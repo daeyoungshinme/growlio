@@ -1,0 +1,159 @@
+# Backend CLAUDE.md
+
+## Commands
+
+### 설치
+```bash
+cd backend && pip install uv && uv pip install -e ".[dev]"
+```
+
+### 실행
+```bash
+# 백엔드 서버 (localhost:8000, Swagger UI: /docs)
+cd backend && .venv/bin/uvicorn app.main:app --reload
+```
+
+### Database
+```bash
+# 마이그레이션 실행
+cd backend && .venv/bin/alembic upgrade head
+
+# 새 마이그레이션 생성
+cd backend && .venv/bin/alembic revision --autogenerate -m "description"
+
+# 현재 마이그레이션 상태 확인
+cd backend && .venv/bin/alembic current
+```
+
+### Tests
+```bash
+# 전체 테스트 (pytest-asyncio, asyncio_mode="auto")
+cd backend && .venv/bin/pytest
+
+# 단일 파일
+cd backend && .venv/bin/pytest tests/test_asset_service.py -v
+```
+
+> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨.
+
+### Lint & Type Check
+```bash
+# Ruff 린터 (E/F/I/UP/B/SIM 규칙, E712 제외)
+cd backend && .venv/bin/ruff check .
+
+# Mypy 타입 체크
+cd backend && .venv/bin/mypy app/
+```
+
+### Environment
+`backend/.env` (`.env.example` 참고):
+- `DATABASE_URL` — PostgreSQL asyncpg URL
+- `REDIS_URL`
+- `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/LS 자격증명 AES-256 암호화 키
+- `APP_SECRET_KEY` — JWT 서명 키
+- `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
+- `DART_API_KEY` — DART OpenAPI 키. `.env`에서 로드 (`.env.example` 참고)
+
+---
+
+## Architecture (`backend/app/`)
+
+**핵심 흐름: 계좌 동기화 → 스냅샷 저장 → 대시보드/포트폴리오 집계**
+
+```
+API Request
+  └── api/v1/router.py        # 모든 라우터 등록
+        ├── assets.py         # 계좌 CRUD + 동기화 트리거
+        ├── auth.py           # 로그인/회원가입/토큰 refresh
+        ├── alerts.py         # 알림 목록 + 읽음 처리
+        ├── backtest.py       # 백테스트 실행
+        ├── dashboard.py      # 대시보드 집계 (get_dashboard_summary)
+        ├── dividends.py      # 배당금 요약 + 예상 배당금
+        ├── invest.py         # DCA 분석
+        ├── open_banking.py   # 오픈뱅킹 계좌 연결
+        ├── portfolio.py      # 전체 계좌 통합 조회 (/overview)
+        ├── rebalancing.py    # 리밸런싱 추천
+        ├── settings.py       # KIS/LS 자격증명 + 목표 설정
+        ├── stocks.py         # 종목 검색
+        └── transactions.py   # 입출금/배당 내역 CRUD
+
+services/
+  ├── asset_service.py        # 계좌별 sync 함수 + 대시보드 집계
+  ├── auth_service.py         # 회원가입/로그인/JWT 발급
+  ├── alert_service.py        # 알림 생성·조회
+  ├── backtest_service.py     # 백테스트 엔진
+  ├── credential_service.py   # AES-256 자격증명 암호화/복호화
+  ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)
+  ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
+  ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
+  ├── email_service.py        # 이메일 발송
+  ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS → LS 우선순위)
+  └── rebalancing_service.py  # 리밸런싱 추천
+
+kis/                          # KIS OpenAPI 클라이언트
+providers/                    # LS증권, 오픈뱅킹 provider 추상화
+utils/                        # 공통 유틸 (날짜, 포맷 등)
+limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
+jobs/                         # APScheduler 정기 작업
+  ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
+  └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
+```
+
+**자격증명 암호화:** KIS/LS App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
+
+**현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API → LS증권 API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
+
+**오픈뱅킹 토큰 자동 갱신:** `providers/openbanking.py`의 `ensure_ob_token_fresh(settings_row, db)` — 만료 1시간 전 `refresh_access_token()` 호출 후 DB commit. `sync_openbanking_account()`와 `token_refresh.py` 양쪽에서 호출됨.
+
+**USD/KRW 환율 캐싱:** `asset_service.py`의 `_get_usd_krw_rate(redis)` → Redis `usd_krw_rate` 키 조회(TTL 1시간) → 없으면 1300.0 fallback. KIS API 성공 시 `_cache_usd_krw_rate(redis, rate)` 호출로 캐시 갱신.
+
+**월별 추이 SQL (`_get_monthly_trend`):** `asset_accounts` JOIN + `is_active = TRUE` 필터 필수. 누락 시 비활성·삭제 계좌 스냅샷이 합산되어 금액이 수배 부풀림. 스냅샷은 `date.today()` 기준 저장 — 월말 스냅샷 개념 없음, "해당 월 마지막 sync일" 값이 월별 대표값으로 사용됨.
+
+**인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
+
+---
+
+## Absolute Rules
+
+**자격증명 암호화**
+- KIS/LS App Key·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
+- 평문 자격증명을 DB에 직접 저장하거나 로그에 출력 금지.
+
+**bcrypt 버전 고정**
+- `bcrypt==4.0.1` 고정. passlib 5.x와 API 불일치로 절대 업그레이드 금지.
+
+**금액 단위**
+- 금액 컬럼 타입: `Numeric(18, 2)` / Python `Mapped[float | None]`.
+
+**SQLAlchemy async 패턴**
+```python
+# 단일 행
+row = await db.scalar(select(Model).where(...))
+# 다중 행
+result = await db.execute(select(Model).where(...))
+rows = result.scalars().all()
+# 저장
+db.add(obj); await db.commit(); await db.refresh(obj)
+```
+- Boolean 필터: `Model.is_active == True  # noqa: E712` (SQLAlchemy 연산자 호환)
+
+**FK cascade 규칙**
+- `user_id` FK → `ondelete="CASCADE"` (유저 삭제 시 연관 데이터 전부 삭제)
+- `account_id` FK → `ondelete="SET NULL"` (계좌 삭제 시 내역은 보존)
+
+**로깅**
+- `structlog` 사용. 이벤트명 snake_case, 구조화 key=value 형식:
+  ```python
+  logger.info("account_synced", account_id=str(account.id), positions=len(positions))
+  ```
+
+**HTTP 에러 메시지**
+- `HTTPException(status_code=..., detail="한국어 메시지")` — 사용자 노출 메시지는 한국어.
+
+**yfinance 비동기 호출**
+- yfinance는 동기 라이브러리. `asyncio.get_event_loop().run_in_executor(None, fn)` 패턴으로 실행.
+- 동시 호출은 `asyncio.Semaphore(5)` 제한.
+
+**Pydantic v2 스타일**
+- ORM 모델 매핑 스키마는 `model_config = {"from_attributes": True}` 필수.
+- `Optional[X]` 대신 `X | None` 사용.

@@ -1,0 +1,64 @@
+import { LineChart, LogOut, PieChart, Settings, Home, Wallet, TrendingUp, Moon, Sun } from "lucide-react";
+import { NavLink } from "react-router-dom";
+import { useAuthStore } from "../../stores/authStore";
+import { useThemeStore } from "../../stores/themeStore";
+
+const nav = [
+  { to: "/dashboard", icon: Home, label: "대시보드" },
+  { to: "/portfolio", icon: PieChart, label: "포트폴리오" },
+  { to: "/asset-management", icon: Wallet, label: "자산관리" },
+  { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
+  { to: "/settings", icon: Settings, label: "설정" },
+];
+
+export default function Sidebar() {
+  const logout = useAuthStore((s) => s.logout);
+  const { isDark, toggle } = useThemeStore();
+
+  return (
+    <aside className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col py-6 px-3">
+      <div className="px-3 mb-8">
+        <div className="flex items-center gap-2">
+          <LineChart className="text-blue-600 dark:text-blue-400" size={22} />
+          <span className="font-bold text-lg text-gray-900 dark:text-gray-50">Growlio</span>
+        </div>
+      </div>
+
+      <nav className="flex-1 space-y-1">
+        {nav.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
+                  : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-50"
+              }`
+            }
+          >
+            <Icon size={18} />
+            {label}
+          </NavLink>
+        ))}
+      </nav>
+
+      <div className="space-y-1">
+        <button
+          onClick={toggle}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+        >
+          {isDark ? <Sun size={18} /> : <Moon size={18} />}
+          {isDark ? "라이트 모드" : "다크 모드"}
+        </button>
+        <button
+          onClick={logout}
+          className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+        >
+          <LogOut size={18} />
+          로그아웃
+        </button>
+      </div>
+    </aside>
+  );
+}

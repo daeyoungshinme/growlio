@@ -1,0 +1,29 @@
+# ── OS ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDE ────────────────────────────────────────────
+.vscode/
+.idea/
+
+# ── 환경 변수 (예제 파일은 커밋 유지) ──────────────
+.env
+.env.local
+.env.*.local
+
+# ── Python ─────────────────────────────────────────
+backend/.venv/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/.mypy_cache/
+*.egg-info/
+
+# ── Node.js ────────────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── 로그 ───────────────────────────────────────────
+*.log
