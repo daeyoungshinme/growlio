@@ -4,6 +4,9 @@
 
 ### 설치
 ```bash
+# 가상환경 생성 (최초 1회)
+cd backend && uv venv
+
 cd backend && pip install uv && uv pip install -e ".[dev]"
 ```
 
@@ -72,6 +75,7 @@ API Request
         ├── invest.py         # DCA 분석
         ├── open_banking.py   # 오픈뱅킹 계좌 연결
         ├── portfolio.py      # 전체 계좌 통합 조회 (/overview)
+        ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── rebalancing.py    # 리밸런싱 추천
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
         ├── stocks.py         # 종목 검색
@@ -85,17 +89,22 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
+  ├── dividend_constants.py   # 배당 관련 상수 정의
+  ├── dividend_providers.py   # 배당 데이터 제공자 추상화
   ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
   ├── email_service.py        # 이메일 발송
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS → LS 우선순위)
+  ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
   └── rebalancing_service.py  # 리밸런싱 추천
 
 kis/                          # KIS OpenAPI 클라이언트
 providers/                    # LS증권, 오픈뱅킹 provider 추상화
-utils/                        # 공통 유틸 (날짜, 포맷 등)
+utils/
+  └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
+  ├── exchange_rate_alert.py  # 환율 알림 정기 작업
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
 ```
 
@@ -105,7 +114,7 @@ jobs/                         # APScheduler 정기 작업
 
 **오픈뱅킹 토큰 자동 갱신:** `providers/openbanking.py`의 `ensure_ob_token_fresh(settings_row, db)` — 만료 1시간 전 `refresh_access_token()` 호출 후 DB commit. `sync_openbanking_account()`와 `token_refresh.py` 양쪽에서 호출됨.
 
-**USD/KRW 환율 캐싱:** `asset_service.py`의 `_get_usd_krw_rate(redis)` → Redis `usd_krw_rate` 키 조회(TTL 1시간) → 없으면 1300.0 fallback. KIS API 성공 시 `_cache_usd_krw_rate(redis, rate)` 호출로 캐시 갱신.
+**USD/KRW 환율 캐싱:** `app/utils/currency.py`의 `get_usd_krw_rate(redis)` → Redis `usd_krw_rate` 키 조회(TTL: `settings.redis_cache_ttl_seconds`) → 없으면 `settings.usd_krw_fallback_rate` fallback. KIS API 성공 시 `cache_usd_krw_rate(redis, rate)` 호출로 갱신. 테스트 패치 경로: `app.utils.currency.cache_usd_krw_rate`.
 
 **월별 추이 SQL (`_get_monthly_trend`):** `asset_accounts` JOIN + `is_active = TRUE` 필터 필수. 누락 시 비활성·삭제 계좌 스냅샷이 합산되어 금액이 수배 부풀림. 스냅샷은 `date.today()` 기준 저장 — 월말 스냅샷 개념 없음, "해당 월 마지막 sync일" 값이 월별 대표값으로 사용됨.
 

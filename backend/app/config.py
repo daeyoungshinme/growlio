@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 30
     jwt_refresh_token_expire_days: int = 7
 
+    # 외부 API 동시 호출 제한 및 캐시 설정
+    api_semaphore_limit: int = 5
+    redis_cache_ttl_seconds: int = 3600
+    usd_krw_fallback_rate: float = 1300.0
+
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
     open_banking_client_id: str = ""

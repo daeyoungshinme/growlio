@@ -1,17 +1,18 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Toaster from "./components/Toaster";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
-import DashboardPage from "./pages/DashboardPage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
-import PortfolioPage from "./pages/PortfolioPage";
-import SettingsPage from "./pages/SettingsPage";
-import AssetManagementPage from "./pages/AssetManagementPage";
-import InvestPlanPage from "./pages/InvestPlanPage";
+
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
+const AssetManagementPage = lazy(() => import("./pages/AssetManagementPage"));
+const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -41,11 +42,11 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<ErrorBoundary><DashboardPage /></ErrorBoundary>} />
-          <Route path="portfolio" element={<ErrorBoundary><PortfolioPage /></ErrorBoundary>} />
-          <Route path="asset-management" element={<ErrorBoundary><AssetManagementPage /></ErrorBoundary>} />
-          <Route path="invest-plan" element={<ErrorBoundary><InvestPlanPage /></ErrorBoundary>} />
-          <Route path="settings" element={<ErrorBoundary><SettingsPage /></ErrorBoundary>} />
+          <Route path="dashboard" element={<ErrorBoundary><Suspense><DashboardPage /></Suspense></ErrorBoundary>} />
+          <Route path="portfolio" element={<ErrorBoundary><Suspense><PortfolioPage /></Suspense></ErrorBoundary>} />
+          <Route path="asset-management" element={<ErrorBoundary><Suspense><AssetManagementPage /></Suspense></ErrorBoundary>} />
+          <Route path="invest-plan" element={<ErrorBoundary><Suspense><InvestPlanPage /></Suspense></ErrorBoundary>} />
+          <Route path="settings" element={<ErrorBoundary><Suspense><SettingsPage /></Suspense></ErrorBoundary>} />
           {/* 구 URL 리다이렉트 */}
           <Route path="assets" element={<Navigate to="/portfolio" replace />} />
           <Route path="trend" element={<Navigate to="/dashboard" replace />} />

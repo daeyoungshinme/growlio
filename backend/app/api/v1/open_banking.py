@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,7 +42,7 @@ async def open_banking_callback(
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
     user_id = _pending_states.pop(state, None)
     if not user_id:
-        raise HTTPException(status_code=400, detail="유효하지 않은 state 값입니다")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 
     token_data = await exchange_code_for_token(code)
     access_token = token_data.get("access_token")
@@ -73,7 +73,7 @@ async def list_ob_accounts(
     """오픈뱅킹으로 연결된 은행 계좌 목록 조회."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
     if not settings_row or not settings_row.ob_access_token:
-        raise HTTPException(status_code=400, detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.")
 
     accounts = await get_user_accounts(
         access_token=settings_row.ob_access_token,
@@ -104,7 +104,7 @@ async def register_ob_account(
         )
     )
     if existing:
-        raise HTTPException(status_code=409, detail="이미 등록된 계좌입니다")
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 계좌입니다")
 
     account = AssetAccount(
         user_id=current_user.id,

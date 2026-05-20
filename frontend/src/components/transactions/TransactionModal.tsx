@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import Modal from "../common/Modal";
 import { api } from "../../api/client";
 import { fetchExchangeRate, searchStocks, StockSuggestion } from "../../api/assets";
 import {
@@ -12,6 +13,7 @@ import {
   updateTransaction,
 } from "../../api/transactions";
 import { fmtKrw } from "../../utils/format";
+import { invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
 
 interface Props {
@@ -86,10 +88,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   });
   const accountPositions = positionsData?.positions ?? [];
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["transactions"] });
-    qc.invalidateQueries({ queryKey: ["dashboard"] });
-  };
+  const invalidate = () => invalidateTransactionData(qc);
 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM, account_id: accountId });
@@ -166,8 +165,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg w-full max-w-lg max-h-[90vh] flex flex-col">
+    <Modal size="md" onClose={onClose}>
         {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <div>
@@ -491,7 +489,6 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
           );
         })()}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

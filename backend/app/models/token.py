@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,7 +9,13 @@ from app.database import Base
 
 
 class KisToken(Base):
-    """KIS OAuth2 액세스 토큰 (DB 영속화 — Redis 만료 시 fallback)"""
+    """KIS OAuth2 액세스 토큰 (DB 영속화 — Redis 만료 시 fallback)
+
+    account_id가 있으면 계좌별 토큰, 없으면 유저 레벨 토큰.
+    unique 제약은 migration에서 partial index로 처리:
+      - account_id IS NULL  → (user_id, is_mock_mode) unique
+      - account_id IS NOT NULL → (account_id) unique
+    """
 
     __tablename__ = "kis_tokens"
 
@@ -17,12 +23,11 @@ class KisToken(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=True
+    )
     access_token: Mapped[str] = mapped_column(Text, nullable=False)
     token_type: Mapped[str] = mapped_column(String(50), default="Bearer", nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "is_mock_mode", name="uq_kis_token_user_mode"),
-    )

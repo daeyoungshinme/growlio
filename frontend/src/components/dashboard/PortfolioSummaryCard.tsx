@@ -3,44 +3,10 @@ import { ChevronDown } from "lucide-react";
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
-import { PIE_COLORS } from "../../utils/colors";
+import { pnlColor } from "../../utils/colors";
 import type { PortfolioPosition, AggregatedPosition, AllocationItem } from "../../types";
-
-function TreemapCell(props: Record<string, unknown>) {
-  const x = (props.x as number) ?? 0;
-  const y = (props.y as number) ?? 0;
-  const width = (props.width as number) ?? 0;
-  const height = (props.height as number) ?? 0;
-  const name = (props.name as string) ?? "";
-  const pct = (props.pct as number) ?? 0;
-  const ticker = (props.ticker as string) ?? "";
-  const index = (props.index as number) ?? 0;
-  const color = PIE_COLORS[index % PIE_COLORS.length];
-
-  return (
-    <g>
-      <rect x={x} y={y} width={width} height={height} fill={color} stroke="#fff" strokeWidth={2} rx={3} />
-      {width > 50 && height > 30 && (
-        <>
-          <text x={x + width / 2} y={y + height / 2 - 7} fill="#fff"
-            textAnchor="middle" fontSize={11} fontWeight="bold">
-            {name.length > 8 ? name.slice(0, 7) + "…" : name}
-          </text>
-          <text x={x + width / 2} y={y + height / 2 + 9} fill="rgba(255,255,255,0.85)"
-            textAnchor="middle" fontSize={10}>
-            {pct.toFixed(1)}%
-          </text>
-          {height > 55 && ticker && (
-            <text x={x + width / 2} y={y + height / 2 + 22} fill="rgba(255,255,255,0.6)"
-              textAnchor="middle" fontSize={9}>
-              {ticker}
-            </text>
-          )}
-        </>
-      )}
-    </g>
-  );
-}
+import TreemapCell from "../common/TreemapCell";
+import { chartTooltipStyle } from "../../utils/chart";
 
 interface Overview {
   total_stock_krw: number;
@@ -116,8 +82,8 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
   const aggregated = groupPositionsByTicker(overview.all_positions ?? [])
     .sort((a, b) => b.total_value_krw - a.total_value_krw);
 
-  const pnlColor = overview.unrealized_pnl_krw >= 0 ? "text-red-500" : "text-blue-500";
-  const retColor = overview.stock_return_pct >= 0 ? "text-red-500" : "text-blue-500";
+  const pnlColorClass = pnlColor(overview.unrealized_pnl_krw);
+  const retColorClass = pnlColor(overview.stock_return_pct);
 
   const chartData = stockAllocation && stockAllocation.length > 0
     ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw, pct: item.pct }))
@@ -131,12 +97,12 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
         <StatBox
           label="평가손익"
           value={`${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`}
-          color={pnlColor}
+          color={pnlColorClass}
         />
         <StatBox
           label="주식 수익률"
           value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
-          color={retColor}
+          color={retColorClass}
         />
       </div>
 
@@ -147,15 +113,7 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
           <ResponsiveContainer width="100%" height={180}>
             <Treemap data={chartData} dataKey="value" content={<TreemapCell />}>
               <Tooltip
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: `1px solid ${isDark ? "#374151" : "#E5E7EB"}`,
-                  backgroundColor: isDark ? "#1f2937" : "#ffffff",
-                  color: isDark ? "#f9fafb" : "#111827",
-                }}
-                labelStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
-                itemStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
+                {...chartTooltipStyle(isDark)}
                 formatter={(value: number, _name: string, props) => [
                   `${fmtKrw(value)} (${(props.payload?.pct ?? 0).toFixed(1)}%)`,
                   props.payload?.ticker
@@ -200,7 +158,7 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
               </thead>
               <tbody>
                 {aggregated.map((p) => {
-                  const pnlColor = p.total_pnl >= 0 ? "text-red-500" : "text-blue-500";
+                  const pnlColorClass = pnlColor(p.total_pnl);
                   return (
                     <tr key={`${p.ticker}-${p.market}`} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="py-2 px-2">
@@ -212,7 +170,7 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
                         {p.total_qty.toLocaleString()}주
                       </td>
                       <td className="py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{fmtKrw(p.total_value_krw)}</td>
-                      <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${pnlColor}`}>
+                      <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${pnlColorClass}`}>
                         {p.total_pnl >= 0 ? "+" : ""}{fmtKrw(p.total_pnl)} ({p.pnl_pct >= 0 ? "+" : ""}{p.pnl_pct.toFixed(1)}%)
                       </td>
                       <td className="py-2 px-2 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">

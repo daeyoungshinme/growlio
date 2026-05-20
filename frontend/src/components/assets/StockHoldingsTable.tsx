@@ -6,6 +6,34 @@ import type { PortfolioPosition, DividendYield } from "../../types";
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 
+function SortTh({
+  k,
+  label,
+  className,
+  sort,
+  onSort,
+}: {
+  k: AggSortKey;
+  label: string;
+  className?: string;
+  sort: AggSortKey;
+  onSort: (k: AggSortKey) => void;
+}) {
+  return (
+    <th
+      onClick={() => onSort(k)}
+      className={`py-2.5 px-4 text-right text-xs font-medium cursor-pointer select-none uppercase ${
+        sort === k
+          ? "text-blue-600 dark:text-blue-400"
+          : "text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
+      } ${className ?? ""}`}
+    >
+      {label}
+      {sort === k ? " ↓" : ""}
+    </th>
+  );
+}
+
 interface Props {
   positions: PortfolioPosition[];
   totalStock: number;
@@ -30,17 +58,6 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
     });
   };
 
-  const SortTh = ({ k, label, className }: { k: AggSortKey; label: string; className?: string }) => (
-    <th
-      onClick={() => setSort(k)}
-      className={`py-2.5 px-4 text-right text-xs font-medium cursor-pointer select-none uppercase ${
-        sort === k ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"
-      } ${className ?? ""}`}
-    >
-      {label}{sort === k ? " ↓" : ""}
-    </th>
-  );
-
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
@@ -59,9 +76,9 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">수량</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">평단가</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">현재가</th>
-                <SortTh k="total_value_krw" label="평가금액" className="min-w-[120px]" />
-                <SortTh k="pnl_pct" label="수익" />
-                <SortTh k="weight_in_stock" label="비중" />
+                <SortTh k="total_value_krw" label="평가금액" className="min-w-[120px]" sort={sort} onSort={setSort} />
+                <SortTh k="pnl_pct" label="수익" sort={sort} onSort={setSort} />
+                <SortTh k="weight_in_stock" label="비중" sort={sort} onSort={setSort} />
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase min-w-[130px]">투자배당율</th>
                 <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase w-20">배당월</th>
               </tr>

@@ -1,5 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
+import { chartTooltipStyle } from "../../utils/chart";
 
 interface Props {
   data: { month: string; total_krw: number }[];
@@ -24,15 +25,7 @@ export default function MonthlyTrendChart({ data }: Props) {
         <Tooltip
           cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)" }}
           formatter={(v: number) => [`${v}만원`, "자산 합계"]}
-          contentStyle={{
-            fontSize: 12,
-            borderRadius: 8,
-            border: `1px solid ${isDark ? "#374151" : "#E5E7EB"}`,
-            backgroundColor: isDark ? "#1f2937" : "#ffffff",
-            color: isDark ? "#f9fafb" : "#111827",
-          }}
-          labelStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
-          itemStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
+          {...chartTooltipStyle(isDark)}
         />
         <Bar dataKey="amount" fill="#2563EB" radius={[4, 4, 0, 0]} />
       </BarChart>

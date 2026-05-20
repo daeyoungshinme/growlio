@@ -27,6 +27,7 @@ export interface AssetAccount {
   sort_order: number;
   notes: string | null;
   created_at: string;
+  has_own_kis_credentials: boolean;
 }
 
 export interface AssetAccountCreate {
@@ -35,6 +36,8 @@ export interface AssetAccountCreate {
   data_source?: string;
   institution?: string;
   kis_account_no?: string;
+  kis_app_key?: string;
+  kis_app_secret?: string;
   ls_account_no?: string;
   ob_fintech_use_no?: string;
   is_mock_mode?: boolean;

@@ -11,6 +11,7 @@ import {
 import type { DCAProjectionPoint } from "../../api/invest";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw, fmtKrwShort } from "../../utils/format";
+import { chartTooltipStyle } from "../../utils/chart";
 
 interface Props {
   data: DCAProjectionPoint[];
@@ -78,14 +79,7 @@ export default function DCAProjectionChart({ data }: Props) {
               return [fmtKrw(value), label];
             }}
             labelFormatter={(label: string) => `${label}`}
-            contentStyle={{
-              fontSize: 12,
-              backgroundColor: isDark ? "#1f2937" : "#ffffff",
-              border: `1px solid ${isDark ? "#374151" : "#e5e7eb"}`,
-              color: isDark ? "#f9fafb" : "#111827",
-            }}
-            labelStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
-            itemStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
+            {...chartTooltipStyle(isDark)}
           />
           <Legend
             formatter={(value: string) => {

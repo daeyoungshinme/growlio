@@ -15,6 +15,15 @@ class KisTokenExpiredError(Exception):
     """KIS 토큰 만료 오류 (EGW00123)."""
 
 
+class KisApiError(Exception):
+    """KIS API 논리 오류 (rt_cd != "0")."""
+
+    def __init__(self, rt_cd: str, msg: str) -> None:
+        self.rt_cd = rt_cd
+        self.msg = msg
+        super().__init__(f"KIS API 오류 [{rt_cd}]: {msg}")
+
+
 async def kis_request(
     method: str,
     path: str,
@@ -53,7 +62,10 @@ async def kis_request(
                     data = response.json()
 
                     if data.get("rt_cd") not in ("0", None):
-                        logger.warning("kis_api_error", rt_cd=data.get("rt_cd"), msg=data.get("msg1"), path=path)
+                        rt_cd = data.get("rt_cd", "?")
+                        msg = data.get("msg1", "알 수 없는 오류")
+                        logger.warning("kis_api_error", rt_cd=rt_cd, msg=msg, path=path)
+                        raise KisApiError(rt_cd, msg)
 
                     await asyncio.sleep(0.05)
                     return data

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,6 +22,8 @@ async def list_transactions(
     account_id: UUID | None = None,
     year: int | None = None,
     transaction_type: str | None = None,
+    skip: int = 0,
+    limit: int = 500,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -33,7 +34,11 @@ async def list_transactions(
         stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
     if transaction_type:
         stmt = stmt.where(Transaction.transaction_type == transaction_type)
-    stmt = stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+    stmt = (
+        stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     result = await db.execute(stmt)
     return result.scalars().all()
 

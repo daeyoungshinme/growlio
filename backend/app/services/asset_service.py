@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 
 import structlog
@@ -15,10 +15,9 @@ from app.kis.overseas_quote import get_overseas_price
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.models.user import UserSettings
 from app.services.credential_service import decrypt
+from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 logger = structlog.get_logger()
-
-_REDIS_USD_KRW_KEY = "usd_krw_rate"
 
 
 def _to_manual_position(p: dict, usd_krw_rate: float) -> dict:
@@ -42,30 +41,6 @@ def _to_manual_position(p: dict, usd_krw_rate: float) -> dict:
         "usd_rate": None,
         "current_price": float(p["current_price"]) if p.get("current_price") else None,
     }
-_REDIS_USD_KRW_TTL = 3600  # 1시간
-
-
-async def _get_usd_krw_rate(redis, fallback_rate: float = 1300.0) -> float:
-    """Redis 캐시에서 USD/KRW 환율 조회. 캐시 미적중 시 fallback 반환."""
-    if redis is None:
-        return fallback_rate
-    try:
-        cached = await redis.get(_REDIS_USD_KRW_KEY)
-        if cached:
-            return float(cached)
-    except Exception:
-        pass
-    return fallback_rate
-
-
-async def _cache_usd_krw_rate(redis, rate: float) -> None:
-    """USD/KRW 환율을 Redis에 캐싱 (TTL: 1시간)."""
-    if redis is None or rate <= 0:
-        return
-    try:
-        await redis.setex(_REDIS_USD_KRW_KEY, _REDIS_USD_KRW_TTL, str(rate))
-    except Exception:
-        pass
 
 
 async def sync_kis_account(
@@ -73,16 +48,30 @@ async def sync_kis_account(
     db: AsyncSession,
     redis,
 ) -> AssetSnapshot:
-    """KIS 계좌 잔고를 API로 조회해 스냅샷을 저장한다."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
-    if not settings_row or not settings_row.kis_app_key:
-        raise ValueError("KIS 자격증명이 설정되지 않았습니다")
+    """KIS 계좌 잔고를 API로 조회해 스냅샷을 저장한다.
 
-    app_key = decrypt(settings_row.kis_app_key)
-    app_secret = decrypt(settings_row.kis_app_secret)
-    is_mock = settings_row.kis_is_mock
+    계좌별 자격증명(account.kis_app_key)이 있으면 우선 사용하고,
+    없으면 UserSettings 전역 자격증명으로 폴백한다.
+    """
+    if account.kis_app_key and account.kis_app_secret:
+        # 계좌별 자격증명 사용
+        app_key = decrypt(account.kis_app_key)
+        app_secret = decrypt(account.kis_app_secret)
+        is_mock = account.is_mock_mode
+        token_account_id = str(account.id)
+        token_user_id = str(account.user_id)
+    else:
+        # 전역 자격증명 폴백
+        settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
+        if not settings_row or not settings_row.kis_app_key:
+            raise ValueError("KIS 자격증명이 설정되지 않았습니다")
+        app_key = decrypt(settings_row.kis_app_key)
+        app_secret = decrypt(settings_row.kis_app_secret)
+        is_mock = settings_row.kis_is_mock
+        token_account_id = None
+        token_user_id = str(account.user_id)
 
-    logger.info("kis_sync_start", account_no=account.kis_account_no, is_mock=is_mock)
+    logger.info("kis_sync_start", account_no=account.kis_account_no, is_mock=is_mock, has_own_creds=bool(account.kis_app_key))
 
     access_token = await get_access_token(
         app_key,
@@ -90,7 +79,8 @@ async def sync_kis_account(
         is_mock=is_mock,
         redis=redis,
         db=db,
-        user_id=str(account.user_id),
+        user_id=token_user_id,
+        account_id=token_account_id,
     )
 
     try:
@@ -100,22 +90,22 @@ async def sync_kis_account(
         logger.warning("kis_token_expired_refreshing", account_no=account.kis_account_no, is_mock=is_mock)
         access_token = await get_access_token(
             app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-            user_id=str(account.user_id), force_refresh=True,
+            user_id=token_user_id, account_id=token_account_id, force_refresh=True,
         )
         domestic = await get_domestic_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
         overseas = await get_overseas_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
 
     # USD → KRW 환산 (Redis 캐시 우선, API 조회 후 캐시 업데이트)
-    usd_krw_rate = await _get_usd_krw_rate(redis)
+    usd_krw_rate = await get_usd_krw_rate(redis)
     if overseas["positions"]:
         sample_ticker = overseas["positions"][0]["ticker"]
         sample_market = overseas["positions"][0]["market"]
         try:
             quote = await get_overseas_price(app_key, app_secret, access_token, sample_ticker, sample_market, is_mock=is_mock)
             usd_krw_rate = quote["usd_krw_rate"]
-            await _cache_usd_krw_rate(redis, usd_krw_rate)
-        except Exception:
-            pass  # 캐시 또는 기본값(1300.0) 사용
+            await cache_usd_krw_rate(redis, usd_krw_rate)
+        except Exception as e:
+            logger.warning("usd_krw_rate_fetch_failed", ticker=sample_ticker, error=str(e))
 
     overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate  # 해외 주식 총평가액
     overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate   # 외화 예수금 (주식 아님)
@@ -212,9 +202,9 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
             fetched_rate = await asyncio.get_running_loop().run_in_executor(None, _sync_usdkrw)
             if fetched_rate:
                 usd_rate = fetched_rate
-                await _cache_usd_krw_rate(redis, fetched_rate)
+                await cache_usd_krw_rate(redis, fetched_rate)
             else:
-                usd_rate = await _get_usd_krw_rate(redis) or None
+                usd_rate = await get_usd_krw_rate(redis) or None
 
         updated = []
         for p in positions:
@@ -228,7 +218,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
             updated.append({**p, "current_price": price_krw})
 
         account.manual_positions = updated
-        account.manual_updated_at = datetime.now(timezone.utc)
+        account.manual_updated_at = datetime.now(UTC)
         positions = updated
 
     invested = sum(p.get("avg_price", 0) * p.get("qty", 0) for p in positions)
@@ -268,15 +258,26 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     return snapshot
 
 
-async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
-    """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
+_STOCK_TYPES = {"STOCK_KIS", "STOCK_LS", "STOCK_OTHER"}
+
+
+def _eval_value(pos_list: list) -> float:
+    return sum((p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0) for p in pos_list)
+
+
+def _invested_value(pos_list: list) -> float:
+    return sum(p.get("avg_price", 0) * p.get("qty", 0) for p in pos_list)
+
+
+async def _build_asset_totals(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> tuple[float, float, float, dict[str, float]]:
+    """최신 스냅샷 기준 총자산·투자금·주식평가액·유형별 금액을 집계한다.
+    Returns: (total_assets_krw, total_invested, stock_value, by_type)
+    """
     from sqlalchemy import func
 
-    from app.models.user import UserSettings
-
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-
-    # 각 계좌의 최신 스냅샷
     subq = (
         select(
             AssetSnapshot.account_id,
@@ -294,7 +295,6 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
     )
     rows = result.all()
 
-    # 스냅샷 없이 manual_amount만 있는 계좌도 집계에 포함
     snapped_ids = {acc.id for _, acc in rows}
     no_snap_result = await db.execute(
         select(AssetAccount).where(
@@ -304,21 +304,8 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
             AssetAccount.manual_amount > 0,
         )
     )
-    no_snap_accounts = [
-        acc for acc in no_snap_result.scalars().all()
-        if acc.id not in snapped_ids
-    ]
+    no_snap_accounts = [acc for acc in no_snap_result.scalars().all() if acc.id not in snapped_ids]
 
-    STOCK_TYPES = {"STOCK_KIS", "STOCK_LS", "STOCK_OTHER"}
-
-    def _eval_value(pos_list: list) -> float:
-        """포지션 리스트의 총평가액 (current_price 없으면 avg_price 대체)."""
-        return sum((p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0) for p in pos_list)
-
-    def _invested_value(pos_list: list) -> float:
-        return sum(p.get("avg_price", 0) * p.get("qty", 0) for p in pos_list)
-
-    # 계좌별 평가금액 집계 — 주식 계좌는 positions 기준 총평가액 사용
     total_assets_krw = 0.0
     total_invested = 0.0
     stock_value = 0.0
@@ -327,17 +314,10 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
     for snap, acc in rows:
         if not acc.include_in_total:
             continue
-        if acc.asset_type in STOCK_TYPES:
+        if acc.asset_type in _STOCK_TYPES:
             pos_list = snap.positions or acc.manual_positions or []
-            if snap.source in ("KIS_API", "LS_SEC"):
-                # API 계좌: snap.amount_krw = 주식평가 + 예수금 (정확한 값)
-                amount = float(snap.amount_krw)
-                # 수익률 계산용 주식 평가액은 positions 기준 (예수금 희석 방지)
-                stock_equity = _eval_value(pos_list) if pos_list else amount
-            else:
-                # 수동 계좌: snap.amount_krw = positions + deposit_krw 로 유지됨
-                amount = float(snap.amount_krw)
-                stock_equity = _eval_value(pos_list) if pos_list else amount
+            amount = float(snap.amount_krw)
+            stock_equity = _eval_value(pos_list) if pos_list else amount
             inv = float(snap.invested_amount or 0) or _invested_value(pos_list)
             stock_value += stock_equity
             total_invested += inv
@@ -349,7 +329,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
     for acc in no_snap_accounts:
         if not acc.include_in_total:
             continue
-        if acc.asset_type in STOCK_TYPES:
+        if acc.asset_type in _STOCK_TYPES:
             pos_list = acc.manual_positions or []
             pos_equity = _eval_value(pos_list) if pos_list else 0.0
             amount = pos_equity + float(acc.deposit_krw or 0) or float(acc.manual_amount or 0)
@@ -365,27 +345,33 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
         total_assets_krw += amount
         by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
 
+    return total_assets_krw, total_invested, stock_value, by_type
+
+
+async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
+    """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
+    from app.models.user import UserSettings
+    from app.services.dividend_service import get_dividend_summary
+
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+
+    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db)
+
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0
 
-    # 목표 달성률
     goal = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None
     goal_pct = (total_assets_krw / goal * 100) if goal else None
 
-    # 연 환산 수익률 + 누적 수익률 (통장금액 + 증권사 총매입금액 기준)
     bank_total = total_assets_krw - stock_value
     base = bank_total + total_invested
     annualized_return, cumulative_return = await _calc_returns(user_id, total_assets_krw, base, db)
 
-    # 월별 추이 (최근 12개월)
     monthly_trend = await _get_monthly_trend(user_id, db)
 
-    # 연간 입금 목표 달성률
     annual_deposit_goal = float(settings_row.annual_deposit_goal) if settings_row and settings_row.annual_deposit_goal else None
     net_deposits_ytd = await _calc_net_deposits_this_year(user_id, db)
     deposit_achievement_pct = (net_deposits_ytd / annual_deposit_goal * 100) if annual_deposit_goal else None
 
-    # 배당금 현황
-    from app.services.dividend_service import get_dividend_summary
     div_summary = await get_dividend_summary(user_id, db)
 
     goal_annual_return_pct = float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
@@ -393,7 +379,10 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
 
     return {
         "total_assets_krw": total_assets_krw,
-        "asset_allocation": [{"type": k, "amount_krw": v, "pct": v / total_assets_krw * 100 if total_assets_krw else 0} for k, v in by_type.items()],
+        "asset_allocation": [
+            {"type": k, "amount_krw": v, "pct": v / total_assets_krw * 100 if total_assets_krw else 0}
+            for k, v in by_type.items()
+        ],
         "goal_amount": goal,
         "goal_achievement_pct": goal_pct,
         "stock_return_pct": stock_return_pct,

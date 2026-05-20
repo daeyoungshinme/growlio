@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { fmtKrwShort } from "../../utils/format";
+import { pnlColor } from "../../utils/colors";
 import type { AccountRow } from "../../types";
 
 const STOCK_TYPE_LABELS: Record<string, string> = {
@@ -19,7 +20,7 @@ const DATA_SOURCE_BADGE: Record<string, string> = {
 function PnlText({ val, pct }: { val: number; pct: number }) {
   const pos = val >= 0;
   return (
-    <span className={pos ? "text-red-500" : "text-blue-500"}>
+    <span className={pnlColor(val)}>
       {pos ? "+" : ""}{fmtKrwShort(val)}원 ({pos ? "+" : ""}{pct.toFixed(2)}%)
     </span>
   );

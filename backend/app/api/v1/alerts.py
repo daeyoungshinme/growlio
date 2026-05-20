@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,7 +67,7 @@ async def list_exchange_rate_alerts(
     return [AlertResponse.from_orm_row(a) for a in alerts]
 
 
-@router.post("/exchange-rate", response_model=AlertResponse, status_code=201)
+@router.post("/exchange-rate", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
 async def create_exchange_rate_alert(
     req: AlertCreate,
     current_user: User = Depends(get_current_user),
@@ -85,7 +85,7 @@ async def create_exchange_rate_alert(
     return AlertResponse.from_orm_row(alert)
 
 
-@router.delete("/exchange-rate/{alert_id}", status_code=204)
+@router.delete("/exchange-rate/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_exchange_rate_alert(
     alert_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -99,6 +99,6 @@ async def delete_exchange_rate_alert(
         )
     )
     if not alert:
-        raise HTTPException(status_code=404, detail="알림을 찾을 수 없습니다")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
     await db.delete(alert)
     await db.commit()

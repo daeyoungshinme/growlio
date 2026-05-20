@@ -3,7 +3,7 @@ import asyncio
 import uuid
 from functools import partial
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,13 +22,13 @@ from app.schemas.rebalancing import (
     TargetPortfolioResponse,
     TargetPortfolioUpdate,
 )
-from app.services.dividend_service import (
-    _is_korean_etf,
-    _sync_naver_etf_dividend_info,
-    _sync_naver_stock_dividend_info,
-    _sync_yahoo_dividend_info,
-    get_ticker_dividend_summary,
+from app.services.dividend_constants import is_korean_etf
+from app.services.dividend_providers import (
+    sync_naver_etf_dividend_info,
+    sync_naver_stock_dividend_info,
+    sync_yahoo_dividend_info,
 )
+from app.services.dividend_service import get_ticker_dividend_summary
 from app.services.price_service import _to_yahoo_symbol, get_historical_returns
 from app.services.rebalancing_service import analyze_rebalancing
 
@@ -49,7 +49,7 @@ async def list_portfolios(
     return rows.scalars().all()
 
 
-@router.post("/portfolios", response_model=TargetPortfolioResponse, status_code=201)
+@router.post("/portfolios", response_model=TargetPortfolioResponse, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     body: TargetPortfolioCreate,
     current_user: User = Depends(get_current_user),
@@ -83,7 +83,7 @@ async def update_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     if body.name is not None:
         portfolio.name = body.name
@@ -97,7 +97,7 @@ async def update_portfolio(
     return portfolio
 
 
-@router.delete("/portfolios/{portfolio_id}", status_code=204)
+@router.delete("/portfolios/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_portfolio(
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -111,7 +111,7 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     await db.delete(portfolio)
     await db.commit()
@@ -140,7 +140,7 @@ async def analyze_portfolio(
             )
         )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     overview = await _build_portfolio_overview(current_user.id, db)
 
@@ -163,7 +163,8 @@ async def analyze_portfolio(
             continue
         is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
         if is_korean:
-            fn = _sync_naver_etf_dividend_info if _is_korean_etf(ticker, market) else _sync_naver_stock_dividend_info
+            is_etf = is_korean_etf(ticker, market)
+            fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
             naver_info = await loop.run_in_executor(None, partial(fn, ticker))
             if naver_info["dividend_yield"] > 0:
                 dividend_map[key] = {
@@ -174,7 +175,7 @@ async def analyze_portfolio(
                 }
         else:
             yahoo_sym = _to_yahoo_symbol(ticker, market)
-            info = await loop.run_in_executor(None, partial(_sync_yahoo_dividend_info, yahoo_sym))
+            info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
             if info["dividend_yield"] > 0:
                 dividend_map[key] = {
                     "ticker": ticker,
@@ -226,7 +227,7 @@ async def execute_portfolio_rebalancing(
             )
         )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     from app.services.rebalancing_execution_service import execute_rebalancing
     return await execute_rebalancing(

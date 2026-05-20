@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
+import { toast } from "../utils/toast";
 import {
   fetchExchangeRateAlerts,
   createExchangeRateAlert,
@@ -19,6 +20,7 @@ interface SettingsData {
   goal_amount: number | null;
   goal_annual_return_pct: number | null;
   annual_deposit_goal: number | null;
+  monthly_deposit_amount: number | null;
   retirement_target_year: number | null;
   user_email: string;
   notification_email: string | null;
@@ -50,11 +52,9 @@ export default function SettingsPage() {
   const [dart, setDart] = useState({ api_key: "" });
   const [goal, setGoal] = useState({ goal_amount: "", goal_annual_return_pct: "", annual_deposit_goal: "", monthly_deposit_amount: "", retirement_target_year: "" });
   const [saving, setSaving] = useState<string | null>(null);
-  const [msg, setMsg] = useState<{ key: string; text: string; ok: boolean } | null>(null);
 
   // 목표환율 알림 상태
   const [alertForm, setAlertForm] = useState({ target_rate: "", direction: "BELOW" as "BELOW" | "ABOVE" });
-  const [alertMsg, setAlertMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [notificationEmail, setNotificationEmail] = useState("");
 
   const { data: alerts = [] } = useQuery<ExchangeRateAlert[]>({
@@ -73,12 +73,10 @@ export default function SettingsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] });
       setAlertForm({ target_rate: "", direction: "BELOW" });
-      setAlertMsg({ text: "알림이 등록되었습니다", ok: true });
-      setTimeout(() => setAlertMsg(null), 3000);
+      toast("알림이 등록되었습니다", "success");
     },
     onError: () => {
-      setAlertMsg({ text: "알림 등록에 실패했습니다", ok: false });
-      setTimeout(() => setAlertMsg(null), 3000);
+      toast("알림 등록에 실패했습니다", "error");
     },
   });
 
@@ -93,16 +91,15 @@ export default function SettingsPage() {
       if (r.data.goal_amount) setGoal((g) => ({ ...g, goal_amount: String(r.data.goal_amount) }));
       if (r.data.goal_annual_return_pct) setGoal((g) => ({ ...g, goal_annual_return_pct: String(r.data.goal_annual_return_pct) }));
       if (r.data.annual_deposit_goal) setGoal((g) => ({ ...g, annual_deposit_goal: String(r.data.annual_deposit_goal) }));
-      if ((r.data as any).monthly_deposit_amount) setGoal((g) => ({ ...g, monthly_deposit_amount: String((r.data as any).monthly_deposit_amount) }));
+      if (r.data.monthly_deposit_amount) setGoal((g) => ({ ...g, monthly_deposit_amount: String(r.data.monthly_deposit_amount) }));
       if (r.data.retirement_target_year) setGoal((g) => ({ ...g, retirement_target_year: String(r.data.retirement_target_year) }));
       if (r.data.kis_account_no) setKis((k) => ({ ...k, account_no: r.data.kis_account_no!, is_mock: r.data.kis_is_mock }));
       setNotificationEmail(r.data.notification_email ?? "");
     });
   }, []);
 
-  const flash = (key: string, ok: boolean, text: string) => {
-    setMsg({ key, text, ok });
-    setTimeout(() => setMsg(null), 3000);
+  const flash = (_key: string, ok: boolean, text: string) => {
+    toast(text, ok ? "success" : "error");
   };
 
   const saveKis = async () => {
@@ -213,7 +210,6 @@ export default function SettingsPage() {
           <button onClick={saveKis} disabled={saving === "kis"} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {saving === "kis" ? "저장 중..." : "저장"}
           </button>
-          {msg?.key === "kis" && <span className={`text-sm ${msg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>{msg.text}</span>}
         </div>
       </SectionCard>
 
@@ -241,7 +237,6 @@ export default function SettingsPage() {
               삭제
             </button>
           )}
-          {msg?.key === "dart" && <span className={`text-sm ${msg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>{msg.text}</span>}
         </div>
       </SectionCard>
 
@@ -263,7 +258,6 @@ export default function SettingsPage() {
               오픈뱅킹 연결
             </button>
           )}
-          {msg?.key === "ob" && <span className={`text-sm ${msg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>{msg.text}</span>}
         </div>
       </SectionCard>
 
@@ -295,9 +289,6 @@ export default function SettingsPage() {
           >
             {saving === "notification-email" ? "저장 중..." : "저장"}
           </button>
-          {msg?.key === "notification-email" && (
-            <span className={`text-sm ${msg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>{msg.text}</span>
-          )}
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">목표환율 도달 시 이메일로 알림을 보내드립니다. 알림은 1회 발동 후 자동으로 비활성화됩니다.</p>
         <div className="flex gap-2 flex-wrap">
@@ -332,11 +323,6 @@ export default function SettingsPage() {
           >
             {createAlertMutation.isPending ? "등록 중..." : "알림 추가"}
           </button>
-          {alertMsg && (
-            <span className={`text-sm ${alertMsg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>
-              {alertMsg.text}
-            </span>
-          )}
         </div>
 
         {alerts.length > 0 && (
@@ -411,7 +397,6 @@ export default function SettingsPage() {
           <button onClick={saveGoal} disabled={saving === "goal"} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {saving === "goal" ? "저장 중..." : "저장"}
           </button>
-          {msg?.key === "goal" && <span className={`text-sm ${msg.ok ? "text-green-600 dark:text-green-400" : "text-red-500"}`}>{msg.text}</span>}
         </div>
       </SectionCard>
     </div>

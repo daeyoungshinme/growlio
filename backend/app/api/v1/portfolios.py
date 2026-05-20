@@ -1,7 +1,7 @@
 """통합 포트폴리오 CRUD API (백테스팅·리밸런싱 공용)."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,7 +28,7 @@ async def list_portfolios(
     return rows.scalars().all()
 
 
-@router.post("", response_model=PortfolioResponse, status_code=201)
+@router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
 async def create_portfolio(
     body: PortfolioCreate,
     current_user: User = Depends(get_current_user),
@@ -62,7 +62,7 @@ async def update_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     if body.name is not None:
         portfolio.name = body.name
@@ -76,7 +76,7 @@ async def update_portfolio(
     return portfolio
 
 
-@router.delete("/{portfolio_id}", status_code=204)
+@router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_portfolio(
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -90,7 +90,7 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=404, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     await db.delete(portfolio)
     await db.commit()

@@ -4,6 +4,8 @@ import { useState } from "react";
 import { AssetAccountCreate, createAccount, deleteAccount, fetchAccounts, syncAccount } from "../api/assets";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
 import { fmtKrwNullable } from "../utils/format";
+import { extractErrorMessage } from "../utils/error";
+import { toast } from "../utils/toast";
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
   BANK_ACCOUNT: "통장잔고",
@@ -36,7 +38,6 @@ export default function AssetsPage() {
   const { data: accounts = [], isLoading } = useQuery({ queryKey: ["accounts"], queryFn: fetchAccounts });
   const [showForm, setShowForm] = useState(false);
   const [syncingId, setSyncingId] = useState<string | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
   const [positionsAccount, setPositionsAccount] = useState<{ id: string; name: string } | null>(null);
 
   const createMut = useMutation({
@@ -50,14 +51,14 @@ export default function AssetsPage() {
 
   const handleSync = async (id: string) => {
     setSyncingId(id);
-    setSyncError(null);
     try {
       await syncAccount(id);
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["accounts"] });
+      toast("동기화 완료", "success");
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? "동기화에 실패했습니다";
-      setSyncError(msg);
+      const msg = extractErrorMessage(e, "동기화에 실패했습니다");
+      toast(msg, "error");
     } finally {
       setSyncingId(null);
     }
@@ -75,12 +76,6 @@ export default function AssetsPage() {
           계좌 추가
         </button>
       </div>
-
-      {syncError && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
-          {syncError}
-        </div>
-      )}
 
       {isLoading ? (
         <div className="text-gray-400">로딩 중...</div>

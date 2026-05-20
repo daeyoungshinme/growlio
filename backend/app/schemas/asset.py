@@ -28,12 +28,20 @@ class RealEstateDetails(BaseModel):
     mortgage_balance_krw: float = 0.0
 
 
+def _validate_positive(v: float | None) -> float | None:
+    if v is not None and v <= 0:
+        raise ValueError("금액은 0보다 커야 합니다")
+    return v
+
+
 class AssetAccountCreate(BaseModel):
     name: str
     asset_type: AssetType
     data_source: DataSource = "MANUAL"
     institution: str | None = None
     kis_account_no: str | None = None
+    kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
     ls_account_no: str | None = None
     ob_fintech_use_no: str | None = None
     ob_bank_code: str | None = None
@@ -49,14 +57,14 @@ class AssetAccountCreate(BaseModel):
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
-        if v is not None and v <= 0:
-            raise ValueError("금액은 0보다 커야 합니다")
-        return v
+        return _validate_positive(v)
 
 
 class AssetAccountUpdate(BaseModel):
     name: str | None = None
     institution: str | None = None
+    kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
     notes: str | None = None
@@ -68,9 +76,7 @@ class AssetAccountUpdate(BaseModel):
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
-        if v is not None and v <= 0:
-            raise ValueError("금액은 0보다 커야 합니다")
-        return v
+        return _validate_positive(v)
 
 
 class AssetAccountResponse(BaseModel):
@@ -93,6 +99,7 @@ class AssetAccountResponse(BaseModel):
     sort_order: int
     notes: str | None
     created_at: datetime
+    has_own_kis_credentials: bool = False  # 계좌별 API 키 보유 여부 (키 원문 노출 금지)
 
     model_config = {"from_attributes": True}
 
@@ -122,9 +129,7 @@ class TransactionCreate(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float) -> float:
-        if v <= 0:
-            raise ValueError("금액은 0보다 커야 합니다")
-        return v
+        return _validate_positive(v)  # type: ignore[return-value]
 
 
 class TransactionUpdate(BaseModel):
@@ -137,9 +142,7 @@ class TransactionUpdate(BaseModel):
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float | None) -> float | None:
-        if v is not None and v <= 0:
-            raise ValueError("금액은 0보다 커야 합니다")
-        return v
+        return _validate_positive(v)
 
 
 class TransactionResponse(BaseModel):

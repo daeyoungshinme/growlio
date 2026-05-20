@@ -55,11 +55,27 @@ export default function DashboardPage() {
   if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">로딩 중...</div>;
   if (error || !data) return <div className="text-red-500">데이터를 불러오지 못했습니다</div>;
 
-  const allocationChartData = data.asset_allocation.map((item) => ({
-    name: ASSET_TYPE_LABELS[item.type] ?? item.type,
-    value: item.amount_krw,
-    pct: item.pct,
-  }));
+  const allocationChartData = (() => {
+    const stockItems = data.asset_allocation.filter((item) =>
+      item.type.startsWith("STOCK_")
+    );
+    const nonStockItems = data.asset_allocation.filter(
+      (item) => !item.type.startsWith("STOCK_")
+    );
+    const result = nonStockItems.map((item) => ({
+      name: ASSET_TYPE_LABELS[item.type] ?? item.type,
+      value: item.amount_krw,
+      pct: item.pct,
+    }));
+    if (stockItems.length > 0) {
+      result.unshift({
+        name: "주식",
+        value: stockItems.reduce((sum, item) => sum + item.amount_krw, 0),
+        pct: stockItems.reduce((sum, item) => sum + item.pct, 0),
+      });
+    }
+    return result;
+  })();
 
   const currentYear = new Date().getFullYear();
   const retirementLabel = data.retirement_target_year

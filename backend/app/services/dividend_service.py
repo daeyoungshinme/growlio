@@ -21,37 +21,23 @@ from app.models.user import UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 from app.services.dart_service import fetch_dart_dividend
+from app.services.dividend_constants import (
+    KNOWN_DIVIDEND_INFO,
+    KNOWN_DIVIDEND_SCHEDULES,
+    is_korean_etf,
+)
+from app.services.dividend_providers import (
+    sync_fdr_etf_dividend_info,
+    sync_fetch_dividend_months,
+    sync_naver_etf_dividend_info,
+    sync_naver_stock_dividend_info,
+    sync_pykrx_etf_dividend_info,
+    sync_yahoo_dividend_info,
+)
 from app.services.price_service import _to_yahoo_symbol
+from app.utils.currency import get_usd_krw_rate
 
 logger = structlog.get_logger()
-
-# (ticker, market.upper()) → 확정 배당지급월 리스트
-# yfinance는 배당락일 기준이라 지급월과 다를 수 있으므로, 알려진 종목은 여기서 고정값 사용.
-# 사용자 수동 override(UserTickerSettings)가 항상 최우선임.
-KNOWN_DIVIDEND_SCHEDULES: dict[tuple[str, str], list[int]] = {
-    # 한국 종목
-    ("005930", "KOSPI"): [4, 5, 8, 11],   # 삼성전자
-    ("005935", "KOSPI"): [4, 5, 8, 11],   # 삼성전자우
-    # 한국 ETF
-    ("367380", "KOSPI"): [2, 5, 8, 11],   # ACE 미국나스닥100
-    ("402970", "KOSPI"): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],  # ACE 미국배당다우존스 (월배당)
-    ("414520", "KOSPI"): [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],  # ACE 미국배당다우존스 (월배당)
-    ("438100", "KOSPI"): [2, 5, 8, 11],   # ACE 미국나스닥100미국채혼합50액티브 (분기배당)
-    # 해외 ETF
-    ("QQQ", "NASDAQ"): [4, 7, 10, 12],    # Invesco QQQ Trust
-    ("SPY", "NYSE"): [1, 4, 7, 10],       # SPDR S&P 500
-    ("SCHD", "NYSE"): [3, 6, 9, 12],      # Schwab US Dividend Equity
-}
-
-# (ticker, market.upper()) → (annual_dps, dividend_yield_decimal)
-# yfinance/KIS/DART 모두 ETF 분배금 데이터를 반환하지 못할 때의 정적 폴백.
-# DPS는 분기별 공시 후 수동 업데이트 필요.
-KNOWN_DIVIDEND_INFO: dict[tuple[str, str], tuple[float, float]] = {
-    ("367380", "KOSPI"): (100.0, 0.0085),  # ACE 미국나스닥100: 연간 ~100원, ~0.85%
-    ("402970", "KOSPI"): (50.0, 0.035),    # ACE 미국배당다우존스: 연간 ~50원, ~3.5%
-    ("414520", "KOSPI"): (50.0, 0.035),    # ACE 미국배당다우존스: 연간 ~50원, ~3.5%
-    ("438100", "KOSPI"): (30.0, 0.012),    # ACE 미국나스닥100미국채혼합50액티브: 연간 ~30원, ~1.2%
-}
 
 
 async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
@@ -176,18 +162,6 @@ async def _get_kis_dividend_fallback(
     except Exception as e:
         logger.warning("kis_dividend_fallback_failed", ticker=ticker, error=str(e))
         return None
-
-
-# KRX 상장 ETF 코드 앞 3자리 prefix 집합 (국내 ETF 판별용)
-# Security.is_etf DB 필드가 실제 사용되기 전까지 prefix 기반으로 판별
-_ETF_CODE_PREFIXES: frozenset[str] = frozenset([
-    "069", "102", "114", "122", "229", "233",
-    "251", "252", "261", "278", "305", "329", "360", "367", "379", "402", "411", "414", "438",
-])
-
-
-def _is_korean_etf(ticker: str, market: str) -> bool:
-    return market.upper() in ("KOSPI", "KOSDAQ") and ticker[:3] in _ETF_CODE_PREFIXES
 
 
 async def _get_kis_etf_dividend_fallback(
@@ -371,244 +345,6 @@ async def _collect_positions_with_names(user_id: uuid.UUID, db: AsyncSession) ->
     return positions_map
 
 
-def _sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
-    """동기 함수 — run_in_executor로 호출.
-    trailingAnnualDividendRate(실제 TTM 주당 배당금)를 DPS로 사용.
-    yield는 trailingAnnualDividendYield 우선, forward dividendYield 폴백.
-    """
-    import yfinance as yf
-    try:
-        ticker = yf.Ticker(yahoo_symbol)
-        info = ticker.info
-        trailing_yld = float(info.get("trailingAnnualDividendYield") or 0)
-        forward_yld = float(info.get("dividendYield") or 0)
-        yld = trailing_yld if trailing_yld > 0 else forward_yld
-
-        # yfinance가 한국 종목에서 decimal(0.027) 대신 percentage(2.7)로 반환하는 사례 보정
-        # 현실적인 배당수익률 상한을 30%로 설정 (0.3 초과 = 단위 오류로 판단)
-        if yld > 0.3:
-            logger.warning("yahoo_yield_percentage_corrected", symbol=yahoo_symbol, raw_yld=yld)
-            yld = yld / 100
-
-        trailing_dps = float(info.get("trailingAnnualDividendRate") or 0)
-        last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)
-
-        # DPS가 주가 대비 50% 초과이면 단위 오류(예: 원 단위 값이 퍼센트로 잘못 입력)로 판단
-        if trailing_dps > 0 and last_price > 0 and trailing_dps / last_price > 0.5:
-            logger.warning("yahoo_dps_unit_corrected", symbol=yahoo_symbol, raw_dps=trailing_dps, price=last_price)
-            trailing_dps = trailing_dps / 100
-
-        dps = round(trailing_dps, 2) if trailing_dps > 0 else round(last_price * yld, 2)
-        return {"dividend_yield": yld, "dps": dps, "ex_dividend_date": None}
-    except Exception as e:
-        logger.warning("yahoo_dividend_info_failed", symbol=yahoo_symbol, error=str(e))
-        return {"dividend_yield": 0.0, "dps": 0.0, "ex_dividend_date": None}
-
-
-def _sync_pykrx_etf_dividend_info(ticker: str) -> dict:
-    """동기 함수 — run_in_executor로 호출.
-
-    pykrx 기존 함수로 ETF 분배수익률 조회. KRX 로그인 불필요 — pykrx가
-    KRX_ID/KRX_PW 미설정 시 자동으로 익명 requests.Session()으로 폴백.
-    ETF가 아니거나 데이터 없으면 {"dps": 0.0, "dividend_yield": 0.0} 반환.
-    """
-    import contextlib
-    import io
-    from datetime import timedelta
-
-    # pykrx import 시 webio.py의 build_krx_session() 호출로 출력되는
-    # "KRX 로그인 실패" 메시지 억제 (기능은 정상 — 익명 폴백으로 동작)
-    with contextlib.redirect_stdout(io.StringIO()):
-        from pykrx import stock
-
-    try:
-        today = date.today()
-        end = today.strftime("%Y%m%d")
-        start = (today - timedelta(days=365)).strftime("%Y%m%d")
-
-        div_df = stock.get_market_dividend_by_date(start, end, ticker)
-        if div_df is None or div_df.empty:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        # 연간 DPS 합산: 분배일에만 DPS > 0이므로 비분배일(0값) 제외 후 합산
-        # 기존 코드의 iloc[-1] 방식은 마지막 거래일 값(대부분 0)을 사용해 항상 0 반환
-        dps_col = next((c for c in ["주당배당금", "DPS"] if c in div_df.columns), None)
-        if dps_col is None:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        annual_dps = float(div_df[dps_col][div_df[dps_col] > 0].sum())
-        if annual_dps <= 0:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        price_df = stock.get_etf_ohlcv_by_date(end, end, ticker)
-        current_price = float(price_df["종가"].iloc[-1]) if not price_df.empty else 0.0
-        yield_decimal = round(annual_dps / current_price, 6) if current_price > 0 else 0.0
-
-        logger.info("pykrx_etf_dividend_fetched", ticker=ticker, annual_dps=annual_dps, yield_decimal=yield_decimal)
-        return {"dps": annual_dps, "dividend_yield": yield_decimal}
-    except Exception as e:
-        logger.warning("pykrx_etf_dividend_failed", ticker=ticker, error=str(e))
-        return {"dps": 0.0, "dividend_yield": 0.0}
-
-
-def _sync_fdr_etf_dividend_info(ticker: str) -> dict:
-    """동기 함수 — run_in_executor로 호출.
-
-    fdr.StockListing('ETF/KR')으로 Naver Finance 기반 현재가 조회 +
-    pykrx get_market_fundamental_by_ticker로 DIV/DPS 조회.
-    StockListing의 'EarningRate'는 3개월 가격수익률이며 분배금수익률이 아님.
-    """
-    import contextlib
-    import io
-
-    try:
-        import FinanceDataReader as fdr
-
-        # Step 1: fdr으로 현재가 조회 (Naver Finance 기반 — KRX 직접 접속 불필요)
-        etf_list = fdr.StockListing("ETF/KR")
-        row = etf_list[etf_list["Symbol"] == ticker]
-        if row.empty:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        current_price = float(row["Price"].iloc[0]) if "Price" in row.columns else 0.0
-        if current_price == 0.0:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        # Step 2: pykrx fundamental로 DIV(배당수익률 %) / DPS(주당배당금) 조회
-        # ETF는 KOSPI 상장 종목이므로 market='ALL' 또는 'KOSPI'로 조회 가능
-        with contextlib.redirect_stdout(io.StringIO()):
-            from pykrx import stock
-
-        today_str = date.today().strftime("%Y%m%d")
-        fund_df = stock.get_market_fundamental_by_ticker(today_str, market="ALL")
-
-        if fund_df is None or fund_df.empty or ticker not in fund_df.index:
-            return {"dps": 0.0, "dividend_yield": 0.0}
-
-        row_f = fund_df.loc[ticker]
-        dps = float(row_f.get("DPS", 0) or 0)
-        div_pct = float(row_f.get("DIV", 0) or 0)
-
-        # DIV는 % 단위 (예: 2.15 = 2.15%)
-        yield_decimal = round(div_pct / 100, 6) if div_pct > 0 else (
-            round(dps / current_price, 6) if (dps > 0 and current_price > 0) else 0.0
-        )
-
-        logger.info("fdr_etf_dividend_fetched", ticker=ticker, dps=dps, yield_decimal=yield_decimal)
-        return {"dps": dps, "dividend_yield": yield_decimal}
-    except Exception as exc:
-        logger.warning("fdr_etf_dividend_failed", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0}
-
-
-def _sync_naver_etf_dividend_info(ticker: str) -> dict:
-    """동기 함수 — run_in_executor로 호출.
-
-    Naver Finance 모바일 API(etfAnalysis)로 국내 ETF TTM 분배율·DPS·배당월 조회.
-    인증 불필요, 공개 API.
-    """
-    import requests as _req
-
-    _MOBILE_UA = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-    )
-    try:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
-        resp = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
-        resp.raise_for_status()
-        div = resp.json().get("dividend") or {}
-        if not div:
-            return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
-
-        # dividendYieldTtm은 퍼센트 단위 (예: 1.45 → 1.45%)
-        yield_pct = float(div.get("dividendYieldTtm") or 0)
-        dps = float(div.get("dividendPerShareTtm") or 0)
-
-        # dividendMonthThisYear: 콤마 구분 문자열 (예: "2,5,8,11")
-        months_raw = div.get("dividendMonthThisYear") or ""
-        months: list[int] = []
-        if months_raw:
-            for part in str(months_raw).split(","):
-                part = part.strip()
-                if part.isdigit():
-                    months.append(int(part))
-
-        logger.info("naver_etf_dividend_fetched", ticker=ticker, dps=dps, yield_pct=yield_pct)
-        return {
-            "dps": dps,
-            "dividend_yield": yield_pct / 100.0,
-            "dividend_months": months,
-        }
-    except Exception as exc:
-        logger.warning("naver_etf_dividend_failed", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
-
-
-def _sync_naver_stock_dividend_info(ticker: str) -> dict:
-    """동기 함수 — run_in_executor로 호출.
-
-    Naver Finance 모바일 API(summary)로 국내 일반주식 배당수익률 조회.
-    ETF 전용인 etfAnalysis 대신 summary 엔드포인트 사용. DPS는 미제공.
-    인증 불필요, 공개 API.
-    """
-    import requests as _req
-
-    _MOBILE_UA = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-    )
-    try:
-        url = f"https://m.stock.naver.com/api/stock/{ticker}/summary"
-        resp = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
-        resp.raise_for_status()
-        detail = resp.json().get("stockItemDetail") or {}
-        # dividendYield: 퍼센트 단위 문자열 (예: "2.21" → 2.21%)
-        yield_pct = float(detail.get("dividendYield") or 0)
-        if yield_pct <= 0:
-            return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
-        logger.info("naver_stock_dividend_fetched", ticker=ticker, yield_pct=yield_pct)
-        return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
-    except Exception as exc:
-        logger.warning("naver_stock_dividend_failed", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
-
-
-def _sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
-    """동기 함수 — run_in_executor로 호출. 과거 2년 배당락일에서 지급월 추출.
-
-    yfinance .dividends 인덱스는 배당락일(ex-date)이므로 실제 지급일과 다를 수 있음.
-    calendar에서 ex-date/payment-date 오프셋을 구해 보정. 기본 오프셋 = 1개월.
-    """
-    import yfinance as yf
-    try:
-        t = yf.Ticker(yahoo_symbol)
-
-        # calendar에서 실제 지급일 오프셋 계산
-        offset_months = 1  # 기본: 배당락일 + 1개월 ≈ 지급일
-        try:
-            cal = t.calendar or {}
-            ex_date = cal.get("Ex-Dividend Date")
-            pay_date = cal.get("Dividend Date")
-            if ex_date and pay_date:
-                ex_m = ex_date.month if hasattr(ex_date, "month") else int(str(ex_date)[5:7])
-                pay_m = pay_date.month if hasattr(pay_date, "month") else int(str(pay_date)[5:7])
-                offset_months = (pay_m - ex_m) % 12
-        except Exception:
-            pass
-
-        divs = t.dividends
-        if divs is None or len(divs) == 0:
-            return []
-        cutoff_year = date.today().year - 2
-        months: set[int] = set()
-        for ts in divs.index:
-            if hasattr(ts, "year") and ts.year >= cutoff_year:
-                payment_month = ((int(ts.month) - 1 + offset_months) % 12) + 1
-                months.add(payment_month)
-        return sorted(months)
-    except Exception:
-        return []
 
 
 async def _load_user_overrides(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], list[int]]:
@@ -669,8 +405,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
     loop = asyncio.get_running_loop()
     kis_creds = await _get_kis_credentials(user_id, db)
 
-    usd_rate_cached = await redis.get("usd_krw_rate")
-    usd_krw_rate: float = float(usd_rate_cached) if usd_rate_cached else 1300.0
+    usd_krw_rate: float = await get_usd_krw_rate(redis)
 
     async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
@@ -713,7 +448,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
                     yield_decimal = cached["yield_decimal"]
 
         async with sem:
-            is_etf = _is_korean_etf(ticker, market)
+            is_etf = is_korean_etf(ticker, market)
 
             # 0순위: Naver Finance (국내 종목 전용, 인증 불필요)
             # ETF: etfAnalysis API (DPS + yield + 배당월)
@@ -721,11 +456,11 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
             if is_korean:
                 if is_etf:
                     naver_info = await loop.run_in_executor(
-                        None, partial(_sync_naver_etf_dividend_info, ticker)
+                        None, partial(sync_naver_etf_dividend_info, ticker)
                     )
                 else:
                     naver_info = await loop.run_in_executor(
-                        None, partial(_sync_naver_stock_dividend_info, ticker)
+                        None, partial(sync_naver_stock_dividend_info, ticker)
                     )
                 if naver_info["dps"] > 0:
                     dps = naver_info["dps"]
@@ -737,7 +472,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
             # 1순위: yfinance (국내/해외 공통)
             if dps == 0.0 or yield_decimal == 0.0:
-                info = await loop.run_in_executor(None, partial(_sync_yahoo_dividend_info, yahoo_sym))
+                info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
                 if info["dividend_yield"] > 0 and yield_decimal == 0.0:
                     yield_decimal = info["dividend_yield"]
                 if info["dps"] > 0 and dps == 0.0:
@@ -764,7 +499,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
             # 3순위: pykrx (국내 — 연간 DPS 합산 방식)
             if is_korean and (dps == 0.0 or yield_decimal == 0.0):
-                pykrx_info = await loop.run_in_executor(None, partial(_sync_pykrx_etf_dividend_info, ticker))
+                pykrx_info = await loop.run_in_executor(None, partial(sync_pykrx_etf_dividend_info, ticker))
                 if pykrx_info["dps"] > 0 and dps == 0.0:
                     dps = pykrx_info["dps"]
                 if pykrx_info["dividend_yield"] > 0 and yield_decimal == 0.0:
@@ -772,7 +507,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
             # 3.5순위: FinanceDataReader ETF (국내 ETF — pykrx 실패 시 fallback)
             if is_korean and is_etf and (dps == 0.0 or yield_decimal == 0.0):
-                fdr_info = await loop.run_in_executor(None, partial(_sync_fdr_etf_dividend_info, ticker))
+                fdr_info = await loop.run_in_executor(None, partial(sync_fdr_etf_dividend_info, ticker))
                 if fdr_info["dps"] > 0 and dps == 0.0:
                     dps = fdr_info["dps"]
                 if fdr_info["dividend_yield"] > 0 and yield_decimal == 0.0:
@@ -813,7 +548,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
                     logger.info("known_dividend_info_used", ticker=ticker, market=market, dps=dps, yield_decimal=yield_decimal)
 
             if need_months_fetch:
-                months = await loop.run_in_executor(None, partial(_sync_fetch_dividend_months, yahoo_sym))
+                months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
 
         if need_months_fetch:
             await redis.setex(months_cache_key, 604800, json.dumps(months))  # 7일 캐시
@@ -992,7 +727,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
     async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
-        is_etf = _is_korean_etf(ticker, market)
+        is_etf = is_korean_etf(ticker, market)
         yahoo_sym = _to_yahoo_symbol(ticker, market)
         yield_decimal = 0.0
         dps = 0.0
@@ -1028,7 +763,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
             # 0순위: Naver Finance etfAnalysis (국내 종목 전용, 캐시와 무관하게 항상 먼저 시도)
             if is_korean:
                 naver_info = await loop.run_in_executor(
-                    None, partial(_sync_naver_etf_dividend_info, ticker)
+                    None, partial(sync_naver_etf_dividend_info, ticker)
                 )
                 if naver_info["dps"] > 0:
                     dps = naver_info["dps"]
@@ -1050,7 +785,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
                 if need_months_fetch:
                     async with sem:
                         loop = asyncio.get_running_loop()
-                        months = await loop.run_in_executor(None, partial(_sync_fetch_dividend_months, yahoo_sym))
+                        months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
                     need_months_fetch = False
                     await redis.setex(months_cache_key, 604800, json.dumps(months))
 
@@ -1060,7 +795,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
                 # 1순위: yfinance (국내/해외 공통)
                 if dps == 0.0 or yield_decimal == 0.0:
-                    info = await loop.run_in_executor(None, partial(_sync_yahoo_dividend_info, yahoo_sym))
+                    info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
                     if info["dividend_yield"] > 0 and yield_decimal == 0.0:
                         yield_decimal = info["dividend_yield"]
                     if info["dps"] > 0 and dps == 0.0:
@@ -1088,7 +823,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
                 # 3순위: pykrx (국내 — 연간 DPS 합산 방식)
                 if is_korean and (dps == 0.0 or yield_decimal == 0.0):
-                    pykrx_info = await loop.run_in_executor(None, partial(_sync_pykrx_etf_dividend_info, ticker))
+                    pykrx_info = await loop.run_in_executor(None, partial(sync_pykrx_etf_dividend_info, ticker))
                     if pykrx_info["dps"] > 0 and dps == 0.0:
                         dps = pykrx_info["dps"]
                     if pykrx_info["dividend_yield"] > 0 and yield_decimal == 0.0:
@@ -1096,7 +831,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
                 # 3.5순위: FinanceDataReader ETF (국내 ETF — pykrx 실패 시 fallback)
                 if is_korean and is_etf and (dps == 0.0 or yield_decimal == 0.0):
-                    fdr_info = await loop.run_in_executor(None, partial(_sync_fdr_etf_dividend_info, ticker))
+                    fdr_info = await loop.run_in_executor(None, partial(sync_fdr_etf_dividend_info, ticker))
                     if fdr_info["dps"] > 0 and dps == 0.0:
                         dps = fdr_info["dps"]
                     if fdr_info["dividend_yield"] > 0 and yield_decimal == 0.0:
@@ -1137,7 +872,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
                         logger.info("known_dividend_info_used", ticker=ticker, market=market, dps=dps, yield_decimal=yield_decimal)
 
                 if need_months_fetch:
-                    months = await loop.run_in_executor(None, partial(_sync_fetch_dividend_months, yahoo_sym))
+                    months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
                     need_months_fetch = False
 
             # dividend info 캐시 저장 (24h) — yfinance/KIS/pykrx 등 비-Naver 소스 결과만 캐시
@@ -1148,7 +883,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
         if need_months_fetch:
             async with sem:
                 loop = asyncio.get_running_loop()
-                months = await loop.run_in_executor(None, partial(_sync_fetch_dividend_months, yahoo_sym))
+                months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
             await redis.setex(months_cache_key, 604800, json.dumps(months))
 
         if is_korean and not is_etf and dps > 0 and qty > 0:

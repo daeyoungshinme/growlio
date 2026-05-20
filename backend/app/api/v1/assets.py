@@ -1,25 +1,44 @@
 import asyncio
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.kis.client import KisApiError
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
-from app.schemas.asset import AssetAccountCreate, AssetAccountResponse, AssetAccountUpdate, AssetSnapshotResponse
-from app.services.asset_service import sync_kis_account, sync_manual_account, sync_openbanking_account
+from app.schemas.asset import (
+    AssetAccountCreate,
+    AssetAccountResponse,
+    AssetAccountUpdate,
+    AssetSnapshotResponse,
+)
+from app.services.asset_service import (
+    _upsert_snapshot,
+    sync_kis_account,
+    sync_manual_account,
+    sync_openbanking_account,
+)
+from app.limiter import limiter
+from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
 
-
 OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX"}
+
+
+def _account_response(account: AssetAccount) -> AssetAccountResponse:
+    """AssetAccount ORM 모델을 Response 스키마로 변환 (has_own_kis_credentials 계산 포함)."""
+    data = AssetAccountResponse.model_validate(account)
+    data.has_own_kis_credentials = bool(account.kis_app_key)
+    return data
 
 
 class ManualPosition(BaseModel):
@@ -37,6 +56,8 @@ router = APIRouter(prefix="/assets", tags=["assets"])
 
 @router.get("", response_model=list[AssetAccountResponse])
 async def list_accounts(
+    skip: int = 0,
+    limit: int = 200,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -44,8 +65,10 @@ async def list_accounts(
         select(AssetAccount)
         .where(AssetAccount.user_id == current_user.id, AssetAccount.is_active == True)  # noqa: E712
         .order_by(AssetAccount.sort_order, AssetAccount.created_at)
+        .offset(skip)
+        .limit(limit)
     )
-    return result.scalars().all()
+    return [_account_response(a) for a in result.scalars().all()]
 
 
 @router.post("", response_model=AssetAccountResponse, status_code=status.HTTP_201_CREATED)
@@ -55,24 +78,35 @@ async def create_account(
     db: AsyncSession = Depends(get_db),
 ):
     if req.data_source == "KIS_API":
-        settings = await db.get(UserSettings, current_user.id)
-        if not settings or not settings.kis_app_key:
-            raise HTTPException(
-                status_code=400,
-                detail="KIS API 자격증명이 없습니다. 설정 > KIS 연동에서 먼저 등록하세요.",
-            )
         if not req.kis_account_no:
-            raise HTTPException(status_code=400, detail="KIS 계좌번호를 입력하세요.")
-        req_data = req.model_dump()
-        req_data["is_mock_mode"] = settings.kis_is_mock
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌번호를 입력하세요.")
+
+        req_data = req.model_dump(exclude={"kis_app_key", "kis_app_secret"})
+
+        if req.kis_app_key and req.kis_app_secret:
+            # 계좌별 자격증명 사용
+            req_data["kis_app_key"] = encrypt(req.kis_app_key)
+            req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
+        else:
+            # 전역 자격증명 확인 (폴백용)
+            settings = await db.get(UserSettings, current_user.id)
+            if not settings or not settings.kis_app_key:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="KIS API 자격증명이 없습니다. 계좌별 API 키를 입력하거나, 설정 > KIS 연동에서 먼저 등록하세요.",
+                )
+            req_data["is_mock_mode"] = settings.kis_is_mock
+            req_data["kis_app_key"] = None
+            req_data["kis_app_secret"] = None
+
         account = AssetAccount(user_id=current_user.id, **req_data)
     else:
-        account = AssetAccount(user_id=current_user.id, **req.model_dump())
+        exclude_creds = {"kis_app_key", "kis_app_secret"}
+        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=exclude_creds))
     db.add(account)
     await db.commit()
     await db.refresh(account)
     if account.manual_amount:
-        from app.services.asset_service import _upsert_snapshot
         snap_amount = float(account.manual_amount)
         if account.asset_type == "REAL_ESTATE":
             mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
@@ -86,7 +120,7 @@ async def create_account(
             source="MANUAL",
         )
         await db.commit()
-    return account
+    return _account_response(account)
 
 
 @router.get("/snapshots/range", response_model=list[AssetSnapshotResponse])
@@ -113,7 +147,7 @@ async def get_account(
     db: AsyncSession = Depends(get_db),
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
-    return account
+    return _account_response(account)
 
 
 @router.put("/{account_id}", response_model=AssetAccountResponse)
@@ -124,13 +158,20 @@ async def update_account(
     db: AsyncSession = Depends(get_db),
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
-    for field, value in req.model_dump(exclude_none=True).items():
+
+    # 계좌별 KIS 자격증명 업데이트 처리 (암호화 필요, 별도 처리)
+    update_fields = req.model_dump(exclude_none=True, exclude={"kis_app_key", "kis_app_secret"})
+    for field, value in update_fields.items():
         setattr(account, field, value)
-    if req.manual_amount is not None or req.deposit_krw is not None or req.real_estate_details is not None:
-        account.manual_updated_at = datetime.now(timezone.utc)
+
+    if req.kis_app_key is not None:
+        account.kis_app_key = encrypt(req.kis_app_key) if req.kis_app_key else None
+        account.kis_app_secret = encrypt(req.kis_app_secret) if req.kis_app_secret else None
+
+    if req.manual_amount is not None or req.deposit_krw is not None or req.real_estate_details is not None:  # noqa: E501
+        account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
-    from app.services.asset_service import _upsert_snapshot
     needs_snapshot = req.manual_amount is not None or (
         account.asset_type == "REAL_ESTATE" and req.real_estate_details is not None
     )
@@ -173,7 +214,29 @@ async def update_account(
             source="MANUAL",
         )
         await db.commit()
-    return account
+    return _account_response(account)
+
+
+@router.delete("/{account_id}/kis-credentials", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account_kis_credentials(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
+    from sqlalchemy import delete as sql_delete
+
+    from app.models.token import KisToken
+    from app.redis_client import get_redis
+
+    account = await _get_owned_account(account_id, current_user.id, db)
+    account.kis_app_key = None
+    account.kis_app_secret = None
+    await db.execute(sql_delete(KisToken).where(KisToken.account_id == account_id))
+    await db.commit()
+
+    redis = await get_redis()
+    await redis.delete(f"kis_token:account:{account_id}")
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -188,7 +251,9 @@ async def delete_account(
 
 
 @router.post("/{account_id}/sync")
+@limiter.limit("5/minute")
 async def sync_account(
+    request: Request,
     account_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -202,7 +267,7 @@ async def sync_account(
         except httpx.HTTPStatusError as e:
             if e.response.status_code >= 500:
                 raise HTTPException(
-                    status_code=502,
+                    status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="KIS API 오류: 모의투자/실계좌 설정을 확인하세요. (계정번호, 앱키, 모드가 일치해야 합니다)",
                 )
             try:
@@ -210,13 +275,24 @@ async def sync_account(
                 msg = kis_body.get("msg1") or str(e)
             except Exception:
                 msg = str(e)
-            raise HTTPException(status_code=400, detail=f"KIS API 오류: {msg}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"KIS API 오류: {msg}")
+        except KisApiError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형이 지원되지 않거나 API 권한이 없을 수 있습니다.",
+            )
+        except (httpx.ConnectError, httpx.TimeoutException):
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.")
+        except RuntimeError as e:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     elif account.data_source == "OPEN_BANKING":
         snapshot = await sync_openbanking_account(account, db)
     elif account.data_source == "MANUAL":
         snapshot = await sync_manual_account(account, db, redis)
     else:
-        raise HTTPException(status_code=400, detail=f"지원하지 않는 데이터 소스: {account.data_source}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"지원하지 않는 데이터 소스: {account.data_source}")
 
     await redis.delete(f"dividend:by-ticker:{current_user.id}:{date.today().year}")
     return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}
@@ -248,10 +324,9 @@ async def save_positions(
     total_invested = sum(p.qty * p.avg_price for p in positions)
     total_value = sum((p.current_price or p.avg_price) * p.qty for p in positions)
     account.manual_amount = total_value  # 평가금액 기준 (current_price 없으면 avg_price 대체)
-    account.manual_updated_at = datetime.now(timezone.utc)
+    account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
-    from app.services.asset_service import _upsert_snapshot
     await _upsert_snapshot(
         db,
         account_id=account.id,
@@ -277,7 +352,7 @@ async def sync_position_prices(
     account = await _get_owned_account(account_id, current_user.id, db)
     positions = account.manual_positions or []
     if not positions:
-        raise HTTPException(status_code=400, detail="저장된 종목이 없습니다")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="저장된 종목이 없습니다")
 
     redis = await get_redis()
     tickers = [(p["ticker"], p.get("market", "KOSPI")) for p in positions]
@@ -304,14 +379,13 @@ async def sync_position_prices(
         updated.append({**p, "current_price": price_krw})
 
     account.manual_positions = updated
-    account.manual_updated_at = datetime.now(timezone.utc)
+    account.manual_updated_at = datetime.now(UTC)
 
     # 평가금액 합계 → manual_amount 갱신 & 스냅샷 저장
     total_value = sum(p["current_price"] * p["qty"] for p in updated)
     total_invested = sum(p["avg_price"] * p["qty"] for p in updated)
     account.manual_amount = total_value
 
-    from app.services.asset_service import _upsert_snapshot
     await _upsert_snapshot(
         db,
         account_id=account.id,
@@ -368,8 +442,12 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
 
 async def _get_owned_account(account_id: UUID, user_id, db: AsyncSession) -> AssetAccount:
     account = await db.scalar(
-        select(AssetAccount).where(AssetAccount.id == account_id, AssetAccount.user_id == user_id)
+        select(AssetAccount).where(
+            AssetAccount.id == account_id,
+            AssetAccount.user_id == user_id,
+            AssetAccount.is_active == True,  # noqa: E712
+        )
     )
     if not account:
-        raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다")
     return account

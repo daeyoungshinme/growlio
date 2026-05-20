@@ -66,6 +66,8 @@ def make_account(make_user_id):
         is_active=True,
         is_mock_mode=True,
         kis_account_no="12345678-01",
+        kis_app_key=None,
+        kis_app_secret=None,
         ls_account_no=None,
         ob_fintech_use_no=None,
         manual_amount=None,

@@ -5,6 +5,7 @@ import { DividendMonthlyBreakdown, TickerDividendItem } from "../../api/dashboar
 import DividendByTickerTable from "./DividendByTickerTable";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
+import { chartTooltipStyle } from "../../utils/chart";
 
 interface Props {
   annualReceived: number | null;
@@ -63,15 +64,7 @@ export default function DividendSection({ annualReceived, estimatedAnnual, month
               <Tooltip
                 formatter={(v: number) => [fmtKrw(v), "배당금"]}
                 cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)" }}
-                contentStyle={{
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: `1px solid ${isDark ? "#374151" : "#E5E7EB"}`,
-                  backgroundColor: isDark ? "#1f2937" : "#ffffff",
-                  color: isDark ? "#f9fafb" : "#111827",
-                }}
-                labelStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
-                itemStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
+                {...chartTooltipStyle(isDark)}
               />
               <Bar dataKey="amount" fill="#16A34A" radius={[3, 3, 0, 0]} />
             </BarChart>

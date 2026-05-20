@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { api } from "../../api/client";
 import { fetchExchangeRate, fetchStockPrice, searchStocks, StockSuggestion } from "../../api/assets";
+import { extractErrorMessage } from "../../utils/error";
 import { fmtKrwShort } from "../../utils/format";
+import Modal from "../common/Modal";
 
 interface Position {
   ticker: string;
@@ -190,16 +192,14 @@ export default function StockPositionsModal({
       const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
       setRows(r.data.positions); setSummary(r.data.summary);
     } catch (e: unknown) {
-      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-      setError(msg ?? "현재가 조회에 실패했습니다");
+      setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally { setSyncing(false); }
   };
 
   const displaySummary = summary ?? liveSummary;
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <Modal size="xl" onClose={onClose}>
 
         {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -484,7 +484,6 @@ export default function StockPositionsModal({
             )}
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -1,6 +1,7 @@
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { SeriesData } from "../../api/backtest";
 import { useThemeStore } from "../../stores/themeStore";
+import { chartTooltipStyle } from "../../utils/chart";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 
@@ -47,15 +48,7 @@ export default function BacktestResultChart({ dates, series }: Props) {
             width={40}
           />
           <Tooltip
-            contentStyle={{
-              fontSize: 12,
-              borderRadius: 8,
-              border: `1px solid ${isDark ? "#374151" : "#E5E7EB"}`,
-              backgroundColor: isDark ? "#1f2937" : "#ffffff",
-              color: isDark ? "#f9fafb" : "#111827",
-            }}
-            labelStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
-            itemStyle={{ color: isDark ? "#f9fafb" : "#111827" }}
+            {...chartTooltipStyle(isDark)}
             formatter={(value: number, name: string) => [
               `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
               name,

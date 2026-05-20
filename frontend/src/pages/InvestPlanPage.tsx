@@ -8,6 +8,7 @@ import GoalTimelineCard from "../components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "../components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "../components/invest/YearlyAchievementTable";
 import { fmtKrw } from "../utils/format";
+import { toast } from "../utils/toast";
 
 interface GoalForm {
   monthly_deposit_amount: string;
@@ -27,7 +28,6 @@ export default function InvestPlanPage() {
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [form, setForm] = useState<GoalForm>({
     monthly_deposit_amount: "",
     goal_annual_return_pct: "",
@@ -59,14 +59,12 @@ export default function InvestPlanPage() {
         goal_start_date: form.goal_start_date || null,
         goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
       });
-      setMsg({ ok: true, text: "설정이 저장되었습니다" });
-      setTimeout(() => setMsg(null), 3000);
+      toast("설정이 저장되었습니다", "success");
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["dca-analysis"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
     } catch {
-      setMsg({ ok: false, text: "저장에 실패했습니다" });
-      setTimeout(() => setMsg(null), 3000);
+      toast("저장에 실패했습니다", "error");
     } finally {
       setSaving(false);
     }
@@ -106,16 +104,6 @@ export default function InvestPlanPage() {
           설정 편집
         </button>
       </div>
-
-      {msg && (
-        <div
-          className={`px-4 py-2.5 rounded-lg text-sm font-medium ${
-            msg.ok ? "bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400"
-          }`}
-        >
-          {msg.text}
-        </div>
-      )}
 
       {/* 현재 설정 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">

@@ -13,9 +13,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379).
 
+## First-time Setup (순서 중요)
+
 ```bash
-# DB/Redis 시작
-cd growlio && docker compose up -d db redis
+# 1. 인프라 시작
+docker compose up -d db redis
+
+# 2. 의존성 설치
+cd backend && uv venv  # 최초 1회: 가상환경 생성
+make install-backend   # pip install
+make install-frontend  # npm install
+
+# 3. 환경 변수 설정
+cp backend/.env.example backend/.env  # 값 채우기 (backend/CLAUDE.md Environment 섹션 참고)
+
+# 4. DB 마이그레이션
+make migrate
+
+# 5. 개발 서버 실행 (터미널 2개)
+make dev-backend
+make dev-frontend
 ```
 
 ## Makefile 단축 명령
@@ -49,6 +66,7 @@ cd frontend && npm run dev
 growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
+├── nginx/            # nginx 리버스 프록시 설정
 ├── docker-compose.yml
 └── Makefile
 ```

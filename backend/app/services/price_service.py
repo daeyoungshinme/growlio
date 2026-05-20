@@ -176,8 +176,8 @@ async def _fetch_fallback(settings_row, ticker: str, market: str, db, redis) -> 
             price = await _price_via_kis(settings_row, ticker, market, db, redis)
             if price:
                 return price
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
     return None
 
 

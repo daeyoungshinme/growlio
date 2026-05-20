@@ -187,7 +187,7 @@ class TestSyncKisAccount:
             patch("app.services.asset_service.get_overseas_balance", new_callable=AsyncMock, return_value=overseas_result),
             patch("app.services.asset_service.get_overseas_price", new_callable=AsyncMock, return_value={"usd_krw_rate": 1300.0}),
             patch("app.services.asset_service._upsert_snapshot", new_callable=AsyncMock, return_value=snap_result),
-            patch("app.services.asset_service._cache_usd_krw_rate", new_callable=AsyncMock),
+            patch("app.utils.currency.cache_usd_krw_rate", new_callable=AsyncMock),
         ):
             # Redis mock: no cached rate
             redis = AsyncMock()

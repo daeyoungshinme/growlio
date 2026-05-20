@@ -34,6 +34,9 @@ class AssetAccount(Base):
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))
+    # 계좌별 KIS 자격증명 (AES-256 암호화) — 없으면 UserSettings 전역 자격증명 사용
+    kis_app_key: Mapped[str | None] = mapped_column(String(512))
+    kis_app_secret: Mapped[str | None] = mapped_column(String(512))
     # LS증권 계좌 (STOCK_LS)
     ls_account_no: Mapped[str | None] = mapped_column(String(20))
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -81,7 +84,7 @@ class AssetSnapshot(Base):
     # 주식 계좌 상세
     invested_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     unrealized_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
-    positions: Mapped[dict | None] = mapped_column(JSONB)
+    positions: Mapped[list | None] = mapped_column(JSONB)
 
     # MANUAL | KIS_API | OPEN_BANKING
     source: Mapped[str] = mapped_column(String(20), default="MANUAL", nullable=False)

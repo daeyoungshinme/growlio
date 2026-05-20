@@ -1,6 +1,6 @@
 """배당금 현황 API."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,5 +85,5 @@ async def del_ticker_setting(
     """배당월 override 삭제 (자동 감지로 복구)."""
     deleted = await delete_ticker_settings(current_user.id, ticker, market, db)
     if not deleted:
-        raise HTTPException(status_code=404, detail="설정이 존재하지 않습니다")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다")
     return {"deleted": True}

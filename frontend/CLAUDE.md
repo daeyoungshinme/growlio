@@ -38,7 +38,7 @@ cd frontend && npm run build
 > 구 URL 리다이렉트: `/assets` → `/portfolio`, `/trend` → `/dashboard`
 
 **컴포넌트 디렉토리 (`src/components/`):**
-assets, backtest, common, dashboard, invest, layout, plans, portfolio, rebalancing, simulation, transactions, trend
+assets, backtest, common, dashboard, invest, layout, portfolio-analysis, portfolios, rebalancing, transactions, trend
 
 **데이터 흐름:**
 ```
@@ -90,6 +90,30 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지
+
+**색상 유틸리티 (`src/utils/colors.ts`)**
+- P&L 색상은 `pnlColor(value)` 함수 사용 — `PROFIT_COLOR`(`text-red-500`) / `LOSS_COLOR`(`text-blue-500`) 상수도 export됨.
+  ```ts
+  import { pnlColor } from "../utils/colors";
+  // <span className={pnlColor(profit)}>
+  ```
+- 직접 `text-red-500` / `text-blue-500` 인라인 작성 금지 (색상 관례 변경 시 일괄 교체 불가).
+
+**차트 유틸리티 (`src/utils/chart.ts`)**
+- `chartTooltipStyle(isDark)` — Recharts `<Tooltip>` 다크모드 스타일 반환. 인라인 스타일 객체 중복 작성 금지.
+  ```ts
+  import { chartTooltipStyle } from "../utils/chart";
+  const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
+  ```
+
+**캐시 무효화 유틸리티 (`src/utils/queryInvalidation.ts`)**
+- 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 동시 무효화.
+- 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
+- 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
+
+**커스텀 훅 (`src/hooks/`)**
+- `useToast()` — toast 알림. 성공/에러 메시지 표시. 인라인 에러 state 대신 사용.
+- `useAsyncAction()` — 비동기 작업 로딩/에러 처리 래퍼.
 
 ---
 

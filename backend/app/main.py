@@ -1,3 +1,4 @@
+import time
 from contextlib import asynccontextmanager
 
 import structlog
@@ -6,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import router
 from app.config import settings
@@ -45,6 +47,29 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start = time.monotonic()
+    response = await call_next(request)
+    duration_ms = round((time.monotonic() - start) * 1000)
+    logger.info(
+        "http_request",
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        duration_ms=duration_ms,
+    )
+    return response
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, StarletteHTTPException):
+        return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    logger.error("unhandled_exception", path=str(request.url.path), error=str(exc), exc_info=True)
+    return JSONResponse(status_code=500, content={"detail": "서버 오류가 발생했습니다."})
 
 
 @app.get("/health")

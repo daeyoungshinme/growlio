@@ -3,6 +3,7 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.kis.auth import _fetch_and_store_token
+from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
@@ -22,7 +23,7 @@ async def refresh_all_user_tokens() -> None:
 
     redis = await get_redis()
     for user, settings_row in rows:
-        # KIS 토큰 갱신
+        # 유저 레벨 KIS 토큰 갱신
         if settings_row.kis_app_key:
             try:
                 app_key = decrypt(settings_row.kis_app_key)
@@ -50,3 +51,34 @@ async def refresh_all_user_tokens() -> None:
                         await ensure_ob_token_fresh(settings_fresh, db)
             except Exception as e:
                 logger.error("ob_token_refresh_failed", user_id=str(user.id), error=str(e))
+
+    # 계좌별 자체 KIS 자격증명 보유 계좌 토큰 갱신
+    async with AsyncSessionLocal() as db:
+        account_result = await db.execute(
+            select(AssetAccount).where(
+                AssetAccount.kis_app_key != None,  # noqa: E711
+                AssetAccount.is_active == True,  # noqa: E712
+                AssetAccount.data_source == "KIS_API",
+            )
+        )
+        accounts_with_creds = account_result.scalars().all()
+
+    for account in accounts_with_creds:
+        try:
+            app_key = decrypt(account.kis_app_key)
+            app_secret = decrypt(account.kis_app_secret)
+            async with AsyncSessionLocal() as db:
+                await _fetch_and_store_token(
+                    app_key,
+                    app_secret,
+                    is_mock=account.is_mock_mode,
+                    redis=redis,
+                    db=db,
+                    user_id=str(account.user_id),
+                    account_id=str(account.id),
+                )
+            logger.info("kis_account_token_refreshed", account_id=str(account.id))
+        except Exception as e:
+            logger.error(
+                "kis_account_token_refresh_failed", account_id=str(account.id), error=str(e)
+            )
