@@ -205,7 +205,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
           <div className="grid grid-cols-2 gap-3">
             {/* 금액 */}
             <div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between h-5">
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">금액 *</label>
                 {form.transaction_type === "DIVIDEND" && (
                   <div className="flex gap-0.5 text-xs">
@@ -263,7 +263,9 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
             </div>
             {/* 날짜 */}
             <div className="min-w-0">
-              <label className="text-xs font-medium text-gray-600 dark:text-gray-400">날짜 *</label>
+              <div className="flex items-center h-5">
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">날짜 *</label>
+              </div>
               <input
                 type="date"
                 className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -432,23 +434,27 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
 
         {/* 내역 목록 */}
         <div className="overflow-y-auto flex-1">
-          {isLoading ? (
-            <div className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">로딩 중...</div>
-          ) : !txList || txList.length === 0 ? (
-            <div className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">등록된 내역이 없습니다</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
-                  <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
-                  <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
-                  <th className="px-3 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {txList.map((tx) => (
+          {(() => {
+            const filtered = (txList ?? []).filter((t) =>
+              t.transaction_type === form.transaction_type
+            );
+            return isLoading ? (
+              <div className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">로딩 중...</div>
+            ) : filtered.length === 0 ? (
+              <div className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">등록된 내역이 없습니다</div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
+                    <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
+                    <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
+                    <th className="px-3 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                {filtered.map((tx) => (
                   <tr key={tx.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{tx.transaction_date}</td>
                     <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
@@ -482,7 +488,8 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                 ))}
               </tbody>
             </table>
-          )}
+          );
+        })()}
         </div>
       </div>
     </div>
