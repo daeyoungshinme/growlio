@@ -91,6 +91,23 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지
 
+**에러 유틸리티 (`src/utils/error.ts`)**
+- `extractErrorMessage(error, fallback?)` — Axios 에러에서 `response.data.detail` 추출. API 에러 메시지 수동 파싱 금지.
+  ```ts
+  import { extractErrorMessage } from "../utils/error";
+  // catch (e) { toast(extractErrorMessage(e)); }
+  ```
+
+**토스트 (`src/utils/toast.ts`)**
+- `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. `useToast()` 훅 외부(비React 코드)에서도 직접 호출 가능.
+  ```ts
+  import { toast } from "../utils/toast";
+  toast("저장되었습니다", "success");
+  ```
+
+**포트폴리오 유틸리티 (`src/utils/portfolio.ts`)**
+- `groupPositionsByTicker(positions)` — 종목 배열을 ticker+market 기준으로 집계. 여러 계좌 보유 종목 합산 표시 시 사용.
+
 **색상 유틸리티 (`src/utils/colors.ts`)**
 - P&L 색상은 `pnlColor(value)` 함수 사용 — `PROFIT_COLOR`(`text-red-500`) / `LOSS_COLOR`(`text-blue-500`) 상수도 export됨.
   ```ts

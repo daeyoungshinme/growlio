@@ -66,7 +66,7 @@ cd frontend && npm run dev
 growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
-├── nginx/            # nginx 리버스 프록시 설정
+├── nginx/            # nginx 리버스 프록시 (포트 80 → frontend 정적파일 + /api/* → backend:8000)
 ├── docker-compose.yml
 └── Makefile
 ```
