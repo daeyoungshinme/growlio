@@ -23,7 +23,7 @@ async def list_transactions(
     year: int | None = None,
     transaction_type: str | None = None,
     skip: int = 0,
-    limit: int = 500,
+    limit: int = 100,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

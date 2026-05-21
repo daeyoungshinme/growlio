@@ -20,8 +20,7 @@ import {
 import { fmtKrw } from "../../utils/format";
 import { invalidateAccountData, invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
-
-const STOCK_TYPES = ["STOCK_KIS", "STOCK_LS", "STOCK_OTHER"];
+import { STOCK_TYPES } from "../../constants";
 
 const TX_LABELS: Record<string, string> = {
   DEPOSIT: "입금",

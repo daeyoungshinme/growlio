@@ -1,28 +1,15 @@
-from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-_DEV_SECRET = "dev-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_env: str = "development"
-    app_secret_key: str = _DEV_SECRET
-
-    @model_validator(mode="after")
-    def _check_production_secrets(self) -> "Settings":
-        if self.app_env == "production" and self.app_secret_key == _DEV_SECRET:
-            raise ValueError(
-                "APP_SECRET_KEY must be changed from the default in production. "
-                "Set a strong random secret in your .env file."
-            )
-        return self
-
+    app_secret_key: str
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/growlio"
     redis_url: str = "redis://localhost:6379/0"
 
-    kis_cred_encryption_key: str = "0" * 64  # 32-byte hex placeholder
+    kis_cred_encryption_key: str  # 32-byte hex (64자), AES-256 암호화 키
 
     allowed_origins: str = "http://localhost:5173"
 

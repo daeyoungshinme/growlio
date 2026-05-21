@@ -15,7 +15,6 @@ export interface AssetAccount {
   data_source: string;
   institution: string | null;
   kis_account_no: string | null;
-  ls_account_no: string | null;
   is_mock_mode: boolean;
   manual_amount: number | null;
   manual_currency: string;
@@ -38,7 +37,6 @@ export interface AssetAccountCreate {
   kis_account_no?: string;
   kis_app_key?: string;
   kis_app_secret?: string;
-  ls_account_no?: string;
   ob_fintech_use_no?: string;
   is_mock_mode?: boolean;
   manual_amount?: number;

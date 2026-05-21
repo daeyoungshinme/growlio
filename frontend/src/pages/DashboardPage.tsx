@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -8,18 +9,8 @@ import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
 import AssetAllocationChart from "../components/dashboard/AssetAllocationChart";
+import { ASSET_TYPE_LABELS } from "../constants";
 import type { PortfolioOverview } from "../types";
-
-const ASSET_TYPE_LABELS: Record<string, string> = {
-  STOCK_KIS: "KIS 주식",
-  STOCK_LS: "LS 주식",
-  STOCK_OTHER: "기타 주식",
-  BANK_ACCOUNT: "은행 통장",
-  DEPOSIT: "예금",
-  CASH_OTHER: "기타 현금",
-  OTHER: "기타",
-  REAL_ESTATE: "부동산",
-};
 
 const fetchOverviewSummary = () =>
   api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
@@ -52,16 +43,10 @@ export default function DashboardPage() {
     refetchInterval: 5 * 60 * 1000,
   });
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">로딩 중...</div>;
-  if (error || !data) return <div className="text-red-500">데이터를 불러오지 못했습니다</div>;
-
-  const allocationChartData = (() => {
-    const stockItems = data.asset_allocation.filter((item) =>
-      item.type.startsWith("STOCK_")
-    );
-    const nonStockItems = data.asset_allocation.filter(
-      (item) => !item.type.startsWith("STOCK_")
-    );
+  const allocationChartData = useMemo(() => {
+    if (!data) return [];
+    const stockItems = data.asset_allocation.filter((item) => item.type.startsWith("STOCK_"));
+    const nonStockItems = data.asset_allocation.filter((item) => !item.type.startsWith("STOCK_"));
     const result = nonStockItems.map((item) => ({
       name: ASSET_TYPE_LABELS[item.type] ?? item.type,
       value: item.amount_krw,
@@ -75,7 +60,10 @@ export default function DashboardPage() {
       });
     }
     return result;
-  })();
+  }, [data]);
+
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">로딩 중...</div>;
+  if (error || !data) return <div className="text-red-500">데이터를 불러오지 못했습니다</div>;
 
   const currentYear = new Date().getFullYear();
   const retirementLabel = data.retirement_target_year

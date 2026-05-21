@@ -21,9 +21,9 @@ class AssetAccount(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_LS | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
+    # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    # MANUAL | KIS_API | LS_SEC | OPEN_BANKING
+    # MANUAL | KIS_API | OPEN_BANKING
     data_source: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     institution: Mapped[str | None] = mapped_column(String(100))
 
@@ -37,8 +37,6 @@ class AssetAccount(Base):
     # 계좌별 KIS 자격증명 (AES-256 암호화) — 없으면 UserSettings 전역 자격증명 사용
     kis_app_key: Mapped[str | None] = mapped_column(String(512))
     kis_app_secret: Mapped[str | None] = mapped_column(String(512))
-    # LS증권 계좌 (STOCK_LS)
-    ls_account_no: Mapped[str | None] = mapped_column(String(20))
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True)
 
     # 수동 입력 금액 / 종목 목록
@@ -47,7 +45,7 @@ class AssetAccount(Base):
     manual_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # 수동 주식 포지션 [{ticker, name, market, qty, avg_price, current_price}]
     manual_positions: Mapped[list | None] = mapped_column(JSONB)
-    # 예수금 (현금 잔고) — KIS/LS sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
+    # 예수금 (현금 잔고) — KIS sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
     deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
     # 부동산 상세 (REAL_ESTATE 전용) — {address, property_type, purchase_price_krw, purchase_date, mortgage_balance_krw}
     real_estate_details: Mapped[dict | None] = mapped_column(JSONB)

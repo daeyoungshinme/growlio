@@ -258,7 +258,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     return snapshot
 
 
-_STOCK_TYPES = {"STOCK_KIS", "STOCK_LS", "STOCK_OTHER"}
+_STOCK_TYPES = {"STOCK_KIS", "STOCK_OTHER"}
 
 
 def _eval_value(pos_list: list) -> float:

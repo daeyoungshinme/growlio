@@ -23,6 +23,9 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
       onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         className={`bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[90vh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
@@ -31,6 +34,7 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
             <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">{title}</h2>
             <button
               onClick={onClose}
+              aria-label="닫기"
               className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
             >
               <X size={18} className="text-gray-500 dark:text-gray-400" />

@@ -2,13 +2,7 @@ import { useState, useEffect } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { fetchExchangeRate, type AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
-
-const STOCK_TYPE_LABELS: Record<string, string> = {
-  STOCK_KIS: "주식 (KIS)",
-  STOCK_LS: "주식 (LS증권)",
-  STOCK_OTHER: "주식 (타증권사)",
-  CASH_OTHER: "예수금 (기타)",
-};
+import { STOCK_TYPE_LABELS } from "../../constants";
 
 export interface AccountStats {
   amount_krw: number;
@@ -33,7 +27,7 @@ interface Props {
 
 export default function StockAccountCard({ account, stats, onDelete, onManagePositions, onTransactions, onEditDeposit, onEditName, onSync, isSyncing, isDeleting }: Props) {
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
-  const accountNo = account.kis_account_no ?? account.ls_account_no ?? null;
+  const accountNo = account.kis_account_no ?? null;
   const hasStats = stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
@@ -113,7 +107,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           {account.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{account.notes}</p>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {(account.data_source === "KIS_API" || account.data_source === "LS_SEC") && (
+          {account.data_source === "KIS_API" && (
             <button onClick={() => onSync(account.id)} disabled={isSyncing}
               title="KIS 데이터 동기화"
               className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50">

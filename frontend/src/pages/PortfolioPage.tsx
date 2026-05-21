@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { api } from "../api/client";
 import { syncAccount } from "../api/assets";
@@ -13,6 +13,7 @@ import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import StatCard from "../components/common/StatCard";
+import { DOMESTIC_MARKETS } from "../constants";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "../types";
 
 interface DividendSummary {
@@ -94,13 +95,13 @@ export default function PortfolioPage() {
     }
   };
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">로딩 중...</div>;
-  if (error || !data) return <div className="text-red-500 p-4">데이터를 불러오지 못했습니다</div>;
+  const stockAccounts = useMemo(
+    () => data?.accounts.filter((a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER") ?? [],
+    [data]
+  );
 
-  const stockAccounts = data.accounts.filter((a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER");
-
-  const DOMESTIC_MARKETS = ["KOSPI", "KOSDAQ", "KRX"];
-  const marketChartData = (() => {
+  const marketChartData = useMemo(() => {
+    if (!data) return [];
     let domestic = 0;
     let foreign = 0;
     for (const p of data.all_positions) {
@@ -113,14 +114,20 @@ export default function PortfolioPage() {
     if (domestic > 0) items.push({ name: "국내 주식", value: domestic, pct: (domestic / total) * 100 });
     if (foreign > 0) items.push({ name: "해외 주식", value: foreign, pct: (foreign / total) * 100 });
     return items;
-  })();
+  }, [data]);
 
-  const stockChartData = data.stock_allocation.map((a) => ({
-    name: a.name,
-    ticker: a.ticker,
-    value: a.value_krw ?? 0,
-    pct: a.pct,
-  }));
+  const stockChartData = useMemo(
+    () => (data?.stock_allocation ?? []).map((a) => ({
+      name: a.name,
+      ticker: a.ticker,
+      value: a.value_krw ?? 0,
+      pct: a.pct,
+    })),
+    [data]
+  );
+
+  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">로딩 중...</div>;
+  if (error || !data) return <div className="text-red-500 p-4">데이터를 불러오지 못했습니다</div>;
 
   const pnlColor = data.unrealized_pnl_krw >= 0 ? "red" : "blue" as const;
   const retColor = data.stock_return_pct >= 0 ? "red" : "blue" as const;

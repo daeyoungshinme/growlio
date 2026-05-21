@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PageLoader from "./components/common/PageLoader";
 import Toaster from "./components/Toaster";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
@@ -42,15 +43,17 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<ErrorBoundary><Suspense><DashboardPage /></Suspense></ErrorBoundary>} />
-          <Route path="portfolio" element={<ErrorBoundary><Suspense><PortfolioPage /></Suspense></ErrorBoundary>} />
-          <Route path="asset-management" element={<ErrorBoundary><Suspense><AssetManagementPage /></Suspense></ErrorBoundary>} />
-          <Route path="invest-plan" element={<ErrorBoundary><Suspense><InvestPlanPage /></Suspense></ErrorBoundary>} />
-          <Route path="settings" element={<ErrorBoundary><Suspense><SettingsPage /></Suspense></ErrorBoundary>} />
+          <Route path="dashboard" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><DashboardPage /></Suspense></ErrorBoundary>} />
+          <Route path="portfolio" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><PortfolioPage /></Suspense></ErrorBoundary>} />
+          <Route path="asset-management" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><AssetManagementPage /></Suspense></ErrorBoundary>} />
+          <Route path="invest-plan" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><InvestPlanPage /></Suspense></ErrorBoundary>} />
+          <Route path="settings" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ErrorBoundary>} />
           {/* 구 URL 리다이렉트 */}
           <Route path="assets" element={<Navigate to="/portfolio" replace />} />
           <Route path="trend" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
     </>

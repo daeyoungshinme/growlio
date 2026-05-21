@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,7 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
+from app.limiter import limiter
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
@@ -21,18 +22,19 @@ ASSET_TYPE_LABELS: dict[str, str] = {
     "BANK_ACCOUNT": "통장잔고",
     "DEPOSIT": "예금/적금",
     "STOCK_KIS": "주식(KIS)",
-    "STOCK_LS": "주식(LS증권)",
     "STOCK_OTHER": "주식(타증권)",
     "CASH_OTHER": "예수금(기타)",
     "OTHER": "기타자산",
     "REAL_ESTATE": "부동산",
 }
 
-STOCK_TYPES = {"STOCK_KIS", "STOCK_LS", "STOCK_OTHER"}
+STOCK_TYPES = {"STOCK_KIS", "STOCK_OTHER"}
 
 
 @router.get("/overview")
+@limiter.limit("10/minute")
 async def portfolio_overview(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

@@ -2,20 +2,8 @@ import { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { fmtKrwShort } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
+import { STOCK_TYPE_LABELS, DATA_SOURCE_BADGE } from "../../constants";
 import type { AccountRow } from "../../types";
-
-const STOCK_TYPE_LABELS: Record<string, string> = {
-  STOCK_KIS: "주식 (KIS)",
-  STOCK_LS: "주식 (LS증권)",
-  STOCK_OTHER: "주식 (타증권사)",
-  CASH_OTHER: "예수금 (기타)",
-};
-
-const DATA_SOURCE_BADGE: Record<string, string> = {
-  KIS_API: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400",
-  LS_SEC: "bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400",
-  OPEN_BANKING: "bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400",
-};
 
 function PnlText({ val, pct }: { val: number; pct: number }) {
   const pos = val >= 0;

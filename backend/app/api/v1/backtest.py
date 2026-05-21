@@ -1,12 +1,13 @@
 """백테스팅 API."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.limiter import limiter
 from app.models.backtest import BacktestPortfolio
 from app.models.user import User
 from app.schemas.backtest import (
@@ -101,7 +102,9 @@ async def delete_portfolio(
 
 
 @router.post("/run", response_model=BacktestResult)
+@limiter.limit("2/minute")
 async def run_backtest_endpoint(
+    request: Request,
     body: BacktestRunRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

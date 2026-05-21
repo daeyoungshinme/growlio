@@ -5,10 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, field_validator
 
 AssetType = Literal[
-    "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_LS", "STOCK_OTHER",
+    "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_OTHER",
     "CASH_OTHER", "OTHER", "REAL_ESTATE",
 ]
-DataSource = Literal["MANUAL", "KIS_API", "LS_SEC", "OPEN_BANKING"]
+DataSource = Literal["MANUAL", "KIS_API", "OPEN_BANKING"]
 TransactionType = Literal["DEPOSIT", "WITHDRAWAL", "DIVIDEND"]
 
 
@@ -42,7 +42,6 @@ class AssetAccountCreate(BaseModel):
     kis_account_no: str | None = None
     kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
-    ls_account_no: str | None = None
     ob_fintech_use_no: str | None = None
     ob_bank_code: str | None = None
     is_mock_mode: bool = True
@@ -86,7 +85,6 @@ class AssetAccountResponse(BaseModel):
     data_source: DataSource
     institution: str | None
     kis_account_no: str | None = None
-    ls_account_no: str | None = None
     is_mock_mode: bool
     manual_amount: float | None
     manual_currency: str

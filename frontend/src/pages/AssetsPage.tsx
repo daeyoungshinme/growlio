@@ -6,31 +6,7 @@ import StockPositionsModal from "../components/assets/StockPositionsModal";
 import { fmtKrwNullable } from "../utils/format";
 import { extractErrorMessage } from "../utils/error";
 import { toast } from "../utils/toast";
-
-const ASSET_TYPE_LABELS: Record<string, string> = {
-  BANK_ACCOUNT: "통장잔고",
-  DEPOSIT: "예금/적금",
-  STOCK_KIS: "주식 (KIS)",
-  STOCK_LS: "주식 (LS증권)",
-  STOCK_OTHER: "주식 (타증권사)",
-  CASH_OTHER: "예수금 (기타)",
-  OTHER: "기타",
-  REAL_ESTATE: "부동산",
-};
-
-const DATA_SOURCE_LABELS: Record<string, string> = {
-  MANUAL: "수동",
-  KIS_API: "KIS 자동",
-  LS_SEC: "LS증권 자동",
-  OPEN_BANKING: "오픈뱅킹",
-};
-
-const DATA_SOURCE_BADGE: Record<string, string> = {
-  KIS_API: "bg-blue-50 text-blue-600",
-  LS_SEC: "bg-purple-50 text-purple-600",
-  OPEN_BANKING: "bg-green-50 text-green-700",
-  MANUAL: "bg-gray-100 text-gray-500",
-};
+import { ASSET_TYPE_LABELS, DATA_SOURCE_LABELS, DATA_SOURCE_BADGE } from "../constants";
 
 
 export default function AssetsPage() {
@@ -102,7 +78,6 @@ export default function AssetsPage() {
                 <p className="text-xs text-gray-400 mt-0.5 truncate">
                   {acc.institution && <span>{acc.institution}</span>}
                   {acc.kis_account_no && <span className="ml-1 text-blue-400">({acc.kis_account_no})</span>}
-                  {acc.ls_account_no && <span className="ml-1 text-purple-400">({acc.ls_account_no})</span>}
                 </p>
               </div>
               <div className="text-right mr-4 shrink-0">
@@ -202,7 +177,6 @@ function AddAccountModal({ onSubmit, onClose, loading }: {
             >
               <option value="MANUAL">수동 입력</option>
               <option value="KIS_API">KIS 한국투자증권 (자동)</option>
-              <option value="LS_SEC">LS증권 (자동)</option>
               <option value="OPEN_BANKING">오픈뱅킹 은행 (자동)</option>
             </select>
           </div>
@@ -226,7 +200,7 @@ function AddAccountModal({ onSubmit, onClose, loading }: {
               className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
               value={form.institution ?? ""}
               onChange={(e) => set("institution", e.target.value)}
-              placeholder="예: 국민은행, LS증권"
+              placeholder="예: 국민은행, 한국투자증권"
             />
           </div>
 
@@ -254,20 +228,6 @@ function AddAccountModal({ onSubmit, onClose, loading }: {
                 placeholder="12345678-01"
               />
               <p className="text-xs text-gray-400 mt-1">설정 페이지에서 KIS App Key/Secret을 먼저 등록해야 합니다.</p>
-            </div>
-          )}
-
-          {/* LS증권 계좌번호 */}
-          {form.data_source === "LS_SEC" && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">LS증권 계좌번호</label>
-              <input
-                className="mt-1 w-full border rounded-lg px-3 py-2 text-sm"
-                value={form.ls_account_no ?? ""}
-                onChange={(e) => set("ls_account_no", e.target.value)}
-                placeholder="12345678-10"
-              />
-              <p className="text-xs text-gray-400 mt-1">설정 페이지에서 LS증권 App Key/Secret을 먼저 등록해야 합니다.</p>
             </div>
           )}
 

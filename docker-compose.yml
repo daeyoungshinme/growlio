@@ -60,6 +60,21 @@ services:
       VITE_API_BASE_URL: http://localhost:8000
     command: npm run dev -- --host 0.0.0.0
 
+  # Production nginx — run: docker compose --profile production up
+  # Build frontend first: docker compose build frontend && docker compose run --rm frontend npm run build
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - frontend_dist:/usr/share/nginx/html:ro
+    depends_on:
+      - backend
+    profiles:
+      - production
+
 volumes:
   postgres_data:
   redis_data:
+  frontend_dist:

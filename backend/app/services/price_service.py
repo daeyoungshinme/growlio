@@ -3,7 +3,6 @@
 우선순위:
   1. Yahoo Finance (API 키 불필요 — 국내·해외 모두 지원, ~15분 지연)
   2. KIS API (설정된 경우, 실시간)
-  3. LS증권 API (설정된 경우, 실시간)
 
 Yahoo Finance 티커 변환:
   KOSPI  005930  →  005930.KS

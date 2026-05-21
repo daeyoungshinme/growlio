@@ -5,7 +5,7 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +41,9 @@ def _account_response(account: AssetAccount) -> AssetAccountResponse:
     return data
 
 
+_VALID_MARKETS = {"KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX", "OTHER"}
+
+
 class ManualPosition(BaseModel):
     ticker: str
     name: str
@@ -50,6 +53,34 @@ class ManualPosition(BaseModel):
     avg_price_usd: float | None = None   # 원본 달러 입력값 (표시용)
     usd_rate: float | None = None        # 평단가 환산에 사용한 환율
     current_price: float | None = None   # 항상 KRW
+
+    @field_validator("ticker")
+    @classmethod
+    def ticker_not_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("티커는 빈 값일 수 없습니다")
+        return v.strip().upper()
+
+    @field_validator("qty")
+    @classmethod
+    def qty_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("수량은 0보다 커야 합니다")
+        return v
+
+    @field_validator("avg_price")
+    @classmethod
+    def avg_price_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("평균단가는 0보다 커야 합니다")
+        return v
+
+    @field_validator("market")
+    @classmethod
+    def market_valid(cls, v: str) -> str:
+        if v not in _VALID_MARKETS:
+            raise ValueError(f"유효하지 않은 시장: {v}. 허용값: {sorted(_VALID_MARKETS)}")
+        return v
 
 router = APIRouter(prefix="/assets", tags=["assets"])
 
@@ -127,6 +158,8 @@ async def create_account(
 async def get_snapshots(
     start_date: date | None = None,
     end_date: date | None = None,
+    limit: int = 365,
+    skip: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -135,7 +168,7 @@ async def get_snapshots(
         query = query.where(AssetSnapshot.snapshot_date >= start_date)
     if end_date:
         query = query.where(AssetSnapshot.snapshot_date <= end_date)
-    query = query.order_by(AssetSnapshot.snapshot_date.desc())
+    query = query.order_by(AssetSnapshot.snapshot_date.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     return result.scalars().all()
 

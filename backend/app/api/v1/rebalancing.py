@@ -3,13 +3,14 @@ import asyncio
 import uuid
 from functools import partial
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.api.v1.portfolio import _build_portfolio_overview
 from app.database import get_db
+from app.limiter import limiter
 from app.models.portfolio import Portfolio
 from app.models.rebalancing import TargetPortfolio
 from app.models.user import User
@@ -118,7 +119,9 @@ async def delete_portfolio(
 
 
 @router.get("/portfolios/{portfolio_id}/analyze", response_model=RebalancingAnalysis)
+@limiter.limit("5/minute")
 async def analyze_portfolio(
+    request: Request,
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -205,7 +208,9 @@ async def analyze_portfolio(
 
 
 @router.post("/portfolios/{portfolio_id}/execute", response_model=ExecutionResult)
+@limiter.limit("2/minute")
 async def execute_portfolio_rebalancing(
+    request: Request,
     portfolio_id: uuid.UUID,
     body: ExecutionRequest,
     current_user: User = Depends(get_current_user),

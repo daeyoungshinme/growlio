@@ -26,13 +26,10 @@ import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
 import { fmtKrw } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
+import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
 
 const TABS = ["은행계좌", "증권계좌", "부동산", "입출금·배당"] as const;
 type Tab = typeof TABS[number];
-
-const BANK_TYPES = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"];
-const STOCK_TYPES = ["STOCK_KIS", "STOCK_LS", "STOCK_OTHER"];
-const REAL_ESTATE_TYPES = ["REAL_ESTATE"];
 
 interface StockOverview {
   total_stock_krw: number;
@@ -84,7 +81,7 @@ export default function AssetManagementPage() {
       invalidateAll();
       setShowBankModal(false);
       setShowStockModal(false);
-      if (data.data_source === "KIS_API" || data.data_source === "LS_SEC") {
+      if (data.data_source === "KIS_API") {
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
@@ -387,7 +384,7 @@ export default function AssetManagementPage() {
         <StockPositionsModal
           accountId={positionsAccount.id}
           accountName={positionsAccount.name}
-          readonly={["KIS_API", "LS_SEC"].includes(positionsAccount.dataSource)}
+          readonly={positionsAccount.dataSource === "KIS_API"}
           onClose={() => {
             setPositionsAccount(null);
             void invalidateAccountData(queryClient);
