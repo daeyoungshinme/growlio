@@ -3,6 +3,8 @@ import asyncio
 import uuid
 from functools import partial
 
+import structlog
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,19 +12,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.api.v1.portfolio import _build_portfolio_overview
 from app.database import get_db
+from app.kis.auth import get_access_token
+from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.limiter import limiter
+from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing import TargetPortfolio
-from app.models.user import User
+from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     ExecutionRequest,
     ExecutionResult,
+    KisBalancePosition,
+    KisBalanceResponse,
     RebalancingAnalysis,
     TargetPortfolioCreate,
     TargetPortfolioResponse,
     TargetPortfolioUpdate,
 )
+from app.services.credential_service import decrypt
 from app.services.dividend_constants import is_korean_etf
 from app.services.dividend_providers import (
     sync_naver_etf_dividend_info,
@@ -32,8 +40,10 @@ from app.services.dividend_providers import (
 from app.services.dividend_service import get_ticker_dividend_summary
 from app.services.price_service import _to_yahoo_symbol, get_historical_returns
 from app.services.rebalancing_service import analyze_rebalancing
+from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
+logger = structlog.get_logger()
 
 
 @router.get("/portfolios", response_model=list[TargetPortfolioResponse])
@@ -207,7 +217,7 @@ async def analyze_portfolio(
     return analyze_rebalancing(portfolio, overview, dividend_map, returns_map)
 
 
-@router.post("/portfolios/{portfolio_id}/execute", response_model=ExecutionResult)
+@router.post("/portfolios/{portfolio_id}/execute", response_model=list[ExecutionResult])
 @limiter.limit("2/minute")
 async def execute_portfolio_rebalancing(
     request: Request,
@@ -242,3 +252,151 @@ async def execute_portfolio_rebalancing(
         db=db,
         redis=redis,
     )
+
+
+async def _fetch_account_balance(
+    account: AssetAccount,
+    user_settings: UserSettings | None,
+    db: AsyncSession,
+    redis,
+    usd_rate: float | None,
+) -> KisBalanceResponse:
+    """단일 KIS 계좌 잔고를 조회해 KisBalanceResponse로 반환한다. 실패 시 예외 발생."""
+    if not account.kis_account_no:
+        raise ValueError("계좌번호가 설정되지 않았습니다.")
+
+    if account.kis_app_key and account.kis_app_secret:
+        app_key = decrypt(account.kis_app_key)
+        app_secret = decrypt(account.kis_app_secret)
+    else:
+        if not user_settings or not user_settings.kis_app_key or not user_settings.kis_app_secret:
+            raise ValueError("KIS 자격증명이 설정되지 않았습니다.")
+        app_key = decrypt(user_settings.kis_app_key)
+        app_secret = decrypt(user_settings.kis_app_secret)
+
+    is_mock = account.is_mock_mode
+    access_token = await get_access_token(
+        app_key, app_secret,
+        is_mock=is_mock,
+        redis=redis,
+        db=db,
+        user_id=str(account.user_id),
+        account_id=str(account.id),
+    )
+
+    domestic = await get_domestic_balance(
+        app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+    )
+    overseas = await get_overseas_balance(
+        app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+    )
+
+    rate = usd_rate or 1350.0
+    positions: list[KisBalancePosition] = []
+    for p in domestic.get("positions", []):
+        positions.append(KisBalancePosition(
+            ticker=p["ticker"],
+            name=p["name"],
+            market=p["market"],
+            quantity=int(p["qty"]),
+            avg_price=float(p["avg_price"]),
+            current_price=float(p["current_price"]),
+            value_krw=float(p["value_krw"]),
+        ))
+    for p in overseas.get("positions", []):
+        positions.append(KisBalancePosition(
+            ticker=p["ticker"],
+            name=p["name"],
+            market=p["market"],
+            quantity=int(p["qty"]),
+            avg_price=round(float(p["avg_price"]) * rate),
+            current_price=round(float(p["current_price"]) * rate),
+            value_krw=round(float(p.get("value_usd", 0)) * rate),
+        ))
+
+    return KisBalanceResponse(
+        account_id=str(account.id),
+        account_name=account.name,
+        is_mock=is_mock,
+        positions=positions,
+        deposit_krw=float(domestic.get("deposit_krw", 0)),
+    )
+
+
+@router.get("/kis-balance/{account_id}", response_model=KisBalanceResponse)
+async def get_kis_account_balance(
+    account_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """KIS 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
+    account = await db.scalar(
+        select(AssetAccount).where(
+            AssetAccount.id == account_id,
+            AssetAccount.user_id == current_user.id,
+        )
+    )
+    if not account:
+        logger.warning(
+            "kis_balance_account_not_found",
+            account_id=str(account_id),
+            user_id=str(current_user.id),
+        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다.")
+    if account.asset_type != "STOCK_KIS":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌만 잔고 조회가 가능합니다.")
+
+    settings: UserSettings | None = None
+    if not (account.kis_app_key and account.kis_app_secret):
+        settings = await db.scalar(
+            select(UserSettings).where(UserSettings.user_id == current_user.id)
+        )
+
+    usd_rate = await get_usd_krw_rate(redis)
+
+    try:
+        return await _fetch_account_balance(account, settings, db, redis, usd_rate)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/kis-balance-all", response_model=list[KisBalanceResponse])
+async def get_all_kis_account_balances(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """연동된 모든 활성 KIS 계좌의 실시간 잔고를 병렬로 조회한다."""
+    acc_result = await db.execute(
+        select(AssetAccount).where(
+            AssetAccount.user_id == current_user.id,
+            AssetAccount.asset_type == "STOCK_KIS",
+            AssetAccount.is_active == True,  # noqa: E712
+        )
+    )
+    kis_accounts = acc_result.scalars().all()
+
+    if not kis_accounts:
+        return []
+
+    settings = await db.scalar(
+        select(UserSettings).where(UserSettings.user_id == current_user.id)
+    )
+    usd_rate = await get_usd_krw_rate(redis)
+
+    tasks = [_fetch_account_balance(acc, settings, db, redis, usd_rate) for acc in kis_accounts]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    return [
+        r if not isinstance(r, Exception)
+        else KisBalanceResponse(
+            account_id=str(acc.id),
+            account_name=acc.name,
+            is_mock=acc.is_mock_mode,
+            positions=[],
+            deposit_krw=0.0,
+            error=str(r),
+        )
+        for acc, r in zip(kis_accounts, results)
+    ]

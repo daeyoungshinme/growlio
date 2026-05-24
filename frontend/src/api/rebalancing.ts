@@ -45,6 +45,15 @@ export interface CurrentHolding {
   current_weight_pct: number;
 }
 
+export interface TickerAccountInfo {
+  account_id: string;
+  account_name: string;
+  asset_type: string;
+  quantity: number;
+  value_krw: number;
+  is_mock_mode: boolean;
+}
+
 export interface RebalancingAnalysis {
   portfolio_id: string;
   portfolio_name: string;
@@ -58,6 +67,7 @@ export interface RebalancingAnalysis {
   total_current_annual_dividend?: number;
   target_weighted_cagr_10y_pct?: number | null;
   current_weighted_cagr_10y_pct?: number | null;
+  ticker_account_map: Record<string, TickerAccountInfo[]>;
 }
 
 export const fetchTargetPortfolios = () =>
@@ -88,10 +98,11 @@ export interface ExecutionOrderItem {
   market: string;
   side: "BUY" | "SELL";
   quantity: number;
+  account_id?: string | null;
 }
 
 export interface ExecutionRequest {
-  account_id: string;
+  account_id?: string | null;
   orders: ExecutionOrderItem[];
 }
 
@@ -116,5 +127,32 @@ export interface ExecutionResult {
   executed_at: string;
 }
 
-export const executeRebalancing = (portfolioId: string, body: ExecutionRequest): Promise<ExecutionResult> =>
-  api.post<ExecutionResult>(`/rebalancing/portfolios/${portfolioId}/execute`, body).then((r) => r.data);
+export const executeRebalancing = (portfolioId: string, body: ExecutionRequest): Promise<ExecutionResult[]> =>
+  api.post<ExecutionResult[]>(`/rebalancing/portfolios/${portfolioId}/execute`, body).then((r) => r.data);
+
+// ── KIS 실시간 잔고 조회 ──────────────────────────────────────
+
+export interface KisBalancePosition {
+  ticker: string;
+  name: string;
+  market: string;
+  quantity: number;
+  avg_price: number;
+  current_price: number;
+  value_krw: number;
+}
+
+export interface KisBalanceResponse {
+  account_id: string;
+  account_name: string;
+  is_mock: boolean;
+  positions: KisBalancePosition[];
+  deposit_krw: number;
+  error?: string | null;
+}
+
+export const fetchKisBalance = (accountId: string): Promise<KisBalanceResponse> =>
+  api.get<KisBalanceResponse>(`/rebalancing/kis-balance/${accountId}`).then((r) => r.data);
+
+export const fetchAllKisBalances = (): Promise<KisBalanceResponse[]> =>
+  api.get<KisBalanceResponse[]>(`/rebalancing/kis-balance-all`).then((r) => r.data);

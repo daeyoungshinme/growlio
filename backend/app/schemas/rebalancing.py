@@ -5,6 +5,15 @@ from datetime import datetime
 from pydantic import BaseModel, field_validator
 
 
+class TickerAccountInfo(BaseModel):
+    account_id: str
+    account_name: str
+    asset_type: str  # "STOCK_KIS" | "STOCK_OTHER" | ...
+    quantity: float = 0       # 해당 계좌 보유 수량
+    value_krw: float = 0      # 해당 계좌 보유 금액 (KRW)
+    is_mock_mode: bool = False  # KIS 모의 여부
+
+
 class TargetPortfolioItem(BaseModel):
     ticker: str
     name: str
@@ -116,6 +125,7 @@ class RebalancingAnalysis(BaseModel):
     total_current_annual_dividend: float = 0.0       # 미추적 종목 포함 전체 보유 기준 연간 배당
     target_weighted_cagr_10y_pct: float | None = None   # 목표 비중 기준 가중 CAGR (10년)
     current_weighted_cagr_10y_pct: float | None = None  # 현재 비중 기준 가중 CAGR (10년)
+    ticker_account_map: dict[str, list[TickerAccountInfo]] = {}  # ticker → 보유 계좌 목록
 
 
 # ── 리밸런싱 실행 ─────────────────────────────────────────────
@@ -124,12 +134,13 @@ class ExecutionOrderItem(BaseModel):
     ticker: str
     name: str
     market: str
-    side: str       # "BUY" | "SELL"
-    quantity: int   # 양수 (방향은 side로)
+    side: str           # "BUY" | "SELL"
+    quantity: int       # 양수 (방향은 side로)
+    account_id: str | None = None   # 실행할 KIS 계좌 ID (None이면 default_account_id 사용)
 
 
 class ExecutionRequest(BaseModel):
-    account_id: uuid.UUID
+    account_id: uuid.UUID | None = None   # 기본 KIS 계좌 (order에 account_id 없을 때 폴백)
     orders: list[ExecutionOrderItem]
 
     @field_validator("orders")
@@ -138,6 +149,25 @@ class ExecutionRequest(BaseModel):
         if not v:
             raise ValueError("주문 항목이 최소 1개 이상이어야 합니다.")
         return v
+
+
+class KisBalancePosition(BaseModel):
+    ticker: str
+    name: str
+    market: str
+    quantity: int
+    avg_price: float
+    current_price: float
+    value_krw: float
+
+
+class KisBalanceResponse(BaseModel):
+    account_id: str
+    account_name: str
+    is_mock: bool
+    positions: list[KisBalancePosition]
+    deposit_krw: float
+    error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 
 class OrderResult(BaseModel):

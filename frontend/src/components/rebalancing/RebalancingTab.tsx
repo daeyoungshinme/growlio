@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit2, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { analyzePortfolio, RebalancingAnalysis } from "../../api/rebalancing";
+import { analyzePortfolio, ExecutionResult, RebalancingAnalysis } from "../../api/rebalancing";
 import {
   createPortfolio,
   deletePortfolio,
@@ -14,6 +14,32 @@ import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "../portfolios/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
 import { toast } from "../../utils/toast";
+
+function applyExecutionResults(analysis: RebalancingAnalysis, results: ExecutionResult[]): RebalancingAnalysis {
+  const successMap: Record<string, number> = {};
+  for (const result of results) {
+    for (const order of result.orders) {
+      if (order.status === "SUCCESS") {
+        const delta = order.side === "BUY" ? order.quantity : -order.quantity;
+        successMap[order.ticker] = (successMap[order.ticker] ?? 0) + delta;
+      }
+    }
+  }
+  return {
+    ...analysis,
+    items: analysis.items.map((item) => {
+      const delta = successMap[item.ticker];
+      if (delta === undefined || item.shares_to_trade === null) return item;
+      const newShares = item.shares_to_trade - delta;
+      const rounded = Math.abs(newShares) < 0.5 ? 0 : newShares;
+      return {
+        ...item,
+        shares_to_trade: rounded,
+        diff_krw: item.current_price_krw != null ? rounded * item.current_price_krw : item.diff_krw,
+      };
+    }),
+  };
+}
 
 export default function RebalancingTab() {
   const queryClient = useQueryClient();
@@ -34,7 +60,8 @@ export default function RebalancingTab() {
     queryKey: ["accounts"],
     queryFn: fetchAccounts,
   });
-  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" && a.is_active);
+  // fetchAccounts는 is_active=True 필터로 활성 계좌만 반환
+  const allAccounts = accounts;
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; items: PortfolioItem[]; base_type: string }) =>
@@ -76,6 +103,10 @@ export default function RebalancingTab() {
     } else {
       createMutation.mutate({ name, items, base_type: baseType });
     }
+  }
+
+  function handleExecuted(results: ExecutionResult[]) {
+    setAnalysis((prev) => prev ? applyExecutionResults(prev, results) : prev);
   }
 
   async function handleAnalyze(portfolioId: string) {
@@ -209,7 +240,8 @@ export default function RebalancingTab() {
             <RebalancingTable
               analysis={analysis}
               portfolioId={analysis.portfolio_id}
-              kisAccounts={kisAccounts}
+              accounts={allAccounts}
+              onExecuted={handleExecuted}
             />
           </div>
         ) : analysisError ? (

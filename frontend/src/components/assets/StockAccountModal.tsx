@@ -102,6 +102,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                     <div>
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-400">KIS App Key</label>
                       <input
+                        type="password"
                         className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         value={form.kis_app_key ?? ""}
                         onChange={(e) => set("kis_app_key", e.target.value || undefined)}

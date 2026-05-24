@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { RebalancingAnalysis, RebalancingItem } from "../../api/rebalancing";
+import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "../../api/rebalancing";
 import { AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
@@ -91,7 +91,8 @@ function Return10yCell({ item }: { item: import("../../api/rebalancing").Rebalan
 interface Props {
   analysis: RebalancingAnalysis;
   portfolioId: string;
-  kisAccounts: AssetAccount[];
+  accounts: AssetAccount[];
+  onExecuted?: (results: ExecutionResult[]) => void;
 }
 
 function CagrCard({ label, cagr }: { label: string; cagr: number | null | undefined }) {
@@ -108,7 +109,8 @@ function CagrCard({ label, cagr }: { label: string; cagr: number | null | undefi
   );
 }
 
-export default function RebalancingTable({ analysis, portfolioId, kisAccounts }: Props) {
+export default function RebalancingTable({ analysis, portfolioId, accounts, onExecuted }: Props) {
+  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS");
   const [showDividendDetail, setShowDividendDetail] = useState(false);
   const [executionOpen, setExecutionOpen] = useState(false);
 
@@ -333,7 +335,8 @@ export default function RebalancingTable({ analysis, portfolioId, kisAccounts }:
         <RebalancingExecutionModal
           portfolioId={portfolioId}
           analysis={analysis}
-          kisAccounts={kisAccounts}
+          accounts={accounts}
+          onExecuted={onExecuted}
           onClose={() => setExecutionOpen(false)}
         />
       )}

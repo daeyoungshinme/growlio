@@ -1,5 +1,6 @@
 """리밸런싱 실행 서비스 — KIS API를 통해 매수/매도 주문을 일괄 실행한다."""
 import uuid
+from collections import defaultdict
 from datetime import UTC, datetime
 
 import structlog
@@ -17,19 +18,11 @@ from app.services.credential_service import decrypt
 logger = structlog.get_logger()
 
 
-async def execute_rebalancing(
-    user_id: uuid.UUID,
+async def _load_account(
     account_id: uuid.UUID,
-    orders: list[ExecutionOrderItem],
+    user_id: uuid.UUID,
     db: AsyncSession,
-    redis,
-) -> ExecutionResult:
-    """선택된 리밸런싱 주문 항목을 KIS API를 통해 순차 실행한다.
-
-    매도 주문을 먼저 처리해 현금을 확보한 뒤 매수 주문을 실행한다.
-    개별 주문 실패 시 나머지 주문은 계속 진행된다.
-    """
-    # KIS 계좌 확인
+) -> AssetAccount:
     account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.id == account_id,
@@ -38,61 +31,123 @@ async def execute_rebalancing(
         )
     )
     if not account:
-        raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다.")
+        raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
     if account.asset_type != "STOCK_KIS":
         raise HTTPException(status_code=400, detail="KIS 계좌만 실행 주문이 가능합니다.")
     if not account.kis_account_no:
         raise HTTPException(status_code=400, detail="계좌번호가 설정되지 않았습니다.")
+    return account
 
-    # KIS 자격증명 로드
+
+async def _load_credentials(
+    account: AssetAccount,
+    settings: UserSettings | None,
+) -> tuple[str, str]:
+    """계좌별 자격증명 우선, 없으면 전역 설정 폴백."""
+    if account.kis_app_key and account.kis_app_secret:
+        return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
+    if settings and settings.kis_app_key and settings.kis_app_secret:
+        return decrypt(settings.kis_app_key), decrypt(settings.kis_app_secret)
+    raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다.")
+
+
+async def execute_rebalancing(
+    user_id: uuid.UUID,
+    account_id: uuid.UUID | None,
+    orders: list[ExecutionOrderItem],
+    db: AsyncSession,
+    redis,
+) -> list[ExecutionResult]:
+    """선택된 리밸런싱 주문 항목을 KIS API를 통해 순차 실행한다.
+
+    주문별 account_id로 계좌를 그룹화해 각 계좌별 독립 실행한다.
+    account_id가 없는 주문은 인자로 전달된 account_id(기본 계좌)를 사용한다.
+    매도 주문을 먼저 처리해 현금을 확보한 뒤 매수 주문을 실행한다.
+    개별 주문 실패 시 나머지 주문은 계속 진행된다.
+    계좌별 ExecutionResult 목록을 반환한다.
+    """
+    # 주문을 account_id별로 그룹화
+    groups: dict[str, list[ExecutionOrderItem]] = defaultdict(list)
+    for order in orders:
+        target_acc_id = order.account_id or (str(account_id) if account_id else None)
+        if not target_acc_id:
+            raise HTTPException(
+                status_code=400,
+                detail=f"주문 계좌가 지정되지 않았습니다. (ticker={order.ticker})",
+            )
+        groups[target_acc_id].append(order)
+
+    if not groups:
+        raise HTTPException(status_code=400, detail="실행할 주문이 없습니다.")
+
+    # 전역 자격증명 (계좌별 키 없을 때 폴백)
     settings = await db.scalar(
         select(UserSettings).where(UserSettings.user_id == user_id)
     )
-    if not settings or not settings.kis_app_key or not settings.kis_app_secret:
-        raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다.")
 
-    app_key = decrypt(settings.kis_app_key)
-    app_secret = decrypt(settings.kis_app_secret)
-    is_mock = account.is_mock_mode
-    account_no = account.kis_account_no
+    results: list[ExecutionResult] = []
 
-    access_token = await get_access_token(
-        app_key, app_secret, is_mock=is_mock, redis=redis, db=db, user_id=str(user_id)
-    )
+    for acc_id_str, group_orders in groups.items():
+        acc_uuid = uuid.UUID(acc_id_str)
+        account = await _load_account(acc_uuid, user_id, db)
+        app_key, app_secret = await _load_credentials(account, settings)
+        is_mock = account.is_mock_mode
+        account_no = account.kis_account_no
 
-    # 매도 우선: sells → buys 순으로 처리
-    sells = [o for o in orders if o.side == "SELL"]
-    buys = [o for o in orders if o.side == "BUY"]
-
-    results: list[OrderResult] = []
-    for order in sells + buys:
-        results.append(
-            await _execute_single_order(
-                order, app_key, app_secret, access_token, account_no, is_mock
-            )
+        access_token = await get_access_token(
+            app_key, app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(user_id),
+            account_id=str(acc_uuid),
         )
 
-    success_count = sum(1 for r in results if r.status == "SUCCESS")
-    fail_count = sum(1 for r in results if r.status == "FAILED")
+        sells = [o for o in group_orders if o.side == "SELL"]
+        buys = [o for o in group_orders if o.side == "BUY"]
 
+        account_results: list[OrderResult] = []
+        for order in sells + buys:
+            account_results.append(
+                await _execute_single_order(
+                    order, app_key, app_secret, access_token, account_no, is_mock
+                )
+            )
+
+        success_count = sum(1 for r in account_results if r.status == "SUCCESS")
+        fail_count = sum(1 for r in account_results if r.status == "FAILED")
+
+        logger.info(
+            "rebalancing_group_executed",
+            user_id=str(user_id),
+            account_id=acc_id_str,
+            is_mock=is_mock,
+            orders=len(group_orders),
+            success=success_count,
+            failed=fail_count,
+        )
+
+        results.append(ExecutionResult(
+            account_id=str(account.id),
+            account_name=account.name,
+            is_mock=is_mock,
+            orders=account_results,
+            success_count=success_count,
+            fail_count=fail_count,
+            executed_at=datetime.now(UTC).isoformat(),
+        ))
+
+    total_success = sum(r.success_count for r in results)
+    total_fail = sum(r.fail_count for r in results)
     logger.info(
         "rebalancing_executed",
         user_id=str(user_id),
-        account_id=str(account_id),
-        is_mock=is_mock,
-        success=success_count,
-        failed=fail_count,
+        account_groups=len(groups),
+        success=total_success,
+        failed=total_fail,
     )
 
-    return ExecutionResult(
-        account_id=str(account_id),
-        account_name=account.name,
-        is_mock=is_mock,
-        orders=results,
-        success_count=success_count,
-        fail_count=fail_count,
-        executed_at=datetime.now(UTC).isoformat(),
-    )
+    return results
 
 
 async def _execute_single_order(

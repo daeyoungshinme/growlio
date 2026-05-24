@@ -35,7 +35,7 @@ export default function PortfolioAnalysisTab() {
     queryKey: ["accounts"],
     queryFn: fetchAccounts,
   });
-  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" && a.is_active);
+  const activeAccounts = accounts.filter((a) => a.is_active);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
@@ -353,7 +353,7 @@ export default function PortfolioAnalysisTab() {
             <RebalancingTable
               analysis={analysis}
               portfolioId={analysis.portfolio_id}
-              kisAccounts={kisAccounts}
+              accounts={activeAccounts}
             />
           </div>
         )}

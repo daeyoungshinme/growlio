@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.models.portfolio import Portfolio
-from app.schemas.rebalancing import CurrentHolding, RebalancingAnalysis, RebalancingItem
+from app.schemas.rebalancing import CurrentHolding, RebalancingAnalysis, RebalancingItem, TickerAccountInfo
 
 
 def analyze_rebalancing(
@@ -166,6 +166,43 @@ def analyze_rebalancing(
                     sum(v * c for v, c in current_holdings_with_cagr) / total_val, 2
                 )
 
+    # ticker별 보유 계좌 맵 구성 (계좌별 수량/금액/모의여부 포함)
+    account_meta_map = {
+        str(acc.get("id", acc.get("account_id", ""))): {
+            "asset_type": acc.get("asset_type", "UNKNOWN"),
+            "is_mock_mode": bool(acc.get("is_mock_mode", False)),
+        }
+        for acc in overview.get("accounts", [])
+    }
+    # (ticker, account_id) → {name, qty, value} 누적
+    holding_map: dict[tuple[str, str], dict] = {}
+    for pos in overview.get("all_positions", []):
+        pos_ticker = pos.get("ticker", "")
+        acc_id = str(pos.get("account_id", ""))
+        if not pos_ticker or not acc_id:
+            continue
+        key = (pos_ticker, acc_id)
+        if key not in holding_map:
+            holding_map[key] = {
+                "account_name": pos.get("account_name", ""),
+                "qty": 0.0,
+                "val": 0.0,
+            }
+        holding_map[key]["qty"] += float(pos.get("qty", 0))
+        holding_map[key]["val"] += float(pos.get("value_krw", 0))
+
+    ticker_account_map: dict[str, list[TickerAccountInfo]] = {}
+    for (pos_ticker, acc_id), data in holding_map.items():
+        meta = account_meta_map.get(acc_id, {})
+        ticker_account_map.setdefault(pos_ticker, []).append(TickerAccountInfo(
+            account_id=acc_id,
+            account_name=data["account_name"],
+            asset_type=meta.get("asset_type", "UNKNOWN"),
+            quantity=round(data["qty"], 4),
+            value_krw=round(data["val"], 0),
+            is_mock_mode=meta.get("is_mock_mode", False),
+        ))
+
     return RebalancingAnalysis(
         portfolio_id=uuid.UUID(str(portfolio.id)),
         portfolio_name=portfolio.name,
@@ -179,4 +216,5 @@ def analyze_rebalancing(
         total_current_annual_dividend=round(target_div_sum + untracked_annual_dividend, 0),
         target_weighted_cagr_10y_pct=target_weighted_cagr,
         current_weighted_cagr_10y_pct=current_weighted_cagr,
+        ticker_account_map=ticker_account_map,
     )
