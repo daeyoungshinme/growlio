@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.kis.auth import get_access_token
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.models.asset import AssetAccount
-from app.models.user import UserSettings
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.credential_service import decrypt
 
@@ -43,16 +42,11 @@ async def _load_account(
     return account
 
 
-async def _load_credentials(
-    account: AssetAccount,
-    settings: UserSettings | None,
-) -> tuple[str, str]:
-    """KIS 계좌별 자격증명 우선, 없으면 전역 설정 폴백."""
+async def _load_credentials(account: AssetAccount) -> tuple[str, str]:
+    """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
     if account.kis_app_key and account.kis_app_secret:
         return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
-    if settings and settings.kis_app_key and settings.kis_app_secret:
-        return decrypt(settings.kis_app_key), decrypt(settings.kis_app_secret)
-    raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다.")
+    raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
 
 
 async def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
@@ -91,11 +85,6 @@ async def execute_rebalancing(
     if not groups:
         raise HTTPException(status_code=400, detail="실행할 주문이 없습니다.")
 
-    # 전역 자격증명 (계좌별 키 없을 때 폴백)
-    settings = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == user_id)
-    )
-
     results: list[ExecutionResult] = []
 
     for acc_id_str, group_orders in groups.items():
@@ -128,7 +117,7 @@ async def execute_rebalancing(
                 )
         else:
             # KIS 계좌
-            app_key, app_secret = await _load_credentials(account, settings)
+            app_key, app_secret = await _load_credentials(account)
             account_no = account.kis_account_no
 
             access_token = await get_access_token(
@@ -209,21 +198,24 @@ async def _execute_kiwoom_single_order(
         result = await place_order_fn(
             access_token, account_no,
             side=order.side, ticker=order.ticker, quantity=order.quantity, is_mock=is_mock,
+            order_type=order.order_type, limit_price=order.limit_price,
         )
         logger.info(
             "kiwoom_order_placed", ticker=order.ticker, side=order.side,
             quantity=order.quantity, order_no=result.get("order_no"), is_mock=is_mock,
+            order_type=order.order_type,
         )
         return OrderResult(
             ticker=order.ticker, name=order.name, market=order.market,
             side=order.side, quantity=order.quantity, status="SUCCESS",
-            order_no=result.get("order_no"),
+            order_no=result.get("order_no"), order_type=order.order_type,
         )
     except Exception as e:
         logger.warning("kiwoom_order_failed", ticker=order.ticker, side=order.side, error=str(e))
         return OrderResult(
             ticker=order.ticker, name=order.name, market=order.market,
             side=order.side, quantity=order.quantity, status="FAILED", error_msg=str(e),
+            order_type=order.order_type,
         )
 
 
@@ -255,6 +247,8 @@ async def _execute_single_order(
                 market=order.market,
                 quantity=order.quantity,
                 is_mock=is_mock,
+                order_type=order.order_type,
+                limit_price=order.limit_price,
             )
         else:
             result = await place_domestic_order(
@@ -263,6 +257,8 @@ async def _execute_single_order(
                 ticker=order.ticker,
                 quantity=order.quantity,
                 is_mock=is_mock,
+                order_type=order.order_type,
+                limit_price=order.limit_price,
             )
 
         logger.info(
@@ -272,6 +268,7 @@ async def _execute_single_order(
             quantity=order.quantity,
             order_no=result.get("order_no"),
             is_mock=is_mock,
+            order_type=order.order_type,
         )
         return OrderResult(
             ticker=order.ticker,
@@ -281,6 +278,7 @@ async def _execute_single_order(
             quantity=order.quantity,
             status="SUCCESS",
             order_no=result.get("order_no"),
+            order_type=order.order_type,
         )
 
     except Exception as e:
@@ -299,4 +297,5 @@ async def _execute_single_order(
             quantity=order.quantity,
             status="FAILED",
             error_msg=str(e),
+            order_type=order.order_type,
         )

@@ -1,8 +1,9 @@
 """리밸런싱 Pydantic 스키마."""
 import uuid
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 
 class TickerAccountInfo(BaseModel):
@@ -140,6 +141,14 @@ class ExecutionOrderItem(BaseModel):
     side: str           # "BUY" | "SELL"
     quantity: int       # 양수 (방향은 side로)
     account_id: str | None = None   # 실행할 KIS 계좌 ID (None이면 default_account_id 사용)
+    order_type: Literal["MARKET", "LIMIT"] = "MARKET"
+    limit_price: float | None = None  # 국내=KRW 정수, 해외=USD 소수점 2자리
+
+    @model_validator(mode="after")
+    def validate_limit_price(self) -> "ExecutionOrderItem":
+        if self.order_type == "LIMIT" and (self.limit_price is None or self.limit_price <= 0):
+            raise ValueError("지정가 주문에는 양수의 limit_price가 필요합니다.")
+        return self
 
 
 class ExecutionRequest(BaseModel):
@@ -186,6 +195,7 @@ class OrderResult(BaseModel):
     status: str             # "SUCCESS" | "FAILED" | "SKIPPED"
     order_no: str | None = None
     error_msg: str | None = None
+    order_type: str = "MARKET"
 
 
 class ExecutionResult(BaseModel):

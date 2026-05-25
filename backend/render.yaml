@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: growlio-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_SECRET_KEY
+        sync: false
+      - key: KIS_CRED_ENCRYPTION_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: OPEN_BANKING_REDIRECT_URI
+        sync: false
+      - key: DART_API_KEY
+        sync: false
+      - key: OPEN_BANKING_CLIENT_ID
+        sync: false
+      - key: OPEN_BANKING_CLIENT_SECRET
+        sync: false
+      - key: OPEN_BANKING_BASE_URL
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false

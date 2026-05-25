@@ -1,5 +1,7 @@
+import re
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _ENV_FILE = Path(__file__).parent.parent / ".env"
@@ -39,9 +41,19 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = "growlio@example.com"
 
+    frontend_url: str = "http://localhost:5173"
+
     @property
     def allowed_origins_list(self) -> list[str]:
         return [o.strip() for o in self.allowed_origins.split(",")]
+
+    @model_validator(mode="after")
+    def _validate_secrets(self) -> "Settings":
+        if not self.app_secret_key or len(self.app_secret_key) < 32:
+            raise ValueError("APP_SECRET_KEY must be at least 32 characters")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", self.kis_cred_encryption_key):
+            raise ValueError("KIS_CRED_ENCRYPTION_KEY must be exactly 64 hex characters")
+        return self
 
 
 settings = Settings()

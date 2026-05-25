@@ -9,6 +9,23 @@ class RegisterRequest(BaseModel):
     display_name: str | None = None
 
 
+class FindAccountRequest(BaseModel):
+    display_name: str = Field(min_length=1, max_length=100)
+
+
+class FindAccountResponse(BaseModel):
+    masked_emails: list[str]
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=100)
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { api } from "../../api/client";
 import { fetchExchangeRate, fetchStockPrice, searchStocks, StockSuggestion } from "../../api/assets";
@@ -69,7 +70,12 @@ export default function StockPositionsModal({
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [usdRate, setUsdRate] = useState<number | null>(null);
+  const { data: rateData } = useQuery({
+    queryKey: ["exchange-rate"],
+    queryFn: fetchExchangeRate,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usdRate = rateData?.usd_krw ?? null;
 
   // 자동완성
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
@@ -86,7 +92,6 @@ export default function StockPositionsModal({
       setSummary(r.data.summary);
     }).finally(() => setLoading(false));
 
-    fetchExchangeRate().then((r) => setUsdRate(r.usd_krw)).catch(() => setUsdRate(1350));
   }, [accountId, readonly]);
 
   useEffect(() => {

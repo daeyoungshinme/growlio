@@ -4,9 +4,10 @@ import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
-import type { PortfolioPosition, AggregatedPosition, AllocationItem } from "../../types";
+import type { PortfolioPosition, AllocationItem } from "../../types";
 import TreemapCell from "../common/TreemapCell";
 import { chartTooltipStyle } from "../../utils/chart";
+import { groupPositionsByTicker } from "../../utils/portfolio";
 
 interface Overview {
   total_stock_krw: number;
@@ -31,41 +32,6 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
   );
 }
 
-function groupPositionsByTicker(positions: PortfolioPosition[]): AggregatedPosition[] {
-  const map = new Map<string, AggregatedPosition>();
-  for (const p of positions) {
-    const key = `${p.ticker}-${p.market}`;
-    const existing = map.get(key);
-    if (!existing) {
-      map.set(key, {
-        ticker: p.ticker,
-        name: p.name,
-        market: p.market,
-        currency: p.currency,
-        total_qty: p.qty,
-        weighted_avg_price: p.avg_price,
-        current_price: p.current_price,
-        total_value_krw: p.value_krw,
-        total_invested_krw: p.invested_krw,
-        total_pnl: p.pnl,
-        pnl_pct: 0,
-        weight_in_stock: p.weight_in_stock,
-      });
-    } else {
-      existing.total_qty += p.qty;
-      existing.total_value_krw += p.value_krw;
-      existing.total_invested_krw += p.invested_krw;
-      existing.total_pnl += p.pnl;
-      existing.weight_in_stock += p.weight_in_stock;
-    }
-  }
-  for (const agg of map.values()) {
-    agg.pnl_pct = agg.total_invested_krw > 0
-      ? (agg.total_pnl / agg.total_invested_krw) * 100
-      : 0;
-  }
-  return Array.from(map.values());
-}
 
 export default function PortfolioSummaryCard({ overview, isLoading, stockAllocation }: Props) {
   const [showAll, setShowAll] = useState(false);

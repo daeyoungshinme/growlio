@@ -45,32 +45,29 @@ def decrypt(ciphertext_hex: str) -> str:
 
 
 async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
-    """유저 설정의 KIS 자격증명을 조회해 액세스 토큰까지 발급한다.
+    """유저의 활성 KIS 계좌 자격증명을 조회해 액세스 토큰까지 발급한다.
 
-    계좌별 자격증명이 없는 경우(배당/포트폴리오 조회 등)에 사용.
-    자격증명 없거나 토큰 발급 실패 시 None 반환.
+    계좌별 자격증명이 없거나 토큰 발급 실패 시 None 반환.
     반환값: {"app_key", "app_secret", "access_token", "is_mock"}
     """
     from app.kis.auth import get_access_token
     from app.models.asset import AssetAccount
-    from app.models.user import UserSettings
     from app.redis_client import get_redis
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not settings_row or not settings_row.kis_app_key or not settings_row.kis_app_secret:
-        return None
-
-    kis_account = await db.scalar(
+    account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.user_id == user_id,
             AssetAccount.data_source == "KIS_API",
             AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )
+    if not account:
+        return None
 
-    app_key = decrypt(settings_row.kis_app_key)
-    app_secret = decrypt(settings_row.kis_app_secret)
-    is_mock = kis_account.is_mock_mode if kis_account else settings_row.kis_is_mock
+    app_key = decrypt(account.kis_app_key)
+    app_secret = decrypt(account.kis_app_secret)
+    is_mock = account.is_mock_mode
 
     try:
         redis = await get_redis()
@@ -81,6 +78,7 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
             redis=redis,
             db=db,
             user_id=str(user_id),
+            account_id=str(account.id),
         )
         return {
             "app_key": app_key,

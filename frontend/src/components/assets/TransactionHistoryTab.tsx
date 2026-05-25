@@ -66,7 +66,12 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState<number>(0);
-  const [usdRate, setUsdRate] = useState<number | null>(null);
+  const { data: rateData } = useQuery({
+    queryKey: ["exchange-rate"],
+    queryFn: fetchExchangeRate,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usdRate = rateData?.usd_krw ?? null;
   const [tickerDirect, setTickerDirect] = useState(false);
   const [tickerQuery, setTickerQuery] = useState("");
   const [tickerSuggestions, setTickerSuggestions] = useState<StockSuggestion[]>([]);
@@ -75,7 +80,6 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   const tickerSearchTimer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
-    fetchExchangeRate().then((r) => setUsdRate(r.usd_krw)).catch(() => {});
     return () => { clearTimeout(tickerSearchTimer.current); };
   }, []);
 

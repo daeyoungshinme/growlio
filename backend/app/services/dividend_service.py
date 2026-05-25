@@ -127,19 +127,16 @@ async def _get_kis_dividend_fallback(
             AssetAccount.user_id == user_id,
             AssetAccount.data_source == "KIS_API",
             AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )
     if not account:
         return None
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not settings_row or not settings_row.kis_app_key or not settings_row.kis_app_secret:
-        return None
-
     try:
         redis = await get_redis()
-        app_key = decrypt(settings_row.kis_app_key)
-        app_secret = decrypt(settings_row.kis_app_secret)
+        app_key = decrypt(account.kis_app_key)
+        app_secret = decrypt(account.kis_app_secret)
         access_token = await get_access_token(
             app_key,
             app_secret,
@@ -147,6 +144,7 @@ async def _get_kis_dividend_fallback(
             redis=redis,
             db=db,
             user_id=str(user_id),
+            account_id=str(account.id),
         )
         result = await get_domestic_dividend_info(
             app_key=app_key,
@@ -175,19 +173,16 @@ async def _get_kis_etf_dividend_fallback(
             AssetAccount.user_id == user_id,
             AssetAccount.data_source == "KIS_API",
             AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )
     if not account:
         return None
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not settings_row or not settings_row.kis_app_key or not settings_row.kis_app_secret:
-        return None
-
     try:
         redis = await get_redis()
-        app_key = decrypt(settings_row.kis_app_key)
-        app_secret = decrypt(settings_row.kis_app_secret)
+        app_key = decrypt(account.kis_app_key)
+        app_secret = decrypt(account.kis_app_secret)
         access_token = await get_access_token(
             app_key,
             app_secret,
@@ -195,6 +190,7 @@ async def _get_kis_etf_dividend_fallback(
             redis=redis,
             db=db,
             user_id=str(user_id),
+            account_id=str(account.id),
         )
         result = await get_domestic_etf_dividend_info(
             app_key=app_key,

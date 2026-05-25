@@ -4,6 +4,7 @@ from typing import Any
 from app.kis.client import kis_request
 from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
+    OVERSEAS_MARKETS,
     TR_DOMESTIC_BUY_MOCK,
     TR_DOMESTIC_BUY_REAL,
     TR_DOMESTIC_SELL_MOCK,
@@ -31,9 +32,6 @@ def _split_account_no(account_no: str) -> tuple[str, str]:
     return account_no[:8], account_no[8:].lstrip("-") or "01"
 
 
-OVERSEAS_MARKETS = set(OVERSEAS_MARKET_CODES.keys())  # {"NYSE", "NASDAQ", "AMEX"}
-
-
 def is_overseas_market(market: str) -> bool:
     return market.upper() in OVERSEAS_MARKETS
 
@@ -48,8 +46,13 @@ async def place_domestic_order(
     ticker: str,
     quantity: int,
     is_mock: bool,
+    order_type: str = "MARKET",
+    limit_price: float | None = None,
 ) -> dict[str, Any]:
-    """국내주식/ETF 시장가 매수·매도 주문."""
+    """국내주식/ETF 매수·매도 주문.
+
+    KIS OpenAPI 스펙: ORD_DVSN "00"=지정가, "01"=시장가.
+    """
     if side == "BUY":
         tr_id = TR_DOMESTIC_BUY_MOCK if is_mock else TR_DOMESTIC_BUY_REAL
     else:
@@ -58,13 +61,20 @@ async def place_domestic_order(
     cano, acnt_prdt_cd = _split_account_no(account_no)
     headers = _auth_headers(app_key, app_secret, access_token, tr_id)
 
+    if order_type == "LIMIT" and limit_price is not None:
+        ord_dvsn = "00"  # 지정가
+        ord_unpr = str(int(limit_price))
+    else:
+        ord_dvsn = "01"  # 시장가
+        ord_unpr = "0"
+
     body: dict[str, Any] = {
         "CANO": cano,
         "ACNT_PRDT_CD": acnt_prdt_cd,
         "PDNO": ticker,
-        "ORD_DVSN": "00",       # 시장가
+        "ORD_DVSN": ord_dvsn,
         "ORD_QTY": str(quantity),
-        "ORD_UNPR": "0",
+        "ORD_UNPR": ord_unpr,
     }
     if side == "SELL":
         body["SLL_TYPE"] = "01"
@@ -95,8 +105,14 @@ async def place_overseas_order(
     market: str,
     quantity: int,
     is_mock: bool,
+    order_type: str = "MARKET",
+    limit_price: float | None = None,
 ) -> dict[str, Any]:
-    """해외주식 시장가 매수·매도 주문."""
+    """해외주식 매수·매도 주문.
+
+    해외 시장가(ORD_DVSN="00", price="0")는 mock 모드에서만 안정 동작.
+    실계좌 시장가 코드는 거래소별로 상이하므로 limit_price 사용 권장.
+    """
     if side == "BUY":
         tr_id = TR_OVERSEAS_BUY_MOCK if is_mock else TR_OVERSEAS_BUY_REAL
     else:
@@ -106,14 +122,21 @@ async def place_overseas_order(
     cano, acnt_prdt_cd = _split_account_no(account_no)
     headers = _auth_headers(app_key, app_secret, access_token, tr_id)
 
+    if order_type == "LIMIT" and limit_price is not None:
+        ord_dvsn = "00"  # 지정가 (해외 KIS: "00"=지정가)
+        ovrs_ord_unpr = f"{limit_price:.2f}"
+    else:
+        ord_dvsn = "00"  # 해외 시장가는 거래소별 코드가 달라 mock 호환 "00" 유지
+        ovrs_ord_unpr = "0"
+
     body: dict[str, Any] = {
         "CANO": cano,
         "ACNT_PRDT_CD": acnt_prdt_cd,
         "OVRS_EXCG_CD": exchange_cd,
         "PDNO": ticker,
-        "ORD_DVSN": "00",
+        "ORD_DVSN": ord_dvsn,
         "ORD_QTY": str(quantity),
-        "OVRS_ORD_UNPR": "0",
+        "OVRS_ORD_UNPR": ovrs_ord_unpr,
         "ORD_SVR_DVSN_CD": "0",
     }
     if side == "SELL":

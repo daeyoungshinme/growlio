@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Growlio</string>
+    <string name="title_activity_main">Growlio</string>
+    <string name="package_name">com.growlio.app</string>
+    <string name="custom_url_scheme">com.growlio.app</string>
+</resources>

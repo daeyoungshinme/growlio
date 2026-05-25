@@ -12,7 +12,10 @@ logger = structlog.get_logger()
 
 
 async def refresh_all_user_tokens() -> None:
-    """매일 06:00 KST — 모든 유저의 KIS·오픈뱅킹 토큰을 갱신."""
+    """매일 06:00 KST — 모든 유저의 오픈뱅킹 토큰과 KIS 계좌별 토큰을 갱신."""
+    redis = await get_redis()
+
+    # 오픈뱅킹 토큰 갱신
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(User, UserSettings)
@@ -21,27 +24,7 @@ async def refresh_all_user_tokens() -> None:
         )
         rows = result.all()
 
-    redis = await get_redis()
     for user, settings_row in rows:
-        # 유저 레벨 KIS 토큰 갱신
-        if settings_row.kis_app_key:
-            try:
-                app_key = decrypt(settings_row.kis_app_key)
-                app_secret = decrypt(settings_row.kis_app_secret)
-                async with AsyncSessionLocal() as db:
-                    await _fetch_and_store_token(
-                        app_key,
-                        app_secret,
-                        is_mock=settings_row.kis_is_mock,
-                        redis=redis,
-                        db=db,
-                        user_id=str(user.id),
-                    )
-                logger.info("kis_token_refreshed", user_id=str(user.id))
-            except Exception as e:
-                logger.error("kis_token_refresh_failed", user_id=str(user.id), error=str(e))
-
-        # 오픈뱅킹 토큰 갱신
         if settings_row.ob_refresh_token:
             try:
                 from app.providers.openbanking import ensure_ob_token_fresh
@@ -52,7 +35,7 @@ async def refresh_all_user_tokens() -> None:
             except Exception as e:
                 logger.error("ob_token_refresh_failed", user_id=str(user.id), error=str(e))
 
-    # 계좌별 자체 KIS 자격증명 보유 계좌 토큰 갱신
+    # 계좌별 KIS 자격증명 보유 계좌 토큰 갱신
     async with AsyncSessionLocal() as db:
         account_result = await db.execute(
             select(AssetAccount).where(

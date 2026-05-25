@@ -17,8 +17,7 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
-from app.models.rebalancing import TargetPortfolio
-from app.models.user import User, UserSettings
+from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     ExecutionRequest,
@@ -54,9 +53,9 @@ async def list_portfolios(
 ):
     """저장된 목표 포트폴리오 목록."""
     rows = await db.execute(
-        select(TargetPortfolio)
-        .where(TargetPortfolio.user_id == current_user.id)
-        .order_by(TargetPortfolio.created_at)
+        select(Portfolio)
+        .where(Portfolio.user_id == current_user.id)
+        .order_by(Portfolio.created_at)
     )
     return rows.scalars().all()
 
@@ -68,7 +67,7 @@ async def create_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """새 목표 포트폴리오 생성."""
-    portfolio = TargetPortfolio(
+    portfolio = Portfolio(
         user_id=current_user.id,
         name=body.name,
         items=[i.model_dump() for i in body.items],
@@ -90,9 +89,9 @@ async def update_portfolio(
 ):
     """목표 포트폴리오 수정."""
     portfolio = await db.scalar(
-        select(TargetPortfolio).where(
-            TargetPortfolio.id == portfolio_id,
-            TargetPortfolio.user_id == current_user.id,
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
         )
     )
     if not portfolio:
@@ -120,9 +119,9 @@ async def delete_portfolio(
 ):
     """목표 포트폴리오 삭제."""
     portfolio = await db.scalar(
-        select(TargetPortfolio).where(
-            TargetPortfolio.id == portfolio_id,
-            TargetPortfolio.user_id == current_user.id,
+        select(Portfolio).where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
         )
     )
     if not portfolio:
@@ -143,20 +142,12 @@ async def analyze_portfolio(
     redis=Depends(get_redis),
 ):
     """현재 자산과 목표 포트폴리오를 비교해 리밸런싱 제안을 반환한다."""
-    # 통합 portfolios 테이블에서 먼저 조회; 없으면 레거시 target_portfolios에서 폴백
     portfolio = await db.scalar(
         select(Portfolio).where(
             Portfolio.id == portfolio_id,
             Portfolio.user_id == current_user.id,
         )
     )
-    if not portfolio:
-        portfolio = await db.scalar(
-            select(TargetPortfolio).where(
-                TargetPortfolio.id == portfolio_id,
-                TargetPortfolio.user_id == current_user.id,
-            )
-        )
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
@@ -250,13 +241,6 @@ async def execute_portfolio_rebalancing(
         )
     )
     if not portfolio:
-        portfolio = await db.scalar(
-            select(TargetPortfolio).where(
-                TargetPortfolio.id == portfolio_id,
-                TargetPortfolio.user_id == current_user.id,
-            )
-        )
-    if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     from app.services.rebalancing_execution_service import execute_rebalancing
@@ -271,7 +255,6 @@ async def execute_portfolio_rebalancing(
 
 async def _fetch_account_balance(
     account: AssetAccount,
-    user_settings: UserSettings | None,
     db: AsyncSession,
     redis,
     usd_rate: float | None,
@@ -279,16 +262,11 @@ async def _fetch_account_balance(
     """단일 KIS 계좌 잔고를 조회해 KisBalanceResponse로 반환한다. 실패 시 예외 발생."""
     if not account.kis_account_no:
         raise ValueError("계좌번호가 설정되지 않았습니다.")
+    if not account.kis_app_key or not account.kis_app_secret:
+        raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
 
-    if account.kis_app_key and account.kis_app_secret:
-        app_key = decrypt(account.kis_app_key)
-        app_secret = decrypt(account.kis_app_secret)
-    else:
-        if not user_settings or not user_settings.kis_app_key or not user_settings.kis_app_secret:
-            raise ValueError("KIS 자격증명이 설정되지 않았습니다.")
-        app_key = decrypt(user_settings.kis_app_key)
-        app_secret = decrypt(user_settings.kis_app_secret)
-
+    app_key = decrypt(account.kis_app_key)
+    app_secret = decrypt(account.kis_app_secret)
     is_mock = account.is_mock_mode
     access_token = await get_access_token(
         app_key, app_secret,
@@ -362,16 +340,10 @@ async def get_kis_account_balance(
     if account.asset_type != "STOCK_KIS":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌만 잔고 조회가 가능합니다.")
 
-    settings: UserSettings | None = None
-    if not (account.kis_app_key and account.kis_app_secret):
-        settings = await db.scalar(
-            select(UserSettings).where(UserSettings.user_id == current_user.id)
-        )
-
     usd_rate = await get_usd_krw_rate(redis)
 
     try:
-        return await _fetch_account_balance(account, settings, db, redis, usd_rate)
+        return await _fetch_account_balance(account, db, redis, usd_rate)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -395,12 +367,9 @@ async def get_all_kis_account_balances(
     if not kis_accounts:
         return []
 
-    settings = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == current_user.id)
-    )
     usd_rate = await get_usd_krw_rate(redis)
 
-    tasks = [_fetch_account_balance(acc, settings, db, redis, usd_rate) for acc in kis_accounts]
+    tasks = [_fetch_account_balance(acc, db, redis, usd_rate) for acc in kis_accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [

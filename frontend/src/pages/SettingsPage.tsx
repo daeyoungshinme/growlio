@@ -12,8 +12,6 @@ import { fetchExchangeRate } from "../api/assets";
 
 interface SettingsData {
   has_kis: boolean;
-  kis_account_no: string | null;
-  kis_is_mock: boolean;
   has_dart: boolean;
   has_open_banking: boolean;
   ob_token_expires_at: string | null;
@@ -48,7 +46,6 @@ const labelClass = "text-sm font-medium text-gray-700 dark:text-gray-300";
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const [current, setCurrent] = useState<SettingsData | null>(null);
-  const [kis, setKis] = useState({ app_key: "", app_secret: "", account_no: "", is_mock: true });
   const [dart, setDart] = useState({ api_key: "" });
   const [goal, setGoal] = useState({ goal_amount: "", goal_annual_return_pct: "", annual_deposit_goal: "", monthly_deposit_amount: "", retirement_target_year: "" });
   const [saving, setSaving] = useState<string | null>(null);
@@ -93,27 +90,12 @@ export default function SettingsPage() {
       if (r.data.annual_deposit_goal) setGoal((g) => ({ ...g, annual_deposit_goal: String(r.data.annual_deposit_goal) }));
       if (r.data.monthly_deposit_amount) setGoal((g) => ({ ...g, monthly_deposit_amount: String(r.data.monthly_deposit_amount) }));
       if (r.data.retirement_target_year) setGoal((g) => ({ ...g, retirement_target_year: String(r.data.retirement_target_year) }));
-      if (r.data.kis_account_no) setKis((k) => ({ ...k, account_no: r.data.kis_account_no!, is_mock: r.data.kis_is_mock }));
       setNotificationEmail(r.data.notification_email ?? "");
     });
   }, []);
 
   const flash = (_key: string, ok: boolean, text: string) => {
     toast(text, ok ? "success" : "error");
-  };
-
-  const saveKis = async () => {
-    setSaving("kis");
-    try {
-      await api.put("/settings/kis", { ...kis });
-      flash("kis", true, "KIS 자격증명이 저장되었습니다");
-      const r = await api.get<SettingsData>("/settings");
-      setCurrent(r.data);
-    } catch {
-      flash("kis", false, "저장에 실패했습니다");
-    } finally {
-      setSaving(null);
-    }
   };
 
   const saveGoal = async () => {
@@ -184,34 +166,6 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-xl">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">설정</h1>
-
-      {/* KIS 한국투자증권 */}
-      <SectionCard title="한국투자증권 (KIS) API" badge={current?.has_kis ? <ConnectedBadge /> : undefined}>
-        <div>
-          <label className={labelClass}>App Key</label>
-          <input type="password" className={inputClass} value={kis.app_key}
-            onChange={(e) => setKis((k) => ({ ...k, app_key: e.target.value }))} placeholder={current?.has_kis ? "••••••••" : "KIS OpenAPI App Key"} />
-        </div>
-        <div>
-          <label className={labelClass}>App Secret</label>
-          <input type="password" className={inputClass} value={kis.app_secret}
-            onChange={(e) => setKis((k) => ({ ...k, app_secret: e.target.value }))} placeholder={current?.has_kis ? "••••••••" : "KIS OpenAPI App Secret"} />
-        </div>
-        <div>
-          <label className={labelClass}>계좌번호</label>
-          <input className={inputClass} value={kis.account_no}
-            onChange={(e) => setKis((k) => ({ ...k, account_no: e.target.value }))} placeholder="12345678-01" />
-        </div>
-        <div className="flex items-center gap-2">
-          <input type="checkbox" id="kis-mock" checked={kis.is_mock} onChange={(e) => setKis((k) => ({ ...k, is_mock: e.target.checked }))} className="w-4 h-4 text-blue-600" />
-          <label htmlFor="kis-mock" className="text-sm text-gray-700 dark:text-gray-300">모의투자 모드 사용</label>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={saveKis} disabled={saving === "kis"} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving === "kis" ? "저장 중..." : "저장"}
-          </button>
-        </div>
-      </SectionCard>
 
       {/* DART OpenAPI */}
       <SectionCard title="DART OpenAPI (금융감독원)" badge={current?.has_dart ? <ConnectedBadge /> : undefined}>

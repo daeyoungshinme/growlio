@@ -6,8 +6,8 @@ from datetime import date
 
 from pydantic import BaseModel
 
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, update as sql_update
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -17,13 +17,6 @@ from app.models.user import User, UserSettings
 from app.services.credential_service import decrypt, encrypt
 
 router = APIRouter(prefix="/settings", tags=["settings"])
-
-
-class KisCredentialsUpdate(BaseModel):
-    app_key: str
-    app_secret: str
-    account_no: str
-    is_mock: bool = True
 
 
 class DartApiKeyUpdate(BaseModel):
@@ -46,8 +39,6 @@ class NotificationEmailUpdate(BaseModel):
 
 class SettingsResponse(BaseModel):
     has_kis: bool
-    kis_account_no: str | None
-    kis_is_mock: bool
     has_dart: bool
     has_open_banking: bool
     ob_token_expires_at: str | None
@@ -67,9 +58,21 @@ async def get_settings(
 ):
     """현재 설정 조회 (자격증명 원문은 반환하지 않음)."""
     row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+
+    # has_kis: 자격증명이 설정된 활성 KIS 계좌 존재 여부
+    kis_account = await db.scalar(
+        select(AssetAccount).where(
+            AssetAccount.user_id == current_user.id,
+            AssetAccount.data_source == "KIS_API",
+            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.kis_app_key != None,  # noqa: E711
+        )
+    )
+    has_kis = kis_account is not None
+
     if not row:
         return SettingsResponse(
-            has_kis=False, kis_account_no=None, kis_is_mock=True,
+            has_kis=has_kis,
             has_dart=False,
             has_open_banking=False, ob_token_expires_at=None,
             goal_amount=None, goal_annual_return_pct=None,
@@ -78,9 +81,7 @@ async def get_settings(
             notification_email=None,
         )
     return SettingsResponse(
-        has_kis=bool(row.kis_app_key),
-        kis_account_no=row.kis_account_no,
-        kis_is_mock=row.kis_is_mock,
+        has_kis=has_kis,
         has_dart=bool(row.dart_api_key),
         has_open_banking=bool(row.ob_access_token),
         ob_token_expires_at=row.ob_token_expires_at.isoformat() if row.ob_token_expires_at else None,
@@ -92,41 +93,6 @@ async def get_settings(
         user_email=current_user.email,
         notification_email=row.notification_email,
     )
-
-
-@router.put("/kis")
-async def update_kis_credentials(
-    req: KisCredentialsUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """KIS 한국투자증권 자격증명 저장."""
-    row = await _get_or_create_settings(current_user.id, db)
-    row.kis_app_key = encrypt(req.app_key)
-    row.kis_app_secret = encrypt(req.app_secret)
-    row.kis_account_no = req.account_no
-    row.kis_is_mock = req.is_mock
-    await db.execute(
-        sql_update(AssetAccount)
-        .where(AssetAccount.user_id == current_user.id, AssetAccount.data_source == "KIS_API")
-        .values(is_mock_mode=req.is_mock)
-    )
-    await db.commit()
-    return {"detail": "KIS 자격증명이 저장되었습니다"}
-
-
-@router.delete("/kis")
-async def delete_kis_credentials(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
-    if row:
-        row.kis_app_key = None
-        row.kis_app_secret = None
-        row.kis_account_no = None
-        await db.commit()
-    return {"detail": "KIS 자격증명이 삭제되었습니다"}
 
 
 @router.put("/dart")

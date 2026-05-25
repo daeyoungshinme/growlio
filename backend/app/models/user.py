@@ -8,6 +8,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -39,11 +52,6 @@ class UserSettings(Base):
     annual_deposit_goal: Mapped[float | None] = mapped_column(Numeric(18, 2))
     monthly_deposit_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     retirement_target_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # KIS 자격증명 (AES-256 암호화)
-    kis_app_key: Mapped[str | None] = mapped_column(String(512))
-    kis_app_secret: Mapped[str | None] = mapped_column(String(512))
-    kis_account_no: Mapped[str | None] = mapped_column(String(20))
-    kis_is_mock: Mapped[bool] = mapped_column(Boolean, default=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 오픈뱅킹

@@ -14,7 +14,6 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
-from app.models.user import UserSettings
 from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
@@ -51,26 +50,15 @@ async def sync_kis_account(
 ) -> AssetSnapshot:
     """KIS 계좌 잔고를 API로 조회해 스냅샷을 저장한다.
 
-    계좌별 자격증명(account.kis_app_key)이 있으면 우선 사용하고,
-    없으면 UserSettings 전역 자격증명으로 폴백한다.
+    account.kis_app_key/kis_app_secret 필수. 미설정 시 ValueError 발생.
     """
-    if account.kis_app_key and account.kis_app_secret:
-        # 계좌별 자격증명 사용
-        app_key = decrypt(account.kis_app_key)
-        app_secret = decrypt(account.kis_app_secret)
-        is_mock = account.is_mock_mode
-        token_account_id = str(account.id)
-        token_user_id = str(account.user_id)
-    else:
-        # 전역 자격증명 폴백
-        settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
-        if not settings_row or not settings_row.kis_app_key:
-            raise ValueError("KIS 자격증명이 설정되지 않았습니다")
-        app_key = decrypt(settings_row.kis_app_key)
-        app_secret = decrypt(settings_row.kis_app_secret)
-        is_mock = settings_row.kis_is_mock
-        token_account_id = None
-        token_user_id = str(account.user_id)
+    if not account.kis_app_key or not account.kis_app_secret:
+        raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
+    app_key = decrypt(account.kis_app_key)
+    app_secret = decrypt(account.kis_app_secret)
+    is_mock = account.is_mock_mode
+    token_account_id = str(account.id)
+    token_user_id = str(account.user_id)
 
     logger.info("kis_sync_start", account_no=account.kis_account_no, is_mock=is_mock, has_own_creds=bool(account.kis_app_key))
 
@@ -259,7 +247,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     """수동 금액/종목으로 스냅샷을 저장한다. redis가 있으면 현재가도 갱신한다."""
     import asyncio
 
-    from app.api.v1.assets import OVERSEAS_MARKETS
+    from app.kis.constants import OVERSEAS_MARKETS
 
     positions = account.manual_positions or []
 
@@ -272,7 +260,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
         has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
         usd_rate: float | None = None
         if has_overseas:
-            from app.api.v1.stocks import _sync_usdkrw
+            from app.services.price_service import _sync_usdkrw
 
             fetched_rate = await asyncio.get_running_loop().run_in_executor(None, _sync_usdkrw)
             if fetched_rate:
@@ -333,7 +321,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     return snapshot
 
 
-_STOCK_TYPES = {"STOCK_KIS", "STOCK_OTHER"}
+_STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
 
 
 def _eval_value(pos_list: list) -> float:
@@ -393,13 +381,16 @@ async def _build_asset_totals(
             pos_list = snap.positions or acc.manual_positions or []
             amount = float(snap.amount_krw)
             stock_equity = _eval_value(pos_list) if pos_list else amount
+            cash = amount - stock_equity
             inv = float(snap.invested_amount or 0) or _invested_value(pos_list)
             stock_value += stock_equity
             total_invested += inv
+            by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + stock_equity
+            by_type["CASH_STOCK"] = by_type.get("CASH_STOCK", 0) + cash
         else:
             amount = float(snap.amount_krw)
+            by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         total_assets_krw += amount
-        by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
 
     for acc in no_snap_accounts:
         if not acc.include_in_total:
@@ -407,18 +398,26 @@ async def _build_asset_totals(
         if acc.asset_type in _STOCK_TYPES:
             pos_list = acc.manual_positions or []
             pos_equity = _eval_value(pos_list) if pos_list else 0.0
-            amount = pos_equity + float(acc.deposit_krw or 0) or float(acc.manual_amount or 0)
+            deposit = float(acc.deposit_krw or 0)
+            computed = pos_equity + deposit
+            amount = computed if computed > 0 else float(acc.manual_amount or 0)
             inv = _invested_value(pos_list) if pos_list else float(acc.manual_amount or 0)
             stock_value += pos_equity or amount
             total_invested += inv
+            if computed > 0:
+                by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + pos_equity
+                by_type["CASH_STOCK"] = by_type.get("CASH_STOCK", 0) + deposit
+            else:
+                by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         elif acc.asset_type == "REAL_ESTATE":
             gross = float(acc.manual_amount or 0)
             mortgage = float((acc.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
             amount = gross - mortgage
+            by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         else:
             amount = float(acc.manual_amount or 0)
+            by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         total_assets_krw += amount
-        by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
 
     return total_assets_krw, total_invested, stock_value, by_type
 

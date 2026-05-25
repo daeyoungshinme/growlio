@@ -20,7 +20,7 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.user import UserSettings
+from app.models.asset import AssetAccount
 from app.services.credential_service import decrypt
 
 logger = structlog.get_logger()
@@ -28,6 +28,20 @@ logger = structlog.get_logger()
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 
 _yfinance_sem = asyncio.Semaphore(5)
+
+
+def _sync_usdkrw() -> float:
+    """동기 함수 — run_in_executor로 호출. 실패 시 0.0 반환."""
+    import yfinance as yf
+    try:
+        hist = yf.Ticker("USDKRW=X").history(period="5d")
+        if not hist.empty:
+            rate = float(hist["Close"].iloc[-1])
+            if rate > 0:
+                return rate
+    except Exception as e:
+        logger.warning("usdkrw_fetch_failed", error=str(e))
+    return 0.0
 
 
 # ── Yahoo Finance 변환 ──────────────────────────────────
@@ -105,7 +119,7 @@ async def fetch_current_price(
     """단일 종목 현재가 조회.
     Yahoo Finance → KIS → LS증권 순으로 시도한다.
     """
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # 1. Yahoo Finance (항상 시도)
     async with _yfinance_sem:
@@ -113,14 +127,11 @@ async def fetch_current_price(
     if price:
         return price
 
-    # 2. 증권사 API fallback (설정된 경우)
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not settings_row:
-        return None
-
-    if settings_row.kis_app_key:
+    # 2. KIS API fallback (KIS 계좌가 있는 경우)
+    account = await _get_any_kis_account(user_id, db)
+    if account:
         try:
-            price = await _price_via_kis(settings_row, ticker, market, db, redis)
+            price = await _price_via_kis(account, ticker, market, db, redis)
             if price:
                 return price
         except Exception as e:
@@ -142,7 +153,7 @@ async def fetch_prices_batch(
     if not tickers:
         return {}
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     # 1. Yahoo Finance 배치 (단일 네트워크 요청)
     async with _yfinance_sem:
@@ -150,13 +161,13 @@ async def fetch_prices_batch(
             None, partial(_sync_yahoo_batch, tickers)
         )
 
-    # 2. 조회 실패한 종목만 증권사 API로 보완
+    # 2. 조회 실패한 종목만 KIS API로 보완 (KIS 계좌가 있는 경우)
     missing = [(t, m) for t, m in tickers if t not in price_map or price_map[t] == 0]
     if missing:
-        settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-        if settings_row:
+        account = await _get_any_kis_account(user_id, db)
+        if account:
             fallback_tasks = [
-                _fetch_fallback(settings_row, ticker, market, db, redis)
+                _fetch_fallback(account, ticker, market, db, redis)
                 for ticker, market in missing
             ]
             results = await asyncio.gather(*fallback_tasks, return_exceptions=True)
@@ -169,27 +180,39 @@ async def fetch_prices_batch(
 
 # ── 내부 헬퍼 ──────────────────────────────────────────
 
-async def _fetch_fallback(settings_row, ticker: str, market: str, db, redis) -> float | None:
-    if settings_row.kis_app_key:
-        try:
-            price = await _price_via_kis(settings_row, ticker, market, db, redis)
-            if price:
-                return price
-        except Exception as e:
-            logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
+async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAccount | None:
+    """유저의 활성 KIS 계좌 중 자격증명이 있는 첫 번째 계좌를 반환."""
+    return await db.scalar(
+        select(AssetAccount).where(
+            AssetAccount.user_id == user_id,
+            AssetAccount.data_source == "KIS_API",
+            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.kis_app_key != None,  # noqa: E711
+        )
+    )
+
+
+async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db, redis) -> float | None:
+    try:
+        price = await _price_via_kis(account, ticker, market, db, redis)
+        if price:
+            return price
+    except Exception as e:
+        logger.warning("kis_price_fallback_failed", ticker=ticker, error=str(e))
     return None
 
 
-async def _price_via_kis(settings_row, ticker: str, market: str, db, redis) -> float | None:
+async def _price_via_kis(account: AssetAccount, ticker: str, market: str, db, redis) -> float | None:
     from app.kis.auth import get_access_token
 
-    app_key = decrypt(settings_row.kis_app_key)
-    app_secret = decrypt(settings_row.kis_app_secret)
-    is_mock = settings_row.kis_is_mock
+    app_key = decrypt(account.kis_app_key)
+    app_secret = decrypt(account.kis_app_secret)
+    is_mock = account.is_mock_mode
     token = await get_access_token(
         app_key, app_secret,
         is_mock=is_mock, redis=redis, db=db,
-        user_id=str(settings_row.user_id),
+        user_id=str(account.user_id),
+        account_id=str(account.id),
     )
     if market in DOMESTIC_MARKETS:
         from app.kis.domestic_quote import get_domestic_price
@@ -258,7 +281,7 @@ async def get_historical_returns(
 
     import json
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(5)
 
     async def _get_one(ticker: str, market: str) -> dict | None:

@@ -31,9 +31,8 @@ from app.services.asset_service import (
 )
 from app.limiter import limiter
 from app.services.credential_service import encrypt
-from app.services.price_service import fetch_prices_batch
-
-OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX"}
+from app.services.price_service import _sync_usdkrw, fetch_prices_batch
+from app.kis.constants import OVERSEAS_MARKETS
 
 
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
@@ -466,8 +465,7 @@ async def sync_position_prices(
     has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
     usd_rate: float | None = None
     if has_overseas:
-        from app.api.v1.stocks import _sync_usdkrw
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
 
     updated = []

@@ -10,25 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
+from app.services.price_service import _sync_usdkrw
 
 logger = structlog.get_logger()
 
 
-def _sync_usdkrw() -> float:
-    import yfinance as yf
-    try:
-        hist = yf.Ticker("USDKRW=X").history(period="5d")
-        if not hist.empty:
-            rate = float(hist["Close"].iloc[-1])
-            if rate > 0:
-                return rate
-    except Exception as e:
-        logger.warning("alert_usdkrw_fetch_failed", error=str(e))
-    return 0.0
-
-
 async def get_current_usd_krw() -> float:
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _sync_usdkrw)
 
 
@@ -71,8 +59,8 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
                 direction=alert.direction,
                 current_rate=current_rate,
             )
-        except Exception:
-            pass  # 이메일 실패해도 알림 상태는 비활성화 유지
+        except Exception as exc:
+            logger.warning("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
 
     if triggered_count:
         await db.commit()

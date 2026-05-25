@@ -15,6 +15,7 @@ import {
   fetchAllKiwoomBalances,
   fetchKisBalance,
   fetchKiwoomBalance,
+  fetchStockPrice,
 } from "../../api/rebalancing";
 import { fmtKrw } from "../../utils/format";
 
@@ -28,6 +29,13 @@ interface Props {
 
 type Phase = "confirm" | "executing" | "result";
 type BalanceLoadState = "idle" | "loading" | "loaded" | "error" | "not_found";
+type OrderType = "MARKET" | "LIMIT";
+type PriceLoadState = "idle" | "loading" | "loaded" | "error";
+
+const OVERSEAS_MARKET_SET = new Set(["NYSE", "NASDAQ", "AMEX", "NYSE_US", "NASDAQ_US", "AMEX_US"]);
+function isOverseasMarket(market: string): boolean {
+  return OVERSEAS_MARKET_SET.has(market.toUpperCase());
+}
 
 function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
   return analysis.items.filter(
@@ -69,16 +77,24 @@ function StatusBadge({ status }: { status: OrderResult["status"] }) {
 
 export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onExecuted, onClose }: Props) {
   const queryClient = useQueryClient();
-  // 비활성 계좌도 포함한 전체 KIS 계좌
   const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM");
 
-  // 실시간 잔고: accountId → 포지션 목록
+  // 실시간 잔고
   const [liveBalances, setLiveBalances] = useState<Record<string, KisBalancePosition[]>>({});
   const [balanceState, setBalanceState] = useState<Record<string, BalanceLoadState>>({});
-  // 예수금: accountId → deposit_krw
   const [depositKrw, setDepositKrw] = useState<Record<string, number>>({});
 
-  // 계좌별 실시간 잔고 수량 조회 (실시간 우선, 분석 결과 폴백)
+  // 현재가 (ticker → 가격)
+  const [priceState, setPriceState] = useState<PriceLoadState>("idle");
+  const [livePricesKrw, setLivePricesKrw] = useState<Record<string, number>>({});
+  const [livePricesUsd, setLivePricesUsd] = useState<Record<string, number>>({});
+  const [globalUsdRate, setGlobalUsdRate] = useState<number | null>(null);
+
+  // 주문 유형 + 지정가 오버라이드
+  const [orderType, setOrderType] = useState<OrderType>("MARKET");
+  // 국내=KRW, 해외=USD 단위로 저장
+  const [limitPriceOverrides, setLimitPriceOverrides] = useState<Record<string, number>>({});
+
   function getAccountQuantity(ticker: string, accountId: string): number {
     const livePos = liveBalances[accountId]?.find((p) => p.ticker === ticker);
     if (livePos !== undefined) return livePos.quantity;
@@ -88,7 +104,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     );
   }
 
-  // 계좌가 ticker를 보유하고 있는지 (실시간 또는 분석 결과 기준)
   function accountHoldsTicker(ticker: string, accountId: string): boolean {
     if (liveBalances[accountId]) {
       return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
@@ -98,7 +113,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     );
   }
 
-  // 계좌의 실시간 잔고 로드 (단일 계좌 재조회용 — KIS/키움 분기)
   async function loadLiveBalance(accountId: string) {
     setBalanceState((prev) => ({ ...prev, [accountId]: "loading" }));
     try {
@@ -119,7 +133,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     }
   }
 
-  // 모든 브로커 계좌(KIS + 키움) 잔고 일괄 로드
   async function loadAllLiveBalances() {
     if (kisAccounts.length === 0) return;
     const loadingState: Record<string, BalanceLoadState> = {};
@@ -160,18 +173,54 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     }
   }
 
-  // 모달 오픈 시 전 계좌 잔고 자동 로딩
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { loadAllLiveBalances(); }, []);
+  async function loadAllPrices() {
+    const actionableItems = getActionableItems(analysis);
+    const tickerMarketMap = new Map<string, string>();
+    actionableItems.forEach((i) => {
+      if (i.ticker !== "CASH") tickerMarketMap.set(i.ticker, i.market);
+    });
+    analysis.untracked_holdings.forEach((h) => tickerMarketMap.set(h.ticker, h.market));
 
-  // 분석 결과에서 ticker가 KIS 계좌에 있는지 확인 (asset_type 기준)
+    if (tickerMarketMap.size === 0) return;
+    setPriceState("loading");
+
+    const entries = Array.from(tickerMarketMap.entries());
+    const results = await Promise.allSettled(
+      entries.map(([ticker, market]) => fetchStockPrice(ticker, market))
+    );
+
+    const newKrw: Record<string, number> = {};
+    const newUsd: Record<string, number> = {};
+    let latestUsdRate: number | null = null;
+
+    results.forEach((result, idx) => {
+      const [ticker] = entries[idx];
+      if (result.status === "fulfilled") {
+        const { price_krw, price_usd, usd_rate } = result.value;
+        if (price_krw != null) newKrw[ticker] = price_krw;
+        if (price_usd != null) newUsd[ticker] = price_usd;
+        if (usd_rate != null) latestUsdRate = usd_rate;
+      }
+    });
+
+    setLivePricesKrw(newKrw);
+    setLivePricesUsd(newUsd);
+    if (latestUsdRate != null) setGlobalUsdRate(latestUsdRate);
+    setPriceState(Object.keys(newKrw).length > 0 ? "loaded" : "error");
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadAllLiveBalances();
+    loadAllPrices();
+  }, []);
+
   function getKisInfos(ticker: string): TickerAccountInfo[] {
     return (analysis.ticker_account_map[ticker] ?? []).filter(
       (a) => a.asset_type === "STOCK_KIS"
     );
   }
 
-  // 기본 매수 계좌: 해당 ticker를 가장 많이 보유한 KIS 계좌, 없으면 첫 번째 계좌
   function primaryKisAccountId(ticker: string): string {
     const defaultId = kisAccounts[0]?.id ?? "";
     const infos = getKisInfos(ticker);
@@ -181,22 +230,19 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
 
   const actionableItems = getActionableItems(analysis);
 
-  // 수량 오버라이드
   const [qtyOverrides, setQtyOverrides] = useState<Record<string, number>>({});
 
-  // BUY 계좌 배정: ticker → accountId
-  const [buyAccountMap, setBuyAccountMap] = useState<Record<string, string>>(() => {
+  const [buyAccounts, setBuyAccounts] = useState<Record<string, string[]>>(() => {
     const defaultAccId = kisAccounts[0]?.id ?? "";
-    const map: Record<string, string> = {};
+    const map: Record<string, string[]> = {};
     if (!defaultAccId) return map;
     actionableItems.forEach((i) => {
       if ((i.shares_to_trade ?? 0) > 0)
-        map[i.ticker] = primaryKisAccountId(i.ticker);
+        map[i.ticker] = [primaryKisAccountId(i.ticker)];
     });
     return map;
   });
 
-  // 체크박스 선택
   const [selected, setSelected] = useState<Set<string>>(() => {
     const keys = new Set<string>();
     const defaultAccId = kisAccounts[0]?.id ?? "";
@@ -215,7 +261,32 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
   const [results, setResults] = useState<ExecutionResult[]>([]);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // ── 계좌별 SELL 행 (분석 결과 + 실시간 잔고 병합) ──
+  // 지정가의 native 가격 (국내=KRW, 해외=USD) — override 없으면 실시간 가격 반환
+  function getLimitPriceNative(key: string, ticker: string, market: string): number {
+    if (key in limitPriceOverrides) return limitPriceOverrides[key];
+    return isOverseasMarket(market)
+      ? (livePricesUsd[ticker] ?? 0)
+      : (livePricesKrw[ticker] ?? 0);
+  }
+
+  function setLimitPrice(key: string, val: number) {
+    setLimitPriceOverrides((prev) => ({ ...prev, [key]: Math.max(0, val) }));
+  }
+
+  // 예상 체결금액 (KRW 기준)
+  function getEstimateKrw(key: string, ticker: string, market: string, qty: number): number | null {
+    if (orderType === "LIMIT") {
+      const native = getLimitPriceNative(key, ticker, market);
+      if (native <= 0) return null;
+      if (isOverseasMarket(market)) {
+        return globalUsdRate != null ? native * globalUsdRate * qty : null;
+      }
+      return native * qty;
+    }
+    const priceKrw = livePricesKrw[ticker] ?? null;
+    return priceKrw != null ? priceKrw * qty : null;
+  }
+
   function getSellRows(accountId: string): {
     item: RebalancingItem;
     currentQty: number;
@@ -230,7 +301,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
       const currentQty = getAccountQuantity(item.ticker, accountId);
       if (currentQty <= 0) continue;
 
-      // 다중 KIS 계좌 보유 시 비례 분배
       const allKisQty = kisAccounts.reduce(
         (sum, acc) => sum + getAccountQuantity(item.ticker, acc.id),
         0
@@ -246,14 +316,13 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     return rows;
   }
 
-  // ── 계좌별 BUY 행 ──
   function getBuyRows(accountId: string): {
     item: RebalancingItem;
     suggestedQty: number;
     currentQty: number;
   }[] {
     return actionableItems
-      .filter((i) => (i.shares_to_trade ?? 0) > 0 && buyAccountMap[i.ticker] === accountId)
+      .filter((i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId))
       .map((i) => ({
         item: i,
         suggestedQty: Math.abs(Math.round(i.shares_to_trade!)),
@@ -261,7 +330,17 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
       }));
   }
 
-  // ── 미추적 종목 SELL 행 ──
+  function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
+    const item = actionableItems.find((i) => i.ticker === ticker);
+    const needed = Math.abs(Math.round(item?.shares_to_trade ?? 0));
+    const allocated = (buyAccounts[ticker] ?? []).reduce((sum, accId) => {
+      const key = `buy_${ticker}_${accId}`;
+      if (!selected.has(key)) return sum;
+      return sum + (qtyOverrides[key] ?? needed);
+    }, 0);
+    return { allocated, needed };
+  }
+
   function getUntrackedSellRows(accountId: string): {
     ticker: string;
     name: string;
@@ -280,7 +359,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     return rows;
   }
 
-  // ── 실행 주문 목록 생성 ──
   function buildOrders(): ExecutionOrderItem[] {
     const orders: ExecutionOrderItem[] = [];
     kisAccounts.forEach((acc) => {
@@ -289,21 +367,33 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
-          orders.push({ ticker: item.ticker, name: item.name, market: item.market, side: "SELL", quantity: qty, account_id: acc.id });
+          orders.push({
+            ticker: item.ticker, name: item.name, market: item.market, side: "SELL", quantity: qty, account_id: acc.id,
+            order_type: orderType,
+            limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, item.ticker, item.market) || null : null,
+          });
       });
       getBuyRows(acc.id).forEach(({ item, suggestedQty }) => {
         const key = `buy_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
-          orders.push({ ticker: item.ticker, name: item.name, market: item.market, side: "BUY", quantity: qty, account_id: acc.id });
+          orders.push({
+            ticker: item.ticker, name: item.name, market: item.market, side: "BUY", quantity: qty, account_id: acc.id,
+            order_type: orderType,
+            limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, item.ticker, item.market) || null : null,
+          });
       });
       getUntrackedSellRows(acc.id).forEach(({ ticker, name, market, suggestedQty }) => {
         const key = `untracked_sell_${ticker}_${acc.id}`;
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
-          orders.push({ ticker, name, market, side: "SELL", quantity: qty, account_id: acc.id });
+          orders.push({
+            ticker, name, market, side: "SELL", quantity: qty, account_id: acc.id,
+            order_type: orderType,
+            limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, ticker, market) || null : null,
+          });
       });
     });
     return orders;
@@ -329,15 +419,16 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     setQtyOverrides((prev) => ({ ...prev, [key]: Math.max(0, val) }));
   }
 
-  function reassignBuyAccount(ticker: string, newAccountId: string) {
-    const prevAccId = buyAccountMap[ticker];
-    if (prevAccId) {
-      const prevKey = `buy_${ticker}_${prevAccId}`;
-      setSelected((prev) => { const next = new Set(prev); next.delete(prevKey); return next; });
-      setQtyOverrides((prev) => { const next = { ...prev }; delete next[prevKey]; return next; });
-    }
-    setBuyAccountMap((prev) => ({ ...prev, [ticker]: newAccountId }));
-    setSelected((prev) => new Set([...prev, `buy_${ticker}_${newAccountId}`]));
+  function addBuyAccount(ticker: string, accountId: string) {
+    setBuyAccounts((prev) => ({ ...prev, [ticker]: [...(prev[ticker] ?? []), accountId] }));
+    setQtyOverrides((prev) => ({ ...prev, [`buy_${ticker}_${accountId}`]: 0 }));
+  }
+
+  function removeBuyAccount(ticker: string, accountId: string) {
+    setBuyAccounts((prev) => ({ ...prev, [ticker]: (prev[ticker] ?? []).filter((id) => id !== accountId) }));
+    const key = `buy_${ticker}_${accountId}`;
+    setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+    setQtyOverrides((prev) => { const next = { ...prev }; delete next[key]; return next; });
   }
 
   async function handleExecute() {
@@ -362,9 +453,60 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     return { sells: sells + untracked, buys };
   }
 
+  // 현재가 셀 렌더링 헬퍼
+  function renderPriceCell(ticker: string, market: string) {
+    const krw = livePricesKrw[ticker];
+    const usd = livePricesUsd[ticker];
+    if (priceState === "loading") {
+      return <span className="text-gray-600 text-[11px]">조회 중</span>;
+    }
+    if (krw != null) {
+      if (isOverseasMarket(market) && usd != null) {
+        return (
+          <div>
+            <div className="text-gray-300 text-[11px]">${usd.toFixed(2)}</div>
+            <div className="text-gray-500 text-[11px]">≈ {fmtKrw(krw)}</div>
+          </div>
+        );
+      }
+      return <span className="text-gray-300 text-[11px]">{fmtKrw(krw)}</span>;
+    }
+    return <span className="text-gray-600 text-[11px]">—</span>;
+  }
+
+  // 지정가 입력 셀 렌더링 헬퍼
+  function renderLimitPriceCell(key: string, ticker: string, market: string, qty: number) {
+    if (orderType !== "LIMIT") return null;
+    const overseas = isOverseasMarket(market);
+    const nativeVal = getLimitPriceNative(key, ticker, market);
+    const estKrw = overseas && globalUsdRate != null ? nativeVal * globalUsdRate * qty : nativeVal * qty;
+
+    return (
+      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-end gap-1">
+          <input
+            type="number"
+            min={0}
+            step={overseas ? 0.01 : 1}
+            value={nativeVal || ""}
+            placeholder={overseas ? "USD" : "KRW"}
+            onChange={(e) => setLimitPrice(key, parseFloat(e.target.value) || 0)}
+            className="w-20 bg-gray-800 border border-indigo-600/50 rounded px-2 py-0.5 text-right text-indigo-300 font-medium text-[11px] focus:outline-none focus:border-indigo-500"
+          />
+          <span className="text-gray-500 text-[11px]">{overseas ? "USD" : "원"}</span>
+        </div>
+        {nativeVal > 0 && (
+          <div className="text-[11px] text-gray-600 mt-0.5 text-right">
+            ≈ {fmtKrw(overseas && globalUsdRate != null ? nativeVal * globalUsdRate : nativeVal)} × {qty}주 = {fmtKrw(estKrw)}
+          </div>
+        )}
+      </td>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
           <h2 className="text-base font-semibold text-white">리밸런싱 실행</h2>
@@ -392,6 +534,39 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                 시장이 닫혀 있을 경우 주문이 예약될 수 있습니다.
               </div>
 
+              {/* 주문 유형 토글 */}
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400">주문 유형</span>
+                <div className="flex rounded-lg border border-gray-700 overflow-hidden">
+                  <button
+                    onClick={() => setOrderType("MARKET")}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      orderType === "MARKET"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    시장가
+                  </button>
+                  <button
+                    onClick={() => setOrderType("LIMIT")}
+                    className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                      orderType === "LIMIT"
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    지정가
+                  </button>
+                </div>
+                {priceState === "loading" && (
+                  <span className="text-xs text-gray-500">현재가 조회 중...</span>
+                )}
+                {priceState === "error" && (
+                  <span className="text-xs text-amber-400">현재가 조회 실패 — 지정가 직접 입력 가능</span>
+                )}
+              </div>
+
               {errorMsg && (
                 <div className="rounded-lg bg-red-900/30 border border-red-700/50 px-4 py-3 text-xs text-red-300">
                   {errorMsg}
@@ -407,7 +582,10 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                     const buyRows = getBuyRows(acc.id);
                     const untrackedRows = getUntrackedSellRows(acc.id);
                     const bState = balanceState[acc.id] ?? "idle";
-                    const hasData = sellRows.length > 0 || buyRows.length > 0 || untrackedRows.length > 0;
+                    const unassignedBuyItems = actionableItems.filter(
+                      (i) => (i.shares_to_trade ?? 0) > 0 && !(buyAccounts[i.ticker] ?? []).includes(acc.id)
+                    );
+                    const hasData = sellRows.length > 0 || buyRows.length > 0 || untrackedRows.length > 0 || unassignedBuyItems.length > 0;
 
                     const { sells, buys } = getAccountSummary(acc.id);
 
@@ -446,7 +624,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                 예수금 <span className="text-gray-300">{fmtKrw(depositKrw[acc.id])}</span>
                               </span>
                             )}
-                            {/* 실시간 잔고 재조회 버튼 */}
                             <button
                               onClick={() => loadLiveBalance(acc.id)}
                               disabled={bState === "loading"}
@@ -474,7 +651,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                     {sellRows.map(({ item, currentQty, suggestedQty }) => {
                                       const key = `sell_${item.ticker}_${acc.id}`;
                                       const qty = qtyOverrides[key] ?? suggestedQty;
-                                      const est = item.current_price_krw ? item.current_price_krw * qty : null;
+                                      const est = getEstimateKrw(key, item.ticker, item.market, qty);
                                       return (
                                         <tr key={key} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => toggleKey(key)}>
                                           <td className="px-3 py-2 w-8">
@@ -487,12 +664,15 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                             />
                                           </td>
                                           <td className="px-3 py-2">
-                                            <div className="text-white font-medium truncate max-w-[130px]">{item.name}</div>
+                                            <div className="text-white font-medium truncate max-w-[120px]">{item.name}</div>
                                             <div className="text-gray-400 text-[11px]">{item.ticker}</div>
                                             <div className="text-gray-500 text-[11px]">현재 {currentQty.toLocaleString()}주 보유</div>
                                           </td>
                                           <td className="px-3 py-2 text-center">
                                             <SideBadge isBuy={false} />
+                                          </td>
+                                          <td className="px-2 py-2 text-right w-24" onClick={(e) => e.stopPropagation()}>
+                                            {renderPriceCell(item.ticker, item.market)}
                                           </td>
                                           <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-end gap-1">
@@ -505,10 +685,11 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                               />
                                               <span className="text-gray-400">주</span>
                                             </div>
-                                            {est != null && (
+                                            {est != null && orderType === "MARKET" && (
                                               <div className="text-[11px] text-gray-500 mt-0.5 text-right">≈ {fmtKrw(est)}</div>
                                             )}
                                           </td>
+                                          {renderLimitPriceCell(key, item.ticker, item.market, qty)}
                                         </tr>
                                       );
                                     })}
@@ -517,74 +698,108 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                               </div>
                             )}
 
-                            {/* 매수 테이블 */}
-                            {buyRows.length > 0 && (
-                              <div>
-                                <div className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
-                                <table className="w-full text-xs">
-                                  <tbody className="divide-y divide-gray-700/30">
-                                    {buyRows.map(({ item, suggestedQty, currentQty }) => {
-                                      const key = `buy_${item.ticker}_${acc.id}`;
-                                      const qty = qtyOverrides[key] ?? suggestedQty;
-                                      const est = item.current_price_krw ? item.current_price_krw * qty : null;
-                                      return (
-                                        <tr key={key} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => toggleKey(key)}>
-                                          <td className="px-3 py-2 w-8">
-                                            <input
-                                              type="checkbox"
-                                              checked={selected.has(key)}
-                                              onChange={() => toggleKey(key)}
-                                              onClick={(e) => e.stopPropagation()}
-                                              className="accent-indigo-500"
-                                            />
-                                          </td>
-                                          <td className="px-3 py-2">
-                                            <div className="text-white font-medium truncate max-w-[100px]">{item.name}</div>
-                                            <div className="text-gray-400 text-[11px]">{item.ticker}</div>
-                                            <div className="text-gray-500 text-[11px]">
-                                              {currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}
-                                            </div>
-                                          </td>
-                                          <td className="px-3 py-2 text-center">
-                                            <SideBadge isBuy={true} />
-                                          </td>
-                                          <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                            <div className="flex items-center justify-end gap-1">
-                                              <input
-                                                type="number"
-                                                min={0}
-                                                value={qty}
-                                                onChange={(e) => setQty(key, parseInt(e.target.value) || 0)}
-                                                className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-red-400 font-medium focus:outline-none focus:border-indigo-500"
-                                              />
-                                              <span className="text-gray-400">주</span>
-                                            </div>
-                                            {est != null && (
-                                              <div className="text-[11px] text-gray-500 mt-0.5 text-right">≈ {fmtKrw(est)}</div>
-                                            )}
-                                          </td>
-                                          {kisAccounts.length > 1 && (
-                                            <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                              <select
-                                                value={acc.id}
-                                                onChange={(e) => reassignBuyAccount(item.ticker, e.target.value)}
-                                                className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-[11px] text-white focus:outline-none focus:border-indigo-500 max-w-[120px]"
-                                              >
-                                                {kisAccounts.map((a) => (
-                                                  <option key={a.id} value={a.id}>
-                                                    {a.name}{a.is_mock_mode ? " [모의]" : ""}
-                                                  </option>
-                                                ))}
-                                              </select>
-                                            </td>
-                                          )}
-                                        </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
-                              </div>
-                            )}
+                            {/* 매수 섹션 */}
+                            {(() => {
+                              if (buyRows.length === 0 && unassignedBuyItems.length === 0) return null;
+                              return (
+                                <div>
+                                  <div className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
+                                  {buyRows.length > 0 && (
+                                    <table className="w-full text-xs">
+                                      <tbody className="divide-y divide-gray-700/30">
+                                        {buyRows.map(({ item, suggestedQty, currentQty }) => {
+                                          const key = `buy_${item.ticker}_${acc.id}`;
+                                          const qty = qtyOverrides[key] ?? suggestedQty;
+                                          const est = getEstimateKrw(key, item.ticker, item.market, qty);
+                                          const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
+                                          const isOnlyAccount = !isMultiAccount;
+                                          const { allocated, needed } = isMultiAccount ? getBuyTotalInfo(item.ticker) : { allocated: 0, needed: 0 };
+                                          return (
+                                            <tr key={key} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => toggleKey(key)}>
+                                              <td className="px-3 py-2 w-8">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selected.has(key)}
+                                                  onChange={() => toggleKey(key)}
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  className="accent-indigo-500"
+                                                />
+                                              </td>
+                                              <td className="px-3 py-2">
+                                                <div className="text-white font-medium truncate max-w-[100px]">{item.name}</div>
+                                                <div className="text-gray-400 text-[11px]">{item.ticker}</div>
+                                                <div className="text-gray-500 text-[11px]">
+                                                  {currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}
+                                                </div>
+                                              </td>
+                                              <td className="px-3 py-2 text-center">
+                                                <SideBadge isBuy={true} />
+                                              </td>
+                                              <td className="px-2 py-2 text-right w-24" onClick={(e) => e.stopPropagation()}>
+                                                {renderPriceCell(item.ticker, item.market)}
+                                              </td>
+                                              <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end gap-1">
+                                                  <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={qty}
+                                                    onChange={(e) => {
+                                                      const val = parseInt(e.target.value) || 0;
+                                                      setQtyOverrides((prev) => ({ ...prev, [key]: Math.max(0, val) }));
+                                                      if (val > 0) setSelected((prev) => new Set([...prev, key]));
+                                                      else setSelected((prev) => { const next = new Set(prev); next.delete(key); return next; });
+                                                    }}
+                                                    className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-red-400 font-medium focus:outline-none focus:border-indigo-500"
+                                                  />
+                                                  <span className="text-gray-400">주</span>
+                                                </div>
+                                                {isMultiAccount ? (
+                                                  <div className={`text-[11px] mt-0.5 text-right ${allocated === needed ? "text-gray-500" : "text-amber-400"}`}>
+                                                    배분 {allocated} / {needed}주
+                                                  </div>
+                                                ) : (
+                                                  est != null && orderType === "MARKET" && (
+                                                    <div className="text-[11px] text-gray-500 mt-0.5 text-right">≈ {fmtKrw(est)}</div>
+                                                  )
+                                                )}
+                                              </td>
+                                              {renderLimitPriceCell(key, item.ticker, item.market, qty)}
+                                              <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                  onClick={() => removeBuyAccount(item.ticker, acc.id)}
+                                                  disabled={isOnlyAccount}
+                                                  title="이 계좌에서 제거"
+                                                  className="text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
+                                                >
+                                                  ×
+                                                </button>
+                                              </td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  )}
+                                  {unassignedBuyItems.length > 0 && (
+                                    <div className="px-4 py-2 border-t border-gray-700/20">
+                                      <select
+                                        value=""
+                                        onChange={(e) => { if (e.target.value) addBuyAccount(e.target.value, acc.id); }}
+                                        className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-600 cursor-pointer"
+                                      >
+                                        <option value="">+ 이 계좌에 매수 종목 추가</option>
+                                        {unassignedBuyItems.map((i) => (
+                                          <option key={i.ticker} value={i.ticker}>
+                                            {i.name} ({i.ticker}) — {Math.abs(Math.round(i.shares_to_trade!))}주
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
 
                             {/* 미추적 종목 매도 (선택적) */}
                             {untrackedRows.length > 0 && (
@@ -594,7 +809,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                 </div>
                                 <table className="w-full text-xs">
                                   <tbody className="divide-y divide-gray-700/30">
-                                    {untrackedRows.map(({ ticker, name, currentQty, suggestedQty }) => {
+                                    {untrackedRows.map(({ ticker, name, market, currentQty, suggestedQty }) => {
                                       const key = `untracked_sell_${ticker}_${acc.id}`;
                                       const qty = qtyOverrides[key] ?? suggestedQty;
                                       return (
@@ -609,12 +824,15 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                             />
                                           </td>
                                           <td className="px-3 py-2">
-                                            <div className="text-amber-300 font-medium truncate max-w-[130px]">{name}</div>
+                                            <div className="text-amber-300 font-medium truncate max-w-[120px]">{name}</div>
                                             <div className="text-gray-400 text-[11px]">{ticker}</div>
                                             <div className="text-gray-500 text-[11px]">현재 {currentQty.toLocaleString()}주 보유</div>
                                           </td>
                                           <td className="px-3 py-2 text-center">
                                             <SideBadge isBuy={false} />
+                                          </td>
+                                          <td className="px-2 py-2 text-right w-24" onClick={(e) => e.stopPropagation()}>
+                                            {renderPriceCell(ticker, market)}
                                           </td>
                                           <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex items-center justify-end gap-1">
@@ -628,6 +846,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                               <span className="text-gray-400">주</span>
                                             </div>
                                           </td>
+                                          {renderLimitPriceCell(key, ticker, market, qty)}
                                         </tr>
                                       );
                                     })}
@@ -686,6 +905,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                       <tr>
                         <th className="px-3 py-2 text-left">종목</th>
                         <th className="px-3 py-2 text-center">구분</th>
+                        <th className="px-3 py-2 text-center">유형</th>
                         <th className="px-3 py-2 text-right">주수</th>
                         <th className="px-3 py-2 text-center">결과</th>
                         <th className="px-3 py-2 text-left">주문번호 / 사유</th>
@@ -700,6 +920,15 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                           </td>
                           <td className="px-3 py-2 text-center">
                             <SideBadge isBuy={o.side === "BUY"} />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                              o.order_type === "LIMIT"
+                                ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40"
+                                : "bg-gray-700 text-gray-400"
+                            }`}>
+                              {o.order_type === "LIMIT" ? "지정가" : "시장가"}
+                            </span>
                           </td>
                           <td className="px-3 py-2 text-right">{o.quantity}주</td>
                           <td className="px-3 py-2 text-center">
@@ -733,7 +962,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                 disabled={orders.length === 0}
                 className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
-                실행 ({orders.length}건)
+                {orderType === "LIMIT" ? "지정가 " : "시장가 "}실행 ({orders.length}건)
               </button>
             </>
           )}

@@ -3,7 +3,7 @@
 Buy & Hold 전략으로 가상 포트폴리오의 과거 수익률을 시뮬레이션한다.
 - yfinance 히스토리컬 가격 사용
 - 벤치마크: S&P500 (SPY)
-- 실제 포트폴리오: AssetSnapshot 일별 합계 시리즈
+- 실제 포트폴리오: 최신 AssetSnapshot positions 비중 기반 yfinance 백테스팅 (성장형과 동일 방식)
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import AssetSnapshot
+from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.portfolio import Portfolio
 from app.schemas.backtest import (
     BacktestResult,
@@ -187,65 +187,76 @@ def _compute_portfolio_series(
     return SeriesData(name=name, values=values), metrics
 
 
-# ── 실제 보유 포트폴리오 시리즈 ───────────────────────────────
+# ── 실제 보유 포트폴리오 holdings 조회 ──────────────────────────
 
-async def _get_real_portfolio_series(
+async def _get_real_portfolio_holdings(
     user_id: uuid.UUID,
-    dates: list[str],
     db: AsyncSession,
-) -> tuple[SeriesData, PortfolioMetrics] | None:
-    """AssetSnapshot 일별 합계로 실제 포트폴리오 수익률 시리즈 계산."""
-    start = date.fromisoformat(dates[0]) if dates else None
-    end = date.fromisoformat(dates[-1]) if dates else None
-    if not start or not end:
-        return None
+    asset_types: list[str] | None = None,
+) -> list[dict] | None:
+    """최신 AssetSnapshot의 positions로부터 실제 보유 종목 비중을 계산.
 
-    rows = await db.execute(
+    반환: [{ticker, market, weight}, ...] — _compute_portfolio_series에 바로 전달 가능.
+    스냅샷이 없거나 포지션이 비어 있으면 None 반환.
+    """
+    # 계좌별 최신 snapshot_date 서브쿼리
+    latest_sub = (
         select(
-            AssetSnapshot.snapshot_date.label("snap_date"),
-            func.sum(AssetSnapshot.amount_krw).label("total"),
+            AssetSnapshot.account_id,
+            func.max(AssetSnapshot.snapshot_date).label("max_date"),
         )
+        .join(AssetAccount, AssetSnapshot.account_id == AssetAccount.id)
         .where(
             AssetSnapshot.user_id == user_id,
-            AssetSnapshot.snapshot_date >= start,
-            AssetSnapshot.snapshot_date <= end,
+            AssetAccount.is_active == True,  # noqa: E712
+            *([AssetAccount.asset_type.in_(asset_types)] if asset_types else []),
         )
-        .group_by(AssetSnapshot.snapshot_date)
-        .order_by(AssetSnapshot.snapshot_date)
+        .group_by(AssetSnapshot.account_id)
+        .subquery()
     )
-    snap_rows = rows.all()
-    if not snap_rows:
+
+    rows = await db.execute(
+        select(AssetSnapshot.positions)
+        .join(
+            latest_sub,
+            (AssetSnapshot.account_id == latest_sub.c.account_id)
+            & (AssetSnapshot.snapshot_date == latest_sub.c.max_date),
+        )
+        .where(AssetSnapshot.positions.isnot(None))
+    )
+    all_positions_raw = rows.scalars().all()
+
+    if not all_positions_raw:
         return None
 
-    snap_map: dict[str, float] = {row.snap_date.isoformat(): float(row.total) for row in snap_rows}
-
-    # forward-fill
-    values: list[float] = []
-    last_val: float | None = None
-    for d in dates:
-        if d in snap_map:
-            last_val = snap_map[d]
-        if last_val is None:
-            # 데이터 시작 전 — 초기값 탐색
+    # ticker+market 기준으로 value_krw 합산
+    ticker_map: dict[tuple[str, str], float] = {}
+    for positions in all_positions_raw:
+        if not positions:
             continue
-        values.append(last_val)
+        for p in positions:
+            ticker = p.get("ticker", "")
+            market = p.get("market", "")
+            if not ticker or not market:
+                continue
+            if ticker in _BACKTEST_SKIP_TICKERS or market in _BACKTEST_SKIP_MARKETS:
+                continue
+            value_krw = p.get("value_krw") or (p.get("current_price", 0) * p.get("qty", 0))
+            if value_krw and value_krw > 0:
+                key = (ticker, market)
+                ticker_map[key] = ticker_map.get(key, 0.0) + float(value_krw)
 
-    if not values:
+    if not ticker_map:
         return None
 
-    # 기준 100 정규화
-    base = values[0]
-    if base <= 0:
+    total_krw = sum(ticker_map.values())
+    if total_krw <= 0:
         return None
-    normalized = [round(v / base * 100, 4) for v in values]
 
-    # dates 앞부분(스냅샷 시작 전 구간)을 None으로 패딩 — 차트 인덱스 정렬
-    pad_count = len(dates) - len(normalized)
-    full_values: list[float | None] = [None] * pad_count + normalized
-
-    name = "실제 포트폴리오"
-    metrics = _compute_metrics(name, normalized)  # 지표는 실제 데이터 기간 기준
-    return SeriesData(name=name, values=full_values), metrics
+    return [
+        {"ticker": ticker, "market": market, "weight": round(value / total_krw * 100, 4)}
+        for (ticker, market), value in ticker_map.items()
+    ]
 
 
 # ── 메인 백테스팅 실행 ─────────────────────────────────────
@@ -276,8 +287,22 @@ async def run_backtest(
     if req.include_spy and "SPY" not in all_symbols:
         all_symbols.append("SPY")
 
+    # 실제 포트폴리오 holdings 사전 조회 — 보유 종목도 yfinance 다운로드에 포함
+    real_asset_types: list[str] | None = None
+    if portfolios and all(p.base_type == "STOCK_ONLY" for p in portfolios):
+        real_asset_types = ["STOCK_KIS", "STOCK_LS", "STOCK_OTHER", "STOCK_KIWOOM"]
+
+    real_holdings: list[dict] | None = None
+    if req.include_real_portfolio:
+        real_holdings = await _get_real_portfolio_holdings(user_id, db, asset_types=real_asset_types)
+        if real_holdings:
+            for h in real_holdings:
+                sym = _to_yf_symbol(h["ticker"], h["market"])
+                if sym not in all_symbols:
+                    all_symbols.append(sym)
+
     # 3. yfinance 히스토리컬 일괄 다운로드
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     price_data: dict[str, list[tuple[str, float]]] = await loop.run_in_executor(
         None,
         partial(_sync_download_history, all_symbols, req.start_date, req.end_date),
@@ -331,11 +356,10 @@ async def run_backtest(
         all_series.append(spy_series)
         all_metrics.append(_compute_metrics("S&P 500", spy_vals))
 
-    # 7. 실제 포트폴리오 시리즈
-    if req.include_real_portfolio:
-        real = await _get_real_portfolio_series(user_id, dates, db)
-        if real:
-            all_series.append(real[0])
-            all_metrics.append(real[1])
+    # 7. 실제 포트폴리오 시리즈 — 최신 스냅샷 positions 비중 기반 yfinance 백테스팅
+    if req.include_real_portfolio and real_holdings:
+        s, m = _compute_portfolio_series("실제 포트폴리오", real_holdings, price_data, dates)
+        all_series.append(s)
+        all_metrics.append(m)
 
     return BacktestResult(dates=dates, series=all_series, metrics=all_metrics)

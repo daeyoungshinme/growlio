@@ -51,8 +51,8 @@ export default function BacktestResultChart({ dates, series }: Props) {
           />
           <Tooltip
             {...chartTooltipStyle(isDark)}
-            formatter={(value: number | null, name: string) => {
-              if (value == null) return ["-", name];
+            formatter={(value: unknown, name: string) => {
+              if (value == null || typeof value !== "number") return ["-", name];
               return [
                 `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
                 name,

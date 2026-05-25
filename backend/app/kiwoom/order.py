@@ -27,21 +27,31 @@ async def place_domestic_order(
     ticker: str,
     quantity: int,
     is_mock: bool,
+    order_type: str = "MARKET",
+    limit_price: float | None = None,
 ) -> dict[str, Any]:
-    """국내주식 시장가 매수·매도 주문 (kt10000/kt10001).
+    """국내주식 매수·매도 주문 (kt10000/kt10001).
 
     side: "BUY" | "SELL"
+    키움 trde_tp: "0"=보통(지정가), "3"=시장가
     """
     api_id = API_ID_DOMESTIC_BUY if side == "BUY" else API_ID_DOMESTIC_SELL
     headers = _auth_headers(access_token, api_id)
+
+    if order_type == "LIMIT" and limit_price is not None:
+        trde_tp = "0"                   # 보통(지정가)
+        ord_uv = str(int(limit_price))
+    else:
+        trde_tp = "3"   # 시장가
+        ord_uv = "0"
 
     body: dict[str, Any] = {
         "acnt_no": account_no,
         "dmst_stex_tp": "KRX",      # 거래소: KRX / NXT / SOR
         "stk_cd": ticker,            # 종목코드
         "ord_qty": str(quantity),    # 주문수량
-        "ord_uv": "0",               # 주문가 (시장가=0)
-        "trde_tp": "3",              # 거래유형: 0=보통, 3=시장가
+        "ord_uv": ord_uv,
+        "trde_tp": trde_tp,
     }
 
     data = await kiwoom_request(

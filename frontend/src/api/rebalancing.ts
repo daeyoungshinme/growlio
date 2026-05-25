@@ -108,6 +108,8 @@ export interface ExecutionOrderItem {
   side: "BUY" | "SELL";
   quantity: number;
   account_id?: string | null;
+  order_type: "MARKET" | "LIMIT";
+  limit_price?: number | null;  // 국내=KRW, 해외=USD
 }
 
 export interface ExecutionRequest {
@@ -124,7 +126,17 @@ export interface OrderResult {
   status: "SUCCESS" | "FAILED" | "SKIPPED";
   order_no: string | null;
   error_msg: string | null;
+  order_type?: string;
 }
+
+export interface StockPriceResponse {
+  price_krw: number | null;
+  price_usd: number | null;
+  usd_rate: number | null;
+}
+
+export const fetchStockPrice = (ticker: string, market: string): Promise<StockPriceResponse> =>
+  api.get<StockPriceResponse>("/stocks/price", { params: { ticker, market } }).then((r) => r.data);
 
 export interface ExecutionResult {
   account_id: string;

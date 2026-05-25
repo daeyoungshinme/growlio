@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { fetchExchangeRate, type AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
@@ -37,11 +38,12 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   const [editDepositValue, setEditDepositValue] = useState("");
   const [depositCurrency, setDepositCurrency] = useState<"KRW" | "USD">("KRW");
   const [depositUsdValue, setDepositUsdValue] = useState<number>(0);
-  const [usdRate, setUsdRate] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetchExchangeRate().then((r) => setUsdRate(r.usd_krw)).catch(() => {});
-  }, []);
+  const { data: rateData } = useQuery({
+    queryKey: ["exchange-rate"],
+    queryFn: fetchExchangeRate,
+    staleTime: 5 * 60 * 1000,
+  });
+  const usdRate = rateData?.usd_krw ?? null;
 
   const handleSaveName = () => {
     const trimmed = editNameValue.trim();

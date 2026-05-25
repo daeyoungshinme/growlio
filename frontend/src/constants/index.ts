@@ -5,6 +5,7 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
   STOCK_KIWOOM: "주식 (키움)",
   STOCK_OTHER: "주식 (타증권사)",
   CASH_OTHER: "예수금 (기타)",
+  CASH_STOCK: "예수금 (증권계좌)",
   OTHER: "기타",
   REAL_ESTATE: "부동산",
 };

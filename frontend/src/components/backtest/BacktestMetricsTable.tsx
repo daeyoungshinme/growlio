@@ -1,4 +1,5 @@
 import { PortfolioMetrics } from "../../api/backtest";
+import { pnlColor } from "../../utils/colors";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 
@@ -37,10 +38,10 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                   />
                   {m.name}
                 </td>
-                <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${m.total_return_pct >= 0 ? "text-red-500" : "text-blue-500"}`}>
+                <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${pnlColor(m.total_return_pct)}`}>
                   {fmt(m.total_return_pct)}
                 </td>
-                <td className={`py-2 px-2 text-right whitespace-nowrap ${m.cagr_pct >= 0 ? "text-red-500" : "text-blue-500"}`}>
+                <td className={`py-2 px-2 text-right whitespace-nowrap ${pnlColor(m.cagr_pct)}`}>
                   {fmt(m.cagr_pct)}
                 </td>
                 <td className="py-2 px-2 text-right text-blue-500 whitespace-nowrap">

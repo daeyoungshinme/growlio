@@ -5,30 +5,34 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
+from app.redis_client import get_redis
 
 router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
-# state 값을 메모리에 임시 저장 (프로덕션에서는 Redis 사용 권장)
-_pending_states: dict[str, str] = {}
+_OB_STATE_PREFIX = "ob_state:"
+_OB_STATE_TTL = 600  # 10분
 
 
 @router.get("/connect")
 async def connect_open_banking(
     current_user: User = Depends(get_current_user),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """오픈뱅킹 OAuth2 인증 시작 — 금융결제원 인증 페이지로 리다이렉트."""
     state = secrets.token_urlsafe(16)
-    _pending_states[state] = str(current_user.id)
+    await redis.setex(f"{_OB_STATE_PREFIX}{state}", _OB_STATE_TTL, str(current_user.id))
     redirect_url = get_authorize_url(state)
     return {"authorize_url": redirect_url}
 
@@ -38,11 +42,14 @@ async def open_banking_callback(
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
-    user_id = _pending_states.pop(state, None)
+    redis_key = f"{_OB_STATE_PREFIX}{state}"
+    user_id = await redis.get(redis_key)
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
+    await redis.delete(redis_key)
 
     token_data = await exchange_code_for_token(code)
     access_token = token_data.get("access_token")
@@ -62,7 +69,8 @@ async def open_banking_callback(
     await db.commit()
 
     # 프론트엔드로 리다이렉트 (연결 성공 페이지)
-    return RedirectResponse(url="http://localhost:5173/settings?ob_connected=1")
+    frontend_origin = settings.allowed_origins_list[0]
+    return RedirectResponse(url=f"{frontend_origin}/settings?ob_connected=1")
 
 
 @router.get("/accounts")

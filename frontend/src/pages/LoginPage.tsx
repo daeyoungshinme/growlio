@@ -66,6 +66,15 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-3">
+          <Link to="/find-account" className="text-blue-600 dark:text-blue-400 hover:underline">
+            아이디 찾기
+          </Link>
+          <Link to="/forgot-password" className="text-blue-600 dark:text-blue-400 hover:underline">
+            비밀번호 찾기
+          </Link>
+        </div>
+
         <p className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
           계정이 없으신가요?{" "}
           <Link to="/register" className="text-blue-600 dark:text-blue-400 hover:underline">

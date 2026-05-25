@@ -10,7 +10,9 @@ import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, Query
 
+from app.kis.constants import OVERSEAS_MARKETS
 from app.redis_client import get_redis
+from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 logger = structlog.get_logger()
 
@@ -101,36 +103,21 @@ async def search_stocks(q: str = Query(..., min_length=1), limit: int = Query(8,
     return await _search_yahoo(q, limit)
 
 
-def _sync_usdkrw() -> float:
-    import yfinance as yf
-    try:
-        hist = yf.Ticker("USDKRW=X").history(period="5d")
-        if not hist.empty:
-            rate = float(hist["Close"].iloc[-1])
-            if rate > 0:
-                return rate
-    except Exception as e:
-        logger.warning("usdkrw_fetch_failed", error=str(e))
-    return 1350.0  # 조회 실패 시 기본값
-
-
-_REDIS_USD_KRW_KEY = "usd_krw_rate"
-_EXCHANGE_RATE_CACHE_TTL = 300  # 5분
-
-
 @router.get("/exchange-rate")
 async def get_exchange_rate(redis: aioredis.Redis = Depends(get_redis)):
     """현재 USD/KRW 환율 조회 (Redis 캐시 → yfinance, ~15분 지연)."""
-    cached = await redis.get(_REDIS_USD_KRW_KEY)
+    from app.services.price_service import _sync_usdkrw
+
+    cached = await redis.get("usd_krw_rate")
     if cached:
         return {"usd_krw": float(cached)}
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     rate = await loop.run_in_executor(None, _sync_usdkrw)
-    await redis.set(_REDIS_USD_KRW_KEY, rate, ex=_EXCHANGE_RATE_CACHE_TTL)
+    if rate > 0:
+        await cache_usd_krw_rate(redis, rate)
+    else:
+        rate = await get_usd_krw_rate(redis)
     return {"usd_krw": rate}
-
-
-OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX"}
 
 
 @router.get("/price")
@@ -138,11 +125,10 @@ async def get_stock_price(ticker: str = Query(...), market: str = Query(...)):
     """단일 종목 현재가 조회 (인증 불필요 — Yahoo Finance).
     해외 종목은 USD → KRW 변환 후 반환.
     """
-    from functools import partial as _partial
-    from app.services.price_service import _sync_yahoo_price
+    from app.services.price_service import _sync_usdkrw, _sync_yahoo_price
 
-    loop = asyncio.get_event_loop()
-    price = await loop.run_in_executor(None, _partial(_sync_yahoo_price, ticker, market))
+    loop = asyncio.get_running_loop()
+    price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
     if not price:
         return {"price_krw": None, "price_usd": None, "usd_rate": None}
 

@@ -10,6 +10,8 @@ import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
 import AssetAllocationChart from "../components/dashboard/AssetAllocationChart";
+import SkeletonCard from "../components/common/SkeletonCard";
+import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { ASSET_TYPE_LABELS } from "../constants";
 import type { PortfolioOverview } from "../types";
 
@@ -51,13 +53,24 @@ export default function DashboardPage() {
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
+    const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
     const stockItems = data.asset_allocation.filter((item) => item.type.startsWith("STOCK_"));
-    const nonStockItems = data.asset_allocation.filter((item) => !item.type.startsWith("STOCK_"));
-    const result = nonStockItems.map((item) => ({
+    const cashItems = data.asset_allocation.filter((item) => CASH_TYPES.has(item.type));
+    const otherItems = data.asset_allocation.filter(
+      (item) => !item.type.startsWith("STOCK_") && !CASH_TYPES.has(item.type)
+    );
+    const result = otherItems.map((item) => ({
       name: ASSET_TYPE_LABELS[item.type] ?? item.type,
       value: item.amount_krw,
       pct: item.pct,
     }));
+    if (cashItems.length > 0) {
+      result.unshift({
+        name: "현금",
+        value: cashItems.reduce((sum, item) => sum + item.amount_krw, 0),
+        pct: cashItems.reduce((sum, item) => sum + item.pct, 0),
+      });
+    }
     if (stockItems.length > 0) {
       result.unshift({
         name: "주식",
@@ -68,7 +81,20 @@ export default function DashboardPage() {
     return result;
   }, [data]);
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">로딩 중...</div>;
+  if (isLoading) return (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <SkeletonCard rows={4} height="h-5" />
+        <SkeletonCard rows={4} height="h-5" />
+      </div>
+      <SkeletonCard rows={3} height="h-4" />
+    </div>
+  );
   if (error || !data) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>

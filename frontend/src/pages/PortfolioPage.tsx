@@ -13,6 +13,8 @@ import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import StatCard from "../components/common/StatCard";
+import SkeletonCard from "../components/common/SkeletonCard";
+import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { DOMESTIC_MARKETS } from "../constants";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "../types";
 
@@ -126,7 +128,17 @@ export default function PortfolioPage() {
     [data]
   );
 
-  if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400">로딩 중...</div>;
+  if (isLoading) return (
+    <div className="space-y-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
+        </div>
+      </div>
+      <SkeletonCard rows={5} height="h-4" />
+      <SkeletonCard rows={3} height="h-4" />
+    </div>
+  );
   if (error || !data) return <div className="text-red-500 p-4">데이터를 불러오지 못했습니다</div>;
 
   const pnlColor = data.unrealized_pnl_krw >= 0 ? "red" : "blue" as const;

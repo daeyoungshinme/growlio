@@ -8,6 +8,9 @@ import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
+import FindAccountPage from "./pages/FindAccountPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
@@ -17,15 +20,22 @@ const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
+  if (isAuthChecking) return <PageLoader />;
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 export default function App() {
   const isDark = useThemeStore((s) => s.isDark);
+  const checkAuth = useAuthStore((s) => s.checkAuth);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
 
   return (
     <>
@@ -34,6 +44,9 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/find-account" element={<FindAccountPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route
           path="/"
           element={
