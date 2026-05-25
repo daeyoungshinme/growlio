@@ -23,6 +23,12 @@ cd frontend && npm run dev
 cd frontend && npm run build
 ```
 
+### 린트 & 테스트
+```bash
+cd frontend && npm run lint  # ESLint (eslint src)
+cd frontend && npm run test  # Vitest (vitest run)
+```
+
 ---
 
 ## Architecture (`frontend/src/`)
@@ -50,7 +56,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **hooks/** — 커스텀 React 훅 디렉토리. API 로직이 아닌 UI 동작 추상화용.
 
-> 린트/테스트 스크립트 없음 (`package.json`에 `lint`, `test` 명령 미설정). 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
+> 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리:** Zustand — `authStore.ts`(인증), `themeStore.ts`(다크모드). 서버 상태는 React Query 전담.
 

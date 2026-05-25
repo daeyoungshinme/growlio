@@ -45,6 +45,10 @@ make install-backend  # cd backend && pip install uv && uv pip install -e ".[dev
 make install-frontend # cd frontend && npm install
 make dev-backend      # uvicorn app.main:app --reload
 make dev-frontend     # npm run dev
+make test-backend     # cd backend && .venv/bin/pytest
+make test-frontend    # cd frontend && npm run test
+make lint             # ruff (backend) + eslint (frontend)
+make typecheck        # mypy (backend) + tsc build (frontend)
 ```
 
 ## Development Servers (요약)
