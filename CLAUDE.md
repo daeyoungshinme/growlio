@@ -52,6 +52,8 @@ make dev-frontend     # npm run dev
 ```bash
 # 백엔드 (localhost:8000)
 cd backend && .venv/bin/uvicorn app.main:app --reload
+# windows
+cd backend && .venv/Scripts/uvicorn.exe app.main:app --reload
 
 # 프론트엔드 (localhost:5173)
 cd frontend && npm run dev

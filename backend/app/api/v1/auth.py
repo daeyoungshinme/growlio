@@ -57,6 +57,9 @@ async def refresh(req: RefreshRequest, db: AsyncSession = Depends(get_db)):
     if payload.get("type") != "refresh":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="잘못된 토큰 유형입니다")
     user_id = payload["sub"]
+    user = await db.scalar(select(User).where(User.id == user_id, User.is_active == True))  # noqa: E712
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="사용자를 찾을 수 없습니다")
     return TokenResponse(
         access_token=create_access_token(user_id),
         refresh_token=create_refresh_token(user_id),

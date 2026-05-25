@@ -7,12 +7,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1.router import router
 from app.config import settings
+from app.database import get_db
 from app.limiter import limiter
-from app.redis_client import close_redis
+from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
 
 logger = structlog.get_logger()
@@ -74,4 +76,25 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "env": settings.app_env}
+    checks: dict[str, str] = {}
+    try:
+        async for db in get_db():
+            await db.execute(text("SELECT 1"))
+        checks["db"] = "ok"
+    except Exception as e:
+        checks["db"] = f"error: {e}"
+
+    try:
+        redis = await get_redis()
+        await redis.ping()
+        checks["redis"] = "ok"
+    except Exception as e:
+        checks["redis"] = f"error: {e}"
+
+    healthy = all(v == "ok" for v in checks.values())
+    if not healthy:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "env": settings.app_env, **checks},
+        )
+    return {"status": "healthy", "env": settings.app_env, **checks}
