@@ -1,5 +1,6 @@
 .PHONY: up down migrate install-backend install-frontend dev-backend dev-frontend \
-        test-backend test-frontend lint typecheck
+        test-backend test-frontend lint typecheck \
+        build-android-debug build-android-release
 
 up:
 	docker compose up -d db redis
@@ -35,3 +36,11 @@ lint:
 typecheck:
 	cd backend && .venv/bin/mypy app/
 	cd frontend && npm run build
+
+build-android-debug:
+	cd frontend && npm run build && npx cap sync android
+	cd frontend/android && gradlew.bat assembleDebug
+
+build-android-release:
+	cd frontend && npm run build && npx cap sync android
+	cd frontend/android && gradlew.bat assembleRelease
