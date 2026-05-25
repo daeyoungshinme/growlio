@@ -137,6 +137,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 **커스텀 훅 (`src/hooks/`)**
 - `useToast()` — toast 알림. 성공/에러 메시지 표시. 인라인 에러 state 대신 사용.
 - `useAsyncAction()` — 비동기 작업 로딩/에러 처리 래퍼.
+  ```ts
+  const { run, loading } = useAsyncAction();
+  await run(async () => { await api.doSomething(); toast("완료", "success"); });
+  // loading은 버튼 disabled 처리에 사용
+  ```
 
 ---
 
@@ -161,3 +166,8 @@ bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-70
 ```
 px-5 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors
 ```
+
+**다크모드**
+- `const { isDark } = useThemeStore()` — 컴포넌트에서 다크모드 상태 조회.
+- Tailwind `dark:` 클래스는 HTML `class="dark"` 토글 방식. `isDark` 직접 사용보다 `dark:` 접두사 우선.
+- 차트(Recharts)는 `dark:` 미지원 → `chartTooltipStyle(isDark)` 사용 (Absolute Rules 참고).

@@ -37,7 +37,7 @@ cd backend && .venv/bin/pytest
 cd backend && .venv/bin/pytest tests/test_asset_service.py -v
 ```
 
-> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨.
+> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
 
 ### Lint & Type Check
 ```bash
@@ -102,6 +102,7 @@ providers/                    # LS증권, 오픈뱅킹 provider 추상화
 utils/
   └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
+                              # 예: @limiter.limit("60/minute") — request: Request 파라미터 필수
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
   ├── exchange_rate_alert.py  # 환율 알림 정기 작업
