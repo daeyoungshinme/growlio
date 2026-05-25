@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
+import { toast } from "../utils/toast";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -35,6 +36,7 @@ api.interceptors.response.use(
         } catch {
           localStorage.removeItem("access_token");
           localStorage.removeItem("refresh_token");
+          toast("세션이 만료되었습니다. 다시 로그인해 주세요.", "error");
           window.location.href = "/login";
         }
       } else {

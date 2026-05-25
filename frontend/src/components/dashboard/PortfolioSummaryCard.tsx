@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
@@ -71,6 +71,19 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
   const [showAll, setShowAll] = useState(false);
   const isDark = useThemeStore((s) => s.isDark);
 
+  const aggregated = useMemo(
+    () => groupPositionsByTicker(overview?.all_positions ?? []).sort((a, b) => b.total_value_krw - a.total_value_krw),
+    [overview?.all_positions],
+  );
+
+  const chartData = useMemo(
+    () =>
+      stockAllocation && stockAllocation.length > 0
+        ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw, pct: item.pct }))
+        : null,
+    [stockAllocation],
+  );
+
   if (isLoading) {
     return <div className="py-6 text-center text-gray-300 dark:text-gray-600 text-sm">로딩 중...</div>;
   }
@@ -79,15 +92,8 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
     return <div className="py-6 text-center text-gray-300 dark:text-gray-600 text-sm">데이터를 불러올 수 없습니다</div>;
   }
 
-  const aggregated = groupPositionsByTicker(overview.all_positions ?? [])
-    .sort((a, b) => b.total_value_krw - a.total_value_krw);
-
   const pnlColorClass = pnlColor(overview.unrealized_pnl_krw);
   const retColorClass = pnlColor(overview.stock_return_pct);
-
-  const chartData = stockAllocation && stockAllocation.length > 0
-    ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw, pct: item.pct }))
-    : null;
 
   return (
     <div className="space-y-4">

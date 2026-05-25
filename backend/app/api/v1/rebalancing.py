@@ -5,7 +5,7 @@ from functools import partial
 
 import structlog
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,7 @@ from app.schemas.rebalancing import (
     ExecutionResult,
     KisBalancePosition,
     KisBalanceResponse,
+    KiwoomBalanceResponse,
     RebalancingAnalysis,
     TargetPortfolioCreate,
     TargetPortfolioResponse,
@@ -72,6 +73,7 @@ async def create_portfolio(
         name=body.name,
         items=[i.model_dump() for i in body.items],
         base_type=body.base_type,
+        account_ids=[str(aid) for aid in body.account_ids] if body.account_ids else None,
     )
     db.add(portfolio)
     await db.commit()
@@ -102,6 +104,8 @@ async def update_portfolio(
         portfolio.items = [i.model_dump() for i in body.items]
     if body.base_type is not None:
         portfolio.base_type = body.base_type
+    if body.account_ids is not None:
+        portfolio.account_ids = [str(aid) for aid in body.account_ids] if body.account_ids else None
 
     await db.commit()
     await db.refresh(portfolio)
@@ -133,6 +137,7 @@ async def delete_portfolio(
 async def analyze_portfolio(
     request: Request,
     portfolio_id: uuid.UUID,
+    account_ids: list[uuid.UUID] | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
@@ -155,7 +160,14 @@ async def analyze_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
-    overview = await _build_portfolio_overview(current_user.id, db)
+    # query param 우선, 없으면 portfolio에 저장된 account_ids 사용, 그것도 없으면 전체 계좌
+    saved_ids = getattr(portfolio, "account_ids", None)
+    effective_account_ids = account_ids or (
+        [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+    )
+    overview = await _build_portfolio_overview(
+        current_user.id, db, account_ids=effective_account_ids
+    )
 
     dividend_items = await get_ticker_dividend_summary(current_user.id, db)
     dividend_map = {
@@ -175,27 +187,30 @@ async def analyze_portfolio(
         if key in dividend_map:
             continue
         is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
-        if is_korean:
-            is_etf = is_korean_etf(ticker, market)
-            fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-            naver_info = await loop.run_in_executor(None, partial(fn, ticker))
-            if naver_info["dividend_yield"] > 0:
-                dividend_map[key] = {
-                    "ticker": ticker,
-                    "market": market,
-                    "dividend_yield": naver_info["dividend_yield"] * 100,  # % 단위
-                    "estimated_annual_krw": 0.0,
-                }
-        else:
-            yahoo_sym = _to_yahoo_symbol(ticker, market)
-            info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
-            if info["dividend_yield"] > 0:
-                dividend_map[key] = {
-                    "ticker": ticker,
-                    "market": market,
-                    "dividend_yield": info["dividend_yield"] * 100,  # % 단위
-                    "estimated_annual_krw": 0.0,
-                }
+        try:
+            if is_korean:
+                is_etf = is_korean_etf(ticker, market)
+                fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
+                naver_info = await loop.run_in_executor(None, partial(fn, ticker))
+                if naver_info["dividend_yield"] > 0:
+                    dividend_map[key] = {
+                        "ticker": ticker,
+                        "market": market,
+                        "dividend_yield": naver_info["dividend_yield"] * 100,  # % 단위
+                        "estimated_annual_krw": 0.0,
+                    }
+            else:
+                yahoo_sym = _to_yahoo_symbol(ticker, market)
+                info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+                if info["dividend_yield"] > 0:
+                    dividend_map[key] = {
+                        "ticker": ticker,
+                        "market": market,
+                        "dividend_yield": info["dividend_yield"] * 100,  # % 단위
+                        "estimated_annual_krw": 0.0,
+                    }
+        except Exception as e:
+            logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
 
     # 목표 포트폴리오 종목 10년 수익률 수집 (CASH 제외)
     target_tickers = [
@@ -399,4 +414,112 @@ async def get_all_kis_account_balances(
             error=str(r),
         )
         for acc, r in zip(kis_accounts, results)
+    ]
+
+
+async def _fetch_kiwoom_account_balance(
+    account: AssetAccount,
+    db: AsyncSession,
+    redis,
+) -> KiwoomBalanceResponse:
+    """키움 계좌 실시간 잔고를 조회해 KiwoomBalanceResponse로 반환한다."""
+    from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
+    from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
+    from app.services.credential_service import decrypt as _decrypt
+
+    if not account.kiwoom_app_key or not account.kiwoom_app_secret:
+        raise ValueError("키움 API 자격증명이 설정되지 않았습니다.")
+
+    app_key = _decrypt(account.kiwoom_app_key)
+    app_secret = _decrypt(account.kiwoom_app_secret)
+    is_mock = account.is_mock_mode
+
+    access_token = await kiwoom_get_access_token(
+        app_key, app_secret,
+        is_mock=is_mock, redis=redis, db=db,
+        user_id=str(account.user_id), account_id=str(account.id),
+    )
+    domestic = await kiwoom_get_domestic_balance(
+        access_token, account.kiwoom_account_no, is_mock=is_mock
+    )
+
+    positions: list[KisBalancePosition] = [
+        KisBalancePosition(
+            ticker=p["ticker"],
+            name=p["name"],
+            market=p["market"],
+            quantity=int(p["qty"]),
+            avg_price=float(p["avg_price"]),
+            current_price=float(p["current_price"]),
+            value_krw=float(p["value_krw"]),
+        )
+        for p in domestic.get("positions", [])
+    ]
+    return KiwoomBalanceResponse(
+        account_id=str(account.id),
+        account_name=account.name,
+        is_mock=is_mock,
+        positions=positions,
+        deposit_krw=float(domestic.get("deposit_krw", 0)),
+    )
+
+
+@router.get("/kiwoom-balance/{account_id}", response_model=KiwoomBalanceResponse)
+async def get_kiwoom_account_balance(
+    account_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
+    account = await db.scalar(
+        select(AssetAccount).where(
+            AssetAccount.id == account_id,
+            AssetAccount.user_id == current_user.id,
+        )
+    )
+    if not account:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다.")
+    if account.asset_type != "STOCK_KIWOOM":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="키움 계좌만 잔고 조회가 가능합니다.")
+
+    try:
+        return await _fetch_kiwoom_account_balance(account, db, redis)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/kiwoom-balance-all", response_model=list[KiwoomBalanceResponse])
+async def get_all_kiwoom_account_balances(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """연동된 모든 활성 키움 계좌의 실시간 잔고를 병렬로 조회한다."""
+    acc_result = await db.execute(
+        select(AssetAccount).where(
+            AssetAccount.user_id == current_user.id,
+            AssetAccount.asset_type == "STOCK_KIWOOM",
+            AssetAccount.is_active == True,  # noqa: E712
+        )
+    )
+    kiwoom_accounts = acc_result.scalars().all()
+
+    if not kiwoom_accounts:
+        return []
+
+    tasks = [_fetch_kiwoom_account_balance(acc, db, redis) for acc in kiwoom_accounts]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    return [
+        r if not isinstance(r, Exception)
+        else KiwoomBalanceResponse(
+            account_id=str(acc.id),
+            account_name=acc.name,
+            is_mock=acc.is_mock_mode,
+            positions=[],
+            deposit_krw=0.0,
+            error=str(r),
+        )
+        for acc, r in zip(kiwoom_accounts, results)
     ]

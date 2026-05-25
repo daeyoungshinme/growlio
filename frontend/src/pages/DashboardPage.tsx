@@ -1,9 +1,10 @@
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
-import { fetchDashboard, fetchDividendByTicker, fetchExchangeRate } from "../api/dashboard";
+import { fetchDashboard, fetchDividendByTicker } from "../api/dashboard";
+import { fetchExchangeRate } from "../api/assets";
 import { fmtKrw, fmtMonth, fmtPct } from "../utils/format";
 import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
@@ -17,16 +18,21 @@ const fetchOverviewSummary = () =>
 
 
 export default function DashboardPage() {
+  const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    refetchInterval: 300_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: ["portfolio-overview"],
     queryFn: fetchOverviewSummary,
-    refetchInterval: 60_000,
+    staleTime: 60_000,
+    refetchInterval: 300_000,
+    refetchOnWindowFocus: true,
   });
 
   const { data: tickerDividends, isLoading: tickerDividendsLoading } = useQuery({
@@ -63,7 +69,17 @@ export default function DashboardPage() {
   }, [data]);
 
   if (isLoading) return <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500">로딩 중...</div>;
-  if (error || !data) return <div className="text-red-500">데이터를 불러오지 못했습니다</div>;
+  if (error || !data) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
+      <button
+        onClick={() => qc.invalidateQueries({ queryKey: ["dashboard"] })}
+        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        다시 시도
+      </button>
+    </div>
+  );
 
   const currentYear = new Date().getFullYear();
   const retirementLabel = data.retirement_target_year

@@ -12,6 +12,7 @@ export interface Portfolio {
   name: string;
   items: PortfolioItem[];
   base_type: string;   // "STOCK_ONLY" | "TOTAL_ASSETS"
+  account_ids?: string[] | null;  // null이면 모든 활성 주식 계좌 사용
   created_at: string;
   updated_at: string;
 }
@@ -23,11 +24,12 @@ export const createPortfolio = (body: {
   name: string;
   items: PortfolioItem[];
   base_type?: string;
+  account_ids?: string[] | null;
 }) => api.post<Portfolio>("/portfolios", body).then((r) => r.data);
 
 export const updatePortfolio = (
   id: string,
-  body: { name?: string; items?: PortfolioItem[]; base_type?: string }
+  body: { name?: string; items?: PortfolioItem[]; base_type?: string; account_ids?: string[] | null }
 ) => api.put<Portfolio>(`/portfolios/${id}`, body).then((r) => r.data);
 
 export const deletePortfolio = (id: string) =>

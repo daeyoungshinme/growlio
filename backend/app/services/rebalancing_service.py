@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime, timezone
 
 from app.models.portfolio import Portfolio
-from app.schemas.rebalancing import CurrentHolding, RebalancingAnalysis, RebalancingItem, TickerAccountInfo
+from app.schemas.rebalancing import RebalancingAnalysis, RebalancingItem, TickerAccountInfo
 
 
 def analyze_rebalancing(
@@ -118,23 +118,52 @@ def analyze_rebalancing(
             actual_years_10y=ret["actual_years"] if ret else None,
         ))
 
-    # 4. 목표 포트폴리오에 없는 보유 종목
-    untracked: list[CurrentHolding] = []
-    untracked_annual_dividend = 0.0
+    # 4. 목표 포트폴리오에 없는 보유 종목 → 전량 매도(diff_krw < 0)로 result_items에 추가
     for key, data in current_map.items():
         if key not in target_keys:
-            weight = (data["value_krw"] / base_krw * 100) if base_krw > 0 else 0.0
-            untracked.append(CurrentHolding(
-                ticker=key[0],
-                name=data["name"],
-                market=key[1],
-                current_value_krw=round(data["value_krw"], 0),
-                current_weight_pct=round(weight, 2),
-            ))
+            ticker_u, market_u = key
+            current_value_u = data["value_krw"]
+            current_price_u = data.get("current_price")
+            weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
+
+            if current_price_u and float(current_price_u) > 0:
+                shares_u: float | None = round(-current_value_u / float(current_price_u), 0)
+            else:
+                shares_u = None
+
+            div_yield_u: float | None = None
+            annual_div_current_u = 0.0
             if dividend_map:
                 d = dividend_map.get(key)
                 if d:
-                    untracked_annual_dividend += float(d.get("estimated_annual_krw") or 0)
+                    yp = float(d.get("dividend_yield") or 0)
+                    estimated_annual = float(d.get("estimated_annual_krw") or 0)
+                    if yp > 0 or estimated_annual > 0:
+                        div_yield_u = yp if yp > 0 else None
+                        annual_div_current_u = estimated_annual
+
+            ret_u = returns_map.get(key) if returns_map else None
+
+            result_items.append(RebalancingItem(
+                ticker=ticker_u,
+                name=data["name"],
+                market=market_u,
+                target_weight_pct=0.0,
+                current_weight_pct=round(weight_u, 2),
+                weight_diff_pct=round(-weight_u, 2),
+                current_value_krw=round(current_value_u, 0),
+                target_value_krw=0,
+                diff_krw=round(-current_value_u, 0),
+                shares_to_trade=shares_u,
+                current_price_krw=float(current_price_u) if current_price_u is not None else None,
+                dividend_yield=div_yield_u,
+                annual_dividend_current_krw=round(annual_div_current_u, 0),
+                annual_dividend_target_krw=0,
+                annual_dividend_diff_krw=round(-annual_div_current_u, 0),
+                return_10y_pct=ret_u["cumulative_return_pct"] if ret_u else None,
+                cagr_10y_pct=ret_u["cagr_pct"] if ret_u else None,
+                actual_years_10y=ret_u["actual_years"] if ret_u else None,
+            ))
 
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
 
@@ -209,11 +238,11 @@ def analyze_rebalancing(
         base_type=portfolio.base_type,
         base_value_krw=round(base_krw, 0),
         items=result_items,
-        untracked_holdings=sorted(untracked, key=lambda x: -x.current_value_krw),
+        untracked_holdings=[],
         analyzed_at=datetime.now(timezone.utc).isoformat(),
         current_portfolio_annual_dividend=target_div_sum,
         target_portfolio_annual_dividend=round(sum(i.annual_dividend_target_krw for i in result_items), 0),
-        total_current_annual_dividend=round(target_div_sum + untracked_annual_dividend, 0),
+        total_current_annual_dividend=target_div_sum,
         target_weighted_cagr_10y_pct=target_weighted_cagr,
         current_weighted_cagr_10y_pct=current_weighted_cagr,
         ticker_account_map=ticker_account_map,

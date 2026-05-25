@@ -7,11 +7,35 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.schemas.portfolio import PortfolioCreate, PortfolioResponse, PortfolioUpdate
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
+
+
+async def _validate_account_ids(
+    account_ids: list[uuid.UUID] | None,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """account_ids가 모두 현재 유저 소유인지 확인한다."""
+    if not account_ids:
+        return
+    result = await db.execute(
+        select(AssetAccount.id).where(
+            AssetAccount.id.in_(account_ids),
+            AssetAccount.user_id == user_id,
+        )
+    )
+    owned = {row[0] for row in result.all()}
+    invalid = [str(aid) for aid in account_ids if aid not in owned]
+    if invalid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"유효하지 않은 계좌 ID: {', '.join(invalid)}",
+        )
 
 
 @router.get("", response_model=list[PortfolioResponse])
@@ -35,11 +59,13 @@ async def create_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """새 포트폴리오 생성."""
+    await _validate_account_ids(body.account_ids, current_user.id, db)
     portfolio = Portfolio(
         user_id=current_user.id,
         name=body.name,
         items=[i.model_dump() for i in body.items],
         base_type=body.base_type,
+        account_ids=[str(aid) for aid in body.account_ids] if body.account_ids else None,
     )
     db.add(portfolio)
     await db.commit()
@@ -64,12 +90,16 @@ async def update_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
+    if body.account_ids is not None:
+        await _validate_account_ids(body.account_ids, current_user.id, db)
     if body.name is not None:
         portfolio.name = body.name
     if body.items is not None:
         portfolio.items = [i.model_dump() for i in body.items]
     if body.base_type is not None:
         portfolio.base_type = body.base_type
+    if body.account_ids is not None:
+        portfolio.account_ids = [str(aid) for aid in body.account_ids] if body.account_ids else None
 
     await db.commit()
     await db.refresh(portfolio)

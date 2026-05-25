@@ -89,6 +89,12 @@ export default function StockPositionsModal({
     fetchExchangeRate().then((r) => setUsdRate(r.usd_krw)).catch(() => setUsdRate(1350));
   }, [accountId, readonly]);
 
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
+  }, []);
+
   const setRow = (i: number, patch: Partial<Position>) =>
     setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
 

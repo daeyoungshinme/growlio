@@ -195,8 +195,8 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
             {analysis.items.map((item, idx) => (
               <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
                 <td className="py-3 px-3">
-                  <div className="font-medium text-gray-100">{item.ticker}</div>
-                  <div className="text-xs text-gray-400 truncate max-w-[120px]">{item.name}</div>
+                  <div className="font-medium text-gray-100 truncate max-w-[120px]">{item.name}</div>
+                  <div className="text-xs text-gray-400">{item.ticker}</div>
                 </td>
                 <td className="py-3 px-3 text-right text-gray-300">
                   {item.current_weight_pct.toFixed(1)}%
@@ -280,8 +280,8 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
                   {dividendItems.map((item, idx) => (
                     <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
                       <td className="py-2 px-3">
-                        <div className="font-medium text-gray-100 text-xs">{item.ticker}</div>
-                        <div className="text-xs text-gray-400 truncate max-w-[120px]">{item.name}</div>
+                        <div className="font-medium text-gray-100 text-xs truncate max-w-[120px]">{item.name}</div>
+                        <div className="text-xs text-gray-400">{item.ticker}</div>
                       </td>
                       <td className="py-2 px-3 text-right text-xs text-gray-300">
                         {item.dividend_yield != null ? `${item.dividend_yield.toFixed(2)}%` : "-"}
@@ -314,8 +314,8 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
             {analysis.untracked_holdings.map((h, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs text-amber-400">
                 <span>
-                  <span className="font-medium">{h.ticker}</span>
-                  <span className="ml-1 text-amber-500">{h.name}</span>
+                  <span className="font-medium">{h.name}</span>
+                  <span className="ml-1 text-amber-500">{h.ticker}</span>
                 </span>
                 <span>{fmtKrw(h.current_value_krw)} ({h.current_weight_pct.toFixed(1)}%)</span>
               </div>

@@ -16,6 +16,7 @@ class PortfolioCreate(BaseModel):
     name: str
     items: list[PortfolioItem]
     base_type: str = "STOCK_ONLY"  # STOCK_ONLY | TOTAL_ASSETS
+    account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
 
     @field_validator("items")
     @classmethod
@@ -39,6 +40,7 @@ class PortfolioUpdate(BaseModel):
     name: str | None = None
     items: list[PortfolioItem] | None = None
     base_type: str | None = None
+    account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
 
     @field_validator("items")
     @classmethod
@@ -67,5 +69,6 @@ class PortfolioResponse(BaseModel):
     name: str
     items: list[PortfolioItem]
     base_type: str
+    account_ids: list[str] | None = None
     created_at: datetime
     updated_at: datetime

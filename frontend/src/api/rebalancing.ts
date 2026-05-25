@@ -87,8 +87,17 @@ export const updateTargetPortfolio = (
 export const deleteTargetPortfolio = (id: string) =>
   api.delete(`/rebalancing/portfolios/${id}`);
 
-export const analyzePortfolio = (id: string) =>
-  api.get<RebalancingAnalysis>(`/rebalancing/portfolios/${id}/analyze`).then((r) => r.data);
+export const analyzePortfolio = (id: string, accountIds?: string[]) => {
+  const params = new URLSearchParams();
+  if (accountIds?.length) {
+    for (const aid of accountIds) params.append("account_ids", aid);
+  }
+  return api
+    .get<RebalancingAnalysis>(`/rebalancing/portfolios/${id}/analyze`, {
+      params: accountIds?.length ? params : undefined,
+    })
+    .then((r) => r.data);
+};
 
 // ── 리밸런싱 실행 ─────────────────────────────────────────────
 
@@ -156,3 +165,9 @@ export const fetchKisBalance = (accountId: string): Promise<KisBalanceResponse> 
 
 export const fetchAllKisBalances = (): Promise<KisBalanceResponse[]> =>
   api.get<KisBalanceResponse[]>(`/rebalancing/kis-balance-all`).then((r) => r.data);
+
+export const fetchKiwoomBalance = (accountId: string): Promise<KisBalanceResponse> =>
+  api.get<KisBalanceResponse>(`/rebalancing/kiwoom-balance/${accountId}`).then((r) => r.data);
+
+export const fetchAllKiwoomBalances = (): Promise<KisBalanceResponse[]> =>
+  api.get<KisBalanceResponse[]>(`/rebalancing/kiwoom-balance-all`).then((r) => r.data);

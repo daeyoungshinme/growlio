@@ -19,7 +19,7 @@ from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction, UserTickerSettings
 from app.models.user import UserSettings
 from app.redis_client import get_redis
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt, get_kis_user_credentials
 from app.services.dart_service import fetch_dart_dividend
 from app.services.dividend_constants import (
     KNOWN_DIVIDEND_INFO,
@@ -213,37 +213,7 @@ async def _get_kis_etf_dividend_fallback(
 
 
 async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
-    """KIS 인증 정보를 1회 조회해 반환. 자격증명 없으면 None."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not settings_row or not settings_row.kis_app_key or not settings_row.kis_app_secret:
-        return None
-
-    kis_account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
-            AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
-        )
-    )
-
-    app_key = decrypt(settings_row.kis_app_key)
-    app_secret = decrypt(settings_row.kis_app_secret)
-    is_mock = kis_account.is_mock_mode if kis_account else False
-
-    try:
-        redis = await get_redis()
-        access_token = await get_access_token(
-            app_key,
-            app_secret,
-            is_mock=is_mock,
-            redis=redis,
-            db=db,
-            user_id=str(user_id),
-        )
-        return {"app_key": app_key, "app_secret": app_secret, "access_token": access_token, "is_mock": is_mock}
-    except Exception as e:
-        logger.warning("kis_credentials_fetch_failed", user_id=str(user_id), error=str(e))
-        return None
+    return await get_kis_user_credentials(user_id, db)
 
 
 

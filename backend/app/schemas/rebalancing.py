@@ -25,6 +25,7 @@ class TargetPortfolioCreate(BaseModel):
     name: str
     items: list[TargetPortfolioItem]
     base_type: str = "STOCK_ONLY"  # STOCK_ONLY | TOTAL_ASSETS
+    account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
 
     @field_validator("items")
     @classmethod
@@ -48,6 +49,7 @@ class TargetPortfolioUpdate(BaseModel):
     name: str | None = None
     items: list[TargetPortfolioItem] | None = None
     base_type: str | None = None
+    account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
 
     @field_validator("items")
     @classmethod
@@ -76,6 +78,7 @@ class TargetPortfolioResponse(BaseModel):
     name: str
     items: list[TargetPortfolioItem]
     base_type: str
+    account_ids: list[str] | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -168,6 +171,10 @@ class KisBalanceResponse(BaseModel):
     positions: list[KisBalancePosition]
     deposit_krw: float
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
+
+
+# 키움 잔고 응답 — KIS와 동일한 구조
+KiwoomBalanceResponse = KisBalanceResponse
 
 
 class OrderResult(BaseModel):

@@ -12,7 +12,9 @@ import {
   TickerAccountInfo,
   executeRebalancing,
   fetchAllKisBalances,
+  fetchAllKiwoomBalances,
   fetchKisBalance,
+  fetchKiwoomBalance,
 } from "../../api/rebalancing";
 import { fmtKrw } from "../../utils/format";
 
@@ -68,7 +70,7 @@ function StatusBadge({ status }: { status: OrderResult["status"] }) {
 export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onExecuted, onClose }: Props) {
   const queryClient = useQueryClient();
   // 비활성 계좌도 포함한 전체 KIS 계좌
-  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS");
+  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM");
 
   // 실시간 잔고: accountId → 포지션 목록
   const [liveBalances, setLiveBalances] = useState<Record<string, KisBalancePosition[]>>({});
@@ -92,15 +94,17 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
       return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
     }
     return (analysis.ticker_account_map[ticker] ?? []).some(
-      (a) => a.account_id === accountId && a.asset_type === "STOCK_KIS" && a.quantity > 0
+      (a) => a.account_id === accountId && (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.quantity > 0
     );
   }
 
-  // KIS 계좌의 실시간 잔고 로드 (단일 계좌 재조회용)
+  // 계좌의 실시간 잔고 로드 (단일 계좌 재조회용 — KIS/키움 분기)
   async function loadLiveBalance(accountId: string) {
     setBalanceState((prev) => ({ ...prev, [accountId]: "loading" }));
     try {
-      const res: KisBalanceResponse = await fetchKisBalance(accountId);
+      const acc = kisAccounts.find((a) => a.id === accountId);
+      const fetchFn = acc?.asset_type === "STOCK_KIWOOM" ? fetchKiwoomBalance : fetchKisBalance;
+      const res: KisBalanceResponse = await fetchFn(accountId);
       setLiveBalances((prev) => ({ ...prev, [accountId]: res.positions }));
       setDepositKrw((prev) => ({ ...prev, [accountId]: res.deposit_krw }));
       setBalanceState((prev) => ({ ...prev, [accountId]: "loaded" }));
@@ -115,7 +119,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     }
   }
 
-  // 모든 KIS 계좌 잔고 일괄 로드
+  // 모든 브로커 계좌(KIS + 키움) 잔고 일괄 로드
   async function loadAllLiveBalances() {
     if (kisAccounts.length === 0) return;
     const loadingState: Record<string, BalanceLoadState> = {};
@@ -123,7 +127,15 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     setBalanceState(loadingState);
 
     try {
-      const responses = await fetchAllKisBalances();
+      const kisOnly = kisAccounts.filter((a) => a.asset_type === "STOCK_KIS");
+      const kiwoomOnly = kisAccounts.filter((a) => a.asset_type === "STOCK_KIWOOM");
+
+      const [kisResponses, kiwoomResponses] = await Promise.all([
+        kisOnly.length > 0 ? fetchAllKisBalances() : Promise.resolve([]),
+        kiwoomOnly.length > 0 ? fetchAllKiwoomBalances() : Promise.resolve([]),
+      ]);
+
+      const responses: KisBalanceResponse[] = [...kisResponses, ...kiwoomResponses];
       const newBalances: Record<string, KisBalancePosition[]> = {};
       const newDeposits: Record<string, number> = {};
       const newStates: Record<string, BalanceLoadState> = {};
@@ -387,7 +399,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
               )}
 
               {kisAccounts.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-4">연결된 KIS 계좌가 없습니다.</p>
+                <p className="text-sm text-gray-400 text-center py-4">연결된 KIS/키움 계좌가 없습니다.</p>
               ) : (
                 <>
                   {kisAccounts.map((acc) => {
@@ -475,8 +487,8 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                             />
                                           </td>
                                           <td className="px-3 py-2">
-                                            <div className="text-white font-medium">{item.ticker}</div>
-                                            <div className="text-gray-400 text-[11px] truncate max-w-[130px]">{item.name}</div>
+                                            <div className="text-white font-medium truncate max-w-[130px]">{item.name}</div>
+                                            <div className="text-gray-400 text-[11px]">{item.ticker}</div>
                                             <div className="text-gray-500 text-[11px]">현재 {currentQty.toLocaleString()}주 보유</div>
                                           </td>
                                           <td className="px-3 py-2 text-center">
@@ -527,8 +539,8 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                             />
                                           </td>
                                           <td className="px-3 py-2">
-                                            <div className="text-white font-medium">{item.ticker}</div>
-                                            <div className="text-gray-400 text-[11px] truncate max-w-[100px]">{item.name}</div>
+                                            <div className="text-white font-medium truncate max-w-[100px]">{item.name}</div>
+                                            <div className="text-gray-400 text-[11px]">{item.ticker}</div>
                                             <div className="text-gray-500 text-[11px]">
                                               {currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}
                                             </div>
@@ -597,8 +609,8 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                                             />
                                           </td>
                                           <td className="px-3 py-2">
-                                            <div className="text-amber-300 font-medium">{ticker}</div>
-                                            <div className="text-gray-400 text-[11px] truncate max-w-[130px]">{name}</div>
+                                            <div className="text-amber-300 font-medium truncate max-w-[130px]">{name}</div>
+                                            <div className="text-gray-400 text-[11px]">{ticker}</div>
                                             <div className="text-gray-500 text-[11px]">현재 {currentQty.toLocaleString()}주 보유</div>
                                           </td>
                                           <td className="px-3 py-2 text-center">
@@ -683,8 +695,8 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                       {result.orders.map((o, idx) => (
                         <tr key={idx} className="text-white">
                           <td className="px-3 py-2">
-                            <div className="font-medium">{o.ticker}</div>
-                            <div className="text-gray-400 text-[11px] truncate max-w-[120px]">{o.name}</div>
+                            <div className="font-medium truncate max-w-[120px]">{o.name}</div>
+                            <div className="text-gray-400 text-[11px]">{o.ticker}</div>
                           </td>
                           <td className="px-3 py-2 text-center">
                             <SideBadge isBuy={o.side === "BUY"} />

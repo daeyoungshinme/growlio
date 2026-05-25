@@ -36,6 +36,9 @@ export default function PortfolioAnalysisTab() {
     queryFn: fetchAccounts,
   });
   const activeAccounts = accounts.filter((a) => a.is_active);
+  const stockAccounts = activeAccounts.filter((a) =>
+    ["STOCK_KIS", "STOCK_OTHER"].includes(a.asset_type)
+  );
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
@@ -54,7 +57,7 @@ export default function PortfolioAnalysisTab() {
   const [includeReal, setIncludeReal] = useState(true);
 
   const createMut = useMutation({
-    mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string }) =>
+    mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
       createPortfolio(args),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portfolios"] });
@@ -64,8 +67,8 @@ export default function PortfolioAnalysisTab() {
   });
 
   const updateMut = useMutation({
-    mutationFn: (args: { id: string; name: string; items: PortfolioItem[]; base_type: string }) =>
-      updatePortfolio(args.id, { name: args.name, items: args.items, base_type: args.base_type }),
+    mutationFn: (args: { id: string; name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
+      updatePortfolio(args.id, { name: args.name, items: args.items, base_type: args.base_type, account_ids: args.account_ids }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["portfolios"] });
       setEditingPortfolio(null);
@@ -110,11 +113,11 @@ export default function PortfolioAnalysisTab() {
       return next;
     });
 
-  function handleSave(name: string, items: PortfolioItem[], baseType: string) {
+  function handleSave(name: string, items: PortfolioItem[], baseType: string, accountIds: string[] | null) {
     if (editingPortfolio) {
-      updateMut.mutate({ id: editingPortfolio.id, name, items, base_type: baseType });
+      updateMut.mutate({ id: editingPortfolio.id, name, items, base_type: baseType, account_ids: accountIds });
     } else {
-      createMut.mutate({ name, items, base_type: baseType });
+      createMut.mutate({ name, items, base_type: baseType, account_ids: accountIds });
     }
   }
 
@@ -127,6 +130,7 @@ export default function PortfolioAnalysisTab() {
     setAnalysisError(null);
     setAnalysis(null);
     try {
+      // account_ids는 백엔드에서 portfolio.account_ids로 자동 처리
       const result = await analyzePortfolio(id);
       setAnalysis(result);
     } catch {
@@ -151,6 +155,15 @@ export default function PortfolioAnalysisTab() {
     .filter((p) => selectedIds.has(p.id))
     .map((p) => p.name)
     .join(", ");
+
+  // 포트폴리오에 지정된 계좌 이름을 표시하는 헬퍼
+  function getAccountLabel(p: Portfolio): string {
+    if (!p.account_ids?.length) return "모든 주식 계좌";
+    const names = p.account_ids
+      .map((id) => stockAccounts.find((a) => a.id === id)?.name ?? id.slice(0, 8))
+      .filter(Boolean);
+    return names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} 외 ${names.length - 2}개`;
+  }
 
   return (
     <div className="flex gap-6">
@@ -208,6 +221,11 @@ export default function PortfolioAnalysisTab() {
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                         {p.base_type === "STOCK_ONLY" ? "주식 자산 기준" : "전체 자산 기준"} · {p.items.length}개 항목
                       </p>
+                      {stockAccounts.length > 1 && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                          계좌: {getAccountLabel(p)}
+                        </p>
+                      )}
                     </div>
                     <div className="flex gap-0.5 shrink-0">
                       <button
@@ -353,7 +371,12 @@ export default function PortfolioAnalysisTab() {
             <RebalancingTable
               analysis={analysis}
               portfolioId={analysis.portfolio_id}
-              accounts={activeAccounts}
+              accounts={(() => {
+                const p = portfolios.find((p) => selectedIds.has(p.id));
+                return p?.account_ids?.length
+                  ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
+                  : activeAccounts;
+              })()}
             />
           </div>
         )}
@@ -392,6 +415,7 @@ export default function PortfolioAnalysisTab() {
       {editorOpen && (
         <UnifiedPortfolioEditor
           initial={editingPortfolio}
+          accounts={stockAccounts}
           onSave={handleSave}
           onClose={() => { setEditorOpen(false); setEditingPortfolio(null); }}
           saving={saving}

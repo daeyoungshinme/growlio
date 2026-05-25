@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fmtKrwShort } from "../../utils/format";
 import { groupPositionsByTicker } from "../../utils/portfolio";
+import { pnlColor } from "../../utils/colors";
 import type { PortfolioPosition, DividendYield } from "../../types";
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
@@ -114,7 +115,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                       <td className="py-3 px-4 text-right text-xs text-gray-500 dark:text-gray-400">{Math.round(agg.weighted_avg_price).toLocaleString()}</td>
                       <td className="py-3 px-4 text-right text-xs font-medium">{agg.current_price.toLocaleString()}</td>
                       <td className="py-3 px-4 text-right text-xs font-semibold">{fmtKrwShort(agg.total_value_krw)}원</td>
-                      <td className={`py-3 px-4 text-right text-xs font-medium ${agg.total_pnl >= 0 ? "text-red-500" : "text-blue-500"}`}>
+                      <td className={`py-3 px-4 text-right text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
                         {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원
                         <span className="font-bold">({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)</span>
                       </td>

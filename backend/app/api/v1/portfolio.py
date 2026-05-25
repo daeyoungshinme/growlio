@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.limiter import limiter
 from app.models.asset import AssetAccount, AssetSnapshot
-from app.models.user import User, UserSettings
-from app.redis_client import get_redis
-from app.services.credential_service import decrypt
+from app.models.user import User
+from app.services.credential_service import get_kis_user_credentials
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -42,14 +42,21 @@ async def portfolio_overview(
     return await _build_portfolio_overview(current_user.id, db)
 
 
-async def _build_portfolio_overview(user_id, db: AsyncSession) -> dict:
+async def _build_portfolio_overview(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    account_ids: list[uuid.UUID] | None = None,
+) -> dict:
     """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용)."""
-    # 활성 계좌 전체
-    acc_result = await db.execute(
+    # 활성 계좌 전체 (account_ids 지정 시 해당 계좌만)
+    query = (
         select(AssetAccount)
         .where(AssetAccount.user_id == user_id, AssetAccount.is_active == True)  # noqa: E712
         .order_by(AssetAccount.sort_order, AssetAccount.created_at)
     )
+    if account_ids:
+        query = query.where(AssetAccount.id.in_(account_ids))
+    acc_result = await db.execute(query)
     accounts: list[AssetAccount] = acc_result.scalars().all()
     if not accounts:
         return _empty_overview()
@@ -263,8 +270,8 @@ async def portfolio_summary(
     """KIS 등록 계좌 전체 실시간 포트폴리오 집계."""
     import asyncio
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
-    if not settings_row or not settings_row.kis_app_key:
+    kis_creds = await get_kis_user_credentials(current_user.id, db)
+    if not kis_creds:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 설정이 필요합니다")
 
     kis_result = await db.execute(
@@ -278,14 +285,10 @@ async def portfolio_summary(
     if not kis_accounts:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="등록된 KIS 계좌가 없습니다")
 
-    app_key = decrypt(settings_row.kis_app_key)
-    app_secret = decrypt(settings_row.kis_app_secret)
-    is_mock = settings_row.kis_is_mock
-
-    redis = await get_redis()
-    access_token = await get_access_token(
-        app_key, app_secret, is_mock=is_mock, redis=redis, db=db, user_id=str(current_user.id)
-    )
+    app_key = kis_creds["app_key"]
+    app_secret = kis_creds["app_secret"]
+    is_mock = kis_creds["is_mock"]
+    access_token = kis_creds["access_token"]
 
     async def _fetch(account_no: str) -> tuple[str, dict, dict]:
         d = await get_domestic_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)

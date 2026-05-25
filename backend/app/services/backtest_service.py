@@ -239,14 +239,13 @@ async def _get_real_portfolio_series(
         return None
     normalized = [round(v / base * 100, 4) for v in values]
 
-    # dates 길이 맞추기 (forward-fill 없는 앞부분 제거)
-    aligned_dates = dates[len(dates) - len(normalized):]
-    if len(aligned_dates) != len(normalized):
-        normalized = normalized[-len(dates):]
+    # dates 앞부분(스냅샷 시작 전 구간)을 None으로 패딩 — 차트 인덱스 정렬
+    pad_count = len(dates) - len(normalized)
+    full_values: list[float | None] = [None] * pad_count + normalized
 
     name = "실제 포트폴리오"
-    metrics = _compute_metrics(name, normalized)
-    return SeriesData(name=name, values=normalized), metrics
+    metrics = _compute_metrics(name, normalized)  # 지표는 실제 데이터 기간 기준
+    return SeriesData(name=name, values=full_values), metrics
 
 
 # ── 메인 백테스팅 실행 ─────────────────────────────────────

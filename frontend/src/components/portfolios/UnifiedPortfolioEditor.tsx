@@ -1,18 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { searchStocks, StockSuggestion } from "../../api/assets";
+import { AssetAccount, searchStocks, StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
 
 interface Props {
   initial?: Portfolio | null;
-  onSave: (name: string, items: PortfolioItem[], baseType: string) => void;
+  accounts?: AssetAccount[];  // 주식 계좌 목록 (STOCK_KIS, STOCK_OTHER)
+  onSave: (name: string, items: PortfolioItem[], baseType: string, accountIds: string[] | null) => void;
   onClose: () => void;
   saving?: boolean;
 }
 
 const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weight: 0 };
 
-export default function UnifiedPortfolioEditor({ initial, onSave, onClose, saving }: Props) {
+export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave, onClose, saving }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
   const [baseType, setBaseType] = useState(initial?.base_type ?? "STOCK_ONLY");
   const [items, setItems] = useState<PortfolioItem[]>(
@@ -20,7 +21,35 @@ export default function UnifiedPortfolioEditor({ initial, onSave, onClose, savin
   );
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
   const [activeRow, setActiveRow] = useState<number | null>(null);
+  const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
+  // 계좌 선택 상태: null이면 모든 계좌, 배열이면 선택된 계좌만
+  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(() => {
+    if (initial?.account_ids?.length) {
+      return new Set(initial.account_ids);
+    }
+    return new Set(accounts.map((a) => a.id));
+  });
+
+  // accounts prop이 바뀌면 새 계좌를 기본 선택에 추가
+  useEffect(() => {
+    if (!initial?.account_ids?.length) {
+      setSelectedAccountIds(new Set(accounts.map((a) => a.id)));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts.map((a) => a.id).sort().join(",")]);
+
+  const isAllSelected = accounts.length === 0 || accounts.every((a) => selectedAccountIds.has(a.id));
+
+  function toggleAccount(id: string) {
+    setSelectedAccountIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   const totalWeight = items.reduce((s, i) => s + (Number(i.weight) || 0), 0);
   const weightOk = Math.abs(totalWeight - 100) < 0.01;
@@ -58,11 +87,20 @@ export default function UnifiedPortfolioEditor({ initial, onSave, onClose, savin
     updateItem(idx, { ticker: s.ticker, name: s.name, market: s.market });
     setSuggestions([]);
     setActiveRow(null);
+    setEditingRows((prev) => { const next = new Set(prev); next.delete(idx); return next; });
+  }
+
+  function startEditing(idx: number) {
+    updateItem(idx, { ticker: "", name: "" });
+    setEditingRows((prev) => new Set(prev).add(idx));
+    setSuggestions([]);
+    setTimeout(() => searchInputRefs.current.get(idx)?.focus(), 0);
   }
 
   function handleSubmit() {
     if (!name.trim() || !weightOk) return;
-    onSave(name.trim(), items, baseType);
+    const accountIds = isAllSelected ? null : Array.from(selectedAccountIds);
+    onSave(name.trim(), items, baseType, accountIds);
   }
 
   useEffect(() => {
@@ -142,11 +180,31 @@ export default function UnifiedPortfolioEditor({ initial, onSave, onClose, savin
                       <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded">부동산</span>
                       <span className="text-sm text-gray-700 flex-1">REAL_ESTATE (순자산 합산)</span>
                     </div>
+                  ) : item.ticker && item.name && !editingRows.has(idx) ? (
+                    /* 표시 모드: 종목 선택 완료 */
+                    <div className="flex-1 flex items-center justify-between gap-2 border border-gray-200 bg-gray-50 rounded-lg px-3 py-2">
+                      <div className="flex items-baseline gap-2 min-w-0">
+                        <span className="text-sm font-semibold text-gray-800 truncate">{item.name}</span>
+                        <span className="text-xs text-gray-400 whitespace-nowrap">{item.ticker} · {item.market}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => startEditing(idx)}
+                        className="text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
+                      >
+                        변경
+                      </button>
+                    </div>
                   ) : (
+                    /* 검색 모드: 종목 입력/검색 */
                     <div className="flex-1 relative">
                       <input
+                        ref={(el) => {
+                          if (el) searchInputRefs.current.set(idx, el);
+                          else searchInputRefs.current.delete(idx);
+                        }}
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="티커 (예: AAPL, 005930)"
+                        placeholder="종목명 또는 티커 검색 (예: 삼성전자, AAPL)"
                         value={item.ticker}
                         onChange={(e) => handleTickerInput(idx, e.target.value)}
                         onFocus={() => setActiveRow(idx)}
@@ -162,9 +220,9 @@ export default function UnifiedPortfolioEditor({ initial, onSave, onClose, savin
                               className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center gap-2 text-sm"
                               onMouseDown={() => selectSuggestion(idx, s)}
                             >
-                              <span className="font-medium text-gray-800">{s.ticker}</span>
-                              <span className="text-gray-500 flex-1 truncate">{s.name}</span>
-                              <span className="text-xs text-gray-400">{s.market}</span>
+                              <span className="font-medium text-gray-800 flex-1 truncate">{s.name}</span>
+                              <span className="text-xs text-gray-400">{s.ticker}</span>
+                              <span className="text-xs text-gray-400 ml-1">{s.market}</span>
                             </button>
                           ))}
                         </div>
@@ -215,6 +273,42 @@ export default function UnifiedPortfolioEditor({ initial, onSave, onClose, savin
               </button>
             </div>
           </div>
+          {/* 분석 대상 계좌 — 주식 계좌가 2개 이상일 때만 표시 */}
+          {accounts.length > 1 && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium text-gray-700">분석 대상 계좌</label>
+                {!isAllSelected && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccountIds(new Set(accounts.map((a) => a.id)))}
+                    className="text-xs text-blue-600 hover:underline"
+                  >
+                    전체 선택
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-5 gap-y-1.5 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                {accounts.map((acc) => (
+                  <label key={acc.id} className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedAccountIds.has(acc.id)}
+                      onChange={() => toggleAccount(acc.id)}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700">{acc.name}</span>
+                    {acc.is_mock_mode && (
+                      <span className="text-xs text-gray-400">(모의)</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                {isAllSelected ? "모든 주식 계좌가 리밸런싱 분석에 포함됩니다." : `${selectedAccountIds.size}개 계좌만 분석에 포함됩니다.`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* 하단 버튼 */}

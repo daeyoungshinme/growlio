@@ -37,9 +37,6 @@ export interface DashboardData {
 export const fetchDashboard = () =>
   api.get<DashboardData>("/dashboard").then((r) => r.data);
 
-export const fetchExchangeRate = () =>
-  api.get<{ usd_krw: number }>("/stocks/exchange-rate").then((r) => r.data);
-
 export interface TickerDividendItem {
   ticker: string | null;
   name: string;

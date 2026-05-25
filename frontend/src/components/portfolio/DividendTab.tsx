@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw, fmtKrwShort } from "../../utils/format";
@@ -38,51 +38,78 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
 
-  const positionsDivMap = Object.fromEntries(dividendData.map((d) => [`${d.ticker}-${d.market}`, d]));
-  const tickerOnlyDivMap: Record<string, DividendYield> = {};
-  for (const d of dividendData) {
-    const existing = tickerOnlyDivMap[d.ticker];
-    if (!existing || d.investment_yield > existing.investment_yield) {
-      tickerOnlyDivMap[d.ticker] = d;
-    }
-  }
+  const positionsDivMap = useMemo(
+    () => Object.fromEntries(dividendData.map((d) => [`${d.ticker}-${d.market}`, d])),
+    [dividendData],
+  );
 
-  const totalEstimated = dividendByTicker.reduce((s, d) => s + d.estimated_annual_krw, 0);
-  const estimatedMonthly = dividendByTicker.reduce((s, d) => s + d.estimated_monthly_krw, 0);
+  const tickerOnlyDivMap = useMemo(() => {
+    const map: Record<string, DividendYield> = {};
+    for (const d of dividendData) {
+      const existing = map[d.ticker];
+      if (!existing || d.investment_yield > existing.investment_yield) map[d.ticker] = d;
+    }
+    return map;
+  }, [dividendData]);
+
+  const totalEstimated = useMemo(
+    () => dividendByTicker.reduce((s, d) => s + d.estimated_annual_krw, 0),
+    [dividendByTicker],
+  );
+  const estimatedMonthly = useMemo(
+    () => dividendByTicker.reduce((s, d) => s + d.estimated_monthly_krw, 0),
+    [dividendByTicker],
+  );
   const received = divSummary?.annual_received ?? 0;
 
-  const dividendChartData = dividendByTicker
-    .filter((d) => d.estimated_annual_krw > 0)
-    .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw)
-    .map((d) => ({
-      name: d.name,
-      ticker: d.ticker ?? undefined,
-      value: d.estimated_annual_krw,
-      pct: totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0,
-    }));
+  const dividendChartData = useMemo(
+    () =>
+      dividendByTicker
+        .filter((d) => d.estimated_annual_krw > 0)
+        .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw)
+        .map((d) => ({
+          name: d.name,
+          ticker: d.ticker ?? undefined,
+          value: d.estimated_annual_krw,
+          pct: totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0,
+        })),
+    [dividendByTicker, totalEstimated],
+  );
 
-  const monthlyEstimateByMonth = Array.from({ length: 12 }, (_, i) => {
-    const m = i + 1;
-    return dividendByTicker.reduce((sum, d) => {
-      if (d.dividend_months.length === 0) return sum + d.estimated_monthly_krw;
-      if (d.dividend_months.includes(m)) return sum + Math.round(d.estimated_annual_krw / d.dividend_months.length);
-      return sum;
-    }, 0);
-  });
+  const monthlyEstimateByMonth = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const m = i + 1;
+        return dividendByTicker.reduce((sum, d) => {
+          if (d.dividend_months.length === 0) return sum + d.estimated_monthly_krw;
+          if (d.dividend_months.includes(m)) return sum + Math.round(d.estimated_annual_krw / d.dividend_months.length);
+          return sum;
+        }, 0);
+      }),
+    [dividendByTicker],
+  );
 
-  const monthCells = Array.from({ length: 12 }, (_, i) => {
-    const m = i + 1;
-    const monthStr = `${currentYear}-${String(m).padStart(2, "0")}`;
-    const actual = divSummary?.monthly_breakdown.find((x) => x.month === monthStr);
-    return { month: m, actual: actual?.amount ?? null, estimated: monthlyEstimateByMonth[i], isPast: m < currentMonth };
-  });
+  const monthCells = useMemo(
+    () =>
+      Array.from({ length: 12 }, (_, i) => {
+        const m = i + 1;
+        const monthStr = `${currentYear}-${String(m).padStart(2, "0")}`;
+        const actual = divSummary?.monthly_breakdown.find((x) => x.month === monthStr);
+        return { month: m, actual: actual?.amount ?? null, estimated: monthlyEstimateByMonth[i], isPast: m < currentMonth };
+      }),
+    [currentYear, currentMonth, divSummary, monthlyEstimateByMonth],
+  );
 
-  const barData = monthCells.map((cell) => ({
-    name: MONTH_LABELS[cell.month - 1],
-    month: cell.month,
-    actual: cell.actual && cell.actual > 0 ? cell.actual : 0,
-    estimated: (!cell.actual || cell.actual === 0) && !cell.isPast ? cell.estimated : 0,
-  }));
+  const barData = useMemo(
+    () =>
+      monthCells.map((cell) => ({
+        name: MONTH_LABELS[cell.month - 1],
+        month: cell.month,
+        actual: cell.actual && cell.actual > 0 ? cell.actual : 0,
+        estimated: (!cell.actual || cell.actual === 0) && !cell.isPast ? cell.estimated : 0,
+      })),
+    [monthCells],
+  );
 
   const selectedMonthTickers = dividendByTicker.filter((d) => d.dividend_months.includes(selectedMonth));
   const monthStr = `${currentYear}-${String(selectedMonth).padStart(2, "0")}`;

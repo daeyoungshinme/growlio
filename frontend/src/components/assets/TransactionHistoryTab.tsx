@@ -76,6 +76,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
   useEffect(() => {
     fetchExchangeRate().then((r) => setUsdRate(r.usd_krw)).catch(() => {});
+    return () => { clearTimeout(tickerSearchTimer.current); };
   }, []);
 
   const { data: txList = [], isLoading } = useQuery({

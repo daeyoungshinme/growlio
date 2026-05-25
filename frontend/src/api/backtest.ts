@@ -24,7 +24,7 @@ export interface BacktestRunRequest {
 
 export interface SeriesData {
   name: string;
-  values: number[];
+  values: (number | null)[];  // null = 해당 날짜 데이터 없음 (실제 포트폴리오 시작 전 구간)
 }
 
 export interface PortfolioMetrics {

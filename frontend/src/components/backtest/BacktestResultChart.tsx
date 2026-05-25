@@ -16,10 +16,12 @@ export default function BacktestResultChart({ dates, series }: Props) {
   if (!dates.length || !series.length) return null;
 
   // recharts가 요구하는 [{date, series0, series1, ...}] 형태로 변환
+  // null 값은 undefined로 변환 — Recharts가 undefined를 선 갭으로 처리
   const chartData = dates.map((d, i) => {
-    const row: Record<string, string | number> = { date: d.slice(0, 7) }; // "YYYY-MM"
+    const row: Record<string, string | number | undefined> = { date: d.slice(0, 7) }; // "YYYY-MM"
     series.forEach((s) => {
-      row[s.name] = s.values[i] ?? 100;
+      const v = s.values[i];
+      row[s.name] = v == null ? undefined : v;
     });
     return row;
   });
@@ -49,10 +51,13 @@ export default function BacktestResultChart({ dates, series }: Props) {
           />
           <Tooltip
             {...chartTooltipStyle(isDark)}
-            formatter={(value: number, name: string) => [
-              `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
-              name,
-            ]}
+            formatter={(value: number | null, name: string) => {
+              if (value == null) return ["-", name];
+              return [
+                `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
+                name,
+              ];
+            }}
           />
           <Legend
             wrapperStyle={{ fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined }}
@@ -67,6 +72,7 @@ export default function BacktestResultChart({ dates, series }: Props) {
               strokeWidth={2}
               dot={false}
               activeDot={{ r: 4 }}
+              connectNulls={false}
             />
           ))}
         </LineChart>

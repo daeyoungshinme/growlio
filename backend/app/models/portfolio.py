@@ -23,6 +23,8 @@ class Portfolio(Base):
     items: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     # STOCK_ONLY | TOTAL_ASSETS — 리밸런싱 기준 자산 (백테스팅에서는 무시)
     base_type: Mapped[str] = mapped_column(String(20), nullable=False, default="STOCK_ONLY")
+    # 리밸런싱 분석 대상 계좌 UUID 목록. null이면 모든 활성 주식 계좌 사용
+    account_ids: Mapped[list | None] = mapped_column(JSONB, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

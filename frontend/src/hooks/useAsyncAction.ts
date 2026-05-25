@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { extractErrorMessage } from "../utils/error";
 
 interface AsyncActionState {
   loading: boolean;
@@ -20,8 +21,7 @@ export function useAsyncAction(): AsyncActionResult {
     try {
       await fn();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : "오류가 발생했습니다.";
-      setError(msg);
+      setError(extractErrorMessage(e));
     } finally {
       setLoading(false);
     }

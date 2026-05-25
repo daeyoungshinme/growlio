@@ -73,7 +73,7 @@ class BacktestRunRequest(BaseModel):
 
 class SeriesData(BaseModel):
     name: str
-    values: list[float]  # 기준 100으로 정규화
+    values: list[float | None]  # 기준 100으로 정규화. None = 해당 날짜 데이터 없음 (앞부분 패딩)
 
 
 class PortfolioMetrics(BaseModel):
