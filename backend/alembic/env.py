@@ -10,7 +10,7 @@ from app.database import Base
 import app.models  # noqa: F401 — ensure all models are imported for metadata
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", settings.database_url.replace('%', '%%'))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -32,10 +32,14 @@ def do_run_migrations(connection):
 
 
 async def run_async_migrations() -> None:
+    extra: dict = {}
+    if settings.supabase_project_url or settings.app_env == "production":
+        extra["connect_args"] = {"ssl": "require"}
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=NullPool,
+        **extra,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

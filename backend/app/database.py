@@ -6,7 +6,8 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 _engine_kwargs: dict = {"echo": settings.app_env == "development"}
-if settings.app_env == "production":
+# Supabase 또는 프로덕션 환경에서는 SSL 필수
+if settings.app_env == "production" or settings.supabase_project_url:
     _engine_kwargs["connect_args"] = {"ssl": "require"}
 
 engine = create_async_engine(settings.database_url, **_engine_kwargs)

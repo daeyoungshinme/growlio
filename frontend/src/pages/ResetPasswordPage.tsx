@@ -1,11 +1,11 @@
 import { LineChart } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 import { useAuthStore } from "../stores/authStore";
+import { toast } from "../utils/toast";
 
 export default function ResetPasswordPage() {
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
   const navigate = useNavigate();
 
   const [newPassword, setNewPassword] = useState("");
@@ -13,7 +13,18 @@ export default function ResetPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionReady, setSessionReady] = useState(false);
   const resetPassword = useAuthStore((s) => s.resetPassword);
+
+  useEffect(() => {
+    // Supabase가 이메일 링크의 #access_token= 프래그먼트를 감지해 세션 설정
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setSessionReady(true);
+      }
+    });
+    return () => subscription.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     if (success) {
@@ -22,12 +33,20 @@ export default function ResetPasswordPage() {
     }
   }, [success, navigate]);
 
-  if (!token) {
+  if (!sessionReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-8 text-center">
-          <p className="text-sm text-red-600 dark:text-red-400 mb-4">유효하지 않은 접근입니다.</p>
-          <Link to="/forgot-password" className="text-sm text-blue-600 dark:text-blue-400 hover:underline">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            비밀번호 재설정 링크를 확인 중입니다...
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            이메일의 재설정 링크를 클릭해 이 페이지에 접근해야 합니다.
+          </p>
+          <Link
+            to="/forgot-password"
+            className="block mt-4 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
             비밀번호 찾기로 돌아가기
           </Link>
         </div>
@@ -50,10 +69,16 @@ export default function ResetPasswordPage() {
 
     setLoading(true);
     try {
-      await resetPassword(token, newPassword);
+      await resetPassword(newPassword);
       setSuccess(true);
-    } catch {
-      setError("링크가 만료되었거나 이미 사용된 링크입니다. 비밀번호 찾기를 다시 시도해주세요.");
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      const msg = (err as Error)?.message ?? "";
+      if (code === "weak_password" || msg.toLowerCase().includes("should not be too common") || msg.toLowerCase().includes("data breach")) {
+        toast("유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.", "error");
+      } else {
+        setError("비밀번호 변경에 실패했습니다. 다시 시도해주세요.");
+      }
     } finally {
       setLoading(false);
     }

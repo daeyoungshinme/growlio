@@ -80,7 +80,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
             <div>
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">현재 금액 (원)</label>
               <input type="number" className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.manual_amount ?? 0} onChange={(e) => set("manual_amount", Number(e.target.value))} />
+                value={form.manual_amount ?? ""} onChange={(e) => set("manual_amount", e.target.value === "" ? undefined : Number(e.target.value))} />
             </div>
           )}
           {form.data_source === "KIS_API" && (

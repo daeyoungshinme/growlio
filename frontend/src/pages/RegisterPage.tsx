@@ -2,6 +2,7 @@ import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import { toast } from "../utils/toast";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");
@@ -31,9 +32,13 @@ export default function RegisterPage() {
       await register(email, password, displayName || undefined);
       navigate("/dashboard");
     } catch (err: unknown) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      if (status === 400) {
+      const msg = (err as Error)?.message ?? "";
+      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been registered")) {
         setError("이미 사용 중인 이메일입니다");
+      } else if (msg === "EMAIL_CONFIRMATION_REQUIRED") {
+        setError("가입 확인 이메일을 발송했습니다. 이메일의 인증 링크를 클릭한 후 로그인해주세요.");
+      } else if (msg.toLowerCase().includes("should not be too common") || msg.toLowerCase().includes("data breach")) {
+        toast("유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.", "error");
       } else {
         setError("회원가입 중 오류가 발생했습니다");
       }

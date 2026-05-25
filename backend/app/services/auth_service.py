@@ -1,35 +1,41 @@
-from datetime import datetime, timedelta, timezone
+"""Supabase JWT 검증 서비스."""
+from datetime import timedelta
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+import structlog
+from jwt import PyJWKClient
 
 from app.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = structlog.get_logger()
 
-ALGORITHM = "HS256"
+_jwks_client = PyJWKClient(
+    f"{settings.supabase_project_url}/auth/v1/.well-known/jwks.json",
+    cache_keys=True,
+)
 
-
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
-
-
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+_LEEWAY = timedelta(seconds=60)
 
 
-def create_access_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
-    return jwt.encode({"sub": user_id, "exp": expire, "type": "access"}, settings.app_secret_key, ALGORITHM)
+def verify_supabase_token(token: str) -> dict:
+    """Supabase 발급 JWT를 검증하고 payload를 반환.
 
-
-def create_refresh_token(user_id: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
-    return jwt.encode({"sub": user_id, "exp": expire, "type": "refresh"}, settings.app_secret_key, ALGORITHM)
-
-
-def decode_token(token: str) -> dict:
+    Raises ValueError on expired or invalid token.
+    """
     try:
-        return jwt.decode(token, settings.app_secret_key, algorithms=[ALGORITHM])
-    except JWTError as e:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        return jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=[signing_key.algorithm_name],
+            options={"verify_exp": True, "verify_aud": False},
+            leeway=_LEEWAY,
+        )
+    except jwt.ExpiredSignatureError as e:
+        raise ValueError("Token expired") from e
+    except jwt.InvalidTokenError as e:
+        logger.warning("token_verification_failed", error_type=type(e).__name__, detail=str(e))
         raise ValueError("Invalid token") from e
+    except Exception as e:
+        logger.error("jwks_fetch_failed", error=str(e))
+        raise ValueError("Token verification failed") from e

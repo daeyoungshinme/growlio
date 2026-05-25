@@ -19,8 +19,11 @@ class Settings(BaseSettings):
 
     allowed_origins: str = "http://localhost:5173"
 
-    jwt_access_token_expire_minutes: int = 30
-    jwt_refresh_token_expire_days: int = 7
+    # Supabase
+    supabase_project_url: str = ""
+    supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
+    supabase_jwt_secret: str = ""
 
     # 외부 API 동시 호출 제한 및 캐시 설정
     api_semaphore_limit: int = 5
@@ -53,6 +56,7 @@ class Settings(BaseSettings):
             raise ValueError("APP_SECRET_KEY must be at least 32 characters")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", self.kis_cred_encryption_key):
             raise ValueError("KIS_CRED_ENCRYPTION_KEY must be exactly 64 hex characters")
+        # supabase_jwt_secret은 RS256 JWKS 방식 사용 시 불필요 (선택적)
         return self
 
 

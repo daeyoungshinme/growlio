@@ -22,9 +22,7 @@ dependencies = [
     # Scheduler
     "apscheduler>=3.10.0",
     # Auth
-    "python-jose[cryptography]>=3.3.0",
-    "passlib[bcrypt]>=1.7.4",
-    "bcrypt==4.0.1",            # passlib 호환 버전 고정 (5.x API 변경으로 incompatible)
+    "PyJWT>=2.8.0",
     "pydantic[email]>=2.7.0",   # EmailStr 사용을 위한 email-validator 포함
     "python-multipart>=0.0.9",
     # Encryption (KIS credentials)
