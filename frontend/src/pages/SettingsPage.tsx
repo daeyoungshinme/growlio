@@ -8,7 +8,7 @@ import {
   deleteExchangeRateAlert,
   type ExchangeRateAlert,
 } from "../api/alerts";
-import { fetchExchangeRate } from "../api/dashboard";
+import { fetchExchangeRate } from "../api/assets";
 
 interface SettingsData {
   has_kis: boolean;

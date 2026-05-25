@@ -15,6 +15,7 @@ export interface AssetAccount {
   data_source: string;
   institution: string | null;
   kis_account_no: string | null;
+  kiwoom_account_no: string | null;
   is_mock_mode: boolean;
   manual_amount: number | null;
   manual_currency: string;
@@ -27,6 +28,7 @@ export interface AssetAccount {
   notes: string | null;
   created_at: string;
   has_own_kis_credentials: boolean;
+  has_own_kiwoom_credentials: boolean;
 }
 
 export interface AssetAccountCreate {
@@ -37,6 +39,9 @@ export interface AssetAccountCreate {
   kis_account_no?: string;
   kis_app_key?: string;
   kis_app_secret?: string;
+  kiwoom_account_no?: string;
+  kiwoom_app_key?: string;
+  kiwoom_app_secret?: string;
   ob_fintech_use_no?: string;
   is_mock_mode?: boolean;
   manual_amount?: number;

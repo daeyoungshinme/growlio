@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.kis.client import KisApiError
+from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
@@ -24,6 +25,7 @@ from app.schemas.asset import (
 from app.services.asset_service import (
     _upsert_snapshot,
     sync_kis_account,
+    sync_kiwoom_account,
     sync_manual_account,
     sync_openbanking_account,
 )
@@ -35,9 +37,10 @@ OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX"}
 
 
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
-    """AssetAccount ORM 모델을 Response 스키마로 변환 (has_own_kis_credentials 계산 포함)."""
+    """AssetAccount ORM 모델을 Response 스키마로 변환."""
     data = AssetAccountResponse.model_validate(account)
     data.has_own_kis_credentials = bool(account.kis_app_key)
+    data.has_own_kiwoom_credentials = bool(account.kiwoom_app_key)
     return data
 
 
@@ -108,18 +111,18 @@ async def create_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
+
     if req.data_source == "KIS_API":
         if not req.kis_account_no:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌번호를 입력하세요.")
 
-        req_data = req.model_dump(exclude={"kis_app_key", "kis_app_secret"})
+        req_data = req.model_dump(exclude=_exclude_creds)
 
         if req.kis_app_key and req.kis_app_secret:
-            # 계좌별 자격증명 사용
             req_data["kis_app_key"] = encrypt(req.kis_app_key)
             req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
         else:
-            # 전역 자격증명 확인 (폴백용)
             settings = await db.get(UserSettings, current_user.id)
             if not settings or not settings.kis_app_key:
                 raise HTTPException(
@@ -131,9 +134,19 @@ async def create_account(
             req_data["kis_app_secret"] = None
 
         account = AssetAccount(user_id=current_user.id, **req_data)
+    elif req.data_source == "KIWOOM_API":
+        if not req.kiwoom_account_no or not req.kiwoom_app_key or not req.kiwoom_app_secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="키움 계좌번호와 API 자격증명(App Key, App Secret)을 모두 입력하세요.",
+            )
+        req_data = req.model_dump(exclude=_exclude_creds)
+        req_data["kiwoom_app_key"] = encrypt(req.kiwoom_app_key)
+        req_data["kiwoom_app_secret"] = encrypt(req.kiwoom_app_secret)
+        req_data["asset_type"] = "STOCK_KIWOOM"
+        account = AssetAccount(user_id=current_user.id, **req_data)
     else:
-        exclude_creds = {"kis_app_key", "kis_app_secret"}
-        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=exclude_creds))
+        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=_exclude_creds))
     db.add(account)
     await db.commit()
     await db.refresh(account)
@@ -192,14 +205,18 @@ async def update_account(
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
 
-    # 계좌별 KIS 자격증명 업데이트 처리 (암호화 필요, 별도 처리)
-    update_fields = req.model_dump(exclude_none=True, exclude={"kis_app_key", "kis_app_secret"})
+    _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
+    update_fields = req.model_dump(exclude_none=True, exclude=_exclude_creds)
     for field, value in update_fields.items():
         setattr(account, field, value)
 
     if req.kis_app_key is not None:
         account.kis_app_key = encrypt(req.kis_app_key) if req.kis_app_key else None
         account.kis_app_secret = encrypt(req.kis_app_secret) if req.kis_app_secret else None
+
+    if req.kiwoom_app_key is not None:
+        account.kiwoom_app_key = encrypt(req.kiwoom_app_key) if req.kiwoom_app_key else None
+        account.kiwoom_app_secret = encrypt(req.kiwoom_app_secret) if req.kiwoom_app_secret else None
 
     if req.manual_amount is not None or req.deposit_krw is not None or req.real_estate_details is not None:  # noqa: E501
         account.manual_updated_at = datetime.now(UTC)
@@ -272,6 +289,28 @@ async def delete_account_kis_credentials(
     await redis.delete(f"kis_token:account:{account_id}")
 
 
+@router.delete("/{account_id}/kiwoom-credentials", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account_kiwoom_credentials(
+    account_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """계좌별 키움 API 자격증명을 삭제한다."""
+    from sqlalchemy import delete as sql_delete
+
+    from app.models.token import KiwoomToken
+    from app.redis_client import get_redis
+
+    account = await _get_owned_account(account_id, current_user.id, db)
+    account.kiwoom_app_key = None
+    account.kiwoom_app_secret = None
+    await db.execute(sql_delete(KiwoomToken).where(KiwoomToken.account_id == account_id))
+    await db.commit()
+
+    redis = await get_redis()
+    await redis.delete(f"kiwoom_token:account:{account_id}")
+
+
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     account_id: UUID,
@@ -320,6 +359,40 @@ async def sync_account(
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
         except ValueError as e:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    elif account.data_source == "KIWOOM_API":
+        try:
+            snapshot = await sync_kiwoom_account(account, db, redis)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code >= 500:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="키움 API 오류: 모의투자/실계좌 설정을 확인하세요. (계좌번호, 앱키, 모드가 일치해야 합니다)",
+                )
+            try:
+                body = e.response.json()
+                msg = body.get("return_msg") or body.get("msg1") or str(e)
+            except Exception:
+                msg = str(e)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"키움 API 오류: {msg}")
+        except KiwoomApiError as e:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})",
+            )
+        except KiwoomTokenExpiredError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="키움 토큰이 만료되었습니다. 잠시 후 다시 시도하세요.",
+            )
+        except (httpx.ConnectError, httpx.TimeoutException):
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="키움 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.")
+        except RuntimeError as e:
+            msg = str(e)
+            if "토큰 발급 실패" in msg:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.")
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=msg)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     elif account.data_source == "OPEN_BANKING":
         snapshot = await sync_openbanking_account(account, db)
     elif account.data_source == "MANUAL":
@@ -358,8 +431,6 @@ async def save_positions(
     total_value = sum((p.current_price or p.avg_price) * p.qty for p in positions)
     account.manual_amount = total_value  # 평가금액 기준 (current_price 없으면 avg_price 대체)
     account.manual_updated_at = datetime.now(UTC)
-    await db.commit()
-    await db.refresh(account)
     await _upsert_snapshot(
         db,
         account_id=account.id,

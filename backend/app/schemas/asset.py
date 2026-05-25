@@ -5,10 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, field_validator
 
 AssetType = Literal[
-    "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_OTHER",
+    "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER",
     "CASH_OTHER", "OTHER", "REAL_ESTATE",
 ]
-DataSource = Literal["MANUAL", "KIS_API", "OPEN_BANKING"]
+DataSource = Literal["MANUAL", "KIS_API", "KIWOOM_API", "OPEN_BANKING"]
 TransactionType = Literal["DEPOSIT", "WITHDRAWAL", "DIVIDEND"]
 
 
@@ -42,6 +42,9 @@ class AssetAccountCreate(BaseModel):
     kis_account_no: str | None = None
     kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
+    kiwoom_account_no: str | None = None
+    kiwoom_app_key: str | None = None     # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
     ob_fintech_use_no: str | None = None
     ob_bank_code: str | None = None
     is_mock_mode: bool = True
@@ -64,6 +67,8 @@ class AssetAccountUpdate(BaseModel):
     institution: str | None = None
     kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
+    kiwoom_app_key: str | None = None     # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
     notes: str | None = None
@@ -85,6 +90,7 @@ class AssetAccountResponse(BaseModel):
     data_source: DataSource
     institution: str | None
     kis_account_no: str | None = None
+    kiwoom_account_no: str | None = None
     is_mock_mode: bool
     manual_amount: float | None
     manual_currency: str
@@ -97,7 +103,8 @@ class AssetAccountResponse(BaseModel):
     sort_order: int
     notes: str | None
     created_at: datetime
-    has_own_kis_credentials: bool = False  # 계좌별 API 키 보유 여부 (키 원문 노출 금지)
+    has_own_kis_credentials: bool = False     # KIS 계좌별 API 키 보유 여부
+    has_own_kiwoom_credentials: bool = False  # 키움 계좌별 API 키 보유 여부
 
     model_config = {"from_attributes": True}
 

@@ -21,9 +21,9 @@ class AssetAccount(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
+    # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_KIWOOM | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    # MANUAL | KIS_API | OPEN_BANKING
+    # MANUAL | KIS_API | KIWOOM_API | OPEN_BANKING
     data_source: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     institution: Mapped[str | None] = mapped_column(String(100))
 
@@ -38,6 +38,12 @@ class AssetAccount(Base):
     kis_app_key: Mapped[str | None] = mapped_column(String(512))
     kis_app_secret: Mapped[str | None] = mapped_column(String(512))
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # 키움 계좌 (STOCK_KIWOOM) — data_source=KIWOOM_API
+    kiwoom_account_no: Mapped[str | None] = mapped_column(String(20))
+    # 계좌별 키움 자격증명 (AES-256 암호화) — 전역 폴백 없음, 항상 필수
+    kiwoom_app_key: Mapped[str | None] = mapped_column(String(512))
+    kiwoom_app_secret: Mapped[str | None] = mapped_column(String(512))
 
     # 수동 입력 금액 / 종목 목록
     manual_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
@@ -84,7 +90,7 @@ class AssetSnapshot(Base):
     unrealized_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
     positions: Mapped[list | None] = mapped_column(JSONB)
 
-    # MANUAL | KIS_API | OPEN_BANKING
+    # MANUAL | KIS_API | KIWOOM_API | OPEN_BANKING
     source: Mapped[str] = mapped_column(String(20), default="MANUAL", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

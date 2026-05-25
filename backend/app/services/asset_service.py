@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, date, datetime
 from typing import Any
@@ -141,6 +142,80 @@ async def sync_kis_account(
         source="KIS_API",
     )
     logger.info("kis_account_synced", account_id=str(account.id), total_krw=total_value_krw)
+    return snapshot
+
+
+async def sync_kiwoom_account(
+    account: AssetAccount,
+    db: AsyncSession,
+    redis,
+) -> AssetSnapshot:
+    """키움증권 OpenAPI+ 계좌 잔고를 API로 조회해 스냅샷을 저장한다.
+
+    키움은 전역 자격증명 폴백 없음 — kiwoom_app_key/secret이 없으면 즉시 오류.
+    """
+    from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
+    from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
+    from app.kiwoom.client import KiwoomTokenExpiredError
+
+    if not account.kiwoom_app_key or not account.kiwoom_app_secret:
+        raise ValueError("키움 API 자격증명이 설정되지 않았습니다")
+    if not account.kiwoom_account_no:
+        raise ValueError("키움 계좌번호가 설정되지 않았습니다")
+
+    app_key = decrypt(account.kiwoom_app_key)
+    app_secret = decrypt(account.kiwoom_app_secret)
+    is_mock = account.is_mock_mode
+
+    logger.info("kiwoom_sync_start", account_no=account.kiwoom_account_no, is_mock=is_mock)
+
+    async def _do_sync() -> dict:
+        token = await kiwoom_get_access_token(
+            app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
+            user_id=str(account.user_id), account_id=str(account.id),
+        )
+        try:
+            return await kiwoom_get_domestic_balance(
+                token, account.kiwoom_account_no, is_mock=is_mock
+            )
+        except KiwoomTokenExpiredError:
+            logger.warning("kiwoom_token_expired_refreshing", account_no=account.kiwoom_account_no)
+            refreshed = await kiwoom_get_access_token(
+                app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
+                user_id=str(account.user_id), account_id=str(account.id), force_refresh=True,
+            )
+            return await kiwoom_get_domestic_balance(
+                refreshed, account.kiwoom_account_no, is_mock=is_mock
+            )
+
+    try:
+        domestic = await asyncio.wait_for(_do_sync(), timeout=50.0)
+    except asyncio.TimeoutError:
+        logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
+        raise RuntimeError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.")
+
+    usd_krw_rate = await get_usd_krw_rate(redis)
+    total_value_krw = domestic["total_value_krw"] + domestic["deposit_krw"]
+    total_invested = domestic["invested_krw"]
+    unrealized_pnl = domestic["total_value_krw"] - total_invested
+
+    account.deposit_krw = domestic["deposit_krw"]
+    account.manual_positions = [_to_manual_position(p, usd_krw_rate) for p in domestic["positions"]]
+    await db.commit()
+
+    snapshot = await _upsert_snapshot(
+        db,
+        account_id=account.id,
+        user_id=account.user_id,
+        snapshot_date=date.today(),
+        amount_krw=total_value_krw,
+        invested_amount=total_invested,
+        unrealized_pnl=unrealized_pnl,
+        positions=domestic["positions"],
+        usd_krw_rate=usd_krw_rate,
+        source="KIWOOM_API",
+    )
+    logger.info("kiwoom_account_synced", account_id=str(account.id), total_krw=total_value_krw)
     return snapshot
 
 

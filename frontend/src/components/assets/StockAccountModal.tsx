@@ -4,12 +4,14 @@ import type { AssetAccountCreate } from "../../api/assets";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
+  STOCK_KIWOOM: "주식 (키움증권)",
   STOCK_OTHER: "주식 (타증권사 / 수동)",
   CASH_OTHER: "예수금 (기타)",
 };
 
 function defaultAssetTypeForSource(source: string): string {
   if (source === "KIS_API") return "STOCK_KIS";
+  if (source === "KIWOOM_API") return "STOCK_KIWOOM";
   return "STOCK_OTHER";
 }
 
@@ -59,6 +61,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
               onChange={(e) => handleSourceChange(e.target.value)}>
               <option value="MANUAL">수동 입력</option>
               <option value="KIS_API">KIS 한국투자증권 (자동)</option>
+              <option value="KIWOOM_API">키움증권 (자동)</option>
             </select>
           </div>
           <div>
@@ -121,6 +124,35 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                     </div>
                   </div>
                 )}
+              </div>
+            </>
+          )}
+          {form.data_source === "KIWOOM_API" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">키움 계좌번호 *</label>
+                <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.kiwoom_account_no ?? ""}
+                  onChange={(e) => set("kiwoom_account_no", e.target.value)} placeholder="12345678-01" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">키움 App Key *</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.kiwoom_app_key ?? ""}
+                  onChange={(e) => set("kiwoom_app_key", e.target.value || undefined)}
+                  placeholder="키움 앱 키"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">키움 App Secret *</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.kiwoom_app_secret ?? ""}
+                  onChange={(e) => set("kiwoom_app_secret", e.target.value || undefined)}
+                  placeholder="키움 앱 시크릿"
+                />
               </div>
             </>
           )}

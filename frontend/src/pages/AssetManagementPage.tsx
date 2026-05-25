@@ -81,7 +81,7 @@ export default function AssetManagementPage() {
       invalidateAll();
       setShowBankModal(false);
       setShowStockModal(false);
-      if (data.data_source === "KIS_API") {
+      if (data.data_source === "KIS_API" || data.data_source === "KIWOOM_API") {
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
@@ -157,13 +157,15 @@ export default function AssetManagementPage() {
   };
 
   const handleSyncKisAccount = async (id: string) => {
+    const acc = accounts.find((a) => a.id === id);
     setSyncingStockIds((prev) => new Set(prev).add(id));
     try {
       await syncAccount(id);
       await invalidateSyncData(queryClient);
       toast("동기화 완료");
     } catch {
-      toast("동기화 실패. KIS API 자격증명을 확인하세요.");
+      const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
+      toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);
     } finally {
       setSyncingStockIds((prev) => {
         const next = new Set(prev);
@@ -384,7 +386,7 @@ export default function AssetManagementPage() {
         <StockPositionsModal
           accountId={positionsAccount.id}
           accountName={positionsAccount.name}
-          readonly={positionsAccount.dataSource === "KIS_API"}
+          readonly={positionsAccount.dataSource === "KIS_API" || positionsAccount.dataSource === "KIWOOM_API"}
           onClose={() => {
             setPositionsAccount(null);
             void invalidateAccountData(queryClient);

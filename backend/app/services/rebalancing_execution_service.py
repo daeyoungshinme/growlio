@@ -1,4 +1,4 @@
-"""리밸런싱 실행 서비스 — KIS API를 통해 매수/매도 주문을 일괄 실행한다."""
+"""리밸런싱 실행 서비스 — KIS/키움 API를 통해 매수/매도 주문을 일괄 실행한다."""
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -17,6 +17,8 @@ from app.services.credential_service import decrypt
 
 logger = structlog.get_logger()
 
+_BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+
 
 async def _load_account(
     account_id: uuid.UUID,
@@ -32,10 +34,12 @@ async def _load_account(
     )
     if not account:
         raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
-    if account.asset_type != "STOCK_KIS":
-        raise HTTPException(status_code=400, detail="KIS 계좌만 실행 주문이 가능합니다.")
-    if not account.kis_account_no:
-        raise HTTPException(status_code=400, detail="계좌번호가 설정되지 않았습니다.")
+    if account.asset_type not in _BROKER_ASSET_TYPES:
+        raise HTTPException(status_code=400, detail="KIS 또는 키움 계좌만 실행 주문이 가능합니다.")
+    if account.asset_type == "STOCK_KIS" and not account.kis_account_no:
+        raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")
+    if account.asset_type == "STOCK_KIWOOM" and not account.kiwoom_account_no:
+        raise HTTPException(status_code=400, detail="키움 계좌번호가 설정되지 않았습니다.")
     return account
 
 
@@ -43,12 +47,19 @@ async def _load_credentials(
     account: AssetAccount,
     settings: UserSettings | None,
 ) -> tuple[str, str]:
-    """계좌별 자격증명 우선, 없으면 전역 설정 폴백."""
+    """KIS 계좌별 자격증명 우선, 없으면 전역 설정 폴백."""
     if account.kis_app_key and account.kis_app_secret:
         return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
     if settings and settings.kis_app_key and settings.kis_app_secret:
         return decrypt(settings.kis_app_key), decrypt(settings.kis_app_secret)
     raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다.")
+
+
+async def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
+    """키움 계좌 자격증명 로드 (전역 폴백 없음)."""
+    if account.kiwoom_app_key and account.kiwoom_app_secret:
+        return decrypt(account.kiwoom_app_key), decrypt(account.kiwoom_app_secret)
+    raise HTTPException(status_code=400, detail="키움 자격증명이 설정되지 않았습니다.")
 
 
 async def execute_rebalancing(
@@ -90,29 +101,52 @@ async def execute_rebalancing(
     for acc_id_str, group_orders in groups.items():
         acc_uuid = uuid.UUID(acc_id_str)
         account = await _load_account(acc_uuid, user_id, db)
-        app_key, app_secret = await _load_credentials(account, settings)
         is_mock = account.is_mock_mode
-        account_no = account.kis_account_no
 
-        access_token = await get_access_token(
-            app_key, app_secret,
-            is_mock=is_mock,
-            redis=redis,
-            db=db,
-            user_id=str(user_id),
-            account_id=str(acc_uuid),
-        )
+        if account.asset_type == "STOCK_KIWOOM":
+            from app.kiwoom.auth import get_access_token as kiwoom_get_token
+            from app.kiwoom.order import place_domestic_order as kiwoom_place_order
 
-        sells = [o for o in group_orders if o.side == "SELL"]
-        buys = [o for o in group_orders if o.side == "BUY"]
-
-        account_results: list[OrderResult] = []
-        for order in sells + buys:
-            account_results.append(
-                await _execute_single_order(
-                    order, app_key, app_secret, access_token, account_no, is_mock
-                )
+            app_key, app_secret = await _load_kiwoom_credentials(account)
+            account_no = account.kiwoom_account_no
+            access_token = await kiwoom_get_token(
+                app_key, app_secret,
+                is_mock=is_mock, redis=redis, db=db,
+                user_id=str(user_id), account_id=str(acc_uuid),
             )
+
+            sells = [o for o in group_orders if o.side == "SELL"]
+            buys = [o for o in group_orders if o.side == "BUY"]
+
+            account_results: list[OrderResult] = []
+            for order in sells + buys:
+                account_results.append(
+                    await _execute_kiwoom_single_order(
+                        order, access_token, account_no, is_mock,
+                        kiwoom_place_order,
+                    )
+                )
+        else:
+            # KIS 계좌
+            app_key, app_secret = await _load_credentials(account, settings)
+            account_no = account.kis_account_no
+
+            access_token = await get_access_token(
+                app_key, app_secret,
+                is_mock=is_mock, redis=redis, db=db,
+                user_id=str(user_id), account_id=str(acc_uuid),
+            )
+
+            sells = [o for o in group_orders if o.side == "SELL"]
+            buys = [o for o in group_orders if o.side == "BUY"]
+
+            account_results = []
+            for order in sells + buys:
+                account_results.append(
+                    await _execute_single_order(
+                        order, app_key, app_secret, access_token, account_no, is_mock
+                    )
+                )
 
         success_count = sum(1 for r in account_results if r.status == "SUCCESS")
         fail_count = sum(1 for r in account_results if r.status == "FAILED")
@@ -148,6 +182,49 @@ async def execute_rebalancing(
     )
 
     return results
+
+
+async def _execute_kiwoom_single_order(
+    order: ExecutionOrderItem,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+    place_order_fn,
+) -> OrderResult:
+    """키움 단건 주문 실행 — 국내주식만 지원 (해외주식 미지원)."""
+    if order.quantity <= 0:
+        return OrderResult(
+            ticker=order.ticker, name=order.name, market=order.market,
+            side=order.side, quantity=order.quantity, status="SKIPPED",
+            error_msg="주문 수량이 0 이하입니다.",
+        )
+    if is_overseas_market(order.market):
+        return OrderResult(
+            ticker=order.ticker, name=order.name, market=order.market,
+            side=order.side, quantity=order.quantity, status="SKIPPED",
+            error_msg="키움 연동은 국내주식만 지원합니다.",
+        )
+
+    try:
+        result = await place_order_fn(
+            access_token, account_no,
+            side=order.side, ticker=order.ticker, quantity=order.quantity, is_mock=is_mock,
+        )
+        logger.info(
+            "kiwoom_order_placed", ticker=order.ticker, side=order.side,
+            quantity=order.quantity, order_no=result.get("order_no"), is_mock=is_mock,
+        )
+        return OrderResult(
+            ticker=order.ticker, name=order.name, market=order.market,
+            side=order.side, quantity=order.quantity, status="SUCCESS",
+            order_no=result.get("order_no"),
+        )
+    except Exception as e:
+        logger.warning("kiwoom_order_failed", ticker=order.ticker, side=order.side, error=str(e))
+        return OrderResult(
+            ticker=order.ticker, name=order.name, market=order.market,
+            side=order.side, quantity=order.quantity, status="FAILED", error_msg=str(e),
+        )
 
 
 async def _execute_single_order(

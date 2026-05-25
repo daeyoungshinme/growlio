@@ -27,7 +27,7 @@ interface Props {
 
 export default function StockAccountCard({ account, stats, onDelete, onManagePositions, onTransactions, onEditDeposit, onEditName, onSync, isSyncing, isDeleting }: Props) {
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
-  const accountNo = account.kis_account_no ?? null;
+  const accountNo = account.kis_account_no ?? account.kiwoom_account_no ?? null;
   const hasStats = stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
@@ -101,15 +101,18 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
             {account.has_own_kis_credentials && (
               <span className="px-2 py-0.5 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">전용 API 키</span>
             )}
+            {account.has_own_kiwoom_credentials && (
+              <span className="px-2 py-0.5 border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">키움 API 키</span>
+            )}
           </div>
           {account.institution && <p className="text-sm text-gray-500 dark:text-gray-400">{account.institution}</p>}
           {accountNo && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{accountNo}</p>}
           {account.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{account.notes}</p>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {account.data_source === "KIS_API" && (
+          {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
             <button onClick={() => onSync(account.id)} disabled={isSyncing}
-              title="KIS 데이터 동기화"
+              title={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
               className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50">
               {isSyncing ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
             </button>
