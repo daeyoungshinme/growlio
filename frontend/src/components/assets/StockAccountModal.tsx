@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { X, CheckCircle, XCircle } from "lucide-react";
 import type { AssetAccountCreate } from "../../api/assets";
+import { verifyKisCredentials } from "../../api/assets";
+import { extractErrorMessage } from "../../utils/error";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -27,9 +29,35 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
     asset_type: "STOCK_KIS",
     data_source: "KIS_API",
     institution: "",
+    is_mock_mode: true,
   });
-  const [showOwnCredentials, setShowOwnCredentials] = useState(false);
   const set = (k: keyof AssetAccountCreate, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+
+  const isKis = form.data_source === "KIS_API";
+  const KIS_ACCOUNT_NO_REGEX = /^\d{8}-\d{2}$|^\d{10}$/;
+  const kisAccountNoValid = !isKis || (!!form.kis_account_no && KIS_ACCOUNT_NO_REGEX.test(form.kis_account_no));
+  const kisValid = !isKis || (kisAccountNoValid && !!form.kis_app_key && !!form.kis_app_secret);
+
+  const [verifyState, setVerifyState] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [verifyError, setVerifyError] = useState("");
+
+  const handleVerify = async () => {
+    if (!form.kis_app_key || !form.kis_app_secret) return;
+    setVerifyState("loading");
+    try {
+      await verifyKisCredentials({
+        kis_app_key: form.kis_app_key,
+        kis_app_secret: form.kis_app_secret,
+        is_mock: form.is_mock_mode ?? true,
+      });
+      setVerifyState("ok");
+    } catch (e) {
+      setVerifyState("error");
+      setVerifyError(extractErrorMessage(e, "자격증명 확인 실패"));
+    }
+  };
+
+  const resetVerify = () => setVerifyState("idle");
 
   const handleSourceChange = (source: string) => {
     set("data_source", source);
@@ -86,43 +114,51 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
           {form.data_source === "KIS_API" && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS 계좌번호</label>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS 계좌번호 *</label>
                 <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.kis_account_no ?? ""}
                   onChange={(e) => set("kis_account_no", e.target.value)} placeholder="12345678-01" />
+                {isKis && form.kis_account_no && !kisAccountNoValid && (
+                  <p className="mt-1 text-xs text-red-500">형식 오류: 12345678-01 형식으로 입력하세요</p>
+                )}
               </div>
-              <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS App Key *</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.kis_app_key ?? ""}
+                  onChange={(e) => { set("kis_app_key", e.target.value); resetVerify(); }}
+                  placeholder="KIS 앱 키"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS App Secret *</label>
+                <input
+                  type="password"
+                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={form.kis_app_secret ?? ""}
+                  onChange={(e) => { set("kis_app_secret", e.target.value); resetVerify(); }}
+                  placeholder="KIS 앱 시크릿"
+                />
+              </div>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowOwnCredentials((v) => !v)}
-                  className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  onClick={handleVerify}
+                  disabled={verifyState === "loading" || !form.kis_app_key || !form.kis_app_secret}
+                  className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
                 >
-                  <span className="font-medium">계좌별 API 키 설정 <span className="text-gray-400 dark:text-gray-500 font-normal">(선택사항)</span></span>
-                  {showOwnCredentials ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                  {verifyState === "loading" ? "확인 중..." : "자격증명 확인"}
                 </button>
-                {showOwnCredentials && (
-                  <div className="px-3 pb-3 space-y-2 border-t border-gray-200 dark:border-gray-700">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 pt-2">미입력 시 설정 페이지의 전역 KIS 자격증명을 사용합니다.</p>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400">KIS App Key</label>
-                      <input
-                        type="password"
-                        className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={form.kis_app_key ?? ""}
-                        onChange={(e) => set("kis_app_key", e.target.value || undefined)}
-                        placeholder="KIS 앱 키"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs font-medium text-gray-600 dark:text-gray-400">KIS App Secret</label>
-                      <input
-                        type="password"
-                        className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        value={form.kis_app_secret ?? ""}
-                        onChange={(e) => set("kis_app_secret", e.target.value || undefined)}
-                        placeholder="KIS 앱 시크릿"
-                      />
-                    </div>
-                  </div>
+                {verifyState === "ok" && (
+                  <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
+                    <CheckCircle size={14} /> 자격증명 확인됨
+                  </span>
+                )}
+                {verifyState === "error" && (
+                  <span className="flex items-center gap-1 text-xs text-red-500">
+                    <XCircle size={14} /> {verifyError}
+                  </span>
                 )}
               </div>
             </>
@@ -166,7 +202,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
         </div>
         <div className="flex justify-end gap-3 mt-5">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
-          <button onClick={() => onSubmit(form)} disabled={isLoading || !form.name}
+          <button onClick={() => onSubmit(form)} disabled={isLoading || !form.name || !kisValid || (isKis && verifyState !== "ok")}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {isLoading ? "저장 중..." : "저장"}
           </button>

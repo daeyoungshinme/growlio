@@ -66,6 +66,9 @@ export const deleteAccount = (id: string) =>
 export const syncAccount = (id: string) =>
   api.post(`/assets/${id}/sync`).then((r) => r.data);
 
+export const verifyKisCredentials = (data: { kis_app_key: string; kis_app_secret: string; is_mock: boolean }) =>
+  api.post<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data).then((r) => r.data);
+
 export const fetchSnapshots = (start?: string, end?: string) =>
   api.get("/assets/snapshots/range", { params: { start_date: start, end_date: end } }).then((r) => r.data);
 

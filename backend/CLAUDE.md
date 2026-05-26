@@ -7,34 +7,34 @@
 # 가상환경 생성 (최초 1회)
 cd backend && uv venv
 
-cd backend && pip install uv && uv pip install -e ".[dev]"
+uv pip install -e ".[dev]"
 ```
 
 ### 실행
 ```bash
 # 백엔드 서버 (localhost:8000, Swagger UI: /docs)
-cd backend && .venv/bin/uvicorn app.main:app --reload
+cd backend && uv run uvicorn app.main:app --reload
 ```
 
 ### Database
 ```bash
 # 마이그레이션 실행
-cd backend && .venv/bin/alembic upgrade head
+cd backend && uv run alembic upgrade head
 
 # 새 마이그레이션 생성
-cd backend && .venv/bin/alembic revision --autogenerate -m "description"
+cd backend && uv run alembic revision --autogenerate -m "description"
 
 # 현재 마이그레이션 상태 확인
-cd backend && .venv/bin/alembic current
+cd backend && uv run alembic current
 ```
 
 ### Tests
 ```bash
 # 전체 테스트 (pytest-asyncio, asyncio_mode="auto")
-cd backend && .venv/bin/pytest
+cd backend && uv run pytest
 
 # 단일 파일
-cd backend && .venv/bin/pytest tests/test_asset_service.py -v
+cd backend && uv run pytest tests/test_asset_service.py -v
 ```
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
@@ -42,10 +42,10 @@ cd backend && .venv/bin/pytest tests/test_asset_service.py -v
 ### Lint & Type Check
 ```bash
 # Ruff 린터 (E/F/I/UP/B/SIM 규칙, E712 제외)
-cd backend && .venv/bin/ruff check .
+cd backend && uv run ruff check .
 
 # Mypy 타입 체크
-cd backend && .venv/bin/mypy app/
+cd backend && uv run mypy app/
 ```
 
 ### Environment

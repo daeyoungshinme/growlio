@@ -11,6 +11,7 @@ import {
   type AssetAccount,
 } from "../api/assets";
 import { fetchTransactions } from "../api/transactions";
+import { extractErrorMessage } from "../utils/error";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
 import TransactionModal from "../components/transactions/TransactionModal";
 import BankAccountModal from "../components/assets/BankAccountModal";
@@ -99,7 +100,7 @@ export default function AssetManagementPage() {
         }
       }
     },
-    onError: () => toast("계좌 추가에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "계좌 추가에 실패했습니다"), "error"),
   });
 
   const deleteMutation = useMutation({

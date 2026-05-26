@@ -30,9 +30,8 @@ cp backend/.env.example backend/.env  # 값 채우기 (backend/CLAUDE.md Environ
 # 4. DB 마이그레이션
 make migrate
 
-# 5. 개발 서버 실행 (터미널 2개)
-make dev-backend
-make dev-frontend
+# 5. 개발 서버 실행
+bash dev.sh   # 백엔드 + 프론트엔드 동시 실행 (Ctrl+C로 종료)
 ```
 
 ## Makefile 단축 명령
@@ -43,9 +42,10 @@ make down             # docker compose down
 make migrate          # cd backend && alembic upgrade head
 make install-backend  # cd backend && pip install uv && uv pip install -e ".[dev]"
 make install-frontend # cd frontend && npm install
-make dev-backend      # uvicorn app.main:app --reload
-make dev-frontend     # npm run dev
-make test-backend     # cd backend && .venv/bin/pytest
+make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh)
+make dev-backend      # 백엔드만 (localhost:8000)
+make dev-frontend     # 프론트엔드만 (localhost:5173)
+make test-backend     # cd backend && pytest
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc build (frontend)
@@ -54,13 +54,13 @@ make typecheck        # mypy (backend) + tsc build (frontend)
 ## Development Servers (요약)
 
 ```bash
-# 백엔드 (localhost:8000)
-cd backend && .venv/bin/uvicorn app.main:app --reload
-# windows
-cd backend && .venv/Scripts/uvicorn.exe app.main:app --reload
+# 통합 실행 (권장 — Mac/Windows Git Bash 동일)
+bash dev.sh    # 백엔드 + 프론트엔드 동시 실행, Ctrl+C로 함께 종료
+make dev       # 동일
 
-# 프론트엔드 (localhost:5173)
-cd frontend && npm run dev
+# 개별 실행
+make dev-backend   # 백엔드만 (localhost:8000)
+make dev-frontend  # 프론트엔드만 (localhost:5173)
 ```
 
 ---

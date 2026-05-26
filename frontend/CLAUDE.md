@@ -3,8 +3,8 @@
 ## Commands
 
 > **Claude Code Bash 환경**: `node`/`npm`/`npx`가 PATH에 없음.
-> 실행 시 앞에 `PATH="/opt/homebrew/Cellar/node@20/20.20.2/bin:$PATH"` 추가 필요.
-> 타입 체크: `PATH="/opt/homebrew/Cellar/node@20/20.20.2/bin:$PATH" node frontend/node_modules/.bin/tsc --noEmit`
+> 실행 시 앞에 `PATH="/c/Program Files/nodejs:$PATH"` 추가 필요.
+> 타입 체크: `PATH="/c/Program Files/nodejs:$PATH" node frontend/node_modules/.bin/tsc --noEmit`
 
 ### 설치
 ```bash

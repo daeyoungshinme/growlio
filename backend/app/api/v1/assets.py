@@ -12,11 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.kis.client import KisApiError
+from app.kis.constants import OVERSEAS_MARKETS
 from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
+from app.limiter import limiter
 from app.models.asset import VALID_MARKETS, AssetAccount, AssetSnapshot
-from app.models.user import User, UserSettings
+from app.models.user import User
 from app.redis_client import get_redis
-from app.utils.redis_lock import redis_lock
 from app.schemas.asset import (
     AssetAccountCreate,
     AssetAccountResponse,
@@ -30,10 +31,9 @@ from app.services.asset_service import (
     sync_manual_account,
     sync_openbanking_account,
 )
-from app.limiter import limiter
 from app.services.credential_service import encrypt
 from app.services.price_service import _sync_usdkrw, fetch_prices_batch
-from app.kis.constants import OVERSEAS_MARKETS
+from app.utils.redis_lock import redis_lock
 
 
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
@@ -102,6 +102,52 @@ async def list_accounts(
     return [_account_response(a) for a in result.scalars().all()]
 
 
+class KisCredentialVerifyRequest(BaseModel):
+    kis_app_key: str
+    kis_app_secret: str
+    is_mock: bool = True
+
+
+@router.post("/verify-kis-credentials")
+@limiter.limit("10/minute")
+async def verify_kis_credentials(
+    request: Request,
+    req: KisCredentialVerifyRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """KIS 자격증명 유효성 확인 (계좌 생성 없이)."""
+    from app.kis.auth import _fetch_and_store_token
+
+    redis = await get_redis()
+    try:
+        await _fetch_and_store_token(
+            req.kis_app_key,
+            req.kis_app_secret,
+            is_mock=req.is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(current_user.id),
+            account_id=None,
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code in (400, 401, 403):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="KIS 자격증명이 잘못되었습니다. App Key/Secret 및 모드를 확인하세요.",
+            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="KIS 서버 오류. 잠시 후 다시 시도하세요.",
+        ) from e
+    except (httpx.ConnectError, httpx.TimeoutException) as e:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="KIS 서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.",
+        ) from e
+    return {"valid": True, "message": "KIS 자격증명이 확인되었습니다."}
+
+
 @router.post("", response_model=AssetAccountResponse, status_code=status.HTTP_201_CREATED)
 async def create_account(
     req: AssetAccountCreate,
@@ -111,25 +157,9 @@ async def create_account(
     _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
 
     if req.data_source == "KIS_API":
-        if not req.kis_account_no:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌번호를 입력하세요.")
-
         req_data = req.model_dump(exclude=_exclude_creds)
-
-        if req.kis_app_key and req.kis_app_secret:
-            req_data["kis_app_key"] = encrypt(req.kis_app_key)
-            req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
-        else:
-            settings = await db.get(UserSettings, current_user.id)
-            if not settings or not settings.kis_app_key:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="KIS API 자격증명이 없습니다. 계좌별 API 키를 입력하거나, 설정 > KIS 연동에서 먼저 등록하세요.",
-                )
-            req_data["is_mock_mode"] = settings.kis_is_mock
-            req_data["kis_app_key"] = None
-            req_data["kis_app_secret"] = None
-
+        req_data["kis_app_key"] = encrypt(req.kis_app_key)    # type: ignore[arg-type]
+        req_data["kis_app_secret"] = encrypt(req.kis_app_secret)  # type: ignore[arg-type]
         account = AssetAccount(user_id=current_user.id, **req_data)
     elif req.data_source == "KIWOOM_API":
         if not req.kiwoom_account_no or not req.kiwoom_app_key or not req.kiwoom_app_secret:

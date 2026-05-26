@@ -118,21 +118,54 @@ def analyze_rebalancing(
             actual_years_10y=ret["actual_years"] if ret else None,
         ))
 
-    # 4. 목표 포트폴리오에 없는 보유 종목 → untracked_holdings에 분리
-    from app.schemas.rebalancing import CurrentHolding
-    untracked: list[CurrentHolding] = []
+    # 4. 목표 포트폴리오에 없는 보유 종목 → target=0인 전량 매도 아이템으로 분류
     for key, data in current_map.items():
         if key not in target_keys:
             ticker_u, market_u = key
             current_value_u = data["value_krw"]
+            current_price_u = data.get("current_price")
             weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
-            untracked.append(CurrentHolding(
+            diff_u = -current_value_u
+            if current_price_u and float(current_price_u) > 0:
+                shares_u: float | None = round(diff_u / float(current_price_u), 0)
+            else:
+                shares_u = None
+
+            div_yield_u: float | None = None
+            annual_div_current_u = 0.0
+            if dividend_map:
+                d = dividend_map.get(key)
+                if d:
+                    yp = float(d.get("dividend_yield") or 0)
+                    estimated_annual = float(d.get("estimated_annual_krw") or 0)
+                    if yp > 0 or estimated_annual > 0:
+                        div_yield_u = yp if yp > 0 else None
+                        annual_div_current_u = estimated_annual
+
+            ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None
+
+            result_items.append(RebalancingItem(
                 ticker=ticker_u,
                 name=data["name"],
                 market=market_u,
-                current_value_krw=round(current_value_u, 0),
+                target_weight_pct=0.0,
                 current_weight_pct=round(weight_u, 2),
+                weight_diff_pct=round(-weight_u, 2),
+                current_value_krw=round(current_value_u, 0),
+                target_value_krw=0.0,
+                diff_krw=round(diff_u, 0),
+                shares_to_trade=shares_u,
+                current_price_krw=float(current_price_u) if current_price_u is not None else None,
+                dividend_yield=div_yield_u,
+                annual_dividend_current_krw=round(annual_div_current_u, 0),
+                annual_dividend_target_krw=0.0,
+                annual_dividend_diff_krw=round(-annual_div_current_u, 0),
+                return_10y_pct=ret_u["cumulative_return_pct"] if ret_u else None,
+                cagr_10y_pct=ret_u["cagr_pct"] if ret_u else None,
+                actual_years_10y=ret_u["actual_years"] if ret_u else None,
             ))
+
+    untracked: list = []  # 하위 호환성: 빈 리스트 유지
 
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
 

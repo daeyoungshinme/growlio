@@ -19,6 +19,7 @@ export interface YearlyAchievement {
 export interface GoalTimeline {
   months_to_goal: number | null;
   expected_goal_date: string | null;
+  actual_expected_goal_date: string | null;
   current_progress_pct: number | null;
   on_track: boolean | null;
   lead_lag_months: number | null;

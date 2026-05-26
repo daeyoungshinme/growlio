@@ -1,4 +1,4 @@
-.PHONY: up down migrate install-backend install-frontend dev-backend dev-frontend \
+.PHONY: up down migrate install-backend install-frontend dev dev-backend dev-frontend \
         test-backend test-frontend lint typecheck \
         build-android-debug build-android-release
 
@@ -9,32 +9,35 @@ down:
 	docker compose down
 
 migrate:
-	cd backend && alembic upgrade head
+	cd backend && uv run alembic upgrade head
 
 install-backend:
-	cd backend && pip install uv && uv pip install -e ".[dev]"
+	cd backend && uv venv && uv pip install -e ".[dev]"
 
 install-frontend:
 	cd frontend && npm install
 
+dev:
+	bash dev.sh
+
 dev-backend:
-	cd backend && uvicorn app.main:app --reload
+	cd backend && uv run uvicorn app.main:app --reload
 
 dev-frontend:
 	cd frontend && npm run dev
 
 test-backend:
-	cd backend && .venv/bin/pytest
+	cd backend && uv run pytest
 
 test-frontend:
 	cd frontend && npm run test
 
 lint:
-	cd backend && .venv/bin/ruff check .
+	cd backend && uv run ruff check .
 	cd frontend && npm run lint
 
 typecheck:
-	cd backend && .venv/bin/mypy app/
+	cd backend && uv run mypy app/
 	cd frontend && npm run build
 
 build-android-debug:

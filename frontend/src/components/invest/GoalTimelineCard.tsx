@@ -1,6 +1,6 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
 import type { GoalTimeline } from "../../api/invest";
-import { fmtKrw } from "../../utils/format";
+import { fmtKrw, fmtMonth } from "../../utils/format";
 
 interface Props {
   timeline: GoalTimeline;
@@ -8,23 +8,33 @@ interface Props {
 }
 
 export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
-  const { months_to_goal, expected_goal_date, current_progress_pct, on_track, lead_lag_months } =
+  const { months_to_goal, expected_goal_date, actual_expected_goal_date, current_progress_pct, on_track, lead_lag_months } =
     timeline;
 
   const leadLagLabel = () => {
     if (lead_lag_months === null || lead_lag_months === undefined) return null;
     if (lead_lag_months > 0)
       return (
-        <span className="text-red-500 flex items-center gap-1">
-          <TrendingUp size={14} />
-          {lead_lag_months}개월 앞서고 있음
+        <span className="flex flex-col gap-0.5">
+          <span className="text-red-500 flex items-center gap-1">
+            <TrendingUp size={14} />
+            {lead_lag_months}개월 앞서고 있음
+          </span>
+          {actual_expected_goal_date && (
+            <span className="text-xs text-red-400">{fmtMonth(actual_expected_goal_date)} 달성 예상</span>
+          )}
         </span>
       );
     if (lead_lag_months < 0)
       return (
-        <span className="text-blue-500 flex items-center gap-1">
-          <TrendingDown size={14} />
-          {Math.abs(lead_lag_months)}개월 뒤처지고 있음
+        <span className="flex flex-col gap-0.5">
+          <span className="text-blue-500 flex items-center gap-1">
+            <TrendingDown size={14} />
+            {Math.abs(lead_lag_months)}개월 뒤처지고 있음
+          </span>
+          {actual_expected_goal_date && (
+            <span className="text-xs text-blue-400">{fmtMonth(actual_expected_goal_date)} 달성 예상</span>
+          )}
         </span>
       );
     return <span className="text-gray-500 dark:text-gray-400">계획과 정확히 일치</span>;

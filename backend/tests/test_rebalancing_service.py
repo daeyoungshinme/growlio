@@ -135,10 +135,10 @@ class TestTotalAssetsBaseType:
 
 
 class TestUntrackedHoldings:
-    """목표 포트폴리오에 없는 보유 종목 검출."""
+    """목표 포트폴리오에 없는 보유 종목 → 전량 매도 아이템으로 분류."""
 
-    def test_untracked_appears(self):
-        """TSLA 보유 중인데 목표 포트폴리오에 없으면 untracked_holdings에 포함."""
+    def test_untracked_appears_as_sell_item(self):
+        """TSLA 보유 중인데 목표 포트폴리오에 없으면 items에 target=0 매도 아이템으로 포함."""
         portfolio = _make_portfolio([
             {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
         ])
@@ -152,9 +152,12 @@ class TestUntrackedHoldings:
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
-        assert len(result.untracked_holdings) == 1
-        assert result.untracked_holdings[0].ticker == "TSLA"
-        assert result.untracked_holdings[0].current_value_krw == 400_000
+        assert result.untracked_holdings == []
+        tsla = next(i for i in result.items if i.ticker == "TSLA")
+        assert tsla.target_weight_pct == 0.0
+        assert tsla.target_value_krw == 0.0
+        assert tsla.diff_krw == -400_000  # 전량 매도
+        assert tsla.shares_to_trade == -4  # -400000 / 100000 = -4
 
     def test_all_tracked_empty_untracked(self):
         """모든 보유 종목이 목표 포트폴리오에 있으면 untracked_holdings 비어 있음."""

@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
@@ -65,10 +66,28 @@ class AssetAccountCreate(BaseModel):
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool = True
 
+    @field_validator("kis_account_no")
+    @classmethod
+    def kis_account_no_format(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not re.fullmatch(r"\d{8}-\d{2}|\d{10}", v):
+            raise ValueError("KIS 계좌번호 형식이 올바르지 않습니다. 예: 12345678-01")
+        return v
+
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
         return _validate_positive(v)
+
+    @model_validator(mode="after")
+    def kis_credentials_required(self) -> "AssetAccountCreate":
+        if self.data_source == "KIS_API":
+            if not self.kis_account_no:
+                raise ValueError("KIS 계좌번호를 입력하세요.")
+            if not self.kis_app_key or not self.kis_app_secret:
+                raise ValueError("KIS App Key와 App Secret을 입력하세요.")
+        return self
 
 
 class AssetAccountUpdate(BaseModel):

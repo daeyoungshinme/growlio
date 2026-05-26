@@ -192,11 +192,16 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
             </tr>
           </thead>
           <tbody>
-            {analysis.items.map((item, idx) => (
+            {analysis.items.map((item, idx) => {
+              const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
+              return (
               <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
                 <td className="py-3 px-3">
                   <div className="font-medium text-gray-100 truncate max-w-[120px]">{item.name}</div>
                   <div className="text-xs text-gray-400">{item.ticker}</div>
+                  {isUntracked && (
+                    <div className="text-xs text-amber-500 mt-0.5">목표 외</div>
+                  )}
                 </td>
                 <td className="py-3 px-3 text-right text-gray-300">
                   {item.current_weight_pct.toFixed(1)}%
@@ -219,7 +224,8 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
                   <Return10yCell item={item} />
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -301,29 +307,6 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
               </table>
             </div>
           )}
-        </div>
-      )}
-
-      {/* 미추적 보유 종목 경고 */}
-      {analysis.untracked_holdings.length > 0 && (
-        <div className="bg-amber-900/20 border border-amber-700/50 rounded-xl p-4">
-          <div className="text-sm font-medium text-amber-300 mb-2">
-            ⚠ 목표 포트폴리오에 없는 보유 종목 ({analysis.untracked_holdings.length}개)
-          </div>
-          <div className="space-y-1">
-            {analysis.untracked_holdings.map((h, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs text-amber-400">
-                <span>
-                  <span className="font-medium">{h.name}</span>
-                  <span className="ml-1 text-amber-500">{h.ticker}</span>
-                </span>
-                <span>{fmtKrw(h.current_value_krw)} ({h.current_weight_pct.toFixed(1)}%)</span>
-              </div>
-            ))}
-          </div>
-          <div className="text-xs text-amber-500 mt-2">
-            이 종목들은 목표 포트폴리오에 포함되지 않았습니다. 매도를 고려하거나 목표 포트폴리오에 추가하세요.
-          </div>
         </div>
       )}
 

@@ -105,8 +105,9 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
       monthCells.map((cell) => ({
         name: MONTH_LABELS[cell.month - 1],
         month: cell.month,
+        isPast: cell.isPast,
         actual: cell.actual && cell.actual > 0 ? cell.actual : 0,
-        estimated: (!cell.actual || cell.actual === 0) && !cell.isPast ? cell.estimated : 0,
+        estimated: (!cell.actual || cell.actual === 0) ? cell.estimated : 0,
       })),
     [monthCells],
   );
@@ -304,7 +305,11 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                   {barData.map((entry) => (
                     <Cell
                       key={entry.month}
-                      fill={entry.month === selectedMonth ? "#4ADE80" : "#86EFAC"}
+                      fill={
+                        entry.month === selectedMonth
+                          ? (entry.isPast ? "#9CA3AF" : "#4ADE80")
+                          : (entry.isPast ? "#D1D5DB" : "#86EFAC")
+                      }
                       opacity={entry.month === selectedMonth ? 1 : 0.75}
                     />
                   ))}
@@ -312,7 +317,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
               </BarChart>
             </ResponsiveContainer>
             <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-2 text-right">
-              진한 초록: 실수령 · 연한 초록: 예상 | 막대 클릭 시 해당 월 상세 표시
+              진한 초록: 실수령 · 연한 초록: 예상(미래) · 회색: 예상(과거 미수령) | 막대 클릭 시 해당 월 상세 표시
             </p>
           </div>
 

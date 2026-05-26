@@ -266,16 +266,20 @@ def _calc_goal_timeline(
 
     # 실제 자산 기준으로 목표 달성까지 남은 개월 탐색 (앞서는/뒤처지는 개월 계산)
     lead_lag_months: int | None = None
+    actual_expected_goal_date: str | None = None
     if months_to_goal and current_actual and projected_now > 0:
         actual_months_to_goal = _calc_months_to_goal(current_actual, pmt, r, goal_amount)
         if actual_months_to_goal:
             remaining_planned = months_to_goal - elapsed
             remaining_actual = actual_months_to_goal
             lead_lag_months = remaining_planned - remaining_actual  # 양수=앞서는 개월
+            actual_expected = today + relativedelta(months=actual_months_to_goal)
+            actual_expected_goal_date = actual_expected.strftime("%Y-%m")
 
     return {
         "months_to_goal": months_to_goal,
         "expected_goal_date": expected_goal_date,
+        "actual_expected_goal_date": actual_expected_goal_date,
         "current_progress_pct": current_progress_pct,
         "on_track": on_track,
         "lead_lag_months": lead_lag_months,
