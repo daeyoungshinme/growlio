@@ -2,10 +2,6 @@
 
 ## Commands
 
-> **Claude Code Bash 환경**: `node`/`npm`/`npx`가 PATH에 없음.
-> 실행 시 앞에 `PATH="/c/Program Files/nodejs:$PATH"` 추가 필요.
-> 타입 체크: `PATH="/c/Program Files/nodejs:$PATH" node frontend/node_modules/.bin/tsc --noEmit`
-
 ### 설치
 ```bash
 cd frontend && npm install
@@ -135,7 +131,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 **커스텀 훅 (`src/hooks/`)**
-- `useToast()` — toast 알림. 성공/에러 메시지 표시. 인라인 에러 state 대신 사용.
 - `useAsyncAction()` — 비동기 작업 로딩/에러 처리 래퍼.
   ```ts
   const { run, loading } = useAsyncAction();

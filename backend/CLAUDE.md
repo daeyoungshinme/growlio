@@ -98,6 +98,7 @@ services/
   └── rebalancing_service.py  # 리밸런싱 추천
 
 kis/                          # KIS OpenAPI 클라이언트
+kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)
 providers/                    # LS증권, 오픈뱅킹 provider 추상화
 utils/
   └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
