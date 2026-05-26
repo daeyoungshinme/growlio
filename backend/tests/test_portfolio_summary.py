@@ -64,16 +64,14 @@ class TestPortfolioSummaryMultiAccount:
         overseas = _make_overseas(100.0, 50.0)
 
         mock_db = AsyncMock()
-        mock_db.scalar = AsyncMock(return_value=settings)
 
         acc_result = MagicMock()
         acc_result.scalars.return_value.all.return_value = [account]
         mock_db.execute = AsyncMock(return_value=acc_result)
 
+        mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.decrypt", return_value="decrypted"),
-            patch("app.api.v1.portfolio.get_redis", new=AsyncMock(return_value=AsyncMock())),
-            patch("app.api.v1.portfolio.get_access_token", new=AsyncMock(return_value="token")),
+            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
             patch("app.api.v1.portfolio.get_domestic_balance", new=AsyncMock(return_value=domestic)),
             patch("app.api.v1.portfolio.get_overseas_balance", new=AsyncMock(return_value=overseas)),
         ):
@@ -102,7 +100,6 @@ class TestPortfolioSummaryMultiAccount:
         overseas2 = _make_overseas(200.0, 80.0)
 
         mock_db = AsyncMock()
-        mock_db.scalar = AsyncMock(return_value=settings)
 
         acc_result = MagicMock()
         acc_result.scalars.return_value.all.return_value = [acc1, acc2]
@@ -118,10 +115,9 @@ class TestPortfolioSummaryMultiAccount:
             call_count["overseas"] += 1
             return overseas1 if account_no == "12345678-01" else overseas2
 
+        mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.decrypt", return_value="decrypted"),
-            patch("app.api.v1.portfolio.get_redis", new=AsyncMock(return_value=AsyncMock())),
-            patch("app.api.v1.portfolio.get_access_token", new=AsyncMock(return_value="token")),
+            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
             patch("app.api.v1.portfolio.get_domestic_balance", side_effect=mock_domestic),
             patch("app.api.v1.portfolio.get_overseas_balance", side_effect=mock_overseas),
         ):
@@ -167,13 +163,16 @@ class TestPortfolioSummaryMultiAccount:
         settings = _make_settings(user_id)
 
         mock_db = AsyncMock()
-        mock_db.scalar = AsyncMock(return_value=settings)
 
         acc_result = MagicMock()
         acc_result.scalars.return_value.all.return_value = []
         mock_db.execute = AsyncMock(return_value=acc_result)
 
-        with pytest.raises(HTTPException) as exc_info:
+        mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
+        with (
+            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
+            pytest.raises(HTTPException) as exc_info,
+        ):
             await portfolio_summary(current_user=user, db=mock_db)
 
         assert exc_info.value.status_code == 400
@@ -196,7 +195,6 @@ class TestPortfolioSummaryMultiAccount:
         overseas["positions"] = []
 
         mock_db = AsyncMock()
-        mock_db.scalar = AsyncMock(return_value=settings)
         acc_result = MagicMock()
         acc_result.scalars.return_value.all.return_value = [acc1, acc2]
         mock_db.execute = AsyncMock(return_value=acc_result)
@@ -204,10 +202,9 @@ class TestPortfolioSummaryMultiAccount:
         async def mock_domestic(app_key, app_secret, token, account_no, is_mock):
             return domestic1 if account_no == "12345678-01" else domestic2
 
+        mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.decrypt", return_value="decrypted"),
-            patch("app.api.v1.portfolio.get_redis", new=AsyncMock(return_value=AsyncMock())),
-            patch("app.api.v1.portfolio.get_access_token", new=AsyncMock(return_value="token")),
+            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
             patch("app.api.v1.portfolio.get_domestic_balance", side_effect=mock_domestic),
             patch("app.api.v1.portfolio.get_overseas_balance", new=AsyncMock(return_value=overseas)),
         ):

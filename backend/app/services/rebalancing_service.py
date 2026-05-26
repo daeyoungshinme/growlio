@@ -118,51 +118,20 @@ def analyze_rebalancing(
             actual_years_10y=ret["actual_years"] if ret else None,
         ))
 
-    # 4. 목표 포트폴리오에 없는 보유 종목 → 전량 매도(diff_krw < 0)로 result_items에 추가
+    # 4. 목표 포트폴리오에 없는 보유 종목 → untracked_holdings에 분리
+    from app.schemas.rebalancing import CurrentHolding
+    untracked: list[CurrentHolding] = []
     for key, data in current_map.items():
         if key not in target_keys:
             ticker_u, market_u = key
             current_value_u = data["value_krw"]
-            current_price_u = data.get("current_price")
             weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
-
-            if current_price_u and float(current_price_u) > 0:
-                shares_u: float | None = round(-current_value_u / float(current_price_u), 0)
-            else:
-                shares_u = None
-
-            div_yield_u: float | None = None
-            annual_div_current_u = 0.0
-            if dividend_map:
-                d = dividend_map.get(key)
-                if d:
-                    yp = float(d.get("dividend_yield") or 0)
-                    estimated_annual = float(d.get("estimated_annual_krw") or 0)
-                    if yp > 0 or estimated_annual > 0:
-                        div_yield_u = yp if yp > 0 else None
-                        annual_div_current_u = estimated_annual
-
-            ret_u = returns_map.get(key) if returns_map else None
-
-            result_items.append(RebalancingItem(
+            untracked.append(CurrentHolding(
                 ticker=ticker_u,
                 name=data["name"],
                 market=market_u,
-                target_weight_pct=0.0,
-                current_weight_pct=round(weight_u, 2),
-                weight_diff_pct=round(-weight_u, 2),
                 current_value_krw=round(current_value_u, 0),
-                target_value_krw=0,
-                diff_krw=round(-current_value_u, 0),
-                shares_to_trade=shares_u,
-                current_price_krw=float(current_price_u) if current_price_u is not None else None,
-                dividend_yield=div_yield_u,
-                annual_dividend_current_krw=round(annual_div_current_u, 0),
-                annual_dividend_target_krw=0,
-                annual_dividend_diff_krw=round(-annual_div_current_u, 0),
-                return_10y_pct=ret_u["cumulative_return_pct"] if ret_u else None,
-                cagr_10y_pct=ret_u["cagr_pct"] if ret_u else None,
-                actual_years_10y=ret_u["actual_years"] if ret_u else None,
+                current_weight_pct=round(weight_u, 2),
             ))
 
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
@@ -238,7 +207,7 @@ def analyze_rebalancing(
         base_type=portfolio.base_type,
         base_value_krw=round(base_krw, 0),
         items=result_items,
-        untracked_holdings=[],
+        untracked_holdings=untracked,
         analyzed_at=datetime.now(timezone.utc).isoformat(),
         current_portfolio_annual_dividend=target_div_sum,
         target_portfolio_annual_dividend=round(sum(i.annual_dividend_target_krw for i in result_items), 0),
