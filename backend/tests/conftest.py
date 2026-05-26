@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 def override_settings(monkeypatch):
     """테스트 중 실제 환경 변수 없이 동작하도록 설정 오버라이드."""
     monkeypatch.setenv("KIS_CRED_ENCRYPTION_KEY", "a" * 64)
-    monkeypatch.setenv("APP_SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("APP_SECRET_KEY", "test-secret-key-for-pytest-at-least-32")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")

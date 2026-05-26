@@ -9,12 +9,19 @@ from app.config import settings
 
 logger = structlog.get_logger()
 
-_jwks_client = PyJWKClient(
-    f"{settings.supabase_project_url}/auth/v1/.well-known/jwks.json",
-    cache_keys=True,
-)
+_jwks_client: PyJWKClient | None = None
 
 _LEEWAY = timedelta(seconds=60)
+
+
+def _get_jwks_client() -> PyJWKClient:
+    global _jwks_client
+    if _jwks_client is None:
+        _jwks_client = PyJWKClient(
+            f"{settings.supabase_project_url}/auth/v1/.well-known/jwks.json",
+            cache_keys=True,
+        )
+    return _jwks_client
 
 
 def verify_supabase_token(token: str) -> dict:
@@ -23,7 +30,7 @@ def verify_supabase_token(token: str) -> dict:
     Raises ValueError on expired or invalid token.
     """
     try:
-        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        signing_key = _get_jwks_client().get_signing_key_from_jwt(token)
         return jwt.decode(
             token,
             signing_key.key,
