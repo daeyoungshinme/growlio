@@ -2,7 +2,7 @@ from datetime import date, datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 AssetType = Literal[
     "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER",
@@ -26,6 +26,15 @@ class RealEstateDetails(BaseModel):
     purchase_price_krw: float | None = None
     purchase_date: str | None = None
     mortgage_balance_krw: float = 0.0
+
+    @model_validator(mode="after")
+    def mortgage_not_exceed_value(self) -> "RealEstateDetails":
+        if (
+            self.purchase_price_krw is not None
+            and self.mortgage_balance_krw > self.purchase_price_krw
+        ):
+            raise ValueError("모기지 잔액이 부동산 가치를 초과할 수 없습니다")
+        return self
 
 
 def _validate_positive(v: float | None) -> float | None:

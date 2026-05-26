@@ -14,6 +14,7 @@ import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "../portfolios/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
 import { toast } from "../../utils/toast";
+import ConfirmModal from "../common/ConfirmModal";
 
 function applyExecutionResults(analysis: RebalancingAnalysis, results: ExecutionResult[]): RebalancingAnalysis {
   const successMap: Record<string, number> = {};
@@ -50,6 +51,7 @@ export default function RebalancingTab() {
   const [analysis, setAnalysis] = useState<RebalancingAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: portfolios = [], isLoading } = useQuery({
     queryKey: ["portfolios"],
@@ -192,7 +194,7 @@ export default function RebalancingTab() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (confirm(`"${p.name}"을(를) 삭제하시겠습니까?`)) deleteMutation.mutate(p.id);
+                      setConfirmDeleteId(p.id);
                     }}
                     className="p-1 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                   >
@@ -264,6 +266,14 @@ export default function RebalancingTab() {
           onSave={handleSave}
           onClose={() => { setEditorOpen(false); setEditingPortfolio(null); }}
           saving={saving}
+        />
+      )}
+      {confirmDeleteId && (
+        <ConfirmModal
+          message="포트폴리오를 삭제하시겠습니까?"
+          confirmLabel="삭제"
+          onConfirm={() => { deleteMutation.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

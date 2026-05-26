@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { fetchExchangeRate, type AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
+import { pnlColor } from "../../utils/colors";
 import { STOCK_TYPE_LABELS } from "../../constants";
 
 export interface AccountStats {
@@ -144,13 +145,13 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
-            <p className={`text-xs font-semibold mt-0.5 ${pnl >= 0 ? "text-red-500" : "text-blue-500"}`}>
+            <p className={`text-xs font-semibold mt-0.5 ${pnlColor(pnl)}`}>
               {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">수익률</p>
-            <p className={`text-xs font-semibold mt-0.5 ${ret >= 0 ? "text-red-500" : "text-blue-500"}`}>
+            <p className={`text-xs font-semibold mt-0.5 ${pnlColor(ret)}`}>
               {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
             </p>
           </div>

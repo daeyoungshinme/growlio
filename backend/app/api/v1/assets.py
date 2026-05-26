@@ -13,9 +13,10 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.kis.client import KisApiError
 from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
-from app.models.asset import AssetAccount, AssetSnapshot
+from app.models.asset import VALID_MARKETS, AssetAccount, AssetSnapshot
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
+from app.utils.redis_lock import redis_lock
 from app.schemas.asset import (
     AssetAccountCreate,
     AssetAccountResponse,
@@ -41,9 +42,6 @@ def _account_response(account: AssetAccount) -> AssetAccountResponse:
     data.has_own_kis_credentials = bool(account.kis_app_key)
     data.has_own_kiwoom_credentials = bool(account.kiwoom_app_key)
     return data
-
-
-_VALID_MARKETS = {"KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX", "OTHER"}
 
 
 class ManualPosition(BaseModel):
@@ -80,8 +78,8 @@ class ManualPosition(BaseModel):
     @field_validator("market")
     @classmethod
     def market_valid(cls, v: str) -> str:
-        if v not in _VALID_MARKETS:
-            raise ValueError(f"유효하지 않은 시장: {v}. 허용값: {sorted(_VALID_MARKETS)}")
+        if v not in VALID_MARKETS:
+            raise ValueError(f"유효하지 않은 시장: {v}. 허용값: {sorted(VALID_MARKETS)}")
         return v
 
 router = APIRouter(prefix="/assets", tags=["assets"])
@@ -332,6 +330,18 @@ async def sync_account(
     account = await _get_owned_account(account_id, current_user.id, db)
     redis = await get_redis()
 
+    lock_key = f"sync_lock:{account_id}"
+    async with redis_lock(redis, lock_key, ttl=120) as acquired:
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
+            )
+        return await _do_sync(account, current_user, db, redis)
+
+
+async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
+    """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출."""
     if account.data_source == "KIS_API":
         try:
             snapshot = await sync_kis_account(account, db, redis)

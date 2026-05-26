@@ -8,8 +8,16 @@ from __future__ import annotations
 from datetime import date
 
 import structlog
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 logger = structlog.get_logger()
+
+_NAVER_RETRY = dict(
+    retry=retry_if_exception_type(Exception),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
 
 
 def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
@@ -137,15 +145,22 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
 def sync_naver_etf_dividend_info(ticker: str) -> dict:
     """Naver Finance 모바일 API(etfAnalysis)로 국내 ETF TTM 분배율·DPS·배당월 조회."""
     import requests as _req
+    import requests.exceptions as _req_exc
 
     _MOBILE_UA = (
         "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
     )
-    try:
+
+    @retry(**_NAVER_RETRY)
+    def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
-        resp = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
-        resp.raise_for_status()
+        r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
+        r.raise_for_status()
+        return r
+
+    try:
+        resp = _fetch()
         div = resp.json().get("dividend") or {}
         if not div:
             return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
@@ -167,31 +182,50 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
             "dividend_yield": yield_pct / 100.0,
             "dividend_months": months,
         }
-    except Exception as exc:
-        logger.warning("naver_etf_dividend_failed", ticker=ticker, error=str(exc))
+    except _req_exc.HTTPError as exc:
+        logger.warning("naver_etf_dividend_http_error", ticker=ticker, status=exc.response.status_code if exc.response else None)
+        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+    except _req_exc.RequestException as exc:
+        logger.warning("naver_etf_dividend_network_error", ticker=ticker, error=str(exc))
+        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.warning("naver_etf_dividend_parse_error", ticker=ticker, error=str(exc))
         return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
 
 
 def sync_naver_stock_dividend_info(ticker: str) -> dict:
     """Naver Finance 모바일 API(summary)로 국내 일반주식 배당수익률 조회. DPS는 미제공."""
     import requests as _req
+    import requests.exceptions as _req_exc
 
     _MOBILE_UA = (
         "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
     )
-    try:
+
+    @retry(**_NAVER_RETRY)
+    def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/summary"
-        resp = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
-        resp.raise_for_status()
+        r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
+        r.raise_for_status()
+        return r
+
+    try:
+        resp = _fetch()
         detail = resp.json().get("stockItemDetail") or {}
         yield_pct = float(detail.get("dividendYield") or 0)
         if yield_pct <= 0:
             return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
         logger.info("naver_stock_dividend_fetched", ticker=ticker, yield_pct=yield_pct)
         return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
-    except Exception as exc:
-        logger.warning("naver_stock_dividend_failed", ticker=ticker, error=str(exc))
+    except _req_exc.HTTPError as exc:
+        logger.warning("naver_stock_dividend_http_error", ticker=ticker, status=exc.response.status_code if exc.response else None)
+        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+    except _req_exc.RequestException as exc:
+        logger.warning("naver_stock_dividend_network_error", ticker=ticker, error=str(exc))
+        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.warning("naver_stock_dividend_parse_error", ticker=ticker, error=str(exc))
         return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
 
 

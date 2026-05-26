@@ -17,6 +17,7 @@ import BacktestResultChart from "../backtest/BacktestResultChart";
 import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
 import RebalancingTable from "../rebalancing/RebalancingTable";
 import { toast } from "../../utils/toast";
+import ConfirmModal from "../common/ConfirmModal";
 
 const today = new Date().toISOString().slice(0, 10);
 const fiveYearsAgo = `${new Date().getFullYear() - 5}-01-01`;
@@ -55,6 +56,7 @@ export default function PortfolioAnalysisTab() {
   const [endDate, setEndDate] = useState(today);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const createMut = useMutation({
     mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
@@ -237,7 +239,7 @@ export default function PortfolioAnalysisTab() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm(`"${p.name}"을(를) 삭제하시겠습니까?`)) deleteMut.mutate(p.id);
+                          setConfirmDeleteId(p.id);
                         }}
                         className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
                       >
@@ -419,6 +421,14 @@ export default function PortfolioAnalysisTab() {
           onSave={handleSave}
           onClose={() => { setEditorOpen(false); setEditingPortfolio(null); }}
           saving={saving}
+        />
+      )}
+      {confirmDeleteId && (
+        <ConfirmModal
+          message="포트폴리오를 삭제하시겠습니까?"
+          confirmLabel="삭제"
+          onConfirm={() => { deleteMut.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+          onCancel={() => setConfirmDeleteId(null)}
         />
       )}
     </div>

@@ -76,8 +76,8 @@ export interface StockSuggestion {
   exchange: string;
 }
 
-export const searchStocks = (q: string): Promise<StockSuggestion[]> =>
-  api.get<StockSuggestion[]>("/stocks/search", { params: { q } }).then((r) => r.data);
+export const searchStocks = (q: string, signal?: AbortSignal): Promise<StockSuggestion[]> =>
+  api.get<StockSuggestion[]>("/stocks/search", { params: { q }, signal }).then((r) => r.data);
 
 export const fetchExchangeRate = (): Promise<{ usd_krw: number }> =>
   api.get<{ usd_krw: number }>("/stocks/exchange-rate").then((r) => r.data);

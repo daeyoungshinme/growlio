@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import { useAuthStore } from "../../stores/authStore";
+import { toast } from "../../utils/toast";
 
 export default function AppLayout() {
   const needsPasswordReset = useAuthStore((s) => s.needsPasswordReset);
@@ -11,9 +12,9 @@ export default function AppLayout() {
     if (!email) return;
     try {
       await forgotPassword(email);
-      alert("비밀번호 재설정 이메일을 발송했습니다. 받은 편지함을 확인해주세요.");
+      toast("비밀번호 재설정 이메일을 발송했습니다. 받은 편지함을 확인해주세요.", "success");
     } catch {
-      alert("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      toast("이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
     }
   };
 

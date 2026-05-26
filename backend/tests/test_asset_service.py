@@ -152,11 +152,10 @@ class TestSyncKisAccount:
 
         from app.services.asset_service import sync_kis_account
 
-        # UserSettings mock (암호화된 키 설정)
-        make_user_settings.kis_app_key = "encrypted_key"
-        make_user_settings.kis_app_secret = "encrypted_secret"
-        make_user_settings.kis_is_mock = True
-        mock_db.scalar.return_value = make_user_settings
+        # Account 레벨 자격증명 설정 (sync_kis_account는 account에서 직접 읽음)
+        make_account.kis_app_key = "encrypted_key"
+        make_account.kis_app_secret = "encrypted_secret"
+        make_account.is_mock_mode = True
 
         domestic_result = {
             "positions": [

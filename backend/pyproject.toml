@@ -43,6 +43,8 @@ dependencies = [
     "aiosmtplib>=3.0.0",
     # Rate limiting
     "slowapi>=0.1.9",
+    # Retry logic for external APIs
+    "tenacity>=8.3.0",
 ]
 
 [project.optional-dependencies]

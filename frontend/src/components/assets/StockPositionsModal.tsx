@@ -82,6 +82,7 @@ export default function StockPositionsModal({
   const [suggestIdx, setSuggestIdx] = useState<number | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortRef = useRef<AbortController | null>(null);
 
   // 행별 현재가 로딩
   const [priceLoadingRows, setPriceLoadingRows] = useState<Set<number>>(new Set());
@@ -97,6 +98,7 @@ export default function StockPositionsModal({
   useEffect(() => {
     return () => {
       if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchAbortRef.current?.abort();
     };
   }, []);
 
@@ -135,8 +137,11 @@ export default function StockPositionsModal({
     if (!value.trim()) { setSuggestions([]); setSuggestIdx(null); return; }
     setSuggestIdx(i);
     searchTimer.current = setTimeout(async () => {
+      searchAbortRef.current?.abort();
+      const controller = new AbortController();
+      searchAbortRef.current = controller;
       setSearchLoading(true);
-      try { setSuggestions(await searchStocks(value.trim())); }
+      try { setSuggestions(await searchStocks(value.trim(), controller.signal)); }
       catch { setSuggestions([]); }
       finally { setSearchLoading(false); }
     }, 300);

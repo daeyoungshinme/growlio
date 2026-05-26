@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -34,7 +34,7 @@ class GoalUpdate(BaseModel):
 
 
 class NotificationEmailUpdate(BaseModel):
-    notification_email: str | None = None
+    notification_email: EmailStr | None = None
 
 
 class SettingsResponse(BaseModel):

@@ -23,6 +23,7 @@ import {
 import BankAccountCard from "../components/assets/BankAccountCard";
 import StockAccountCard, { type AccountStats } from "../components/assets/StockAccountCard";
 import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
+import ConfirmModal from "../components/common/ConfirmModal";
 import { fmtKrw } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
@@ -49,6 +50,7 @@ export default function AssetManagementPage() {
   const [showRealEstateModal, setShowRealEstateModal] = useState(false);
   const [editingRealEstate, setEditingRealEstate] = useState<AssetAccount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
   const [syncingStockIds, setSyncingStockIds] = useState<Set<string>>(new Set());
   const [positionsAccount, setPositionsAccount] = useState<{ id: string; name: string; dataSource: string } | null>(null);
@@ -110,9 +112,14 @@ export default function AssetManagementPage() {
   });
 
   const handleDelete = (id: string) => {
-    if (!confirm("계좌를 삭제하시겠습니까?")) return;
-    setDeletingId(id);
-    deleteMutation.mutate(id);
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDeleteId) return;
+    setDeletingId(confirmDeleteId);
+    deleteMutation.mutate(confirmDeleteId);
+    setConfirmDeleteId(null);
   };
 
   const updateAmountMutation = useMutation({
@@ -401,6 +408,14 @@ export default function AssetManagementPage() {
             setTxAccount(null);
             void invalidateAccountData(queryClient);
           }} />
+      )}
+      {confirmDeleteId && (
+        <ConfirmModal
+          message="계좌를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+          confirmLabel="삭제"
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setConfirmDeleteId(null)}
+        />
       )}
     </div>
   );

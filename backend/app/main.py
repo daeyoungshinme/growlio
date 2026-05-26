@@ -1,3 +1,4 @@
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -18,6 +19,16 @@ from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
 
 logger = structlog.get_logger()
+
+_SECRET_PATTERN = re.compile(
+    r"(appkey|appsecret|secretkey|access_token|Bearer|password|Authorization)"
+    r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{8,}",
+    re.IGNORECASE,
+)
+
+
+def _sanitize(text: str) -> str:
+    return _SECRET_PATTERN.sub(r"\1=[REDACTED]", text)
 
 
 @asynccontextmanager
@@ -70,7 +81,7 @@ async def log_requests(request: Request, call_next):
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, StarletteHTTPException):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    logger.error("unhandled_exception", path=str(request.url.path), error=str(exc), exc_info=True)
+    logger.error("unhandled_exception", path=str(request.url.path), error=_sanitize(str(exc)), exc_info=True)
     return JSONResponse(status_code=500, content={"detail": "서버 오류가 발생했습니다."})
 
 
