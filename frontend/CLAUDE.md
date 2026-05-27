@@ -21,8 +21,9 @@ cd frontend && npm run build
 
 ### 린트 & 테스트
 ```bash
-cd frontend && npm run lint  # ESLint (eslint src)
-cd frontend && npm run test  # Vitest (vitest run)
+cd frontend && npm run lint    # ESLint (eslint src)
+cd frontend && npm run test    # Vitest (vitest run)
+cd frontend && npm run format  # Prettier (prettier --write src)
 ```
 
 ---
@@ -36,6 +37,11 @@ cd frontend && npm run test  # Vitest (vitest run)
 - `/asset-management` — **모든 계좌 관리 허브**. 은행계좌/증권계좌 추가·삭제, 종목관리(StockPositionsModal), 입출금(TransactionModal), 입출금·배당 내역 탭
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
 - `/settings` — KIS/LS 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
+- `/register` — 회원가입 (RegisterPage)
+- `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
+- `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
+- `/find-account` — 계정 찾기 (FindAccountPage)
+- `/trend` — 월별 추이 (TrendPage)
 
 > 구 URL 리다이렉트: `/assets` → `/portfolio`, `/trend` → `/dashboard`
 
@@ -50,7 +56,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — 커스텀 React 훅 디렉토리. API 로직이 아닌 UI 동작 추상화용.
+**hooks/** — 현재 미사용 (디렉토리 없음).
 
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 

@@ -92,6 +92,7 @@ services/
   ├── dividend_constants.py   # 배당 관련 상수 정의
   ├── dividend_providers.py   # 배당 데이터 제공자 추상화
   ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
+  ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS → LS 우선순위)
   ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
@@ -99,7 +100,7 @@ services/
 
 kis/                          # KIS OpenAPI 클라이언트
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)
-providers/                    # LS증권, 오픈뱅킹 provider 추상화
+providers/                    # 오픈뱅킹 provider (base.py + openbanking.py)
 utils/
   └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
@@ -112,7 +113,7 @@ jobs/                         # APScheduler 정기 작업
 
 **자격증명 암호화:** KIS/LS App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
-**현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API → LS증권 API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
+**현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
 
 **오픈뱅킹 토큰 자동 갱신:** `providers/openbanking.py`의 `ensure_ob_token_fresh(settings_row, db)` — 만료 1시간 전 `refresh_access_token()` 호출 후 DB commit. `sync_openbanking_account()`와 `token_refresh.py` 양쪽에서 호출됨.
 
@@ -129,9 +130,6 @@ jobs/                         # APScheduler 정기 작업
 **자격증명 암호화**
 - KIS/LS App Key·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
 - 평문 자격증명을 DB에 직접 저장하거나 로그에 출력 금지.
-
-**bcrypt 버전 고정**
-- `bcrypt==4.0.1` 고정. passlib 5.x와 API 불일치로 절대 업그레이드 금지.
 
 **금액 단위**
 - 금액 컬럼 타입: `Numeric(18, 2)` / Python `Mapped[float | None]`.

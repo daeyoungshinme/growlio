@@ -87,7 +87,7 @@ growlio/
 
 ### 데이터 모델 핵심
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_LS/STOCK_OTHER/CASH_OTHER/OTHER)과 `data_source`(MANUAL/KIS_API/LS_SEC/OPEN_BANKING) 조합으로 동작 결정
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API/OPEN_BANKING) 조합으로 동작 결정
 - `AssetSnapshot` — 일별 계좌 스냅샷. `positions` JSONB에 종목 배열 저장. `(account_id, snapshot_date)` unique constraint
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
 - `UserSettings` — KIS/LS 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
