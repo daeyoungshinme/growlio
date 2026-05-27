@@ -73,7 +73,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
                 <th className="py-2.5 px-3 text-center text-xs font-medium text-gray-300 dark:text-gray-600 w-8">#</th>
-                <th className="py-2.5 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
+                <th className="py-2.5 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase sticky left-0 z-20 bg-gray-50 dark:bg-gray-800">종목</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">수량</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">평단가</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">현재가</th>
@@ -100,7 +100,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                       onClick={() => toggle(key)}
                     >
                       <td className="py-3 px-3 text-center text-xs text-gray-300 dark:text-gray-600">{i + 1}</td>
-                      <td className="py-3 px-5">
+                      <td className="py-3 px-5 sticky left-0 z-10 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-700">
                         <div className="flex items-center gap-2">
                           <span className={`text-gray-400 dark:text-gray-500 ${hasMultiple ? "visible" : "invisible"}`}>
                             {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

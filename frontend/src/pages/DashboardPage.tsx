@@ -145,7 +145,7 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-4 gap-4">
+          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">목표 수익률</p>
               <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
@@ -232,7 +232,7 @@ export default function DashboardPage() {
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 상세</h2>
-          <div className="max-h-72 overflow-y-auto">
+          <div className="max-h-48 lg:max-h-72 overflow-y-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-white dark:bg-gray-900">
                 <tr className="border-b border-gray-100 dark:border-gray-700">

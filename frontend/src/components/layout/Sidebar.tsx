@@ -16,7 +16,7 @@ export default function Sidebar() {
   const { isDark, toggle } = useThemeStore();
 
   return (
-    <aside aria-label="사이드바 내비게이션" className="w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex flex-col py-6 px-3">
+    <aside aria-label="사이드바 내비게이션" className="hidden lg:flex w-56 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-700 flex-col py-6 px-3">
       <div className="px-3 mb-8">
         <div className="flex items-center gap-2">
           <LineChart className="text-blue-600 dark:text-blue-400" size={22} aria-hidden="true" />

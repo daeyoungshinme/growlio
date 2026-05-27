@@ -195,7 +195,7 @@ export default function AssetManagementPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">계좌를 등록하고 입출금·배당 내역을 관리합니다.</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit mb-6">
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-full sm:w-fit mb-6 overflow-x-auto">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
             className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
