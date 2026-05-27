@@ -2,10 +2,12 @@ services:
   - type: web
     name: growlio-api
     runtime: docker
+    rootDir: backend
     dockerfilePath: ./Dockerfile
     plan: free
     region: singapore
     healthCheckPath: /health
+    startCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
     envVars:
       - key: APP_ENV
         value: production
@@ -19,13 +21,21 @@ services:
         sync: false
       - key: ALLOWED_ORIGINS
         sync: false
-      - key: OPEN_BANKING_REDIRECT_URI
+      - key: SUPABASE_PROJECT_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
         sync: false
       - key: DART_API_KEY
         sync: false
       - key: OPEN_BANKING_CLIENT_ID
         sync: false
       - key: OPEN_BANKING_CLIENT_SECRET
+        sync: false
+      - key: OPEN_BANKING_REDIRECT_URI
         sync: false
       - key: OPEN_BANKING_BASE_URL
         sync: false

@@ -10,7 +10,7 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
 export const api = axios.create({
   baseURL: "/api/v1",
   headers: { "Content-Type": "application/json" },
-  timeout: 30_000,
+  timeout: 60_000,
 });
 
 // Supabase 액세스 토큰을 Authorization 헤더에 첨부

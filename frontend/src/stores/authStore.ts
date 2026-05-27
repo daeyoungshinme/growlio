@@ -27,6 +27,15 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error || !data.user) throw new Error(error?.message ?? "Login failed");
+
+    // signInWithPassword 직후 세션이 활성화되므로 api interceptor가 토큰을 자동 첨부함.
+    // sync-profile은 멱등(이미 있으면 기존 반환)이므로 매 로그인마다 호출해도 안전.
+    try {
+      await api.post("/auth/sync-profile", { display_name: null });
+    } catch {
+      // 백엔드 일시 불가 시 로그인 자체는 계속 진행 (checkAuth에서 재시도됨)
+    }
+
     set({
       isAuthenticated: true,
       email: data.user.email ?? null,
