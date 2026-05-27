@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { fetchDashboard, fetchDividendByTicker } from "../api/dashboard";
@@ -21,6 +21,7 @@ const fetchOverviewSummary = () =>
 
 export default function DashboardPage() {
   const qc = useQueryClient();
+  const [showMonthlyDetail, setShowMonthlyDetail] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboard,
@@ -234,15 +235,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: 월별 자산 추이 + 월별 상세 테이블 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 자산 추이 (최근 12개월)</h2>
-          <MonthlyTrendChart data={data.monthly_trend} />
-        </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 상세</h2>
-          <div className="max-h-48 lg:max-h-72 overflow-y-auto">
+      {/* Row 3: 월별 자산 추이 */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 자산 추이 (최근 12개월)</h2>
+        <MonthlyTrendChart data={data.monthly_trend} />
+        <button
+          onClick={() => setShowMonthlyDetail((v) => !v)}
+          className="mt-4 w-full flex items-center justify-between py-2 px-3 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <span>월별 상세</span>
+          <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showMonthlyDetail ? "rotate-180" : ""}`} />
+        </button>
+        {showMonthlyDetail && (
+          <div className="mt-2 max-h-72 overflow-y-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-white dark:bg-gray-900">
                 <tr className="border-b border-gray-100 dark:border-gray-700">
@@ -278,7 +283,7 @@ export default function DashboardPage() {
               </tbody>
             </table>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
