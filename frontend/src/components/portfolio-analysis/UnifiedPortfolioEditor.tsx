@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { AssetAccount, searchStocks, StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
@@ -23,6 +23,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchAbortController = useRef<AbortController | null>(null);
   const searchInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // 계좌 선택 상태: null이면 모든 계좌, 배열이면 선택된 계좌만
@@ -33,13 +34,15 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
     return new Set(accounts.map((a) => a.id));
   });
 
+  const accountIdKey = useMemo(() => accounts.map((a) => a.id).sort().join(","), [accounts]);
+
   // accounts prop이 바뀌면 새 계좌를 기본 선택에 추가
   useEffect(() => {
     if (!initial?.account_ids?.length) {
       setSelectedAccountIds(new Set(accounts.map((a) => a.id)));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts.map((a) => a.id).sort().join(",")]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial은 마운트 후 변경되지 않는 고정 prop
+  }, [accountIdKey]);
 
   const isAllSelected = accounts.length === 0 || accounts.every((a) => selectedAccountIds.has(a.id));
 
@@ -72,14 +75,28 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
     setItems((prev) => [...prev, { ticker: "REAL_ESTATE", name: "부동산", market: "KR_PROPERTY", weight: 0 }]);
   }
 
+  useEffect(() => {
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      if (searchAbortController.current) searchAbortController.current.abort();
+    };
+  }, []);
+
   function handleTickerInput(idx: number, value: string) {
     updateItem(idx, { ticker: value });
     if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (searchAbortController.current) searchAbortController.current.abort();
     if (value.length < 1) { setSuggestions([]); return; }
     searchTimer.current = setTimeout(async () => {
+      const controller = new AbortController();
+      searchAbortController.current = controller;
       setActiveRow(idx);
-      const results = await searchStocks(value);
-      setSuggestions(results);
+      try {
+        const results = await searchStocks(value, controller.signal);
+        setSuggestions(results);
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") setSuggestions([]);
+      }
     }, 300);
   }
 

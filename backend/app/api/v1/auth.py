@@ -22,7 +22,9 @@ async def me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/sync-profile", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def sync_profile(
+    request: Request,
     req: SyncProfileRequest,
     payload: dict = Depends(get_token_payload),
     db: AsyncSession = Depends(get_db),
@@ -59,7 +61,7 @@ def _mask_email(email: str) -> str:
 
 
 @router.post("/find-account", response_model=FindAccountResponse)
-@limiter.limit("5/minute")
+@limiter.limit("3/minute")
 async def find_account(request: Request, req: FindAccountRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(User.display_name == req.display_name, User.is_active == True)  # noqa: E712

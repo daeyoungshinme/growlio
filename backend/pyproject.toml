@@ -23,7 +23,6 @@ dependencies = [
     "apscheduler>=3.10.0",
     # Auth
     "PyJWT>=2.8.0",
-    "pydantic[email]>=2.7.0",   # EmailStr 사용을 위한 email-validator 포함
     "python-multipart>=0.0.9",
     # Encryption (KIS credentials)
     "cryptography>=42.0.0",

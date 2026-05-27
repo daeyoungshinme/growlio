@@ -12,11 +12,12 @@ import {
   updatePortfolio,
 } from "../../api/portfolios";
 import { fetchAccounts } from "../../api/assets";
-import UnifiedPortfolioEditor from "../portfolios/UnifiedPortfolioEditor";
+import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import BacktestResultChart from "../backtest/BacktestResultChart";
 import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
 import RebalancingTable from "../rebalancing/RebalancingTable";
 import { toast } from "../../utils/toast";
+import { extractErrorMessage } from "../../utils/error";
 import ConfirmModal from "../common/ConfirmModal";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -135,8 +136,8 @@ export default function PortfolioAnalysisTab() {
       // account_ids는 백엔드에서 portfolio.account_ids로 자동 처리
       const result = await analyzePortfolio(id);
       setAnalysis(result);
-    } catch {
-      setAnalysisError("분석 중 오류가 발생했습니다.");
+    } catch (err) {
+      setAnalysisError(extractErrorMessage(err, "분석 중 오류가 발생했습니다."));
     } finally {
       setAnalyzing(false);
     }

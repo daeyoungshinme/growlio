@@ -11,7 +11,7 @@ import {
   updatePortfolio,
 } from "../../api/portfolios";
 import { fetchAccounts } from "../../api/assets";
-import UnifiedPortfolioEditor from "../portfolios/UnifiedPortfolioEditor";
+import UnifiedPortfolioEditor from "../portfolio-analysis/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
 import { toast } from "../../utils/toast";
 import ConfirmModal from "../common/ConfirmModal";

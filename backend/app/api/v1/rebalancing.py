@@ -14,6 +14,8 @@ from app.api.v1.portfolio import _build_portfolio_overview
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
+from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
+from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
@@ -24,7 +26,6 @@ from app.schemas.rebalancing import (
     ExecutionResult,
     KisBalancePosition,
     KisBalanceResponse,
-    KiwoomBalanceResponse,
     RebalancingAnalysis,
     TargetPortfolioCreate,
     TargetPortfolioResponse,
@@ -253,77 +254,93 @@ async def execute_portfolio_rebalancing(
     )
 
 
-async def _fetch_account_balance(
+async def _fetch_broker_balance(
     account: AssetAccount,
     db: AsyncSession,
     redis,
-    usd_rate: float | None,
+    usd_rate: float | None = None,
 ) -> KisBalanceResponse:
-    """단일 KIS 계좌 잔고를 조회해 KisBalanceResponse로 반환한다. 실패 시 예외 발생."""
-    if not account.kis_account_no:
-        raise ValueError("계좌번호가 설정되지 않았습니다.")
-    if not account.kis_app_key or not account.kis_app_secret:
-        raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
+    """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다. 실패 시 예외 발생."""
+    if account.asset_type == "STOCK_KIS":
+        if not account.kis_account_no:
+            raise ValueError("계좌번호가 설정되지 않았습니다.")
+        if not account.kis_app_key or not account.kis_app_secret:
+            raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
 
-    app_key = decrypt(account.kis_app_key)
-    app_secret = decrypt(account.kis_app_secret)
-    is_mock = account.is_mock_mode
-    access_token = await get_access_token(
-        app_key, app_secret,
-        is_mock=is_mock,
-        redis=redis,
-        db=db,
-        user_id=str(account.user_id),
-        account_id=str(account.id),
-    )
+        app_key = decrypt(account.kis_app_key)
+        app_secret = decrypt(account.kis_app_secret)
+        is_mock = account.is_mock_mode
+        access_token = await get_access_token(
+            app_key, app_secret,
+            is_mock=is_mock, redis=redis, db=db,
+            user_id=str(account.user_id), account_id=str(account.id),
+        )
+        domestic = await get_domestic_balance(
+            app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+        )
+        overseas = await get_overseas_balance(
+            app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+        )
+        rate = usd_rate or 1350.0
+        positions: list[KisBalancePosition] = []
+        for p in domestic.get("positions", []):
+            positions.append(KisBalancePosition(
+                ticker=p["ticker"], name=p["name"], market=p["market"],
+                quantity=int(p["qty"]), avg_price=float(p["avg_price"]),
+                current_price=float(p["current_price"]), value_krw=float(p["value_krw"]),
+            ))
+        for p in overseas.get("positions", []):
+            positions.append(KisBalancePosition(
+                ticker=p["ticker"], name=p["name"], market=p["market"],
+                quantity=int(p["qty"]),
+                avg_price=round(float(p["avg_price"]) * rate),
+                current_price=round(float(p["current_price"]) * rate),
+                value_krw=round(float(p.get("value_usd", 0)) * rate),
+            ))
+        return KisBalanceResponse(
+            account_id=str(account.id), account_name=account.name, is_mock=is_mock,
+            positions=positions, deposit_krw=float(domestic.get("deposit_krw", 0)),
+        )
 
-    domestic = await get_domestic_balance(
-        app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-    )
-    overseas = await get_overseas_balance(
-        app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-    )
+    if account.asset_type == "STOCK_KIWOOM":
+        if not account.kiwoom_app_key or not account.kiwoom_app_secret:
+            raise ValueError("키움 API 자격증명이 설정되지 않았습니다.")
 
-    rate = usd_rate or 1350.0
-    positions: list[KisBalancePosition] = []
-    for p in domestic.get("positions", []):
-        positions.append(KisBalancePosition(
-            ticker=p["ticker"],
-            name=p["name"],
-            market=p["market"],
-            quantity=int(p["qty"]),
-            avg_price=float(p["avg_price"]),
-            current_price=float(p["current_price"]),
-            value_krw=float(p["value_krw"]),
-        ))
-    for p in overseas.get("positions", []):
-        positions.append(KisBalancePosition(
-            ticker=p["ticker"],
-            name=p["name"],
-            market=p["market"],
-            quantity=int(p["qty"]),
-            avg_price=round(float(p["avg_price"]) * rate),
-            current_price=round(float(p["current_price"]) * rate),
-            value_krw=round(float(p.get("value_usd", 0)) * rate),
-        ))
+        app_key = decrypt(account.kiwoom_app_key)
+        app_secret = decrypt(account.kiwoom_app_secret)
+        is_mock = account.is_mock_mode
+        access_token = await kiwoom_get_access_token(
+            app_key, app_secret,
+            is_mock=is_mock, redis=redis, db=db,
+            user_id=str(account.user_id), account_id=str(account.id),
+        )
+        domestic = await kiwoom_get_domestic_balance(
+            access_token, account.kiwoom_account_no, is_mock=is_mock
+        )
+        positions = [
+            KisBalancePosition(
+                ticker=p["ticker"], name=p["name"], market=p["market"],
+                quantity=int(p["qty"]), avg_price=float(p["avg_price"]),
+                current_price=float(p["current_price"]), value_krw=float(p["value_krw"]),
+            )
+            for p in domestic.get("positions", [])
+        ]
+        return KisBalanceResponse(
+            account_id=str(account.id), account_name=account.name, is_mock=is_mock,
+            positions=positions, deposit_krw=float(domestic.get("deposit_krw", 0)),
+        )
 
-    return KisBalanceResponse(
-        account_id=str(account.id),
-        account_name=account.name,
-        is_mock=is_mock,
-        positions=positions,
-        deposit_krw=float(domestic.get("deposit_krw", 0)),
-    )
+    raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
 
 
-@router.get("/kis-balance/{account_id}", response_model=KisBalanceResponse)
-async def get_kis_account_balance(
+@router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)
+async def get_broker_account_balance(
     account_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
 ):
-    """KIS 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
+    """KIS 또는 키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
     account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.id == account_id,
@@ -332,44 +349,42 @@ async def get_kis_account_balance(
     )
     if not account:
         logger.warning(
-            "kis_balance_account_not_found",
+            "broker_balance_account_not_found",
             account_id=str(account_id),
             user_id=str(current_user.id),
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다.")
-    if account.asset_type != "STOCK_KIS":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 계좌만 잔고 조회가 가능합니다.")
+    if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다.")
 
     usd_rate = await get_usd_krw_rate(redis)
-
     try:
-        return await _fetch_account_balance(account, db, redis, usd_rate)
+        return await _fetch_broker_balance(account, db, redis, usd_rate)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/kis-balance-all", response_model=list[KisBalanceResponse])
-async def get_all_kis_account_balances(
+@router.get("/broker-balance-all", response_model=list[KisBalanceResponse])
+async def get_all_broker_balances(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
 ):
-    """연동된 모든 활성 KIS 계좌의 실시간 잔고를 병렬로 조회한다."""
+    """연동된 모든 활성 KIS/키움 계좌의 실시간 잔고를 병렬로 조회한다."""
     acc_result = await db.execute(
         select(AssetAccount).where(
             AssetAccount.user_id == current_user.id,
-            AssetAccount.asset_type == "STOCK_KIS",
+            AssetAccount.asset_type.in_(["STOCK_KIS", "STOCK_KIWOOM"]),
             AssetAccount.is_active == True,  # noqa: E712
         )
     )
-    kis_accounts = acc_result.scalars().all()
+    accounts = acc_result.scalars().all()
 
-    if not kis_accounts:
+    if not accounts:
         return []
 
     usd_rate = await get_usd_krw_rate(redis)
-
-    tasks = [_fetch_account_balance(acc, db, redis, usd_rate) for acc in kis_accounts]
+    tasks = [_fetch_broker_balance(acc, db, redis, usd_rate) for acc in accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [
@@ -382,113 +397,5 @@ async def get_all_kis_account_balances(
             deposit_krw=0.0,
             error=str(r),
         )
-        for acc, r in zip(kis_accounts, results)
-    ]
-
-
-async def _fetch_kiwoom_account_balance(
-    account: AssetAccount,
-    db: AsyncSession,
-    redis,
-) -> KiwoomBalanceResponse:
-    """키움 계좌 실시간 잔고를 조회해 KiwoomBalanceResponse로 반환한다."""
-    from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
-    from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
-    from app.services.credential_service import decrypt as _decrypt
-
-    if not account.kiwoom_app_key or not account.kiwoom_app_secret:
-        raise ValueError("키움 API 자격증명이 설정되지 않았습니다.")
-
-    app_key = _decrypt(account.kiwoom_app_key)
-    app_secret = _decrypt(account.kiwoom_app_secret)
-    is_mock = account.is_mock_mode
-
-    access_token = await kiwoom_get_access_token(
-        app_key, app_secret,
-        is_mock=is_mock, redis=redis, db=db,
-        user_id=str(account.user_id), account_id=str(account.id),
-    )
-    domestic = await kiwoom_get_domestic_balance(
-        access_token, account.kiwoom_account_no, is_mock=is_mock
-    )
-
-    positions: list[KisBalancePosition] = [
-        KisBalancePosition(
-            ticker=p["ticker"],
-            name=p["name"],
-            market=p["market"],
-            quantity=int(p["qty"]),
-            avg_price=float(p["avg_price"]),
-            current_price=float(p["current_price"]),
-            value_krw=float(p["value_krw"]),
-        )
-        for p in domestic.get("positions", [])
-    ]
-    return KiwoomBalanceResponse(
-        account_id=str(account.id),
-        account_name=account.name,
-        is_mock=is_mock,
-        positions=positions,
-        deposit_krw=float(domestic.get("deposit_krw", 0)),
-    )
-
-
-@router.get("/kiwoom-balance/{account_id}", response_model=KiwoomBalanceResponse)
-async def get_kiwoom_account_balance(
-    account_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
-):
-    """키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
-    account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.id == account_id,
-            AssetAccount.user_id == current_user.id,
-        )
-    )
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다.")
-    if account.asset_type != "STOCK_KIWOOM":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="키움 계좌만 잔고 조회가 가능합니다.")
-
-    try:
-        return await _fetch_kiwoom_account_balance(account, db, redis)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@router.get("/kiwoom-balance-all", response_model=list[KiwoomBalanceResponse])
-async def get_all_kiwoom_account_balances(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
-):
-    """연동된 모든 활성 키움 계좌의 실시간 잔고를 병렬로 조회한다."""
-    acc_result = await db.execute(
-        select(AssetAccount).where(
-            AssetAccount.user_id == current_user.id,
-            AssetAccount.asset_type == "STOCK_KIWOOM",
-            AssetAccount.is_active == True,  # noqa: E712
-        )
-    )
-    kiwoom_accounts = acc_result.scalars().all()
-
-    if not kiwoom_accounts:
-        return []
-
-    tasks = [_fetch_kiwoom_account_balance(acc, db, redis) for acc in kiwoom_accounts]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    return [
-        r if not isinstance(r, Exception)
-        else KiwoomBalanceResponse(
-            account_id=str(acc.id),
-            account_name=acc.name,
-            is_mock=acc.is_mock_mode,
-            positions=[],
-            deposit_krw=0.0,
-            error=str(r),
-        )
-        for acc, r in zip(kiwoom_accounts, results)
+        for acc, r in zip(accounts, results)
     ]

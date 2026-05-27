@@ -13,7 +13,7 @@ import {
 import { fetchTransactions } from "../api/transactions";
 import { extractErrorMessage } from "../utils/error";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
-import TransactionModal from "../components/transactions/TransactionModal";
+import TransactionModal from "../components/assets/TransactionModal";
 import BankAccountModal from "../components/assets/BankAccountModal";
 import StockAccountModal from "../components/assets/StockAccountModal";
 import {

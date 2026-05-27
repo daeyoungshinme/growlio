@@ -101,9 +101,14 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
     setTickerDirect(false); setTickerQuery(""); setTickerSuggestions([]); setShowTickerSuggestions(false);
   };
 
+  const VALID_TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const;
+  type TxType = (typeof VALID_TX_TYPES)[number];
+  const isValidTxType = (val: unknown): val is TxType =>
+    VALID_TX_TYPES.includes(val as TxType);
+
   const triggerDepositPrompt = (amt: number, txType: string) => {
-    if (amt > 0 && onDepositUpdate) {
-      setDepositPrompt({ amount: amt, txType: txType as "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND" });
+    if (amt > 0 && onDepositUpdate && isValidTxType(txType)) {
+      setDepositPrompt({ amount: amt, txType });
     }
   };
 
@@ -216,7 +221,15 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                       <button
                         key={c}
                         type="button"
-                        onClick={() => { setCurrency(c); setAmountUsd(0); set("amount", 0); }}
+                        onClick={() => {
+                          if (c === currency) return;
+                          if (c === "USD") {
+                            setAmountUsd(usdRate && form.amount ? parseFloat((form.amount / usdRate).toFixed(2)) : 0);
+                          } else {
+                            setAmountUsd(0);
+                          }
+                          setCurrency(c);
+                        }}
                         className={`px-1.5 py-0.5 rounded transition-colors ${
                           currency === c
                             ? "bg-blue-600 text-white"

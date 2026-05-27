@@ -1,5 +1,6 @@
 import asyncio
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
@@ -194,15 +195,21 @@ async def create_account(
     return _account_response(account)
 
 
+_MAX_SNAPSHOTS_LIMIT = 365
+
+
 @router.get("/snapshots/range", response_model=list[AssetSnapshotResponse])
 async def get_snapshots(
     start_date: date | None = None,
     end_date: date | None = None,
-    limit: int = 365,
+    limit: int = _MAX_SNAPSHOTS_LIMIT,
     skip: int = 0,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if start_date and end_date and start_date > end_date:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_date는 end_date보다 이전이어야 합니다")
+    limit = min(limit, _MAX_SNAPSHOTS_LIMIT)
     query = select(AssetSnapshot).where(AssetSnapshot.user_id == current_user.id)
     if start_date:
         query = query.where(AssetSnapshot.snapshot_date >= start_date)
@@ -466,8 +473,8 @@ async def save_positions(
     account = await _get_owned_account(account_id, current_user.id, db)
     raw = [p.model_dump() for p in positions]
     account.manual_positions = raw
-    total_invested = sum(p.qty * p.avg_price for p in positions)
-    total_value = sum((p.current_price or p.avg_price) * p.qty for p in positions)
+    total_invested = float(sum(Decimal(str(p.qty)) * Decimal(str(p.avg_price)) for p in positions))
+    total_value = float(sum(Decimal(str(p.current_price or p.avg_price)) * Decimal(str(p.qty)) for p in positions))
     account.manual_amount = total_value  # 평가금액 기준 (current_price 없으면 avg_price 대체)
     account.manual_updated_at = datetime.now(UTC)
     await _upsert_snapshot(
@@ -524,8 +531,8 @@ async def sync_position_prices(
     account.manual_updated_at = datetime.now(UTC)
 
     # 평가금액 합계 → manual_amount 갱신 & 스냅샷 저장
-    total_value = sum(p["current_price"] * p["qty"] for p in updated)
-    total_invested = sum(p["avg_price"] * p["qty"] for p in updated)
+    total_value = float(sum(Decimal(str(p["current_price"])) * Decimal(str(p["qty"])) for p in updated))
+    total_invested = float(sum(Decimal(str(p["avg_price"])) * Decimal(str(p["qty"])) for p in updated))
     account.manual_amount = total_value
 
     await _upsert_snapshot(

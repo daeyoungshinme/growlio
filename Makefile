@@ -1,5 +1,6 @@
 .PHONY: up down migrate install-backend install-frontend dev dev-backend dev-frontend \
         test-backend test-frontend lint typecheck \
+        clean format db-reset \
         build-android-debug build-android-release
 
 up:
@@ -39,6 +40,16 @@ lint:
 typecheck:
 	cd backend && uv run mypy app/
 	cd frontend && npm run build
+
+clean:
+	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache
+
+format:
+	cd backend && uv run ruff check . --fix
+	cd frontend && npm run format
+
+db-reset:
+	docker compose down -v && docker compose up -d db redis && sleep 3 && $(MAKE) migrate
 
 build-android-debug:
 	cd frontend && npm run build && npx cap sync android

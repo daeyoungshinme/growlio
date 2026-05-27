@@ -1,5 +1,6 @@
 import re
 import time
+import uuid
 from contextlib import asynccontextmanager
 
 import structlog
@@ -63,16 +64,36 @@ app.include_router(router)
 
 
 @app.middleware("http")
+async def add_request_id(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
+
+
+@app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.monotonic()
     response = await call_next(request)
     duration_ms = round((time.monotonic() - start) * 1000)
+    request_id = getattr(request.state, "request_id", "-")
     logger.info(
         "http_request",
         method=request.method,
         path=request.url.path,
         status=response.status_code,
         duration_ms=duration_ms,
+        request_id=request_id,
     )
     return response
 

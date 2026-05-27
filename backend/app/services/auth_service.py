@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 
 _jwks_client: PyJWKClient | None = None
 
-_LEEWAY = timedelta(seconds=60)
+_LEEWAY = timedelta(seconds=5)
 
 
 def _get_jwks_client() -> PyJWKClient:

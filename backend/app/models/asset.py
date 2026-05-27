@@ -32,7 +32,7 @@ class AssetAccount(Base):
     # 오픈뱅킹 연결 정보
     ob_bank_code: Mapped[str | None] = mapped_column(String(10))
     ob_account_no_encrypted: Mapped[str | None] = mapped_column(String(200))
-    ob_fintech_use_no: Mapped[str | None] = mapped_column(String(50))
+    ob_fintech_use_no: Mapped[str | None] = mapped_column(String(50), unique=True)
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))

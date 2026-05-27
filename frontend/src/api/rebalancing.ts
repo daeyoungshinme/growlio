@@ -172,14 +172,8 @@ export interface KisBalanceResponse {
   error?: string | null;
 }
 
-export const fetchKisBalance = (accountId: string): Promise<KisBalanceResponse> =>
-  api.get<KisBalanceResponse>(`/rebalancing/kis-balance/${accountId}`).then((r) => r.data);
+export const fetchBrokerBalance = (accountId: string): Promise<KisBalanceResponse> =>
+  api.get<KisBalanceResponse>(`/rebalancing/broker-balance/${accountId}`).then((r) => r.data);
 
-export const fetchAllKisBalances = (): Promise<KisBalanceResponse[]> =>
-  api.get<KisBalanceResponse[]>(`/rebalancing/kis-balance-all`).then((r) => r.data);
-
-export const fetchKiwoomBalance = (accountId: string): Promise<KisBalanceResponse> =>
-  api.get<KisBalanceResponse>(`/rebalancing/kiwoom-balance/${accountId}`).then((r) => r.data);
-
-export const fetchAllKiwoomBalances = (): Promise<KisBalanceResponse[]> =>
-  api.get<KisBalanceResponse[]>(`/rebalancing/kiwoom-balance-all`).then((r) => r.data);
+export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
+  api.get<KisBalanceResponse[]>(`/rebalancing/broker-balance-all`).then((r) => r.data);

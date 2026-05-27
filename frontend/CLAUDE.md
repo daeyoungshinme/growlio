@@ -130,14 +130,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
-**커스텀 훅 (`src/hooks/`)**
-- `useAsyncAction()` — 비동기 작업 로딩/에러 처리 래퍼.
-  ```ts
-  const { run, loading } = useAsyncAction();
-  await run(async () => { await api.doSomething(); toast("완료", "success"); });
-  // loading은 버튼 disabled 처리에 사용
-  ```
-
 ---
 
 ## Tailwind UI 패턴

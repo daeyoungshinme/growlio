@@ -48,7 +48,12 @@ class Settings(BaseSettings):
 
     @property
     def allowed_origins_list(self) -> list[str]:
-        return [o.strip() for o in self.allowed_origins.split(",")]
+        origins = [o.strip() for o in self.allowed_origins.split(",")]
+        if self.app_env == "production":
+            for o in origins:
+                if not o.startswith("https://"):
+                    raise ValueError(f"CORS origin must use HTTPS in production: {o}")
+        return origins
 
     @model_validator(mode="after")
     def _validate_secrets(self) -> "Settings":
