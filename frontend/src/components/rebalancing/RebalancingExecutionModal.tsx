@@ -11,7 +11,6 @@ import {
   OrderResult,
   RebalancingAnalysis,
   RebalancingItem,
-  TickerAccountInfo,
   executeRebalancing,
   fetchAllBrokerBalances,
   fetchBrokerBalance,
@@ -386,10 +385,6 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
     loadAllLiveBalances();
     loadAllPrices();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function getKisInfos(ticker: string): TickerAccountInfo[] {
-    return (analysis.ticker_account_map[ticker] ?? []).filter((a) => a.asset_type === "STOCK_KIS");
-  }
 
   const actionableItems = getActionableItems(analysis);
 
