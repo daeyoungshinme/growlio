@@ -58,6 +58,10 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **hooks/** — 현재 미사용 (디렉토리 없음).
 
+**asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
+
+**Dead code:** `src/lib/supabase.ts` — 현재 미사용. 수정/확장 금지.
+
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리:** Zustand — `authStore.ts`(인증), `themeStore.ts`(다크모드). 서버 상태는 React Query 전담.

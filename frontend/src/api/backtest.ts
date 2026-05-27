@@ -20,6 +20,7 @@ export interface BacktestRunRequest {
   end_date: string;
   include_spy: boolean;
   include_real_portfolio: boolean;
+  reinvest_dividends: boolean;
 }
 
 export interface SeriesData {

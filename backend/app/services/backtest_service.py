@@ -48,7 +48,12 @@ def _to_yf_symbol(ticker: str, market: str) -> str:
 
 # ── yfinance 히스토리컬 다운로드 (동기) ──────────────────────
 
-def _sync_download_history(symbols: list[str], start: date, end: date) -> dict[str, list[tuple[str, float]]]:
+def _sync_download_history(
+    symbols: list[str],
+    start: date,
+    end: date,
+    reinvest_dividends: bool = True,
+) -> dict[str, list[tuple[str, float]]]:
     """symbol → [(date_str, price), ...] 반환. 동기 함수."""
     import pandas as pd
     import yfinance as yf
@@ -61,7 +66,7 @@ def _sync_download_history(symbols: list[str], start: date, end: date) -> dict[s
             symbols,
             start=start.isoformat(),
             end=end.isoformat(),
-            auto_adjust=True,
+            auto_adjust=reinvest_dividends,
             progress=False,
             threads=False,
         )
@@ -305,7 +310,7 @@ async def run_backtest(
     loop = asyncio.get_running_loop()
     price_data: dict[str, list[tuple[str, float]]] = await loop.run_in_executor(
         None,
-        partial(_sync_download_history, all_symbols, req.start_date, req.end_date),
+        partial(_sync_download_history, all_symbols, req.start_date, req.end_date, req.reinvest_dividends),
     )
 
     # 4. 공통 날짜 축 구성 (SPY 또는 첫 번째 심볼의 거래일 기준)

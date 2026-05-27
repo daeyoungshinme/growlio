@@ -61,6 +61,7 @@ class BacktestRunRequest(BaseModel):
     end_date: date
     include_spy: bool = True
     include_real_portfolio: bool = True
+    reinvest_dividends: bool = True
 
     @field_validator("end_date")
     @classmethod

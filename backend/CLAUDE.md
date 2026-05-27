@@ -61,7 +61,12 @@ cd backend && uv run mypy app/
 
 ## Architecture (`backend/app/`)
 
-**핵심 흐름: 계좌 동기화 → 스냅샷 저장 → 대시보드/포트폴리오 집계**
+### 데이터 모델
+
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API/OPEN_BANKING) 조합으로 동작 결정
+- `AssetSnapshot` — 일별 계좌 스냅샷. `positions` JSONB에 종목 배열 저장. `(account_id, snapshot_date)` unique constraint
+- `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
+- `UserSettings` — KIS/LS 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
 
 ```
 API Request
@@ -133,6 +138,7 @@ jobs/                         # APScheduler 정기 작업
 
 **금액 단위**
 - 금액 컬럼 타입: `Numeric(18, 2)` / Python `Mapped[float | None]`.
+- 해외 종목 `avg_price` 포함 **모든 금액은 KRW 저장** — 프론트에서 USD × 환율 변환 후 전송.
 
 **SQLAlchemy async 패턴**
 ```python

@@ -57,6 +57,7 @@ export default function PortfolioAnalysisTab() {
   const [endDate, setEndDate] = useState(today);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
+  const [reinvestDividends, setReinvestDividends] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const createMut = useMutation({
@@ -104,6 +105,7 @@ export default function PortfolioAnalysisTab() {
         end_date: endDate,
         include_spy: includeSpy,
         include_real_portfolio: includeReal,
+        reinvest_dividends: reinvestDividends,
       }),
     onSuccess: (data) => setBacktestResult(data),
     onError: () => toast("백테스트 실행에 실패했습니다"),
@@ -338,6 +340,15 @@ export default function PortfolioAnalysisTab() {
                     className="rounded text-blue-600"
                   />
                   실제 포트폴리오 포함
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={reinvestDividends}
+                    onChange={(e) => setReinvestDividends(e.target.checked)}
+                    className="rounded text-blue-600"
+                  />
+                  배당금 재투자
                 </label>
               </div>
               <button
