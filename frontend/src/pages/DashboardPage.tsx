@@ -122,7 +122,7 @@ export default function DashboardPage() {
       <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">대시보드</h1>
 
       {/* Row 1: Hero Card — 자산 현황 + 핵심 지표 통합 */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col lg:flex-row gap-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-row gap-3 lg:gap-6">
         {/* 좌측: 자산 총액 + 누적 수익률 + 3개 미니 지표 */}
         <div className="flex-1 flex flex-col justify-between">
           <div className="flex flex-col gap-4">
@@ -182,8 +182,18 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
-        {/* 우측: 자산 비중 도넛 차트 */}
-        <div className="lg:w-72 shrink-0">
+        {/* 모바일: 컴팩트 도넛 차트 (우측 고정) */}
+        <div className="lg:hidden w-28 sm:w-36 shrink-0">
+          {allocationChartData.length > 0 ? (
+            <AssetAllocationChart data={allocationChartData} compact />
+          ) : (
+            <div className="flex items-center justify-center h-32 text-gray-300 dark:text-gray-600 text-xs text-center">
+              자산<br />없음
+            </div>
+          )}
+        </div>
+        {/* 데스크탑: 풀사이즈 도넛 차트 */}
+        <div className="hidden lg:block lg:w-72 shrink-0">
           {allocationChartData.length > 0 ? (
             <AssetAllocationChart data={allocationChartData} />
           ) : (
