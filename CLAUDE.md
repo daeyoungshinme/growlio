@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Growlio** — 한국투자증권(KIS)/LS증권 API, 금융결제원 오픈뱅킹을 연동하는 자산관리 웹앱. React SPA + FastAPI 백엔드 구조.
+**Growlio** — 한국투자증권(KIS)/키움증권(Kiwoom) API, 금융결제원 오픈뱅킹을 연동하는 자산관리 웹앱. React SPA + FastAPI 백엔드 구조.
 
 ## Prerequisites
 
@@ -25,7 +25,8 @@ make install-backend   # pip install
 make install-frontend  # npm install
 
 # 3. 환경 변수 설정
-cp backend/.env.example backend/.env  # 값 채우기 (backend/CLAUDE.md Environment 섹션 참고)
+cp backend/.env.example backend/.env    # 값 채우기 (backend/CLAUDE.md Environment 섹션 참고)
+cp frontend/.env.example frontend/.env  # 값 채우기 (frontend/CLAUDE.md Environment 섹션 참고)
 
 # 4. DB 마이그레이션
 make migrate
@@ -49,6 +50,11 @@ make test-backend     # cd backend && pytest
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc build (frontend)
+make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
+make format           # ruff --fix (backend) + prettier --write (frontend)
+make db-reset         # docker compose down -v + up + migrate (데이터 초기화)
+make build-android-debug    # npm build + cap sync + gradlew assembleDebug
+make build-android-release  # npm build + cap sync + gradlew assembleRelease
 ```
 
 ---
@@ -60,7 +66,10 @@ make typecheck        # mypy (backend) + tsc build (frontend)
 growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
+│   └── android/      # Capacitor Android 프로젝트
 ├── nginx/            # nginx 리버스 프록시 (포트 80 → frontend 정적파일 + /api/* → backend:8000)
+├── .github/          # GitHub Actions (CI: lint/test/build, Android APK)
+├── render.yaml       # Render 백엔드 배포 설정
 ├── docker-compose.yml
 └── Makefile
 ```
@@ -76,3 +85,5 @@ growlio/
 ## Key Constraints (공통)
 
 - `avg_price` 및 모든 금액 컬럼은 **항상 KRW** — 해외 종목은 프론트에서 USD × 환율 변환 후 전송
+- **월별 추이 쿼리**: `is_active = TRUE` 필터 필수 — 누락 시 비활성 계좌 스냅샷이 합산되어 금액 수배 부풀림
+- **스냅샷 기준**: 월말 스냅샷 개념 없음 — 해당 월 마지막 sync일 값이 월별 대표값으로 사용됨

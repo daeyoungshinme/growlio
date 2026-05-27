@@ -26,6 +26,21 @@ cd frontend && npm run test    # Vitest (vitest run)
 cd frontend && npm run format  # Prettier (prettier --write src)
 ```
 
+### Android 빌드 (Capacitor)
+```bash
+cd frontend && npm run cap:sync    # 웹 빌드 → Android 프로젝트 동기화
+cd frontend && npm run cap:android # Android Studio로 열기
+make build-android-debug           # APK Debug 빌드 (루트 Makefile)
+make build-android-release         # APK Release 빌드
+```
+
+### Environment
+`frontend/.env` (`.env.example` 참고):
+- `VITE_SUPABASE_URL` — Supabase Project URL
+- `VITE_SUPABASE_ANON_KEY` — Supabase Anon Key (JWT)
+
+> `src/lib/supabase.ts`에서 import됨. `.env` 없으면 Supabase 클라이언트 초기화 실패.
+
 ---
 
 ## Architecture (`frontend/src/`)
@@ -36,7 +51,7 @@ cd frontend && npm run format  # Prettier (prettier --write src)
 - `/portfolio` — 주식 계좌 **조회 전용** (읽기 전용). 계좌별 sync, 차트, 종목 현황. 계좌 추가/삭제/종목관리/입출금은 여기서 하지 않음
 - `/asset-management` — **모든 계좌 관리 허브**. 은행계좌/증권계좌 추가·삭제, 종목관리(StockPositionsModal), 입출금(TransactionModal), 입출금·배당 내역 탭
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — KIS/LS 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
+- `/settings` — KIS/키움 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
 - `/register` — 회원가입 (RegisterPage)
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
@@ -56,7 +71,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — 현재 미사용 (디렉토리 없음).
+**hooks/** — 현재 미사용 (디렉토리는 존재하나 비어있음).
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
 

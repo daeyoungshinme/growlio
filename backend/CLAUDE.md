@@ -50,12 +50,25 @@ cd backend && uv run mypy app/
 
 ### Environment
 `backend/.env` (`.env.example` 참고):
+- `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
+- `APP_SECRET_KEY` — JWT 서명 키
 - `DATABASE_URL` — PostgreSQL asyncpg URL
 - `REDIS_URL`
-- `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/LS 자격증명 AES-256 암호화 키
-- `APP_SECRET_KEY` — JWT 서명 키
-- `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
-- `DART_API_KEY` — DART OpenAPI 키. `.env`에서 로드 (`.env.example` 참고)
+- `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
+
+**Supabase** (`supabase.com > Project Settings > API`):
+- `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_JWT_SECRET` — Settings > API > JWT Settings
+
+**DART**:
+- `DART_API_KEY` — opendart.fss.or.kr
+
+**금융결제원 오픈뱅킹**:
+- `OPEN_BANKING_CLIENT_ID`, `OPEN_BANKING_CLIENT_SECRET`
+- `OPEN_BANKING_REDIRECT_URI`, `OPEN_BANKING_BASE_URL`
+
+**SMTP** (환율 알림 이메일):
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
 
 ---
 
@@ -66,7 +79,7 @@ cd backend && uv run mypy app/
 - `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API/OPEN_BANKING) 조합으로 동작 결정
 - `AssetSnapshot` — 일별 계좌 스냅샷. `positions` JSONB에 종목 배열 저장. `(account_id, snapshot_date)` unique constraint
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/LS 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
+- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
 
 ```
 API Request
@@ -116,7 +129,7 @@ jobs/                         # APScheduler 정기 작업
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
 ```
 
-**자격증명 암호화:** KIS/LS App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
+**자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
 **현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
 
@@ -133,7 +146,7 @@ jobs/                         # APScheduler 정기 작업
 ## Absolute Rules
 
 **자격증명 암호화**
-- KIS/LS App Key·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
+- KIS/키움 App Key·Secret은 반드시 `credential_service.encrypt()` 후 DB 저장, 읽을 때 `decrypt()` 호출.
 - 평문 자격증명을 DB에 직접 저장하거나 로그에 출력 금지.
 
 **금액 단위**
