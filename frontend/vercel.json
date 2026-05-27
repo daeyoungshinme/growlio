@@ -3,6 +3,10 @@
     {
       "source": "/api/:path*",
       "destination": "https://growlio-api.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!api|assets|icons|sw\\.js|workbox.*\\.js|manifest\\.webmanifest).*)",
+      "destination": "/index.html"
     }
   ]
 }

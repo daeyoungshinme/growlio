@@ -26,6 +26,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        globPatterns: ["**/*.{html,ico,png,svg,woff,woff2,webmanifest}"],
+        cleanupOutdatedCaches: true,
+        navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/growlio-api\.onrender\.com\/.*/,
