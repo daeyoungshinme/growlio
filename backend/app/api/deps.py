@@ -26,7 +26,7 @@ async def get_token_payload(
     try:
         return verify_supabase_token(token)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
 
 
 async def get_current_user(
@@ -37,7 +37,7 @@ async def get_current_user(
     try:
         payload = verify_supabase_token(token)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from None
 
     user_id = payload.get("sub")
     if not user_id:

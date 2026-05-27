@@ -74,16 +74,22 @@ async def fetch_ticker_dividend_info(
     if need_months_fetch:
         cached_months = await redis.get(months_cache_key)
         if cached_months:
-            months = json.loads(cached_months)
-            need_months_fetch = False
+            try:
+                months = json.loads(cached_months)
+                need_months_fetch = False
+            except (json.JSONDecodeError, TypeError):
+                await redis.delete(months_cache_key)
 
     cached_info = await redis.get(info_cache_key)
     if cached_info:
-        cached = json.loads(cached_info)
-        if dps == 0.0:
-            dps = cached["dps"]
-        if yield_decimal == 0.0:
-            yield_decimal = cached["yield_decimal"]
+        try:
+            cached = json.loads(cached_info)
+            if dps == 0.0:
+                dps = cached["dps"]
+            if yield_decimal == 0.0:
+                yield_decimal = cached["yield_decimal"]
+        except (json.JSONDecodeError, TypeError, KeyError):
+            await redis.delete(info_cache_key)
 
     async with sem:
         # 0순위: Naver Finance (국내 종목 전용, 인증 불필요)

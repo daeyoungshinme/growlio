@@ -22,8 +22,9 @@ from app.scheduler import init_scheduler, scheduler
 logger = structlog.get_logger()
 
 _SECRET_PATTERN = re.compile(
-    r"(appkey|appsecret|secretkey|access_token|Bearer|password|Authorization)"
-    r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{8,}",
+    r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
+    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|redis_url|database_url)"
+    r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{4,}",
     re.IGNORECASE,
 )
 
@@ -108,25 +109,22 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 @app.get("/health")
 async def health():
-    checks: dict[str, str] = {}
+    db_ok = False
+    redis_ok = False
     try:
         async for db in get_db():
             await db.execute(text("SELECT 1"))
-        checks["db"] = "ok"
+        db_ok = True
     except Exception as e:
-        checks["db"] = f"error: {e}"
+        logger.error("health_check_db_failed", error=str(e))
 
     try:
         redis = await get_redis()
         await redis.ping()
-        checks["redis"] = "ok"
+        redis_ok = True
     except Exception as e:
-        checks["redis"] = f"error: {e}"
+        logger.error("health_check_redis_failed", error=str(e))
 
-    healthy = all(v == "ok" for v in checks.values())
-    if not healthy:
-        return JSONResponse(
-            status_code=503,
-            content={"status": "unhealthy", "env": settings.app_env, **checks},
-        )
-    return {"status": "healthy", "env": settings.app_env, **checks}
+    if db_ok and redis_ok:
+        return {"status": "ok"}
+    return JSONResponse(status_code=503, content={"status": "unavailable"})

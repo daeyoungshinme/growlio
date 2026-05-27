@@ -11,6 +11,8 @@ Thumbs.db
 .env.local
 .env.*.local
 backend/.env
+frontend/.env
+frontend/.env.local
 
 # ── Python ─────────────────────────────────────────
 backend/.venv/

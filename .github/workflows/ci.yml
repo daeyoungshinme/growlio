@@ -70,6 +70,12 @@ jobs:
       - name: Test (pytest)
         run: .venv/bin/pytest -x -q
 
+      - name: Security scan (bandit)
+        run: .venv/bin/bandit -r app/ -ll -q || true
+
+      - name: Dependency vulnerability check (pip-audit)
+        run: .venv/bin/pip-audit --skip-editable -q || true
+
   frontend:
     name: Frontend — lint, typecheck, build
     runs-on: ubuntu-latest

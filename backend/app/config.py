@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     redis_cache_ttl_seconds: int = 3600
     usd_krw_fallback_rate: float = 1300.0
 
+    # DB 커넥션 풀 설정
+    database_pool_size: int = 10
+    database_max_overflow: int = 5
+    database_pool_timeout: int = 30
+
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
     open_banking_client_id: str = ""

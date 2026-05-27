@@ -94,7 +94,7 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
 
 
 @router.get("/search")
-async def search_stocks(q: str = Query(..., min_length=1), limit: int = Query(8, le=20)):
+async def search_stocks(q: str = Query(..., min_length=1, max_length=100), limit: int = Query(8, le=20)):
     """종목명·티커 검색.
     한글 입력 → 네이버 금융, 영문/티커 → Yahoo Finance.
     """

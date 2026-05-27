@@ -28,6 +28,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 export default function App() {
   const isDark = useThemeStore((s) => s.isDark);
   const checkAuth = useAuthStore((s) => s.checkAuth);
+  const logout = useAuthStore((s) => s.logout);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -36,6 +37,12 @@ export default function App() {
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
+
+  useEffect(() => {
+    const handleSessionExpired = () => logout();
+    window.addEventListener("growlio:session-expired", handleSessionExpired);
+    return () => window.removeEventListener("growlio:session-expired", handleSessionExpired);
+  }, [logout]);
 
   return (
     <>

@@ -180,7 +180,7 @@ async def sync_kiwoom_account(
         domestic = await asyncio.wait_for(_do_sync(), timeout=50.0)
     except asyncio.TimeoutError:
         logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
-        raise RuntimeError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.")
+        raise RuntimeError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from None
 
     usd_krw_rate = await get_usd_krw_rate(redis)
     total_value_krw = domestic["total_value_krw"] + domestic["deposit_krw"]
@@ -284,11 +284,8 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
         account.manual_updated_at = datetime.now(UTC)
         positions = updated
 
-    invested = sum(p.get("avg_price", 0) * p.get("qty", 0) for p in positions)
-    value = sum(
-        (p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0)
-        for p in positions
-    )
+    invested = _invested_value(positions)
+    value = _eval_value(positions)
     pnl = value - invested if positions else 0.0
 
     if positions:

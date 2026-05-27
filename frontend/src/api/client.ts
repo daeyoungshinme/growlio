@@ -41,11 +41,11 @@ api.interceptors.response.use(
           return api.request(config);
         }
       } catch {
-        // 리프레시 실패 시 로그아웃
+        // 리프레시 실패 시 세션 만료 이벤트 발행 → App.tsx에서 logout() 처리
       }
       if (window.location.pathname !== "/login") {
         toast("세션이 만료되었습니다. 다시 로그인해 주세요.", "error");
-        window.location.href = "/login";
+        window.dispatchEvent(new CustomEvent("growlio:session-expired"));
       }
     }
     return Promise.reject(error);

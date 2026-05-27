@@ -377,68 +377,59 @@ async def sync_account(
         return await _do_sync(account, current_user, db, redis)
 
 
+def _raise_http_status_error(e: httpx.HTTPStatusError, provider: str, body_msg_key: str) -> None:
+    """httpx.HTTPStatusError를 FastAPI HTTPException으로 변환."""
+    if e.response.status_code >= 500:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"{provider} API 오류: 모의투자/실계좌 설정을 확인하세요.",
+        ) from e
+    try:
+        body = e.response.json()
+        msg = body.get(body_msg_key) or body.get("msg1") or str(e)
+    except Exception:
+        msg = str(e)
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{provider} API 오류: {msg}") from e
+
+
 async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
     """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출."""
     if account.data_source == "KIS_API":
         try:
             snapshot = await sync_kis_account(account, db, redis)
         except httpx.HTTPStatusError as e:
-            if e.response.status_code >= 500:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="KIS API 오류: 모의투자/실계좌 설정을 확인하세요. (계정번호, 앱키, 모드가 일치해야 합니다)",
-                )
-            try:
-                kis_body = e.response.json()
-                msg = kis_body.get("msg1") or str(e)
-            except Exception:
-                msg = str(e)
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"KIS API 오류: {msg}")
+            _raise_http_status_error(e, "KIS", "msg1")
         except KisApiError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형이 지원되지 않거나 API 권한이 없을 수 있습니다.",
-            )
+            ) from e
         except (httpx.ConnectError, httpx.TimeoutException):
-            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.")
-        except RuntimeError as e:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(e))
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from None
+        except (RuntimeError, ValueError) as e:
+            code = status.HTTP_400_BAD_REQUEST if isinstance(e, ValueError) else status.HTTP_502_BAD_GATEWAY
+            raise HTTPException(status_code=code, detail=str(e)) from e
     elif account.data_source == "KIWOOM_API":
         try:
             snapshot = await sync_kiwoom_account(account, db, redis)
         except httpx.HTTPStatusError as e:
-            if e.response.status_code >= 500:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="키움 API 오류: 모의투자/실계좌 설정을 확인하세요. (계좌번호, 앱키, 모드가 일치해야 합니다)",
-                )
-            try:
-                body = e.response.json()
-                msg = body.get("return_msg") or body.get("msg1") or str(e)
-            except Exception:
-                msg = str(e)
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"키움 API 오류: {msg}")
+            _raise_http_status_error(e, "키움", "return_msg")
         except KiwoomApiError as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})",
-            )
+            ) from e
         except KiwoomTokenExpiredError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="키움 토큰이 만료되었습니다. 잠시 후 다시 시도하세요.",
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="키움 토큰이 만료되었습니다. 잠시 후 다시 시도하세요.") from None
         except (httpx.ConnectError, httpx.TimeoutException):
-            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="키움 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.")
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="키움 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from None
         except RuntimeError as e:
             msg = str(e)
-            if "토큰 발급 실패" in msg:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.")
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=msg)
+            code = status.HTTP_400_BAD_REQUEST if "토큰 발급 실패" in msg else status.HTTP_502_BAD_GATEWAY
+            detail = f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요." if "토큰 발급 실패" in msg else msg
+            raise HTTPException(status_code=code, detail=detail) from e
         except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     elif account.data_source == "OPEN_BANKING":
         snapshot = await sync_openbanking_account(account, db)
     elif account.data_source == "MANUAL":

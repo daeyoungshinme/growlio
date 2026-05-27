@@ -38,10 +38,13 @@ def encrypt(plaintext: str) -> str:
 def decrypt(ciphertext_hex: str) -> str:
     """hex 문자열을 복호화 → 원문 반환."""
     key = _get_key()
-    data = bytes.fromhex(ciphertext_hex)
-    nonce, ct = data[:12], data[12:]
-    aesgcm = AESGCM(key)
-    return aesgcm.decrypt(nonce, ct, None).decode()
+    try:
+        data = bytes.fromhex(ciphertext_hex)
+        nonce, ct = data[:12], data[12:]
+        aesgcm = AESGCM(key)
+        return aesgcm.decrypt(nonce, ct, None).decode()
+    except Exception as e:
+        raise ValueError("Decryption failed") from e
 
 
 async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:

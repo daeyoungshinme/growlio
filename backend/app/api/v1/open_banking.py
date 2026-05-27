@@ -46,10 +46,9 @@ async def open_banking_callback(
 ):
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
     redis_key = f"{_OB_STATE_PREFIX}{state}"
-    user_id = await redis.get(redis_key)
+    user_id = await redis.getdel(redis_key)
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
-    await redis.delete(redis_key)
 
     token_data = await exchange_code_for_token(code)
     access_token = token_data.get("access_token")
