@@ -82,6 +82,14 @@ growlio/
 
 ---
 
+## 배포 & CI
+
+- `render.yaml` — 백엔드 Render 배포 설정. 프론트엔드는 별도 호스팅.
+- `nginx/` — 포트 80 리버스 프록시. `/api/*` → backend:8000, 그 외 → frontend 정적파일. 새 API prefix 추가 시 수정 필요.
+- `.github/` — CI: lint/test/build (push/PR마다 실행). Android APK 빌드 workflow 포함.
+
+---
+
 ## Key Constraints (공통)
 
 - `avg_price` 및 모든 금액 컬럼은 **항상 KRW** — 해외 종목은 프론트에서 USD × 환율 변환 후 전송

@@ -58,7 +58,7 @@ make build-android-release         # APK Release 빌드
 - `/find-account` — 계정 찾기 (FindAccountPage)
 - `/trend` — 월별 추이 (TrendPage)
 
-> 구 URL 리다이렉트: `/assets` → `/portfolio`, `/trend` → `/dashboard`
+> 구 URL 리다이렉트: `/assets` → `/portfolio`
 
 **컴포넌트 디렉토리 (`src/components/`):**
 assets, backtest, common, dashboard, invest, layout, portfolio-analysis, portfolios, rebalancing, transactions, trend

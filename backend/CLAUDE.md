@@ -107,7 +107,7 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
-  ├── dividend_constants.py   # 배당 관련 상수 정의
+  ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
   ├── dividend_providers.py   # 배당 데이터 제공자 추상화
   ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
