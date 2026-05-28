@@ -165,8 +165,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">설정</h1>
-
       {/* DART OpenAPI */}
       <SectionCard title="DART OpenAPI (금융감독원)" badge={current?.has_dart ? <ConnectedBadge /> : undefined}>
         <p className="text-xs text-gray-500 dark:text-gray-400">

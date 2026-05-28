@@ -120,8 +120,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">대시보드</h1>
-
       {/* Row 1: Hero Card — 자산 현황 + 핵심 지표 통합 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-row gap-3 lg:gap-6">
         {/* 좌측: 자산 총액 + 누적 수익률 + 3개 미니 지표 */}

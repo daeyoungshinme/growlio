@@ -191,7 +191,6 @@ export default function AssetManagementPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-gray-50">자산관리</h1>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">계좌를 등록하고 입출금·배당 내역을 관리합니다.</p>
       </div>
 
