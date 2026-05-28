@@ -20,6 +20,7 @@ import httpx
 import structlog
 
 from app.config import settings
+from app.services.credential_service import decrypt, encrypt
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,10 +94,13 @@ async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
 async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession") -> str:
     """오픈뱅킹 토큰 만료 1시간 전에 자동 갱신 후 유효한 액세스 토큰 반환.
 
-    갱신 실패 시 로그 경고만 남기고 기존 토큰으로 재시도.
+    DB에는 AES-256 암호화된 값이 저장되므로 읽기 시 decrypt, 쓰기 시 encrypt 적용.
     """
     if not settings_row.ob_access_token or not settings_row.ob_refresh_token:
         raise ValueError("오픈뱅킹 토큰이 없습니다. 다시 연결해주세요.")
+
+    current_access = decrypt(settings_row.ob_access_token)
+    current_refresh = decrypt(settings_row.ob_refresh_token)
 
     expires_at = settings_row.ob_token_expires_at
     if expires_at and expires_at.tzinfo is None:
@@ -105,21 +109,22 @@ async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession"
     needs_refresh = not expires_at or expires_at < datetime.now(timezone.utc) + timedelta(hours=1)
     if needs_refresh:
         try:
-            token_data = await refresh_access_token(settings_row.ob_refresh_token)
-            settings_row.ob_access_token = token_data["access_token"]
+            token_data = await refresh_access_token(current_refresh)
+            settings_row.ob_access_token = encrypt(token_data["access_token"])
             if "refresh_token" in token_data:
-                settings_row.ob_refresh_token = token_data["refresh_token"]
+                settings_row.ob_refresh_token = encrypt(token_data["refresh_token"])
             if "expires_in" in token_data:
                 settings_row.ob_token_expires_at = datetime.now(timezone.utc) + timedelta(
                     seconds=int(token_data["expires_in"])
                 )
             await db.commit()
             logger.info("ob_token_refreshed", user_id=str(settings_row.user_id))
+            current_access = token_data["access_token"]
         except Exception as e:
             logger.error("ob_token_refresh_failed", user_id=str(settings_row.user_id), error=str(e))
             raise RuntimeError("오픈뱅킹 토큰 갱신에 실패했습니다. 다시 연결해주세요.") from e
 
-    return settings_row.ob_access_token
+    return current_access
 
 
 async def get_account_balance(

@@ -71,10 +71,10 @@ jobs:
         run: .venv/bin/pytest -x -q
 
       - name: Security scan (bandit)
-        run: .venv/bin/bandit -r app/ -ll -q || true
+        run: .venv/bin/bandit -r app/ -ll -q
 
       - name: Dependency vulnerability check (pip-audit)
-        run: .venv/bin/pip-audit --skip-editable -q || true
+        run: .venv/bin/pip-audit --skip-editable -q
 
   frontend:
     name: Frontend — lint, typecheck, build
@@ -101,3 +101,6 @@ jobs:
 
       - name: Build + typecheck (tsc + vite)
         run: npm run build
+
+      - name: Dependency vulnerability check (npm audit)
+        run: npm audit --audit-level=high

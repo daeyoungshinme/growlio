@@ -90,7 +90,7 @@ export default function InvestPlanPage() {
   const isConfigured = data?.is_configured;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">적립식 DCA 복리계산 및 월/년 목표달성율</p>

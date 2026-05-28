@@ -171,9 +171,9 @@ export default function PortfolioAnalysisTab() {
   }
 
   return (
-    <div className="flex gap-6">
-      {/* ── 좌측: 포트폴리오 목록 ──────────────────────────────────── */}
-      <div className="w-72 flex-shrink-0 space-y-3">
+    <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+      {/* ── 포트폴리오 목록 (모바일: 상단 전체폭, 데스크톱: 좌측 고정) ── */}
+      <div className="w-full md:w-64 md:flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
           <button
@@ -260,12 +260,12 @@ export default function PortfolioAnalysisTab() {
       {/* ── 우측: 분석 패널 ──────────────────────────────────────── */}
       <div className="flex-1 min-w-0 space-y-4">
         {/* 분석 버튼 행 */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleRebalancingAnalysis}
             disabled={!canRebalance || analyzing}
             title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
               analysisMode === "rebalancing"
                 ? "bg-blue-600 text-white hover:bg-blue-700"
                 : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -280,7 +280,7 @@ export default function PortfolioAnalysisTab() {
 
           <button
             onClick={handleSwitchToBacktest}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               analysisMode === "backtest"
                 ? "bg-blue-600 text-white hover:bg-blue-700"
                 : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -290,7 +290,7 @@ export default function PortfolioAnalysisTab() {
           </button>
 
           {selectedIds.size > 0 && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">
+            <span className="w-full md:w-auto text-xs text-gray-400 dark:text-gray-500">
               {selectedNames}
               {selectedIds.size > 1 && ` 외 ${selectedIds.size - 1}개`} 선택됨
             </span>
@@ -300,29 +300,31 @@ export default function PortfolioAnalysisTab() {
         {/* 백테스팅 설정 패널 */}
         {analysisMode === "backtest" && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-            <div className="flex flex-wrap gap-4 items-end">
-              <div>
-                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">시작일</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  max={endDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="space-y-3">
+              <div className="flex flex-wrap gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">시작일</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    max={endDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">종료일</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    max={today}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">종료일</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  min={startDate}
-                  max={today}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap gap-x-4 gap-y-2">
                 <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
                   <input
                     type="checkbox"
@@ -351,13 +353,15 @@ export default function PortfolioAnalysisTab() {
                   배당금 재투자
                 </label>
               </div>
-              <button
-                onClick={() => { setBacktestResult(null); runMut.mutate(); }}
-                disabled={!canRunBacktest || runMut.isPending}
-                className="ml-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {runMut.isPending ? "계산 중..." : "▶ 백테스팅 실행"}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => { setBacktestResult(null); runMut.mutate(); }}
+                  disabled={!canRunBacktest || runMut.isPending}
+                  className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  {runMut.isPending ? "계산 중..." : "▶ 백테스팅 실행"}
+                </button>
+              </div>
             </div>
             {runMut.isError && (
               <p className="mt-2 text-xs text-red-500">

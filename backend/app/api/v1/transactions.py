@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +20,10 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 @router.get("", response_model=list[TransactionResponse])
 async def list_transactions(
     account_id: UUID | None = None,
-    year: int | None = None,
+    year: int | None = Query(None, ge=1900, le=2100),
     transaction_type: str | None = None,
-    skip: int = 0,
-    limit: int = 100,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

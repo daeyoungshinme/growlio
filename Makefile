@@ -49,6 +49,9 @@ format:
 	cd frontend && npm run format
 
 db-reset:
+	@echo "WARNING: This will DELETE all database data (docker volumes)!"
+	@echo "Press Ctrl+C to cancel, or wait 5 seconds to continue..."
+	@sleep 5
 	docker compose down -v && docker compose up -d db redis && sleep 3 && $(MAKE) migrate
 
 build-android-debug:

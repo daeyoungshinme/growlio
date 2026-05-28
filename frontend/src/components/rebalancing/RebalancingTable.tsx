@@ -180,7 +180,7 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-700 text-xs text-gray-400">
-              <th className="text-left py-2 px-3 font-medium">종목</th>
+              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">종목</th>
               <th className="text-right py-2 px-3 font-medium">현재 비중</th>
               <th className="text-left py-2 px-3 font-medium">목표 비중</th>
               <th className="text-right py-2 px-3 font-medium">차이</th>
@@ -196,7 +196,7 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
               const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
               return (
               <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
-                <td className="py-3 px-3">
+                <td className="py-3 px-3 sticky left-0 bg-gray-900 hover:bg-gray-700 transition-colors">
                   <div className="font-medium text-gray-100 truncate max-w-[120px]">{item.name}</div>
                   <div className="text-xs text-gray-400">{item.ticker}</div>
                   {isUntracked && (

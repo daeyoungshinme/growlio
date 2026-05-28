@@ -7,6 +7,7 @@ from typing import Any
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.kis.auth import get_access_token
@@ -471,33 +472,26 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[st
 
 
 async def _upsert_snapshot(db: AsyncSession, *, account_id, user_id, snapshot_date, amount_krw, source, **kwargs) -> AssetSnapshot:
-    existing = await db.scalar(
-        select(AssetSnapshot).where(
-            AssetSnapshot.account_id == account_id,
-            AssetSnapshot.snapshot_date == snapshot_date,
+    set_values = {"amount_krw": amount_krw, "source": source, **kwargs}
+    stmt = (
+        pg_insert(AssetSnapshot)
+        .values(
+            account_id=account_id,
+            user_id=user_id,
+            snapshot_date=snapshot_date,
+            amount_krw=amount_krw,
+            source=source,
+            **kwargs,
         )
+        .on_conflict_do_update(
+            constraint="uq_snapshot_account_date",
+            set_=set_values,
+        )
+        .returning(AssetSnapshot)
     )
-    if existing:
-        existing.amount_krw = amount_krw
-        existing.source = source
-        for k, v in kwargs.items():
-            setattr(existing, k, v)
-        await db.commit()
-        await db.refresh(existing)
-        return existing
-
-    snap = AssetSnapshot(
-        account_id=account_id,
-        user_id=user_id,
-        snapshot_date=snapshot_date,
-        amount_krw=amount_krw,
-        source=source,
-        **kwargs,
-    )
-    db.add(snap)
+    result = await db.execute(stmt)
     await db.commit()
-    await db.refresh(snap)
-    return snap
+    return result.scalar_one()
 
 
 async def _calc_returns(

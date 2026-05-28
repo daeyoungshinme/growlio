@@ -68,6 +68,8 @@ class AssetAccount(Base):
     snapshots: Mapped[list["AssetSnapshot"]] = relationship(back_populates="account")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account")
 
+    __table_args__ = (Index("idx_asset_accounts_user_id", "user_id"),)
+
 
 class AssetSnapshot(Base):
     """일별 자산 스냅샷 — 추이 차트 및 수익률 계산용"""

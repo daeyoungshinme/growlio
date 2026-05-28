@@ -7,6 +7,7 @@ import PortfolioAnalysisTab from "../components/portfolio-analysis/PortfolioAnal
 import AccountCard from "../components/assets/AccountCard";
 import StockHoldingsTable from "../components/assets/StockHoldingsTable";
 import TreemapChart from "../components/portfolio/TreemapChart";
+import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
 import { fmtKrwShort } from "../utils/format";
 import { extractErrorMessage } from "../utils/error";
@@ -186,10 +187,7 @@ export default function PortfolioPage() {
 
       {tab === "증권사 계좌" && (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <TreemapChart data={marketChartData} title="국내/해외 주식 비중" />
-            <TreemapChart data={stockChartData} title="종목별 비중 (주식 내)" />
-          </div>
+          <DomesticForeignBar items={marketChartData} />
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">

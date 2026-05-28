@@ -18,6 +18,7 @@ from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
 from app.redis_client import get_redis
+from app.services.credential_service import decrypt, encrypt
 
 router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
@@ -61,8 +62,8 @@ async def open_banking_callback(
         settings_row = UserSettings(user_id=user_id)
         db.add(settings_row)
 
-    settings_row.ob_access_token = access_token
-    settings_row.ob_refresh_token = refresh_token
+    settings_row.ob_access_token = encrypt(access_token) if access_token else None
+    settings_row.ob_refresh_token = encrypt(refresh_token) if refresh_token else None
     settings_row.ob_user_seq_no = user_seq_no
     settings_row.ob_token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
     await db.commit()
@@ -83,7 +84,7 @@ async def list_ob_accounts(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.")
 
     accounts = await get_user_accounts(
-        access_token=settings_row.ob_access_token,
+        access_token=decrypt(settings_row.ob_access_token),
         user_seq_no=settings_row.ob_user_seq_no or "",
     )
     return {
