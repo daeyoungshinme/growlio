@@ -11,9 +11,9 @@ interface Props {
 
 export default function AssetAllocationChart({ data, compact = false }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  const height = compact ? 128 : 240;
-  const innerRadius = compact ? 28 : 60;
-  const outerRadius = compact ? 46 : 90;
+  const height = compact ? 164 : 400;
+  const innerRadius = compact ? 36 : 100;
+  const outerRadius = compact ? 62 : 158;
 
   return (
     <div className="flex flex-col">

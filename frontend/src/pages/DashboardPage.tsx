@@ -18,6 +18,32 @@ import type { PortfolioOverview } from "../types";
 const fetchOverviewSummary = () =>
   api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
+function estimateGoalMonth(
+  currentAssets: number,
+  goalAmount: number | null,
+  goalAnnualReturnPct: number | null,
+  annualDepositGoal: number | null
+): { year: number; month: number } | null {
+  if (goalAmount == null || goalAmount <= 0) return null;
+  if (currentAssets >= goalAmount) {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  }
+  const rMonthly = Math.pow(1 + (goalAnnualReturnPct ?? 0) / 100, 1 / 12) - 1;
+  const pmt = (annualDepositGoal ?? 0) / 12;
+  if (rMonthly <= 0 && pmt <= 0) return null;
+  let assets = currentAssets;
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth() + 1;
+  for (let i = 0; i < 1200; i++) {
+    assets = assets * (1 + rMonthly) + pmt;
+    month++;
+    if (month > 12) { month = 1; year++; }
+    if (assets >= goalAmount) return { year, month };
+  }
+  return null;
+}
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -118,6 +144,23 @@ export default function DashboardPage() {
       ? "text-green-600"
       : "text-blue-600 dark:text-blue-400";
 
+  const goalAchievementColor =
+    data.goal_achievement_pct == null
+      ? "text-gray-400 dark:text-gray-500"
+      : data.goal_achievement_pct >= 100
+      ? "text-red-500"
+      : data.goal_achievement_pct >= 80
+      ? "text-orange-500"
+      : "text-gray-600 dark:text-gray-300";
+
+  const estimatedDate = estimateGoalMonth(
+    data.total_assets_krw,
+    data.goal_amount ?? null,
+    data.goal_annual_return_pct ?? null,
+    data.annual_deposit_goal ?? null
+  );
+
+
   return (
     <div className="space-y-6">
       {/* Row 1: Hero Card — 자산 현황 + 핵심 지표 통합 */}
@@ -127,13 +170,13 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-              <p className="text-2xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
+              <p className="text-3xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
-              <p className={`text-2xl font-bold mt-0.5 ${
+              <p className={`text-xl font-bold mt-0.5 ${
                 data.cumulative_return_pct == null
                   ? "text-gray-400 dark:text-gray-500"
                   : data.cumulative_return_pct >= 0
@@ -144,45 +187,57 @@ export default function DashboardPage() {
               </p>
             </div>
           </div>
-          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">목표 수익률</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">목표수익률(연간)</p>
               <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
                 {data.goal_annual_return_pct != null ? `${data.goal_annual_return_pct}%` : "미설정"}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">연간</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">입금 달성률</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                {data.annual_deposit_goal != null
+                  ? `입금 달성률(${fmtKrw(data.annual_deposit_goal)})`
+                  : "입금 달성률"}
+              </p>
               <p className={`text-sm font-semibold mt-0.5 ${depositColor}`}>
                 {data.deposit_achievement_pct != null
                   ? `${data.deposit_achievement_pct.toFixed(1)}%`
                   : "목표 미설정"}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {data.annual_deposit_goal != null
-                  ? `${(data.annual_deposit_goal / 1e4).toFixed(0)}만원 목표`
-                  : "미설정"}
-              </p>
             </div>
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">은퇴 목표</p>
               <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{retirementLabel}</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {data.retirement_target_year ? "목표 연도" : "미설정"}
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">목표 자산</p>
+              <p className={`text-sm font-semibold mt-0.5 ${data.goal_amount != null ? "text-emerald-600 dark:text-emerald-400" : "text-gray-400 dark:text-gray-500"}`}>
+                {data.goal_amount != null ? fmtKrw(data.goal_amount) : "미설정"}
               </p>
             </div>
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">USD/KRW</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                {estimatedDate != null
+                  ? `달성률(${estimatedDate.year}.${estimatedDate.month})`
+                  : "달성률"}
+              </p>
+              <p className={`text-sm font-semibold mt-0.5 ${goalAchievementColor}`}>
+                {data.goal_achievement_pct != null
+                  ? `${data.goal_achievement_pct.toFixed(1)}%`
+                  : "목표 미설정"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
                 {exchangeRate ? Math.round(exchangeRate.usd_krw).toLocaleString() + "원" : "—"}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">기준환율</p>
             </div>
           </div>
         </div>
         {/* 모바일: 컴팩트 도넛 차트 (우측 고정) */}
-        <div className="lg:hidden w-28 sm:w-36 shrink-0">
+        <div className="lg:hidden w-32 sm:w-40 shrink-0">
           {allocationChartData.length > 0 ? (
             <AssetAllocationChart data={allocationChartData} compact />
           ) : (
@@ -192,7 +247,7 @@ export default function DashboardPage() {
           )}
         </div>
         {/* 데스크탑: 풀사이즈 도넛 차트 */}
-        <div className="hidden lg:block lg:w-72 shrink-0">
+        <div className="hidden lg:block lg:w-[460px] shrink-0">
           {allocationChartData.length > 0 ? (
             <AssetAllocationChart data={allocationChartData} />
           ) : (
@@ -226,7 +281,6 @@ export default function DashboardPage() {
           <DividendSection
             annualReceived={data.annual_dividends_received ?? null}
             estimatedAnnual={data.estimated_annual_dividends ?? null}
-            monthlyBreakdown={data.dividend_monthly_breakdown ?? []}
             tickerItems={tickerDividends}
             tickerItemsLoading={tickerDividendsLoading}
           />

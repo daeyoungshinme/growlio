@@ -1,40 +1,34 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { DividendMonthlyBreakdown, TickerDividendItem } from "../../api/dashboard";
+import { TickerDividendItem } from "../../api/dashboard";
 import DividendByTickerTable from "./DividendByTickerTable";
-import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
-import { chartTooltipStyle } from "../../utils/chart";
 
 interface Props {
   annualReceived: number | null;
   estimatedAnnual: number | null;
-  monthlyBreakdown: DividendMonthlyBreakdown[];
   tickerItems?: TickerDividendItem[];
   tickerItemsLoading?: boolean;
 }
 
 function StatBox({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 flex-1">
+    <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 flex-1">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-xl font-bold text-gray-900 dark:text-gray-50 mt-1">{value}</p>
+      <p className="text-base font-semibold text-gray-900 dark:text-gray-50 mt-1">{value}</p>
       {sub && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{sub}</p>}
     </div>
   );
 }
 
-export default function DividendSection({ annualReceived, estimatedAnnual, monthlyBreakdown, tickerItems, tickerItemsLoading }: Props) {
-  const hasData = monthlyBreakdown.length > 0;
+export default function DividendSection({ annualReceived, estimatedAnnual, tickerItems, tickerItemsLoading }: Props) {
   const [showTicker, setShowTicker] = useState(false);
-  const isDark = useThemeStore((s) => s.isDark);
   const filteredTickerItems = (tickerItems ?? [])
     .filter((d) => d.estimated_annual_krw > 0)
     .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex gap-3">
         <StatBox
           label="올해 배당금"
@@ -47,36 +41,6 @@ export default function DividendSection({ annualReceived, estimatedAnnual, month
           sub="배당수익률 기준 추정"
         />
       </div>
-
-      {hasData && (
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 font-medium">월별 배당 수령 현황</p>
-          <ResponsiveContainer width="100%" height={120}>
-            <BarChart data={monthlyBreakdown} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-              <XAxis
-                dataKey="month"
-                tick={{ fontSize: 11, fill: "#9CA3AF" }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => v.slice(5)}
-              />
-              <YAxis hide />
-              <Tooltip
-                formatter={(v: number) => [fmtKrw(v), "배당금"]}
-                cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)" }}
-                {...chartTooltipStyle(isDark)}
-              />
-              <Bar dataKey="amount" fill="#16A34A" radius={[3, 3, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {!hasData && (
-        <p className="text-xs text-gray-300 dark:text-gray-600 text-center py-2">
-          포트폴리오 페이지에서 계좌별 배당금 내역을 추가하면 여기에 표시됩니다
-        </p>
-      )}
 
       <div>
         <button
