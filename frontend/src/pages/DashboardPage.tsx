@@ -258,18 +258,18 @@ export default function DashboardPage() {
               </thead>
               <tbody>
                 {data.monthly_trend.length === 0 ? (
-                  <tr><td colSpan={3} className="py-8 text-center text-gray-300 dark:text-gray-600 text-sm">데이터 없음</td></tr>
+                  <tr><td colSpan={3} className="py-8 text-center text-gray-300 dark:text-gray-600 text-xs">데이터 없음</td></tr>
                 ) : (
                   [...data.monthly_trend].reverse().map((row, i, arr) => {
                     const prev = arr[i + 1];
                     const change = prev ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100 : null;
                     return (
                       <tr key={row.month} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                        <td className="py-2.5 px-3 text-sm text-gray-700 dark:text-gray-300">{fmtMonth(row.month)}</td>
-                        <td className="py-2.5 px-3 text-sm text-right font-medium text-gray-900 dark:text-gray-50">
+                        <td className="py-2.5 px-3 text-xs text-gray-700 dark:text-gray-300">{fmtMonth(row.month)}</td>
+                        <td className="py-2.5 px-3 text-xs text-right font-medium text-gray-900 dark:text-gray-50">
                           {fmtKrw(row.total_krw)}
                         </td>
-                        <td className="py-2.5 px-3 text-sm text-right">
+                        <td className="py-2.5 px-3 text-xs text-right">
                           {change != null ? (
                             <span className={change >= 0 ? "text-red-500 font-medium" : "text-blue-500 font-medium"}>
                               {change >= 0 ? "+" : ""}{change.toFixed(2)}%

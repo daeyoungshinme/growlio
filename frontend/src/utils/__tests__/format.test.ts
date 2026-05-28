@@ -17,6 +17,11 @@ describe("fmtKrw", () => {
     expect(fmtKrw(0)).toBe("0원");
   });
 
+  it("소수점 절삭 (원 단위)", () => {
+    expect(fmtKrw(3500.75)).toBe("3,500원");
+    expect(fmtKrw(9999.99)).toBe("9,999원");
+  });
+
   it("음수 처리", () => {
     expect(fmtKrw(-150_000_000)).toBe("-1.50억원");
     expect(fmtKrw(-50_000)).toBe("-5만원");
@@ -41,6 +46,10 @@ describe("fmtKrwShort", () => {
 
   it("만 단위 (원 없음)", () => {
     expect(fmtKrwShort(50_000)).toBe("5만");
+  });
+
+  it("소수점 절삭 (원 단위)", () => {
+    expect(fmtKrwShort(3500.75)).toBe("3,500");
   });
 });
 

@@ -165,7 +165,7 @@ export default function StockPositionsModal({
   // 달러 평단가 입력
   const handleAvgPriceUsd = (i: number, usdVal: string) => {
     const usd = usdVal === "" ? 0 : parseFloat(usdVal) || 0;
-    const krw = usdRate ? Math.round(usd * usdRate) : 0;
+    const krw = usdRate ? Math.floor(usd * usdRate) : 0;
     setRow(i, { avg_price_usd: usd || null, usd_rate: usdRate, avg_price: krw });
   };
 
@@ -394,7 +394,7 @@ export default function StockPositionsModal({
                             </div>
                             {usdRate && (row.avg_price_usd ?? 0) > 0 && (
                               <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                                ≈ ₩{Math.round((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
+                                ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
                               </div>
                             )}
                           </div>

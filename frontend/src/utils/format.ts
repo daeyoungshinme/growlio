@@ -7,7 +7,7 @@
 export function fmtKrw(n: number): string {
   if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(2)}억원`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만원`;
-  return `${n.toLocaleString()}원`;
+  return `${Math.floor(n).toLocaleString()}원`;
 }
 
 /**
@@ -25,7 +25,7 @@ export function fmtKrwNullable(n: number | null | undefined): string {
 export function fmtKrwShort(n: number): string {
   if (Math.abs(n) >= 1e8) return `${(n / 1e8).toFixed(1)}억`;
   if (Math.abs(n) >= 1e4) return `${Math.round(n / 1e4).toLocaleString()}만`;
-  return `${n.toLocaleString()}`;
+  return `${Math.floor(n).toLocaleString()}`;
 }
 
 /**
