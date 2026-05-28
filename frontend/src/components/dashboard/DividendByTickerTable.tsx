@@ -93,7 +93,72 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
   return (
     <div>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 font-medium">종목별 배당 현황</p>
-      <div className="overflow-x-auto">
+
+      {/* 모바일 카드 뷰 */}
+      <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+        {isLoading ? (
+          <div className="py-6 text-center text-xs text-gray-300 dark:text-gray-600">로딩 중...</div>
+        ) : items.length === 0 ? (
+          <div className="py-6 text-center text-xs text-gray-300 dark:text-gray-600">보유 종목 없음</div>
+        ) : (
+          items.map((item, idx) => {
+            const pct = totalEstimated > 0 ? (item.estimated_annual_krw / totalEstimated) * 100 : 0;
+            return (
+              <div key={item.ticker ?? `unclassified-${idx}`} className="py-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 dark:text-gray-200 truncate text-xs">{item.name}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      {item.ticker ?? "미분류"}
+                      {(item.investment_yield ?? 0) > 0 && ` · 배당율 ${item.investment_yield.toFixed(2)}%`}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    {item.estimated_annual_krw > 0 ? (
+                      <>
+                        <p className="text-xs font-medium text-green-600 dark:text-green-400">{fmtKrwShort(item.estimated_annual_krw)}원</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {item.currency === "USD" && item.estimated_monthly_usd != null
+                            ? `$${item.estimated_monthly_usd.toFixed(2)}/월`
+                            : `월 ${fmtKrwShort(item.estimated_monthly_krw)}원`}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-300 dark:text-gray-600">—</p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                  <MonthBadges months={item.dividend_months ?? []} isManual={item.dividend_months_is_manual ?? false} />
+                  {item.estimated_annual_krw > 0 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">비중 {pct.toFixed(1)}%</span>
+                  )}
+                  {item.ticker && (
+                    <button
+                      onClick={() =>
+                        setEditTarget({
+                          ticker: item.ticker!,
+                          market: item.market ?? "",
+                          name: item.name,
+                          currentMonths: item.dividend_months,
+                          isManual: item.dividend_months_is_manual,
+                        })
+                      }
+                      className="p-0.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded transition-colors"
+                      title="배당월 수정"
+                    >
+                      <Pencil size={10} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* 데스크탑 테이블 */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full min-w-[380px] text-xs">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-700">

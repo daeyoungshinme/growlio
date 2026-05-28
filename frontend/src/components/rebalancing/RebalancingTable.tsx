@@ -175,8 +175,40 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
         </div>
       )}
 
-      {/* 리밸런싱 테이블 */}
-      <div className="overflow-x-auto">
+      {/* 리밸런싱 테이블 — 모바일 카드 뷰 */}
+      <div className="sm:hidden divide-y divide-gray-700">
+        {analysis.items.map((item, idx) => {
+          const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
+          return (
+            <div key={idx} className="py-3 px-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-medium text-gray-100 truncate text-sm">{item.name}</p>
+                    {isUntracked && <span className="text-xs text-amber-500 shrink-0">목표 외</span>}
+                  </div>
+                  <p className="text-xs text-gray-400">{item.ticker} · 현재 {item.current_weight_pct.toFixed(1)}%</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <DiffCell diff={item.diff_krw} />
+                  <p className="text-xs text-gray-400 mt-0.5"><SharesCell item={item} /></p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <WeightBar current={item.current_weight_pct} target={item.target_weight_pct} />
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
+                <span>현재 {fmtKrw(item.current_value_krw)}</span>
+                <span>→ 목표 {fmtKrw(item.target_value_krw)}</span>
+                <WeightDiffBadge diff={item.weight_diff_pct} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 리밸런싱 테이블 — 데스크탑 테이블 */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-700 text-xs text-gray-400">
@@ -269,43 +301,66 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
             </div>
           </div>
 
-          {/* 종목별 배당 상세 테이블 */}
+          {/* 종목별 배당 상세 — 모바일 카드 */}
           {showDividendDetail && dividendItems.length > 0 && (
-            <div className="overflow-x-auto mt-2">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-600 text-xs text-gray-400">
-                    <th className="text-left py-2 px-3 font-medium">종목</th>
-                    <th className="text-right py-2 px-3 font-medium">배당수익률</th>
-                    <th className="text-right py-2 px-3 font-medium">현재 연배당</th>
-                    <th className="text-right py-2 px-3 font-medium">목표 연배당</th>
-                    <th className="text-right py-2 px-3 font-medium">배당 증감</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dividendItems.map((item, idx) => (
-                    <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
-                      <td className="py-2 px-3">
-                        <div className="font-medium text-gray-100 text-xs truncate max-w-[120px]">{item.name}</div>
-                        <div className="text-xs text-gray-400">{item.ticker}</div>
-                      </td>
-                      <td className="py-2 px-3 text-right text-xs text-gray-300">
-                        {item.dividend_yield != null ? `${item.dividend_yield.toFixed(2)}%` : "-"}
-                      </td>
-                      <td className="py-2 px-3 text-right text-xs text-gray-300">
-                        {fmtKrw(item.annual_dividend_current_krw ?? 0)}
-                      </td>
-                      <td className="py-2 px-3 text-right text-xs text-gray-300">
-                        {fmtKrw(item.annual_dividend_target_krw ?? 0)}
-                      </td>
-                      <td className="py-2 px-3 text-right">
+            <>
+              <div className="sm:hidden divide-y divide-gray-700 mt-2">
+                {dividendItems.map((item, idx) => (
+                  <div key={idx} className="py-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-100 text-xs truncate">{item.name}</p>
+                        <p className="text-xs text-gray-400">{item.ticker}{item.dividend_yield != null && ` · 배당율 ${item.dividend_yield.toFixed(2)}%`}</p>
+                      </div>
+                      <div className="text-right shrink-0">
                         <DividendDiffCell diff={item.annual_dividend_diff_krw ?? 0} />
-                      </td>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
+                      <span>현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}</span>
+                      <span>→ 목표 {fmtKrw(item.annual_dividend_target_krw ?? 0)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 종목별 배당 상세 — 데스크탑 테이블 */}
+              <div className="hidden sm:block overflow-x-auto mt-2">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-600 text-xs text-gray-400">
+                      <th className="text-left py-2 px-3 font-medium">종목</th>
+                      <th className="text-right py-2 px-3 font-medium">배당수익률</th>
+                      <th className="text-right py-2 px-3 font-medium">현재 연배당</th>
+                      <th className="text-right py-2 px-3 font-medium">목표 연배당</th>
+                      <th className="text-right py-2 px-3 font-medium">배당 증감</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {dividendItems.map((item, idx) => (
+                      <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
+                        <td className="py-2 px-3">
+                          <div className="font-medium text-gray-100 text-xs truncate max-w-[120px]">{item.name}</div>
+                          <div className="text-xs text-gray-400">{item.ticker}</div>
+                        </td>
+                        <td className="py-2 px-3 text-right text-xs text-gray-300">
+                          {item.dividend_yield != null ? `${item.dividend_yield.toFixed(2)}%` : "-"}
+                        </td>
+                        <td className="py-2 px-3 text-right text-xs text-gray-300">
+                          {fmtKrw(item.annual_dividend_current_krw ?? 0)}
+                        </td>
+                        <td className="py-2 px-3 text-right text-xs text-gray-300">
+                          {fmtKrw(item.annual_dividend_target_krw ?? 0)}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <DividendDiffCell diff={item.annual_dividend_diff_krw ?? 0} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

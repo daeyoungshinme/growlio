@@ -502,48 +502,84 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         ) : filtered.length === 0 ? (
           <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">등록된 내역이 없습니다.</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
-                <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
-                <th className="text-right px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
-                <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">계좌</th>
-                <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
-                <th className="px-3 py-3" />
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* 모바일 카드 뷰 */}
+            <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
               {filtered.map((tx: Transaction) => (
-                <tr key={tx.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{tx.transaction_date}</td>
-                  <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
-                    <span>{TX_LABELS[tx.transaction_type]}</span>
-                    {tx.ticker && <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">{tx.ticker}</span>}
-                  </td>
-                  <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">{fmtKrw(tx.amount)}</td>
-                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
-                    {tx.account_id ? (accountMap[tx.account_id] ?? "—") : "—"}
-                  </td>
-                  <td className="px-3 py-3 text-gray-400 dark:text-gray-500 text-sm">
-                    <div className="max-w-[160px] truncate">{tx.notes || "—"}</div>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex justify-end gap-1">
+                <div key={tx.id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-medium ${TX_COLORS[tx.transaction_type]}`}>{TX_LABELS[tx.transaction_type]}</span>
+                        {tx.ticker && <span className="text-xs text-gray-400 dark:text-gray-500">{tx.ticker}</span>}
+                      </div>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                        {tx.transaction_date} · {tx.account_id ? (accountMap[tx.account_id] ?? "—") : "—"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrw(tx.amount)}</p>
                       <button onClick={() => startEdit(tx)}
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
-                        <Pencil size={15} />
+                        <Pencil size={14} />
                       </button>
                       <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </div>
+                  {tx.notes && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{tx.notes}</p>
+                  )}
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+
+            {/* 데스크탑 테이블 */}
+            <table className="hidden sm:table w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
+                  <th className="text-right px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">계좌</th>
+                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
+                  <th className="px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((tx: Transaction) => (
+                  <tr key={tx.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{tx.transaction_date}</td>
+                    <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
+                      <span>{TX_LABELS[tx.transaction_type]}</span>
+                      {tx.ticker && <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">{tx.ticker}</span>}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">{fmtKrw(tx.amount)}</td>
+                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
+                      {tx.account_id ? (accountMap[tx.account_id] ?? "—") : "—"}
+                    </td>
+                    <td className="px-3 py-3 text-gray-400 dark:text-gray-500 text-sm">
+                      <div className="max-w-[160px] truncate">{tx.notes || "—"}</div>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => startEdit(tx)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
+                          <Pencil size={15} />
+                        </button>
+                        <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending}
+                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         )}
       </div>
     </div>

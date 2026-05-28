@@ -17,7 +17,28 @@ export default function BacktestMetricsTable({ metrics }: Props) {
   return (
     <div>
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-2">성과 지표 비교</p>
-      <div className="overflow-x-auto">
+      {/* 모바일 카드 뷰 */}
+      <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+        {metrics.map((m, i) => (
+          <div key={m.name} className="py-2.5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="inline-block w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                <p className="font-medium text-gray-800 dark:text-gray-200 text-sm truncate">{m.name}</p>
+              </div>
+              <p className={`text-sm font-semibold shrink-0 ${pnlColor(m.total_return_pct)}`}>{fmt(m.total_return_pct)}</p>
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-gray-500 flex-wrap pl-3.5">
+              <span>CAGR <span className={pnlColor(m.cagr_pct)}>{fmt(m.cagr_pct)}</span></span>
+              <span>MDD <span className="text-blue-500">-{m.mdd_pct.toFixed(2)}%</span></span>
+              <span>Sharpe {m.sharpe_ratio.toFixed(3)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 데스크탑 테이블 */}
+      <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-700">

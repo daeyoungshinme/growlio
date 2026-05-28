@@ -27,7 +27,37 @@ export function RebalancingResultSection({ results }: Props) {
               )}
             </span>
           </div>
-          <table className="w-full text-xs">
+          {/* 모바일 카드 뷰 */}
+          <div className="sm:hidden divide-y divide-gray-700/50">
+            {result.orders.map((o, idx) => (
+              <div key={idx} className="px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <SideBadge isBuy={o.side === "BUY"} />
+                      <p className="font-medium text-white truncate text-sm">{o.name}</p>
+                    </div>
+                    <p className="text-gray-400 text-xs mt-0.5">{o.ticker}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <StatusBadge status={o.status} />
+                    <p className="text-gray-300 text-xs mt-0.5">{o.quantity}주</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400 flex-wrap">
+                  <span className={`px-1.5 py-0.5 rounded font-medium text-[11px] ${o.order_type === "LIMIT" ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40" : "bg-gray-700 text-gray-400"}`}>
+                    {o.order_type === "LIMIT" ? "지정가" : "시장가"}
+                  </span>
+                  {(o.order_no ?? o.error_msg) && (
+                    <span className="truncate max-w-[160px]">{o.order_no ?? o.error_msg}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 데스크탑 테이블 */}
+          <table className="hidden sm:table w-full text-xs">
             <thead className="bg-gray-800 text-gray-400">
               <tr>
                 <th className="px-3 py-2 text-left">종목</th>
