@@ -262,8 +262,8 @@ export default function StockPositionsModal({
           </div>
         </div>
 
-        {/* 종목 테이블 */}
-        <div className="flex-1 overflow-auto px-6 py-4">
+        {/* 종목 목록 */}
+        <div className="flex-1 overflow-auto px-4 sm:px-6 py-4">
           {loading ? (
             <div className="text-gray-400 dark:text-gray-500 text-sm py-8 text-center flex items-center justify-center gap-2">
               <Loader2 size={16} className="animate-spin" /> 불러오는 중...
@@ -273,191 +273,369 @@ export default function StockPositionsModal({
               동기화 후 보유종목이 표시됩니다
             </div>
           ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left pb-2 pr-3 font-medium w-52">종목명</th>
-                  <th className="text-right pb-2 pr-3 font-medium w-24">보유수량</th>
-                  <th className="text-right pb-2 pr-3 font-medium w-32">평단가</th>
-                  <th className="text-right pb-2 pr-3 font-medium">매입금액</th>
-                  <th className="text-right pb-2 pr-3 font-medium w-32">현재가(원)</th>
-                  <th className="text-right pb-2 pr-3 font-medium">평가금액</th>
-                  <th className="text-right pb-2 font-medium">수익률</th>
-                  <th className="w-8" />
-                </tr>
-              </thead>
-              <tbody>
+            <>
+              {/* ── 모바일 카드 뷰 (sm 미만) ── */}
+              <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
                 {liveRows.map((row, i) => {
                   const overseas = OVERSEAS.has(row.market);
                   const priceLoading = priceLoadingRows.has(i);
                   return (
-                    <tr key={i} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 align-top">
-
-                      {/* 종목명 + 티커/시장 표시 + 자동완성 */}
-                      <td className="py-2 pr-3">
-                        <div className="relative">
-                          <input
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
-                            value={row.name}
-                            onChange={(e) => handleNameChange(i, e.target.value)}
-                            onFocus={() => { if (row.name && suggestions.length) setSuggestIdx(i); }}
-                            onBlur={() => handleNameBlur(i)}
-                            placeholder="종목명 또는 코드 검색..."
-                            autoComplete="off"
-                            disabled={readonly}
-                          />
-                          {/* 티커 · 시장 표시 */}
-                          {(row.ticker || row.market !== "KOSPI") && (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              {row.ticker && (
-                                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{row.ticker}</span>
-                              )}
-                              {row.ticker && <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>}
-                              <select
-                                className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-none"
-                                value={row.market}
-                                onChange={(e) => {
-                                  const newMarket = e.target.value;
-                                  const wasOverseas = OVERSEAS.has(row.market);
-                                  const nowOverseas = OVERSEAS.has(newMarket);
-                                  if (wasOverseas !== nowOverseas) {
-                                    setRow(i, { market: newMarket, avg_price: 0, avg_price_usd: null, usd_rate: null });
-                                  } else {
-                                    setRow(i, { market: newMarket });
-                                  }
-                                }}
-                              >
-                                <option value="KOSPI">KOSPI</option>
-                                <option value="KOSDAQ">KOSDAQ</option>
-                                <option value="NYSE">NYSE</option>
-                                <option value="NASDAQ">NASDAQ</option>
-                                <option value="AMEX">AMEX</option>
-                              </select>
-                            </div>
-                          )}
-                          {/* 검색 중 인디케이터 */}
-                          {searchLoading && suggestIdx === i && (
-                            <span className="absolute right-2 top-2">
-                              <Loader2 size={12} className="animate-spin text-gray-400" />
-                            </span>
-                          )}
-                          {/* 자동완성 드롭다운 */}
-                          {suggestIdx === i && suggestions.length > 0 && (
-                            <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-52 overflow-y-auto">
-                              {suggestions.map((s, si) => (
-                                <button
-                                  key={si}
-                                  className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-blue-50 dark:hover:bg-blue-950 text-left"
-                                  onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(i, s); }}
-                                >
-                                  <span className="flex flex-col">
-                                    <span className="font-medium text-gray-900 dark:text-gray-50">{s.name}</span>
-                                    <span className="text-gray-400 dark:text-gray-500 font-mono">{s.ticker}</span>
-                                  </span>
-                                  <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-1.5 py-0.5 ml-2 shrink-0 text-xs">{s.market}</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* 보유수량 */}
-                      <td className="py-2 pr-3">
+                    <div key={i} className="py-4 space-y-3">
+                      {/* 종목명 검색 */}
+                      <div className="relative">
                         <input
-                          type="number"
-                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
-                          value={row.qty || ""}
-                          onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
-                          min={0}
-                          placeholder="0"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                          value={row.name}
+                          onChange={(e) => handleNameChange(i, e.target.value)}
+                          onFocus={() => { if (row.name && suggestions.length) setSuggestIdx(i); }}
+                          onBlur={() => handleNameBlur(i)}
+                          placeholder="종목명 또는 코드 검색..."
+                          autoComplete="off"
                           disabled={readonly}
                         />
-                      </td>
-
-                      {/* 평단가 — 해외: 달러 입력, 국내: 원화 입력 */}
-                      <td className="py-2 pr-3">
-                        {overseas ? (
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-gray-400 shrink-0">$</span>
-                              <input
-                                type="number"
-                                className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
-                                value={row.avg_price_usd ?? ""}
-                                onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
-                                placeholder="0.00"
-                                min={0}
-                                step="0.01"
-                                disabled={readonly}
-                              />
-                            </div>
-                            {usdRate && (row.avg_price_usd ?? 0) > 0 && (
-                              <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                                ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
-                              </div>
-                            )}
+                        {searchLoading && suggestIdx === i && (
+                          <span className="absolute right-3 top-3">
+                            <Loader2 size={14} className="animate-spin text-gray-400" />
+                          </span>
+                        )}
+                        {suggestIdx === i && suggestions.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-52 overflow-y-auto">
+                            {suggestions.map((s, si) => (
+                              <button
+                                key={si}
+                                className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-950 text-left"
+                                onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(i, s); }}
+                              >
+                                <span className="flex flex-col">
+                                  <span className="font-medium text-gray-900 dark:text-gray-50">{s.name}</span>
+                                  <span className="text-gray-400 dark:text-gray-500 font-mono text-xs">{s.ticker}</span>
+                                </span>
+                                <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 ml-2 shrink-0 text-xs">{s.market}</span>
+                              </button>
+                            ))}
                           </div>
-                        ) : (
+                        )}
+                      </div>
+
+                      {/* 마켓 선택 + 삭제 버튼 */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {row.ticker && (
+                            <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{row.ticker}</span>
+                          )}
+                          <select
+                            className="text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg px-2 py-1.5 focus:outline-none disabled:opacity-50"
+                            value={row.market}
+                            disabled={readonly}
+                            onChange={(e) => {
+                              const newMarket = e.target.value;
+                              const wasOverseas = OVERSEAS.has(row.market);
+                              const nowOverseas = OVERSEAS.has(newMarket);
+                              if (wasOverseas !== nowOverseas) {
+                                setRow(i, { market: newMarket, avg_price: 0, avg_price_usd: null, usd_rate: null });
+                              } else {
+                                setRow(i, { market: newMarket });
+                              }
+                            }}
+                          >
+                            <option value="KOSPI">KOSPI</option>
+                            <option value="KOSDAQ">KOSDAQ</option>
+                            <option value="NYSE">NYSE</option>
+                            <option value="NASDAQ">NASDAQ</option>
+                            <option value="AMEX">AMEX</option>
+                          </select>
+                        </div>
+                        {!readonly && (
+                          <button onClick={() => removeRow(i)} className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg">
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* 수량 + 평단가 */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">보유수량</p>
                           <input
                             type="number"
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
-                            value={row.avg_price || ""}
-                            onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
+                            className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                            value={row.qty || ""}
+                            onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
                             min={0}
                             placeholder="0"
                             disabled={readonly}
                           />
-                        )}
-                      </td>
-
-                      {/* 매입금액 (자동계산) */}
-                      <td className="py-2 pr-3 text-right text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {fmtKrwShort(row.invested_amount ?? 0)}원
-                      </td>
-
-                      {/* 현재가 — 자동조회 or 수동 입력 */}
-                      <td className="py-2 pr-3">
-                        <div className="relative">
-                          <input
-                            type="number"
-                            className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-                            value={priceLoading ? "" : (rows[i].current_price ?? "")}
-                            onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
-                            placeholder={priceLoading ? "조회중..." : "자동조회"}
-                            min={0}
-                            disabled={priceLoading}
-                          />
-                          {priceLoading && (
-                            <span className="absolute right-2 top-2">
-                              <Loader2 size={12} className="animate-spin text-blue-400" />
-                            </span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">평단가</p>
+                          {overseas ? (
+                            <div>
+                              <div className="flex items-center gap-1">
+                                <span className="text-sm text-gray-400 shrink-0">$</span>
+                                <input
+                                  type="number"
+                                  className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                                  value={row.avg_price_usd ?? ""}
+                                  onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
+                                  placeholder="0.00"
+                                  min={0}
+                                  step="0.01"
+                                  disabled={readonly}
+                                />
+                              </div>
+                              {usdRate && (row.avg_price_usd ?? 0) > 0 && (
+                                <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
+                                  ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <input
+                              type="number"
+                              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                              value={row.avg_price || ""}
+                              onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
+                              min={0}
+                              placeholder="0"
+                              disabled={readonly}
+                            />
                           )}
                         </div>
-                      </td>
+                      </div>
 
-                      {/* 평가금액 (자동계산) */}
-                      <td className="py-2 pr-3 text-right text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        {fmtKrwShort(row.value_amount ?? 0)}원
-                      </td>
+                      {/* 현재가 + 매입금액 */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">현재가(원)</p>
+                          <div className="relative">
+                            <input
+                              type="number"
+                              className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                              value={priceLoading ? "" : (rows[i].current_price ?? "")}
+                              onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
+                              placeholder={priceLoading ? "조회중..." : "자동조회"}
+                              min={0}
+                              disabled={priceLoading}
+                            />
+                            {priceLoading && (
+                              <span className="absolute right-3 top-3">
+                                <Loader2 size={14} className="animate-spin text-blue-400" />
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">매입금액</p>
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 pt-2.5 text-right">
+                            {fmtKrwShort(row.invested_amount ?? 0)}원
+                          </p>
+                        </div>
+                      </div>
 
-                      {/* 수익률 (자동계산) */}
-                      <td className="py-2 pr-3">
-                        <PnlCell val={row.pnl ?? 0} pct={row.pnl_pct ?? 0} />
-                      </td>
-
-                      <td className="py-2">
-                        {!readonly && (
-                          <button onClick={() => removeRow(i)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded">
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
+                      {/* 평가금액 + 수익률 */}
+                      <div className="grid grid-cols-2 gap-3 pb-1">
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">평가금액</p>
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                            {fmtKrwShort(row.value_amount ?? 0)}원
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">수익률</p>
+                          <PnlCell val={row.pnl ?? 0} pct={row.pnl_pct ?? 0} />
+                        </div>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
+              </div>
+
+              {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
+                      <th className="text-left pb-2 pr-3 font-medium w-52">종목명</th>
+                      <th className="text-right pb-2 pr-3 font-medium w-24">보유수량</th>
+                      <th className="text-right pb-2 pr-3 font-medium w-32">평단가</th>
+                      <th className="text-right pb-2 pr-3 font-medium">매입금액</th>
+                      <th className="text-right pb-2 pr-3 font-medium w-32">현재가(원)</th>
+                      <th className="text-right pb-2 pr-3 font-medium">평가금액</th>
+                      <th className="text-right pb-2 font-medium">수익률</th>
+                      <th className="w-8" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {liveRows.map((row, i) => {
+                      const overseas = OVERSEAS.has(row.market);
+                      const priceLoading = priceLoadingRows.has(i);
+                      return (
+                        <tr key={i} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 align-top">
+
+                          {/* 종목명 + 티커/시장 표시 + 자동완성 */}
+                          <td className="py-2 pr-3">
+                            <div className="relative">
+                              <input
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                                value={row.name}
+                                onChange={(e) => handleNameChange(i, e.target.value)}
+                                onFocus={() => { if (row.name && suggestions.length) setSuggestIdx(i); }}
+                                onBlur={() => handleNameBlur(i)}
+                                placeholder="종목명 또는 코드 검색..."
+                                autoComplete="off"
+                                disabled={readonly}
+                              />
+                              {(row.ticker || row.market !== "KOSPI") && (
+                                <div className="flex items-center gap-1 mt-0.5">
+                                  {row.ticker && (
+                                    <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{row.ticker}</span>
+                                  )}
+                                  {row.ticker && <span className="text-gray-300 dark:text-gray-600 text-xs">·</span>}
+                                  <select
+                                    className="text-xs text-gray-400 dark:text-gray-500 border-0 bg-transparent p-0 cursor-pointer focus:outline-none"
+                                    value={row.market}
+                                    onChange={(e) => {
+                                      const newMarket = e.target.value;
+                                      const wasOverseas = OVERSEAS.has(row.market);
+                                      const nowOverseas = OVERSEAS.has(newMarket);
+                                      if (wasOverseas !== nowOverseas) {
+                                        setRow(i, { market: newMarket, avg_price: 0, avg_price_usd: null, usd_rate: null });
+                                      } else {
+                                        setRow(i, { market: newMarket });
+                                      }
+                                    }}
+                                  >
+                                    <option value="KOSPI">KOSPI</option>
+                                    <option value="KOSDAQ">KOSDAQ</option>
+                                    <option value="NYSE">NYSE</option>
+                                    <option value="NASDAQ">NASDAQ</option>
+                                    <option value="AMEX">AMEX</option>
+                                  </select>
+                                </div>
+                              )}
+                              {searchLoading && suggestIdx === i && (
+                                <span className="absolute right-2 top-2">
+                                  <Loader2 size={12} className="animate-spin text-gray-400" />
+                                </span>
+                              )}
+                              {suggestIdx === i && suggestions.length > 0 && (
+                                <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-52 overflow-y-auto">
+                                  {suggestions.map((s, si) => (
+                                    <button
+                                      key={si}
+                                      className="w-full flex items-center justify-between px-3 py-2 text-xs hover:bg-blue-50 dark:hover:bg-blue-950 text-left"
+                                      onMouseDown={(e) => { e.preventDefault(); handleSelectSuggestion(i, s); }}
+                                    >
+                                      <span className="flex flex-col">
+                                        <span className="font-medium text-gray-900 dark:text-gray-50">{s.name}</span>
+                                        <span className="text-gray-400 dark:text-gray-500 font-mono">{s.ticker}</span>
+                                      </span>
+                                      <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-1.5 py-0.5 ml-2 shrink-0 text-xs">{s.market}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 보유수량 */}
+                          <td className="py-2 pr-3">
+                            <input
+                              type="number"
+                              className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                              value={row.qty || ""}
+                              onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
+                              min={0}
+                              placeholder="0"
+                              disabled={readonly}
+                            />
+                          </td>
+
+                          {/* 평단가 */}
+                          <td className="py-2 pr-3">
+                            {overseas ? (
+                              <div>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-xs text-gray-400 shrink-0">$</span>
+                                  <input
+                                    type="number"
+                                    className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                                    value={row.avg_price_usd ?? ""}
+                                    onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
+                                    placeholder="0.00"
+                                    min={0}
+                                    step="0.01"
+                                    disabled={readonly}
+                                  />
+                                </div>
+                                {usdRate && (row.avg_price_usd ?? 0) > 0 && (
+                                  <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
+                                    ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
+                                value={row.avg_price || ""}
+                                onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
+                                min={0}
+                                placeholder="0"
+                                disabled={readonly}
+                              />
+                            )}
+                          </td>
+
+                          {/* 매입금액 (자동계산) */}
+                          <td className="py-2 pr-3 text-right text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {fmtKrwShort(row.invested_amount ?? 0)}원
+                          </td>
+
+                          {/* 현재가 */}
+                          <td className="py-2 pr-3">
+                            <div className="relative">
+                              <input
+                                type="number"
+                                className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                                value={priceLoading ? "" : (rows[i].current_price ?? "")}
+                                onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
+                                placeholder={priceLoading ? "조회중..." : "자동조회"}
+                                min={0}
+                                disabled={priceLoading}
+                              />
+                              {priceLoading && (
+                                <span className="absolute right-2 top-2">
+                                  <Loader2 size={12} className="animate-spin text-blue-400" />
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* 평가금액 (자동계산) */}
+                          <td className="py-2 pr-3 text-right text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            {fmtKrwShort(row.value_amount ?? 0)}원
+                          </td>
+
+                          {/* 수익률 (자동계산) */}
+                          <td className="py-2 pr-3">
+                            <PnlCell val={row.pnl ?? 0} pct={row.pnl_pct ?? 0} />
+                          </td>
+
+                          <td className="py-2">
+                            {!readonly && (
+                              <button onClick={() => removeRow(i)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded">
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
 
           {!readonly && (

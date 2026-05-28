@@ -57,11 +57,11 @@ export default function YearlyAchievementTable({ data }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">
-              <th className="text-left py-2 font-medium">연도</th>
-              <th className="text-right py-2 font-medium">이론 연말값</th>
-              <th className="text-right py-2 font-medium">실제 연말값</th>
-              <th className="text-right py-2 font-medium">달성율</th>
-              <th className="text-right py-2 font-medium">차이</th>
+              <th className="text-left py-2 pr-3 font-medium">연도</th>
+              <th className="text-right py-2 px-3 font-medium">이론 연말값</th>
+              <th className="text-right py-2 px-3 font-medium">실제 연말값</th>
+              <th className="text-right py-2 px-3 font-medium">달성율</th>
+              <th className="text-right py-2 pl-3 font-medium">차이</th>
             </tr>
           </thead>
           <tbody>
@@ -72,15 +72,15 @@ export default function YearlyAchievementTable({ data }: Props) {
                   : null;
               return (
                 <tr key={row.year} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="py-2.5 font-medium text-gray-800 dark:text-gray-200">{row.year}년</td>
-                  <td className="py-2.5 text-right text-gray-600 dark:text-gray-400">
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 dark:text-gray-200">{row.year}년</td>
+                  <td className="py-2.5 px-3 text-right text-gray-600 dark:text-gray-400">
                     {fmtKrw(row.projected_year_end_krw)}
                   </td>
-                  <td className="py-2.5 text-right text-gray-900 dark:text-gray-50 font-semibold">
+                  <td className="py-2.5 px-3 text-right text-gray-900 dark:text-gray-50 font-semibold">
                     {row.actual_year_end_krw !== null ? fmtKrw(row.actual_year_end_krw) : "—"}
                   </td>
                   <td
-                    className={`py-2.5 text-right font-bold ${
+                    className={`py-2.5 px-3 text-right font-bold ${
                       row.achievement_pct !== null
                         ? pctColor(row.achievement_pct)
                         : "text-gray-400 dark:text-gray-500"
@@ -91,7 +91,7 @@ export default function YearlyAchievementTable({ data }: Props) {
                       : "—"}
                   </td>
                   <td
-                    className={`py-2.5 text-right text-xs ${
+                    className={`py-2.5 pl-3 text-right text-xs ${
                       diff === null
                         ? "text-gray-400 dark:text-gray-500"
                         : diff >= 0

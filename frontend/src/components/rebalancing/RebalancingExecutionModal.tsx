@@ -18,16 +18,16 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
   const { phase, results, confirmed, orderType } = state;
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+    <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
+      <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-[92vh] flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-700">
           <h2 className="text-base font-semibold text-white">리밸런싱 실행</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors text-xl leading-none">
             ×
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {phase === "confirm" && (
             <RebalancingConfirmStep
               kisAccounts={kisAccounts}
@@ -57,7 +57,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
           {phase === "result" && <RebalancingResultSection results={results} />}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
           {phase === "confirm" && (
             <>
               <button

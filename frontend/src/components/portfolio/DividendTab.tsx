@@ -3,7 +3,6 @@ import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw, fmtKrwShort } from "../../utils/format";
 import { chartTooltipStyle } from "../../utils/chart";
-import StatCard from "../common/StatCard";
 import TreemapChart from "./TreemapChart";
 import type { DividendByTicker, DividendYield } from "../../types";
 
@@ -123,28 +122,32 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard
-          label="예상 연간 배당금"
-          value={totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
-          sub="보유 종목 배당수익률 기준 추정"
-          color="green"
-          size="sm"
-        />
-        <StatCard
-          label="올해 수령 배당금"
-          value={received > 0 ? `${fmtKrwShort(received)}원` : "—"}
-          sub={received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
-          color="gray"
-          size="sm"
-        />
-        <StatCard
-          label="월평균 예상 배당금"
-          value={estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
-          sub="연간 예상 배당금 ÷ 12"
-          color="blue"
-          size="sm"
-        />
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
+          <div className="px-4 py-4 sm:px-5">
+            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">예상 연간 배당금</p>
+            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-green-600">
+              {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">보유 종목 배당수익률 기준 추정</p>
+          </div>
+          <div className="px-4 py-4 sm:px-5">
+            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">올해 수령 배당금</p>
+            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50">
+              {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+              {received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
+            </p>
+          </div>
+          <div className="px-4 py-4 sm:px-5">
+            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">월평균 예상 배당금</p>
+            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-blue-600">
+              {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
+            </p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">연간 예상 배당금 ÷ 12</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">

@@ -74,6 +74,7 @@ export function RebalancingConfirmStep({
     const overseas = isOverseasMarket(market);
     const nativeVal = getLimitPriceNative(key, ticker, market);
     const estKrw = overseas && globalUsdRate != null ? nativeVal * globalUsdRate * qty : nativeVal * qty;
+    const currentNativePrice = overseas ? livePricesUsd[ticker] : livePricesKrw[ticker];
     return (
       <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
@@ -88,12 +89,125 @@ export function RebalancingConfirmStep({
           />
           <span className="text-gray-500 text-[11px]">{overseas ? "USD" : "원"}</span>
         </div>
+        {priceState === "loaded" && currentNativePrice != null && (
+          <button
+            onClick={() => dispatch({ type: "SET_LIMIT_PRICE", key, price: currentNativePrice })}
+            className="text-[10px] text-indigo-400 hover:text-indigo-300 mt-0.5 block ml-auto"
+          >
+            현재가로
+          </button>
+        )}
         {nativeVal > 0 && (
-          <div className="text-[11px] text-gray-600 mt-0.5 text-right">
-            ≈ {fmtKrw(overseas && globalUsdRate != null ? nativeVal * globalUsdRate : nativeVal)} × {qty}주 = {fmtKrw(estKrw)}
+          <div className="text-[11px] text-gray-600 mt-0.5 text-right leading-tight">
+            <div>≈ {fmtKrw(overseas && globalUsdRate != null ? nativeVal * globalUsdRate : nativeVal)} × {qty}주</div>
+            <div>= {fmtKrw(estKrw)}</div>
           </div>
         )}
       </td>
+    );
+  }
+
+  function renderMobileCard(
+    key: string,
+    item: RebalancingItem,
+    qty: number,
+    isBuy: boolean,
+    extra?: React.ReactNode
+  ) {
+    const overseas = isOverseasMarket(item.market);
+    const nativePrice = getLimitPriceNative(key, item.ticker, item.market);
+    const est = getEstimateKrw(key, item.ticker, item.market, qty);
+    const currentNativePrice = overseas ? livePricesUsd[item.ticker] : livePricesKrw[item.ticker];
+    const estKrw =
+      overseas && globalUsdRate != null ? nativePrice * globalUsdRate * qty : nativePrice * qty;
+
+    return (
+      <div key={key} className={`px-4 py-3 ${selected.has(key) ? "bg-indigo-950/20" : ""}`}>
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            checked={selected.has(key)}
+            onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })}
+            className="mt-0.5 w-5 h-5 accent-indigo-500 shrink-0"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-medium text-white text-sm">{item.name}</span>
+              <SideBadge isBuy={isBuy} />
+            </div>
+            <p className="text-gray-400 text-xs mt-0.5">{item.ticker}</p>
+          </div>
+        </div>
+
+        <div className="mt-3 flex items-end gap-3 pl-8">
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-gray-500 mb-1">현재가</p>
+            <div>{renderPriceCell(item.ticker, item.market)}</div>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-gray-500 mb-1">수량</p>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={0}
+                value={qty}
+                onChange={(e) =>
+                  dispatch({
+                    type: isBuy ? "SET_QTY_AND_SELECT" : "SET_QTY",
+                    key,
+                    qty: parseInt(e.target.value) || 0,
+                  })
+                }
+                className={`w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${isBuy ? "text-red-400" : "text-blue-400"}`}
+              />
+              <span className="text-gray-400 text-sm shrink-0">주</span>
+            </div>
+            {est != null && orderType === "MARKET" && (
+              <p className="text-[11px] text-gray-500 mt-1 text-right">≈ {fmtKrw(est)}</p>
+            )}
+            {extra}
+          </div>
+        </div>
+
+        {orderType === "LIMIT" && (
+          <div className="mt-3 pl-8">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[11px] text-gray-500">지정가</p>
+              {priceState === "loaded" && currentNativePrice != null && (
+                <button
+                  onClick={() => dispatch({ type: "SET_LIMIT_PRICE", key, price: currentNativePrice })}
+                  className="text-[11px] text-indigo-400 hover:text-indigo-300"
+                >
+                  현재가로
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                step={overseas ? 0.01 : 1}
+                value={nativePrice || ""}
+                placeholder={overseas ? "USD 입력" : "원 입력"}
+                onChange={(e) =>
+                  dispatch({ type: "SET_LIMIT_PRICE", key, price: parseFloat(e.target.value) || 0 })
+                }
+                className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-3 py-2 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
+              />
+              <span className="text-gray-400 text-sm shrink-0">{overseas ? "USD" : "원"}</span>
+            </div>
+            {nativePrice > 0 && (
+              <p className="text-[11px] text-gray-600 mt-1 text-right">
+                ≈{" "}
+                {fmtKrw(
+                  overseas && globalUsdRate != null ? nativePrice * globalUsdRate : nativePrice
+                )}{" "}
+                × {qty}주 = {fmtKrw(estKrw)}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -113,14 +227,14 @@ export function RebalancingConfirmStep({
         시장이 닫혀 있을 경우 주문이 예약될 수 있습니다.
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-gray-400">주문 유형</span>
         <div className="flex rounded-lg border border-gray-700 overflow-hidden">
           {(["MARKET", "LIMIT"] as OrderType[]).map((type) => (
             <button
               key={type}
               onClick={() => dispatch({ type: "SET_ORDER_TYPE", orderType: type })}
-              className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
                 orderType === type ? "bg-indigo-600 text-white" : "bg-gray-800 text-gray-400 hover:text-white"
               }`}
             >
@@ -129,12 +243,14 @@ export function RebalancingConfirmStep({
           ))}
         </div>
         {priceState === "loading" && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-gray-500 w-full sm:w-auto">
             현재가 조회 중... ({priceLoadProgress.loaded}/{priceLoadProgress.total})
           </span>
         )}
         {priceState === "error" && (
-          <span className="text-xs text-amber-400">현재가 조회 실패 — 지정가 직접 입력 가능</span>
+          <span className="text-xs text-amber-400 w-full sm:w-auto">
+            현재가 조회 실패 — 지정가 직접 입력 가능
+          </span>
         )}
       </div>
 
@@ -164,14 +280,15 @@ export function RebalancingConfirmStep({
 
             return (
               <div key={acc.id} className="border border-gray-700 rounded-xl overflow-hidden">
-                <div className="bg-gray-800/70 px-4 py-2.5 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-white">{acc.name}</span>
+                {/* 계좌 헤더 */}
+                <div className="bg-gray-800/70 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-0 sm:justify-between">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium text-white truncate">{acc.name}</span>
                     {acc.kis_account_no && (
-                      <span className="text-xs text-gray-400">({acc.kis_account_no})</span>
+                      <span className="text-xs text-gray-400 shrink-0">({acc.kis_account_no})</span>
                     )}
                     <span
-                      className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                      className={`text-[11px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
                         acc.is_mock_mode
                           ? "bg-yellow-900/40 text-yellow-400 border border-yellow-700/50"
                           : "bg-red-900/30 text-red-400 border border-red-700/40"
@@ -180,12 +297,12 @@ export function RebalancingConfirmStep({
                       {acc.is_mock_mode ? "모의" : "실계좌"}
                     </span>
                     {!acc.is_active && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 shrink-0">
                         비활성
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-gray-400">
                       {sells > 0 && <span className="text-blue-400">매도 {sells}건</span>}
                       {sells > 0 && buys > 0 && <span className="text-gray-600 mx-1">|</span>}
@@ -223,137 +340,303 @@ export function RebalancingConfirmStep({
                 {hasData && (
                   <div>
                     {(sellRows.length > 0 || buyRows.length > 0) && (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <colgroup>
-                            <col style={{ width: "32px" }} />
-                            <col />
-                            <col style={{ width: "56px" }} />
-                            <col style={{ width: "110px" }} />
-                            <col style={{ width: "140px" }} />
-                            {orderType === "LIMIT" && <col style={{ width: "176px" }} />}
-                            <col style={{ width: "32px" }} />
-                          </colgroup>
-                          <thead>
-                            <tr className="text-[11px] text-gray-500 border-b border-gray-700/50">
-                              <th />
-                              <th className="px-3 py-2 text-left font-normal">종목</th>
-                              <th className="px-3 py-2 text-center font-normal">구분</th>
-                              <th className="px-2 py-2 text-right font-normal">현재가</th>
-                              <th className="px-3 py-2 text-right font-normal">수량</th>
-                              {orderType === "LIMIT" && <th className="px-2 py-2 text-right font-normal">지정가</th>}
-                              <th />
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-700/30">
-                            {sellRows.length > 0 && (
-                              <>
-                                <tr>
-                                  <td colSpan={orderType === "LIMIT" ? 7 : 6} className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">
-                                    매도
-                                  </td>
-                                </tr>
-                                {sellRows.map(({ item, currentQty, suggestedQty }) => {
-                                  const key = `sell_${item.ticker}_${acc.id}`;
-                                  const qty = qtyOverrides[key] ?? suggestedQty;
-                                  const est = getEstimateKrw(key, item.ticker, item.market, qty);
-                                  return (
-                                    <tr key={key} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}>
-                                      <td className="px-3 py-2">
-                                        <input type="checkbox" checked={selected.has(key)} onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })} onClick={(e) => e.stopPropagation()} className="accent-indigo-500" />
-                                      </td>
-                                      <td className="px-3 py-2">
-                                        <div className="text-white font-medium truncate max-w-[120px]">{item.name}</div>
-                                        <div className="text-gray-400 text-[11px]">{item.ticker}</div>
-                                        <div className="text-gray-500 text-[11px]">현재 {currentQty.toLocaleString()}주 보유</div>
-                                      </td>
-                                      <td className="px-3 py-2 text-center"><SideBadge isBuy={false} /></td>
-                                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>{renderPriceCell(item.ticker, item.market)}</td>
-                                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end gap-1">
-                                          <input type="number" min={0} value={qty} onChange={(e) => dispatch({ type: "SET_QTY", key, qty: parseInt(e.target.value) || 0 })} className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-blue-400 font-medium focus:outline-none focus:border-indigo-500" />
-                                          <span className="text-gray-400">주</span>
-                                        </div>
-                                        {est != null && orderType === "MARKET" && (
-                                          <div className="text-[11px] text-gray-500 mt-0.5 text-right">≈ {fmtKrw(est)}</div>
-                                        )}
-                                      </td>
-                                      {renderLimitPriceCell(key, item.ticker, item.market, qty)}
-                                      <td />
-                                    </tr>
-                                  );
-                                })}
-                              </>
-                            )}
+                      <>
+                        {/* 모바일 카드 뷰 */}
+                        <div className="md:hidden divide-y divide-gray-700/30">
+                          {sellRows.length > 0 && (
+                            <>
+                              <div className="px-4 py-2 text-[11px] text-gray-500 bg-gray-800/30">매도</div>
+                              {sellRows.map(({ item, currentQty, suggestedQty }) => {
+                                const key = `sell_${item.ticker}_${acc.id}`;
+                                const qty = qtyOverrides[key] ?? suggestedQty;
+                                return renderMobileCard(
+                                  key,
+                                  item,
+                                  qty,
+                                  false,
+                                  <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                    현재 {currentQty.toLocaleString()}주 보유
+                                  </p>
+                                );
+                              })}
+                            </>
+                          )}
+                          {buyRows.length > 0 && (
+                            <>
+                              <div className="px-4 py-2 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
+                              {buyRows.map(({ item, suggestedQty, currentQty }) => {
+                                const key = `buy_${item.ticker}_${acc.id}`;
+                                const qty = qtyOverrides[key] ?? suggestedQty;
+                                const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
+                                const { allocated, needed } = isMultiAccount
+                                  ? getBuyTotalInfo(item.ticker)
+                                  : { allocated: 0, needed: 0 };
+                                return renderMobileCard(
+                                  key,
+                                  item,
+                                  qty,
+                                  true,
+                                  isMultiAccount ? (
+                                    <div
+                                      className={`text-[11px] mt-0.5 text-right ${
+                                        allocated === needed ? "text-gray-500" : "text-amber-400"
+                                      }`}
+                                    >
+                                      배분 {allocated} / {needed}주
+                                    </div>
+                                  ) : (
+                                    <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                      {currentQty > 0
+                                        ? `현재 ${currentQty.toLocaleString()}주 보유`
+                                        : "현재 미보유"}
+                                    </p>
+                                  )
+                                );
+                              })}
+                            </>
+                          )}
+                        </div>
 
-                            {buyRows.length > 0 && (
-                              <>
-                                <tr>
-                                  <td colSpan={orderType === "LIMIT" ? 7 : 6} className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">
-                                    매수
-                                  </td>
-                                </tr>
-                                {buyRows.map(({ item, suggestedQty, currentQty }) => {
-                                  const key = `buy_${item.ticker}_${acc.id}`;
-                                  const qty = qtyOverrides[key] ?? suggestedQty;
-                                  const est = getEstimateKrw(key, item.ticker, item.market, qty);
-                                  const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
-                                  const isOnlyAccount = !isMultiAccount;
-                                  const { allocated, needed } = isMultiAccount ? getBuyTotalInfo(item.ticker) : { allocated: 0, needed: 0 };
-                                  return (
-                                    <tr key={key} className="hover:bg-gray-800/40 cursor-pointer" onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}>
-                                      <td className="px-3 py-2">
-                                        <input type="checkbox" checked={selected.has(key)} onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })} onClick={(e) => e.stopPropagation()} className="accent-indigo-500" />
-                                      </td>
-                                      <td className="px-3 py-2">
-                                        <div className="text-white font-medium truncate max-w-[120px]">{item.name}</div>
-                                        <div className="text-gray-400 text-[11px]">{item.ticker}</div>
-                                        <div className="text-gray-500 text-[11px]">
-                                          {currentQty > 0 ? `현재 ${currentQty.toLocaleString()}주 보유` : "현재 미보유"}
-                                        </div>
-                                      </td>
-                                      <td className="px-3 py-2 text-center"><SideBadge isBuy={true} /></td>
-                                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>{renderPriceCell(item.ticker, item.market)}</td>
-                                      <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <div className="flex items-center justify-end gap-1">
-                                          <input type="number" min={0} value={qty} onChange={(e) => dispatch({ type: "SET_QTY_AND_SELECT", key, qty: parseInt(e.target.value) || 0 })} className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-red-400 font-medium focus:outline-none focus:border-indigo-500" />
-                                          <span className="text-gray-400">주</span>
-                                        </div>
-                                        {isMultiAccount ? (
-                                          <div className={`text-[11px] mt-0.5 text-right ${allocated === needed ? "text-gray-500" : "text-amber-400"}`}>
-                                            배분 {allocated} / {needed}주
+                        {/* 데스크탑 테이블 */}
+                        <div className="hidden md:block overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <colgroup>
+                              <col style={{ width: "32px" }} />
+                              <col />
+                              <col style={{ width: "56px" }} />
+                              <col style={{ width: "125px" }} />
+                              <col style={{ width: "140px" }} />
+                              {orderType === "LIMIT" && <col style={{ width: "190px" }} />}
+                              <col style={{ width: "32px" }} />
+                            </colgroup>
+                            <thead>
+                              <tr className="text-[11px] text-gray-500 border-b border-gray-700/50">
+                                <th />
+                                <th className="px-3 py-2 text-left font-normal">종목</th>
+                                <th className="px-3 py-2 text-center font-normal">구분</th>
+                                <th className="px-2 py-2 text-right font-normal">현재가</th>
+                                <th className="px-3 py-2 text-right font-normal">수량</th>
+                                {orderType === "LIMIT" && (
+                                  <th className="px-2 py-2 text-right font-normal">지정가</th>
+                                )}
+                                <th />
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-700/30">
+                              {sellRows.length > 0 && (
+                                <>
+                                  <tr>
+                                    <td
+                                      colSpan={orderType === "LIMIT" ? 7 : 6}
+                                      className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30"
+                                    >
+                                      매도
+                                    </td>
+                                  </tr>
+                                  {sellRows.map(({ item, currentQty, suggestedQty }) => {
+                                    const key = `sell_${item.ticker}_${acc.id}`;
+                                    const qty = qtyOverrides[key] ?? suggestedQty;
+                                    const est = getEstimateKrw(key, item.ticker, item.market, qty);
+                                    return (
+                                      <tr
+                                        key={key}
+                                        className="hover:bg-gray-800/40 cursor-pointer"
+                                        onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
+                                      >
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={selected.has(key)}
+                                            onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="accent-indigo-500"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <div className="text-white font-medium truncate">
+                                            {item.name}
                                           </div>
-                                        ) : (
-                                          est != null && orderType === "MARKET" && (
-                                            <div className="text-[11px] text-gray-500 mt-0.5 text-right">≈ {fmtKrw(est)}</div>
-                                          )
-                                        )}
-                                      </td>
-                                      {renderLimitPriceCell(key, item.ticker, item.market, qty)}
-                                      <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                          onClick={() => dispatch({ type: "REMOVE_BUY_ACCOUNT", ticker: item.ticker, accountId: acc.id })}
-                                          disabled={isOnlyAccount}
-                                          title="이 계좌에서 제거"
-                                          className="text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
+                                          <div className="text-gray-400 text-[11px]">{item.ticker}</div>
+                                          <div className="text-gray-500 text-[11px]">
+                                            현재 {currentQty.toLocaleString()}주 보유
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                          <SideBadge isBuy={false} />
+                                        </td>
+                                        <td
+                                          className="px-2 py-2 text-right"
+                                          onClick={(e) => e.stopPropagation()}
                                         >
-                                          ×
-                                        </button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </>
-                            )}
-                          </tbody>
-                        </table>
-                      </div>
+                                          {renderPriceCell(item.ticker, item.market)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex items-center justify-end gap-1">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              value={qty}
+                                              onChange={(e) =>
+                                                dispatch({
+                                                  type: "SET_QTY",
+                                                  key,
+                                                  qty: parseInt(e.target.value) || 0,
+                                                })
+                                              }
+                                              className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-blue-400 font-medium focus:outline-none focus:border-indigo-500"
+                                            />
+                                            <span className="text-gray-400">주</span>
+                                          </div>
+                                          {est != null && orderType === "MARKET" && (
+                                            <div className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                              ≈ {fmtKrw(est)}
+                                            </div>
+                                          )}
+                                        </td>
+                                        {renderLimitPriceCell(key, item.ticker, item.market, qty)}
+                                        <td />
+                                      </tr>
+                                    );
+                                  })}
+                                </>
+                              )}
+
+                              {buyRows.length > 0 && (
+                                <>
+                                  <tr>
+                                    <td
+                                      colSpan={orderType === "LIMIT" ? 7 : 6}
+                                      className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30"
+                                    >
+                                      매수
+                                    </td>
+                                  </tr>
+                                  {buyRows.map(({ item, suggestedQty, currentQty }) => {
+                                    const key = `buy_${item.ticker}_${acc.id}`;
+                                    const qty = qtyOverrides[key] ?? suggestedQty;
+                                    const est = getEstimateKrw(key, item.ticker, item.market, qty);
+                                    const isMultiAccount =
+                                      (buyAccounts[item.ticker] ?? []).length > 1;
+                                    const isOnlyAccount = !isMultiAccount;
+                                    const { allocated, needed } = isMultiAccount
+                                      ? getBuyTotalInfo(item.ticker)
+                                      : { allocated: 0, needed: 0 };
+                                    return (
+                                      <tr
+                                        key={key}
+                                        className="hover:bg-gray-800/40 cursor-pointer"
+                                        onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
+                                      >
+                                        <td className="px-3 py-2">
+                                          <input
+                                            type="checkbox"
+                                            checked={selected.has(key)}
+                                            onChange={() => dispatch({ type: "TOGGLE_SELECTED", key })}
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="accent-indigo-500"
+                                          />
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          <div className="text-white font-medium truncate">
+                                            {item.name}
+                                          </div>
+                                          <div className="text-gray-400 text-[11px]">{item.ticker}</div>
+                                          <div className="text-gray-500 text-[11px]">
+                                            {currentQty > 0
+                                              ? `현재 ${currentQty.toLocaleString()}주 보유`
+                                              : "현재 미보유"}
+                                          </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-center">
+                                          <SideBadge isBuy={true} />
+                                        </td>
+                                        <td
+                                          className="px-2 py-2 text-right"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          {renderPriceCell(item.ticker, item.market)}
+                                        </td>
+                                        <td
+                                          className="px-3 py-2 text-right"
+                                          onClick={(e) => e.stopPropagation()}
+                                        >
+                                          <div className="flex items-center justify-end gap-1">
+                                            <input
+                                              type="number"
+                                              min={0}
+                                              value={qty}
+                                              onChange={(e) =>
+                                                dispatch({
+                                                  type: "SET_QTY_AND_SELECT",
+                                                  key,
+                                                  qty: parseInt(e.target.value) || 0,
+                                                })
+                                              }
+                                              className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-red-400 font-medium focus:outline-none focus:border-indigo-500"
+                                            />
+                                            <span className="text-gray-400">주</span>
+                                          </div>
+                                          {isMultiAccount ? (
+                                            <div
+                                              className={`text-[11px] mt-0.5 text-right ${
+                                                allocated === needed
+                                                  ? "text-gray-500"
+                                                  : "text-amber-400"
+                                              }`}
+                                            >
+                                              배분 {allocated} / {needed}주
+                                            </div>
+                                          ) : (
+                                            est != null &&
+                                            orderType === "MARKET" && (
+                                              <div className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                                ≈ {fmtKrw(est)}
+                                              </div>
+                                            )
+                                          )}
+                                        </td>
+                                        {renderLimitPriceCell(key, item.ticker, item.market, qty)}
+                                        <td className="px-2 py-2 text-right" onClick={(e) => e.stopPropagation()}>
+                                          <button
+                                            onClick={() =>
+                                              dispatch({
+                                                type: "REMOVE_BUY_ACCOUNT",
+                                                ticker: item.ticker,
+                                                accountId: acc.id,
+                                              })
+                                            }
+                                            disabled={isOnlyAccount}
+                                            title="이 계좌에서 제거"
+                                            className="text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
+                                          >
+                                            ×
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
                     )}
                     {unassignedBuyItems.length > 0 && (
                       <div className="px-4 py-2 border-t border-gray-700/20">
                         <select
                           value=""
-                          onChange={(e) => { if (e.target.value) dispatch({ type: "ADD_BUY_ACCOUNT", ticker: e.target.value, accountId: acc.id }); }}
+                          onChange={(e) => {
+                            if (e.target.value)
+                              dispatch({
+                                type: "ADD_BUY_ACCOUNT",
+                                ticker: e.target.value,
+                                accountId: acc.id,
+                              });
+                          }}
                           className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-600 cursor-pointer"
                         >
                           <option value="">+ 이 계좌에 매수 종목 추가</option>

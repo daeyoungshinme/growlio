@@ -13,7 +13,7 @@ import { fmtKrwShort } from "../utils/format";
 import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
-import StatCard from "../components/common/StatCard";
+import { pnlColor } from "../utils/colors";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { DOMESTIC_MARKETS } from "../constants";
@@ -142,9 +142,6 @@ export default function PortfolioPage() {
   );
   if (error || !data) return <div className="text-red-500 p-4">데이터를 불러오지 못했습니다</div>;
 
-  const pnlColor = data.unrealized_pnl_krw >= 0 ? "red" : "blue" as const;
-  const retColor = data.stock_return_pct >= 0 ? "red" : "blue" as const;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -162,23 +159,21 @@ export default function PortfolioPage() {
       </div>
 
       {/* 상단 요약 */}
-      {(() => {
-        const evalSub = `평가손익 ${data.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrwShort(data.unrealized_pnl_krw)}원 (${data.stock_return_pct >= 0 ? "+" : ""}${data.stock_return_pct.toFixed(2)}%)`;
-        return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
-            <div className="col-span-2 lg:col-span-1">
-              <StatCard label="주식 총평가액" value={`${fmtKrwShort(Math.round(data.total_invested_krw / 1e6) * 1e6 + Math.round(data.unrealized_pnl_krw / 1e6) * 1e6)}원`} sub={evalSub} color="blue" />
-            </div>
-            <StatCard label="총 매입금액" value={`${fmtKrwShort(data.total_invested_krw)}원`} size="sm" />
-            <StatCard label="평가손익"
-              value={`${data.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrwShort(data.unrealized_pnl_krw)}원`}
-              size="sm" color={pnlColor} />
-            <StatCard label="주식 수익률"
-              value={`${data.stock_return_pct >= 0 ? "+" : ""}${data.stock_return_pct.toFixed(2)}%`}
-              size="sm" color={retColor} />
-          </div>
-        );
-      })()}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
+        <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
+        <p className="text-xl sm:text-2xl font-bold mt-1 leading-tight text-blue-600">
+          {fmtKrwShort(Math.round(data.total_invested_krw / 1e6) * 1e6 + Math.round(data.unrealized_pnl_krw / 1e6) * 1e6)}원
+        </p>
+        <div className="flex items-center gap-2 mt-2">
+          <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
+            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}{fmtKrwShort(data.unrealized_pnl_krw)}원
+          </span>
+          <span className="text-gray-300 dark:text-gray-600">·</span>
+          <span className={`text-sm font-semibold ${pnlColor(data.stock_return_pct)}`}>
+            {data.stock_return_pct >= 0 ? "+" : ""}{data.stock_return_pct.toFixed(2)}%
+          </span>
+        </div>
+      </div>
 
       {/* 탭 */}
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none">

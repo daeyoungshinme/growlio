@@ -155,7 +155,7 @@ export default function InvestPlanPage() {
         <>
           <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
           <DCAProjectionChart data={data.projection_months} />
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
             <YearlyAchievementTable data={data.yearly_achievements} />
             <MonthlyAchievementTable data={data.projection_months} />
           </div>
