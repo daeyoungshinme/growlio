@@ -11,6 +11,14 @@ export function fmtKrw(n: number): string {
 }
 
 /**
+ * 주가 표시용 — 만원/억원 축약 없이 원 단위 그대로 표시
+ * 예: 20_000 → "20,000원", 150_000 → "150,000원"
+ */
+export function fmtKrwPrice(n: number): string {
+  return `${Math.floor(n).toLocaleString()}원`;
+}
+
+/**
  * null/undefined를 허용하는 금액 포맷 — null이면 "—" 반환
  */
 export function fmtKrwNullable(n: number | null | undefined): string {

@@ -165,7 +165,7 @@ export default function PortfolioPage() {
       {(() => {
         const evalSub = `평가손익 ${data.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrwShort(data.unrealized_pnl_krw)}원 (${data.stock_return_pct >= 0 ? "+" : ""}${data.stock_return_pct.toFixed(2)}%)`;
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 items-start">
             <div className="col-span-2 lg:col-span-1">
               <StatCard label="주식 총평가액" value={`${fmtKrwShort(Math.round(data.total_invested_krw / 1e6) * 1e6 + Math.round(data.unrealized_pnl_krw / 1e6) * 1e6)}원`} sub={evalSub} color="blue" />
             </div>
@@ -173,11 +173,9 @@ export default function PortfolioPage() {
             <StatCard label="평가손익"
               value={`${data.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrwShort(data.unrealized_pnl_krw)}원`}
               size="sm" color={pnlColor} />
-            <div className="col-span-2 lg:col-span-1">
-              <StatCard label="주식 수익률"
-                value={`${data.stock_return_pct >= 0 ? "+" : ""}${data.stock_return_pct.toFixed(2)}%`}
-                size="sm" color={retColor} />
-            </div>
+            <StatCard label="주식 수익률"
+              value={`${data.stock_return_pct >= 0 ? "+" : ""}${data.stock_return_pct.toFixed(2)}%`}
+              size="sm" color={retColor} />
           </div>
         );
       })()}

@@ -1,6 +1,6 @@
 import { AssetAccount } from "../../api/assets";
 import { RebalancingItem } from "../../api/rebalancing";
-import { fmtKrw } from "../../utils/format";
+import { fmtKrw, fmtKrwPrice } from "../../utils/format";
 import { SideBadge } from "./RebalancingBadges";
 import { ExecutionAction, ExecutionState, OrderType, isOverseasMarket } from "./useRebalancingExecution";
 
@@ -60,11 +60,11 @@ export function RebalancingConfirmStep({
         return (
           <div>
             <div className="text-gray-300 text-[11px]">${usd.toFixed(2)}</div>
-            <div className="text-gray-500 text-[11px]">≈ {fmtKrw(krw)}</div>
+            <div className="text-gray-500 text-[11px]">≈ {fmtKrwPrice(krw)}</div>
           </div>
         );
       }
-      return <span className="text-gray-300 text-[11px]">{fmtKrw(krw)}</span>;
+      return <span className="text-gray-300 text-[11px]">{fmtKrwPrice(krw)}</span>;
     }
     return <span className="text-gray-600 text-[11px]">—</span>;
   }
