@@ -126,14 +126,14 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
         <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
           <div className="px-4 py-4 sm:px-5">
             <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">예상 연간 배당금</p>
-            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-green-600">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600">
               {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">보유 종목 배당수익률 기준 추정</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">배당수익률 기준 추정</p>
           </div>
           <div className="px-4 py-4 sm:px-5">
             <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">올해 수령 배당금</p>
-            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50">
               {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -142,7 +142,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
           </div>
           <div className="px-4 py-4 sm:px-5">
             <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">월평균 예상 배당금</p>
-            <p className="text-sm sm:text-base font-bold mt-1 leading-tight text-blue-600">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600">
               {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">연간 예상 배당금 ÷ 12</p>

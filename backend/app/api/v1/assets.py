@@ -484,7 +484,9 @@ async def save_positions(
 
 
 @router.post("/{account_id}/positions/sync-prices")
+@limiter.limit("5/minute")
 async def sync_position_prices(
+    request: Request,
     account_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

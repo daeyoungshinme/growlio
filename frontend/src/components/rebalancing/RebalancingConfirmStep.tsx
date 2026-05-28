@@ -51,22 +51,23 @@ export function RebalancingConfirmStep({
     confirmed,
   } = state;
 
-  function renderPriceCell(ticker: string, market: string) {
+  function renderPriceCell(ticker: string, market: string, large?: boolean) {
     const krw = livePricesKrw[ticker];
     const usd = livePricesUsd[ticker];
+    const priceCls = large ? "text-sm" : "text-[11px]";
     if (priceState === "loading") return <span className="text-gray-600 text-[11px]">조회 중</span>;
     if (krw != null) {
       if (isOverseasMarket(market) && usd != null) {
         return (
           <div>
-            <div className="text-gray-300 text-[11px]">${usd.toFixed(2)}</div>
+            <div className={`text-gray-300 ${priceCls}`}>${usd.toFixed(2)}</div>
             <div className="text-gray-500 text-[11px]">≈ {fmtKrwPrice(krw)}</div>
           </div>
         );
       }
-      return <span className="text-gray-300 text-[11px]">{fmtKrwPrice(krw)}</span>;
+      return <span className={`text-gray-300 ${priceCls}`}>{fmtKrwPrice(krw)}</span>;
     }
-    return <span className="text-gray-600 text-[11px]">—</span>;
+    return <span className={`text-gray-600 ${priceCls}`}>—</span>;
   }
 
   function renderLimitPriceCell(key: string, ticker: string, market: string, qty: number) {
@@ -122,8 +123,9 @@ export function RebalancingConfirmStep({
       overseas && globalUsdRate != null ? nativePrice * globalUsdRate * qty : nativePrice * qty;
 
     return (
-      <div key={key} className={`px-4 py-3 ${selected.has(key) ? "bg-indigo-950/20" : ""}`}>
-        <div className="flex items-start gap-3">
+      <div key={key} className={`px-3 py-1.5 ${selected.has(key) ? "bg-indigo-950/20" : ""}`}>
+        {/* Row 1: checkbox | 종목명+티커 | qty input */}
+        <div className="flex items-start gap-2">
           <input
             type="checkbox"
             checked={selected.has(key)}
@@ -135,22 +137,15 @@ export function RebalancingConfirmStep({
               <span className="font-medium text-white text-sm">{item.name}</span>
               <SideBadge isBuy={isBuy} />
             </div>
-            <p className="text-gray-400 text-xs mt-0.5">{item.ticker}</p>
+            <p className="text-gray-400 text-xs">{item.ticker}</p>
           </div>
-        </div>
-
-        <div className="mt-3 flex items-end gap-3 pl-8">
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-500 mb-1">현재가</p>
-            <div>{renderPriceCell(item.ticker, item.market)}</div>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-gray-500 mb-1">수량</p>
+          <div className="shrink-0 text-right">
             <div className="flex items-center gap-1">
               <input
                 type="number"
                 min={0}
-                value={qty}
+                value={qty || ""}
+                onFocus={(e) => e.target.select()}
                 onChange={(e) =>
                   dispatch({
                     type: isBuy ? "SET_QTY_AND_SELECT" : "SET_QTY",
@@ -158,20 +153,26 @@ export function RebalancingConfirmStep({
                     qty: parseInt(e.target.value) || 0,
                   })
                 }
-                className={`w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${isBuy ? "text-red-400" : "text-blue-400"}`}
+                className={`w-24 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${isBuy ? "text-red-400" : "text-blue-400"}`}
               />
               <span className="text-gray-400 text-sm shrink-0">주</span>
             </div>
             {est != null && orderType === "MARKET" && (
-              <p className="text-[11px] text-gray-500 mt-1 text-right">≈ {fmtKrw(est)}</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">≈ {fmtKrw(est)}</p>
             )}
             {extra}
           </div>
         </div>
 
+        {/* Row 2: 현재가 인라인 */}
+        <div className="mt-0.5 pl-7 flex items-center gap-1.5">
+          <span className="text-[11px] text-gray-500">현재가</span>
+          <div>{renderPriceCell(item.ticker, item.market, true)}</div>
+        </div>
+
         {orderType === "LIMIT" && (
-          <div className="mt-3 pl-8">
-            <div className="flex items-center justify-between mb-1">
+          <div className="mt-1 pl-7">
+            <div className="flex items-center justify-between mb-0.5">
               <p className="text-[11px] text-gray-500">지정가</p>
               {priceState === "loaded" && currentNativePrice != null && (
                 <button
@@ -192,12 +193,12 @@ export function RebalancingConfirmStep({
                 onChange={(e) =>
                   dispatch({ type: "SET_LIMIT_PRICE", key, price: parseFloat(e.target.value) || 0 })
                 }
-                className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-3 py-2 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
+                className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-2 py-1 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
               />
               <span className="text-gray-400 text-sm shrink-0">{overseas ? "USD" : "원"}</span>
             </div>
             {nativePrice > 0 && (
-              <p className="text-[11px] text-gray-600 mt-1 text-right">
+              <p className="text-[11px] text-gray-600 mt-0.5 text-right">
                 ≈{" "}
                 {fmtKrw(
                   overseas && globalUsdRate != null ? nativePrice * globalUsdRate : nativePrice
@@ -281,7 +282,7 @@ export function RebalancingConfirmStep({
             return (
               <div key={acc.id} className="border border-gray-700 rounded-xl overflow-hidden">
                 {/* 계좌 헤더 */}
-                <div className="bg-gray-800/70 px-4 py-2.5 flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-0 sm:justify-between">
+                <div className="bg-gray-800/70 px-4 py-2 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-0 sm:justify-between">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium text-white truncate">{acc.name}</span>
                     {acc.kis_account_no && (
@@ -345,7 +346,7 @@ export function RebalancingConfirmStep({
                         <div className="md:hidden divide-y divide-gray-700/30">
                           {sellRows.length > 0 && (
                             <>
-                              <div className="px-4 py-2 text-[11px] text-gray-500 bg-gray-800/30">매도</div>
+                              <div className="px-3 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매도</div>
                               {sellRows.map(({ item, currentQty, suggestedQty }) => {
                                 const key = `sell_${item.ticker}_${acc.id}`;
                                 const qty = qtyOverrides[key] ?? suggestedQty;
@@ -363,7 +364,7 @@ export function RebalancingConfirmStep({
                           )}
                           {buyRows.length > 0 && (
                             <>
-                              <div className="px-4 py-2 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
+                              <div className="px-3 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
                               {buyRows.map(({ item, suggestedQty, currentQty }) => {
                                 const key = `buy_${item.ticker}_${acc.id}`;
                                 const qty = qtyOverrides[key] ?? suggestedQty;
@@ -478,7 +479,8 @@ export function RebalancingConfirmStep({
                                             <input
                                               type="number"
                                               min={0}
-                                              value={qty}
+                                              value={qty || ""}
+                                              onFocus={(e) => e.target.select()}
                                               onChange={(e) =>
                                                 dispatch({
                                                   type: "SET_QTY",
@@ -567,7 +569,8 @@ export function RebalancingConfirmStep({
                                             <input
                                               type="number"
                                               min={0}
-                                              value={qty}
+                                              value={qty || ""}
+                                              onFocus={(e) => e.target.select()}
                                               onChange={(e) =>
                                                 dispatch({
                                                   type: "SET_QTY_AND_SELECT",

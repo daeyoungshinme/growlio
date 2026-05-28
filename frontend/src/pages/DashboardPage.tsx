@@ -4,7 +4,7 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { fetchDashboard, fetchDividendByTicker } from "../api/dashboard";
-import { fetchExchangeRate } from "../api/assets";
+import { useExchangeRate } from "../hooks/useExchangeRate";
 import { fmtKrw, fmtMonth, fmtPct } from "../utils/format";
 import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
@@ -71,12 +71,7 @@ export default function DashboardPage() {
     refetchInterval: false,
   });
 
-  const { data: exchangeRate } = useQuery({
-    queryKey: ["exchange-rate"],
-    queryFn: fetchExchangeRate,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
-  });
+  const exchangeRate = useExchangeRate();
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
@@ -231,7 +226,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
-                {exchangeRate ? Math.round(exchangeRate.usd_krw).toLocaleString() + "원" : "—"}
+                {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
               </p>
             </div>
           </div>

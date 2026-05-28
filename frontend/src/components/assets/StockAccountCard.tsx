@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
-import { fetchExchangeRate, type AssetAccount } from "../../api/assets";
-import { fmtKrw } from "../../utils/format";
+import { type AssetAccount } from "../../api/assets";
+import { useExchangeRate } from "../../hooks/useExchangeRate";
+import { fmtKrw, fmtPct } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import { STOCK_TYPE_LABELS } from "../../constants";
 
@@ -39,12 +39,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   const [editDepositValue, setEditDepositValue] = useState("");
   const [depositCurrency, setDepositCurrency] = useState<"KRW" | "USD">("KRW");
   const [depositUsdValue, setDepositUsdValue] = useState<number>(0);
-  const { data: rateData } = useQuery({
-    queryKey: ["exchange-rate"],
-    queryFn: fetchExchangeRate,
-    staleTime: 5 * 60 * 1000,
-  });
-  const usdRate = rateData?.usd_krw ?? null;
+  const usdRate = useExchangeRate();
 
   const handleSaveName = () => {
     const trimmed = editNameValue.trim();
@@ -146,7 +141,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
         </div>
       </div>
       {hasStats && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-5">
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
             <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(stats!.amount_krw)}</p>
@@ -154,10 +149,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
             <p className={`text-xs font-semibold mt-0.5 ${pnlColor(pnl)}`}>
-              {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}
-            </p>
-            <p className={`text-xs ${pnlColor(ret)}`}>
-              {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
+              {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}({fmtPct(ret)})
             </p>
           </div>
           <div>

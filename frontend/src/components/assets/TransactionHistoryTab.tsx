@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import { api } from "../../api/client";
 import {
-  fetchExchangeRate,
   searchStocks,
   updateAccount,
   type StockSuggestion,
   type AssetAccount,
 } from "../../api/assets";
+import { useExchangeRate } from "../../hooks/useExchangeRate";
 import {
   fetchTransactions,
   createTransaction,
@@ -21,18 +21,7 @@ import { fmtKrw } from "../../utils/format";
 import { invalidateAccountData, invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
 import { STOCK_TYPES } from "../../constants";
-
-const TX_LABELS: Record<string, string> = {
-  DEPOSIT: "입금",
-  WITHDRAWAL: "출금",
-  DIVIDEND: "배당",
-};
-
-const TX_COLORS: Record<string, string> = {
-  DEPOSIT: "text-blue-600",
-  WITHDRAWAL: "text-red-500",
-  DIVIDEND: "text-green-600",
-};
+import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
 
 const today = new Date().toISOString().slice(0, 10);
 const currentYear = new Date().getFullYear();
@@ -66,12 +55,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState<number>(0);
-  const { data: rateData } = useQuery({
-    queryKey: ["exchange-rate"],
-    queryFn: fetchExchangeRate,
-    staleTime: 5 * 60 * 1000,
-  });
-  const usdRate = rateData?.usd_krw ?? null;
+  const usdRate = useExchangeRate();
   const [tickerDirect, setTickerDirect] = useState(false);
   const [tickerQuery, setTickerQuery] = useState("");
   const [tickerSuggestions, setTickerSuggestions] = useState<StockSuggestion[]>([]);
@@ -83,12 +67,12 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     return () => { clearTimeout(tickerSearchTimer.current); };
   }, []);
 
-  const { data: txList = [], isLoading } = useQuery({
+  const { data: txList = [], isLoading } = useQuery<Transaction[]>({
     queryKey: ["transactions", "all", selectedYear],
     queryFn: () => fetchTransactions({ year: selectedYear }),
   });
 
-  const { data: positionsData } = useQuery({
+  const { data: positionsData } = useQuery<{ positions: Array<{ ticker: string; name: string; qty: number }> }>({
     queryKey: ["account-positions", form.account_id],
     queryFn: () =>
       api
@@ -198,16 +182,28 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     }
   };
 
-  const yearDeposit = txList.filter((t) => t.transaction_type === "DEPOSIT").reduce((s, t) => s + t.amount, 0);
-  const yearDividend = txList.filter((t) => t.transaction_type === "DIVIDEND").reduce((s, t) => s + t.amount, 0);
+  const yearDeposit = useMemo(
+    () => txList.filter((t) => t.transaction_type === "DEPOSIT").reduce((s, t) => s + t.amount, 0),
+    [txList],
+  );
+  const yearDividend = useMemo(
+    () => txList.filter((t) => t.transaction_type === "DIVIDEND").reduce((s, t) => s + t.amount, 0),
+    [txList],
+  );
 
-  const filtered = txList.filter((t) => {
-    if (filterAccountId && t.account_id !== filterAccountId) return false;
-    if (filterType && t.transaction_type !== filterType) return false;
-    return true;
-  });
+  const filtered = useMemo(
+    () => txList.filter((t) => {
+      if (filterAccountId && t.account_id !== filterAccountId) return false;
+      if (filterType && t.transaction_type !== filterType) return false;
+      return true;
+    }),
+    [txList, filterAccountId, filterType],
+  );
 
-  const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+  const accountMap = useMemo(
+    () => Object.fromEntries(accounts.map((a) => [a.id, a.name])),
+    [accounts],
+  );
 
   return (
     <div className="space-y-5">

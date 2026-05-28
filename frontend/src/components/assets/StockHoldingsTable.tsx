@@ -71,7 +71,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
         <>
         {/* 모바일 카드 뷰 */}
         <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-          {sorted.map((agg, i) => {
+          {sorted.map((agg) => {
             const key = `${agg.ticker}-${agg.market}`;
             const divData = dividendMap[key];
             return (
@@ -79,7 +79,6 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">{i + 1}</span>
                       <p className="font-semibold text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
                     </div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
@@ -112,7 +111,6 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                <th className="py-2.5 px-3 text-center text-xs font-medium text-gray-300 dark:text-gray-600 w-8">#</th>
                 <th className="py-2.5 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase sticky left-0 z-20 bg-gray-50 dark:bg-gray-800">종목</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">수량</th>
                 <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">평단가</th>
@@ -125,7 +123,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
               </tr>
             </thead>
             <tbody>
-              {sorted.map((agg, i) => {
+              {sorted.map((agg) => {
                 const key = `${agg.ticker}-${agg.market}`;
                 const isExpanded = expandedSet.has(key);
                 const hasMultiple = agg.sub_positions.length > 1;
@@ -139,7 +137,6 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                       }`}
                       onClick={() => toggle(key)}
                     >
-                      <td className="py-3 px-3 text-center text-xs text-gray-300 dark:text-gray-600">{i + 1}</td>
                       <td className="py-3 px-5 sticky left-0 z-10 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-700">
                         <div className="flex items-center gap-2">
                           <span className={`text-gray-400 dark:text-gray-500 ${hasMultiple ? "visible" : "invisible"}`}>

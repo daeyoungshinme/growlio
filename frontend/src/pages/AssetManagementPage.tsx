@@ -25,7 +25,7 @@ import BankAccountCard from "../components/assets/BankAccountCard";
 import StockAccountCard, { type AccountStats } from "../components/assets/StockAccountCard";
 import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
 import ConfirmModal from "../components/common/ConfirmModal";
-import { fmtKrw } from "../utils/format";
+import { fmtKrw, fmtPct } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
@@ -294,11 +294,11 @@ export default function AssetManagementPage() {
                 const pnl = overview?.unrealized_pnl_krw ?? 0;
                 const ret = overview?.stock_return_pct ?? 0;
                 const pnlColor = pnl >= 0 ? "text-red-500" : "text-blue-500";
-                const retColor = ret >= 0 ? "text-red-500" : "text-blue-500";
+                const totalDepositKrw = stockAccounts.reduce((s, a) => s + (a.deposit_krw ?? 0), 0);
                 return (
                   <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
                     <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">증권계좌 전체 요약</p>
-                    <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+                    <div className="grid grid-cols-3 gap-x-6 gap-y-3">
                       <div>
                         <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
                         <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(overview?.total_stock_krw ?? 0)}</p>
@@ -306,14 +306,12 @@ export default function AssetManagementPage() {
                       <div>
                         <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
                         <p className={`text-sm font-semibold mt-0.5 ${pnlColor}`}>
-                          {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}
+                          {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}({fmtPct(ret)})
                         </p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">수익률</p>
-                        <p className={`text-sm font-semibold mt-0.5 ${retColor}`}>
-                          {ret >= 0 ? "+" : ""}{ret.toFixed(2)}%
-                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
+                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(totalDepositKrw)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>

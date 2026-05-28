@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { chartTooltipStyle } from "../../utils/chart";
@@ -8,13 +9,16 @@ interface Props {
 
 export default function MonthlyTrendChart({ data }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  const chartData = data.map((d) => {
-    const [yearStr, monthStr] = d.month.split("-");
-    return {
-      month: `${yearStr.slice(2)}.${parseInt(monthStr)}`,
-      amount: Math.round(d.total_krw / 1e4),
-    };
-  });
+  const chartData = useMemo(
+    () => data.map((d) => {
+      const [yearStr, monthStr] = d.month.split("-");
+      return {
+        month: `${yearStr.slice(2)}.${parseInt(monthStr)}`,
+        amount: Math.round(d.total_krw / 1e4),
+      };
+    }),
+    [data],
+  );
 
   return (
     <ResponsiveContainer width="100%" height={220}>

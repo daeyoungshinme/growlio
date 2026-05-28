@@ -61,7 +61,7 @@ def _mask_email(email: str) -> str:
 
 
 @router.post("/find-account", response_model=FindAccountResponse)
-@limiter.limit("3/minute")
+@limiter.limit("1/minute")
 async def find_account(request: Request, req: FindAccountRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(User).where(User.display_name == req.display_name, User.is_active == True)  # noqa: E712

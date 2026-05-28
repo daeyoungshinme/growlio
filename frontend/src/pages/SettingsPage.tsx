@@ -8,7 +8,7 @@ import {
   deleteExchangeRateAlert,
   type ExchangeRateAlert,
 } from "../api/alerts";
-import { fetchExchangeRate } from "../api/assets";
+import { useExchangeRate } from "../hooks/useExchangeRate";
 
 interface SettingsData {
   has_kis: boolean;
@@ -59,11 +59,7 @@ export default function SettingsPage() {
     queryFn: fetchExchangeRateAlerts,
   });
 
-  const { data: exchangeRateData } = useQuery({
-    queryKey: ["exchange-rate"],
-    queryFn: fetchExchangeRate,
-    refetchInterval: 60_000,
-  });
+  const usdKrw = useExchangeRate();
 
   const createAlertMutation = useMutation({
     mutationFn: () => createExchangeRateAlert(Number(alertForm.target_rate), alertForm.direction),
@@ -215,9 +211,9 @@ export default function SettingsPage() {
 
       {/* 목표환율 알림 */}
       <SectionCard title="목표환율 알림 (USD/KRW)">
-        {exchangeRateData && (
+        {usdKrw !== null && (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            현재 환율: <span className="font-semibold text-gray-800 dark:text-gray-100">{exchangeRateData.usd_krw.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} 원</span>
+            현재 환율: <span className="font-semibold text-gray-800 dark:text-gray-100">{usdKrw.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} 원</span>
           </p>
         )}
         <div>

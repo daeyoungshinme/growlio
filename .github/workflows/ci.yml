@@ -76,6 +76,21 @@ jobs:
       - name: Dependency vulnerability check (pip-audit)
         run: .venv/bin/pip-audit --skip-editable -q
 
+  secret-scan:
+    name: Secret scan (TruffleHog)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: TruffleHog scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --only-verified
+
   frontend:
     name: Frontend — lint, typecheck, build
     runs-on: ubuntu-latest

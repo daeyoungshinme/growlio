@@ -20,7 +20,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
   return (
     <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
       <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-[92vh] flex flex-col">
-        <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-4 border-b border-gray-700">
+        <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-700">
           <h2 className="text-base font-semibold text-white">리밸런싱 실행</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors text-xl leading-none">
             ×
@@ -57,12 +57,15 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
           {phase === "result" && <RebalancingResultSection results={results} />}
         </div>
 
-        <div className="shrink-0 px-4 sm:px-6 py-4 border-t border-gray-700 flex justify-end gap-3">
+        <div
+          className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3"
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
+        >
           {phase === "confirm" && (
             <>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
+                className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 취소
               </button>
@@ -70,7 +73,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                 <button
                   onClick={exec.handleExecute}
                   disabled={orders.length === 0}
-                  className="px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   정말 실행할까요? ({orders.length}건)
                 </button>
@@ -78,7 +81,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
                 <button
                   onClick={() => dispatch({ type: "CONFIRM_CLICK" })}
                   disabled={orders.length === 0}
-                  className="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   {orderType === "LIMIT" ? "지정가 " : "시장가 "}실행 ({orders.length}건)
                 </button>
@@ -88,7 +91,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
           {phase === "result" && (
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
             >
               닫기
             </button>

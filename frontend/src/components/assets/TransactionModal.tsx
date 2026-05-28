@@ -1,9 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import Modal from "../common/Modal";
 import { api } from "../../api/client";
-import { fetchExchangeRate, searchStocks, StockSuggestion } from "../../api/assets";
+import { searchStocks, StockSuggestion } from "../../api/assets";
+import { useExchangeRate } from "../../hooks/useExchangeRate";
 import {
   createTransaction,
   deleteTransaction,
@@ -15,6 +16,7 @@ import {
 import { fmtKrw } from "../../utils/format";
 import { invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
+import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
 
 interface Props {
   accountId: string;
@@ -23,18 +25,6 @@ interface Props {
   onDepositUpdate?: (newDeposit: number) => void;
   onClose: () => void;
 }
-
-const TX_LABELS: Record<string, string> = {
-  DEPOSIT: "입금",
-  WITHDRAWAL: "출금",
-  DIVIDEND: "배당",
-};
-
-const TX_COLORS: Record<string, string> = {
-  DEPOSIT: "text-blue-600",
-  WITHDRAWAL: "text-red-500",
-  DIVIDEND: "text-green-600",
-};
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -55,12 +45,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
 
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState<number>(0);
-  const { data: rateData } = useQuery({
-    queryKey: ["exchange-rate"],
-    queryFn: fetchExchangeRate,
-    staleTime: 5 * 60 * 1000,
-  });
-  const usdRate = rateData?.usd_krw ?? null;
+  const usdRate = useExchangeRate();
   const [tickerDirect, setTickerDirect] = useState(false);
   const [tickerQuery, setTickerQuery] = useState("");
   const [tickerSuggestions, setTickerSuggestions] = useState<StockSuggestion[]>([]);
@@ -77,17 +62,17 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
     return () => { clearTimeout(tickerSearchTimer.current); };
   }, []);
 
-  const { data: txList, isLoading } = useQuery({
+  const { data: txList, isLoading } = useQuery<Transaction[]>({
     queryKey: ["transactions", accountId],
     queryFn: () => fetchTransactions({ account_id: accountId }),
   });
 
-  const { data: positionsData } = useQuery({
+  const { data: positionsData } = useQuery<{ positions: Array<{ ticker: string; name: string; qty: number }> }>({
     queryKey: ["account-positions", accountId],
     queryFn: () =>
       api
         .get<{ positions: Array<{ ticker: string; name: string; qty: number }> }>(`/assets/${accountId}/positions`)
-        .then((r: { data: { positions: Array<{ ticker: string; name: string; qty: number }> } }) => r.data),
+        .then((r) => r.data),
     enabled: !!accountId,
     staleTime: 60_000,
   });
