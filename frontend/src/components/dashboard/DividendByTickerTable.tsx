@@ -3,7 +3,7 @@ import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import { TickerDividendItem, updateTickerDividendMonths, deleteTickerDividendMonths } from "../../api/dashboard";
 import DividendMonthsModal from "./DividendMonthsModal";
-import { fmtKrw } from "../../utils/format";
+import { fmtKrwShort } from "../../utils/format";
 import { toast } from "../../utils/toast";
 
 interface Props {
@@ -33,7 +33,7 @@ function MonthBadges({ months, isManual }: { months: number[] | undefined; isMan
               : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
           }`}
         >
-          {m}월
+          {m}
         </span>
       ))}
       {rest > 0 && (
@@ -154,11 +154,11 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
                     <td className="py-2 px-2 text-right font-medium text-green-600 dark:text-green-400 whitespace-nowrap">
                       {item.estimated_annual_krw > 0 ? (
                         <div className="flex flex-col items-end gap-0.5">
-                          <span>{fmtKrw(item.estimated_annual_krw)}</span>
+                          <span>{fmtKrwShort(item.estimated_annual_krw)}원</span>
                           <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
                             {item.currency === "USD" && item.estimated_monthly_usd != null
-                              ? `$${item.estimated_monthly_usd.toFixed(2)} (${fmtKrw(item.estimated_monthly_krw)})/월`
-                              : `${fmtKrw(item.estimated_monthly_krw)}/월`}
+                              ? `$${item.estimated_monthly_usd.toFixed(2)} · 월 ${fmtKrwShort(item.estimated_monthly_krw)}원`
+                              : `월 ${fmtKrwShort(item.estimated_monthly_krw)}원`}
                           </span>
                         </div>
                       ) : "—"}

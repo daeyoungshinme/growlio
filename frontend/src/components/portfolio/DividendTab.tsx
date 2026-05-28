@@ -123,24 +123,27 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <StatCard
           label="예상 연간 배당금"
           value={totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
           sub="보유 종목 배당수익률 기준 추정"
           color="green"
+          size="sm"
         />
         <StatCard
           label="올해 수령 배당금"
           value={received > 0 ? `${fmtKrwShort(received)}원` : "—"}
           sub={received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
           color="gray"
+          size="sm"
         />
         <StatCard
           label="월평균 예상 배당금"
           value={estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
           sub="연간 예상 배당금 ÷ 12"
           color="blue"
+          size="sm"
         />
       </div>
 
@@ -174,7 +177,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                     <th className="py-2 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
                     <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">투자배당율</th>
                     <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당월</th>
-                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">예상 연간 배당금</th>
+                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">연간 배당금</th>
                     <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">비중</th>
                   </tr>
                 </thead>

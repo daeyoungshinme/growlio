@@ -68,7 +68,47 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
       {aggregated.length === 0 ? (
         <div className="py-12 text-center text-gray-300 dark:text-gray-600 text-sm">보유 종목이 없습니다</div>
       ) : (
-        <div className="overflow-x-auto max-h-[800px] overflow-y-auto">
+        <>
+        {/* 모바일 카드 뷰 */}
+        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+          {sorted.map((agg, i) => {
+            const key = `${agg.ticker}-${agg.market}`;
+            const divData = dividendMap[key];
+            return (
+              <div key={key} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">{i + 1}</span>
+                      <p className="font-semibold text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
+                    </div>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
+                    <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
+                      {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+                  <span>{agg.total_qty.toLocaleString()}주</span>
+                  <span>·</span>
+                  <span>비중 {agg.weight_in_stock.toFixed(1)}%</span>
+                  {!divLoading && !divError && divData?.investment_yield > 0 && (
+                    <>
+                      <span>·</span>
+                      <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 데스크탑 테이블 */}
+        <div className="hidden sm:block overflow-x-auto max-h-[800px] overflow-y-auto">
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
@@ -213,6 +253,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

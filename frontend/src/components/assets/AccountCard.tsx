@@ -72,49 +72,77 @@ export default function AccountCard({ acc, onSync, syncing }: Props) {
       </div>
 
       {open && hasPositions && (
-        <div className="border-t border-gray-100 dark:border-gray-700 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-400 dark:text-gray-500 tracking-wide">
-                <th className="text-left px-5 py-2.5 font-medium">종목</th>
-                <th className="text-right px-3 py-2.5 font-medium">보유수</th>
-                <th className="text-right px-3 py-2.5 font-medium">평단가</th>
-                <th className="text-right px-3 py-2.5 font-medium">현재가</th>
-                <th className="text-right px-3 py-2.5 font-medium">매입금액</th>
-                <th className="text-right px-3 py-2.5 font-medium">평가금액</th>
-                <th className="text-right px-5 py-2.5 font-medium">수익률</th>
-              </tr>
-            </thead>
-            <tbody>
-              {acc.positions.map((p) => (
-                <tr key={`${p.ticker}-${p.market}`} className="border-t border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/20">
-                  <td className="px-5 py-3">
-                    <p className="font-medium text-gray-900 dark:text-gray-50">{p.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{p.ticker} · {p.market}</p>
-                  </td>
-                  <td className="px-3 py-3 text-right">{p.qty.toLocaleString()}주</td>
-                  <td className="px-3 py-3 text-right text-gray-500 dark:text-gray-400">{p.avg_price.toLocaleString()}</td>
-                  <td className="px-3 py-3 text-right font-medium">{p.current_price.toLocaleString()}</td>
-                  <td className="px-3 py-3 text-right text-gray-500 dark:text-gray-400">{fmtKrwShort(p.invested_krw)}원</td>
-                  <td className="px-3 py-3 text-right font-medium">{fmtKrwShort(p.value_krw)}원</td>
+        <div className="border-t border-gray-100 dark:border-gray-700">
+          {/* 모바일 카드 뷰 */}
+          <div className="sm:hidden divide-y divide-gray-50 dark:divide-gray-800">
+            {acc.positions.map((p) => (
+              <div key={`${p.ticker}-${p.market}`} className="px-4 py-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-medium text-sm text-gray-900 dark:text-gray-50 truncate">{p.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    {p.ticker} · {p.market} · {p.qty.toLocaleString()}주
+                  </p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">{fmtKrwShort(p.value_krw)}원</p>
+                  <p className="text-xs mt-0.5"><PnlText val={p.pnl} pct={p.pnl_pct} /></p>
+                </div>
+              </div>
+            ))}
+            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">합계</span>
+              <div className="text-right">
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">{fmtKrwShort(acc.amount_krw)}원</p>
+                <p className="text-xs mt-0.5"><PnlText val={acc.unrealized_pnl} pct={acc.invested_krw ? acc.unrealized_pnl / acc.invested_krw * 100 : 0} /></p>
+              </div>
+            </div>
+          </div>
+
+          {/* 데스크탑 테이블 */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800 text-xs text-gray-400 dark:text-gray-500 tracking-wide">
+                  <th className="text-left px-5 py-2.5 font-medium">종목</th>
+                  <th className="text-right px-3 py-2.5 font-medium">보유수</th>
+                  <th className="text-right px-3 py-2.5 font-medium">평단가</th>
+                  <th className="text-right px-3 py-2.5 font-medium">현재가</th>
+                  <th className="text-right px-3 py-2.5 font-medium">매입금액</th>
+                  <th className="text-right px-3 py-2.5 font-medium">평가금액</th>
+                  <th className="text-right px-5 py-2.5 font-medium">수익률</th>
+                </tr>
+              </thead>
+              <tbody>
+                {acc.positions.map((p) => (
+                  <tr key={`${p.ticker}-${p.market}`} className="border-t border-gray-50 dark:border-gray-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/20">
+                    <td className="px-5 py-3">
+                      <p className="font-medium text-gray-900 dark:text-gray-50">{p.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{p.ticker} · {p.market}</p>
+                    </td>
+                    <td className="px-3 py-3 text-right">{p.qty.toLocaleString()}주</td>
+                    <td className="px-3 py-3 text-right text-gray-500 dark:text-gray-400">{p.avg_price.toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right font-medium">{p.current_price.toLocaleString()}</td>
+                    <td className="px-3 py-3 text-right text-gray-500 dark:text-gray-400">{fmtKrwShort(p.invested_krw)}원</td>
+                    <td className="px-3 py-3 text-right font-medium">{fmtKrwShort(p.value_krw)}원</td>
+                    <td className="px-5 py-3 text-right text-sm">
+                      <PnlText val={p.pnl} pct={p.pnl_pct} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-sm font-semibold">
+                  <td className="px-5 py-3 text-gray-500 dark:text-gray-400">합계</td>
+                  <td colSpan={3} />
+                  <td className="px-3 py-3 text-right">{fmtKrwShort(acc.invested_krw)}원</td>
+                  <td className="px-3 py-3 text-right">{fmtKrwShort(acc.amount_krw)}원</td>
                   <td className="px-5 py-3 text-right text-sm">
-                    <PnlText val={p.pnl} pct={p.pnl_pct} />
+                    <PnlText val={acc.unrealized_pnl} pct={acc.invested_krw ? acc.unrealized_pnl / acc.invested_krw * 100 : 0} />
                   </td>
                 </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 text-sm font-semibold">
-                <td className="px-5 py-3 text-gray-500 dark:text-gray-400">합계</td>
-                <td colSpan={3} />
-                <td className="px-3 py-3 text-right">{fmtKrwShort(acc.invested_krw)}원</td>
-                <td className="px-3 py-3 text-right">{fmtKrwShort(acc.amount_krw)}원</td>
-                <td className="px-5 py-3 text-right text-sm">
-                  <PnlText val={acc.unrealized_pnl} pct={acc.invested_krw ? acc.unrealized_pnl / acc.invested_krw * 100 : 0} />
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
     </div>
