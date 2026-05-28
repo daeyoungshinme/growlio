@@ -130,7 +130,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
               <p className="text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
-                {data.total_assets_krw.toLocaleString()}원
+                {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>
             <div>
