@@ -191,7 +191,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                         <tr key={rowKey} className="border-t border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
                           <td className="py-2 px-5">
                             <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
-                            <p className="text-[10px] text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
+                            <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
                           </td>
                           <td className="py-2 px-3 text-right">
                             {divLoading ? (
@@ -206,7 +206,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                             {d.dividend_months.length === 0 ? (
                               <span className="text-gray-300 dark:text-gray-600">—</span>
                             ) : d.dividend_months.length === 12 ? (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-medium">
+                              <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-medium">
                                 월배당
                               </span>
                             ) : (
@@ -214,7 +214,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                                 {d.dividend_months.map((m) => (
                                   <span
                                     key={m}
-                                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                    className={`text-xs px-1.5 py-0.5 rounded-full ${
                                       d.dividend_months_is_manual
                                         ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
                                         : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
@@ -316,7 +316,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <p className="text-[10px] text-gray-300 dark:text-gray-600 mt-2 text-right">
+            <p className="text-xs text-gray-300 dark:text-gray-600 mt-2 text-right">
               진한 초록: 실수령 · 연한 초록: 예상(미래) · 회색: 예상(과거 미수령) | 막대 클릭 시 해당 월 상세 표시
             </p>
           </div>
@@ -368,7 +368,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                           >
                             <td className="py-2 px-5">
                               <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
                             </td>
                             <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">
                               {d.investment_yield > 0 ? `${d.investment_yield.toFixed(2)}%` : "—"}
@@ -390,7 +390,7 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
                             </td>
                             <td className="py-2 px-5 text-right">
                               <span
-                                className={`text-[10px] px-2 py-0.5 rounded-full ${
+                                className={`text-xs px-2 py-0.5 rounded-full ${
                                   d.dividend_months_is_manual
                                     ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
                                     : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"

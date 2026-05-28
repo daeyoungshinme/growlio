@@ -37,14 +37,14 @@ export default function DividendSection({ annualReceived, estimatedAnnual, month
     <div className="space-y-4">
       <div className="flex gap-3">
         <StatBox
-          label="올해 수령 배당금"
+          label="올해 배당금"
           value={annualReceived != null && annualReceived > 0 ? fmtKrw(annualReceived) : "—"}
-          sub={annualReceived != null && annualReceived > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
+          sub={annualReceived != null && annualReceived > 0 ? "실수령 합계" : "배당 내역을 입력해주세요"}
         />
         <StatBox
-          label="예상 연간 배당금"
+          label="예상 배당금"
           value={estimatedAnnual != null && estimatedAnnual > 0 ? fmtKrw(estimatedAnnual) : "—"}
-          sub="보유 종목 배당수익률 기준 추정"
+          sub="배당수익률 기준 추정"
         />
       </div>
 
@@ -55,7 +55,7 @@ export default function DividendSection({ annualReceived, estimatedAnnual, month
             <BarChart data={monthlyBreakdown} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="month"
-                tick={{ fontSize: 10, fill: "#9CA3AF" }}
+                tick={{ fontSize: 11, fill: "#9CA3AF" }}
                 axisLine={false}
                 tickLine={false}
                 tickFormatter={(v) => v.slice(5)}

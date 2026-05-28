@@ -118,7 +118,7 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
 
         {showAll && (
           <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-xs">
+            <table className="w-full min-w-[360px] text-xs">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
                   <th className="py-1.5 px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
@@ -142,8 +142,11 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
                         {p.total_qty.toLocaleString()}주
                       </td>
                       <td className="py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">{fmtKrw(p.total_value_krw)}</td>
-                      <td className={`py-2 px-2 text-right font-medium whitespace-nowrap ${pnlColorClass}`}>
-                        {p.total_pnl >= 0 ? "+" : ""}{fmtKrw(p.total_pnl)} ({p.pnl_pct >= 0 ? "+" : ""}{p.pnl_pct.toFixed(1)}%)
+                      <td className={`py-2 px-2 text-right font-medium ${pnlColorClass}`}>
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="whitespace-nowrap">{p.total_pnl >= 0 ? "+" : ""}{fmtKrw(p.total_pnl)}</span>
+                          <span className="text-xs font-normal whitespace-nowrap">{p.pnl_pct >= 0 ? "+" : ""}{p.pnl_pct.toFixed(1)}%</span>
+                        </div>
                       </td>
                       <td className="py-2 px-2 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">
                         {p.weight_in_stock.toFixed(1)}%

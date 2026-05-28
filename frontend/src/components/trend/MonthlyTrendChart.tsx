@@ -21,7 +21,7 @@ export default function MonthlyTrendChart({ data }: Props) {
       <BarChart data={chartData} margin={{ top: 5, right: 10, bottom: 0, left: 10 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#F3F4F6"} />
         <XAxis dataKey="month" tick={{ fontSize: 12, fill: isDark ? "#9CA3AF" : "#6B7280" }} />
-        <YAxis tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }} unit="만" />
+        <YAxis tick={{ fontSize: 12, fill: isDark ? "#9CA3AF" : "#6B7280" }} unit="만" />
         <Tooltip
           cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)" }}
           formatter={(v: number) => [`${v}만원`, "자산 합계"]}

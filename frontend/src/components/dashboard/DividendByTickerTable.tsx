@@ -15,7 +15,7 @@ function MonthBadges({ months, isManual }: { months: number[] | undefined; isMan
   if (!months || months.length === 0) return <span className="text-gray-300 dark:text-gray-600">—</span>;
   if (months.length === 12) {
     return (
-      <span className="text-[10px] px-1.5 py-0 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-medium">
+      <span className="text-xs px-1.5 py-0 rounded-full bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400 font-medium">
         월배당
       </span>
     );
@@ -27,7 +27,7 @@ function MonthBadges({ months, isManual }: { months: number[] | undefined; isMan
       {visible.map((m) => (
         <span
           key={m}
-          className={`text-[10px] px-1 py-0 rounded-full ${
+          className={`text-xs px-1.5 py-0 rounded-full ${
             isManual
               ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
               : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
@@ -37,7 +37,7 @@ function MonthBadges({ months, isManual }: { months: number[] | undefined; isMan
         </span>
       ))}
       {rest > 0 && (
-        <span className="text-[10px] px-1 py-0 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">+{rest}</span>
+        <span className="text-xs px-1.5 py-0 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">+{rest}</span>
       )}
     </div>
   );
@@ -94,13 +94,13 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
     <div>
       <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 font-medium">종목별 배당 현황</p>
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full min-w-[380px] text-xs">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-700">
               <th className="py-1.5 px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
-              <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">투자배당율</th>
+              <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">배당율</th>
               <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당월</th>
-              <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">연간 / 월 배당금</th>
+              <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">연간/월 배당</th>
               <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">비중</th>
             </tr>
           </thead>
@@ -155,7 +155,7 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
                       {item.estimated_annual_krw > 0 ? (
                         <div className="flex flex-col items-end gap-0.5">
                           <span>{fmtKrw(item.estimated_annual_krw)}</span>
-                          <span className="text-[11px] font-normal text-gray-400 dark:text-gray-500">
+                          <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
                             {item.currency === "USD" && item.estimated_monthly_usd != null
                               ? `$${item.estimated_monthly_usd.toFixed(2)} (${fmtKrw(item.estimated_monthly_krw)})/월`
                               : `${fmtKrw(item.estimated_monthly_krw)}/월`}

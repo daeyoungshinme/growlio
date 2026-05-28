@@ -17,16 +17,16 @@ export default function TreemapCell(props: Record<string, unknown>) {
       {width > 50 && height > 30 && (
         <>
           <text x={x + width / 2} y={y + height / 2 - 7} fill="#fff"
-            textAnchor="middle" fontSize={11} fontWeight="bold">
+            textAnchor="middle" fontSize={12} fontWeight="bold">
             {name.length > 8 ? name.slice(0, 7) + "…" : name}
           </text>
           <text x={x + width / 2} y={y + height / 2 + 9} fill="rgba(255,255,255,0.85)"
-            textAnchor="middle" fontSize={10}>
+            textAnchor="middle" fontSize={11}>
             {pct.toFixed(1)}%
           </text>
           {height > 55 && ticker && (
             <text x={x + width / 2} y={y + height / 2 + 22} fill="rgba(255,255,255,0.6)"
-              textAnchor="middle" fontSize={9}>
+              textAnchor="middle" fontSize={10}>
               {ticker}
             </text>
           )}

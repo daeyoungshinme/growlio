@@ -129,7 +129,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-              <p className="text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
+              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>
@@ -152,7 +152,7 @@ export default function DashboardPage() {
               <p className="text-sm font-semibold text-purple-600 dark:text-purple-400 mt-0.5">
                 {data.goal_annual_return_pct != null ? `${data.goal_annual_return_pct}%` : "미설정"}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">연간 목표</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">연간</p>
             </div>
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">입금 달성률</p>
@@ -163,15 +163,15 @@ export default function DashboardPage() {
               </p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                 {data.annual_deposit_goal != null
-                  ? `목표 ${(data.annual_deposit_goal / 1e4).toFixed(0)}만원`
-                  : "목표 미설정"}
+                  ? `${(data.annual_deposit_goal / 1e4).toFixed(0)}만원 목표`
+                  : "미설정"}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">은퇴 목표</p>
               <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{retirementLabel}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                {data.retirement_target_year ? "은퇴 목표 연도" : "미설정"}
+                {data.retirement_target_year ? "목표 연도" : "미설정"}
               </p>
             </div>
             <div>
