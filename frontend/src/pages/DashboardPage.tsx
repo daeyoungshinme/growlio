@@ -127,7 +127,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-              <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
+              <p className="text-2xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>

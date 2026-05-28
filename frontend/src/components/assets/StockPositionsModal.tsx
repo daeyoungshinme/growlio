@@ -241,7 +241,7 @@ export default function StockPositionsModal({
         )}
 
         {/* 요약 카드 */}
-        <div className="grid grid-cols-4 gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
           {[
             { label: "매입금액", val: displaySummary.total_invested, color: "" },
             { label: "평가금액", val: displaySummary.total_value, color: "" },
@@ -256,7 +256,7 @@ export default function StockPositionsModal({
           ))}
           <div>
             <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">수익률</p>
-            <p className={`font-bold text-xl ${displaySummary.total_pnl_pct >= 0 ? "text-red-500" : "text-blue-500"}`}>
+            <p className={`font-bold text-base sm:text-xl ${displaySummary.total_pnl_pct >= 0 ? "text-red-500" : "text-blue-500"}`}>
               {displaySummary.total_pnl_pct >= 0 ? "+" : ""}{displaySummary.total_pnl_pct.toFixed(2)}%
             </p>
           </div>

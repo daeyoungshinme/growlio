@@ -223,14 +223,10 @@ export default function PortfolioAnalysisTab() {
                       <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
                         {p.name}
                       </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
                         {p.base_type === "STOCK_ONLY" ? "주식 자산 기준" : "전체 자산 기준"} · {p.items.length}개 항목
+                        {stockAccounts.length > 1 && ` · 계좌: ${getAccountLabel(p)}`}
                       </p>
-                      {stockAccounts.length > 1 && (
-                        <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                          계좌: {getAccountLabel(p)}
-                        </p>
-                      )}
                     </div>
                     <div className="flex gap-0.5 shrink-0">
                       <button
