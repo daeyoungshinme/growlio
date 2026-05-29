@@ -11,7 +11,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379).
+Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, Node 18+ 필수.
+
+> **pre-commit hooks** 설정됨 — commit 시 ruff, mypy, eslint, trailing-whitespace 자동 실행. 실패 시 commit 블록.
 
 ## First-time Setup (순서 중요)
 
