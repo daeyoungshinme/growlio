@@ -4,7 +4,6 @@ import { RefreshCw } from "lucide-react";
 import { api } from "../api/client";
 import { syncAccount } from "../api/assets";
 import PortfolioAnalysisTab from "../components/portfolio-analysis/PortfolioAnalysisTab";
-import AccountCard from "../components/assets/AccountCard";
 import StockHoldingsTable from "../components/assets/StockHoldingsTable";
 import TreemapChart from "../components/portfolio/TreemapChart";
 import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
@@ -28,13 +27,12 @@ interface DividendSummary {
 
 const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
-const TABS = ["증권사 계좌", "종목 현황", "배당 현황", "포트폴리오 분석"] as const;
+const TABS = ["종목 현황", "배당 현황", "포트폴리오 분석"] as const;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>("증권사 계좌");
-  const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("종목 현황");
   const [syncingAll, setSyncingAll] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -64,19 +62,6 @@ export default function PortfolioPage() {
     staleTime: 1000 * 60 * 60,
   });
 
-  const handleSync = async (id: string) => {
-    setSyncingId(id);
-    try {
-      await syncAccount(id);
-      await invalidateSyncData(qc);
-      toast("동기화 완료", "success");
-    } catch (e: unknown) {
-      toast(extractErrorMessage(e, "동기화에 실패했습니다"), "error");
-    } finally {
-      setSyncingId(null);
-    }
-  };
-
   const handleSyncAll = async () => {
     if (!data) return;
     const accounts = data.accounts.filter(
@@ -85,7 +70,6 @@ export default function PortfolioPage() {
     setSyncingAll(true);
     try {
       for (const acc of accounts) {
-        setSyncingId(acc.id);
         await syncAccount(acc.id);
       }
       await invalidateSyncData(qc);
@@ -94,7 +78,6 @@ export default function PortfolioPage() {
       toast(extractErrorMessage(e, "일부 계좌 동기화에 실패했습니다"), "error");
     } finally {
       setSyncingAll(false);
-      setSyncingId(null);
     }
   };
 
@@ -148,7 +131,7 @@ export default function PortfolioPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSyncAll}
-            disabled={syncingAll || !!syncingId}
+            disabled={syncingAll}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
@@ -183,36 +166,9 @@ export default function PortfolioPage() {
         ))}
       </div>
 
-      {tab === "증권사 계좌" && (
-        <>
-          <DomesticForeignBar items={marketChartData} />
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-gray-700 dark:text-gray-300">증권사 계좌</h2>
-              <p className="text-xs text-gray-400 dark:text-gray-500">계좌 추가·관리는 <strong>자산관리</strong> 메뉴에서</p>
-            </div>
-
-            {stockAccounts.length === 0 ? (
-              <div className="bg-gray-50 dark:bg-gray-900 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center text-gray-400 dark:text-gray-500 text-sm">
-                등록된 증권사 계좌가 없습니다. <strong>자산관리</strong> 메뉴에서 계좌를 추가하세요.
-              </div>
-            ) : (
-              stockAccounts.map((acc) => (
-                <AccountCard
-                  key={acc.id}
-                  acc={acc}
-                  syncing={syncingId === acc.id || syncingAll}
-                  onSync={() => handleSync(acc.id)}
-                />
-              ))
-            )}
-          </div>
-        </>
-      )}
-
       {tab === "종목 현황" && (
         <>
+          <DomesticForeignBar items={marketChartData} />
           <TreemapChart data={stockChartData} title="종목별 비중" />
           {(() => {
             const dividendMap = Object.fromEntries(

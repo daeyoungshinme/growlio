@@ -16,6 +16,8 @@ interface GoalForm {
   goal_amount: string;
   goal_start_date: string;
   goal_initial_amount: string;
+  annual_deposit_goal: string;
+  retirement_target_year: string;
 }
 
 export default function InvestPlanPage() {
@@ -34,17 +36,22 @@ export default function InvestPlanPage() {
     goal_amount: "",
     goal_start_date: "",
     goal_initial_amount: "",
+    annual_deposit_goal: "",
+    retirement_target_year: "",
   });
 
-  const openEdit = () => {
+  const openEdit = async () => {
     if (!data) return;
     const s = data.settings;
+    const settingsRes = await api.get<{ annual_deposit_goal: number | null; retirement_target_year: number | null }>("/settings");
     setForm({
       monthly_deposit_amount: s.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
       goal_annual_return_pct: s.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
       goal_amount: s.goal_amount ? String(s.goal_amount) : "",
       goal_start_date: s.goal_start_date ?? "",
       goal_initial_amount: s.goal_initial_amount ? String(s.goal_initial_amount) : "",
+      annual_deposit_goal: settingsRes.data.annual_deposit_goal ? String(settingsRes.data.annual_deposit_goal) : "",
+      retirement_target_year: settingsRes.data.retirement_target_year ? String(settingsRes.data.retirement_target_year) : "",
     });
     setEditing(true);
   };
@@ -58,11 +65,14 @@ export default function InvestPlanPage() {
         goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
         goal_start_date: form.goal_start_date || null,
         goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
+        annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
+        retirement_target_year: form.retirement_target_year ? Number(form.retirement_target_year) : null,
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);
       queryClient.invalidateQueries({ queryKey: ["dca-analysis"] });
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["settings"] });
     } catch {
       toast("저장에 실패했습니다", "error");
     } finally {
@@ -141,6 +151,9 @@ export default function InvestPlanPage() {
             </p>
           </div>
         </div>
+        <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+          연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다.
+        </p>
         {!isConfigured && (
           <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
             월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수 있습니다.{" "}
@@ -165,27 +178,32 @@ export default function InvestPlanPage() {
       {/* 설정 편집 모달 */}
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md space-y-4 mx-4 border border-gray-200 dark:border-gray-700">
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">적립 계획 설정</h2>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">투자 목표 설정</h2>
 
-            {[
-              { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
-              { label: "목표 연수익률 (%)", key: "goal_annual_return_pct", placeholder: "8" },
-              { label: "목표 금액 (원)", key: "goal_amount", placeholder: "500000000" },
-              { label: "투자 시작일", key: "goal_start_date", placeholder: "2024-01-01", type: "date" },
-              { label: "투자 시작시점 자산 (원)", key: "goal_initial_amount", placeholder: "100000000" },
-            ].map(({ label, key, placeholder, type }) => (
-              <div key={key}>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
-                <input
-                  type={type ?? "number"}
-                  value={form[key as keyof GoalForm]}
-                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            ))}
+            <div className="space-y-4">
+              {[
+                { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
+                { label: "목표 연수익률 (%)", key: "goal_annual_return_pct", placeholder: "8" },
+                { label: "목표 금액 (원)", key: "goal_amount", placeholder: "500000000" },
+                { label: "투자 시작일", key: "goal_start_date", placeholder: "2024-01-01", type: "date" },
+                { label: "투자 시작시점 자산 (원)", key: "goal_initial_amount", placeholder: "100000000", hint: "비워두면 스냅샷 자동 사용" },
+                { label: "연간 입금 목표 (원)", key: "annual_deposit_goal", placeholder: "24000000", hint: "대시보드 입금 달성률에 표시" },
+                { label: "은퇴 목표시점 (연도)", key: "retirement_target_year", placeholder: "2045", hint: "대시보드 은퇴 카운트다운에 표시" },
+              ].map(({ label, key, placeholder, type, hint }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
+                  <input
+                    type={type ?? "number"}
+                    value={form[key as keyof GoalForm]}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {hint && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{hint}</p>}
+                </div>
+              ))}
+            </div>
 
             <div className="flex gap-3 pt-2">
               <button

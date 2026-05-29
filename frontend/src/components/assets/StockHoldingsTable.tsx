@@ -93,7 +93,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                 <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
                   <span>{agg.total_qty.toLocaleString()}주</span>
                   <span>·</span>
-                  <span>비중 {agg.weight_in_stock.toFixed(1)}%</span>
+                  <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
                   {!divLoading && !divError && divData?.investment_yield > 0 && (
                     <>
                       <span>·</span>
@@ -161,7 +161,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                           <div className="w-16 bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                             <div className="bg-blue-500 h-full rounded-full" style={{ width: `${Math.min(agg.weight_in_stock, 100)}%` }} />
                           </div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 w-10 text-right">{agg.weight_in_stock.toFixed(1)}%</span>
+                          <span className="text-xs text-indigo-500 dark:text-indigo-400 w-10 text-right">{agg.weight_in_stock.toFixed(1)}%</span>
                         </div>
                       </td>
                       {divLoading ? (
@@ -179,7 +179,7 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
                           <td className="py-3 px-4 text-right">
                             {divData.investment_yield > 0 ? (
                               <>
-                                <span className="text-xs text-green-600 font-medium">{divData.investment_yield.toFixed(2)}%</span>
+                                <span className="text-xs text-green-600 dark:text-green-400 font-medium">{divData.investment_yield.toFixed(2)}%</span>
                                 {divData.dps > 0 && (
                                   <p className="text-xs text-gray-400 mt-0.5">
                                     {(divData.dps * agg.total_qty).toLocaleString()}{["KOSPI", "KOSDAQ", "KRX"].includes(divData.market) ? "원" : "$"}

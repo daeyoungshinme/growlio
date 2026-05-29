@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Sun, Moon, LogOut } from "lucide-react";
 import { api } from "../api/client";
 import { toast } from "../utils/toast";
+import { useThemeStore } from "../stores/themeStore";
+import { useAuthStore } from "../stores/authStore";
 import {
   fetchExchangeRateAlerts,
   createExchangeRateAlert,
@@ -45,9 +49,10 @@ const labelClass = "text-sm font-medium text-gray-700 dark:text-gray-300";
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { isDark, toggle } = useThemeStore();
+  const { logout } = useAuthStore();
   const [current, setCurrent] = useState<SettingsData | null>(null);
   const [dart, setDart] = useState({ api_key: "" });
-  const [goal, setGoal] = useState({ goal_amount: "", goal_annual_return_pct: "", annual_deposit_goal: "", monthly_deposit_amount: "", retirement_target_year: "" });
   const [saving, setSaving] = useState<string | null>(null);
 
   // 목표환율 알림 상태
@@ -81,35 +86,12 @@ export default function SettingsPage() {
   useEffect(() => {
     api.get<SettingsData>("/settings").then((r) => {
       setCurrent(r.data);
-      if (r.data.goal_amount) setGoal((g) => ({ ...g, goal_amount: String(r.data.goal_amount) }));
-      if (r.data.goal_annual_return_pct) setGoal((g) => ({ ...g, goal_annual_return_pct: String(r.data.goal_annual_return_pct) }));
-      if (r.data.annual_deposit_goal) setGoal((g) => ({ ...g, annual_deposit_goal: String(r.data.annual_deposit_goal) }));
-      if (r.data.monthly_deposit_amount) setGoal((g) => ({ ...g, monthly_deposit_amount: String(r.data.monthly_deposit_amount) }));
-      if (r.data.retirement_target_year) setGoal((g) => ({ ...g, retirement_target_year: String(r.data.retirement_target_year) }));
       setNotificationEmail(r.data.notification_email ?? "");
     });
   }, []);
 
   const flash = (_key: string, ok: boolean, text: string) => {
     toast(text, ok ? "success" : "error");
-  };
-
-  const saveGoal = async () => {
-    setSaving("goal");
-    try {
-      await api.put("/settings/goal", {
-        goal_amount: goal.goal_amount ? Number(goal.goal_amount) : null,
-        goal_annual_return_pct: goal.goal_annual_return_pct ? Number(goal.goal_annual_return_pct) : null,
-        annual_deposit_goal: goal.annual_deposit_goal ? Number(goal.annual_deposit_goal) : null,
-        monthly_deposit_amount: goal.monthly_deposit_amount ? Number(goal.monthly_deposit_amount) : null,
-        retirement_target_year: goal.retirement_target_year ? Number(goal.retirement_target_year) : null,
-      });
-      flash("goal", true, "목표가 저장되었습니다");
-    } catch {
-      flash("goal", false, "저장에 실패했습니다");
-    } finally {
-      setSaving(null);
-    }
   };
 
   const saveDart = async () => {
@@ -161,6 +143,26 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
+      {/* 모바일 전용: 앱 설정 (데스크톱은 사이드바에서 접근) */}
+      <div className="lg:hidden">
+        <SectionCard title="앱 설정">
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
+          </button>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+          >
+            <LogOut size={18} />
+            로그아웃
+          </button>
+        </SectionCard>
+      </div>
+
       {/* DART OpenAPI */}
       <SectionCard title="DART OpenAPI (금융감독원)" badge={current?.has_dart ? <ConnectedBadge /> : undefined}>
         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -310,42 +312,15 @@ export default function SettingsPage() {
 
       {/* 투자 목표 */}
       <SectionCard title="투자 목표 설정">
-        <div>
-          <label className={labelClass}>목표 자산 (원)</label>
-          <input type="number" className={inputClass} value={goal.goal_amount}
-            onChange={(e) => setGoal((g) => ({ ...g, goal_amount: e.target.value }))} placeholder="예: 100000000 (1억)" />
-        </div>
-        <div>
-          <label className={labelClass}>목표 연 수익률 (%)</label>
-          <input type="number" step="0.1" className={inputClass} value={goal.goal_annual_return_pct}
-            onChange={(e) => setGoal((g) => ({ ...g, goal_annual_return_pct: e.target.value }))} placeholder="예: 7.0" />
-        </div>
-        <div>
-          <label className={labelClass}>연간 입금 목표 (원)</label>
-          <input type="number" className={inputClass} value={goal.annual_deposit_goal}
-            onChange={(e) => setGoal((g) => ({ ...g, annual_deposit_goal: e.target.value }))}
-            placeholder="예: 24000000 (월 200만원 × 12)" />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">올해 입출금 내역 기준으로 달성률이 대시보드에 표시됩니다</p>
-        </div>
-        <div>
-          <label className={labelClass}>월 적립액 (원)</label>
-          <input type="number" className={inputClass} value={goal.monthly_deposit_amount}
-            onChange={(e) => setGoal((g) => ({ ...g, monthly_deposit_amount: e.target.value }))}
-            placeholder="예: 500000 (50만원)" />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">투자 계획 페이지의 DCA 복리 시뮬레이션 기준 금액입니다</p>
-        </div>
-        <div>
-          <label className={labelClass}>은퇴 목표시점 (연도)</label>
-          <input type="number" className={inputClass} value={goal.retirement_target_year}
-            onChange={(e) => setGoal((g) => ({ ...g, retirement_target_year: e.target.value }))}
-            placeholder="예: 2045" min="2025" max="2100" />
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">대시보드에 은퇴까지 남은 기간이 표시됩니다</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={saveGoal} disabled={saving === "goal"} className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {saving === "goal" ? "저장 중..." : "저장"}
-          </button>
-        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          월 적립액, 목표 금액, 연간 입금 목표 등 투자 목표는 투자계획 페이지에서 통합 설정합니다.
+        </p>
+        <Link
+          to="/invest-plan"
+          className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          투자계획 설정하기 →
+        </Link>
       </SectionCard>
     </div>
   );
