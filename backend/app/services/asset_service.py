@@ -291,7 +291,9 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     pnl = value - invested if positions else 0.0
 
     if positions:
-        amount_krw = value if value else invested
+        usd_rate_val = (await get_usd_krw_rate(redis)) if redis else 1300.0
+        deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate_val or 1300.0)
+        amount_krw = (value if value else invested) + deposit
         account.manual_amount = amount_krw
     elif account.asset_type == "REAL_ESTATE":
         # 부동산: 순자산(시세 - 담보대출)을 스냅샷에 저장
@@ -365,12 +367,16 @@ async def _build_asset_totals(
     rows = result.all()
 
     snapped_ids = {acc.id for _, acc in rows}
+    from sqlalchemy import and_, or_
     no_snap_result = await db.execute(
         select(AssetAccount).where(
             AssetAccount.user_id == user_id,
             AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.manual_amount.isnot(None),
-            AssetAccount.manual_amount > 0,
+            or_(
+                and_(AssetAccount.manual_amount.isnot(None), AssetAccount.manual_amount > 0),
+                AssetAccount.deposit_krw > 0,
+                AssetAccount.deposit_usd > 0,
+            ),
         )
     )
     no_snap_accounts = [acc for acc in no_snap_result.scalars().all() if acc.id not in snapped_ids]
