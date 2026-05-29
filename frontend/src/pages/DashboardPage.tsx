@@ -111,9 +111,6 @@ export default function DashboardPage() {
   );
 
   const currentYear = new Date().getFullYear();
-  const retirementLabel = data.retirement_target_year
-    ? `${data.retirement_target_year}년 (${data.retirement_target_year - currentYear}년 후)`
-    : "미설정";
 
   const depositColor =
     data.deposit_achievement_pct != null && data.deposit_achievement_pct >= 100
@@ -137,7 +134,8 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Row 1: Hero Card — 자산 현황 + 핵심 지표 통합 */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-row gap-3 lg:gap-6">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-3 lg:gap-4">
+        <div className="flex flex-row gap-3 lg:gap-6">
         {/* 좌측: 자산 총액 + 누적 수익률 + 3개 미니 지표 */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           <div className="flex flex-col gap-4">
@@ -146,124 +144,57 @@ export default function DashboardPage() {
               <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {fmtKrw(Math.floor(data.total_assets_krw))}
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
-              <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
-                data.cumulative_return_pct == null
-                  ? "text-gray-400 dark:text-gray-500"
-                  : data.cumulative_return_pct >= 0
-                  ? "text-red-500"
-                  : "text-blue-500"
-              }`}>
-                {fmtPct(data.cumulative_return_pct)}
-              </p>
-            </div>
-          </div>
-          {/* 목표 달성 전망 — GoalTimelineCard 스타일 */}
-          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4 space-y-3">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {/* 현재 진행율 */}
+            <div className="flex items-start gap-6">
               <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">현재 진행율</p>
-                <p className={`text-lg font-bold ${progressColor}`}>
-                  {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+                <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
+                  data.cumulative_return_pct == null
+                    ? "text-gray-400 dark:text-gray-500"
+                    : data.cumulative_return_pct >= 0
+                    ? "text-red-500"
+                    : "text-blue-500"
+                }`}>
+                  {fmtPct(data.cumulative_return_pct)}
                 </p>
-                {goalAmountDisplay != null && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표 {fmtKrw(goalAmountDisplay)}</p>
-                )}
-              </div>
-              {/* 목표 달성 예상 */}
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">목표 달성 예상</p>
-                <p className="text-lg font-bold text-gray-900 dark:text-gray-50">
-                  {timeline?.expected_goal_date ? fmtMonth(timeline.expected_goal_date) : "—"}
-                </p>
-                {timeline?.months_to_goal != null && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">약 {timeline.months_to_goal}개월 후</p>
-                )}
-              </div>
-              {/* 계획 대비 */}
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">계획 대비</p>
-                {timeline?.lead_lag_months == null ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">—</p>
-                ) : timeline.lead_lag_months > 0 ? (
-                  <span className="flex flex-col gap-0.5 mt-1">
-                    <span className="text-xs sm:text-sm font-medium text-red-500 flex items-center gap-1">
-                      <TrendingUp size={14} />{timeline.lead_lag_months}개월 앞서는 중
-                    </span>
-                    {timeline.actual_expected_goal_date && (
-                      <span className="text-xs text-red-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
-                    )}
-                  </span>
-                ) : timeline.lead_lag_months < 0 ? (
-                  <span className="flex flex-col gap-0.5 mt-1">
-                    <span className="text-xs sm:text-sm font-medium text-blue-500 flex items-center gap-1">
-                      <TrendingDown size={14} />{Math.abs(timeline.lead_lag_months)}개월 뒤처지는 중
-                    </span>
-                    {timeline.actual_expected_goal_date && (
-                      <span className="text-xs text-blue-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
-                    )}
-                  </span>
-                ) : (
-                  <p className="text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mt-1">계획과 정확히 일치</p>
-                )}
-              </div>
-              {/* 상태 */}
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">상태</p>
-                {timeline?.on_track == null ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">—</p>
-                ) : timeline.on_track ? (
-                  <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-red-500 mt-1">
-                    <TrendingUp size={14} /> 계획 달성 중
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium text-blue-500 mt-1">
-                    <TrendingDown size={14} /> 계획 미달
-                  </span>
-                )}
-              </div>
-            </div>
-            {/* 진행 바 */}
-            {currentProgressPct != null && (
-              <div>
-                <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mb-1">
-                  <span>0%</span>
-                  <span>100%</span>
-                </div>
-                <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 rounded-full transition-all"
-                    style={{ width: `${Math.min(currentProgressPct, 100)}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            {/* 보조 항목: 입금 달성률 · 은퇴 목표 · 환율 */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 pt-2 border-t border-gray-50 dark:border-gray-800">
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate">입금 달성률</p>
-                {data.annual_deposit_goal != null && (
-                  <p className="text-xs text-gray-300 dark:text-gray-600 truncate">{fmtKrw(data.annual_deposit_goal)}</p>
-                )}
-                <p className={`text-sm font-semibold mt-0.5 ${depositColor}`}>
-                  {data.deposit_achievement_pct != null ? `${data.deposit_achievement_pct.toFixed(1)}%` : "목표 미설정"}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">은퇴 목표</p>
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{retirementLabel}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
                   {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
                 </p>
+              </div>
+            </div>
+          </div>
+          {/* 보조 항목: 입금 달성률 · 은퇴 목표 */}
+          <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate">입금 달성률</p>
+                <p className={`text-sm font-semibold mt-0.5 ${depositColor}`}>
+                  {data.deposit_achievement_pct != null ? `${data.deposit_achievement_pct.toFixed(1)}%` : "목표 미설정"}
+                </p>
+                {data.annual_deposit_goal != null && (
+                  <p className="text-xs text-gray-300 dark:text-gray-600 truncate mt-0.5">목표 {fmtKrw(data.annual_deposit_goal)}</p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">은퇴 목표</p>
+                {data.retirement_target_year ? (
+                  <>
+                    <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                      {data.retirement_target_year}년
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {data.retirement_target_year - currentYear}년 후
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">미설정</p>
+                )}
               </div>
             </div>
           </div>
@@ -285,6 +216,74 @@ export default function DashboardPage() {
           ) : (
             <div className="flex items-center justify-center h-40 text-gray-300 dark:text-gray-600 text-sm">
               자산 데이터 없음
+            </div>
+          )}
+        </div>
+        </div>
+        {/* 목표 달성 전망 */}
+        <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-3">
+          <div className="grid grid-cols-3 gap-4">
+            {/* 현재 진행율 */}
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">현재 진행율</p>
+              <p className={`text-sm sm:text-base lg:text-lg font-bold ${progressColor}`}>
+                {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
+              </p>
+              {goalAmountDisplay != null && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표 {fmtKrw(goalAmountDisplay)}</p>
+              )}
+            </div>
+            {/* 목표 달성 예상 */}
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">목표 달성 예상</p>
+              <p className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 dark:text-gray-50">
+                {timeline?.expected_goal_date ? fmtMonth(timeline.expected_goal_date) : "—"}
+              </p>
+              {timeline?.months_to_goal != null && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">약 {timeline.months_to_goal}개월 후</p>
+              )}
+            </div>
+            {/* 계획 대비 */}
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">계획 대비</p>
+              {timeline?.lead_lag_months == null ? (
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">—</p>
+              ) : timeline.lead_lag_months > 0 ? (
+                <span className="flex flex-col gap-0.5 mt-1">
+                  <span className="text-xs font-medium text-red-500 flex items-center gap-1">
+                    <TrendingUp size={12} />{timeline.lead_lag_months}개월 앞서는 중
+                  </span>
+                  {timeline.actual_expected_goal_date && (
+                    <span className="text-xs text-red-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                  )}
+                </span>
+              ) : timeline.lead_lag_months < 0 ? (
+                <span className="flex flex-col gap-0.5 mt-1">
+                  <span className="text-xs font-medium text-blue-500 flex items-center gap-1">
+                    <TrendingDown size={12} />{Math.abs(timeline.lead_lag_months)}개월 뒤처지는 중
+                  </span>
+                  {timeline.actual_expected_goal_date && (
+                    <span className="text-xs text-blue-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                  )}
+                </span>
+              ) : (
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">계획과 정확히 일치</p>
+              )}
+            </div>
+          </div>
+          {/* 진행 바 */}
+          {currentProgressPct != null && (
+            <div>
+              <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mb-1">
+                <span>0%</span>
+                <span>100%</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(currentProgressPct, 100)}%` }}
+                />
+              </div>
             </div>
           )}
         </div>
