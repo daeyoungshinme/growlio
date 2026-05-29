@@ -251,23 +251,23 @@ export default function DashboardPage() {
               ) : timeline.lead_lag_months > 0 ? (
                 <span className="flex flex-col gap-0.5 mt-1">
                   <span className="text-xs font-medium text-red-500 flex items-center gap-1">
-                    <TrendingUp size={12} />{timeline.lead_lag_months}개월 앞서는 중
+                    <TrendingUp size={12} />{timeline.lead_lag_months}개월 앞서
                   </span>
                   {timeline.actual_expected_goal_date && (
-                    <span className="text-xs text-red-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                    <span className="text-xs text-red-400 whitespace-nowrap">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
                   )}
                 </span>
               ) : timeline.lead_lag_months < 0 ? (
                 <span className="flex flex-col gap-0.5 mt-1">
                   <span className="text-xs font-medium text-blue-500 flex items-center gap-1">
-                    <TrendingDown size={12} />{Math.abs(timeline.lead_lag_months)}개월 뒤처지는 중
+                    <TrendingDown size={12} />{Math.abs(timeline.lead_lag_months)}개월 지연
                   </span>
                   {timeline.actual_expected_goal_date && (
-                    <span className="text-xs text-blue-400">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                    <span className="text-xs text-blue-400 whitespace-nowrap">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
                   )}
                 </span>
               ) : (
-                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">계획과 정확히 일치</p>
+                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">계획과 일치</p>
               )}
             </div>
           </div>

@@ -129,6 +129,18 @@ export default function SettingsPage() {
     }
   };
 
+  const sendTestEmail = async () => {
+    setSaving("test-email");
+    try {
+      await api.post("/settings/test-email");
+      flash("test-email", true, "테스트 이메일을 발송했습니다. 받은편지함을 확인하세요.");
+    } catch {
+      flash("test-email", false, "이메일 발송에 실패했습니다. SMTP 설정을 확인하세요.");
+    } finally {
+      setSaving(null);
+    }
+  };
+
   const connectOpenBanking = async () => {
     const r = await api.get<{ authorize_url: string }>("/open-banking/connect");
     window.location.href = r.data.authorize_url;
@@ -143,26 +155,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* 모바일 전용: 앱 설정 (데스크톱은 사이드바에서 접근) */}
-      <div className="lg:hidden">
-        <SectionCard title="앱 설정">
-          <button
-            onClick={toggle}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-          >
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
-            {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
-          </button>
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-          >
-            <LogOut size={18} />
-            로그아웃
-          </button>
-        </SectionCard>
-      </div>
-
       {/* DART OpenAPI */}
       <SectionCard title="DART OpenAPI (금융감독원)" badge={current?.has_dart ? <ConnectedBadge /> : undefined}>
         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -238,6 +230,13 @@ export default function SettingsPage() {
             className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saving === "notification-email" ? "저장 중..." : "저장"}
+          </button>
+          <button
+            onClick={sendTestEmail}
+            disabled={saving === "test-email"}
+            className="px-5 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {saving === "test-email" ? "발송 중..." : "테스트 발송"}
           </button>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500">목표환율 도달 시 이메일로 알림을 보내드립니다. 알림은 1회 발동 후 자동으로 비활성화됩니다.</p>
@@ -322,6 +321,26 @@ export default function SettingsPage() {
           투자계획 설정하기 →
         </Link>
       </SectionCard>
+
+      {/* 모바일 전용: 앱 설정 (데스크톱은 사이드바에서 접근) */}
+      <div className="lg:hidden">
+        <SectionCard title="앱 설정">
+          <button
+            onClick={toggle}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+          >
+            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
+          </button>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+          >
+            <LogOut size={18} />
+            로그아웃
+          </button>
+        </SectionCard>
+      </div>
     </div>
   );
 }

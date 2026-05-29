@@ -1,6 +1,5 @@
 import {
   CartesianGrid,
-  Legend,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -54,9 +53,26 @@ export default function DCAProjectionChart({ data }: Props) {
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">이론 복리 곡선 vs 실제 자산</h3>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">이론 복리 곡선 vs 실제 자산</h3>
+      <div className="flex items-center gap-4 flex-wrap mb-3 text-xs text-gray-500 dark:text-gray-400">
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-5 border-t-2 border-blue-500" />
+          이론 복리 곡선 (과거)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-5 border-t-2 border-blue-500 border-dashed" />
+          이론 복리 곡선 (미래)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-flex items-center gap-0.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+            <span className="inline-block w-3 border-t-2 border-red-500" />
+          </span>
+          실제 자산
+        </span>
+      </div>
       <ResponsiveContainer width="100%" height={280}>
-        <LineChart data={chartData} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
+        <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f0f0f0"} />
           <XAxis
             dataKey="month"
@@ -80,14 +96,6 @@ export default function DCAProjectionChart({ data }: Props) {
             }}
             labelFormatter={(label: string) => `${label}`}
             {...chartTooltipStyle(isDark)}
-          />
-          <Legend
-            formatter={(value: string) => {
-              if (value === "projected_krw") return "이론 복리 곡선 (과거)";
-              if (value === "projected_future_krw") return "이론 복리 곡선 (미래)";
-              return "실제 자산";
-            }}
-            wrapperStyle={{ fontSize: 12, color: isDark ? "#d1d5db" : undefined }}
           />
           <Line
             type="monotone"
@@ -114,12 +122,11 @@ export default function DCAProjectionChart({ data }: Props) {
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-        파란선: 이론 복리 곡선 (점선=미래) / 빨간선: 실제 자산
-        {!hasActualData && (
-          <span className="ml-2 text-yellow-500">· 실제 자산 데이터가 없습니다. 계좌를 동기화하면 표시됩니다.</span>
-        )}
-      </p>
+      {!hasActualData && (
+        <p className="text-xs text-yellow-500 mt-2">
+          실제 자산 데이터가 없습니다. 계좌를 동기화하면 표시됩니다.
+        </p>
+      )}
     </div>
   );
 }
