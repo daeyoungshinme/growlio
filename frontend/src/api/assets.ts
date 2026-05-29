@@ -21,6 +21,7 @@ export interface AssetAccount {
   manual_currency: string;
   manual_updated_at: string | null;
   deposit_krw: number | null;
+  deposit_usd: number | null;
   real_estate_details: RealEstateDetails | null;
   include_in_total: boolean;
   is_active: boolean;
@@ -45,6 +46,8 @@ export interface AssetAccountCreate {
   ob_fintech_use_no?: string;
   is_mock_mode?: boolean;
   manual_amount?: number;
+  deposit_krw?: number;
+  deposit_usd?: number;
   notes?: string;
   sort_order?: number;
   real_estate_details?: RealEstateDetails;

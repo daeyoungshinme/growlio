@@ -61,6 +61,7 @@ class AssetAccountCreate(BaseModel):
     manual_amount: float | None = None
     manual_currency: str = "KRW"
     deposit_krw: float | None = None
+    deposit_usd: float | None = None
     notes: str | None = None
     sort_order: int = 0
     real_estate_details: RealEstateDetails | None = None
@@ -99,6 +100,7 @@ class AssetAccountUpdate(BaseModel):
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
+    deposit_usd: float | None = None
     notes: str | None = None
     is_active: bool | None = None
     sort_order: int | None = None
@@ -125,6 +127,7 @@ class AssetAccountResponse(BaseModel):
     manual_updated_at: datetime | None
     manual_positions: list[Any] | None = None
     deposit_krw: float | None = None
+    deposit_usd: float | None = None
     real_estate_details: dict | None = None
     include_in_total: bool
     is_active: bool

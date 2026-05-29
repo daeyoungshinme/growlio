@@ -29,6 +29,7 @@ import { fmtKrw, fmtPct } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
+import { useExchangeRate } from "../hooks/useExchangeRate";
 
 const TABS = ["은행계좌", "증권계좌", "부동산", "입출금·배당"] as const;
 type Tab = typeof TABS[number];
@@ -50,6 +51,7 @@ export default function AssetManagementPage() {
   const [showStockModal, setShowStockModal] = useState(false);
   const [showRealEstateModal, setShowRealEstateModal] = useState(false);
   const [editingRealEstate, setEditingRealEstate] = useState<AssetAccount | null>(null);
+  const [editingBankAccount, setEditingBankAccount] = useState<AssetAccount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
@@ -123,16 +125,16 @@ export default function AssetManagementPage() {
     setConfirmDeleteId(null);
   };
 
-  const updateAmountMutation = useMutation({
-    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
-      updateAccount(id, { manual_amount: amount }),
-    onSuccess: () => invalidateAll(),
-    onError: () => toast("금액 수정에 실패했습니다"),
+  const updateBankMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
+      updateAccount(id, data),
+    onSuccess: () => { invalidateAll(); setEditingBankAccount(null); },
+    onError: () => toast("계좌 수정에 실패했습니다", "error"),
   });
 
   const updateDepositMutation = useMutation({
-    mutationFn: ({ id, deposit_krw }: { id: string; deposit_krw: number }) =>
-      updateAccount(id, { deposit_krw }),
+    mutationFn: ({ id, deposit_krw, deposit_usd }: { id: string; deposit_krw: number; deposit_usd?: number }) =>
+      updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
     onSuccess: () => invalidateAll(),
     onError: () => toast("예수금 수정에 실패했습니다"),
   });
@@ -182,6 +184,8 @@ export default function AssetManagementPage() {
       });
     }
   };
+
+  const usdRate = useExchangeRate();
 
   const bankAccounts = accounts.filter((a) => BANK_TYPES.includes(a.asset_type));
   const stockAccounts = accounts.filter((a) => STOCK_TYPES.includes(a.asset_type));
@@ -277,8 +281,12 @@ export default function AssetManagementPage() {
             <div className="space-y-3">
               {bankAccounts.map((account) => (
                 <BankAccountCard key={account.id} account={account}
+                  usdRate={usdRate}
                   onDelete={handleDelete}
-                  onEditAmount={(id, amount) => updateAmountMutation.mutate({ id, amount })}
+                  onEditModal={(id) => {
+                    const acc = bankAccounts.find((a) => a.id === id);
+                    if (acc) setEditingBankAccount(acc);
+                  }}
                   onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                   onSync={handleSyncBank}
                   isDeleting={deletingId === account.id && deleteMutation.isPending}
@@ -294,7 +302,10 @@ export default function AssetManagementPage() {
                 const pnl = overview?.unrealized_pnl_krw ?? 0;
                 const ret = overview?.stock_return_pct ?? 0;
                 const pnlColor = pnl >= 0 ? "text-red-500" : "text-blue-500";
-                const totalDepositKrw = stockAccounts.reduce((s, a) => s + (a.deposit_krw ?? 0), 0);
+                const totalDepositKrw = stockAccounts.reduce(
+                  (s, a) => s + (a.deposit_krw ?? 0) + (a.deposit_usd ?? 0) * (usdRate ?? 1),
+                  0
+                );
                 return (
                   <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
                     <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">증권계좌 전체 요약</p>
@@ -352,7 +363,7 @@ export default function AssetManagementPage() {
                       onDelete={handleDelete}
                       onManagePositions={setPositionsAccount}
                       onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
-                      onEditDeposit={(id, amount) => updateDepositMutation.mutate({ id, deposit_krw: amount })}
+                      onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
                       onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                       onSync={handleSyncKisAccount}
                       isSyncing={syncingStockIds.has(account.id)}
@@ -369,6 +380,13 @@ export default function AssetManagementPage() {
         <BankAccountModal onClose={() => setShowBankModal(false)}
           onSubmit={(data) => createMutation.mutate(data)}
           isLoading={createMutation.isPending} />
+      )}
+      {editingBankAccount && (
+        <BankAccountModal
+          initialAccount={editingBankAccount}
+          onClose={() => setEditingBankAccount(null)}
+          onSubmit={(data) => updateBankMutation.mutate({ id: editingBankAccount.id, data })}
+          isLoading={updateBankMutation.isPending} />
       )}
       {showStockModal && (
         <StockAccountModal onClose={() => setShowStockModal(false)}

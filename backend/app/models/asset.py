@@ -55,6 +55,8 @@ class AssetAccount(Base):
     manual_positions: Mapped[list | None] = mapped_column(JSONB)
     # 예수금 (현금 잔고) — KIS sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
     deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    # 외화 예수금 (USD) — KIS 해외 계좌 sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
+    deposit_usd: Mapped[float | None] = mapped_column(Numeric(18, 4))
     # 부동산 상세 (REAL_ESTATE 전용) — {address, property_type, purchase_price_krw, purchase_date, mortgage_balance_krw}
     real_estate_details: Mapped[dict | None] = mapped_column(JSONB)
 

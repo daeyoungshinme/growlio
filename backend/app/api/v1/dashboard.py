@@ -5,6 +5,7 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.limiter import limiter
 from app.models.user import User
+from app.redis_client import get_redis
 from app.schemas.asset import DashboardResponse
 from app.services.asset_service import get_dashboard_summary
 
@@ -18,4 +19,5 @@ async def dashboard(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_dashboard_summary(current_user.id, db)
+    redis = await get_redis()
+    return await get_dashboard_summary(current_user.id, db, redis)

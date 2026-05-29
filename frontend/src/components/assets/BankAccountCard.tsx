@@ -11,18 +11,17 @@ const BANK_TYPE_LABELS: Record<string, string> = {
 
 interface Props {
   account: AssetAccount;
+  usdRate: number | null;
   onDelete: (id: string) => void;
-  onEditAmount: (id: string, amount: number) => void;
+  onEditModal: (id: string) => void;
   onEditName: (id: string, name: string) => void;
   onSync: (id: string) => void;
   isDeleting: boolean;
   isSyncing: boolean;
 }
 
-export default function BankAccountCard({ account, onDelete, onEditAmount, onEditName, onSync, isDeleting, isSyncing }: Props) {
+export default function BankAccountCard({ account, usdRate, onDelete, onEditModal, onEditName, onSync, isDeleting, isSyncing }: Props) {
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
-  const [editMode, setEditMode] = useState(false);
-  const [editValue, setEditValue] = useState(String(account.manual_amount ?? 0));
   const [editNameMode, setEditNameMode] = useState(false);
   const [editNameValue, setEditNameValue] = useState(account.name);
 
@@ -34,13 +33,12 @@ export default function BankAccountCard({ account, onDelete, onEditAmount, onEdi
     }
   };
 
-  const handleSave = () => {
-    const amount = Number(editValue);
-    if (!isNaN(amount) && amount >= 0) {
-      onEditAmount(account.id, amount);
-      setEditMode(false);
-    }
-  };
+  const hasDepositFields = account.deposit_krw != null || account.deposit_usd != null;
+  const displayTotal = hasDepositFields
+    ? (account.deposit_krw ?? 0) + (account.deposit_usd && usdRate ? account.deposit_usd * usdRate : 0)
+    : (account.manual_amount ?? 0);
+
+  const showAmount = hasDepositFields ? displayTotal > 0 : account.manual_amount != null;
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex items-start justify-between gap-4">
@@ -76,30 +74,23 @@ export default function BankAccountCard({ account, onDelete, onEditAmount, onEdi
           <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">{typeLabel}</span>
         </div>
         {account.institution && <p className="text-sm text-gray-500 dark:text-gray-400">{account.institution}</p>}
-        {editMode ? (
-          <div className="flex items-center gap-2 mt-2">
-            <input
-              type="number"
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2 py-1 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              autoFocus
-              onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") setEditMode(false); }}
-            />
-            <button onClick={handleSave} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">저장</button>
-            <button onClick={() => setEditMode(false)} className="text-xs text-gray-400 dark:text-gray-500 hover:underline">취소</button>
+        {showAmount && (
+          <div className="mt-1">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{fmtKrw(displayTotal)}</p>
+            {hasDepositFields && account.deposit_usd != null && account.deposit_usd > 0 && (
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                ₩{(account.deposit_krw ?? 0).toLocaleString()} + ${account.deposit_usd.toLocaleString()}
+                {usdRate ? ` (환율 ${usdRate.toLocaleString()}원/USD)` : ""}
+              </p>
+            )}
           </div>
-        ) : (
-          account.manual_amount != null && (
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-1">{fmtKrw(account.manual_amount)}</p>
-          )
         )}
         {account.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{account.notes}</p>}
       </div>
       <div className="flex items-center gap-1 shrink-0">
         {account.data_source === "MANUAL" && (
           <button
-            onClick={() => { setEditValue(String(account.manual_amount ?? 0)); setEditMode(true); }}
+            onClick={() => onEditModal(account.id)}
             title="금액 수정"
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
             <Pencil size={15} />

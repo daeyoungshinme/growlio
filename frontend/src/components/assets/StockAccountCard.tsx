@@ -20,7 +20,7 @@ interface Props {
   onDelete: (id: string) => void;
   onManagePositions: (account: { id: string; name: string; dataSource: string }) => void;
   onTransactions: (account: { id: string; name: string }) => void;
-  onEditDeposit: (id: string, amount: number) => void;
+  onEditDeposit: (id: string, depositKrw: number, depositUsd: number) => void;
   onEditName: (id: string, name: string) => void;
   onSync: (id: string) => void;
   isSyncing: boolean;
@@ -36,9 +36,8 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   const [editNameMode, setEditNameMode] = useState(false);
   const [editNameValue, setEditNameValue] = useState(account.name);
   const [editDepositMode, setEditDepositMode] = useState(false);
-  const [editDepositValue, setEditDepositValue] = useState("");
-  const [depositCurrency, setDepositCurrency] = useState<"KRW" | "USD">("KRW");
-  const [depositUsdValue, setDepositUsdValue] = useState<number>(0);
+  const [editKrwValue, setEditKrwValue] = useState("");
+  const [editUsdValue, setEditUsdValue] = useState("");
   const usdRate = useExchangeRate();
 
   const handleSaveName = () => {
@@ -50,17 +49,14 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   };
 
   const handleSave = () => {
-    const krwAmount = depositCurrency === "USD"
-      ? Math.round(depositUsdValue * (usdRate ?? 1))
-      : Number(editDepositValue);
-    onEditDeposit(account.id, krwAmount);
+    onEditDeposit(account.id, Number(editKrwValue) || 0, Number(editUsdValue) || 0);
     setEditDepositMode(false);
   };
 
   const handleCancel = () => {
     setEditDepositMode(false);
-    setDepositCurrency("KRW");
-    setDepositUsdValue(0);
+    setEditKrwValue("");
+    setEditUsdValue("");
   };
 
   return (
@@ -153,68 +149,78 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
             </p>
           </div>
           <div>
-            <div className="flex items-center justify-between">
-              <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
-              {editDepositMode && (
-                <div className="flex gap-0.5 text-xs">
-                  {(["KRW", "USD"] as const).map((c) => (
-                    <button key={c} type="button"
-                      onClick={() => { setDepositCurrency(c); setDepositUsdValue(0); }}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${
-                        depositCurrency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"
-                      }`}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
             {editDepositMode ? (
-              depositCurrency === "USD" ? (
-                <div>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <span className="text-xs text-gray-400 shrink-0">$</span>
-                    <input
-                      type="number" autoFocus step="0.01" min={0}
-                      value={depositUsdValue || ""}
-                      onChange={(e) => setDepositUsdValue(parseFloat(e.target.value) || 0)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSave();
-                        if (e.key === "Escape") handleCancel();
-                      }}
-                      className="w-20 border rounded px-1.5 py-0.5 text-xs"
-                    />
-                    <button onClick={handleSave} className="text-xs text-blue-500 hover:text-blue-700">저장</button>
-                    <button onClick={handleCancel} className="text-xs text-gray-400">취소</button>
-                  </div>
-                  {usdRate && depositUsdValue > 0 && (
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      ≈ {fmtKrw(Math.round(depositUsdValue * usdRate))}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center gap-1 mt-0.5">
+              <div className="mt-0.5 space-y-1">
+                <div className="flex items-center gap-1">
                   <input
-                    type="number" autoFocus
-                    value={editDepositValue}
-                    onChange={(e) => setEditDepositValue(e.target.value)}
+                    type="number" autoFocus min={0}
+                    value={editKrwValue}
+                    onChange={(e) => setEditKrwValue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleSave();
                       if (e.key === "Escape") handleCancel();
                     }}
-                    className="w-20 border rounded px-1.5 py-0.5 text-xs"
+                    placeholder="원화"
+                    className="w-20 border rounded px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-50"
                   />
+                  <span className="text-xs text-gray-400 shrink-0">원</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-gray-400 shrink-0">$</span>
+                  <input
+                    type="number" min={0} step="0.01"
+                    value={editUsdValue}
+                    onChange={(e) => setEditUsdValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSave();
+                      if (e.key === "Escape") handleCancel();
+                    }}
+                    placeholder="외화"
+                    className="w-20 border rounded px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-50"
+                  />
+                  <span className="text-xs text-gray-400 shrink-0">USD</span>
+                </div>
+                {usdRate && Number(editUsdValue) > 0 && (
+                  <p className="text-xs text-gray-400">≈ {fmtKrw(Math.round(Number(editUsdValue) * usdRate))}</p>
+                )}
+                <div className="flex gap-2">
                   <button onClick={handleSave} className="text-xs text-blue-500 hover:text-blue-700">저장</button>
                   <button onClick={handleCancel} className="text-xs text-gray-400">취소</button>
                 </div>
-              )
+              </div>
             ) : (
-              <div className="flex items-center gap-1 mt-0.5">
-                <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{fmtKrw(account.deposit_krw ?? 0)}</p>
+              <div className="flex items-start gap-1 mt-0.5">
+                <div className="flex-1">
+                  {(() => {
+                    const krw = account.deposit_krw ?? 0;
+                    const usd = account.deposit_usd ?? 0;
+                    const hasUsd = usd > 0;
+                    const usdAsKrw = hasUsd && usdRate ? Math.round(usd * usdRate) : 0;
+                    const total = krw + usdAsKrw;
+                    return (
+                      <>
+                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          {fmtKrw(hasUsd && usdRate ? total : krw)}
+                        </p>
+                        {hasUsd && (
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                            {usdRate
+                              ? `${fmtKrw(krw)} + $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                              : `$${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })} (환율 조회 중)`}
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
                 <button
-                  onClick={() => { setEditDepositValue(String(account.deposit_krw ?? 0)); setDepositCurrency("KRW"); setDepositUsdValue(0); setEditDepositMode(true); }}
-                  className="p-1.5 sm:p-0.5 text-gray-300 hover:text-blue-400 transition-colors">
+                  onClick={() => {
+                    setEditKrwValue(String(account.deposit_krw ?? 0));
+                    setEditUsdValue(account.deposit_usd ? String(account.deposit_usd) : "");
+                    setEditDepositMode(true);
+                  }}
+                  className="p-1.5 sm:p-0.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0">
                   <Pencil size={12} />
                 </button>
               </div>

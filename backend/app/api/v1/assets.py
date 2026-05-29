@@ -252,7 +252,7 @@ async def update_account(
         account.kiwoom_app_key = encrypt(req.kiwoom_app_key) if req.kiwoom_app_key else None
         account.kiwoom_app_secret = encrypt(req.kiwoom_app_secret) if req.kiwoom_app_secret else None
 
-    if req.manual_amount is not None or req.deposit_krw is not None or req.real_estate_details is not None:  # noqa: E501
+    if req.manual_amount is not None or req.deposit_krw is not None or req.deposit_usd is not None or req.real_estate_details is not None:  # noqa: E501
         account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
@@ -273,7 +273,11 @@ async def update_account(
             source="MANUAL",
         )
         await db.commit()
-    if req.deposit_krw is not None:
+    if req.deposit_krw is not None or req.deposit_usd is not None:
+        from app.redis_client import get_redis
+        from app.utils.currency import get_usd_krw_rate
+        redis = await get_redis()
+        usd_rate = await get_usd_krw_rate(redis)
         latest_snap = await db.scalar(
             select(AssetSnapshot)
             .where(AssetSnapshot.account_id == account.id)
@@ -285,7 +289,8 @@ async def update_account(
             (p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0)
             for p in pos_list
         )
-        total = pos_value + float(account.deposit_krw or 0)
+        usd_as_krw = float(account.deposit_usd or 0) * usd_rate
+        total = pos_value + float(account.deposit_krw or 0) + usd_as_krw
         await _upsert_snapshot(
             db,
             account_id=account.id,
@@ -468,12 +473,18 @@ async def save_positions(
     total_value = float(sum(Decimal(str(p.current_price or p.avg_price)) * Decimal(str(p.qty)) for p in positions))
     account.manual_amount = total_value  # 평가금액 기준 (current_price 없으면 avg_price 대체)
     account.manual_updated_at = datetime.now(UTC)
+    usd_rate = 1.0
+    if account.deposit_usd:
+        from app.redis_client import get_redis
+        from app.utils.currency import get_usd_krw_rate
+        redis = await get_redis()
+        usd_rate = await get_usd_krw_rate(redis)
     await _upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,
         snapshot_date=date.today(),
-        amount_krw=total_value + float(account.deposit_krw or 0),
+        amount_krw=total_value + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate,
         invested_amount=total_invested,
         unrealized_pnl=total_value - total_invested,
         positions=raw,
@@ -504,7 +515,7 @@ async def sync_position_prices(
     # 해외 종목이 있으면 환율 조회 (USD → KRW 변환)
     has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
     usd_rate: float | None = None
-    if has_overseas:
+    if has_overseas or account.deposit_usd:
         loop = asyncio.get_running_loop()
         usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
 
@@ -533,7 +544,7 @@ async def sync_position_prices(
         account_id=account.id,
         user_id=account.user_id,
         snapshot_date=date.today(),
-        amount_krw=total_value + float(account.deposit_krw or 0),
+        amount_krw=total_value + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate or 1),
         invested_amount=total_invested,
         unrealized_pnl=total_value - total_invested,
         positions=updated,

@@ -114,6 +114,7 @@ async def sync_kis_account(
     ]
 
     account.deposit_krw = domestic["deposit_krw"]
+    account.deposit_usd = overseas["deposit_usd"]
     account.manual_positions = [_to_manual_position(p, usd_krw_rate) for p in all_positions]
     await db.commit()
 
@@ -299,6 +300,9 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
         amount_krw = gross - mortgage
         if gross == 0:
             raise ValueError("부동산 시세(manual_amount)가 설정되지 않았습니다")
+    elif account.deposit_krw is not None or account.deposit_usd is not None:
+        usd_rate = await get_usd_krw_rate(redis)
+        amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate or 1300.0)
     else:
         amount_krw = float(account.manual_amount or 0)
         if amount_krw == 0:
@@ -333,11 +337,15 @@ def _invested_value(pos_list: list) -> float:
 async def _build_asset_totals(
     user_id: uuid.UUID,
     db: AsyncSession,
+    redis=None,
 ) -> tuple[float, float, float, dict[str, float]]:
     """최신 스냅샷 기준 총자산·투자금·주식평가액·유형별 금액을 집계한다.
     Returns: (total_assets_krw, total_invested, stock_value, by_type)
     """
     from sqlalchemy import func
+
+    from app.utils.currency import get_usd_krw_rate
+    usd_rate = (await get_usd_krw_rate(redis)) if redis else 1.0
 
     subq = (
         select(
@@ -396,7 +404,7 @@ async def _build_asset_totals(
         if acc.asset_type in _STOCK_TYPES:
             pos_list = acc.manual_positions or []
             pos_equity = _eval_value(pos_list) if pos_list else 0.0
-            deposit = float(acc.deposit_krw or 0)
+            deposit = float(acc.deposit_krw or 0) + float(acc.deposit_usd or 0) * usd_rate
             computed = pos_equity + deposit
             amount = computed if computed > 0 else float(acc.manual_amount or 0)
             inv = _invested_value(pos_list) if pos_list else float(acc.manual_amount or 0)
@@ -420,14 +428,14 @@ async def _build_asset_totals(
     return total_assets_krw, total_invested, stock_value, by_type
 
 
-async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
+async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
     from app.models.user import UserSettings
     from app.services.dividend_service import get_dividend_summary
 
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
-    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db)
+    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, redis)
 
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0
 

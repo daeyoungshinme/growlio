@@ -19,14 +19,14 @@ interface Props {
 export default function Modal({ children, onClose, title, size = "md", closeOnBackdrop = false }: Props) {
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4"
+      className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-[env(safe-area-inset-bottom)]"
       onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[90vh] flex flex-col`}
+        className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[90dvh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {title != null && (

@@ -2,7 +2,9 @@ import { useState } from "react";
 import { X, CheckCircle, XCircle } from "lucide-react";
 import type { AssetAccountCreate } from "../../api/assets";
 import { verifyKisCredentials } from "../../api/assets";
+import { useExchangeRate } from "../../hooks/useExchangeRate";
 import { extractErrorMessage } from "../../utils/error";
+import { fmtKrw } from "../../utils/format";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -24,6 +26,7 @@ interface Props {
 }
 
 export default function StockAccountModal({ onClose, onSubmit, isLoading }: Props) {
+  const usdRate = useExchangeRate();
   const [form, setForm] = useState<AssetAccountCreate>({
     name: "",
     asset_type: "STOCK_KIS",
@@ -32,6 +35,12 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
     is_mock_mode: true,
   });
   const set = (k: keyof AssetAccountCreate, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
+  const [depositKrw, setDepositKrw] = useState<number | undefined>(undefined);
+  const [depositUsd, setDepositUsd] = useState<number | undefined>(undefined);
+
+  const usdAsKrw = depositUsd != null && usdRate != null ? Math.round(depositUsd * usdRate) : 0;
+  const totalKrw = (depositKrw ?? 0) + usdAsKrw;
+  const hasAnyDeposit = (depositKrw ?? 0) > 0 || (depositUsd ?? 0) > 0;
 
   const isKis = form.data_source === "KIS_API";
   const KIS_ACCOUNT_NO_REGEX = /^\d{8}-\d{2}$|^\d{10}$/;
@@ -64,7 +73,19 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
     set("asset_type", defaultAssetTypeForSource(source));
     if (source !== "MANUAL") {
       set("manual_amount", undefined);
+      setDepositKrw(undefined);
+      setDepositUsd(undefined);
     }
+  };
+
+  const handleSubmit = () => {
+    let submitForm = form;
+    if (form.data_source === "MANUAL") {
+      const usdConverted = depositUsd != null && usdRate != null ? Math.round(depositUsd * usdRate) : 0;
+      const total = (depositKrw ?? 0) + usdConverted;
+      submitForm = { ...form, manual_amount: total > 0 ? total : undefined };
+    }
+    onSubmit(submitForm);
   };
 
   return (
@@ -105,10 +126,37 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
               onChange={(e) => set("institution", e.target.value)} placeholder="예: 한국투자증권, LS증권" />
           </div>
           {form.data_source === "MANUAL" && (
-            <div>
-              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">현재 금액 (원)</label>
-              <input type="number" className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.manual_amount ?? ""} onChange={(e) => set("manual_amount", e.target.value === "" ? undefined : Number(e.target.value))} />
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">예수금</label>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">원화 예수금</label>
+                <div className="relative mt-0.5">
+                  <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={depositKrw ?? ""} onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))} placeholder="0" />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">외화 예수금 (USD)</label>
+                <div className="relative mt-0.5">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+                  <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={depositUsd ?? ""} onChange={(e) => setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))} placeholder="0" />
+                </div>
+                {(depositUsd ?? 0) > 0 && (
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                    {usdRate == null
+                      ? "환율 정보를 불러오는 중..."
+                      : `≈ ${fmtKrw(usdAsKrw)} (환율 ${usdRate.toLocaleString()}원/USD)`}
+                  </p>
+                )}
+              </div>
+              {hasAnyDeposit && (
+                <div className="flex justify-between items-center pt-1 border-t border-gray-100 dark:border-gray-700">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">합계</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-50">{fmtKrw(totalKrw)}</span>
+                </div>
+              )}
             </div>
           )}
           {form.data_source === "KIS_API" && (
@@ -202,7 +250,8 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
         </div>
         <div className="flex justify-end gap-3 mt-5">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
-          <button onClick={() => onSubmit(form)} disabled={isLoading || !form.name || !kisValid || (isKis && verifyState !== "ok")}
+          <button onClick={handleSubmit}
+            disabled={isLoading || !form.name || !kisValid || (isKis && verifyState !== "ok") || (form.data_source === "MANUAL" && (depositUsd ?? 0) > 0 && usdRate == null)}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {isLoading ? "저장 중..." : "저장"}
           </button>
