@@ -21,12 +21,20 @@ router = APIRouter(prefix="/alerts", tags=["alerts"])
 class AlertCreate(BaseModel):
     target_rate: float
     direction: Literal["BELOW", "ABOVE"]
+    max_trigger_count: int = 1
 
     @field_validator("target_rate")
     @classmethod
     def validate_rate(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("목표환율은 0보다 커야 합니다")
+        return v
+
+    @field_validator("max_trigger_count")
+    @classmethod
+    def validate_count(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("알림 횟수는 1 이상이어야 합니다")
         return v
 
 
@@ -37,6 +45,8 @@ class AlertResponse(BaseModel):
     target_rate: float
     direction: str
     is_active: bool
+    max_trigger_count: int
+    trigger_count: int
     triggered_at: datetime | None
     created_at: datetime
 
@@ -47,6 +57,8 @@ class AlertResponse(BaseModel):
             target_rate=float(row.target_rate),
             direction=row.direction,
             is_active=row.is_active,
+            max_trigger_count=row.max_trigger_count,
+            trigger_count=row.trigger_count,
             triggered_at=row.triggered_at,
             created_at=row.created_at,
         )
@@ -78,8 +90,31 @@ async def create_exchange_rate_alert(
         user_id=current_user.id,
         target_rate=req.target_rate,
         direction=req.direction,
+        max_trigger_count=req.max_trigger_count,
     )
     db.add(alert)
+    await db.commit()
+    await db.refresh(alert)
+    return AlertResponse.from_orm_row(alert)
+
+
+@router.patch("/exchange-rate/{alert_id}/reactivate", response_model=AlertResponse)
+async def reactivate_exchange_rate_alert(
+    alert_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """비활성 알림을 재활성화하고 발동 횟수를 초기화한다."""
+    alert = await db.scalar(
+        select(ExchangeRateAlert).where(
+            ExchangeRateAlert.id == alert_id,
+            ExchangeRateAlert.user_id == current_user.id,
+        )
+    )
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    alert.is_active = True
+    alert.trigger_count = 0
     await db.commit()
     await db.refresh(alert)
     return AlertResponse.from_orm_row(alert)

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "react-router-dom";
 import { Settings2 } from "lucide-react";
 import { api } from "../api/client";
 import { fetchDCAAnalysis } from "../api/invest";
@@ -22,6 +23,7 @@ interface GoalForm {
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["dca-analysis"],
     queryFn: fetchDCAAnalysis,
@@ -30,6 +32,7 @@ export default function InvestPlanPage() {
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [autoOpenTriggered, setAutoOpenTriggered] = useState(false);
   const [form, setForm] = useState<GoalForm>({
     monthly_deposit_amount: "",
     goal_annual_return_pct: "",
@@ -55,6 +58,13 @@ export default function InvestPlanPage() {
     });
     setEditing(true);
   };
+
+  useEffect(() => {
+    if (location.state?.openEdit && !autoOpenTriggered && !isLoading && data) {
+      setAutoOpenTriggered(true);
+      openEdit();
+    }
+  }, [location.state, isLoading, data]);
 
   const saveSettings = async () => {
     setSaving(true);

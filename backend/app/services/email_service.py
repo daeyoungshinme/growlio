@@ -70,6 +70,48 @@ async def send_exchange_rate_alert(
         raise
 
 
+async def send_test_email(to_email: str) -> None:
+    """이메일 설정 확인용 테스트 이메일 발송."""
+    if not settings.smtp_host or not settings.smtp_user:
+        raise RuntimeError("smtp_not_configured")
+
+    subject = "[Growlio] 이메일 알림 설정 확인"
+    html = """
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #1d4ed8;">이메일 알림 연결 완료</h2>
+      <p style="color: #374151; margin-top: 16px;">
+        Growlio 목표환율 알림 이메일이 정상적으로 설정되었습니다.<br>
+        목표환율 조건이 충족되면 이 주소로 알림이 발송됩니다.
+      </p>
+      <p style="color: #64748b; font-size: 13px; margin-top: 20px;">
+        본인이 요청하지 않은 경우 이 이메일을 무시하세요.
+      </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        ctx = ssl.create_default_context()
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user,
+            password=settings.smtp_password,
+            start_tls=True,
+            tls_context=ctx,
+        )
+        logger.info("test_email_sent", to=to_email)
+    except Exception as e:
+        logger.error("test_email_failed", to=to_email, error=str(e))
+        raise
+
+
 async def send_password_reset_email(to_email: str, reset_link: str) -> None:
     """비밀번호 재설정 링크 이메일 발송."""
     if not settings.smtp_host or not settings.smtp_user:

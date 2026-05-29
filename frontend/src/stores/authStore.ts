@@ -45,7 +45,13 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   register: async (email, password, displayName?) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: import.meta.env.VITE_REDIRECT_URL ?? "https://growlio-lovat.vercel.app",
+      },
+    });
     if (error || !data.user) throw new Error(error?.message ?? "Registration failed");
 
     if (!data.session) {

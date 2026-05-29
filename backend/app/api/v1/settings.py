@@ -6,7 +6,7 @@ from datetime import date
 
 from pydantic import BaseModel, EmailStr
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,6 +158,29 @@ async def update_notification_email(
     row.notification_email = req.notification_email or None
     await db.commit()
     return {"detail": "알림 이메일이 저장되었습니다"}
+
+
+@router.post("/test-email")
+async def send_test_email_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """알림 이메일 설정 확인용 테스트 이메일 발송."""
+    from app.services.email_service import send_test_email
+
+    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    to_email = (row.notification_email if row else None) or current_user.email
+
+    try:
+        await send_test_email(to_email)
+    except RuntimeError as e:
+        if "smtp_not_configured" in str(e):
+            raise HTTPException(status_code=503, detail="SMTP가 설정되지 않았습니다. 서버 관리자에게 문의하세요.")
+        raise HTTPException(status_code=500, detail="이메일 발송에 실패했습니다.")
+    except Exception:
+        raise HTTPException(status_code=500, detail="이메일 발송에 실패했습니다.")
+
+    return {"detail": f"{to_email}으로 테스트 이메일을 발송했습니다."}
 
 
 async def _get_or_create_settings(user_id, db: AsyncSession) -> UserSettings:

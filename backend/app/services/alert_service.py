@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import select
@@ -13,6 +13,8 @@ from app.models.user import User, UserSettings
 from app.services.price_service import _sync_usdkrw
 
 logger = structlog.get_logger()
+
+_MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
 
 
 async def get_current_usd_krw() -> float:
@@ -48,9 +50,11 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         if not should_trigger:
             continue
 
-        alert.is_active = False
-        alert.triggered_at = datetime.now(tz=timezone.utc)
-        triggered_count += 1
+        # 다회 발동 알림: 쿨다운 체크 (마지막 발동 후 1시간 이내면 건너뜀)
+        if alert.max_trigger_count > 1 and alert.triggered_at:
+            elapsed = datetime.now(tz=timezone.utc) - alert.triggered_at
+            if elapsed < _MULTI_TRIGGER_COOLDOWN:
+                continue
 
         try:
             await send_exchange_rate_alert(
@@ -61,6 +65,13 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
             )
         except Exception as exc:
             logger.warning("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+            continue
+
+        alert.trigger_count += 1
+        alert.triggered_at = datetime.now(tz=timezone.utc)
+        if alert.trigger_count >= alert.max_trigger_count:
+            alert.is_active = False
+        triggered_count += 1
 
     if triggered_count:
         await db.commit()

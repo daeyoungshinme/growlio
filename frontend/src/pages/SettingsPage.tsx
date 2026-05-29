@@ -9,6 +9,7 @@ import { useAuthStore } from "../stores/authStore";
 import {
   fetchExchangeRateAlerts,
   createExchangeRateAlert,
+  reactivateExchangeRateAlert,
   deleteExchangeRateAlert,
   type ExchangeRateAlert,
 } from "../api/alerts";
@@ -56,7 +57,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState<string | null>(null);
 
   // 목표환율 알림 상태
-  const [alertForm, setAlertForm] = useState({ target_rate: "", direction: "BELOW" as "BELOW" | "ABOVE" });
+  const [alertForm, setAlertForm] = useState({ target_rate: "", direction: "BELOW" as "BELOW" | "ABOVE", max_trigger_count: "1" });
   const [notificationEmail, setNotificationEmail] = useState("");
 
   const { data: alerts = [] } = useQuery<ExchangeRateAlert[]>({
@@ -67,14 +68,30 @@ export default function SettingsPage() {
   const usdKrw = useExchangeRate();
 
   const createAlertMutation = useMutation({
-    mutationFn: () => createExchangeRateAlert(Number(alertForm.target_rate), alertForm.direction),
+    mutationFn: () =>
+      createExchangeRateAlert(
+        Number(alertForm.target_rate),
+        alertForm.direction,
+        Math.max(1, Number(alertForm.max_trigger_count) || 1),
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] });
-      setAlertForm({ target_rate: "", direction: "BELOW" });
+      setAlertForm({ target_rate: "", direction: "BELOW", max_trigger_count: "1" });
       toast("알림이 등록되었습니다", "success");
     },
     onError: () => {
       toast("알림 등록에 실패했습니다", "error");
+    },
+  });
+
+  const reactivateAlertMutation = useMutation({
+    mutationFn: (id: string) => reactivateExchangeRateAlert(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] });
+      toast("알림이 재활성화되었습니다", "success");
+    },
+    onError: () => {
+      toast("재활성화에 실패했습니다", "error");
     },
   });
 
@@ -239,7 +256,7 @@ export default function SettingsPage() {
             {saving === "test-email" ? "발송 중..." : "테스트 발송"}
           </button>
         </div>
-        <p className="text-xs text-gray-400 dark:text-gray-500">목표환율 도달 시 이메일로 알림을 보내드립니다. 알림은 1회 발동 후 자동으로 비활성화됩니다.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">목표환율 도달 시 이메일로 알림을 보내드립니다. 다회 발동 알림은 발동 간 최소 1시간 간격이 적용됩니다.</p>
         <div className="flex gap-2 flex-wrap">
           <div className="flex-1 min-w-[120px]">
             <label className={labelClass}>목표환율 (원)</label>
@@ -263,6 +280,17 @@ export default function SettingsPage() {
               <option value="ABOVE">이상 (↑)</option>
             </select>
           </div>
+          <div className="flex-1 min-w-[80px]">
+            <label className={labelClass}>알림 횟수</label>
+            <input
+              type="number"
+              className={inputClass}
+              value={alertForm.max_trigger_count}
+              onChange={(e) => setAlertForm((f) => ({ ...f, max_trigger_count: e.target.value }))}
+              min="1"
+              placeholder="1"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -281,28 +309,43 @@ export default function SettingsPage() {
                 key={alert.id}
                 className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
               >
-                <div className="text-sm">
+                <div className="text-sm min-w-0">
                   <span className="font-medium text-gray-800 dark:text-gray-100">
                     {Number(alert.target_rate).toLocaleString("ko-KR")}원 {alert.direction === "BELOW" ? "이하" : "이상"}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
+                    {alert.trigger_count}/{alert.max_trigger_count}회
                   </span>
                   {alert.is_active ? (
                     <span className="ml-2 text-xs text-green-600 dark:text-green-400">활성</span>
                   ) : (
                     <span className="ml-2 text-xs text-gray-400">
-                      발동됨 {alert.triggered_at ? `(${new Date(alert.triggered_at).toLocaleDateString("ko-KR")})` : ""}
+                      비활성 {alert.triggered_at ? `(${new Date(alert.triggered_at).toLocaleDateString("ko-KR")})` : ""}
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => deleteAlertMutation.mutate(alert.id)}
-                  disabled={deleteAlertMutation.isPending}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
-                  title="삭제"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  {!alert.is_active && (
+                    <button
+                      onClick={() => reactivateAlertMutation.mutate(alert.id)}
+                      disabled={reactivateAlertMutation.isPending}
+                      className="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+                      title="재활성화"
+                    >
+                      재활성화
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteAlertMutation.mutate(alert.id)}
+                    disabled={deleteAlertMutation.isPending}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                    title="삭제"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -316,6 +359,7 @@ export default function SettingsPage() {
         </p>
         <Link
           to="/invest-plan"
+          state={{ openEdit: true }}
           className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           투자계획 설정하기 →
