@@ -44,17 +44,22 @@ export default function InvestPlanPage() {
   });
 
   const openEdit = async () => {
-    if (!data) return;
-    const s = data.settings;
-    const settingsRes = await api.get<{ annual_deposit_goal: number | null; retirement_target_year: number | null }>("/settings");
+    const s = data?.settings;
+    let annual_deposit_goal = "";
+    let retirement_target_year = "";
+    if (data) {
+      const settingsRes = await api.get<{ annual_deposit_goal: number | null; retirement_target_year: number | null }>("/settings");
+      annual_deposit_goal = settingsRes.data.annual_deposit_goal ? String(settingsRes.data.annual_deposit_goal) : "";
+      retirement_target_year = settingsRes.data.retirement_target_year ? String(settingsRes.data.retirement_target_year) : "";
+    }
     setForm({
-      monthly_deposit_amount: s.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
-      goal_annual_return_pct: s.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
-      goal_amount: s.goal_amount ? String(s.goal_amount) : "",
-      goal_start_date: s.goal_start_date ?? "",
-      goal_initial_amount: s.goal_initial_amount ? String(s.goal_initial_amount) : "",
-      annual_deposit_goal: settingsRes.data.annual_deposit_goal ? String(settingsRes.data.annual_deposit_goal) : "",
-      retirement_target_year: settingsRes.data.retirement_target_year ? String(settingsRes.data.retirement_target_year) : "",
+      monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
+      goal_annual_return_pct: s?.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
+      goal_amount: s?.goal_amount ? String(s.goal_amount) : "",
+      goal_start_date: s?.goal_start_date ?? "",
+      goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
+      annual_deposit_goal,
+      retirement_target_year,
     });
     setEditing(true);
   };
@@ -65,6 +70,13 @@ export default function InvestPlanPage() {
       openEdit();
     }
   }, [location.state, isLoading, data]);
+
+  useEffect(() => {
+    if (!isLoading && !autoOpenTriggered && data && !data.is_configured) {
+      setAutoOpenTriggered(true);
+      openEdit();
+    }
+  }, [isLoading, data, autoOpenTriggered]);
 
   const saveSettings = async () => {
     setSaving(true);
@@ -90,27 +102,27 @@ export default function InvestPlanPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64 text-gray-400 dark:text-gray-500 text-sm">
-        불러오는 중…
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <div className="flex items-center justify-center h-64 text-red-500 text-sm">
-        데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
-      </div>
-    );
-  }
-
   const s = data?.settings;
   const isConfigured = data?.is_configured;
 
   return (
     <div className="space-y-6">
+      {isLoading && (
+        <div className="flex items-center justify-center h-16 text-gray-400 dark:text-gray-500 text-sm">
+          불러오는 중…
+        </div>
+      )}
+      {isError && (
+        <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
+          <span>데이터를 불러오지 못했습니다.</span>
+          <button
+            onClick={() => queryClient.invalidateQueries({ queryKey: ["dca-analysis"] })}
+            className="underline font-medium ml-2"
+          >
+            다시 시도
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">적립식 DCA 복리계산 및 월/년 목표달성율</p>
@@ -164,7 +176,7 @@ export default function InvestPlanPage() {
         <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
           연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다.
         </p>
-        {!isConfigured && (
+        {data && !isConfigured && (
           <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
             월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수 있습니다.{" "}
             <button onClick={openEdit} className="underline font-medium">

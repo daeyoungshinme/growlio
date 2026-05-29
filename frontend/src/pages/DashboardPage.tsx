@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowRight, ChevronDown, TrendingDown, TrendingUp, Wallet } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
+import { fetchAccounts } from "../api/assets";
 import { fetchDashboard, fetchDividendByTicker } from "../api/dashboard";
 import { fetchDCAAnalysis } from "../api/invest";
 import { useExchangeRate } from "../hooks/useExchangeRate";
@@ -21,6 +22,7 @@ const fetchOverviewSummary = () =>
 
 export default function DashboardPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [showMonthlyDetail, setShowMonthlyDetail] = useState(false);
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
@@ -50,6 +52,12 @@ export default function DashboardPage() {
     queryFn: fetchDCAAnalysis,
     staleTime: 60_000,
     refetchInterval: 300_000,
+  });
+
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
+    queryKey: ["accounts"],
+    queryFn: fetchAccounts,
+    staleTime: 60_000,
   });
 
   const exchangeRate = useExchangeRate();
@@ -84,7 +92,7 @@ export default function DashboardPage() {
     return result;
   }, [data]);
 
-  if (isLoading) return (
+  if (isLoading || accountsLoading) return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
         <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
@@ -107,6 +115,26 @@ export default function DashboardPage() {
       >
         다시 시도
       </button>
+    </div>
+  );
+
+  if (accounts.length === 0) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center max-w-md w-full">
+        <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+        <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
+          등록된 자산이 없습니다
+        </h2>
+        <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
+          자산관리에서 계좌를 등록하면<br />대시보드에서 자산 현황을 확인할 수 있습니다.
+        </p>
+        <button
+          onClick={() => navigate("/asset-management")}
+          className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          자산관리로 이동
+        </button>
+      </div>
     </div>
   );
 

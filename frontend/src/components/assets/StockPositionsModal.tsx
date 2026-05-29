@@ -258,7 +258,7 @@ export default function StockPositionsModal({
         </div>
 
         {/* 종목 목록 */}
-        <div className="flex-1 overflow-auto px-4 sm:px-6 py-4">
+        <div className="flex-1 min-h-0 overflow-auto px-4 sm:px-6 py-4">
           {loading ? (
             <div className="text-gray-400 dark:text-gray-500 text-sm py-8 text-center flex items-center justify-center gap-2">
               <Loader2 size={16} className="animate-spin" /> 불러오는 중...
@@ -651,7 +651,7 @@ export default function StockPositionsModal({
         )}
 
         {/* 하단 버튼 */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+        <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
           <button
             onClick={handleSyncAll}
             disabled={syncing || rows.every((r) => !r.ticker)}

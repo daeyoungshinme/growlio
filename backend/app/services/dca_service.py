@@ -42,6 +42,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
             "goal_timeline": {
                 "months_to_goal": None,
                 "expected_goal_date": None,
+                "actual_expected_goal_date": None,
                 "current_progress_pct": None,
                 "on_track": None,
                 "lead_lag_months": None,
