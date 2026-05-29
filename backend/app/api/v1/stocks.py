@@ -8,9 +8,10 @@ from functools import partial
 import httpx
 import redis.asyncio as aioredis
 import structlog
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.kis.constants import OVERSEAS_MARKETS
+from app.limiter import limiter
 from app.redis_client import get_redis
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
@@ -94,7 +95,12 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
 
 
 @router.get("/search")
-async def search_stocks(q: str = Query(..., min_length=1, max_length=100), limit: int = Query(8, le=20)):
+@limiter.limit("30/minute")
+async def search_stocks(
+    request: Request,
+    q: str = Query(..., min_length=1, max_length=100),
+    limit: int = Query(8, le=20),
+):
     """종목명·티커 검색.
     한글 입력 → 네이버 금융, 영문/티커 → Yahoo Finance.
     """
@@ -104,7 +110,8 @@ async def search_stocks(q: str = Query(..., min_length=1, max_length=100), limit
 
 
 @router.get("/exchange-rate")
-async def get_exchange_rate(redis: aioredis.Redis = Depends(get_redis)):
+@limiter.limit("10/minute")
+async def get_exchange_rate(request: Request, redis: aioredis.Redis = Depends(get_redis)):
     """현재 USD/KRW 환율 조회 (Redis 캐시 → yfinance, ~15분 지연)."""
     from app.services.price_service import _sync_usdkrw
 
@@ -121,7 +128,12 @@ async def get_exchange_rate(redis: aioredis.Redis = Depends(get_redis)):
 
 
 @router.get("/price")
-async def get_stock_price(ticker: str = Query(...), market: str = Query(...)):
+@limiter.limit("30/minute")
+async def get_stock_price(
+    request: Request,
+    ticker: str = Query(..., min_length=1, max_length=20),
+    market: str = Query(...),
+):
     """단일 종목 현재가 조회 (인증 불필요 — Yahoo Finance).
     해외 종목은 USD → KRW 변환 후 반환.
     """

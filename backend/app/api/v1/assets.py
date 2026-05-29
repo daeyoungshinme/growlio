@@ -58,15 +58,20 @@ class ManualPosition(BaseModel):
     @field_validator("ticker")
     @classmethod
     def ticker_not_empty(cls, v: str) -> str:
-        if not v.strip():
+        stripped = v.strip()
+        if not stripped:
             raise ValueError("티커는 빈 값일 수 없습니다")
-        return v.strip().upper()
+        if len(stripped) > 20:
+            raise ValueError("티커는 20자 이하여야 합니다")
+        return stripped.upper()
 
     @field_validator("qty")
     @classmethod
     def qty_positive(cls, v: float) -> float:
         if v <= 0:
             raise ValueError("수량은 0보다 커야 합니다")
+        if v > 1_000_000:
+            raise ValueError("수량은 1,000,000 이하여야 합니다")
         return v
 
     @field_validator("avg_price")
@@ -84,6 +89,15 @@ class ManualPosition(BaseModel):
         return v
 
 router = APIRouter(prefix="/assets", tags=["assets"])
+
+
+def _calc_manual_snap_amount(account: AssetAccount) -> float:
+    """manual_amount에서 부동산 모기지를 차감한 스냅샷 저장용 금액을 반환한다."""
+    amount = float(account.manual_amount or 0)
+    if account.asset_type == "REAL_ESTATE":
+        mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
+        amount -= mortgage
+    return amount
 
 
 @router.get("", response_model=list[AssetAccountResponse])
@@ -179,16 +193,12 @@ async def create_account(
     await db.commit()
     await db.refresh(account)
     if account.manual_amount:
-        snap_amount = float(account.manual_amount)
-        if account.asset_type == "REAL_ESTATE":
-            mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-            snap_amount = snap_amount - mortgage
         await _upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=date.today(),
-            amount_krw=snap_amount,
+            amount_krw=_calc_manual_snap_amount(account),
             source="MANUAL",
         )
         await db.commit()
@@ -260,16 +270,12 @@ async def update_account(
         account.asset_type == "REAL_ESTATE" and req.real_estate_details is not None
     )
     if needs_snapshot and account.manual_amount:
-        snap_amount = float(account.manual_amount)
-        if account.asset_type == "REAL_ESTATE":
-            mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-            snap_amount = snap_amount - mortgage
         await _upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=date.today(),
-            amount_krw=snap_amount,
+            amount_krw=_calc_manual_snap_amount(account),
             source="MANUAL",
         )
         await db.commit()

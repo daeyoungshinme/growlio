@@ -35,6 +35,15 @@ def _sanitize(text: str) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Redis 연결 확인 — 실패 시 즉시 종료
+    try:
+        redis = await get_redis()
+        await redis.ping()
+        logger.info("redis_connected")
+    except Exception as e:
+        logger.error("redis_startup_failed", error=str(e))
+        raise RuntimeError(f"Redis에 연결할 수 없습니다: {e}") from e
+
     init_scheduler()
     logger.info("app_started", env=settings.app_env)
     yield

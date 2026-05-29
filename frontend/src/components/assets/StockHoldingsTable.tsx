@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fmtKrwShort } from "../../utils/format";
 import { groupPositionsByTicker } from "../../utils/portfolio";
@@ -43,12 +43,12 @@ interface Props {
   divError: boolean;
 }
 
-export default function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, divError }: Props) {
+function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, divError }: Props) {
   const [sort, setSort] = useState<AggSortKey>("total_value_krw");
   const [expandedSet, setExpandedSet] = useState<Set<string>>(new Set());
 
-  const aggregated = groupPositionsByTicker(positions);
-  const sorted = [...aggregated].sort((a, b) => b[sort] - a[sort]);
+  const aggregated = useMemo(() => groupPositionsByTicker(positions), [positions]);
+  const sorted = useMemo(() => [...aggregated].sort((a, b) => b[sort] - a[sort]), [aggregated, sort]);
 
   const toggle = (key: string) => {
     setExpandedSet((prev) => {
@@ -255,3 +255,5 @@ export default function StockHoldingsTable({ positions, totalStock, dividendMap,
     </div>
   );
 }
+
+export default memo(StockHoldingsTable);

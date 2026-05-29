@@ -200,7 +200,7 @@ class TestVerifySupabaseToken:
         user_id = str(uuid.uuid4())
 
         token = pyjwt.encode(
-            {"sub": user_id, "email": "test@example.com", "exp": future},
+            {"sub": user_id, "email": "test@example.com", "exp": future, "aud": "authenticated"},
             secret,
             algorithm="HS256",
         )

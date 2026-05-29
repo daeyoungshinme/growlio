@@ -73,6 +73,7 @@ def make_account(make_user_id):
         manual_positions=None,
         manual_currency="KRW",
         deposit_krw=None,
+        deposit_usd=None,
     )
 
 

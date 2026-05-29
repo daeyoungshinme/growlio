@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import UTC, datetime, timedelta
 
 import redis.asyncio as aioredis
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
@@ -19,6 +21,8 @@ from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt, encrypt
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
@@ -51,21 +55,33 @@ async def open_banking_callback(
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 
+    # state에 바인딩된 user_id가 실제로 DB에 존재하는지 검증
+    try:
+        uid = uuid.UUID(user_id)
+    except ValueError:
+        logger.warning("ob_callback_invalid_user_id", user_id=user_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다") from None
+
+    user_exists = await db.scalar(select(User).where(User.id == uid))
+    if not user_exists:
+        logger.warning("ob_callback_user_not_found", user_id=user_id)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
+
     token_data = await exchange_code_for_token(code)
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
     user_seq_no = token_data.get("user_seq_no")
     expires_in = int(token_data.get("expires_in", 7776000))  # 기본 90일
 
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == uid))
     if not settings_row:
-        settings_row = UserSettings(user_id=user_id)
+        settings_row = UserSettings(user_id=uid)
         db.add(settings_row)
 
     settings_row.ob_access_token = encrypt(access_token) if access_token else None
     settings_row.ob_refresh_token = encrypt(refresh_token) if refresh_token else None
     settings_row.ob_user_seq_no = user_seq_no
-    settings_row.ob_token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+    settings_row.ob_token_expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
     await db.commit()
 
     # 프론트엔드로 리다이렉트 (연결 성공 페이지)

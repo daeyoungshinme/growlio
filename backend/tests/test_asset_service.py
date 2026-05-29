@@ -11,21 +11,31 @@ import pytest
 # ── _upsert_snapshot 테스트 ─────────────────────────────────
 
 class TestUpsertSnapshot:
-    """_upsert_snapshot: 스냅샷 upsert 로직 검증."""
+    """_upsert_snapshot: 스냅샷 upsert 로직 검증.
+
+    구현은 pg_insert().on_conflict_do_update().returning() 방식을 사용한다.
+    insert/update 분기 없이 단일 SQL 문으로 처리되므로 db.execute()와 db.commit() 호출만 검증한다.
+    """
 
     @pytest.mark.asyncio
-    async def test_creates_new_snapshot_when_not_exists(self, mock_db):
-        """기존 스냅샷 없으면 새로 생성한다."""
+    async def test_executes_upsert_and_commits(self, mock_db):
+        """pg_insert upsert가 db.execute()와 db.commit()을 호출한다."""
+        from types import SimpleNamespace
         from app.services.asset_service import _upsert_snapshot
-
-        mock_db.scalar.return_value = None  # 기존 스냅샷 없음
-        mock_db.refresh = AsyncMock(side_effect=lambda obj: None)
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
         today = date.today()
 
-        await _upsert_snapshot(
+        snap = SimpleNamespace(
+            id=uuid.uuid4(), account_id=account_id, user_id=user_id,
+            snapshot_date=today, amount_krw=5_000_000.0, source="MANUAL",
+        )
+        mock_execute_result = MagicMock()
+        mock_execute_result.scalar_one.return_value = snap
+        mock_db.execute = AsyncMock(return_value=mock_execute_result)
+
+        result = await _upsert_snapshot(
             mock_db,
             account_id=account_id,
             user_id=user_id,
@@ -33,42 +43,37 @@ class TestUpsertSnapshot:
             amount_krw=5_000_000.0,
             source="MANUAL",
         )
-        # 새 스냅샷이 세션에 추가되어야 한다
-        mock_db.add.assert_called_once()
+
+        mock_db.execute.assert_called_once()
         mock_db.commit.assert_called_once()
+        assert result.amount_krw == 5_000_000.0
 
     @pytest.mark.asyncio
-    async def test_updates_existing_snapshot(self, mock_db):
-        """당일 스냅샷이 이미 있으면 금액을 업데이트한다."""
+    async def test_upsert_passes_correct_amount(self, mock_db):
+        """upsert 호출 시 amount_krw가 올바르게 전달된다."""
+        from types import SimpleNamespace
         from app.services.asset_service import _upsert_snapshot
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
         today = date.today()
 
-        existing = SimpleNamespace(
-            id=uuid.uuid4(),
-            account_id=account_id,
-            user_id=user_id,
-            snapshot_date=today,
-            amount_krw=3_000_000.0,
-            source="MANUAL",
-        )
-        mock_db.scalar.return_value = existing
+        snap = SimpleNamespace(amount_krw=9_999_000.0, source="KIS_API", snapshot_date=today)
+        mock_execute_result = MagicMock()
+        mock_execute_result.scalar_one.return_value = snap
+        mock_db.execute = AsyncMock(return_value=mock_execute_result)
 
         result = await _upsert_snapshot(
             mock_db,
             account_id=account_id,
             user_id=user_id,
             snapshot_date=today,
-            amount_krw=5_000_000.0,  # 새 금액
+            amount_krw=9_999_000.0,
             source="KIS_API",
         )
 
-        assert existing.amount_krw == 5_000_000.0
-        assert existing.source == "KIS_API"
-        mock_db.add.assert_not_called()  # 새로 추가하지 않음
-        mock_db.commit.assert_called_once()
+        assert result.amount_krw == 9_999_000.0
+        assert result.source == "KIS_API"
 
 
 # ── sync_manual_account 테스트 ──────────────────────────────

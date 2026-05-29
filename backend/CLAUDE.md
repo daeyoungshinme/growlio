@@ -141,6 +141,8 @@ jobs/                         # APScheduler 정기 작업
 
 **인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
 
+**LS증권 통합:** 구현 시도 후 제거됨. `migration g1h2i3j4k5l6_remove_ls_securities.py`로 DB 컬럼 삭제 완료. `price_service.py`와 `backtest_service.py`에 잔여 주석만 존재 — 재구현 시 migration downgrade 후 코드 추가 필요.
+
 ---
 
 ## Absolute Rules

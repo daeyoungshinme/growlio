@@ -35,7 +35,8 @@ def verify_supabase_token(token: str) -> dict:
             token,
             signing_key.key,
             algorithms=[signing_key.algorithm_name],
-            options={"verify_exp": True, "verify_aud": False},
+            options={"verify_exp": True, "verify_aud": True},
+            audience="authenticated",
             leeway=_LEEWAY,
         )
     except jwt.ExpiredSignatureError as e:

@@ -5,13 +5,14 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User
 
@@ -51,7 +52,7 @@ class AlertResponse(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_orm_row(cls, row: ExchangeRateAlert) -> "AlertResponse":
+    def from_orm_row(cls, row: ExchangeRateAlert) -> AlertResponse:
         return cls(
             id=row.id,
             target_rate=float(row.target_rate),
@@ -66,6 +67,8 @@ class AlertResponse(BaseModel):
 
 @router.get("/exchange-rate", response_model=list[AlertResponse])
 async def list_exchange_rate_alerts(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -74,13 +77,17 @@ async def list_exchange_rate_alerts(
         select(ExchangeRateAlert)
         .where(ExchangeRateAlert.user_id == current_user.id)
         .order_by(ExchangeRateAlert.created_at.desc())
+        .offset(skip)
+        .limit(limit)
     )
     alerts = result.scalars().all()
     return [AlertResponse.from_orm_row(a) for a in alerts]
 
 
 @router.post("/exchange-rate", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("20/minute")
 async def create_exchange_rate_alert(
+    request: Request,
     req: AlertCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
