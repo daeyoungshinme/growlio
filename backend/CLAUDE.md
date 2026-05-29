@@ -39,6 +39,8 @@ cd backend && uv run pytest tests/test_asset_service.py -v
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
 
+**테스트 파일:** `test_asset_service.py`, `test_auth_api.py`, `test_credential_service.py`, `test_dividend_service.py`, `test_portfolio_summary.py`, `test_price_service.py`, `test_rebalancing_service.py`, `test_security.py`
+
 ### Lint & Type Check
 ```bash
 # Ruff 린터 (E/F/I/UP/B/SIM 규칙, E712 제외)
@@ -140,6 +142,8 @@ jobs/                         # APScheduler 정기 작업
 **월별 추이 SQL (`_get_monthly_trend`):** `asset_accounts` JOIN + `is_active = TRUE` 필터 필수. 누락 시 비활성·삭제 계좌 스냅샷이 합산되어 금액이 수배 부풀림. 스냅샷은 `date.today()` 기준 저장 — 월말 스냅샷 개념 없음, "해당 월 마지막 sync일" 값이 월별 대표값으로 사용됨.
 
 **인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
+
+**미들웨어 스택 (`main.py` lifespan):** Request ID 주입 → 보안 헤더(X-Content-Type-Options, X-Frame-Options, X-XSS-Protection) → HTTP 요청 로깅 → slowapi 레이트 리미팅 → 예외 핸들러(자격증명 정보 자동 redact).
 
 **LS증권 통합:** 구현 시도 후 제거됨. `migration g1h2i3j4k5l6_remove_ls_securities.py`로 DB 컬럼 삭제 완료. `price_service.py`와 `backtest_service.py`에 잔여 주석만 존재 — 재구현 시 migration downgrade 후 코드 추가 필요.
 

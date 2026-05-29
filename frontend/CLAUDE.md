@@ -71,11 +71,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — 현재 미사용 (디렉토리는 존재하나 비어있음).
+**hooks/** — `useExchangeRate.ts` 존재. 환율 조회 훅.
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
 
-**Dead code:** `src/lib/supabase.ts` — 현재 미사용. 수정/확장 금지.
+**`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
 
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
