@@ -4,7 +4,7 @@ import { ArrowRight, ChevronDown, TrendingDown, TrendingUp, Wallet } from "lucid
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { fetchAccounts } from "../api/assets";
-import { fetchDashboard, fetchDividendByTicker } from "../api/dashboard";
+import { fetchDashboard } from "../api/dashboard";
 import { fetchDCAAnalysis } from "../api/invest";
 import { useExchangeRate } from "../hooks/useExchangeRate";
 import { fmtKrw, fmtMonth, fmtPct } from "../utils/format";
@@ -40,13 +40,6 @@ export default function DashboardPage() {
     refetchOnWindowFocus: true,
   });
 
-  const { data: tickerDividends, isLoading: tickerDividendsLoading } = useQuery({
-    queryKey: ["dividend-by-ticker"],
-    queryFn: fetchDividendByTicker,
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: false,
-  });
-
   const { data: dcaData } = useQuery({
     queryKey: ["invest-dca"],
     queryFn: fetchDCAAnalysis,
@@ -61,6 +54,13 @@ export default function DashboardPage() {
   });
 
   const exchangeRate = useExchangeRate();
+
+  const overallDividendYield = useMemo(() => {
+    const estimated = data?.estimated_annual_dividends;
+    const invested = overview?.total_invested_krw;
+    if (estimated && invested && invested > 0) return (estimated / invested) * 100;
+    return null;
+  }, [data?.estimated_annual_dividends, overview?.total_invested_krw]);
 
   const allocationChartData = useMemo(() => {
     if (!data) return [];
@@ -335,13 +335,25 @@ export default function DashboardPage() {
             stockAllocation={overview?.stock_allocation}
           />
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">배당 현황</h2>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="flex items-center justify-between px-5 pt-4 pb-2">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
+            <Link
+              to="/portfolio?tab=배당+현황"
+              className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              자세히 보기 <ArrowRight size={14} />
+            </Link>
+          </div>
           <DividendSection
             annualReceived={data.annual_dividends_received ?? null}
             estimatedAnnual={data.estimated_annual_dividends ?? null}
-            tickerItems={tickerDividends}
-            tickerItemsLoading={tickerDividendsLoading}
+            estimatedMonthly={
+              data.estimated_annual_dividends != null
+                ? Math.round(data.estimated_annual_dividends / 12)
+                : null
+            }
+            overallDividendYield={overallDividendYield}
           />
         </div>
       </div>

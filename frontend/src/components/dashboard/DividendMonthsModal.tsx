@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
+import { MONTH_LABELS } from "../../utils/dividendUtils";
 
 interface Props {
   ticker: string;
@@ -12,8 +13,6 @@ interface Props {
   onReset: () => void;
   isSaving: boolean;
 }
-
-const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
 export default function DividendMonthsModal({
   ticker, market, name, currentMonths, isManual, onClose, onSave, onReset, isSaving,

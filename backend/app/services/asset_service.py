@@ -14,9 +14,10 @@ from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
+from app.exceptions import BadRequestError, CredentialMissingError
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services.credential_service import decrypt
-from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
+from app.utils.currency import cache_usd_krw_rate, fetch_usd_krw, get_usd_krw_rate
 
 logger = structlog.get_logger()
 
@@ -54,7 +55,7 @@ async def sync_kis_account(
     account.kis_app_key/kis_app_secret 필수. 미설정 시 ValueError 발생.
     """
     if not account.kis_app_key or not account.kis_app_secret:
-        raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
+        raise CredentialMissingError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
     app_key = decrypt(account.kis_app_key)
     app_secret = decrypt(account.kis_app_secret)
     is_mock = account.is_mock_mode
@@ -149,9 +150,9 @@ async def sync_kiwoom_account(
     from app.kiwoom.client import KiwoomTokenExpiredError
 
     if not account.kiwoom_app_key or not account.kiwoom_app_secret:
-        raise ValueError("키움 API 자격증명이 설정되지 않았습니다")
+        raise CredentialMissingError("키움 API 자격증명이 설정되지 않았습니다")
     if not account.kiwoom_account_no:
-        raise ValueError("키움 계좌번호가 설정되지 않았습니다")
+        raise CredentialMissingError("키움 계좌번호가 설정되지 않았습니다")
 
     app_key = decrypt(account.kiwoom_app_key)
     app_secret = decrypt(account.kiwoom_app_secret)
@@ -217,10 +218,10 @@ async def sync_openbanking_account(account: AssetAccount, db: AsyncSession) -> A
 
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
     if not settings_row or not settings_row.ob_access_token:
-        raise ValueError("오픈뱅킹 토큰이 없습니다. 다시 연결해주세요.")
+        raise CredentialMissingError("오픈뱅킹 토큰이 없습니다. 다시 연결해주세요.")
 
     if not account.ob_fintech_use_no:
-        raise ValueError("오픈뱅킹 핀테크이용번호가 없습니다")
+        raise CredentialMissingError("오픈뱅킹 핀테크이용번호가 없습니다")
 
     access_token = await ensure_ob_token_fresh(settings_row, db)
 
@@ -247,8 +248,6 @@ async def sync_openbanking_account(account: AssetAccount, db: AsyncSession) -> A
 
 async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=None) -> AssetSnapshot:
     """수동 금액/종목으로 스냅샷을 저장한다. redis가 있으면 현재가도 갱신한다."""
-    import asyncio
-
     from app.kis.constants import OVERSEAS_MARKETS
 
     positions = account.manual_positions or []
@@ -262,14 +261,7 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
         has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
         usd_rate: float | None = None
         if has_overseas:
-            from app.services.price_service import _sync_usdkrw
-
-            fetched_rate = await asyncio.get_running_loop().run_in_executor(None, _sync_usdkrw)
-            if fetched_rate:
-                usd_rate = fetched_rate
-                await cache_usd_krw_rate(redis, fetched_rate)
-            else:
-                usd_rate = await get_usd_krw_rate(redis) or None
+            usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
 
         updated = []
         for p in positions:
@@ -291,8 +283,8 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
     pnl = value - invested if positions else 0.0
 
     if positions:
-        usd_rate_val = (await get_usd_krw_rate(redis)) if redis else 1300.0
-        deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate_val or 1300.0)
+        usd_rate_val = await fetch_usd_krw(redis)
+        deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate_val
         amount_krw = (value if value else invested) + deposit
         account.manual_amount = amount_krw
     elif account.asset_type == "REAL_ESTATE":
@@ -301,14 +293,14 @@ async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=Non
         mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
         amount_krw = gross - mortgage
         if gross == 0:
-            raise ValueError("부동산 시세(manual_amount)가 설정되지 않았습니다")
+            raise BadRequestError("부동산 시세(manual_amount)가 설정되지 않았습니다")
     elif account.deposit_krw is not None or account.deposit_usd is not None:
-        usd_rate = await get_usd_krw_rate(redis)
-        amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate or 1300.0)
+        usd_rate = await fetch_usd_krw(redis)
+        amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
     else:
         amount_krw = float(account.manual_amount or 0)
         if amount_krw == 0:
-            raise ValueError("수동 금액이 설정되지 않았습니다")
+            raise BadRequestError("수동 금액이 설정되지 않았습니다")
 
     today = date.today()
     snapshot = await _upsert_snapshot(
@@ -346,8 +338,7 @@ async def _build_asset_totals(
     """
     from sqlalchemy import func
 
-    from app.utils.currency import get_usd_krw_rate
-    usd_rate = (await get_usd_krw_rate(redis)) if redis else 1.0
+    usd_rate = await fetch_usd_krw(redis)
 
     subq = (
         select(

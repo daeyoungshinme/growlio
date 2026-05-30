@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -14,7 +14,7 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
-from app.services.credential_service import decrypt, encrypt
+from app.services.credential_service import encrypt
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -31,6 +31,27 @@ class GoalUpdate(BaseModel):
     retirement_target_year: int | None = None
     goal_start_date: date | None = None
     goal_initial_amount: float | None = None
+
+    @field_validator("goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount")
+    @classmethod
+    def validate_positive(cls, v: float | None) -> float | None:
+        if v is not None and v < 0:
+            raise ValueError("금액은 0 이상이어야 합니다")
+        return v
+
+    @field_validator("goal_annual_return_pct")
+    @classmethod
+    def validate_return_pct(cls, v: float | None) -> float | None:
+        if v is not None and not (0 <= v <= 100):
+            raise ValueError("수익률은 0~100% 범위여야 합니다")
+        return v
+
+    @field_validator("retirement_target_year")
+    @classmethod
+    def validate_target_year(cls, v: int | None) -> int | None:
+        if v is not None and v < date.today().year:
+            raise ValueError("목표 연도는 현재 연도 이상이어야 합니다")
+        return v
 
 
 class NotificationEmailUpdate(BaseModel):

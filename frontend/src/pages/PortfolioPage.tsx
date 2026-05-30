@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { api } from "../api/client";
 import { syncAccount } from "../api/assets";
@@ -8,7 +9,7 @@ import StockHoldingsTable from "../components/assets/StockHoldingsTable";
 import TreemapChart from "../components/portfolio/TreemapChart";
 import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
-import { fmtKrwShort } from "../utils/format";
+import { fmtKrwShort, fmtKrwPrice } from "../utils/format";
 import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
@@ -32,7 +33,11 @@ type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<Tab>("종목 현황");
+  const [searchParams] = useSearchParams();
+  const initialTab = TABS.includes(searchParams.get("tab") as Tab)
+    ? (searchParams.get("tab") as Tab)
+    : "종목 현황";
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [syncingAll, setSyncingAll] = useState(false);
 
   const { data, isLoading, error } = useQuery({
@@ -145,7 +150,7 @@ export default function PortfolioPage() {
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
         <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
         <p className="text-xl sm:text-2xl font-bold mt-1 leading-tight text-blue-600">
-          {fmtKrwShort(Math.round(data.total_invested_krw / 1e6) * 1e6 + Math.round(data.unrealized_pnl_krw / 1e6) * 1e6)}원
+          {fmtKrwPrice(data.total_stock_krw)}
         </p>
         <div className="mt-2">
           <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
@@ -193,6 +198,7 @@ export default function PortfolioPage() {
           divLoading={divLoading}
           divSummary={divSummary}
           dividendByTicker={dividendByTicker}
+          totalInvestedKrw={data?.total_invested_krw}
         />
       )}
 

@@ -15,6 +15,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.v1.router import router
 from app.config import settings
 from app.database import get_db
+from app.exceptions import AppError
 from app.limiter import limiter
 from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
@@ -106,6 +107,11 @@ async def log_requests(request: Request, call_next):
         request_id=request_id,
     )
     return response
+
+
+@app.exception_handler(AppError)
+async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 
 
 @app.exception_handler(Exception)

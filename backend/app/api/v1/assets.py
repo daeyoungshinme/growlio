@@ -1,4 +1,3 @@
-import asyncio
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -33,7 +32,8 @@ from app.services.asset_service import (
     sync_openbanking_account,
 )
 from app.services.credential_service import encrypt
-from app.services.price_service import _sync_usdkrw, fetch_prices_batch
+from app.services.price_service import fetch_prices_batch
+from app.utils.currency import fetch_usd_krw
 from app.utils.redis_lock import redis_lock
 
 
@@ -280,10 +280,8 @@ async def update_account(
         )
         await db.commit()
     if req.deposit_krw is not None or req.deposit_usd is not None:
-        from app.redis_client import get_redis
-        from app.utils.currency import get_usd_krw_rate
         redis = await get_redis()
-        usd_rate = await get_usd_krw_rate(redis)
+        usd_rate = await fetch_usd_krw(redis)
         latest_snap = await db.scalar(
             select(AssetSnapshot)
             .where(AssetSnapshot.account_id == account.id)
@@ -481,10 +479,8 @@ async def save_positions(
     account.manual_updated_at = datetime.now(UTC)
     usd_rate = 1.0
     if account.deposit_usd:
-        from app.redis_client import get_redis
-        from app.utils.currency import get_usd_krw_rate
         redis = await get_redis()
-        usd_rate = await get_usd_krw_rate(redis)
+        usd_rate = await fetch_usd_krw(redis)
     await _upsert_snapshot(
         db,
         account_id=account.id,
@@ -522,8 +518,7 @@ async def sync_position_prices(
     has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
     usd_rate: float | None = None
     if has_overseas or account.deposit_usd:
-        loop = asyncio.get_running_loop()
-        usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
+        usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
 
     updated = []
     for p in positions:

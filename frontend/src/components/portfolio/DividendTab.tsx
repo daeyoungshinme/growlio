@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
-import { fmtKrw, fmtKrwShort } from "../../utils/format";
-import { chartTooltipStyle } from "../../utils/chart";
+import { fmtKrwShort } from "../../utils/format";
 import TreemapChart from "./TreemapChart";
+import MonthlyDividendChart from "./MonthlyDividendChart";
+import MonthlyTickerDetail from "./MonthlyTickerDetail";
 import type { DividendByTicker, DividendYield } from "../../types";
+import { MONTH_LABELS, dividendFreqInfo, weightBarColor, yieldBadgeClass } from "../../utils/dividendUtils";
 
 interface DividendSummary {
   annual_received: number;
@@ -18,42 +19,13 @@ interface Props {
   divLoading: boolean;
   divSummary: DividendSummary | undefined;
   dividendByTicker: DividendByTicker[];
+  totalInvestedKrw?: number;
 }
 
 const DIV_SUBTABS = ["종목별 배당", "월별 배당"] as const;
 type DivSubTab = (typeof DIV_SUBTABS)[number];
 
-const MONTH_LABELS = [
-  "1월", "2월", "3월", "4월", "5월", "6월",
-  "7월", "8월", "9월", "10월", "11월", "12월",
-];
-
-function yieldBadgeClass(y: number): string {
-  if (y >= 7) return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 font-bold";
-  if (y >= 4) return "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400";
-  if (y >= 2) return "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400";
-  return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
-}
-
-function dividendFreqInfo(months: number[], isManual: boolean): { label: string; cls: string } {
-  const n = months.length;
-  if (n === 0) return { label: "미설정", cls: "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500" };
-  if (n === 12) return { label: "월배당", cls: "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400" };
-  if (n === 4) return { label: "분기배당", cls: "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400" };
-  if (n === 2) return { label: "반기배당", cls: "bg-orange-50 dark:bg-orange-950 text-orange-600 dark:text-orange-400" };
-  if (n === 1) return { label: "연배당", cls: "bg-purple-50 dark:bg-purple-950 text-purple-600 dark:text-purple-400" };
-  if (isManual) return { label: `${n}회/년(수동)`, cls: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400" };
-  return { label: `${n}회/년`, cls: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" };
-}
-
-function weightBarColor(pct: number): string {
-  if (pct >= 25) return "bg-amber-400";
-  if (pct >= 15) return "bg-blue-400";
-  if (pct >= 5) return "bg-emerald-400";
-  return "bg-gray-400";
-}
-
-export default function DividendTab({ dividendData, divLoading, divSummary, dividendByTicker }: Props) {
+export default function DividendTab({ dividendData, divLoading: _divLoading, divSummary, dividendByTicker, totalInvestedKrw }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [divSubTab, setDivSubTab] = useState<DivSubTab>("종목별 배당");
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -86,6 +58,14 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
   );
   const received = divSummary?.annual_received ?? 0;
 
+  const overallDividendYield = useMemo(
+    () =>
+      totalInvestedKrw && totalInvestedKrw > 0 && totalEstimated > 0
+        ? (totalEstimated / totalInvestedKrw) * 100
+        : null,
+    [totalEstimated, totalInvestedKrw],
+  );
+
   const dividendChartData = useMemo(
     () =>
       dividendByTicker
@@ -98,6 +78,15 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
           pct: totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0,
         })),
     [dividendByTicker, totalEstimated],
+  );
+
+  // 종목별 배당 테이블용 (모바일/데스크탑 공용) — 중복 sort 제거
+  const sortedByTicker = useMemo(
+    () =>
+      dividendByTicker
+        .filter((d) => d.estimated_annual_krw > 0)
+        .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw),
+    [dividendByTicker],
   );
 
   const monthlyEstimateByMonth = useMemo(
@@ -136,7 +125,10 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
     [monthCells],
   );
 
-  const selectedMonthTickers = dividendByTicker.filter((d) => d.dividend_months.includes(selectedMonth));
+  const selectedMonthTickers = useMemo(
+    () => dividendByTicker.filter((d) => d.dividend_months.includes(selectedMonth)),
+    [dividendByTicker, selectedMonth],
+  );
   const monthStr = `${currentYear}-${String(selectedMonth).padStart(2, "0")}`;
   const selectedMonthActual = divSummary?.monthly_breakdown.find((x) => x.month === monthStr);
   const monthTickerActualMap: Record<string, number> = {};
@@ -152,7 +144,14 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
           <div className="px-4 py-4 sm:px-5">
             <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">예상 연간 배당금</p>
             <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600">
-              {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
+              {totalEstimated > 0 ? (
+                <>
+                  {fmtKrwShort(totalEstimated)}원
+                  {overallDividendYield != null && (
+                    <span className="text-sm font-semibold ml-1">({overallDividendYield.toFixed(2)}%)</span>
+                  )}
+                </>
+              ) : "—"}
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">배당수익률 기준 추정</p>
           </div>
@@ -200,130 +199,121 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
             </div>
             {/* 모바일 카드 뷰 */}
             <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-              {dividendByTicker
-                .filter((d) => d.estimated_annual_krw > 0)
-                .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw)
-                .map((d) => {
-                  const pct = totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
-                  const rowKey = `${d.ticker}-${d.market}`;
-                  const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                  const investmentYield = (posDiv?.investment_yield ?? 0) > 0 ? posDiv.investment_yield : (d.investment_yield ?? 0);
-                  const barColor = weightBarColor(pct);
-                  const freqInfo = dividendFreqInfo(d.dividend_months, d.dividend_months_is_manual);
-                  return (
-                    <div key={rowKey} className="px-4 py-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-gray-50 truncate text-sm">{d.name}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{d.ticker} · {d.market}</p>
-                          {investmentYield > 0 && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full mt-1 inline-block ${yieldBadgeClass(investmentYield)}`}>
-                              배당율 {investmentYield.toFixed(2)}%
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(d.estimated_annual_krw)}원</p>
-                          <div className="flex items-center justify-end gap-1 mt-1">
-                            <div className="w-12 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                              <div className={`${barColor} h-full rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                            </div>
-                            <span className="text-xs text-gray-400 dark:text-gray-500">{pct.toFixed(1)}%</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>{freqInfo.label}</span>
-                        {d.dividend_months.length > 0 && d.dividend_months.length < 12 && (
-                          d.dividend_months.map((m) => (
-                            <span key={m} className="text-xs px-1 py-0 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">{m}월</span>
-                          ))
+              {sortedByTicker.map((d) => {
+                const pct = totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
+                const rowKey = `${d.ticker}-${d.market}`;
+                const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
+                const investmentYield = (posDiv?.investment_yield ?? 0) > 0 ? posDiv.investment_yield : (d.investment_yield ?? 0);
+                const barColor = weightBarColor(pct);
+                const freqInfo = dividendFreqInfo(d.dividend_months, d.dividend_months_is_manual);
+                return (
+                  <div key={rowKey} className="px-4 py-3">
+                    {/* Row 1: 종목명 + 연간 배당액 */}
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{d.name}</p>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 shrink-0 whitespace-nowrap">
+                        {fmtKrwShort(d.estimated_annual_krw)}원
+                      </span>
+                    </div>
+                    {/* Row 2: 티커·마켓 + 배당율 배지 | 비중 바 + % */}
+                    <div className="flex items-center justify-between mt-0.5 gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                          {d.ticker} · {d.market}
+                        </span>
+                        {investmentYield > 0 && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${yieldBadgeClass(investmentYield)}`}>
+                            {investmentYield.toFixed(2)}%
+                          </span>
                         )}
                       </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                          <div className={`${barColor} h-full rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        </div>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">{pct.toFixed(1)}%</span>
+                      </div>
                     </div>
-                  );
-                })}
-              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">합계</span>
-                <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">{fmtKrwShort(totalEstimated)}원</span>
-              </div>
+                    {/* Row 3: 빈도 배지 + 월 배지들 */}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>
+                        {freqInfo.label}
+                      </span>
+                      {d.dividend_months.length > 0 && d.dividend_months.length < 12 &&
+                        d.dividend_months.map((m) => (
+                          <span key={m} className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-100">
+                            {m}월
+                          </span>
+                        ))
+                      }
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
             {/* 데스크탑 테이블 */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
                     <th className="py-2 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
-                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">투자배당율</th>
-                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당월</th>
-                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">연간 배당금</th>
-                    <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">비중</th>
+                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">투자배당수익율</th>
+                    <th className="py-2 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">연간 배당금</th>
+                    <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">비중</th>
+                    <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당 빈도</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dividendByTicker
-                    .filter((d) => d.estimated_annual_krw > 0)
-                    .sort((a, b) => b.estimated_annual_krw - a.estimated_annual_krw)
-                    .map((d) => {
-                      const pct = totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
-                      const rowKey = `${d.ticker}-${d.market}`;
-                      const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
-                      const investmentYield = (posDiv?.investment_yield ?? 0) > 0 ? posDiv.investment_yield : (d.investment_yield ?? 0);
-                      const barColor = weightBarColor(pct);
-                      const freqInfo = dividendFreqInfo(d.dividend_months, d.dividend_months_is_manual);
-                      return (
-                        <tr key={rowKey} className="border-t border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="py-2 px-5">
-                            <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
-                            <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
-                          </td>
-                          <td className="py-2 px-3 text-right">
-                            {divLoading ? (
-                              <span className="text-gray-300 dark:text-gray-600 text-xs">...</span>
-                            ) : investmentYield > 0 ? (
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${yieldBadgeClass(investmentYield)}`}>
-                                {investmentYield.toFixed(2)}%
-                              </span>
-                            ) : (
-                              <span className="text-gray-300 dark:text-gray-600">—</span>
-                            )}
-                          </td>
-                          <td className="py-2 px-3 text-right">
-                            <div className="flex flex-wrap gap-0.5 justify-end items-center">
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>{freqInfo.label}</span>
-                              {d.dividend_months.length > 0 && d.dividend_months.length < 12 && (
-                                d.dividend_months.map((m) => (
-                                  <span key={m} className="text-xs px-1 py-0 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500">{m}월</span>
-                                ))
-                              )}
+                  {sortedByTicker.map((d) => {
+                    const pct = totalEstimated > 0 ? (d.estimated_annual_krw / totalEstimated) * 100 : 0;
+                    const rowKey = `${d.ticker}-${d.market}`;
+                    const posDiv = positionsDivMap[rowKey] ?? tickerOnlyDivMap[d.ticker ?? ""];
+                    const investmentYield = (posDiv?.investment_yield ?? 0) > 0 ? posDiv.investment_yield : (d.investment_yield ?? 0);
+                    const barColor = weightBarColor(pct);
+                    const freqInfo = dividendFreqInfo(d.dividend_months, d.dividend_months_is_manual);
+                    return (
+                      <tr key={rowKey} className="border-t border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="py-2 px-5">
+                          <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
+                        </td>
+                        <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">
+                          {investmentYield > 0 ? `${investmentYield.toFixed(2)}%` : "—"}
+                        </td>
+                        <td className="py-2 px-4 text-right font-semibold text-gray-900 dark:text-gray-50">
+                          {fmtKrwShort(d.estimated_annual_krw)}원
+                        </td>
+                        <td className="py-2 px-3">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                              <div className={`${barColor} h-full rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
                             </div>
-                          </td>
-                          <td className="py-2 px-3 text-right font-semibold text-gray-900 dark:text-gray-50">
-                            {fmtKrwShort(d.estimated_annual_krw)}원
-                          </td>
-                          <td className="py-2 px-5 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <div className="w-16 bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
-                                <div className={`${barColor} h-full rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                              </div>
-                              <span className="text-xs font-medium text-gray-700 dark:text-gray-300 w-10 text-right">{pct.toFixed(1)}%</span>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">{pct.toFixed(1)}%</span>
+                          </div>
+                        </td>
+                        <td className="py-2 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>
+                              {freqInfo.label}
+                            </span>
+                            {d.dividend_months.length > 0 && d.dividend_months.length < 12 &&
+                              d.dividend_months.map((m) => (
+                                <span key={m} className="text-xs px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-100">
+                                  {m}월
+                                </span>
+                              ))
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
-                <tfoot>
-                  <tr className="bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 font-semibold text-sm">
-                    <td className="py-2.5 px-5 text-gray-500 dark:text-gray-400">합계</td>
-                    <td className="py-2.5 px-3" />
-                    <td className="py-2.5 px-3" />
-                    <td className="py-2.5 px-3 text-right text-gray-900 dark:text-gray-50">{fmtKrwShort(totalEstimated)}원</td>
-                    <td className="py-2.5 px-5 text-right text-gray-500 dark:text-gray-400">100%</td>
-                  </tr>
-                </tfoot>
               </table>
+            </div>
+            <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">합계</span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">{fmtKrwShort(totalEstimated)}원</span>
             </div>
           </div>
         </div>
@@ -334,200 +324,21 @@ export default function DividendTab({ dividendData, divLoading, divSummary, divi
 
       {divSubTab === "월별 배당" && (
         <div className="space-y-4">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 배당 현황 ({currentYear})</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart
-                data={barData}
-                margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                onClick={(e) => {
-                  if (e?.activePayload?.[0]) {
-                    const d = e.activePayload[0].payload as { month: number };
-                    setSelectedMonth(d.month);
-                  }
-                }}
-              >
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tickFormatter={(v: number) =>
-                    v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : v >= 1e4 ? `${Math.round(v / 1e4)}만` : `${v}`
-                  }
-                  tick={{ fontSize: 11, fill: "#9CA3AF" }}
-                  axisLine={false}
-                  tickLine={false}
-                  width={48}
-                />
-                <Tooltip
-                  formatter={(value: number, name: string) => [
-                    `${fmtKrwShort(value)}원`,
-                    name === "actual" ? "실수령" : "예상",
-                  ]}
-                  cursor={{ fill: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)" }}
-                  {...chartTooltipStyle(isDark)}
-                />
-                <Bar dataKey="actual" stackId="a" radius={[0, 0, 0, 0]} cursor="pointer">
-                  {barData.map((entry) => (
-                    <Cell
-                      key={entry.month}
-                      fill={entry.month === selectedMonth ? "#15803D" : "#16A34A"}
-                      opacity={entry.month === selectedMonth ? 1 : 0.75}
-                    />
-                  ))}
-                </Bar>
-                <Bar dataKey="estimated" stackId="a" radius={[4, 4, 0, 0]} cursor="pointer">
-                  {barData.map((entry) => (
-                    <Cell
-                      key={entry.month}
-                      fill={
-                        entry.month === selectedMonth
-                          ? (entry.isPast ? "#9CA3AF" : "#4ADE80")
-                          : (entry.isPast ? "#D1D5DB" : "#86EFAC")
-                      }
-                      opacity={entry.month === selectedMonth ? 1 : 0.75}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <p className="text-xs text-gray-300 dark:text-gray-600 mt-2 text-right">
-              진한 초록: 실수령 · 연한 초록: 예상(미래) · 회색: 예상(과거 미수령) | 막대 클릭 시 해당 월 상세 표시
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-800 dark:text-gray-200">
-                {MONTH_LABELS[selectedMonth - 1]} 배당 종목
-                {selectedMonthActual && selectedMonthActual.amount > 0 ? (
-                  <span className="ml-2 text-xs font-normal text-green-600 dark:text-green-400">
-                    실수령 {fmtKrwShort(selectedMonthActual.amount)}원
-                  </span>
-                ) : monthlyEstimateByMonth[selectedMonth - 1] > 0 ? (
-                  <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">
-                    예상 {fmtKrwShort(monthlyEstimateByMonth[selectedMonth - 1])}원
-                  </span>
-                ) : null}
-              </h3>
-              <span className="text-xs text-gray-400 dark:text-gray-500">{selectedMonthTickers.length}개 종목</span>
-            </div>
-            {selectedMonthTickers.length > 0 ? (
-              <>
-                {/* 모바일 카드 뷰 */}
-                <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-                  {selectedMonthTickers
-                    .sort((a, b) => {
-                      const aCount = a.dividend_months.length > 0 ? a.dividend_months.length : 12;
-                      const bCount = b.dividend_months.length > 0 ? b.dividend_months.length : 12;
-                      return Math.round(b.estimated_annual_krw / bCount) - Math.round(a.estimated_annual_krw / aCount);
-                    })
-                    .map((d) => {
-                      const payCount = d.dividend_months.length > 0 ? d.dividend_months.length : 12;
-                      const payAmt = Math.round(d.estimated_annual_krw / payCount);
-                      const usdPerPayment = d.estimated_monthly_usd != null ? (d.estimated_monthly_usd * 12) / payCount : null;
-                      const actualAmt = monthTickerActualMap[`${monthStr}-${d.ticker ?? ""}`];
-                      return (
-                        <div key={`${d.ticker}-${d.market}`} className="px-4 py-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="font-medium text-gray-900 dark:text-gray-50 truncate text-sm">{d.name}</p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                {d.ticker} · {d.market}
-                                {d.investment_yield > 0 && ` · ${d.investment_yield.toFixed(2)}%`}
-                              </p>
-                            </div>
-                            <div className="text-right shrink-0">
-                              {actualAmt && actualAmt > 0 ? (
-                                <p className="font-medium text-green-600 dark:text-green-400 text-sm">수령 {fmtKrw(actualAmt)}</p>
-                              ) : d.currency === "USD" && usdPerPayment != null && usdPerPayment > 0 ? (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{fmtKrw(payAmt)}</p>
-                              ) : payAmt > 0 ? (
-                                <p className="text-sm text-gray-500 dark:text-gray-400">예상 {fmtKrw(payAmt)}</p>
-                              ) : (
-                                <p className="text-sm text-gray-300 dark:text-gray-600">—</p>
-                              )}
-                              <span className={`text-xs px-1.5 py-0 rounded-full ${d.dividend_months_is_manual ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400" : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"}`}>
-                                {d.dividend_months_is_manual ? "수동" : "자동"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-
-                {/* 데스크탑 테이블 */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                        <th className="py-2 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
-                        <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">투자배당수익율</th>
-                        <th className="py-2 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당금</th>
-                        <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당월 설정</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedMonthTickers
-                        .sort((a, b) => {
-                          const aCount = a.dividend_months.length > 0 ? a.dividend_months.length : 12;
-                          const bCount = b.dividend_months.length > 0 ? b.dividend_months.length : 12;
-                          return Math.round(b.estimated_annual_krw / bCount) - Math.round(a.estimated_annual_krw / aCount);
-                        })
-                        .map((d) => {
-                          const payCount = d.dividend_months.length > 0 ? d.dividend_months.length : 12;
-                          const payAmt = Math.round(d.estimated_annual_krw / payCount);
-                          const usdPerPayment =
-                            d.estimated_monthly_usd != null ? (d.estimated_monthly_usd * 12) / payCount : null;
-                          const actualAmt = monthTickerActualMap[`${monthStr}-${d.ticker ?? ""}`];
-                          return (
-                            <tr
-                              key={`${d.ticker}-${d.market}`}
-                              className="border-t border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-                            >
-                              <td className="py-2 px-5">
-                                <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
-                                <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
-                              </td>
-                              <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">
-                                {d.investment_yield > 0 ? `${d.investment_yield.toFixed(2)}%` : "—"}
-                              </td>
-                              <td className="py-2 px-4 text-right">
-                                {actualAmt && actualAmt > 0 ? (
-                                  <span className="font-medium text-green-600 dark:text-green-400">
-                                    수령 {fmtKrw(actualAmt)}
-                                  </span>
-                                ) : d.currency === "USD" && usdPerPayment != null && usdPerPayment > 0 ? (
-                                  <span className="text-gray-500 dark:text-gray-400">
-                                    {fmtKrw(payAmt)}(${usdPerPayment.toFixed(2)})
-                                  </span>
-                                ) : payAmt > 0 ? (
-                                  <span className="text-gray-500 dark:text-gray-400">예상 {fmtKrw(payAmt)}</span>
-                                ) : (
-                                  <span className="text-gray-300 dark:text-gray-600">—</span>
-                                )}
-                              </td>
-                              <td className="py-2 px-5 text-right">
-                                <span
-                                  className={`text-xs px-2 py-0.5 rounded-full ${
-                                    d.dividend_months_is_manual
-                                      ? "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400"
-                                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400"
-                                  }`}
-                                >
-                                  {d.dividend_months_is_manual ? "수동" : "자동"}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">이 달에 배당 예정 종목이 없습니다.</p>
-            )}
-          </div>
+          <MonthlyDividendChart
+            barData={barData}
+            currentYear={currentYear}
+            selectedMonth={selectedMonth}
+            isDark={isDark}
+            onMonthSelect={setSelectedMonth}
+          />
+          <MonthlyTickerDetail
+            selectedMonth={selectedMonth}
+            selectedMonthTickers={selectedMonthTickers}
+            selectedMonthActual={selectedMonthActual}
+            monthStr={monthStr}
+            monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1]}
+            monthTickerActualMap={monthTickerActualMap}
+          />
         </div>
       )}
     </div>

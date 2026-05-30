@@ -83,13 +83,14 @@ class TestSyncManualAccount:
 
     @pytest.mark.asyncio
     async def test_raises_when_no_amount_and_no_positions(self, mock_db, make_account):
-        """금액도, 포지션도 없으면 ValueError 발생."""
+        """금액도, 포지션도 없으면 BadRequestError 발생."""
+        from app.exceptions import BadRequestError
         from app.services.asset_service import sync_manual_account
 
         make_account.manual_amount = 0
         make_account.manual_positions = []
 
-        with pytest.raises(ValueError, match="수동 금액이 설정되지 않았습니다"):
+        with pytest.raises(BadRequestError, match="수동 금액이 설정되지 않았습니다"):
             await sync_manual_account(make_account, mock_db, redis=None)
 
     @pytest.mark.asyncio
