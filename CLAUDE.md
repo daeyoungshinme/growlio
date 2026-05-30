@@ -34,7 +34,11 @@ cp frontend/.env.example frontend/.env  # 값 채우기 (frontend/CLAUDE.md Envi
 make migrate
 
 # 5. 개발 서버 실행
+# Windows (Git Bash)
 bash dev.sh   # 백엔드 + 프론트엔드 동시 실행 (Ctrl+C로 종료)
+# macOS / Linux — 터미널 2개에서 각각 실행:
+# cd backend && uv run uvicorn app.main:app --reload
+# cd frontend && npm run dev
 ```
 
 ## Makefile 단축 명령
@@ -45,7 +49,7 @@ make down             # docker compose down
 make migrate          # cd backend && alembic upgrade head
 make install-backend  # cd backend && pip install uv && uv pip install -e ".[dev]"
 make install-frontend # cd frontend && npm install
-make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh)
+make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && pytest

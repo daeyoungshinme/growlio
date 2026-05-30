@@ -71,7 +71,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — `useExchangeRate.ts` 존재. 환율 조회 훅.
+**hooks/** — `useExchangeRate.ts` (환율 조회). 현재 유일한 훅.
+
+**테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트만 존재: `format.test.ts`, `error.test.ts`, `colors.test.ts`.
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
 
