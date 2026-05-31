@@ -131,6 +131,7 @@ limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
   ├── exchange_rate_alert.py  # 환율 알림 정기 작업
+  ├── rebalancing_alert.py    # 매일 18:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
 ```
 

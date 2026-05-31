@@ -156,6 +156,18 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
   ```
 - 직접 `text-red-500` / `text-blue-500` 인라인 작성 금지 (색상 관례 변경 시 일괄 교체 불가).
 
+**배당 유틸리티 (`src/utils/dividendUtils.ts`)**
+- `yieldBadgeClass(yield)` — 배당수익률에 따른 Tailwind 뱃지 클래스 반환 (≥7%: 초록, ≥4%: 에메랄드, ≥2%: 황색).
+- `dividendFreqInfo(months, isManual)` — 월 배열로 배당 주기 레이블·색상 반환 (월배당/분기배당/반기배당/연배당).
+- `weightBarColor(pct)` — 포트폴리오 비중 막대 색상 반환. 인라인 클래스 직접 작성 금지.
+
+**마켓 유틸리티 (`src/constants/markets.ts`)**
+- `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.
+  ```ts
+  import { isOverseasMarket } from "../constants/markets";
+  // isOverseasMarket("NYSE") → true, isOverseasMarket("KOSPI") → false
+  ```
+
 **차트 유틸리티 (`src/utils/chart.ts`)**
 - `chartTooltipStyle(isDark)` — Recharts `<Tooltip>` 다크모드 스타일 반환. 인라인 스타일 객체 중복 작성 금지.
   ```ts
