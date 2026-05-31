@@ -4,9 +4,10 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { STALE_TIME } from "./constants/queryConfig";
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
+  defaultOptions: { queries: { staleTime: STALE_TIME.SHORT, retry: 1 } },
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

@@ -1,28 +1,49 @@
 import type { QueryClient } from "@tanstack/react-query";
+import { QUERY_KEYS } from "../constants/queryKeys";
 
 /** 계좌 sync 후 — portfolio + dashboard + 배당 데이터 */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ["portfolio-overview"] }),
-    qc.invalidateQueries({ queryKey: ["dashboard"] }),
-    qc.invalidateQueries({ queryKey: ["dividend-by-ticker"] }),
-    qc.invalidateQueries({ queryKey: ["dividend-summary"] }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummary }),
   ]);
 }
 
 /** 계좌 CUD 후 — accounts + portfolio + dashboard */
 export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ["accounts"] }),
-    qc.invalidateQueries({ queryKey: ["portfolio-overview"] }),
-    qc.invalidateQueries({ queryKey: ["dashboard"] }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
   ]);
 }
 
 /** 거래내역 CUD 후 — transactions + dashboard */
 export function invalidateTransactionData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: ["transactions"] }),
-    qc.invalidateQueries({ queryKey: ["dashboard"] }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
   ]);
+}
+
+/** 포트폴리오/백테스트/리밸런싱 CUD 후 */
+export function invalidatePortfolioData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
+}
+
+/** DCA 목표 변경 후 — dca-analysis + invest-dca + settings + dashboard */
+export function invalidateDcaData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.investDca }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+  ]);
+}
+
+/** 환율 알림 CUD 후 */
+export function invalidateAlertData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.exchangeRateAlerts });
 }

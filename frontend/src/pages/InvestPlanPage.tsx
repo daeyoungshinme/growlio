@@ -10,6 +10,9 @@ import MonthlyAchievementTable from "../components/invest/MonthlyAchievementTabl
 import YearlyAchievementTable from "../components/invest/YearlyAchievementTable";
 import { fmtKrw } from "../utils/format";
 import { toast } from "../utils/toast";
+import { STALE_TIME } from "../constants/queryConfig";
+import { QUERY_KEYS } from "../constants/queryKeys";
+import { invalidateDcaData } from "../utils/queryInvalidation";
 
 interface GoalForm {
   monthly_deposit_amount: string;
@@ -25,9 +28,9 @@ export default function InvestPlanPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["dca-analysis"],
+    queryKey: QUERY_KEYS.dcaAnalysis,
     queryFn: fetchDCAAnalysis,
-    staleTime: 60_000,
+    staleTime: STALE_TIME.MEDIUM,
   });
 
   const [editing, setEditing] = useState(false);
@@ -92,9 +95,7 @@ export default function InvestPlanPage() {
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);
-      queryClient.invalidateQueries({ queryKey: ["dca-analysis"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      await invalidateDcaData(queryClient);
     } catch {
       toast("저장에 실패했습니다", "error");
     } finally {
@@ -116,7 +117,7 @@ export default function InvestPlanPage() {
         <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
           <span>데이터를 불러오지 못했습니다.</span>
           <button
-            onClick={() => queryClient.invalidateQueries({ queryKey: ["dca-analysis"] })}
+            onClick={() => invalidateDcaData(queryClient)}
             className="underline font-medium ml-2"
           >
             다시 시도

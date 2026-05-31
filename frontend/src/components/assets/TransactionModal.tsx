@@ -17,6 +17,7 @@ import { fmtKrw } from "../../utils/format";
 import { invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
 import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
+import { STALE_TIME } from "../../constants/queryConfig";
 
 interface Props {
   accountId: string;
@@ -74,7 +75,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
         .get<{ positions: Array<{ ticker: string; name: string; qty: number }> }>(`/assets/${accountId}/positions`)
         .then((r) => r.data),
     enabled: !!accountId,
-    staleTime: 60_000,
+    staleTime: STALE_TIME.MEDIUM,
   });
   const accountPositions = positionsData?.positions ?? [];
 

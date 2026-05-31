@@ -18,6 +18,8 @@ import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
 import RebalancingTable from "../rebalancing/RebalancingTable";
 import { toast } from "../../utils/toast";
 import { extractErrorMessage } from "../../utils/error";
+import { invalidatePortfolioData } from "../../utils/queryInvalidation";
+import { QUERY_KEYS } from "../../constants/queryKeys";
 import ConfirmModal from "../common/ConfirmModal";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -29,12 +31,12 @@ export default function PortfolioAnalysisTab() {
   const qc = useQueryClient();
 
   const { data: portfolios = [], isLoading } = useQuery({
-    queryKey: ["portfolios"],
+    queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
   const activeAccounts = accounts.filter((a) => a.is_active);
@@ -64,7 +66,7 @@ export default function PortfolioAnalysisTab() {
     mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
       createPortfolio(args),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(qc);
       setEditorOpen(false);
     },
     onError: () => toast("포트폴리오 저장에 실패했습니다"),
@@ -74,7 +76,7 @@ export default function PortfolioAnalysisTab() {
     mutationFn: (args: { id: string; name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
       updatePortfolio(args.id, { name: args.name, items: args.items, base_type: args.base_type, account_ids: args.account_ids }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(qc);
       setEditingPortfolio(null);
       setEditorOpen(false);
       setAnalysis(null);
@@ -85,7 +87,7 @@ export default function PortfolioAnalysisTab() {
   const deleteMut = useMutation({
     mutationFn: deletePortfolio,
     onSuccess: (_, id) => {
-      qc.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(qc);
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);

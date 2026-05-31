@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, Node 18+ 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, Node 18+, [uv](https://docs.astral.sh/uv/) 필수.
 
 > **pre-commit hooks** 설정됨 — commit 시 ruff, mypy, eslint, trailing-whitespace 자동 실행. 실패 시 commit 블록.
 
@@ -61,6 +61,7 @@ make format           # ruff --fix (backend) + prettier --write (frontend)
 make db-reset         # docker compose down -v + up + migrate (데이터 초기화)
 make build-android-debug    # npm build + cap sync + gradlew assembleDebug
 make build-android-release  # npm build + cap sync + gradlew assembleRelease
+# Android 빌드 전제: JDK 17+, Android Studio (SDK 설치 포함) 필요
 ```
 
 ---

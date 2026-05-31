@@ -14,6 +14,8 @@ import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "../portfolio-analysis/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
 import { toast } from "../../utils/toast";
+import { invalidatePortfolioData } from "../../utils/queryInvalidation";
+import { QUERY_KEYS } from "../../constants/queryKeys";
 import ConfirmModal from "../common/ConfirmModal";
 
 function applyExecutionResults(analysis: RebalancingAnalysis, results: ExecutionResult[]): RebalancingAnalysis {
@@ -54,12 +56,12 @@ export default function RebalancingTab() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const { data: portfolios = [], isLoading } = useQuery({
-    queryKey: ["portfolios"],
+    queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
 
   const { data: accounts = [] } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
   // fetchAccounts는 is_active=True 필터로 활성 계좌만 반환
@@ -69,7 +71,7 @@ export default function RebalancingTab() {
     mutationFn: (body: { name: string; items: PortfolioItem[]; base_type: string }) =>
       createPortfolio(body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(queryClient);
       setEditorOpen(false);
     },
     onError: () => toast("포트폴리오 저장에 실패했습니다"),
@@ -79,7 +81,7 @@ export default function RebalancingTab() {
     mutationFn: ({ id, body }: { id: string; body: { name?: string; items?: PortfolioItem[]; base_type?: string } }) =>
       updatePortfolio(id, body),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(queryClient);
       setEditorOpen(false);
       setEditingPortfolio(null);
       setAnalysis(null);
@@ -90,7 +92,7 @@ export default function RebalancingTab() {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deletePortfolio(id),
     onSuccess: (_, id) => {
-      queryClient.invalidateQueries({ queryKey: ["portfolios"] });
+      invalidatePortfolioData(queryClient);
       if (selectedId === id) {
         setSelectedId(null);
         setAnalysis(null);

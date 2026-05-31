@@ -35,6 +35,9 @@ cd backend && uv run pytest
 
 # 단일 파일
 cd backend && uv run pytest tests/test_asset_service.py -v
+
+# 특정 테스트 필터
+cd backend && uv run pytest -k "test_name" -x  # -x: 첫 실패 시 중단
 ```
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
@@ -145,7 +148,7 @@ jobs/                         # APScheduler 정기 작업
 
 **미들웨어 스택 (`main.py` lifespan):** Request ID 주입 → 보안 헤더(X-Content-Type-Options, X-Frame-Options, X-XSS-Protection) → HTTP 요청 로깅 → slowapi 레이트 리미팅 → 예외 핸들러(자격증명 정보 자동 redact).
 
-**LS증권 통합:** 구현 시도 후 제거됨. `migration g1h2i3j4k5l6_remove_ls_securities.py`로 DB 컬럼 삭제 완료. `price_service.py`와 `backtest_service.py`에 잔여 주석만 존재 — 재구현 시 migration downgrade 후 코드 추가 필요.
+**LS증권 통합:** 구현 시도 후 완전 제거됨. DB 컬럼은 `migration g1h2i3j4k5l6_remove_ls_securities.py`로 삭제, 잔여 주석도 정리 완료. 재구현 시 migration downgrade 필요.
 
 ---
 

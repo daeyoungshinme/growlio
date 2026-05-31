@@ -17,6 +17,8 @@ import { pnlColor } from "../utils/colors";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { DOMESTIC_MARKETS } from "../constants";
+import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
+import { QUERY_KEYS } from "../constants/queryKeys";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "../types";
 
 interface DividendSummary {
@@ -41,30 +43,30 @@ export default function PortfolioPage() {
   const [syncingAll, setSyncingAll] = useState(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["portfolio-overview"],
+    queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchOverview,
-    refetchInterval: 60_000,
+    refetchInterval: REFETCH_INTERVAL.PORTFOLIO,
   });
 
   const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
-    queryKey: ["dividend-positions"],
+    queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
     enabled: tab === "종목 현황" || tab === "배당 현황",
-    staleTime: 1000 * 60 * 60,
+    staleTime: STALE_TIME.LONG,
   });
 
   const { data: divSummary } = useQuery({
-    queryKey: ["dividend-summary"],
+    queryKey: QUERY_KEYS.dividendSummary,
     queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
     enabled: tab === "배당 현황",
-    staleTime: 1000 * 60 * 60,
+    staleTime: STALE_TIME.LONG,
   });
 
   const { data: dividendByTicker = [] } = useQuery({
-    queryKey: ["dividend-by-ticker"],
+    queryKey: QUERY_KEYS.dividendByTicker,
     queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
     enabled: tab === "배당 현황",
-    staleTime: 1000 * 60 * 60,
+    staleTime: STALE_TIME.LONG,
   });
 
   const handleSyncAll = async () => {
@@ -149,7 +151,7 @@ export default function PortfolioPage() {
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
         <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
-        <p className="text-xl sm:text-2xl font-bold mt-1 leading-tight text-blue-600">
+        <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600">
           {fmtKrwPrice(data.total_stock_krw)}
         </p>
         <div className="mt-2">

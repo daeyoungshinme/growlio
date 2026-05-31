@@ -14,6 +14,8 @@ import {
   type ExchangeRateAlert,
 } from "../api/alerts";
 import { useExchangeRate } from "../hooks/useExchangeRate";
+import { invalidateAlertData } from "../utils/queryInvalidation";
+import { QUERY_KEYS } from "../constants/queryKeys";
 
 interface SettingsData {
   has_kis: boolean;
@@ -61,7 +63,7 @@ export default function SettingsPage() {
   const [notificationEmail, setNotificationEmail] = useState("");
 
   const { data: alerts = [] } = useQuery<ExchangeRateAlert[]>({
-    queryKey: ["exchange-rate-alerts"],
+    queryKey: QUERY_KEYS.exchangeRateAlerts,
     queryFn: fetchExchangeRateAlerts,
   });
 
@@ -75,7 +77,7 @@ export default function SettingsPage() {
         Math.max(1, Number(alertForm.max_trigger_count) || 1),
       ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] });
+      invalidateAlertData(queryClient);
       setAlertForm({ target_rate: "", direction: "BELOW", max_trigger_count: "1" });
       toast("알림이 등록되었습니다", "success");
     },
@@ -87,7 +89,7 @@ export default function SettingsPage() {
   const reactivateAlertMutation = useMutation({
     mutationFn: (id: string) => reactivateExchangeRateAlert(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] });
+      invalidateAlertData(queryClient);
       toast("알림이 재활성화되었습니다", "success");
     },
     onError: () => {
@@ -97,7 +99,7 @@ export default function SettingsPage() {
 
   const deleteAlertMutation = useMutation({
     mutationFn: (id: string) => deleteExchangeRateAlert(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["exchange-rate-alerts"] }),
+    onSuccess: () => invalidateAlertData(queryClient),
   });
 
   useEffect(() => {

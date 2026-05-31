@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "../../api/assets";
 import { extractErrorMessage } from "../../utils/error";
 import { toast } from "../../utils/toast";
+import { QUERY_KEYS } from "../../constants/queryKeys";
 import {
   ExecutionOrderItem,
   ExecutionResult,
@@ -366,7 +367,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       const is404 = (err as { response?: { status?: number } }).response?.status === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
       if (is404) {
-        queryClient.invalidateQueries({ queryKey: ["accounts"] });
+        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
       } else {
         toast(extractErrorMessage(err, "잔고 조회에 실패했습니다"), "error");
       }

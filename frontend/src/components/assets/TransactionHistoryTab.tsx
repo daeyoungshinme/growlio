@@ -22,6 +22,7 @@ import { invalidateAccountData, invalidateTransactionData } from "../../utils/qu
 import { toast } from "../../utils/toast";
 import { STOCK_TYPES } from "../../constants";
 import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
+import { STALE_TIME } from "../../constants/queryConfig";
 
 const today = new Date().toISOString().slice(0, 10);
 const currentYear = new Date().getFullYear();
@@ -81,7 +82,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         )
         .then((r) => r.data),
     enabled: !!form.account_id && form.transaction_type === "DIVIDEND",
-    staleTime: 60_000,
+    staleTime: STALE_TIME.MEDIUM,
   });
   const accountPositions = positionsData?.positions ?? [];
 

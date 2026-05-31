@@ -117,7 +117,7 @@ async def fetch_current_price(
     redis=None,
 ) -> float | None:
     """단일 종목 현재가 조회.
-    Yahoo Finance → KIS → LS증권 순으로 시도한다.
+    Yahoo Finance → KIS 순으로 시도한다.
     """
     loop = asyncio.get_running_loop()
 
@@ -148,7 +148,7 @@ async def fetch_prices_batch(
 ) -> dict[str, float]:
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
-    Yahoo Finance 배치 조회 후, 실패한 종목만 KIS/LS로 보완한다.
+    Yahoo Finance 배치 조회 후, 실패한 종목만 KIS로 보완한다.
     """
     if not tickers:
         return {}

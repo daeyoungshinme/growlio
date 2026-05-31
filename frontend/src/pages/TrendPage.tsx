@@ -2,9 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchDashboard } from "../api/dashboard";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
 import { fmtKrw, fmtMonth } from "../utils/format";
+import { pnlColor } from "../utils/colors";
+import { QUERY_KEYS } from "../constants/queryKeys";
 
 export default function TrendPage() {
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: fetchDashboard });
+  const { data, isLoading } = useQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
 
   if (isLoading) return <div className="text-gray-400">로딩 중...</div>;
 
@@ -39,7 +41,7 @@ export default function TrendPage() {
                   </td>
                   <td className="py-2 px-3 text-sm text-right">
                     {change != null ? (
-                      <span className={change >= 0 ? "text-red-500 font-medium" : "text-blue-500 font-medium"}>
+                      <span className={`${pnlColor(change)} font-medium`}>
                         {change >= 0 ? "+" : ""}{change.toFixed(2)}%
                       </span>
                     ) : "—"}

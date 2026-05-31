@@ -23,6 +23,7 @@ cd frontend && npm run build
 ```bash
 cd frontend && npm run lint    # ESLint (eslint src)
 cd frontend && npm run test    # Vitest (vitest run)
+cd frontend && npm run test -- src/utils/__tests__/format.test.ts  # 단일 파일
 cd frontend && npm run format  # Prettier (prettier --write src)
 ```
 
@@ -99,12 +100,22 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 | 대시보드 집계 | `["dashboard"]` |
 | 포트폴리오 overview | `["portfolio-overview"]` |
 | 포트폴리오/백테스트/리밸런싱 탭 | `["portfolios"]` |
+| 전체 계좌 목록 | `["accounts"]` |
 | 계좌별 포지션 | `["account-positions", accountId]` |
-| 전체 거래내역 | `["transactions", "all", selectedYear]` |
+| 전체 거래내역 (무기간) | `["transactions", "all"]` |
+| 연도별 거래내역 | `["transactions", "all", year]` |
 | 배당금 티커별 | `["dividend-by-ticker"]` |
+| 배당금 요약 | `["dividend-summary"]` |
+| 배당금 포지션 | `["dividend-positions"]` |
+| DCA 분석 (InvestPlanPage) | `["dca-analysis"]` |
+| DCA 분석 (DashboardPage) | `["invest-dca"]` |
+| 설정 | `["settings"]` |
+| 환율 알림 목록 | `["exchange-rate-alerts"]` |
+
+> 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지.
 
 **mutation 후 캐시 무효화**
-- 트랜잭션 CUD → `["transactions", accountId]` + `["dashboard"]` 동시 무효화.
+- 트랜잭션 CUD → `["transactions", "all"]` + `["dashboard"]` 동시 무효화.
 - 계좌 sync → `["portfolio-overview"]` + `["dashboard"]` 무효화.
 - 계좌 CUD (자산관리에서) → `["accounts"]` + `["portfolio-overview"]` + `["dashboard"]` 동시 무효화.
 
@@ -155,7 +166,16 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 **캐시 무효화 유틸리티 (`src/utils/queryInvalidation.ts`)**
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 동시 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
+- 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
+- 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios 무효화.
+- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + invest-dca + settings + dashboard 무효화.
+- 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
+
+**쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
+- `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
+- `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (1분)
+- staleTime/refetchInterval 매직 넘버 직접 작성 금지. 상수 import해 사용.
 
 ---
 

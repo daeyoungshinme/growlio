@@ -6,6 +6,7 @@ import DividendMonthsModal from "./DividendMonthsModal";
 import { fmtKrwShort } from "../../utils/format";
 import { toast } from "../../utils/toast";
 import { dividendFreqInfo, weightBarColor, yieldBadgeClass } from "../../utils/dividendUtils";
+import { QUERY_KEYS } from "../../constants/queryKeys";
 
 interface Props {
   items: TickerDividendItem[];
@@ -50,8 +51,8 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
     mutationFn: ({ ticker, market, months }: { ticker: string; market: string; months: number[] }) =>
       updateTickerDividendMonths(ticker, market, months),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["dividend-by-ticker"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
       setEditTarget(null);
     },
     onError: () => toast("배당월 저장에 실패했습니다"),
@@ -61,8 +62,8 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
     mutationFn: ({ ticker, market }: { ticker: string; market: string }) =>
       deleteTickerDividendMonths(ticker, market),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["dividend-by-ticker"] });
-      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
+      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
       setEditTarget(null);
     },
     onError: () => toast("배당월 초기화에 실패했습니다"),

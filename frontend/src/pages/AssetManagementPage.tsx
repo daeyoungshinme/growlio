@@ -29,6 +29,7 @@ import { fmtKrw, fmtPct } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
+import { QUERY_KEYS } from "../constants/queryKeys";
 import { useExchangeRate } from "../hooks/useExchangeRate";
 
 const TABS = ["은행계좌", "증권계좌", "부동산", "입출금·배당"] as const;
@@ -62,18 +63,18 @@ export default function AssetManagementPage() {
   const queryClient = useQueryClient();
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
 
   const { data: overview } = useQuery({
-    queryKey: ["portfolio-overview"],
+    queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchStockOverview,
     enabled: tab === "증권계좌",
   });
 
   const { data: allTx = [] } = useQuery({
-    queryKey: ["transactions", "all-time"],
+    queryKey: QUERY_KEYS.transactionsAll,
     queryFn: () => fetchTransactions(),
     enabled: tab === "증권계좌",
   });

@@ -1,5 +1,5 @@
 import { PortfolioMetrics } from "../../api/backtest";
-import { pnlColor } from "../../utils/colors";
+import { pnlColor, LOSS_COLOR } from "../../utils/colors";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 
@@ -30,7 +30,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
             </div>
             <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-gray-500 flex-wrap pl-3.5">
               <span>CAGR <span className={pnlColor(m.cagr_pct)}>{fmt(m.cagr_pct)}</span></span>
-              <span>MDD <span className="text-blue-500">-{m.mdd_pct.toFixed(2)}%</span></span>
+              <span>MDD <span className={LOSS_COLOR}>-{m.mdd_pct.toFixed(2)}%</span></span>
               <span>Sharpe {m.sharpe_ratio.toFixed(3)}</span>
             </div>
           </div>
@@ -65,7 +65,7 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                 <td className={`py-2 px-2 text-right whitespace-nowrap ${pnlColor(m.cagr_pct)}`}>
                   {fmt(m.cagr_pct)}
                 </td>
-                <td className="py-2 px-2 text-right text-blue-500 whitespace-nowrap">
+                <td className={`py-2 px-2 text-right ${LOSS_COLOR} whitespace-nowrap`}>
                   -{m.mdd_pct.toFixed(2)}%
                 </td>
                 <td className="py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">

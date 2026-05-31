@@ -15,6 +15,9 @@ import AssetAllocationChart from "../components/dashboard/AssetAllocationChart";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { ASSET_TYPE_LABELS } from "../constants";
+import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../utils/colors";
+import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
+import { QUERY_KEYS } from "../constants/queryKeys";
 import type { PortfolioOverview } from "../types";
 
 const fetchOverviewSummary = () =>
@@ -25,32 +28,32 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [showMonthlyDetail, setShowMonthlyDetail] = useState(false);
   const { data, isLoading, error } = useQuery({
-    queryKey: ["dashboard"],
+    queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
-    staleTime: 60_000,
-    refetchInterval: 300_000,
+    staleTime: STALE_TIME.MEDIUM,
+    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: true,
   });
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: ["portfolio-overview"],
+    queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchOverviewSummary,
-    staleTime: 60_000,
-    refetchInterval: 300_000,
+    staleTime: STALE_TIME.MEDIUM,
+    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: true,
   });
 
   const { data: dcaData } = useQuery({
-    queryKey: ["invest-dca"],
+    queryKey: QUERY_KEYS.investDca,
     queryFn: fetchDCAAnalysis,
-    staleTime: 60_000,
-    refetchInterval: 300_000,
+    staleTime: STALE_TIME.MEDIUM,
+    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
   });
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: ["accounts"],
+    queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: 60_000,
+    staleTime: STALE_TIME.MEDIUM,
   });
 
   const exchangeRate = useExchangeRate();
@@ -110,7 +113,7 @@ export default function DashboardPage() {
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
       <button
-        onClick={() => qc.invalidateQueries({ queryKey: ["dashboard"] })}
+        onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard })}
         className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
       >
         다시 시도
@@ -169,7 +172,7 @@ export default function DashboardPage() {
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-              <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-1">
+              <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {fmtKrw(Math.floor(data.total_assets_krw))}
               </p>
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
@@ -182,9 +185,7 @@ export default function DashboardPage() {
                 <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
                   data.cumulative_return_pct == null
                     ? "text-gray-400 dark:text-gray-500"
-                    : data.cumulative_return_pct >= 0
-                    ? "text-red-500"
-                    : "text-blue-500"
+                    : pnlColor(data.cumulative_return_pct)
                 }`}>
                   {fmtPct(data.cumulative_return_pct)}
                 </p>
@@ -278,7 +279,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">—</p>
               ) : timeline.lead_lag_months > 0 ? (
                 <span className="flex flex-col gap-0.5 mt-1">
-                  <span className="text-xs font-medium text-red-500 flex items-center gap-1">
+                  <span className={`text-xs font-medium ${PROFIT_COLOR} flex items-center gap-1`}>
                     <TrendingUp size={12} />{timeline.lead_lag_months}개월 앞서
                   </span>
                   {timeline.actual_expected_goal_date && (
@@ -287,7 +288,7 @@ export default function DashboardPage() {
                 </span>
               ) : timeline.lead_lag_months < 0 ? (
                 <span className="flex flex-col gap-0.5 mt-1">
-                  <span className="text-xs font-medium text-blue-500 flex items-center gap-1">
+                  <span className={`text-xs font-medium ${LOSS_COLOR} flex items-center gap-1`}>
                     <TrendingDown size={12} />{Math.abs(timeline.lead_lag_months)}개월 지연
                   </span>
                   {timeline.actual_expected_goal_date && (
@@ -361,7 +362,7 @@ export default function DashboardPage() {
       {/* Row 3: 월별 자산 추이 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 자산 추이 (최근 12개월)</h2>
-        <MonthlyTrendChart data={data.monthly_trend} />
+        <MonthlyTrendChart data={data.monthly_trend ?? []} />
         <button
           onClick={() => setShowMonthlyDetail((v) => !v)}
           className="mt-4 w-full flex items-center justify-between py-2 px-3 text-xs text-gray-400 dark:text-gray-500 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
@@ -380,10 +381,10 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.monthly_trend.length === 0 ? (
+                {(data.monthly_trend ?? []).length === 0 ? (
                   <tr><td colSpan={3} className="py-8 text-center text-gray-300 dark:text-gray-600 text-xs">데이터 없음</td></tr>
                 ) : (
-                  [...data.monthly_trend].reverse().map((row, i, arr) => {
+                  [...(data.monthly_trend ?? [])].reverse().map((row, i, arr) => {
                     const prev = arr[i + 1];
                     const change = prev ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100 : null;
                     return (
@@ -394,7 +395,7 @@ export default function DashboardPage() {
                         </td>
                         <td className="py-2 px-2 text-xs text-right">
                           {change != null ? (
-                            <span className={change >= 0 ? "text-red-500 font-medium" : "text-blue-500 font-medium"}>
+                            <span className={`${pnlColor(change)} font-medium`}>
                               {change >= 0 ? "+" : ""}{change.toFixed(2)}%
                             </span>
                           ) : <span className="text-gray-300 dark:text-gray-600">—</span>}

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "../../api/rebalancing";
 import { AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
+import { PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 
 function DiffCell({ diff }: { diff: number }) {
   if (diff === 0) return <span className="text-gray-400">-</span>;
   const isBuy = diff > 0;
   return (
-    <span className={`font-medium ${isBuy ? "text-red-500" : "text-blue-500"}`}>
+    <span className={`font-medium ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
       {isBuy ? "+" : ""}{fmtKrw(diff)}
     </span>
   );
@@ -18,7 +19,7 @@ function WeightDiffBadge({ diff }: { diff: number }) {
   if (Math.abs(diff) < 0.1) return <span className="text-gray-400 text-xs">±0%</span>;
   const isBuy = diff > 0;
   return (
-    <span className={`text-xs font-medium ${isBuy ? "text-red-500" : "text-blue-500"}`}>
+    <span className={`text-xs font-medium ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
       {isBuy ? "▲" : "▼"} {Math.abs(diff).toFixed(1)}%
     </span>
   );
@@ -51,7 +52,7 @@ function SharesCell({ item }: { item: RebalancingItem }) {
   if (shares === 0) return <span className="text-gray-400">0</span>;
   const isBuy = shares > 0;
   return (
-    <span className={`font-medium text-xs ${isBuy ? "text-red-500" : "text-blue-500"}`}>
+    <span className={`font-medium text-xs ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
       {isBuy ? "+" : ""}{shares.toFixed(0)}주
     </span>
   );
@@ -155,13 +156,13 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
         </div>
         <div className="bg-red-900/30 rounded-xl p-3 text-center">
           <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
-          <div className="text-sm font-semibold text-red-500">
+          <div className={`text-sm font-semibold ${PROFIT_COLOR}`}>
             {fmtKrw(analysis.items.filter((i) => i.diff_krw > 0).reduce((s, i) => s + i.diff_krw, 0))}
           </div>
         </div>
         <div className="bg-blue-900/30 rounded-xl p-3 text-center">
           <div className="text-xs text-gray-400 mb-1">총 매도 필요</div>
-          <div className="text-sm font-semibold text-blue-500">
+          <div className={`text-sm font-semibold ${LOSS_COLOR}`}>
             {fmtKrw(Math.abs(analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0)))}
           </div>
         </div>

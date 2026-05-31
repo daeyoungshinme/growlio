@@ -103,14 +103,21 @@ async def fetch_ticker_dividend_info(
             if need_months_fetch and naver_info["dividend_months"]:
                 months = naver_info["dividend_months"]
                 need_months_fetch = False
+            if naver_info["dps"] > 0 or naver_info["dividend_yield"] > 0:
+                logger.debug("naver_dividend_used", ticker=ticker)
 
         if dps == 0.0 or yield_decimal == 0.0:
             # 1순위: yfinance (국내/해외 공통)
             info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+            yahoo_contributed = False
             if info["dividend_yield"] > 0 and yield_decimal == 0.0:
                 yield_decimal = info["dividend_yield"]
+                yahoo_contributed = True
             if info["dps"] > 0 and dps == 0.0:
                 dps = info["dps"]
+                yahoo_contributed = True
+            if yahoo_contributed:
+                logger.debug("yahoo_dividend_used", ticker=ticker)
             ex_dividend_date = info.get("ex_dividend_date")
 
             # 2순위 (ETF): KIS ETF 전용 API (FHPET01010000) — 실시간 분배율
@@ -188,5 +195,7 @@ async def fetch_ticker_dividend_info(
 
     if dps > 0 or yield_decimal > 0:
         await redis.setex(info_cache_key, 86400, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
+    else:
+        logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 
     return yield_decimal, dps, months, ex_dividend_date

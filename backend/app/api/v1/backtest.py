@@ -1,4 +1,6 @@
 """백테스팅 API."""
+import hashlib
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -10,6 +12,7 @@ from app.database import get_db
 from app.limiter import limiter
 from app.models.backtest import BacktestPortfolio
 from app.models.user import User
+from app.redis_client import get_redis
 from app.schemas.backtest import (
     BacktestPortfolioCreate,
     BacktestPortfolioResponse,
@@ -101,6 +104,9 @@ async def delete_portfolio(
     await db.commit()
 
 
+_BACKTEST_CACHE_TTL = 86400  # 24시간
+
+
 @router.post("/run", response_model=BacktestResult)
 @limiter.limit("2/minute")
 async def run_backtest_endpoint(
@@ -113,4 +119,16 @@ async def run_backtest_endpoint(
     if not body.portfolio_ids and not body.include_spy and not body.include_real_portfolio:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="최소 1개의 포트폴리오 또는 벤치마크를 선택해주세요.")
 
-    return await run_backtest(current_user.id, body, db)
+    redis = await get_redis()
+    param_hash = hashlib.md5(
+        json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
+    ).hexdigest()
+    cache_key = f"backtest:{current_user.id}:{param_hash}"
+
+    cached = await redis.get(cache_key)
+    if cached:
+        return BacktestResult.model_validate_json(cached)
+
+    result = await run_backtest(current_user.id, body, db)
+    await redis.setex(cache_key, _BACKTEST_CACHE_TTL, result.model_dump_json())
+    return result
