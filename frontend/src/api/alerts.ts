@@ -75,3 +75,37 @@ export const upsertRebalancingAlert = (
 
 export const deleteRebalancingAlert = (portfolioId: string) =>
   api.delete(`/alerts/rebalancing/${portfolioId}`);
+
+// ── 주가 목표 알림 ──────────────────────────────────────────────────────────
+
+export interface StockPriceAlert {
+  id: string;
+  ticker: string;
+  market: string;
+  name: string;
+  target_price: number;
+  direction: "BELOW" | "ABOVE";
+  is_active: boolean;
+  max_trigger_count: number;
+  trigger_count: number;
+  triggered_at: string | null;
+  created_at: string;
+}
+
+export const fetchStockPriceAlerts = () =>
+  api.get<StockPriceAlert[]>("/alerts/stock-price").then((r) => r.data);
+
+export const createStockPriceAlert = (body: {
+  ticker: string;
+  market: string;
+  name: string;
+  target_price: number;
+  direction: "BELOW" | "ABOVE";
+  max_trigger_count?: number;
+}) => api.post<StockPriceAlert>("/alerts/stock-price", body).then((r) => r.data);
+
+export const reactivateStockPriceAlert = (id: string) =>
+  api.patch<StockPriceAlert>(`/alerts/stock-price/${id}/reactivate`).then((r) => r.data);
+
+export const deleteStockPriceAlert = (id: string) =>
+  api.delete(`/alerts/stock-price/${id}`).then((r) => r.data);

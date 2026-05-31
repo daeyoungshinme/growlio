@@ -4,13 +4,13 @@ from __future__ import annotations
 import asyncio
 import calendar
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import ExchangeRateAlert, RebalancingAlert
+from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.price_service import _sync_usdkrw
@@ -55,7 +55,7 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
 
         # 다회 발동 알림: 쿨다운 체크 (마지막 발동 후 1시간 이내면 건너뜀)
         if alert.max_trigger_count > 1 and alert.triggered_at:
-            elapsed = datetime.now(tz=timezone.utc) - alert.triggered_at
+            elapsed = datetime.now(tz=UTC) - alert.triggered_at
             if elapsed < _MULTI_TRIGGER_COOLDOWN:
                 continue
 
@@ -71,7 +71,7 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
             continue
 
         alert.trigger_count += 1
-        alert.triggered_at = datetime.now(tz=timezone.utc)
+        alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
         triggered_count += 1
@@ -206,9 +206,73 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             logger.warning("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
             continue
 
-        alert.last_triggered_at = datetime.now(tz=timezone.utc)
+        alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1
 
     if triggered_count:
         await db.commit()
         logger.info("rebalancing_alerts_triggered", count=triggered_count)
+
+
+async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
+    """활성 주가 알림을 조회하고 조건 충족 시 이메일 발송 후 비활성화."""
+    from app.services.email_service import send_stock_price_alert
+    from app.services.price_service import fetch_prices_batch
+
+    result = await db.execute(
+        select(StockPriceAlert, User.email, UserSettings.notification_email)
+        .join(User, User.id == StockPriceAlert.user_id)
+        .outerjoin(UserSettings, UserSettings.user_id == User.id)
+        .where(StockPriceAlert.is_active == True)  # noqa: E712
+    )
+    rows = result.all()
+    if not rows:
+        return
+
+    # ticker별 그룹화 후 배치 조회 (user_id는 첫 번째 유저 기준)
+    sample_user_id = rows[0][0].user_id
+    unique_tickers = list({(a.ticker, a.market) for a, _, _ in rows})
+    price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, redis)
+
+    triggered_count = 0
+    for alert, user_email, notification_email in rows:
+        price = price_map.get(alert.ticker)
+        if not price:
+            continue
+
+        target = float(alert.target_price)
+        should_trigger = (
+            (alert.direction == "BELOW" and price <= target)
+            or (alert.direction == "ABOVE" and price >= target)
+        )
+        if not should_trigger:
+            continue
+
+        if alert.max_trigger_count > 1 and alert.triggered_at:
+            elapsed = datetime.now(tz=UTC) - alert.triggered_at
+            if elapsed < _MULTI_TRIGGER_COOLDOWN:
+                continue
+
+        email = notification_email or user_email
+        try:
+            await send_stock_price_alert(
+                to_email=email,
+                ticker=alert.ticker,
+                name=alert.name,
+                target_price=target,
+                current_price=price,
+                direction=alert.direction,
+            )
+        except Exception as exc:
+            logger.warning("stock_price_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+            continue
+
+        alert.trigger_count += 1
+        alert.triggered_at = datetime.now(tz=UTC)
+        if alert.trigger_count >= alert.max_trigger_count:
+            alert.is_active = False
+        triggered_count += 1
+
+    if triggered_count:
+        await db.commit()
+        logger.info("stock_price_alerts_triggered", count=triggered_count)

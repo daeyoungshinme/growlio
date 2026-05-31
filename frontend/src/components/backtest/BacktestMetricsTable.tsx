@@ -32,6 +32,8 @@ export default function BacktestMetricsTable({ metrics }: Props) {
               <span>CAGR <span className={pnlColor(m.cagr_pct)}>{fmt(m.cagr_pct)}</span></span>
               <span>MDD <span className={LOSS_COLOR}>-{m.mdd_pct.toFixed(2)}%</span></span>
               <span>Sharpe {m.sharpe_ratio.toFixed(3)}</span>
+              <span>변동성 {m.volatility_pct.toFixed(2)}%</span>
+              <span>Sortino {m.sortino_ratio.toFixed(3)}</span>
             </div>
           </div>
         ))}
@@ -47,6 +49,8 @@ export default function BacktestMetricsTable({ metrics }: Props) {
               <th className="py-1.5 px-2 text-right font-medium text-gray-400 dark:text-gray-500 uppercase">CAGR</th>
               <th className="py-1.5 px-2 text-right font-medium text-gray-400 dark:text-gray-500 uppercase">MDD</th>
               <th className="py-1.5 px-2 text-right font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">Sharpe</th>
+              <th className="py-1.5 px-2 text-right font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">변동성</th>
+              <th className="py-1.5 px-2 text-right font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">Sortino</th>
             </tr>
           </thead>
           <tbody>
@@ -70,6 +74,12 @@ export default function BacktestMetricsTable({ metrics }: Props) {
                 </td>
                 <td className="py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   {m.sharpe_ratio.toFixed(3)}
+                </td>
+                <td className="py-2 px-2 text-right text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                  {m.volatility_pct.toFixed(2)}%
+                </td>
+                <td className="py-2 px-2 text-right text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {m.sortino_ratio.toFixed(3)}
                 </td>
               </tr>
             ))}

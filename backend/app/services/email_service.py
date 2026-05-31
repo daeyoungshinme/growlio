@@ -191,6 +191,68 @@ async def send_rebalancing_alert(
         raise
 
 
+async def send_stock_price_alert(
+    to_email: str,
+    ticker: str,
+    name: str,
+    target_price: float,
+    current_price: float,
+    direction: str,
+) -> None:
+    """주가 목표가 도달 알림 이메일 발송."""
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return
+
+    direction_label = "이하" if direction == "BELOW" else "이상"
+    subject = f"[Growlio] 주가 목표 도달 — {name}({ticker}) {target_price:,.0f}원 {direction_label}"
+
+    html = f"""
+    <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+      <h2 style="color: #1d4ed8;">주가 목표 도달 알림</h2>
+      <table style="width:100%; border-collapse: collapse; margin-top: 16px;">
+        <tr>
+          <td style="padding: 8px; background: #f1f5f9; font-weight: bold;">종목</td>
+          <td style="padding: 8px;">{name} ({ticker})</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; background: #f1f5f9; font-weight: bold;">목표가</td>
+          <td style="padding: 8px;">{target_price:,.0f}원 ({direction_label})</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px; background: #f1f5f9; font-weight: bold;">현재가</td>
+          <td style="padding: 8px; color: #1d4ed8; font-weight: bold;">{current_price:,.0f}원</td>
+        </tr>
+      </table>
+      <p style="margin-top: 20px; color: #64748b; font-size: 13px;">
+        설정하신 주가 목표 조건이 충족되어 발송되었습니다.
+      </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        ctx = ssl.create_default_context()
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user,
+            password=settings.smtp_password,
+            start_tls=True,
+            tls_context=ctx,
+        )
+        logger.info("stock_price_alert_email_sent", to=to_email, ticker=ticker, current_price=current_price)
+    except Exception as e:
+        logger.error("stock_price_alert_email_failed", to=to_email, error=str(e))
+        raise
+
+
 async def send_test_email(to_email: str) -> None:
     """이메일 설정 확인용 테스트 이메일 발송."""
     if not settings.smtp_host or not settings.smtp_user:

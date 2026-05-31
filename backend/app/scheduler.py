@@ -38,5 +38,19 @@ def init_scheduler() -> None:
         id="rebalancing_alert_check_daily",
         replace_existing=True,
     )
+    from app.jobs.dca_auto_buy import run_dca_auto_execution
+    scheduler.add_job(
+        run_dca_auto_execution,
+        CronTrigger(hour=9, minute=0, timezone="Asia/Seoul"),
+        id="dca_auto_execution_daily",
+        replace_existing=True,
+    )
+    from app.jobs.stock_price_alert import run_stock_price_alert_check
+    scheduler.add_job(
+        run_stock_price_alert_check,
+        IntervalTrigger(minutes=10),
+        id="stock_price_alert_check",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

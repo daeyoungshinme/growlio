@@ -30,6 +30,9 @@ export interface DashboardData {
   estimated_annual_dividends: number | null;
   dividend_monthly_breakdown: DividendMonthlyBreakdown[];
   cumulative_return_pct: number | null;
+  xirr_pct: number | null;
+  benchmark_kospi_pct: number | null;
+  benchmark_sp500_pct: number | null;
   goal_annual_return_pct: number | null;
   retirement_target_year: number | null;
 }

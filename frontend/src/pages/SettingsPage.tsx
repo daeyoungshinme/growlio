@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sun, Moon, LogOut } from "lucide-react";
 import { api } from "../api/client";
-import { type SettingsData } from "../api/settings";
+import { type SettingsData, updateAutoDca } from "../api/settings";
+import { fetchAccounts } from "../api/assets";
+import { fetchPortfolios } from "../api/portfolios";
 import { toast } from "../utils/toast";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
@@ -12,11 +14,18 @@ import {
   createExchangeRateAlert,
   reactivateExchangeRateAlert,
   deleteExchangeRateAlert,
+  fetchStockPriceAlerts,
+  createStockPriceAlert,
+  reactivateStockPriceAlert,
+  deleteStockPriceAlert,
   type ExchangeRateAlert,
+  type StockPriceAlert,
 } from "../api/alerts";
+import { searchStocks, type StockSuggestion } from "../api/assets";
 import { useExchangeRate } from "../hooks/useExchangeRate";
 import { invalidateAlertData } from "../utils/queryInvalidation";
 import { QUERY_KEYS } from "../constants/queryKeys";
+import { STALE_TIME } from "../constants/queryConfig";
 
 function SectionCard({ title, badge, children }: { title: string; badge?: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -54,7 +63,120 @@ export default function SettingsPage() {
     queryFn: fetchExchangeRateAlerts,
   });
 
+  const { data: portfolios = [] } = useQuery({
+    queryKey: QUERY_KEYS.portfolios,
+    queryFn: fetchPortfolios,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+
+  const { data: accounts = [] } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+
+  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" && a.is_active);
+
+  const [dcaForm, setDcaForm] = useState({
+    enabled: false,
+    day: "1",
+    amount: "",
+    portfolio_id: "",
+    account_id: "",
+  });
+
+  const saveDcaMutation = useMutation({
+    mutationFn: () =>
+      updateAutoDca({
+        enabled: dcaForm.enabled,
+        day: dcaForm.day ? Number(dcaForm.day) : null,
+        amount: dcaForm.amount ? Number(dcaForm.amount) : null,
+        portfolio_id: dcaForm.portfolio_id || null,
+        account_id: dcaForm.account_id || null,
+      }),
+    onSuccess: () => {
+      toast("자동 정기매수 설정이 저장되었습니다", "success");
+      api.get<SettingsData>("/settings").then((r) => {
+        setCurrent(r.data);
+        syncDcaForm(r.data);
+      });
+    },
+    onError: () => toast("저장에 실패했습니다", "error"),
+  });
+
+  const syncDcaForm = (data: SettingsData) => {
+    setDcaForm({
+      enabled: data.auto_dca_enabled,
+      day: data.auto_dca_day ? String(data.auto_dca_day) : "1",
+      amount: data.auto_dca_amount ? String(data.auto_dca_amount) : "",
+      portfolio_id: data.auto_dca_portfolio_id ?? "",
+      account_id: data.auto_dca_account_id ?? "",
+    });
+  };
+
   const usdKrw = useExchangeRate();
+
+  // 주가 목표 알림 상태
+  const { data: stockAlerts = [], refetch: refetchStockAlerts } = useQuery<StockPriceAlert[]>({
+    queryKey: QUERY_KEYS.stockPriceAlerts,
+    queryFn: fetchStockPriceAlerts,
+  });
+
+  const [stockAlertForm, setStockAlertForm] = useState({
+    query: "",
+    target_price: "",
+    direction: "BELOW" as "BELOW" | "ABOVE",
+    max_trigger_count: "1",
+  });
+  const [stockSuggestions, setStockSuggestions] = useState<StockSuggestion[]>([]);
+  const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
+  const [stockSearchLoading, setStockSearchLoading] = useState(false);
+  const stockSearchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const handleStockSearch = (value: string) => {
+    setStockAlertForm((f) => ({ ...f, query: value }));
+    setSelectedStock(null);
+    if (stockSearchTimer.current !== undefined) clearTimeout(stockSearchTimer.current);
+    if (!value.trim()) { setStockSuggestions([]); return; }
+    stockSearchTimer.current = setTimeout(async () => {
+      setStockSearchLoading(true);
+      try { setStockSuggestions(await searchStocks(value.trim())); }
+      catch { setStockSuggestions([]); }
+      finally { setStockSearchLoading(false); }
+    }, 300);
+  };
+
+  const createStockAlertMutation = useMutation({
+    mutationFn: () => {
+      if (!selectedStock || !stockAlertForm.target_price) throw new Error("입력값 없음");
+      return createStockPriceAlert({
+        ticker: selectedStock.ticker,
+        market: selectedStock.market,
+        name: selectedStock.name,
+        target_price: Number(stockAlertForm.target_price),
+        direction: stockAlertForm.direction,
+        max_trigger_count: Math.max(1, Number(stockAlertForm.max_trigger_count) || 1),
+      });
+    },
+    onSuccess: () => {
+      refetchStockAlerts();
+      setStockAlertForm({ query: "", target_price: "", direction: "BELOW", max_trigger_count: "1" });
+      setSelectedStock(null);
+      setStockSuggestions([]);
+      toast("주가 알림이 등록되었습니다", "success");
+    },
+    onError: () => toast("알림 등록에 실패했습니다", "error"),
+  });
+
+  const reactivateStockAlertMutation = useMutation({
+    mutationFn: (id: string) => reactivateStockPriceAlert(id),
+    onSuccess: () => { refetchStockAlerts(); toast("알림이 재활성화되었습니다", "success"); },
+  });
+
+  const deleteStockAlertMutation = useMutation({
+    mutationFn: (id: string) => deleteStockPriceAlert(id),
+    onSuccess: () => refetchStockAlerts(),
+  });
 
   const createAlertMutation = useMutation({
     mutationFn: () =>
@@ -93,6 +215,7 @@ export default function SettingsPage() {
     api.get<SettingsData>("/settings").then((r) => {
       setCurrent(r.data);
       setNotificationEmail(r.data.notification_email ?? "");
+      syncDcaForm(r.data);
     });
   }, []);
 
@@ -338,6 +461,230 @@ export default function SettingsPage() {
               </div>
             ))}
           </div>
+        )}
+      </SectionCard>
+
+      {/* 주가 목표 알림 */}
+      <SectionCard title="주가 목표 알림">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          특정 종목이 목표가에 도달하면 이메일로 알림을 보내드립니다.
+        </p>
+        <div className="space-y-3">
+          {/* 종목 검색 */}
+          <div className="relative">
+            <label className={labelClass}>종목 검색</label>
+            <input
+              type="text"
+              className={inputClass}
+              value={stockAlertForm.query}
+              onChange={(e) => handleStockSearch(e.target.value)}
+              placeholder="종목명 또는 티커 (예: SCHD, 삼성전자)"
+            />
+            {selectedStock && (
+              <div className="mt-1 text-xs text-green-600 dark:text-green-400 font-medium">
+                선택됨: {selectedStock.name} ({selectedStock.ticker} · {selectedStock.market})
+              </div>
+            )}
+            {stockSearchLoading && (
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">검색 중...</p>
+            )}
+            {stockSuggestions.length > 0 && !selectedStock && (
+              <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                {stockSuggestions.map((s) => (
+                  <button
+                    key={`${s.ticker}-${s.market}`}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => {
+                      setSelectedStock(s);
+                      setStockAlertForm((f) => ({ ...f, query: `${s.name} (${s.ticker})` }));
+                      setStockSuggestions([]);
+                    }}
+                  >
+                    <span className="font-medium text-gray-800 dark:text-gray-200">{s.name}</span>
+                    <span className="ml-2 text-xs text-gray-400">{s.ticker} · {s.market}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <div className="flex-1 min-w-[120px]">
+              <label className={labelClass}>목표가 (원)</label>
+              <input
+                type="number"
+                className={inputClass}
+                value={stockAlertForm.target_price}
+                onChange={(e) => setStockAlertForm((f) => ({ ...f, target_price: e.target.value }))}
+                placeholder="예: 30000"
+                min="0"
+              />
+            </div>
+            <div className="flex-1 min-w-[100px]">
+              <label className={labelClass}>조건</label>
+              <select
+                className={inputClass}
+                value={stockAlertForm.direction}
+                onChange={(e) => setStockAlertForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))}
+              >
+                <option value="BELOW">이하 (↓)</option>
+                <option value="ABOVE">이상 (↑)</option>
+              </select>
+            </div>
+            <div className="flex-1 min-w-[80px]">
+              <label className={labelClass}>알림 횟수</label>
+              <input
+                type="number"
+                className={inputClass}
+                value={stockAlertForm.max_trigger_count}
+                onChange={(e) => setStockAlertForm((f) => ({ ...f, max_trigger_count: e.target.value }))}
+                min="1"
+                placeholder="1"
+              />
+            </div>
+          </div>
+          <button
+            onClick={() => createStockAlertMutation.mutate()}
+            disabled={!selectedStock || !stockAlertForm.target_price || createStockAlertMutation.isPending}
+            className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {createStockAlertMutation.isPending ? "등록 중..." : "알림 추가"}
+          </button>
+        </div>
+
+        {stockAlerts.length > 0 && (
+          <div className="mt-2 space-y-2">
+            {stockAlerts.map((alert) => (
+              <div
+                key={alert.id}
+                className="flex items-center justify-between px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+              >
+                <div className="text-sm min-w-0">
+                  <span className="font-medium text-gray-800 dark:text-gray-100">
+                    {alert.name} ({alert.ticker})
+                  </span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {Number(alert.target_price).toLocaleString("ko-KR")}원 {alert.direction === "BELOW" ? "이하" : "이상"}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-400">{alert.trigger_count}/{alert.max_trigger_count}회</span>
+                  {alert.is_active
+                    ? <span className="ml-2 text-xs text-green-600 dark:text-green-400">활성</span>
+                    : <span className="ml-2 text-xs text-gray-400">비활성</span>
+                  }
+                </div>
+                <div className="flex items-center gap-1 ml-2 shrink-0">
+                  {!alert.is_active && (
+                    <button
+                      onClick={() => reactivateStockAlertMutation.mutate(alert.id)}
+                      disabled={reactivateStockAlertMutation.isPending}
+                      className="px-2 py-1 text-xs text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-600 rounded-md hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+                    >
+                      재활성화
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteStockAlertMutation.mutate(alert.id)}
+                    disabled={deleteStockAlertMutation.isPending}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* 자동 정기매수 (DCA) */}
+      <SectionCard title="자동 정기매수 (DCA)">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          매월 설정한 날에 지정 포트폴리오 비중대로 KIS 계좌에서 자동 매수합니다. 실거래 주문이 실행되므로 신중히 설정하세요.
+        </p>
+        <div className="flex items-center gap-3">
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={dcaForm.enabled}
+              onChange={(e) => setDcaForm((f) => ({ ...f, enabled: e.target.checked }))}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-full" />
+          </label>
+          <span className="text-sm text-gray-700 dark:text-gray-300 font-medium">
+            {dcaForm.enabled ? "자동매수 활성화" : "자동매수 비활성화"}
+          </span>
+        </div>
+        {dcaForm.enabled && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={labelClass}>실행일 (매월)</label>
+                <select
+                  className={inputClass}
+                  value={dcaForm.day}
+                  onChange={(e) => setDcaForm((f) => ({ ...f, day: e.target.value }))}
+                >
+                  {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                    <option key={d} value={d}>{d}일</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className={labelClass}>월 매수 금액 (원)</label>
+                <input
+                  type="number"
+                  className={inputClass}
+                  value={dcaForm.amount}
+                  onChange={(e) => setDcaForm((f) => ({ ...f, amount: e.target.value }))}
+                  placeholder="500000"
+                  min="0"
+                />
+              </div>
+            </div>
+            <div>
+              <label className={labelClass}>비중 기준 포트폴리오</label>
+              <select
+                className={inputClass}
+                value={dcaForm.portfolio_id}
+                onChange={(e) => setDcaForm((f) => ({ ...f, portfolio_id: e.target.value }))}
+              >
+                <option value="">선택하세요</option>
+                {portfolios.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>매수 실행 계좌 (KIS)</label>
+              <select
+                className={inputClass}
+                value={dcaForm.account_id}
+                onChange={(e) => setDcaForm((f) => ({ ...f, account_id: e.target.value }))}
+              >
+                <option value="">선택하세요</option>
+                {kisAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              {kisAccounts.length === 0 && (
+                <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">KIS 계좌를 먼저 등록해주세요.</p>
+              )}
+            </div>
+          </div>
+        )}
+        <button
+          onClick={() => saveDcaMutation.mutate()}
+          disabled={saveDcaMutation.isPending}
+          className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {saveDcaMutation.isPending ? "저장 중..." : "저장"}
+        </button>
+        {current?.auto_dca_last_executed_at && (
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            마지막 자동매수: {new Date(current.auto_dca_last_executed_at).toLocaleString("ko-KR")}
+          </p>
         )}
       </SectionCard>
 

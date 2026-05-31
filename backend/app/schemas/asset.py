@@ -208,5 +208,8 @@ class DashboardResponse(BaseModel):
     estimated_annual_dividends: float | None = None
     dividend_monthly_breakdown: list[dict] = []
     cumulative_return_pct: float | None = None
+    xirr_pct: float | None = None
+    benchmark_kospi_pct: float | None = None
+    benchmark_sp500_pct: float | None = None
     goal_annual_return_pct: float | None = None
     retirement_target_year: int | None = None

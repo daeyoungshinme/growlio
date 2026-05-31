@@ -98,7 +98,10 @@ def _sync_download_history(
 
 def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
     if len(values) < 2:
-        return PortfolioMetrics(name=name, total_return_pct=0, cagr_pct=0, mdd_pct=0, sharpe_ratio=0)
+        return PortfolioMetrics(
+            name=name, total_return_pct=0, cagr_pct=0, mdd_pct=0,
+            sharpe_ratio=0, volatility_pct=0, sortino_ratio=0,
+        )
 
     total_return = (values[-1] / 100.0 - 1) * 100
     years = len(values) / 252  # 거래일 기준
@@ -114,16 +117,37 @@ def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
         if dd > max_dd:
             max_dd = dd
 
-    # Sharpe (일별 수익률 기준, 무위험이율 = 0 가정)
+    # 일별 수익률
     daily_rets = [(values[i] - values[i - 1]) / values[i - 1] for i in range(1, len(values))]
     n = len(daily_rets)
     if n < 2:
-        sharpe = 0.0
+        return PortfolioMetrics(
+            name=name,
+            total_return_pct=round(total_return, 2),
+            cagr_pct=round(cagr, 2),
+            mdd_pct=round(max_dd, 2),
+            sharpe_ratio=0, volatility_pct=0, sortino_ratio=0,
+        )
+
+    mean_r = sum(daily_rets) / n
+    variance = sum((r - mean_r) ** 2 for r in daily_rets) / (n - 1)
+    std_r = math.sqrt(variance) if variance > 0 else 0
+
+    # Sharpe (무위험이율 = 0 가정, 연율화)
+    sharpe = (mean_r / std_r * math.sqrt(252)) if std_r > 0 else 0
+
+    # Volatility (연율화 표준편차, %)
+    volatility_pct = std_r * math.sqrt(252) * 100
+
+    # Sortino (하방 편차 기준)
+    downside_rets = [r for r in daily_rets if r < 0]
+    if len(downside_rets) >= 2:
+        ds_mean = sum(downside_rets) / len(downside_rets)
+        ds_var = sum((r - ds_mean) ** 2 for r in downside_rets) / (len(downside_rets) - 1)
+        ds_std = math.sqrt(ds_var) if ds_var > 0 else 0
+        sortino = (mean_r / ds_std * math.sqrt(252)) if ds_std > 0 else 0
     else:
-        mean_r = sum(daily_rets) / n
-        variance = sum((r - mean_r) ** 2 for r in daily_rets) / (n - 1)
-        std_r = math.sqrt(variance) if variance > 0 else 0
-        sharpe = (mean_r / std_r * math.sqrt(252)) if std_r > 0 else 0
+        sortino = 0.0
 
     return PortfolioMetrics(
         name=name,
@@ -131,6 +155,8 @@ def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
         cagr_pct=round(cagr, 2),
         mdd_pct=round(max_dd, 2),
         sharpe_ratio=round(sharpe, 3),
+        volatility_pct=round(volatility_pct, 2),
+        sortino_ratio=round(sortino, 3),
     )
 
 

@@ -34,6 +34,8 @@ export interface PortfolioMetrics {
   cagr_pct: number;
   mdd_pct: number;
   sharpe_ratio: number;
+  volatility_pct: number;
+  sortino_ratio: number;
 }
 
 export interface BacktestResult {

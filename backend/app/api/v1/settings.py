@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import date
-
-from pydantic import BaseModel, EmailStr, field_validator
+from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,6 +57,28 @@ class NotificationEmailUpdate(BaseModel):
     notification_email: EmailStr | None = None
 
 
+class AutoDcaUpdate(BaseModel):
+    enabled: bool
+    day: int | None = None
+    amount: float | None = None
+    portfolio_id: str | None = None
+    account_id: str | None = None
+
+    @field_validator("day")
+    @classmethod
+    def validate_day(cls, v: int | None) -> int | None:
+        if v is not None and not (1 <= v <= 28):
+            raise ValueError("실행일은 1~28 사이여야 합니다")
+        return v
+
+    @field_validator("amount")
+    @classmethod
+    def validate_amount(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("매수 금액은 0보다 커야 합니다")
+        return v
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -70,6 +91,12 @@ class SettingsResponse(BaseModel):
     retirement_target_year: int | None = None
     user_email: str
     notification_email: str | None = None
+    auto_dca_enabled: bool = False
+    auto_dca_day: int | None = None
+    auto_dca_amount: float | None = None
+    auto_dca_portfolio_id: str | None = None
+    auto_dca_account_id: str | None = None
+    auto_dca_last_executed_at: str | None = None
 
 
 @router.get("", response_model=SettingsResponse)
@@ -113,6 +140,12 @@ async def get_settings(
         retirement_target_year=row.retirement_target_year,
         user_email=current_user.email,
         notification_email=row.notification_email,
+        auto_dca_enabled=row.auto_dca_enabled,
+        auto_dca_day=row.auto_dca_day,
+        auto_dca_amount=float(row.auto_dca_amount) if row.auto_dca_amount else None,
+        auto_dca_portfolio_id=str(row.auto_dca_portfolio_id) if row.auto_dca_portfolio_id else None,
+        auto_dca_account_id=str(row.auto_dca_account_id) if row.auto_dca_account_id else None,
+        auto_dca_last_executed_at=row.auto_dca_last_executed_at.isoformat() if row.auto_dca_last_executed_at else None,
     )
 
 
@@ -160,8 +193,8 @@ async def update_goal(
     if req.retirement_target_year is not None:
         row.retirement_target_year = req.retirement_target_year
     if req.goal_start_date is not None:
-        from datetime import datetime, timezone
-        row.goal_start_date = datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
+        from datetime import datetime
+        row.goal_start_date = datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
     if req.goal_initial_amount is not None:
         row.goal_initial_amount = req.goal_initial_amount
     await db.commit()
@@ -179,6 +212,24 @@ async def update_notification_email(
     row.notification_email = req.notification_email or None
     await db.commit()
     return {"detail": "알림 이메일이 저장되었습니다"}
+
+
+@router.put("/auto-dca")
+async def update_auto_dca(
+    req: AutoDcaUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """자동 DCA 정기매수 설정."""
+    import uuid as uuid_mod
+    row = await _get_or_create_settings(current_user.id, db)
+    row.auto_dca_enabled = req.enabled
+    row.auto_dca_day = req.day
+    row.auto_dca_amount = req.amount
+    row.auto_dca_portfolio_id = uuid_mod.UUID(req.portfolio_id) if req.portfolio_id else None
+    row.auto_dca_account_id = uuid_mod.UUID(req.account_id) if req.account_id else None
+    await db.commit()
+    return {"detail": "자동 정기매수 설정이 저장되었습니다"}
 
 
 @router.post("/test-email")

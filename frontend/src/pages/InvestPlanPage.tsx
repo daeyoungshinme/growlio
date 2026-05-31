@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
-import { Settings2 } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { api } from "../api/client";
 import { fetchSettings } from "../api/settings";
 import { fetchDCAAnalysis } from "../api/invest";
+import { fetchTaxSummary } from "../api/tax";
 import DCAProjectionChart from "../components/invest/DCAProjectionChart";
 import GoalTimelineCard from "../components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "../components/invest/MonthlyAchievementTable";
@@ -28,10 +29,21 @@ interface GoalForm {
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
   const location = useLocation();
+  const currentYear = new Date().getFullYear();
+
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEYS.dcaAnalysis,
     queryFn: fetchDCAAnalysis,
     staleTime: STALE_TIME.MEDIUM,
+  });
+
+  const [taxYear, setTaxYear] = useState(currentYear);
+  const [showTax, setShowTax] = useState(false);
+  const { data: taxData, isLoading: taxLoading } = useQuery({
+    queryKey: QUERY_KEYS.taxSummary(taxYear),
+    queryFn: () => fetchTaxSummary(taxYear),
+    staleTime: STALE_TIME.LONG,
+    enabled: showTax,
   });
 
   const [editing, setEditing] = useState(false);
@@ -198,6 +210,96 @@ export default function InvestPlanPage() {
           </div>
         </>
       )}
+
+      {/* 세금 추정 섹션 */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={() => setShowTax((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base font-semibold text-gray-800 dark:text-gray-200">세금 추정</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">배당세·해외 양도세 예상 납부액</span>
+          </div>
+          {showTax ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </button>
+        {showTax && (
+          <div className="px-5 pb-5 space-y-4 border-t border-gray-100 dark:border-gray-800">
+            <div className="flex items-center gap-3 pt-4">
+              <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>
+              <select
+                value={taxYear}
+                onChange={(e) => setTaxYear(Number(e.target.value))}
+                className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
+                  <option key={y} value={y}>{y}년</option>
+                ))}
+              </select>
+            </div>
+
+            {taxLoading && (
+              <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>
+            )}
+
+            {taxData && !taxLoading && (
+              <div className="space-y-4">
+                {/* 경고 배너 */}
+                {(taxData.domestic_large_holder_warning || taxData.comprehensive_tax_warning) && (
+                  <div className="space-y-2">
+                    {taxData.domestic_large_holder_warning && (
+                      <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                        <AlertTriangle size={14} className="text-orange-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-orange-700 dark:text-orange-400">
+                          국내 주식 보유액이 10억원 이상입니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다.
+                        </p>
+                      </div>
+                    )}
+                    {taxData.comprehensive_tax_warning && (
+                      <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                        <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-red-700 dark:text-red-400">
+                          금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수 있습니다.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 세금 항목 카드 */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">배당소득세</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-50 mt-1">
+                      {fmtKrw(taxData.dividend_tax_krw)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      배당수령 {fmtKrw(taxData.dividend_income_krw)} × {taxData.rates.dividend_tax_rate_pct}%
+                    </p>
+                  </div>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">해외 양도세 추정</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-50 mt-1">
+                      {fmtKrw(taxData.overseas_tax_estimated_krw)}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} (250만 공제 후 {taxData.rates.overseas_tax_rate_pct}%)
+                    </p>
+                  </div>
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">예상 납부 합계</p>
+                    <p className="text-lg font-bold text-blue-700 dark:text-blue-300 mt-1">
+                      {fmtKrw(taxData.total_estimated_tax_krw)}
+                    </p>
+                    <p className="text-xs text-blue-500 dark:text-blue-500 mt-1">{taxYear}년 기준</p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{taxData.note}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 설정 편집 모달 */}
       {editing && (

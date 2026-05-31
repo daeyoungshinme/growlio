@@ -340,6 +340,7 @@ export default function DividendTab({ dividendData, divLoading: _divLoading, div
           />
         </div>
       )}
+
     </div>
   );
 }

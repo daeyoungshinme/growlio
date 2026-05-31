@@ -73,6 +73,8 @@ class PortfolioMetrics(BaseModel):
     cagr_pct: float
     mdd_pct: float
     sharpe_ratio: float
+    volatility_pct: float = 0.0
+    sortino_ratio: float = 0.0
 
 
 class BacktestResult(BaseModel):

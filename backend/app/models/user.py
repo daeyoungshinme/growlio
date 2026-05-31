@@ -48,5 +48,18 @@ class UserSettings(Base):
     ob_user_seq_no: Mapped[str | None] = mapped_column(String(20))
     # 알림 설정
     notification_email: Mapped[str | None] = mapped_column(String(255))
+    # 자동 DCA (정기매수)
+    auto_dca_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    auto_dca_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    auto_dca_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    auto_dca_portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    auto_dca_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
+    auto_dca_last_executed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="settings")

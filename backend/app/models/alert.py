@@ -1,7 +1,18 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -54,4 +65,31 @@ class RebalancingAlert(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "portfolio_id", name="uq_rebalancing_alert_user_portfolio"),
+    )
+
+
+class StockPriceAlert(Base):
+    __tablename__ = "stock_price_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    ticker: Mapped[str] = mapped_column(String(20), nullable=False)
+    market: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    target_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
+    direction: Mapped[str] = mapped_column(
+        Enum("BELOW", "ABOVE", name="stock_alert_direction_enum"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),
     )

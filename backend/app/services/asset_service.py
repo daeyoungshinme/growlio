@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import structlog
@@ -10,11 +11,11 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.exceptions import BadRequestError, CredentialMissingError
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
-from app.exceptions import BadRequestError, CredentialMissingError
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, fetch_usd_krw, get_usd_krw_rate
@@ -181,7 +182,7 @@ async def sync_kiwoom_account(
 
     try:
         domestic = await asyncio.wait_for(_do_sync(), timeout=50.0)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
         raise RuntimeError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from None
 
@@ -443,6 +444,15 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
     base = bank_total + total_invested
     annualized_return, cumulative_return = await _calc_returns(user_id, total_assets_krw, base, db)
 
+    xirr_pct = await _calc_xirr(user_id, total_assets_krw, db)
+
+    from sqlalchemy import func as sqlfunc
+    first_snap_result = await db.execute(
+        select(sqlfunc.min(AssetSnapshot.snapshot_date)).where(AssetSnapshot.user_id == user_id)
+    )
+    first_snap_date = first_snap_result.scalar()
+    benchmarks = await _get_benchmarks(first_snap_date, redis) if first_snap_date else {"kospi_pct": None, "sp500_pct": None}
+
     monthly_trend = await _get_monthly_trend(user_id, db)
 
     annual_deposit_goal = float(settings_row.annual_deposit_goal) if settings_row and settings_row.annual_deposit_goal else None
@@ -465,6 +475,9 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         "stock_return_pct": stock_return_pct,
         "annual_return_pct": annualized_return,
         "cumulative_return_pct": cumulative_return,
+        "xirr_pct": xirr_pct,
+        "benchmark_kospi_pct": benchmarks.get("kospi_pct"),
+        "benchmark_sp500_pct": benchmarks.get("sp500_pct"),
         "goal_annual_return_pct": goal_annual_return_pct,
         "retirement_target_year": retirement_target_year,
         "monthly_trend": monthly_trend,
@@ -556,6 +569,104 @@ async def _get_monthly_trend(user_id, db: AsyncSession) -> list[dict]:
         {"uid": str(user_id)},
     )
     return [{"month": str(row.month), "total_krw": float(row.total_krw)} for row in result]
+
+
+def _xirr(cashflows: list[tuple[date, float]]) -> float | None:
+    """Newton-Raphson XIRR. cashflows: [(date, amount)] 음수=유출, 양수=유입."""
+    if len(cashflows) < 2:
+        return None
+    amounts = [a for _, a in cashflows]
+    if all(a >= 0 for a in amounts) or all(a <= 0 for a in amounts):
+        return None
+
+    d0 = min(d for d, _ in cashflows)
+    days = [(d - d0).days for d, _ in cashflows]
+
+    pairs = list(zip(amounts, days, strict=True))
+    rate = 0.1
+    for _ in range(200):
+        try:
+            npv = sum(cf / (1 + rate) ** (d / 365.0) for cf, d in pairs)
+            dnpv = sum(
+                -cf * (d / 365.0) / (1 + rate) ** (d / 365.0 + 1) for cf, d in pairs
+            )
+        except (ZeroDivisionError, OverflowError):
+            return None
+        if abs(dnpv) < 1e-12:
+            break
+        new_rate = rate - npv / dnpv
+        if abs(new_rate - rate) < 1e-7:
+            return round(new_rate * 100, 2)
+        rate = max(new_rate, -0.99)
+    return None
+
+
+async def _calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) -> float | None:
+    """Transaction 기반 XIRR 계산. 트랜잭션 없으면 None."""
+    from sqlalchemy import asc
+
+    result = await db.execute(
+        select(Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type.in_(["DEPOSIT", "WITHDRAWAL"]),
+        )
+        .order_by(asc(Transaction.transaction_date))
+    )
+    rows = result.all()
+    if not rows:
+        return None
+
+    cashflows: list[tuple[date, float]] = []
+    for row in rows:
+        if row.transaction_type == "DEPOSIT":
+            cashflows.append((row.transaction_date, -float(row.amount)))
+        else:
+            cashflows.append((row.transaction_date, float(row.amount)))
+
+    cashflows.append((date.today(), current_total))
+    return _xirr(cashflows)
+
+
+async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:
+    """KOSPI·S&P500의 start_date~오늘 수익률 조회. Redis 24h 캐시."""
+    end_date = date.today()
+    cache_key = f"benchmark:{start_date}:{end_date}"
+
+    if redis:
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
+    def _fetch() -> dict[str, float | None]:
+        import yfinance as yf  # type: ignore[import-untyped]
+
+        result: dict[str, float | None] = {}
+        for symbol, key in [("^KS11", "kospi_pct"), ("^GSPC", "sp500_pct")]:
+            try:
+                hist = yf.Ticker(symbol).history(
+                    start=start_date,
+                    end=end_date + timedelta(days=1),
+                )
+                if len(hist) >= 2:
+                    pct = (hist["Close"].iloc[-1] / hist["Close"].iloc[0] - 1) * 100
+                    result[key] = round(float(pct), 2)
+                else:
+                    result[key] = None
+            except Exception:
+                result[key] = None
+        return result
+
+    loop = asyncio.get_running_loop()
+    try:
+        data = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=15.0)
+    except Exception:
+        data = {"kospi_pct": None, "sp500_pct": None}
+
+    if redis:
+        await redis.set(cache_key, json.dumps(data), ex=86400)
+
+    return data
 
 
 async def _calc_net_deposits_this_year(user_id, db: AsyncSession) -> float:
