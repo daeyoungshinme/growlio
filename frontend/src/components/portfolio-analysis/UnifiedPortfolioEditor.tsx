@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { AssetAccount, searchStocks, StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
+import { PORTFOLIO_WEIGHT_TOLERANCE } from "../../constants/validation";
 
 interface Props {
   initial?: Portfolio | null;
@@ -55,7 +56,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }
 
   const totalWeight = items.reduce((s, i) => s + (Number(i.weight) || 0), 0);
-  const weightOk = Math.abs(totalWeight - 100) < 0.01;
+  const weightOk = Math.abs(totalWeight - 100) < PORTFOLIO_WEIGHT_TOLERANCE;
 
   function updateItem(idx: number, patch: Partial<PortfolioItem>) {
     setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));

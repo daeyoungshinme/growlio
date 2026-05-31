@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Sun, Moon, LogOut } from "lucide-react";
 import { api } from "../api/client";
+import { type SettingsData } from "../api/settings";
 import { toast } from "../utils/toast";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
@@ -16,20 +17,6 @@ import {
 import { useExchangeRate } from "../hooks/useExchangeRate";
 import { invalidateAlertData } from "../utils/queryInvalidation";
 import { QUERY_KEYS } from "../constants/queryKeys";
-
-interface SettingsData {
-  has_kis: boolean;
-  has_dart: boolean;
-  has_open_banking: boolean;
-  ob_token_expires_at: string | null;
-  goal_amount: number | null;
-  goal_annual_return_pct: number | null;
-  annual_deposit_goal: number | null;
-  monthly_deposit_amount: number | null;
-  retirement_target_year: number | null;
-  user_email: string;
-  notification_email: string | null;
-}
 
 function SectionCard({ title, badge, children }: { title: string; badge?: React.ReactNode; children: React.ReactNode }) {
   return (

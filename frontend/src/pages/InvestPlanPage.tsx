@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { Settings2 } from "lucide-react";
 import { api } from "../api/client";
+import { fetchSettings } from "../api/settings";
 import { fetchDCAAnalysis } from "../api/invest";
 import DCAProjectionChart from "../components/invest/DCAProjectionChart";
 import GoalTimelineCard from "../components/invest/GoalTimelineCard";
@@ -51,9 +52,9 @@ export default function InvestPlanPage() {
     let annual_deposit_goal = "";
     let retirement_target_year = "";
     if (data) {
-      const settingsRes = await api.get<{ annual_deposit_goal: number | null; retirement_target_year: number | null }>("/settings");
-      annual_deposit_goal = settingsRes.data.annual_deposit_goal ? String(settingsRes.data.annual_deposit_goal) : "";
-      retirement_target_year = settingsRes.data.retirement_target_year ? String(settingsRes.data.retirement_target_year) : "";
+      const settingsData = await fetchSettings();
+      annual_deposit_goal = settingsData.annual_deposit_goal ? String(settingsData.annual_deposit_goal) : "";
+      retirement_target_year = settingsData.retirement_target_year ? String(settingsData.retirement_target_year) : "";
     }
     setForm({
       monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",

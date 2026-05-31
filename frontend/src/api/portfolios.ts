@@ -13,6 +13,7 @@ export interface Portfolio {
   items: PortfolioItem[];
   base_type: string;   // "STOCK_ONLY" | "TOTAL_ASSETS"
   account_ids?: string[] | null;  // null이면 모든 활성 주식 계좌 사용
+  sort_order: number;
   created_at: string;
   updated_at: string;
 }
@@ -34,3 +35,6 @@ export const updatePortfolio = (
 
 export const deletePortfolio = (id: string) =>
   api.delete(`/portfolios/${id}`);
+
+export const reorderPortfolios = (items: { id: string; sort_order: number }[]) =>
+  api.patch("/portfolios/reorder", { items });

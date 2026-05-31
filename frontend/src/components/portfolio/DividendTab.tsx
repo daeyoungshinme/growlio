@@ -141,35 +141,34 @@ export default function DividendTab({ dividendData, divLoading: _divLoading, div
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
-          <div className="px-4 py-4 sm:px-5">
-            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">예상 연간 배당금</p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600">
-              {totalEstimated > 0 ? (
-                <>
-                  {fmtKrwShort(totalEstimated)}원
-                  {overallDividendYield != null && (
-                    <span className="text-sm font-semibold ml-1">({overallDividendYield.toFixed(2)}%)</span>
-                  )}
-                </>
-              ) : "—"}
+          <div className="px-2 py-3 sm:px-4 sm:py-4">
+            <p className="text-[10px] sm:text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500 whitespace-nowrap overflow-hidden">예상 연간 배당금</p>
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 whitespace-nowrap overflow-hidden">
+              {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">배당수익률 기준 추정</p>
+            {totalEstimated > 0 && overallDividendYield != null ? (
+              <p className="text-[11px] sm:text-xs font-semibold text-green-500 mt-0.5 leading-tight">
+                {overallDividendYield.toFixed(2)}% 배당수익률
+              </p>
+            ) : (
+              <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5">배당수익률 기준 추정</p>
+            )}
           </div>
-          <div className="px-4 py-4 sm:px-5">
-            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">올해 수령 배당금</p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50">
+          <div className="px-2 py-3 sm:px-4 sm:py-4">
+            <p className="text-[10px] sm:text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500 whitespace-nowrap overflow-hidden">올해 수령 배당금</p>
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 whitespace-nowrap overflow-hidden">
               {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5">
               {received > 0 ? "실제 수령 합계" : "배당 내역을 입력해주세요"}
             </p>
           </div>
-          <div className="px-4 py-4 sm:px-5">
-            <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">월평균 예상 배당금</p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600">
+          <div className="px-2 py-3 sm:px-4 sm:py-4">
+            <p className="text-[10px] sm:text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500 whitespace-nowrap overflow-hidden">월평균 예상 배당금</p>
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 whitespace-nowrap overflow-hidden">
               {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
             </p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">연간 예상 배당금 ÷ 12</p>
+            <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 mt-0.5">연간 예상 배당금 ÷ 12</p>
           </div>
         </div>
       </div>

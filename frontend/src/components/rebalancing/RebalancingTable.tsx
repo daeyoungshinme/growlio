@@ -150,9 +150,10 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
       {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-gray-700 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">기준 자산</div>
+          <div className="text-xs text-gray-400 mb-1">
+            {analysis.base_type === "STOCK_ONLY" ? "기준 자산(주식)" : "기준 자산(전체)"}
+          </div>
           <div className="text-sm font-semibold text-gray-100">{fmtKrw(analysis.base_value_krw)}</div>
-          <div className="text-xs text-gray-500">{analysis.base_type === "STOCK_ONLY" ? "주식 자산" : "전체 자산"}</div>
         </div>
         <div className="bg-red-900/30 rounded-xl p-3 text-center">
           <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
@@ -279,17 +280,23 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
           </div>
 
           {/* 요약 카드 */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2">
             <div className="bg-gray-700 rounded-xl p-3 text-center">
-              <div className="text-xs text-gray-400 mb-1">현재 연간 배당</div>
+              <div className="text-xs text-gray-400 mb-1">
+                <span className="sm:hidden">현재 배당</span>
+                <span className="hidden sm:inline">현재 연간 배당</span>
+              </div>
               <div className="text-sm font-semibold text-gray-100">{fmtKrw(totalCurrentDiv)}</div>
-              <div className="text-xs text-gray-500 mt-0.5">전체 보유 기준</div>
+              <div className="text-xs text-gray-500 mt-0.5 hidden sm:block">전체 보유 기준</div>
             </div>
             <div className="bg-gray-700 rounded-xl p-3 text-center">
-              <div className="text-xs text-gray-400 mb-1">리밸런싱 후 연간 배당</div>
+              <div className="text-xs text-gray-400 mb-1">
+                <span className="sm:hidden">리밸 후 배당</span>
+                <span className="hidden sm:inline">리밸런싱 후 연간 배당</span>
+              </div>
               <div className="text-sm font-semibold text-gray-100">{fmtKrw(targetDiv)}</div>
             </div>
-            <div className={`rounded-xl p-3 text-center ${divDiff >= 0 ? "bg-green-900/30" : "bg-red-900/30"}`}>
+            <div className={`col-span-1 rounded-xl p-3 text-center ${divDiff >= 0 ? "bg-green-900/30" : "bg-red-900/30"}`}>
               <div className="text-xs text-gray-400 mb-1">배당 증감</div>
               <div className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {divDiff >= 0 ? "+" : ""}{fmtKrw(divDiff)}
@@ -317,9 +324,10 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
                         <DividendDiffCell diff={item.annual_dividend_diff_krw ?? 0} />
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 flex-wrap">
-                      <span>현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}</span>
-                      <span>→ 목표 {fmtKrw(item.annual_dividend_target_krw ?? 0)}</span>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 overflow-hidden">
+                      <span className="truncate">현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}</span>
+                      <span className="shrink-0">→</span>
+                      <span className="truncate">목표 {fmtKrw(item.annual_dividend_target_krw ?? 0)}</span>
                     </div>
                   </div>
                 ))}

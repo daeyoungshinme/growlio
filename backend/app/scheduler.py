@@ -11,6 +11,7 @@ def init_scheduler() -> None:
     from app.jobs.asset_sync import run_daily_asset_sync
     from app.jobs.token_refresh import refresh_all_user_tokens
     from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
+    from app.jobs.rebalancing_alert import run_rebalancing_alert_check
     from apscheduler.triggers.interval import IntervalTrigger
 
     scheduler.add_job(
@@ -29,6 +30,12 @@ def init_scheduler() -> None:
         run_exchange_rate_alert_check,
         IntervalTrigger(minutes=5),
         id="exchange_rate_alert_check",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_rebalancing_alert_check,
+        CronTrigger(hour=18, minute=30, timezone="Asia/Seoul"),
+        id="rebalancing_alert_check_daily",
         replace_existing=True,
     )
     scheduler.start()

@@ -129,15 +129,6 @@ export interface OrderResult {
   order_type?: string;
 }
 
-export interface StockPriceResponse {
-  price_krw: number | null;
-  price_usd: number | null;
-  usd_rate: number | null;
-}
-
-export const fetchStockPrice = (ticker: string, market: string): Promise<StockPriceResponse> =>
-  api.get<StockPriceResponse>("/stocks/price", { params: { ticker, market } }).then((r) => r.data);
-
 export interface ExecutionResult {
   account_id: string;
   account_name: string;

@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
-from app.schemas.portfolio import PortfolioCreate, PortfolioResponse, PortfolioUpdate
+from app.schemas.portfolio import PortfolioCreate, PortfolioReorderRequest, PortfolioResponse, PortfolioUpdate
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -47,7 +47,7 @@ async def list_portfolios(
     rows = await db.execute(
         select(Portfolio)
         .where(Portfolio.user_id == current_user.id)
-        .order_by(Portfolio.created_at)
+        .order_by(Portfolio.sort_order, Portfolio.created_at)
     )
     return rows.scalars().all()
 
@@ -123,4 +123,20 @@ async def delete_portfolio(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
 
     await db.delete(portfolio)
+    await db.commit()
+
+
+@router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+async def reorder_portfolios(
+    body: PortfolioReorderRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """포트폴리오 순서 일괄 업데이트."""
+    for item in body.items:
+        await db.execute(
+            update(Portfolio)
+            .where(Portfolio.id == item.id, Portfolio.user_id == current_user.id)
+            .values(sort_order=item.sort_order)
+        )
     await db.commit()

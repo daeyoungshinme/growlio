@@ -15,4 +15,6 @@ export const QUERY_KEYS = {
   settings: ["settings"] as const,
   exchangeRate: ["exchange-rate"] as const,
   exchangeRateAlerts: ["exchange-rate-alerts"] as const,
+  rebalancingAlerts: ["rebalancing-alerts"] as const,
+  rebalancingAlert: (portfolioId: string) => ["rebalancing-alert", portfolioId] as const,
 } as const;

@@ -9,7 +9,7 @@ import StockHoldingsTable from "../components/assets/StockHoldingsTable";
 import TreemapChart from "../components/portfolio/TreemapChart";
 import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
-import { fmtKrwShort, fmtKrwPrice } from "../utils/format";
+import { fmtKrwPrice } from "../utils/format";
 import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
@@ -30,7 +30,8 @@ interface DividendSummary {
 
 const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
-const TABS = ["종목 현황", "배당 현황", "포트폴리오 분석"] as const;
+import { PORTFOLIO_TABS } from "../constants/tabs";
+const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
@@ -156,7 +157,7 @@ export default function PortfolioPage() {
         </p>
         <div className="mt-2">
           <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
-            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}{fmtKrwShort(data.unrealized_pnl_krw)}원({data.stock_return_pct >= 0 ? "+" : ""}{data.stock_return_pct.toFixed(2)}%)
+            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}{fmtKrwPrice(data.unrealized_pnl_krw)}({data.stock_return_pct >= 0 ? "+" : ""}{data.stock_return_pct.toFixed(2)}%)
           </span>
         </div>
       </div>

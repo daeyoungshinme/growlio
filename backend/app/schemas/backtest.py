@@ -4,6 +4,8 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, field_validator
 
+from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
+
 
 class HoldingItem(BaseModel):
     ticker: str
@@ -18,12 +20,7 @@ class BacktestPortfolioCreate(BaseModel):
     @field_validator("holdings")
     @classmethod
     def validate_holdings(cls, v: list[HoldingItem]) -> list[HoldingItem]:
-        if not v:
-            raise ValueError("종목이 최소 1개 이상이어야 합니다.")
-        total = sum(h.weight for h in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights(v)
 
 
 class BacktestPortfolioUpdate(BaseModel):
@@ -33,14 +30,7 @@ class BacktestPortfolioUpdate(BaseModel):
     @field_validator("holdings")
     @classmethod
     def validate_holdings(cls, v: list[HoldingItem] | None) -> list[HoldingItem] | None:
-        if v is None:
-            return v
-        if not v:
-            raise ValueError("종목이 최소 1개 이상이어야 합니다.")
-        total = sum(h.weight for h in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights_optional(v)
 
 
 class BacktestPortfolioResponse(BaseModel):

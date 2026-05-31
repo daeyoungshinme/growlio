@@ -1,6 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Bell, Edit2, GripVertical, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { BacktestResult, runBacktest } from "../../api/backtest";
 import { analyzePortfolio, RebalancingAnalysis } from "../../api/rebalancing";
 import {
@@ -9,6 +24,7 @@ import {
   createPortfolio,
   deletePortfolio,
   fetchPortfolios,
+  reorderPortfolios,
   updatePortfolio,
 } from "../../api/portfolios";
 import { fetchAccounts } from "../../api/assets";
@@ -20,12 +36,36 @@ import { toast } from "../../utils/toast";
 import { extractErrorMessage } from "../../utils/error";
 import { invalidatePortfolioData } from "../../utils/queryInvalidation";
 import { QUERY_KEYS } from "../../constants/queryKeys";
+import { STALE_TIME } from "../../constants/queryConfig";
+import { fetchRebalancingAlerts } from "../../api/alerts";
 import ConfirmModal from "../common/ConfirmModal";
+import RebalancingAlertModal from "./RebalancingAlertModal";
 
-const today = new Date().toISOString().slice(0, 10);
-const fiveYearsAgo = `${new Date().getFullYear() - 5}-01-01`;
+import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "../../constants/defaults";
 
 type AnalysisMode = "rebalancing" | "backtest";
+
+function SortablePortfolioItem({
+  id,
+  children,
+}: {
+  id: string;
+  children: (props: { dragHandleListeners: React.HTMLAttributes<HTMLElement> }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    position: "relative",
+    zIndex: isDragging ? 1 : undefined,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children({ dragHandleListeners: { ...attributes, ...listeners } as React.HTMLAttributes<HTMLElement> })}
+    </div>
+  );
+}
 
 export default function PortfolioAnalysisTab() {
   const qc = useQueryClient();
@@ -34,6 +74,11 @@ export default function PortfolioAnalysisTab() {
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
+
+  const [sortedPortfolios, setSortedPortfolios] = useState<Portfolio[]>([]);
+  useEffect(() => {
+    setSortedPortfolios(portfolios);
+  }, [portfolios]);
 
   const { data: accounts = [] } = useQuery({
     queryKey: QUERY_KEYS.accounts,
@@ -55,12 +100,41 @@ export default function PortfolioAnalysisTab() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
 
-  const [startDate, setStartDate] = useState(fiveYearsAgo);
-  const [endDate, setEndDate] = useState(today);
+  const [startDate, setStartDate] = useState(BACKTEST_DEFAULT_START_DATE);
+  const [endDate, setEndDate] = useState(BACKTEST_DEFAULT_END_DATE);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
+
+  const { data: rebalancingAlerts = [] } = useQuery({
+    queryKey: QUERY_KEYS.rebalancingAlerts,
+    queryFn: fetchRebalancingAlerts,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+  const alertPortfolioIds = new Set(rebalancingAlerts.map((a) => a.portfolio_id));
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+  );
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const snapshot = sortedPortfolios;
+    const oldIndex = snapshot.findIndex((p) => p.id === active.id);
+    const newIndex = snapshot.findIndex((p) => p.id === over.id);
+    const reordered = arrayMove(snapshot, oldIndex, newIndex);
+
+    setSortedPortfolios(reordered);
+    reorderPortfolios(reordered.map((p, i) => ({ id: p.id, sort_order: i }))).catch(() => {
+      setSortedPortfolios(snapshot);
+      toast("순서 변경에 실패했습니다");
+    });
+  }
 
   const createMut = useMutation({
     mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
@@ -158,7 +232,7 @@ export default function PortfolioAnalysisTab() {
   const canRebalance = selectedIds.size === 1;
   const saving = createMut.isPending || updateMut.isPending;
 
-  const selectedNames = portfolios
+  const selectedNames = sortedPortfolios
     .filter((p) => selectedIds.has(p.id))
     .map((p) => p.name)
     .join(", ");
@@ -190,7 +264,7 @@ export default function PortfolioAnalysisTab() {
           <div className="flex justify-center py-8">
             <Loader2 size={20} className="animate-spin text-gray-400 dark:text-gray-500" />
           </div>
-        ) : portfolios.length === 0 ? (
+        ) : sortedPortfolios.length === 0 ? (
           <div className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
             <div className="mb-2">포트폴리오가 없습니다.</div>
             <button
@@ -201,57 +275,82 @@ export default function PortfolioAnalysisTab() {
             </button>
           </div>
         ) : (
-          portfolios.map((p) => (
-            <div
-              key={p.id}
-              className={`rounded-xl border p-3 cursor-pointer transition-colors ${
-                selectedIds.has(p.id)
-                  ? "border-blue-400 bg-blue-50 dark:bg-blue-950"
-                  : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
-              }`}
-              onClick={() => toggleSelect(p.id)}
-            >
-              <div className="flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={selectedIds.has(p.id)}
-                  onChange={() => toggleSelect(p.id)}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-0.5 rounded text-blue-600 flex-shrink-0"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-1">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
-                        {p.name}
-                      </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                        {p.base_type === "STOCK_ONLY" ? "주식 자산 기준" : "전체 자산 기준"} · {p.items.length}개 항목
-                        {stockAccounts.length > 1 && ` · 계좌: ${getAccountLabel(p)}`}
-                      </p>
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortedPortfolios.map((p) => p.id)} strategy={verticalListSortingStrategy}>
+              {sortedPortfolios.map((p) => (
+                <SortablePortfolioItem key={p.id} id={p.id}>
+                  {({ dragHandleListeners }) => (
+                    <div
+                      className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+                        selectedIds.has(p.id)
+                          ? "border-blue-400 bg-blue-50 dark:bg-blue-950"
+                          : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      }`}
+                      onClick={() => toggleSelect(p.id)}
+                    >
+                      <div className="flex items-start gap-2">
+                        <button
+                          {...dragHandleListeners}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+                        >
+                          <GripVertical size={14} />
+                        </button>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(p.id)}
+                          onChange={() => toggleSelect(p.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="mt-0.5 rounded text-blue-600 flex-shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-1">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                                {p.name}
+                              </p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                                {p.base_type === "STOCK_ONLY" ? "주식 자산 기준" : "전체 자산 기준"} · {p.items.length}개 항목
+                                {stockAccounts.length > 1 && ` · 계좌: ${getAccountLabel(p)}`}
+                              </p>
+                            </div>
+                            <div className="flex gap-0.5 shrink-0">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
+                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setAlertModalPortfolioId(p.id); }}
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  alertPortfolioIds.has(p.id)
+                                    ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    : "text-gray-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                }`}
+                                title="리밸런싱 알림 설정"
+                              >
+                                <Bell size={12} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDeleteId(p.id);
+                                }}
+                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-0.5 shrink-0">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
-                        className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
-                      >
-                        <Edit2 size={12} />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setConfirmDeleteId(p.id);
-                        }}
-                        className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
+                  )}
+                </SortablePortfolioItem>
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
@@ -316,7 +415,7 @@ export default function PortfolioAnalysisTab() {
                     type="date"
                     value={endDate}
                     min={startDate}
-                    max={today}
+                    max={BACKTEST_DEFAULT_END_DATE}
                     onChange={(e) => setEndDate(e.target.value)}
                     className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -388,7 +487,7 @@ export default function PortfolioAnalysisTab() {
               analysis={analysis}
               portfolioId={analysis.portfolio_id}
               accounts={(() => {
-                const p = portfolios.find((p) => selectedIds.has(p.id));
+                const p = sortedPortfolios.find((p) => selectedIds.has(p.id));
                 return p?.account_ids?.length
                   ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
                   : activeAccounts;
@@ -443,6 +542,13 @@ export default function PortfolioAnalysisTab() {
           confirmLabel="삭제"
           onConfirm={() => { deleteMut.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
           onCancel={() => setConfirmDeleteId(null)}
+        />
+      )}
+      {alertModalPortfolioId && (
+        <RebalancingAlertModal
+          portfolioId={alertModalPortfolioId}
+          portfolioName={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
+          onClose={() => setAlertModalPortfolioId(null)}
         />
       )}
     </div>

@@ -35,4 +35,4 @@ export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"
 export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"];
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];
 
-export const DOMESTIC_MARKETS: string[] = ["KOSPI", "KOSDAQ", "KRX"];
+export { DOMESTIC_MARKETS } from "./markets";

@@ -225,7 +225,7 @@ async def sync_openbanking_account(account: AssetAccount, db: AsyncSession) -> A
 
     access_token = await ensure_ob_token_fresh(settings_row, db)
 
-    bank_tran_id = f"M202400001U{secrets.token_hex(4).upper()}"
+    bank_tran_id = f"M{date.today().year:04d}00001U{secrets.token_hex(4).upper()}"
     data = await get_account_balance(
         access_token=access_token,
         fintech_use_no=account.ob_fintech_use_no,

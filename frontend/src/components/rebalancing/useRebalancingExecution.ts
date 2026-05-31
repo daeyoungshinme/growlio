@@ -4,6 +4,9 @@ import { AssetAccount } from "../../api/assets";
 import { extractErrorMessage } from "../../utils/error";
 import { toast } from "../../utils/toast";
 import { QUERY_KEYS } from "../../constants/queryKeys";
+import { fetchStockPrice } from "../../api/assets";
+import { invalidateSyncData } from "../../utils/queryInvalidation";
+import { OVERSEAS_MARKET_SET, isOverseasMarket } from "../../constants/markets";
 import {
   ExecutionOrderItem,
   ExecutionResult,
@@ -14,7 +17,6 @@ import {
   executeRebalancing,
   fetchAllBrokerBalances,
   fetchBrokerBalance,
-  fetchStockPrice,
 } from "../../api/rebalancing";
 
 export type Phase = "confirm" | "executing" | "result";
@@ -160,10 +162,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
   }
 }
 
-const OVERSEAS_MARKET_SET = new Set(["NYSE", "NASDAQ", "AMEX", "NYSE_US", "NASDAQ_US", "AMEX_US"]);
-export function isOverseasMarket(market: string): boolean {
-  return OVERSEAS_MARKET_SET.has(market.toUpperCase());
-}
+export { isOverseasMarket, OVERSEAS_MARKET_SET };
 
 export function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
   return analysis.items.filter(
@@ -447,6 +446,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     try {
       const res = await executeRebalancing(portfolioId, { account_id: null, orders });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
+      await invalidateSyncData(queryClient);
       onExecuted?.(res);
     } catch (e: unknown) {
       dispatch({ type: "EXECUTE_ERROR", msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다.") });

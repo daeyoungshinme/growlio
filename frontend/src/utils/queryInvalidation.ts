@@ -47,3 +47,11 @@ export function invalidateDcaData(qc: QueryClient) {
 export function invalidateAlertData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.exchangeRateAlerts });
 }
+
+/** 리밸런싱 알림 CUD 후 */
+export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: string) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
+  ]);
+}

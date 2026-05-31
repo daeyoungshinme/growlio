@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
+
 
 class TickerAccountInfo(BaseModel):
     account_id: str
@@ -31,12 +33,7 @@ class TargetPortfolioCreate(BaseModel):
     @field_validator("items")
     @classmethod
     def validate_items(cls, v: list[TargetPortfolioItem]) -> list[TargetPortfolioItem]:
-        if not v:
-            raise ValueError("항목이 최소 1개 이상이어야 합니다.")
-        total = sum(i.weight for i in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights(v)
 
     @field_validator("base_type")
     @classmethod
@@ -55,14 +52,7 @@ class TargetPortfolioUpdate(BaseModel):
     @field_validator("items")
     @classmethod
     def validate_items(cls, v: list[TargetPortfolioItem] | None) -> list[TargetPortfolioItem] | None:
-        if v is None:
-            return v
-        if not v:
-            raise ValueError("항목이 최소 1개 이상이어야 합니다.")
-        total = sum(i.weight for i in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights_optional(v)
 
     @field_validator("base_type")
     @classmethod

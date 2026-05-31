@@ -2,7 +2,9 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
+
+from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
 class PortfolioItem(BaseModel):
@@ -21,12 +23,7 @@ class PortfolioCreate(BaseModel):
     @field_validator("items")
     @classmethod
     def validate_items(cls, v: list[PortfolioItem]) -> list[PortfolioItem]:
-        if not v:
-            raise ValueError("종목이 최소 1개 이상이어야 합니다.")
-        total = sum(i.weight for i in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights(v)
 
     @field_validator("base_type")
     @classmethod
@@ -45,14 +42,7 @@ class PortfolioUpdate(BaseModel):
     @field_validator("items")
     @classmethod
     def validate_items(cls, v: list[PortfolioItem] | None) -> list[PortfolioItem] | None:
-        if v is None:
-            return v
-        if not v:
-            raise ValueError("종목이 최소 1개 이상이어야 합니다.")
-        total = sum(i.weight for i in v)
-        if abs(total - 100.0) > 0.01:
-            raise ValueError(f"비중 합계가 100이어야 합니다. (현재: {total:.2f})")
-        return v
+        return validate_portfolio_weights_optional(v)
 
     @field_validator("base_type")
     @classmethod
@@ -60,6 +50,21 @@ class PortfolioUpdate(BaseModel):
         if v is not None and v not in ("STOCK_ONLY", "TOTAL_ASSETS"):
             raise ValueError("base_type은 STOCK_ONLY 또는 TOTAL_ASSETS이어야 합니다.")
         return v
+
+
+class PortfolioReorderItem(BaseModel):
+    id: uuid.UUID
+    sort_order: int
+
+
+class PortfolioReorderRequest(BaseModel):
+    items: list[PortfolioReorderItem]
+
+    @model_validator(mode="after")
+    def validate_not_empty(self) -> "PortfolioReorderRequest":
+        if not self.items:
+            raise ValueError("items는 최소 1개 이상이어야 합니다.")
+        return self
 
 
 class PortfolioResponse(BaseModel):
@@ -70,5 +75,6 @@ class PortfolioResponse(BaseModel):
     items: list[PortfolioItem]
     base_type: str
     account_ids: list[str] | None = None
+    sort_order: int = 0
     created_at: datetime
     updated_at: datetime

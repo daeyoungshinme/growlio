@@ -31,8 +31,9 @@ import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { useExchangeRate } from "../hooks/useExchangeRate";
+import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
 
-const TABS = ["은행계좌", "증권계좌", "부동산", "입출금·배당"] as const;
+const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = typeof TABS[number];
 
 interface StockOverview {

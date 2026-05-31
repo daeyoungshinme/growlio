@@ -29,8 +29,9 @@ api.interceptors.response.use(
   async (error) => {
     const config = error.config as RetryableConfig | undefined;
     const isAuthEndpoint = config?.url?.startsWith("/auth/");
+    const status = error.response?.status as number | undefined;
 
-    if (error.response?.status === 401 && config && !config._retry && !isAuthEndpoint) {
+    if (status === 401 && config && !config._retry && !isAuthEndpoint) {
       config._retry = true;
       try {
         const {
@@ -47,7 +48,10 @@ api.interceptors.response.use(
         toast("세션이 만료되었습니다. 다시 로그인해 주세요.", "error");
         window.dispatchEvent(new CustomEvent("growlio:session-expired"));
       }
+    } else if (status != null && status >= 500 && !isAuthEndpoint) {
+      toast("서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.", "error");
     }
+
     return Promise.reject(error);
   }
 );

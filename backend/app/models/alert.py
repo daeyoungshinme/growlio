@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, Numeric, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -25,4 +25,33 @@ class ExchangeRateAlert(Base):
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class RebalancingAlert(Base):
+    __tablename__ = "rebalancing_alerts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    threshold_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    schedule_type: Mapped[str] = mapped_column(String(12), nullable=False, default="DAILY")
+    schedule_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    schedule_day_of_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    only_when_drift: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "portfolio_id", name="uq_rebalancing_alert_user_portfolio"),
     )
