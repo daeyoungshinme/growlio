@@ -68,7 +68,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio-analysis, portfol
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
   └── api/{alerts,assets,backtest,dashboard,invest,portfolios,rebalancing,transactions}.ts
-        └── React Query useQuery/useMutation   # 60초 자동 refetch
+        └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
 
@@ -123,6 +123,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 트랜잭션 CUD → `["transactions", "all"]` + `["dashboard"]` 동시 무효화.
 - 계좌 sync → `["portfolio-overview"]` + `["dashboard"]` 무효화.
 - 계좌 CUD (자산관리에서) → `["accounts"]` + `["portfolio-overview"]` + `["dashboard"]` 동시 무효화.
+
+> 수동 `invalidateQueries` 호출 금지 — `src/utils/queryInvalidation.ts`의 유틸 함수 사용 (하단 참고).
 
 **포맷팅 유틸리티 (`src/utils/format.ts`)**
 - 모든 포맷 함수는 `src/utils/format.ts`에서 import. 로컬 재정의 금지.
