@@ -130,10 +130,10 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4 pb-[env(safe-area-inset-bottom)]">
+      <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85vh] sm:max-h-[90vh] flex flex-col">
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 dark:border-gray-700">
           <h2 className="font-semibold text-gray-800 dark:text-gray-50">
             {initial ? "포트폴리오 수정" : "새 포트폴리오 만들기"}
           </h2>
@@ -142,12 +142,12 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
+        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
           {/* 이름 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">포트폴리오 이름</label>
             <input
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="예: 성장형 포트폴리오"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -223,7 +223,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
                           if (el) searchInputRefs.current.set(idx, el);
                           else searchInputRefs.current.delete(idx);
                         }}
-                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 placeholder-gray-400 dark:placeholder-gray-500 rounded-lg px-3 py-2.5 sm:py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                         placeholder="종목명 또는 티커 검색 (예: 삼성전자, AAPL)"
                         value={item.ticker}
                         onChange={(e) => handleTickerInput(idx, e.target.value)}
@@ -254,12 +254,11 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
                     min={0}
                     max={100}
                     step={0.1}
-                    className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="비중 %"
+                    className="w-20 sm:w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 sm:py-2 text-sm text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="%"
                     value={item.weight || ""}
                     onChange={(e) => updateItem(idx, { weight: parseFloat(e.target.value) || 0 })}
                   />
-                  <span className="text-sm text-gray-500 dark:text-gray-400">%</span>
                   <button
                     onClick={() => removeItem(idx)}
                     className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
@@ -306,24 +305,24 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
               );
             })()}
 
-            <div className="flex gap-2 mt-3">
+            <div className="flex flex-wrap gap-2 mt-3">
               <button
                 onClick={() => setItems((prev) => [...prev, { ...EMPTY_ITEM }])}
-                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
               >
                 <Plus size={14} /> 종목 추가
               </button>
               <button
                 onClick={addCash}
                 disabled={items.some((i) => i.ticker === "CASH")}
-                className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
               >
                 <Plus size={14} /> 현금 추가
               </button>
               <button
                 onClick={addRealEstate}
                 disabled={items.some((i) => i.market === "KR_PROPERTY")}
-                className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 px-2 py-1 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
+                className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 px-2 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
               >
                 <Plus size={14} /> 부동산 추가
               </button>
@@ -344,7 +343,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
                   </button>
                 )}
               </div>
-              <div className="flex flex-wrap gap-x-5 gap-y-1.5 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="flex flex-wrap gap-x-3 sm:gap-x-5 gap-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                 {accounts.map((acc) => (
                   <label key={acc.id} className="flex items-center gap-1.5 cursor-pointer">
                     <input
@@ -368,17 +367,17 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
         </div>
 
         {/* 하단 버튼 */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex gap-3 px-4 py-4 sm:px-6 border-t border-gray-100 dark:border-gray-700">
           <button
             onClick={onClose}
-            className="px-5 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             취소
           </button>
           <button
             onClick={handleSubmit}
             disabled={!name.trim() || !weightOk || saving}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 sm:py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saving ? "저장 중..." : "저장"}
           </button>
