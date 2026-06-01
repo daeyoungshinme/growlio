@@ -35,10 +35,10 @@ make migrate
 
 # 5. 개발 서버 실행
 # Windows (Git Bash)
-bash dev.sh   # 백엔드 + 프론트엔드 동시 실행 (Ctrl+C로 종료)
+bash dev.sh         # 또는: make dev (백엔드 + 프론트엔드 동시 실행)
 # macOS / Linux — 터미널 2개에서 각각 실행:
-# cd backend && uv run uvicorn app.main:app --reload
-# cd frontend && npm run dev
+make dev-backend    # 터미널 1 (localhost:8000)
+make dev-frontend   # 터미널 2 (localhost:5173)
 ```
 
 ## Makefile 단축 명령

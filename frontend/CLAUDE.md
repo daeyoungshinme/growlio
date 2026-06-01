@@ -72,7 +72,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — `useExchangeRate.ts` (환율 조회). 현재 유일한 훅.
+**hooks/** — `useExchangeRate.ts` (환율 조회). 새 커스텀 훅은 이 디렉토리에 추가.
 
 **테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트만 존재: `format.test.ts`, `error.test.ts`, `colors.test.ts`.
 
