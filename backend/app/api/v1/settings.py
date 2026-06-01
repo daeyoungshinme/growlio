@@ -9,6 +9,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import uuid as uuid_mod
+
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.asset import AssetAccount
@@ -221,7 +223,6 @@ async def update_auto_dca(
     db: AsyncSession = Depends(get_db),
 ):
     """자동 DCA 정기매수 설정."""
-    import uuid as uuid_mod
     row = await _get_or_create_settings(current_user.id, db)
     row.auto_dca_enabled = req.enabled
     row.auto_dca_day = req.day

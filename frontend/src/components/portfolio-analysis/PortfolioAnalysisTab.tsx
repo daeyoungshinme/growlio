@@ -114,6 +114,7 @@ export default function PortfolioAnalysisTab() {
     staleTime: STALE_TIME.MEDIUM,
   });
   const alertPortfolioIds = new Set(rebalancingAlerts.map((a) => a.portfolio_id));
+  const alertByPortfolioId = Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a]));
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -321,6 +322,17 @@ export default function PortfolioAnalysisTab() {
                               >
                                 <Edit2 size={12} />
                               </button>
+                              {alertPortfolioIds.has(p.id) && (
+                                <span
+                                  className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                    alertByPortfolioId[p.id]?.mode === "AUTO"
+                                      ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
+                                      : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
+                                  }`}
+                                >
+                                  {alertByPortfolioId[p.id]?.mode === "AUTO" ? "자동" : "알림"}
+                                </span>
+                              )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); setAlertModalPortfolioId(p.id); }}
                                 className={`p-1.5 rounded-lg transition-colors ${
@@ -493,6 +505,31 @@ export default function PortfolioAnalysisTab() {
                   : activeAccounts;
               })()}
             />
+            {/* 자동화 설정 CTA */}
+            {(() => {
+              const portfolioIdStr = analysis.portfolio_id.toString();
+              const existingAlert = alertByPortfolioId[portfolioIdStr];
+              return (
+                <div className="flex items-center justify-between mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
+                  {existingAlert ? (
+                    <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
+                      <Bell size={12} />
+                      {existingAlert.mode === "AUTO"
+                        ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
+                        : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-500 dark:text-gray-400">이 포트폴리오에 자동화를 설정하시겠어요?</span>
+                  )}
+                  <button
+                    onClick={() => setAlertModalPortfolioId(portfolioIdStr)}
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap ml-3"
+                  >
+                    {existingAlert ? "설정 변경" : "자동화 설정"}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         )}
         {analysisMode === "rebalancing" && analysisError && (

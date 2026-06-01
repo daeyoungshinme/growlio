@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.kis.auth import get_access_token
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
-from app.models.asset import AssetAccount
+from app.models.asset import AssetAccount, RebalancingExecution
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.credential_service import decrypt
 
@@ -62,6 +62,9 @@ async def execute_rebalancing(
     orders: list[ExecutionOrderItem],
     db: AsyncSession,
     redis,
+    portfolio_id: uuid.UUID | None = None,
+    triggered_by: str = "MANUAL",
+    strategy: str = "FULL",
 ) -> list[ExecutionResult]:
     """선택된 리밸런싱 주문 항목을 KIS API를 통해 순차 실행한다.
 
@@ -69,7 +72,7 @@ async def execute_rebalancing(
     account_id가 없는 주문은 인자로 전달된 account_id(기본 계좌)를 사용한다.
     매도 주문을 먼저 처리해 현금을 확보한 뒤 매수 주문을 실행한다.
     개별 주문 실패 시 나머지 주문은 계속 진행된다.
-    계좌별 ExecutionResult 목록을 반환한다.
+    계좌별 ExecutionResult 목록을 반환하고 실행 이력을 DB에 저장한다.
     """
     # 주문을 account_id별로 그룹화
     groups: dict[str, list[ExecutionOrderItem]] = defaultdict(list)
@@ -162,13 +165,34 @@ async def execute_rebalancing(
 
     total_success = sum(r.success_count for r in results)
     total_fail = sum(r.fail_count for r in results)
+    total_skipped = sum(
+        sum(1 for o in r.orders if o.status == "SKIPPED") for r in results
+    )
     logger.info(
         "rebalancing_executed",
         user_id=str(user_id),
         account_groups=len(groups),
         success=total_success,
         failed=total_fail,
+        skipped=total_skipped,
     )
+
+    # 실행 이력 저장
+    try:
+        execution = RebalancingExecution(
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            triggered_by=triggered_by,
+            strategy=strategy,
+            results=[r.model_dump() for r in results],
+            total_success=total_success,
+            total_fail=total_fail,
+            total_skipped=total_skipped,
+        )
+        db.add(execution)
+        await db.commit()
+    except Exception as e:
+        logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))
 
     return results
 

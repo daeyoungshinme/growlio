@@ -157,6 +157,10 @@ class RebalancingAlertCreate(BaseModel):
     schedule_day_of_week: int | None = None  # WEEKLY 전용: 0=월...6=일
     schedule_day_of_month: int | None = None  # MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL: 1~28
     only_when_drift: bool = True
+    mode: Literal["NOTIFY", "AUTO"] = "NOTIFY"
+    strategy: Literal["FULL", "BUY_ONLY"] = "BUY_ONLY"
+    account_id: uuid.UUID | None = None
+    order_type: Literal["MARKET", "LIMIT"] = "MARKET"
 
     @field_validator("threshold_pct")
     @classmethod
@@ -191,6 +195,10 @@ class RebalancingAlertResponse(BaseModel):
     schedule_day_of_week: int | None
     schedule_day_of_month: int | None
     only_when_drift: bool
+    mode: str
+    strategy: str
+    account_id: uuid.UUID | None
+    order_type: str
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -259,6 +267,10 @@ async def upsert_rebalancing_alert(
         alert.schedule_day_of_week = body.schedule_day_of_week
         alert.schedule_day_of_month = body.schedule_day_of_month
         alert.only_when_drift = body.only_when_drift
+        alert.mode = body.mode
+        alert.strategy = body.strategy
+        alert.account_id = body.account_id
+        alert.order_type = body.order_type
         alert.is_active = True
     else:
         alert = RebalancingAlert(
@@ -269,6 +281,10 @@ async def upsert_rebalancing_alert(
             schedule_day_of_week=body.schedule_day_of_week,
             schedule_day_of_month=body.schedule_day_of_month,
             only_when_drift=body.only_when_drift,
+            mode=body.mode,
+            strategy=body.strategy,
+            account_id=body.account_id,
+            order_type=body.order_type,
             is_active=True,
         )
         db.add(alert)

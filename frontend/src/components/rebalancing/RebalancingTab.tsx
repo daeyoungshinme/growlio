@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit2, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Edit2, History, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { analyzePortfolio, ExecutionResult, RebalancingAnalysis } from "../../api/rebalancing";
 import {
   createPortfolio,
@@ -13,6 +13,7 @@ import {
 import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "../portfolio-analysis/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
+import RebalancingHistoryTab from "./RebalancingHistoryTab";
 import { toast } from "../../utils/toast";
 import { invalidatePortfolioData } from "../../utils/queryInvalidation";
 import { QUERY_KEYS } from "../../constants/queryKeys";
@@ -44,9 +45,12 @@ function applyExecutionResults(analysis: RebalancingAnalysis, results: Execution
   };
 }
 
+type TabType = "analysis" | "history";
+
 export default function RebalancingTab() {
   const queryClient = useQueryClient();
 
+  const [activeTab, setActiveTab] = useState<TabType>("analysis");
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -141,7 +145,34 @@ export default function RebalancingTab() {
   const saving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <div className="flex gap-6">
+    <div className="space-y-4">
+      {/* 탭 */}
+      <div className="flex gap-1 border-b border-gray-700">
+        <button
+          onClick={() => setActiveTab("analysis")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "analysis"
+              ? "text-blue-400 border-b-2 border-blue-400 -mb-px"
+              : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <RefreshCw size={14} /> 분석 및 실행
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-colors ${
+            activeTab === "history"
+              ? "text-blue-400 border-b-2 border-blue-400 -mb-px"
+              : "text-gray-400 hover:text-gray-200"
+          }`}
+        >
+          <History size={14} /> 실행 이력
+        </button>
+      </div>
+
+      {activeTab === "history" && <RebalancingHistoryTab />}
+
+      {activeTab === "analysis" && <div className="flex gap-6">
       {/* 좌측: 포트폴리오 목록 */}
       <div className="w-72 flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
@@ -278,6 +309,7 @@ export default function RebalancingTab() {
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
+      </div>}
     </div>
   );
 }

@@ -42,6 +42,10 @@ export interface RebalancingAlert {
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;
   only_when_drift: boolean;
+  mode: "NOTIFY" | "AUTO";
+  strategy: "FULL" | "BUY_ONLY";
+  account_id: string | null;
+  order_type: "MARKET" | "LIMIT";
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -54,6 +58,10 @@ export interface RebalancingAlertUpsert {
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;
   only_when_drift: boolean;
+  mode: "NOTIFY" | "AUTO";
+  strategy: "FULL" | "BUY_ONLY";
+  account_id: string | null;
+  order_type: "MARKET" | "LIMIT";
 }
 
 export const fetchRebalancingAlerts = () =>

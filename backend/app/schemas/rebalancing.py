@@ -1,5 +1,6 @@
 """리밸런싱 Pydantic 스키마."""
 import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
@@ -136,3 +137,23 @@ class ExecutionResult(BaseModel):
     success_count: int
     fail_count: int
     executed_at: str        # ISO timestamp
+
+
+# ── 리밸런싱 실행 이력 ────────────────────────────────────────
+
+class RebalancingExecutionSummary(BaseModel):
+    id: uuid.UUID
+    portfolio_id: uuid.UUID | None
+    triggered_by: str   # "MANUAL" | "AUTO" | "ONE_CLICK"
+    strategy: str       # "FULL" | "BUY_ONLY"
+    total_success: int
+    total_fail: int
+    total_skipped: int
+    executed_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RebalancingExecutionDetail(RebalancingExecutionSummary):
+    results: list[ExecutionResult] | None = None
+

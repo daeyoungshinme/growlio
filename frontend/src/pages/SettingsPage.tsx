@@ -688,6 +688,19 @@ export default function SettingsPage() {
         )}
       </SectionCard>
 
+      {/* 리밸런싱 자동화 */}
+      <SectionCard title="리밸런싱 자동화">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          리밸런싱 알림·자동 실행은 포트폴리오별로 설정합니다. 알림 주기, 이탈 임계값, 자동 주문 실행 여부를 포트폴리오 분석 탭에서 개별 설정할 수 있습니다.
+        </p>
+        <Link
+          to="/portfolio?tab=포트폴리오분석"
+          className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+        >
+          포트폴리오 분석 탭에서 설정하기 →
+        </Link>
+      </SectionCard>
+
       {/* 투자 목표 */}
       <SectionCard title="투자 목표 설정">
         <p className="text-xs text-gray-500 dark:text-gray-400">

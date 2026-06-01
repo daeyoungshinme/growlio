@@ -8,6 +8,7 @@ import {
   deleteRebalancingAlert,
   type ScheduleType,
 } from "../../api/alerts";
+import { fetchAccounts } from "../../api/assets";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { STALE_TIME } from "../../constants/queryConfig";
 import { invalidateRebalancingAlertData } from "../../utils/queryInvalidation";
@@ -46,6 +47,7 @@ function buildDescription(
   dayOfMonth: number,
   onlyWhenDrift: boolean,
   threshold: number,
+  mode: "NOTIFY" | "AUTO",
 ): string {
   const when =
     scheduleType === "DAILY"
@@ -60,12 +62,17 @@ function buildDescription(
               ? `매 6개월 ${dayOfMonth}일 18:30에`
               : `매년 ${dayOfMonth}일 18:30에`;
 
+  const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
+
   return onlyWhenDrift
-    ? `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} 알림을 받습니다.`
+    ? `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`
     : `${when} 리밸런싱 현황 리포트를 받습니다.`;
 }
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
+
+const inputClass =
+  "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
 export default function RebalancingAlertModal({ portfolioId, portfolioName, onClose }: Props) {
   const qc = useQueryClient();
@@ -75,6 +82,10 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
   const [dayOfMonth, setDayOfMonth] = useState(1);
   const [onlyWhenDrift, setOnlyWhenDrift] = useState(true);
   const [threshold, setThreshold] = useState(5);
+  const [mode, setMode] = useState<"NOTIFY" | "AUTO">("NOTIFY");
+  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">("BUY_ONLY");
+  const [accountId, setAccountId] = useState<string>("");
+  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
 
   const { data: alert, isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlert(portfolioId),
@@ -86,6 +97,16 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
     },
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+
+  const brokerAccounts = accounts.filter(
+    (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
+  );
+
   useEffect(() => {
     if (!alert) return;
     setScheduleType(alert.schedule_type);
@@ -93,6 +114,10 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
     setDayOfMonth(alert.schedule_day_of_month ?? 1);
     setOnlyWhenDrift(alert.only_when_drift);
     setThreshold(alert.threshold_pct);
+    setMode(alert.mode ?? "NOTIFY");
+    setStrategy(alert.strategy ?? "BUY_ONLY");
+    setAccountId(alert.account_id ?? "");
+    setOrderType(alert.order_type ?? "MARKET");
   }, [alert]);
 
   const upsertMut = useMutation({
@@ -103,30 +128,34 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
         schedule_day_of_week: scheduleType === "WEEKLY" ? dayOfWeek : null,
         schedule_day_of_month: NEEDS_DAY_OF_MONTH.includes(scheduleType) ? dayOfMonth : null,
         only_when_drift: onlyWhenDrift,
+        mode,
+        strategy,
+        account_id: mode === "AUTO" && accountId ? accountId : null,
+        order_type: orderType,
       }),
     onSuccess: () => {
       invalidateRebalancingAlertData(qc, portfolioId);
-      toast("알림이 설정되었습니다", "success");
+      toast("설정이 저장되었습니다", "success");
       onClose();
     },
-    onError: (e) => toast(extractErrorMessage(e, "알림 설정에 실패했습니다")),
+    onError: (e) => toast(extractErrorMessage(e, "설정 저장에 실패했습니다")),
   });
 
   const deleteMut = useMutation({
     mutationFn: () => deleteRebalancingAlert(portfolioId),
     onSuccess: () => {
       invalidateRebalancingAlertData(qc, portfolioId);
-      toast("알림이 해제되었습니다", "success");
+      toast("설정이 해제되었습니다", "success");
       onClose();
     },
-    onError: (e) => toast(extractErrorMessage(e, "알림 해제에 실패했습니다")),
+    onError: (e) => toast(extractErrorMessage(e, "설정 해제에 실패했습니다")),
   });
 
   const isPending = upsertMut.isPending || deleteMut.isPending;
   const hasAlert = !!alert;
 
   return (
-    <Modal title={`리밸런싱 알림 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
+    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
       <div className="p-6 space-y-5">
         {isLoading ? (
           <div className="flex justify-center py-4">
@@ -136,7 +165,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
           <>
             {/* ── 알림 주기 ── */}
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">알림 주기</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
               <div className="flex flex-wrap gap-1.5">
                 {SCHEDULE_OPTIONS.map(({ value, label }) => (
                   <button
@@ -195,7 +224,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                     ))}
                   </select>
                   <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {SCHEDULE_LABEL[scheduleType]}마다 이 날짜에 발송
+                    {SCHEDULE_LABEL[scheduleType]}마다 이 날짜에 실행
                   </span>
                 </div>
               </div>
@@ -203,7 +232,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
 
             {/* ── 알림 조건 ── */}
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">알림 조건</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
               <div className="space-y-2">
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
@@ -213,9 +242,9 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                     className="mt-0.5 text-blue-600"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    비중 이탈 시에만 발송
+                    비중 이탈 시에만
                     <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      이탈 종목이 있을 때만 알림을 보냅니다
+                      이탈 종목이 있을 때만 동작합니다
                     </span>
                   </span>
                 </label>
@@ -227,9 +256,9 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                     className="mt-0.5 text-blue-600"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">
-                    주기마다 항상 발송
+                    주기마다 항상
                     <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      이탈 여부와 관계없이 주기마다 전체 현황을 보냅니다
+                      이탈 여부와 관계없이 주기마다 리포트를 받습니다
                     </span>
                   </span>
                 </label>
@@ -259,18 +288,123 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
               </div>
             )}
 
+            {/* ── 실행 모드 ── */}
+            <div>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 모드</p>
+              <div className="grid grid-cols-2 gap-2">
+                {(["NOTIFY", "AUTO"] as const).map((m) => (
+                  <label
+                    key={m}
+                    className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      mode === m
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                        : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="mode"
+                      value={m}
+                      checked={mode === m}
+                      onChange={() => setMode(m)}
+                      className="mt-0.5 accent-blue-600"
+                    />
+                    <div>
+                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                        {m === "NOTIFY" ? "알림만 (권장)" : "자동 실행"}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                        {m === "NOTIFY" ? "이메일로 알림 수신" : "조건 충족 시 주문 자동 실행"}
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* ── 자동 실행 옵션 (AUTO 모드) ── */}
+            {mode === "AUTO" && (
+              <div className="space-y-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
+                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                  ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    실행 계좌 (KIS/키움)
+                  </label>
+                  <select
+                    className={inputClass}
+                    value={accountId}
+                    onChange={(e) => setAccountId(e.target.value)}
+                  >
+                    <option value="">계좌 선택</option>
+                    {brokerAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {(["BUY_ONLY", "FULL"] as const).map((s) => (
+                    <label
+                      key={s}
+                      className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                        strategy === s
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                          : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="strategy"
+                        value={s}
+                        checked={strategy === s}
+                        onChange={() => setStrategy(s)}
+                        className="mt-0.5 accent-blue-600"
+                      />
+                      <div>
+                        <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                          {s === "BUY_ONLY" ? "매수만 (권장)" : "매도+매수"}
+                        </div>
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {s === "BUY_ONLY" ? "세금 절감" : "완전 리밸런싱"}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    주문 유형
+                  </label>
+                  <select
+                    className={inputClass}
+                    value={orderType}
+                    onChange={(e) => setOrderType(e.target.value as "MARKET" | "LIMIT")}
+                  >
+                    <option value="MARKET">시장가</option>
+                    <option value="LIMIT">지정가</option>
+                  </select>
+                </div>
+              </div>
+            )}
+
             {/* ── 설명 텍스트 ── */}
             <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-              {buildDescription(scheduleType, dayOfWeek, dayOfMonth, onlyWhenDrift, threshold)}
+              {buildDescription(scheduleType, dayOfWeek, dayOfMonth, onlyWhenDrift, threshold, mode)}
             </p>
 
             {/* ── 현재 설정 표시 ── */}
             {hasAlert && (
               <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
-                현재 알림이 활성화되어 있습니다.
+                현재 설정이 활성화되어 있습니다.
                 {alert.last_triggered_at && (
                   <span className="block mt-0.5 text-blue-500">
-                    마지막 발송:{" "}
+                    마지막 실행:{" "}
                     {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
                   </span>
                 )}
@@ -289,7 +423,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                 ) : (
                   <Bell size={14} />
                 )}
-                {hasAlert ? "알림 업데이트" : "알림 설정"}
+                {hasAlert ? "설정 업데이트" : "자동화 설정"}
               </button>
               {hasAlert && (
                 <button
@@ -302,7 +436,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                   ) : (
                     <BellOff size={14} />
                   )}
-                  알림 해제
+                  설정 해제
                 </button>
               )}
             </div>

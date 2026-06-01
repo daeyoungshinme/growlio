@@ -1,5 +1,5 @@
 from app.models.user import User, UserSettings
-from app.models.asset import AssetAccount, AssetSnapshot
+from app.models.asset import AssetAccount, AssetSnapshot, RebalancingExecution
 from app.models.security import Security
 from app.models.token import KisToken
 from app.models.backtest import BacktestPortfolio
@@ -11,6 +11,7 @@ __all__ = [
     "UserSettings",
     "AssetAccount",
     "AssetSnapshot",
+    "RebalancingExecution",
     "Security",
     "KisToken",
     "BacktestPortfolio",

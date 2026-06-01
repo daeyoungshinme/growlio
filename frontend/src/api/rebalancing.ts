@@ -135,3 +135,31 @@ export const fetchBrokerBalance = (accountId: string): Promise<KisBalanceRespons
 
 export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
   api.get<KisBalanceResponse[]>(`/rebalancing/broker-balance-all`).then((r) => r.data);
+
+// ── 원클릭 실행 ──────────────────────────────────────────────
+
+export const quickExecuteRebalancing = (portfolioId: string): Promise<ExecutionResult[]> =>
+  api.post<ExecutionResult[]>(`/rebalancing/portfolios/${portfolioId}/quick-execute`).then((r) => r.data);
+
+// ── 실행 이력 ──────────────────────────────────────────────
+
+export interface RebalancingExecutionSummary {
+  id: string;
+  portfolio_id: string | null;
+  triggered_by: "MANUAL" | "AUTO" | "ONE_CLICK";
+  strategy: "FULL" | "BUY_ONLY";
+  total_success: number;
+  total_fail: number;
+  total_skipped: number;
+  executed_at: string;
+}
+
+export interface RebalancingExecutionDetail extends RebalancingExecutionSummary {
+  results: ExecutionResult[] | null;
+}
+
+export const fetchRebalancingHistory = (limit = 20): Promise<RebalancingExecutionSummary[]> =>
+  api.get<RebalancingExecutionSummary[]>(`/rebalancing/history`, { params: { limit } }).then((r) => r.data);
+
+export const fetchRebalancingExecutionDetail = (id: string): Promise<RebalancingExecutionDetail> =>
+  api.get<RebalancingExecutionDetail>(`/rebalancing/history/${id}`).then((r) => r.data);

@@ -55,6 +55,16 @@ class RebalancingAlert(Base):
     schedule_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     schedule_day_of_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
     only_when_drift: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # 실행 모드: NOTIFY(이메일 알림만) | AUTO(자동 주문 실행)
+    mode: Mapped[str] = mapped_column(String(10), nullable=False, default="NOTIFY")
+    # 자동 실행 전략: BUY_ONLY | FULL
+    strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="BUY_ONLY")
+    # AUTO 모드 실행 계좌 (KIS/키움)
+    account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    # 주문 유형: MARKET | LIMIT
+    order_type: Mapped[str] = mapped_column(String(10), nullable=False, default="MARKET")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

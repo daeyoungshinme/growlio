@@ -136,6 +136,32 @@ class Transaction(Base):
     )
 
 
+class RebalancingExecution(Base):
+    """리밸런싱 실행 이력 — 수동/자동/원클릭 실행 결과를 저장한다."""
+
+    __tablename__ = "rebalancing_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    )
+    # MANUAL | AUTO | ONE_CLICK
+    triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
+    # FULL | BUY_ONLY
+    strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="FULL")
+    # List[ExecutionResult] JSONB
+    results: Mapped[list | None] = mapped_column(JSONB)
+    total_success: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_fail: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_skipped: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("idx_rebalancing_executions_user", "user_id", "executed_at"),)
+
+
 class UserTickerSettings(Base):
     """사용자별 종목 설정 — 배당월 수동 override."""
 

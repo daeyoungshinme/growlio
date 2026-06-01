@@ -190,21 +190,70 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             items_to_show = analysis.items
             is_scheduled_report = True
 
-        # 5. 이메일 발송
+        mode = getattr(alert, "mode", "NOTIFY")
         email = notification_email or user_email
-        try:
-            await send_rebalancing_alert(
-                to_email=email,
-                portfolio_name=portfolio.name,
-                threshold_pct=threshold,
-                items_to_show=items_to_show,
-                drifting_count=len(drifting),
-                is_scheduled_report=is_scheduled_report,
-                schedule_type=getattr(alert, "schedule_type", "DAILY"),
-            )
-        except Exception as exc:
-            logger.warning("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
-            continue
+
+        if mode == "AUTO" and alert.account_id and drifting:
+            # 5a. AUTO 모드: 자동 주문 실행
+            from app.redis_client import get_redis
+            from app.schemas.rebalancing import ExecutionOrderItem
+            from app.services.rebalancing_execution_service import execute_rebalancing
+
+            strategy = getattr(alert, "strategy", "BUY_ONLY")
+            order_type = getattr(alert, "order_type", "MARKET")
+
+            orders: list[ExecutionOrderItem] = []
+            for item in drifting:
+                if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
+                    continue
+                qty = abs(int(item.shares_to_trade))
+                if qty <= 0:
+                    continue
+                side = "BUY" if item.diff_krw > 0 else "SELL"
+                if strategy == "BUY_ONLY" and side == "SELL":
+                    continue
+                orders.append(
+                    ExecutionOrderItem(
+                        ticker=item.ticker,
+                        name=item.name,
+                        market=item.market,
+                        side=side,
+                        quantity=qty,
+                        account_id=str(alert.account_id),
+                        order_type=order_type,
+                    )
+                )
+
+            if orders:
+                try:
+                    redis = await get_redis()
+                    await execute_rebalancing(
+                        user_id=alert.user_id,
+                        account_id=alert.account_id,
+                        orders=orders,
+                        db=db,
+                        redis=redis,
+                        portfolio_id=portfolio.id,
+                        triggered_by="AUTO",
+                        strategy=strategy,
+                    )
+                except Exception as exc:
+                    logger.warning("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
+        else:
+            # 5b. NOTIFY 모드: 이메일 알림만
+            try:
+                await send_rebalancing_alert(
+                    to_email=email,
+                    portfolio_name=portfolio.name,
+                    threshold_pct=threshold,
+                    items_to_show=items_to_show,
+                    drifting_count=len(drifting),
+                    is_scheduled_report=is_scheduled_report,
+                    schedule_type=getattr(alert, "schedule_type", "DAILY"),
+                )
+            except Exception as exc:
+                logger.warning("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+                continue
 
         alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1
