@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "../../api/rebalancing";
 import { AssetAccount } from "../../api/assets";
+import { RebalancingAlert } from "../../api/alerts";
 import { fmtKrw } from "../../utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
+import { Bell } from "lucide-react";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 
 function DiffCell({ diff }: { diff: number }) {
@@ -94,6 +96,8 @@ interface Props {
   portfolioId: string;
   accounts: AssetAccount[];
   onExecuted?: (results: ExecutionResult[]) => void;
+  existingAlert?: RebalancingAlert;
+  onAlertClick?: () => void;
 }
 
 function CagrCard({ label, cagr }: { label: string; cagr: number | null | undefined }) {
@@ -110,7 +114,9 @@ function CagrCard({ label, cagr }: { label: string; cagr: number | null | undefi
   );
 }
 
-export default function RebalancingTable({ analysis, portfolioId, accounts, onExecuted }: Props) {
+export default function RebalancingTable({
+  analysis, portfolioId, accounts, onExecuted, existingAlert, onAlertClick,
+}: Props) {
   const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS");
   const [showDividendDetail, setShowDividendDetail] = useState(false);
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -130,21 +136,50 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
 
   return (
     <div className="space-y-4">
-      {/* 실행 버튼 — KIS 계좌 없으면 disabled */}
-      <div className="flex justify-end items-center gap-2">
-        {kisAccounts.length === 0 && (
-          <span className="text-xs text-gray-500">
-            KIS 증권계좌 연동 시 자동 주문 가능
-          </span>
-        )}
-        <button
-          onClick={() => setExecutionOpen(true)}
-          disabled={kisAccounts.length === 0}
-          className="bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-          title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
-        >
-          ⚡ 리밸런싱 실행
-        </button>
+      {/* 실행 버튼 행 */}
+      <div className="flex items-center gap-2">
+        {/* 모바일 전용: 알림설정 버튼 */}
+        <div className="sm:hidden flex items-center gap-1.5">
+          {existingAlert && (
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+              existingAlert.mode === "AUTO"
+                ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
+                : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
+            }`}>
+              {existingAlert.mode === "AUTO" ? "자동" : "알림"}
+            </span>
+          )}
+          {onAlertClick && (
+            <button
+              onClick={onAlertClick}
+              className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+                existingAlert
+                  ? "border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
+                  : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
+              }`}
+            >
+              <Bell size={11} />
+              {existingAlert ? "설정 변경" : "알림설정"}
+            </button>
+          )}
+        </div>
+
+        {/* 리밸런싱 실행 버튼 (우측 정렬) */}
+        <div className="flex items-center gap-2 ml-auto">
+          {kisAccounts.length === 0 && (
+            <span className="text-xs text-gray-500 hidden sm:inline">
+              KIS 증권계좌 연동 시 자동 주문 가능
+            </span>
+          )}
+          <button
+            onClick={() => setExecutionOpen(true)}
+            disabled={kisAccounts.length === 0}
+            className="bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
+          >
+            ⚡ 리밸런싱 실행
+          </button>
+        </div>
       </div>
 
       {/* 요약 카드 */}
@@ -168,6 +203,53 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
           </div>
         </div>
       </div>
+
+      {/* 집중도 지표 (HHI) */}
+      {(() => {
+        const TRADING_FEE_RATE = 0.00014;
+        const currentHHI = analysis.items.reduce((s, i) => s + i.current_weight_pct ** 2, 0);
+        const targetHHI = analysis.items
+          .filter((i) => i.target_weight_pct > 0)
+          .reduce((s, i) => s + i.target_weight_pct ** 2, 0);
+
+        function hhiLabel(hhi: number) {
+          if (hhi < 1000) return { text: "분산형", cls: "text-green-400" };
+          if (hhi < 2500) return { text: "보통", cls: "text-yellow-400" };
+          return { text: "집중형", cls: "text-red-400" };
+        }
+
+        const totalBuy = analysis.items.filter((i) => i.diff_krw > 0).reduce((s, i) => s + i.diff_krw, 0);
+        const totalSell = Math.abs(analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0));
+        const estFee = (totalBuy + totalSell) * TRADING_FEE_RATE;
+
+        const curLabel = hhiLabel(currentHHI);
+        const tgtLabel = hhiLabel(targetHHI);
+
+        return (
+          <div className="space-y-2">
+            {/* HHI */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-700 rounded-xl p-3 text-center" title="HHI (허핀달-허쉬만 지수): 포트폴리오 집중도. 낮을수록 분산">
+                <div className="text-xs text-gray-400 mb-1">현재 집중도 (HHI)</div>
+                <div className={`text-sm font-semibold ${curLabel.cls}`}>{currentHHI.toFixed(0)}</div>
+                <div className={`text-xs mt-0.5 ${curLabel.cls}`}>{curLabel.text}</div>
+              </div>
+              <div className="bg-gray-700 rounded-xl p-3 text-center" title="리밸런싱 후 목표 HHI">
+                <div className="text-xs text-gray-400 mb-1">목표 집중도 (HHI)</div>
+                <div className={`text-sm font-semibold ${tgtLabel.cls}`}>{targetHHI.toFixed(0)}</div>
+                <div className={`text-xs mt-0.5 ${tgtLabel.cls}`}>{tgtLabel.text}</div>
+              </div>
+            </div>
+            {/* 거래 비용 */}
+            {estFee > 0 && (
+              <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+                <span className="text-gray-400">예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span></span>
+                <span className="text-gray-200 font-medium">{fmtKrw(estFee)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* 포트폴리오 10년 수익률 요약 */}
       {hasCagrData && (
@@ -371,6 +453,29 @@ export default function RebalancingTable({ analysis, portfolioId, accounts, onEx
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* 미추적 보유 종목 */}
+      {analysis.untracked_holdings.length > 0 && (
+        <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl p-4">
+          <div className="text-xs font-medium text-amber-400 mb-2">
+            포트폴리오 미포함 보유 종목 ({analysis.untracked_holdings.length}개)
+          </div>
+          <div className="space-y-1.5">
+            {analysis.untracked_holdings.map((h, idx) => (
+              <div key={idx} className="flex items-center justify-between text-xs">
+                <div className="min-w-0">
+                  <span className="font-medium text-gray-200 truncate">{h.name}</span>
+                  <span className="text-gray-500 ml-1.5">{h.ticker}</span>
+                </div>
+                <div className="text-right shrink-0 ml-3">
+                  <span className="text-gray-300">{fmtKrw(h.current_value_krw)}</span>
+                  <span className="text-gray-500 ml-1">({h.current_weight_pct.toFixed(1)}%)</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

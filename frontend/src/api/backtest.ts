@@ -60,3 +60,17 @@ export const deleteBacktestPortfolio = (id: string) =>
 
 export const runBacktest = (req: BacktestRunRequest) =>
   api.post<BacktestResult>("/backtest/run", req).then((r) => r.data);
+
+export interface CorrelationRequest {
+  portfolio_ids: string[];
+  start_date: string;
+  end_date: string;
+}
+
+export interface CorrelationResult {
+  labels: string[];
+  matrix: (number | null)[][];
+}
+
+export const runCorrelation = (req: CorrelationRequest) =>
+  api.post<CorrelationResult>("/backtest/correlation", req).then((r) => r.data);

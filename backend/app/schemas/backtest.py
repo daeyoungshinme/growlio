@@ -81,3 +81,22 @@ class BacktestResult(BaseModel):
     dates: list[str]       # "YYYY-MM-DD" 목록
     series: list[SeriesData]
     metrics: list[PortfolioMetrics]
+
+
+class CorrelationRequest(BaseModel):
+    portfolio_ids: list[uuid.UUID]
+    start_date: date
+    end_date: date
+
+    @field_validator("end_date")
+    @classmethod
+    def validate_dates(cls, v: date, info) -> date:
+        start = info.data.get("start_date")
+        if start and v <= start:
+            raise ValueError("end_date는 start_date 이후여야 합니다.")
+        return v
+
+
+class CorrelationResult(BaseModel):
+    labels: list[str]
+    matrix: list[list[float | None]]

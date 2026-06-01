@@ -19,8 +19,10 @@ from app.schemas.backtest import (
     BacktestPortfolioUpdate,
     BacktestResult,
     BacktestRunRequest,
+    CorrelationRequest,
+    CorrelationResult,
 )
-from app.services.backtest_service import run_backtest
+from app.services.backtest_service import compute_correlation, run_backtest
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 
@@ -130,5 +132,35 @@ async def run_backtest_endpoint(
         return BacktestResult.model_validate_json(cached)
 
     result = await run_backtest(current_user.id, body, db)
+    await redis.setex(cache_key, _BACKTEST_CACHE_TTL, result.model_dump_json())
+    return result
+
+
+@router.post("/correlation", response_model=CorrelationResult)
+@limiter.limit("5/minute")
+async def run_correlation_endpoint(
+    request: Request,
+    body: CorrelationRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """선택된 포트폴리오 종목 간 월별 수익률 상관관계 분석."""
+    if not body.portfolio_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="최소 1개의 포트폴리오를 선택해주세요.",
+        )
+
+    redis = await get_redis()
+    param_hash = hashlib.md5(
+        json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
+    ).hexdigest()
+    cache_key = f"correlation:{current_user.id}:{param_hash}"
+
+    cached = await redis.get(cache_key)
+    if cached:
+        return CorrelationResult.model_validate_json(cached)
+
+    result = await compute_correlation(current_user.id, body, db)
     await redis.setex(cache_key, _BACKTEST_CACHE_TTL, result.model_dump_json())
     return result

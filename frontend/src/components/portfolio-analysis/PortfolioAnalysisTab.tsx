@@ -16,7 +16,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, Edit2, GripVertical, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { BacktestResult, runBacktest } from "../../api/backtest";
+import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "../../api/backtest";
 import { analyzePortfolio, RebalancingAnalysis } from "../../api/rebalancing";
 import {
   Portfolio,
@@ -31,6 +31,7 @@ import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import BacktestResultChart from "../backtest/BacktestResultChart";
 import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
+import CorrelationHeatmap from "../backtest/CorrelationHeatmap";
 import RebalancingTable from "../rebalancing/RebalancingTable";
 import { toast } from "../../utils/toast";
 import { extractErrorMessage } from "../../utils/error";
@@ -99,9 +100,12 @@ export default function PortfolioAnalysisTab() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
+  const [correlationResult, setCorrelationResult] = useState<CorrelationResult | null>(null);
+  const [correlationLoading, setCorrelationLoading] = useState(false);
 
   const [startDate, setStartDate] = useState(BACKTEST_DEFAULT_START_DATE);
   const [endDate, setEndDate] = useState(BACKTEST_DEFAULT_END_DATE);
+  const [activePreset, setActivePreset] = useState<number | null>(5);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
@@ -226,6 +230,7 @@ export default function PortfolioAnalysisTab() {
     setAnalysisMode("backtest");
     setAnalysis(null);
     setAnalysisError(null);
+    setCorrelationResult(null);
   }
 
   const canRunBacktest =
@@ -311,9 +316,33 @@ export default function PortfolioAnalysisTab() {
                                 {p.name}
                               </p>
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                                {p.base_type === "STOCK_ONLY" ? "주식 자산 기준" : "전체 자산 기준"} · {p.items.length}개 항목
-                                {stockAccounts.length > 1 && ` · 계좌: ${getAccountLabel(p)}`}
+                                {p.base_type === "STOCK_ONLY" ? "주식 기준" : "전체 자산"} · {p.items.length}개 항목
+                                {stockAccounts.length > 1 && ` · ${getAccountLabel(p)}`}
                               </p>
+                              {/* 미니 비중 바 */}
+                              {p.items.length > 0 && (() => {
+                                const MINI_COLORS = ["#2563EB","#16A34A","#D97706","#DC2626","#7C3AED","#0891B2","#DB2777","#059669"];
+                                const sorted = [...p.items].sort((a, b) => b.weight - a.weight);
+                                const top = sorted.slice(0, 5);
+                                const rest = sorted.slice(5).reduce((s, i) => s + i.weight, 0);
+                                return (
+                                  <div className="mt-1.5 flex h-1.5 rounded-full overflow-hidden gap-px">
+                                    {top.map((item, ci) => (
+                                      <div
+                                        key={item.ticker}
+                                        title={`${item.name ?? item.ticker}: ${item.weight.toFixed(1)}%`}
+                                        style={{ width: `${item.weight}%`, backgroundColor: MINI_COLORS[ci] }}
+                                      />
+                                    ))}
+                                    {rest > 0 && (
+                                      <div
+                                        title={`기타: ${rest.toFixed(1)}%`}
+                                        style={{ width: `${rest}%`, backgroundColor: "#9CA3AF" }}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                             <div className="flex gap-0.5 shrink-0">
                               <button
@@ -410,6 +439,48 @@ export default function PortfolioAnalysisTab() {
         {analysisMode === "backtest" && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
             <div className="space-y-3">
+              {/* 기간 프리셋 */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">기간</span>
+                {([1, 3, 5, 10] as const).map((y) => {
+                  const isActive = activePreset === y;
+                  return (
+                    <button
+                      key={y}
+                      onClick={() => {
+                        const end = BACKTEST_DEFAULT_END_DATE;
+                        const start = `${new Date().getFullYear() - y}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+                        setStartDate(start);
+                        setEndDate(end);
+                        setActivePreset(y);
+                      }}
+                      className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+                        isActive
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {y}년
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => {
+                    const end = BACKTEST_DEFAULT_END_DATE;
+                    const start = `${new Date().getFullYear() - 30}-01-01`;
+                    setStartDate(start);
+                    setEndDate(end);
+                    setActivePreset(30);
+                  }}
+                  className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+                    activePreset === 30
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  최대
+                </button>
+              </div>
               <div className="flex flex-wrap gap-3">
                 <div>
                   <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">시작일</label>
@@ -417,7 +488,7 @@ export default function PortfolioAnalysisTab() {
                     type="date"
                     value={startDate}
                     max={endDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => { setStartDate(e.target.value); setActivePreset(null); }}
                     className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -428,7 +499,7 @@ export default function PortfolioAnalysisTab() {
                     value={endDate}
                     min={startDate}
                     max={BACKTEST_DEFAULT_END_DATE}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => { setEndDate(e.target.value); setActivePreset(null); }}
                     className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -464,7 +535,7 @@ export default function PortfolioAnalysisTab() {
               </div>
               <div className="flex justify-end">
                 <button
-                  onClick={() => { setBacktestResult(null); runMut.mutate(); }}
+                  onClick={() => { setBacktestResult(null); setCorrelationResult(null); runMut.mutate(); }}
                   disabled={!canRunBacktest || runMut.isPending}
                   className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                 >
@@ -504,13 +575,15 @@ export default function PortfolioAnalysisTab() {
                   ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
                   : activeAccounts;
               })()}
+              existingAlert={alertByPortfolioId[analysis.portfolio_id.toString()]}
+              onAlertClick={() => setAlertModalPortfolioId(analysis.portfolio_id.toString())}
             />
             {/* 자동화 설정 CTA */}
             {(() => {
               const portfolioIdStr = analysis.portfolio_id.toString();
               const existingAlert = alertByPortfolioId[portfolioIdStr];
               return (
-                <div className="flex items-center justify-between mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
+                <div className="hidden sm:flex items-center justify-between mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
                   {existingAlert ? (
                     <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
                       <Bell size={12} />
@@ -544,6 +617,37 @@ export default function PortfolioAnalysisTab() {
             <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
             <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
               <BacktestMetricsTable metrics={backtestResult.metrics} />
+            </div>
+            {/* 상관관계 분석 섹션 */}
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+              {correlationResult ? (
+                <CorrelationHeatmap result={correlationResult} />
+              ) : (
+                <div className="flex justify-center">
+                  <button
+                    onClick={async () => {
+                      if (!selectedIds.size) return;
+                      setCorrelationLoading(true);
+                      try {
+                        const res = await runCorrelation({
+                          portfolio_ids: Array.from(selectedIds),
+                          start_date: startDate,
+                          end_date: endDate,
+                        });
+                        setCorrelationResult(res);
+                      } catch {
+                        toast("상관관계 분석에 실패했습니다");
+                      } finally {
+                        setCorrelationLoading(false);
+                      }
+                    }}
+                    disabled={correlationLoading || !selectedIds.size}
+                    className="flex items-center gap-2 px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
+                  >
+                    {correlationLoading ? <><Loader2 size={12} className="animate-spin" /> 분석 중...</> : "📊 종목 간 상관관계 분석"}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
