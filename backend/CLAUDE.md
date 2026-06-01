@@ -104,6 +104,7 @@ API Request
         ├── rebalancing.py    # 리밸런싱 추천
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
         ├── stocks.py         # 종목 검색
+        ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
         └── transactions.py   # 입출금/배당 내역 CRUD
 
 services/
@@ -119,7 +120,9 @@ services/
   ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
+  ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS → LS 우선순위)
+  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
   ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
   └── rebalancing_service.py  # 리밸런싱 추천
 

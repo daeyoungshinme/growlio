@@ -57,7 +57,7 @@ make build-android-release         # APK Release 빌드
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
 - `/find-account` — 계정 찾기 (FindAccountPage)
-- `/trend` — 월별 추이 (TrendPage)
+- `/trend` — `/dashboard`로 리다이렉트 (TrendPage 제거됨)
 
 > 구 URL 리다이렉트: `/assets` → `/portfolio`
 
@@ -110,7 +110,12 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 | DCA 분석 (InvestPlanPage) | `["dca-analysis"]` |
 | DCA 분석 (DashboardPage) | `["invest-dca"]` |
 | 설정 | `["settings"]` |
+| 현재 환율 | `["exchange-rate"]` |
 | 환율 알림 목록 | `["exchange-rate-alerts"]` |
+| 주가 알림 목록 | `["stock-price-alerts"]` |
+| 리밸런싱 알림 목록 | `["rebalancing-alerts"]` |
+| 포트폴리오별 리밸런싱 알림 | `["rebalancing-alert", portfolioId]` |
+| 세금 추정 요약 | `["tax-summary", year]` |
 
 > 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지.
 
@@ -182,6 +187,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios 무효화.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + invest-dca + settings + dashboard 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
+- 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
