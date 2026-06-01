@@ -471,3 +471,5 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     handleExecute,
   };
 }
+
+export type RebalancingExecutionHook = ReturnType<typeof useRebalancingExecution>;

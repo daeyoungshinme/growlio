@@ -1,11 +1,8 @@
 """리밸런싱 Pydantic 스키마."""
 import uuid
-from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
-
-from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
 class TickerAccountInfo(BaseModel):
@@ -15,63 +12,6 @@ class TickerAccountInfo(BaseModel):
     quantity: float = 0       # 해당 계좌 보유 수량
     value_krw: float = 0      # 해당 계좌 보유 금액 (KRW)
     is_mock_mode: bool = False  # KIS 모의 여부
-
-
-class TargetPortfolioItem(BaseModel):
-    ticker: str
-    name: str
-    market: str
-    weight: float  # 0~100, 합계 = 100
-
-
-class TargetPortfolioCreate(BaseModel):
-    name: str
-    items: list[TargetPortfolioItem]
-    base_type: str = "STOCK_ONLY"  # STOCK_ONLY | TOTAL_ASSETS
-    account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
-
-    @field_validator("items")
-    @classmethod
-    def validate_items(cls, v: list[TargetPortfolioItem]) -> list[TargetPortfolioItem]:
-        return validate_portfolio_weights(v)
-
-    @field_validator("base_type")
-    @classmethod
-    def validate_base_type(cls, v: str) -> str:
-        if v not in ("STOCK_ONLY", "TOTAL_ASSETS"):
-            raise ValueError("base_type은 STOCK_ONLY 또는 TOTAL_ASSETS이어야 합니다.")
-        return v
-
-
-class TargetPortfolioUpdate(BaseModel):
-    name: str | None = None
-    items: list[TargetPortfolioItem] | None = None
-    base_type: str | None = None
-    account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
-
-    @field_validator("items")
-    @classmethod
-    def validate_items(cls, v: list[TargetPortfolioItem] | None) -> list[TargetPortfolioItem] | None:
-        return validate_portfolio_weights_optional(v)
-
-    @field_validator("base_type")
-    @classmethod
-    def validate_base_type(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("STOCK_ONLY", "TOTAL_ASSETS"):
-            raise ValueError("base_type은 STOCK_ONLY 또는 TOTAL_ASSETS이어야 합니다.")
-        return v
-
-
-class TargetPortfolioResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
-    id: uuid.UUID
-    name: str
-    items: list[TargetPortfolioItem]
-    base_type: str
-    account_ids: list[str] | None = None
-    created_at: datetime
-    updated_at: datetime
 
 
 # ── 리밸런싱 분석 결과 ────────────────────────────────────────

@@ -1,21 +1,5 @@
 import { api } from "./client";
 
-export interface TargetPortfolioItem {
-  ticker: string;
-  name: string;
-  market: string;
-  weight: number;
-}
-
-export interface TargetPortfolio {
-  id: string;
-  name: string;
-  items: TargetPortfolioItem[];
-  base_type: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface RebalancingItem {
   ticker: string;
   name: string;
@@ -69,23 +53,6 @@ export interface RebalancingAnalysis {
   current_weighted_cagr_10y_pct?: number | null;
   ticker_account_map: Record<string, TickerAccountInfo[]>;
 }
-
-export const fetchTargetPortfolios = () =>
-  api.get<TargetPortfolio[]>("/rebalancing/portfolios").then((r) => r.data);
-
-export const createTargetPortfolio = (body: {
-  name: string;
-  items: TargetPortfolioItem[];
-  base_type: string;
-}) => api.post<TargetPortfolio>("/rebalancing/portfolios", body).then((r) => r.data);
-
-export const updateTargetPortfolio = (
-  id: string,
-  body: { name?: string; items?: TargetPortfolioItem[]; base_type?: string }
-) => api.put<TargetPortfolio>(`/rebalancing/portfolios/${id}`, body).then((r) => r.data);
-
-export const deleteTargetPortfolio = (id: string) =>
-  api.delete(`/rebalancing/portfolios/${id}`);
 
 export const analyzePortfolio = (id: string, accountIds?: string[]) => {
   const params = new URLSearchParams();

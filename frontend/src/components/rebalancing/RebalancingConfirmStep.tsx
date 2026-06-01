@@ -1,40 +1,28 @@
-import { AssetAccount } from "../../api/assets";
 import { RebalancingItem } from "../../api/rebalancing";
 import { fmtKrw, fmtKrwPrice } from "../../utils/format";
 import { SideBadge } from "./RebalancingBadges";
-import { ExecutionAction, ExecutionState, OrderType, isOverseasMarket } from "./useRebalancingExecution";
+import { OrderType, RebalancingExecutionHook, isOverseasMarket } from "./useRebalancingExecution";
 
 interface Props {
-  kisAccounts: AssetAccount[];
-  actionableItems: RebalancingItem[];
-  state: ExecutionState;
-  dispatch: React.Dispatch<ExecutionAction>;
-  getSellRows: (accountId: string) => { item: RebalancingItem; currentQty: number; suggestedQty: number }[];
-  getBuyRows: (accountId: string) => { item: RebalancingItem; suggestedQty: number; currentQty: number }[];
-  getBuyTotalInfo: (ticker: string) => { allocated: number; needed: number };
-  getAccountSummary: (accountId: string) => { sells: number; buys: number };
-  getLimitPriceNative: (key: string, ticker: string, market: string) => number;
-  getEstimateKrw: (key: string, ticker: string, market: string, qty: number) => number | null;
-  loadLiveBalance: (accountId: string) => Promise<void>;
-  hasRealAccount: boolean;
+  exec: RebalancingExecutionHook;
   ordersCount: number;
 }
 
-export function RebalancingConfirmStep({
-  kisAccounts,
-  actionableItems,
-  state,
-  dispatch,
-  getSellRows,
-  getBuyRows,
-  getBuyTotalInfo,
-  getAccountSummary,
-  getLimitPriceNative,
-  getEstimateKrw,
-  loadLiveBalance,
-  hasRealAccount,
-  ordersCount,
-}: Props) {
+export function RebalancingConfirmStep({ exec, ordersCount }: Props) {
+  const {
+    kisAccounts,
+    actionableItems,
+    state,
+    dispatch,
+    getSellRows,
+    getBuyRows,
+    getBuyTotalInfo,
+    getAccountSummary,
+    getLimitPriceNative,
+    getEstimateKrw,
+    loadLiveBalance,
+    hasRealAccount,
+  } = exec;
   const {
     balanceState,
     depositKrw,

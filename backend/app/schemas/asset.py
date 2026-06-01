@@ -1,16 +1,11 @@
 import re
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, field_validator, model_validator
 
-AssetType = Literal[
-    "BANK_ACCOUNT", "DEPOSIT", "STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER",
-    "CASH_OTHER", "OTHER", "REAL_ESTATE",
-]
-DataSource = Literal["MANUAL", "KIS_API", "KIWOOM_API", "OPEN_BANKING"]
-TransactionType = Literal["DEPOSIT", "WITHDRAWAL", "DIVIDEND"]
+from app.enums import AssetType, DataSource, TransactionType
 
 
 class PositionItem(BaseModel):

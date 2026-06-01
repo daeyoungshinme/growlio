@@ -58,6 +58,11 @@ export default function DashboardPage() {
 
   const exchangeRate = useExchangeRate();
 
+  const reversedMonthlyTrend = useMemo(
+    () => [...(data?.monthly_trend ?? [])].reverse(),
+    [data?.monthly_trend]
+  );
+
   const overallDividendYield = useMemo(() => {
     const estimated = data?.estimated_annual_dividends;
     const invested = overview?.total_invested_krw;
@@ -416,7 +421,7 @@ export default function DashboardPage() {
                 {(data.monthly_trend ?? []).length === 0 ? (
                   <tr><td colSpan={3} className="py-8 text-center text-gray-300 dark:text-gray-600 text-xs">데이터 없음</td></tr>
                 ) : (
-                  [...(data.monthly_trend ?? [])].reverse().map((row, i, arr) => {
+                  reversedMonthlyTrend.map((row, i, arr) => {
                     const prev = arr[i + 1];
                     const change = prev ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100 : null;
                     return (

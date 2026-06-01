@@ -4,6 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from app.enums import PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
@@ -17,7 +18,7 @@ class PortfolioItem(BaseModel):
 class PortfolioCreate(BaseModel):
     name: str
     items: list[PortfolioItem]
-    base_type: str = "STOCK_ONLY"  # STOCK_ONLY | TOTAL_ASSETS
+    base_type: PortfolioBaseType = PortfolioBaseType.STOCK_ONLY
     account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
 
     @field_validator("items")
@@ -25,31 +26,17 @@ class PortfolioCreate(BaseModel):
     def validate_items(cls, v: list[PortfolioItem]) -> list[PortfolioItem]:
         return validate_portfolio_weights(v)
 
-    @field_validator("base_type")
-    @classmethod
-    def validate_base_type(cls, v: str) -> str:
-        if v not in ("STOCK_ONLY", "TOTAL_ASSETS"):
-            raise ValueError("base_type은 STOCK_ONLY 또는 TOTAL_ASSETS이어야 합니다.")
-        return v
-
 
 class PortfolioUpdate(BaseModel):
     name: str | None = None
     items: list[PortfolioItem] | None = None
-    base_type: str | None = None
+    base_type: PortfolioBaseType | None = None
     account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
 
     @field_validator("items")
     @classmethod
     def validate_items(cls, v: list[PortfolioItem] | None) -> list[PortfolioItem] | None:
         return validate_portfolio_weights_optional(v)
-
-    @field_validator("base_type")
-    @classmethod
-    def validate_base_type(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("STOCK_ONLY", "TOTAL_ASSETS"):
-            raise ValueError("base_type은 STOCK_ONLY 또는 TOTAL_ASSETS이어야 합니다.")
-        return v
 
 
 class PortfolioReorderItem(BaseModel):

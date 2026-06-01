@@ -14,7 +14,7 @@ interface Props {
 
 export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onExecuted, onClose }: Props) {
   const exec = useRebalancingExecution({ portfolioId, analysis, accounts, onExecuted });
-  const { state, dispatch, kisAccounts, actionableItems, orders, hasRealAccount } = exec;
+  const { state, orders, dispatch } = exec;
   const { phase, results, confirmed, orderType } = state;
 
   return (
@@ -30,18 +30,7 @@ export function RebalancingExecutionModal({ portfolioId, analysis, accounts, onE
         <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
           {phase === "confirm" && (
             <RebalancingConfirmStep
-              kisAccounts={kisAccounts}
-              actionableItems={actionableItems}
-              state={state}
-              dispatch={dispatch}
-              getSellRows={exec.getSellRows}
-              getBuyRows={exec.getBuyRows}
-              getBuyTotalInfo={exec.getBuyTotalInfo}
-              getAccountSummary={exec.getAccountSummary}
-              getLimitPriceNative={exec.getLimitPriceNative}
-              getEstimateKrw={exec.getEstimateKrw}
-              loadLiveBalance={exec.loadLiveBalance}
-              hasRealAccount={hasRealAccount}
+              exec={exec}
               ordersCount={orders.length}
             />
           )}
