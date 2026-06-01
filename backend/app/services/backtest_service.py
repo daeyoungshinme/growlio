@@ -16,8 +16,9 @@ from functools import partial
 import structlog
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models.asset import AssetAccount, AssetSnapshot
+from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.portfolio import Portfolio
 from app.schemas.backtest import (
     BacktestResult,
@@ -195,9 +196,9 @@ def _compute_portfolio_series(
                 break
 
     if not init_prices:
-        values = [100.0] * len(dates)
-        metrics = _compute_metrics(name, values)
-        return SeriesData(name=name, values=values), metrics
+        empty_vals: list[float] = [100.0] * len(dates)
+        metrics = _compute_metrics(name, empty_vals)
+        return SeriesData(name=name, values=empty_vals), metrics
 
     values: list[float] = []
     for d in dates:
@@ -248,36 +249,42 @@ async def _get_real_portfolio_holdings(
         .subquery()
     )
 
-    rows = await db.execute(
-        select(AssetSnapshot.positions)
+    # 최신 스냅샷 ID 목록 조회
+    snap_rows = await db.execute(
+        select(AssetSnapshot.id)
         .join(
             latest_sub,
             (AssetSnapshot.account_id == latest_sub.c.account_id)
             & (AssetSnapshot.snapshot_date == latest_sub.c.max_date),
         )
-        .where(AssetSnapshot.positions.isnot(None))
     )
-    all_positions_raw = rows.scalars().all()
+    snap_ids = [row[0] for row in snap_rows.all()]
 
-    if not all_positions_raw:
+    if not snap_ids:
+        return None
+
+    # positions 테이블에서 해당 스냅샷 포지션 조회
+    pos_rows = await db.execute(
+        select(Position).where(Position.snapshot_id.in_(snap_ids))
+    )
+    all_positions = pos_rows.scalars().all()
+
+    if not all_positions:
         return None
 
     # ticker+market 기준으로 value_krw 합산
     ticker_map: dict[tuple[str, str], float] = {}
-    for positions in all_positions_raw:
-        if not positions:
+    for p in all_positions:
+        ticker = p.ticker
+        market = p.market
+        if not ticker or not market:
             continue
-        for p in positions:
-            ticker = p.get("ticker", "")
-            market = p.get("market", "")
-            if not ticker or not market:
-                continue
-            if ticker in _BACKTEST_SKIP_TICKERS or market in _BACKTEST_SKIP_MARKETS:
-                continue
-            value_krw = p.get("value_krw") or (p.get("current_price", 0) * p.get("qty", 0))
-            if value_krw and value_krw > 0:
-                key = (ticker, market)
-                ticker_map[key] = ticker_map.get(key, 0.0) + float(value_krw)
+        if ticker in _BACKTEST_SKIP_TICKERS or market in _BACKTEST_SKIP_MARKETS:
+            continue
+        value_krw = float(p.value_krw or 0) or (float(p.current_price or 0) * float(p.qty or 0))
+        if value_krw and value_krw > 0:
+            key = (ticker, market)
+            ticker_map[key] = ticker_map.get(key, 0.0) + value_krw
 
     if not ticker_map:
         return None
@@ -301,7 +308,9 @@ async def run_backtest(
 ) -> BacktestResult:
     # 1. 포트폴리오 설정 로드
     port_rows = await db.execute(
-        select(Portfolio).where(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(
             Portfolio.user_id == user_id,
             Portfolio.id.in_(req.portfolio_ids),
         )
@@ -312,9 +321,9 @@ async def run_backtest(
     all_symbols: list[str] = []
     for p in portfolios:
         for h in p.items:
-            if h["ticker"] in _BACKTEST_SKIP_TICKERS or h["market"] in _BACKTEST_SKIP_MARKETS:
+            if h.ticker in _BACKTEST_SKIP_TICKERS or h.market in _BACKTEST_SKIP_MARKETS:
                 continue
-            sym = _to_yf_symbol(h["ticker"], h["market"])
+            sym = _to_yf_symbol(h.ticker, h.market)
             if sym not in all_symbols:
                 all_symbols.append(sym)
     if req.include_spy and "SPY" not in all_symbols:
@@ -323,14 +332,14 @@ async def run_backtest(
     # 실제 포트폴리오 holdings 사전 조회 — 보유 종목도 yfinance 다운로드에 포함
     real_asset_types: list[str] | None = None
     if portfolios and all(p.base_type == "STOCK_ONLY" for p in portfolios):
-        real_asset_types = ["STOCK_KIS", "STOCK_LS", "STOCK_OTHER", "STOCK_KIWOOM"]
+        real_asset_types = ["STOCK_KIS", "STOCK_OTHER", "STOCK_KIWOOM"]
 
     real_holdings: list[dict] | None = None
     if req.include_real_portfolio:
         real_holdings = await _get_real_portfolio_holdings(user_id, db, asset_types=real_asset_types)
         if real_holdings:
-            for h in real_holdings:
-                sym = _to_yf_symbol(h["ticker"], h["market"])
+            for rh in real_holdings:
+                sym = _to_yf_symbol(rh["ticker"], rh["market"])
                 if sym not in all_symbols:
                     all_symbols.append(sym)
 
@@ -363,10 +372,12 @@ async def run_backtest(
     all_metrics: list[PortfolioMetrics] = []
 
     for p in portfolios:
+        # PortfolioItem 모델 → dict 변환 (backtest 내부 함수 호환)
         investable = [
-            h for h in p.items
-            if h["ticker"] not in _BACKTEST_SKIP_TICKERS
-            and h["market"] not in _BACKTEST_SKIP_MARKETS
+            {"ticker": h.ticker, "market": h.market, "weight": float(h.weight), "name": h.name}
+            for h in p.items
+            if h.ticker not in _BACKTEST_SKIP_TICKERS
+            and h.market not in _BACKTEST_SKIP_MARKETS
         ]
         s, m = _compute_portfolio_series(p.name, investable, price_data, dates)
         all_series.append(s)
@@ -378,9 +389,9 @@ async def run_backtest(
         spy_vals: list[float] = []
         base_price: float | None = None
         for d in dates:
-            p = spy_prices.get(d)
-            if p and base_price is None:
-                base_price = p
+            spy_p = spy_prices.get(d)
+            if spy_p and base_price is None:
+                base_price = spy_p
             if base_price and base_price > 0:
                 spy_vals.append(round((spy_prices.get(d, base_price) / base_price) * 100, 4))
             else:
@@ -486,19 +497,17 @@ async def compute_correlation(
     symbols: list[str] = []
     labels: list[str] = []
 
-    for p in portfolios:
-        for item in (p.items or []):
-            ticker = item.get("ticker", "")
-            market = item.get("market", "")
-            if not ticker or not market:
+    for port in portfolios:
+        for item in (port.items or []):
+            if not item.ticker or not item.market:
                 continue
-            if ticker in _BACKTEST_SKIP_TICKERS or market in _BACKTEST_SKIP_MARKETS:
+            if item.ticker in _BACKTEST_SKIP_TICKERS or item.market in _BACKTEST_SKIP_MARKETS:
                 continue
-            sym = _to_yf_symbol(ticker, market)
+            sym = _to_yf_symbol(item.ticker, item.market)
             if sym not in seen:
                 seen.add(sym)
                 symbols.append(sym)
-                labels.append(item.get("name") or ticker)
+                labels.append(item.name or item.ticker)
 
     if not symbols:
         return CorrelationResult(labels=[], matrix=[])

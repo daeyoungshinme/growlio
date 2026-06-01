@@ -76,89 +76,86 @@ class TestUpsertSnapshot:
         assert result.source == "KIS_API"
 
 
-# ── sync_manual_account 테스트 ──────────────────────────────
+# ── ManualProvider 테스트 ──────────────────────────────
 
-class TestSyncManualAccount:
-    """수동 계좌 동기화 로직 검증."""
+class TestManualProvider:
+    """수동 계좌 동기화 로직 검증 (ManualProvider)."""
+
+    def _mock_position(self, ticker="005930", name="삼성전자", market="KOSPI",
+                       qty=10, avg_price=70000, current_price=80000):
+        p = MagicMock()
+        p.ticker = ticker; p.name = name; p.market = market
+        p.qty = qty; p.avg_price = avg_price; p.current_price = current_price
+        p.currency = "KRW"; p.value_krw = current_price * qty
+        p.avg_price_usd = None; p.usd_rate = None
+        return p
 
     @pytest.mark.asyncio
     async def test_raises_when_no_amount_and_no_positions(self, mock_db, make_account):
         """금액도, 포지션도 없으면 BadRequestError 발생."""
         from app.exceptions import BadRequestError
-        from app.services.asset_service import sync_manual_account
+        from app.providers.manual_provider import ManualProvider
 
         make_account.manual_amount = 0
-        make_account.manual_positions = []
+        make_account.asset_type = "CASH_OTHER"
+        make_account.deposit_krw = None
+        make_account.deposit_usd = None
+        # mock_db.execute returns [] by default (no positions)
 
+        provider = ManualProvider()
         with pytest.raises(BadRequestError, match="수동 금액이 설정되지 않았습니다"):
-            await sync_manual_account(make_account, mock_db, redis=None)
+            await provider.sync(make_account, mock_db, redis=None)
 
     @pytest.mark.asyncio
     async def test_uses_manual_amount_when_no_positions(self, mock_db, make_account):
-        """포지션 없으면 manual_amount로 스냅샷 저장."""
-        from app.services.asset_service import sync_manual_account
+        """포지션 없으면 manual_amount로 BalanceResult 반환."""
+        from app.providers.manual_provider import ManualProvider
 
         make_account.manual_amount = 10_000_000.0
-        make_account.manual_positions = []
         make_account.asset_type = "CASH_OTHER"
+        make_account.deposit_krw = None
+        make_account.deposit_usd = None
+        # mock_db.execute returns [] by default (no positions)
 
-        mock_db.scalar.return_value = None  # 기존 스냅샷 없음
+        provider = ManualProvider()
+        balance = await provider.sync(make_account, mock_db, redis=None)
 
-        snap_result = SimpleNamespace(
-            id=uuid.uuid4(),
-            amount_krw=10_000_000.0,
-            source="MANUAL",
-            snapshot_date=date.today(),
-        )
-
-        with patch("app.services.asset_service._upsert_snapshot", new_callable=AsyncMock) as mock_upsert:
-            mock_upsert.return_value = snap_result
-            result = await sync_manual_account(make_account, mock_db, redis=None)
-
-        mock_upsert.assert_called_once()
-        call_kwargs = mock_upsert.call_args.kwargs
-        assert call_kwargs["amount_krw"] == 10_000_000.0
-        assert call_kwargs["source"] == "MANUAL"
+        assert balance.total_value_krw == 10_000_000.0
 
     @pytest.mark.asyncio
     async def test_calculates_pnl_from_positions(self, mock_db, make_account):
         """포지션 있을 때 pnl = 평가금액 - 매입금액 계산."""
-        from app.services.asset_service import sync_manual_account
+        from app.providers.manual_provider import ManualProvider
+        from unittest.mock import AsyncMock
 
-        make_account.manual_positions = [
-            {"ticker": "005930", "market": "KOSPI", "qty": 10, "avg_price": 70000, "current_price": 80000},
-        ]
+        mock_pos = self._mock_position(qty=10, avg_price=70000, current_price=80000)
+        execute_result = MagicMock()
+        execute_result.scalars.return_value.all.return_value = [mock_pos]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
         make_account.manual_amount = None
+        make_account.asset_type = "STOCK_OTHER"
+        make_account.deposit_krw = None
+        make_account.deposit_usd = None
 
-        snap_result = SimpleNamespace(amount_krw=800_000.0, source="MANUAL", snapshot_date=date.today())
+        provider = ManualProvider()
+        balance = await provider.sync(make_account, mock_db, redis=None)
 
-        with patch("app.services.asset_service._upsert_snapshot", new_callable=AsyncMock) as mock_upsert:
-            mock_upsert.return_value = snap_result
-            await sync_manual_account(make_account, mock_db, redis=None)
-
-        call_kwargs = mock_upsert.call_args.kwargs
-        # 평가액: 80000 * 10 = 800,000
-        assert call_kwargs["amount_krw"] == 800_000.0
-        # 매입액: 70000 * 10 = 700,000
-        assert call_kwargs["invested_amount"] == 700_000.0
-        # 손익: 100,000
-        assert call_kwargs["unrealized_pnl"] == 100_000.0
+        assert balance.total_value_krw == 800_000.0  # 80000 * 10
+        assert balance.invested_krw == 700_000.0      # 70000 * 10
+        assert balance.pnl_krw == 100_000.0           # 800k - 700k
 
 
-# ── sync_kis_account 테스트 ─────────────────────────────────
+# ── KISProvider 테스트 ─────────────────────────────────
 
-class TestSyncKisAccount:
+class TestKISProvider:
     """KIS 계좌 동기화 시 manual_positions 자동 설정 검증."""
 
     @pytest.mark.asyncio
-    async def test_sets_manual_positions_after_sync(self, mock_db, make_account, make_user_settings):
-        """sync_kis_account 호출 후 account.manual_positions에 보유종목이 저장된다."""
-        from types import SimpleNamespace
-        from unittest.mock import AsyncMock, patch
+    async def test_sets_positions_after_sync(self, mock_db, make_account, make_user_settings):
+        """KISProvider.sync() 호출 후 BalanceResult에 보유종목이 담긴다."""
+        from app.providers.kis_provider import KISProvider
 
-        from app.services.asset_service import sync_kis_account
-
-        # Account 레벨 자격증명 설정 (sync_kis_account는 account에서 직접 읽음)
         make_account.kis_app_key = "encrypted_key"
         make_account.kis_app_secret = "encrypted_secret"
         make_account.is_mock_mode = True
@@ -183,36 +180,33 @@ class TestSyncKisAccount:
             "total_value_usd": 950.0,
             "deposit_usd": 0.0,
         }
-        snap_result = SimpleNamespace(snapshot_date=date.today(), amount_krw=1_000_000.0)
 
         with (
-            patch("app.services.asset_service.decrypt", return_value="plain_value"),
-            patch("app.services.asset_service.get_access_token", new_callable=AsyncMock, return_value="token"),
-            patch("app.services.asset_service.get_domestic_balance", new_callable=AsyncMock, return_value=domestic_result),
-            patch("app.services.asset_service.get_overseas_balance", new_callable=AsyncMock, return_value=overseas_result),
-            patch("app.services.asset_service.get_overseas_price", new_callable=AsyncMock, return_value={"usd_krw_rate": 1300.0}),
-            patch("app.services.asset_service._upsert_snapshot", new_callable=AsyncMock, return_value=snap_result),
-            patch("app.utils.currency.cache_usd_krw_rate", new_callable=AsyncMock),
+            patch("app.providers.kis_provider.decrypt", return_value="plain_value"),
+            patch("app.providers.kis_provider.get_access_token", new_callable=AsyncMock, return_value="token"),
+            patch("app.providers.kis_provider.get_domestic_balance", new_callable=AsyncMock, return_value=domestic_result),
+            patch("app.providers.kis_provider.get_overseas_balance", new_callable=AsyncMock, return_value=overseas_result),
+            patch("app.providers.kis_provider.get_overseas_price", new_callable=AsyncMock, return_value={"usd_krw_rate": 1300.0}),
+            patch("app.providers.kis_provider.cache_usd_krw_rate", new_callable=AsyncMock),
         ):
-            # Redis mock: no cached rate
             redis = AsyncMock()
             redis.get = AsyncMock(return_value=None)
-            await sync_kis_account(make_account, mock_db, redis)
+            provider = KISProvider()
+            balance = await provider.sync(make_account, mock_db, redis)
 
-        # manual_positions에 국내 + 해외 종목이 저장되어야 한다
-        assert make_account.manual_positions is not None
-        assert len(make_account.manual_positions) == 2
+        # 국내 + 해외 포지션 2개
+        assert len(balance.positions) == 2
 
         # 국내 종목: avg_price는 KRW 그대로
-        domestic_pos = next(p for p in make_account.manual_positions if p["ticker"] == "005930")
-        assert domestic_pos["avg_price"] == 70000.0
-        assert domestic_pos["avg_price_usd"] is None
+        domestic_pos = next(p for p in balance.positions if p.ticker == "005930")
+        assert domestic_pos.avg_price == 70000.0
+        assert domestic_pos.avg_price_usd is None
 
         # 해외 종목: avg_price는 USD * usd_krw_rate로 변환
-        overseas_pos = next(p for p in make_account.manual_positions if p["ticker"] == "AAPL")
-        assert overseas_pos["avg_price"] == 180.0 * 1300.0
-        assert overseas_pos["avg_price_usd"] == 180.0
-        assert overseas_pos["usd_rate"] == 1300.0
+        overseas_pos = next(p for p in balance.positions if p.ticker == "AAPL")
+        assert overseas_pos.avg_price == 180.0 * 1300.0
+        assert overseas_pos.avg_price_usd == 180.0
+        assert overseas_pos.usd_rate == 1300.0
 
 
 # ── 계좌별 수익률 계산 테스트 ───────────────────────────────

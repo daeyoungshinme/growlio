@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.asset import AssetAccount
 from app.redis_client import get_redis
-from app.services.asset_service import sync_kis_account, sync_manual_account, sync_openbanking_account
+from app.services.asset_service import sync_account
 
 logger = structlog.get_logger()
 
@@ -23,12 +23,7 @@ async def run_daily_asset_sync() -> None:
     for account in accounts:
         try:
             async with AsyncSessionLocal() as db:
-                if account.data_source == "KIS_API":
-                    await sync_kis_account(account, db, redis)
-                elif account.data_source == "OPEN_BANKING":
-                    await sync_openbanking_account(account, db, redis)
-                elif account.data_source == "MANUAL":
-                    await sync_manual_account(account, db)
+                await sync_account(account, db, redis)
             logger.info("account_synced", account_id=str(account.id), name=account.name)
         except Exception as e:
             logger.error("account_sync_failed", account_id=str(account.id), name=account.name, error=str(e))

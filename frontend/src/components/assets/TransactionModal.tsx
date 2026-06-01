@@ -1,10 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Modal from "../common/Modal";
 import { api } from "../../api/client";
-import { searchStocks, StockSuggestion } from "../../api/assets";
 import { useExchangeRate } from "../../hooks/useExchangeRate";
+import { useForm } from "../../hooks/useForm";
+import { useStockSearch } from "../../hooks/useStockSearch";
 import {
   createTransaction,
   deleteTransaction,
@@ -40,28 +41,20 @@ const EMPTY_FORM: TransactionCreate = {
 
 export default function TransactionModal({ accountId, accountName, depositKrw = 0, onDepositUpdate, onClose }: Props) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<TransactionCreate>({ ...EMPTY_FORM, account_id: accountId });
-  const set = <K extends keyof TransactionCreate>(k: K, v: TransactionCreate[K]) =>
-    setForm((f) => ({ ...f, [k]: v }));
+  const { form, set, setForm } = useForm<TransactionCreate>({ ...EMPTY_FORM, account_id: accountId });
 
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState<number>(0);
   const usdRate = useExchangeRate();
   const [tickerDirect, setTickerDirect] = useState(false);
   const [tickerQuery, setTickerQuery] = useState("");
-  const [tickerSuggestions, setTickerSuggestions] = useState<StockSuggestion[]>([]);
-  const [tickerSearchLoading, setTickerSearchLoading] = useState(false);
+  const { suggestions: tickerSuggestions, isSearching: tickerSearchLoading, search: runTickerSearch, clearSuggestions: clearTickerSuggestions } = useStockSearch();
   const [showTickerSuggestions, setShowTickerSuggestions] = useState(false);
-  const tickerSearchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [depositPrompt, setDepositPrompt] = useState<{
     amount: number;
     txType: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
   } | null>(null);
-
-  useEffect(() => {
-    return () => { clearTimeout(tickerSearchTimer.current); };
-  }, []);
 
   const { data: txList, isLoading } = useQuery<Transaction[]>({
     queryKey: ["transactions", accountId],
@@ -84,7 +77,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM, account_id: accountId });
     setCurrency("KRW"); setAmountUsd(0);
-    setTickerDirect(false); setTickerQuery(""); setTickerSuggestions([]); setShowTickerSuggestions(false);
+    setTickerDirect(false); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false);
   };
 
   const VALID_TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const;
@@ -143,7 +136,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
     setTickerDirect(!!tx.ticker);
     setTickerQuery(tx.ticker ?? "");
     setCurrency("KRW"); setAmountUsd(0);
-    setTickerSuggestions([]); setShowTickerSuggestions(false);
+    clearTickerSuggestions(); setShowTickerSuggestions(false);
   };
 
   const handleSubmit = () => {
@@ -183,7 +176,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                 onClick={() => {
                   set("transaction_type", t);
                   setCurrency("KRW"); setAmountUsd(0);
-                  setTickerDirect(false); setTickerQuery(""); setTickerSuggestions([]); setShowTickerSuggestions(false);
+                  setTickerDirect(false); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false);
                 }}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
                   form.transaction_type === t
@@ -308,14 +301,8 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                         const v = e.target.value;
                         setTickerQuery(v); set("ticker", v);
                         setShowTickerSuggestions(true);
-                        if (tickerSearchTimer.current) clearTimeout(tickerSearchTimer.current);
-                        if (!v.trim()) { setTickerSuggestions([]); return; }
-                        tickerSearchTimer.current = setTimeout(async () => {
-                          setTickerSearchLoading(true);
-                          try { setTickerSuggestions(await searchStocks(v.trim())); }
-                          catch { setTickerSuggestions([]); }
-                          finally { setTickerSearchLoading(false); }
-                        }, 300);
+                        if (!v.trim()) { clearTickerSuggestions(); return; }
+                        runTickerSearch(v);
                       }}
                       onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowTickerSuggestions(false), 150)}
@@ -332,7 +319,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                             className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2"
                             onMouseDown={() => {
                               setTickerQuery(s.name); set("ticker", s.name);
-                              setTickerSuggestions([]); setShowTickerSuggestions(false);
+                              clearTickerSuggestions(); setShowTickerSuggestions(false);
                             }}>
                             <span className="font-medium text-blue-700 dark:text-blue-400">{s.ticker}</span>
                             <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
@@ -344,7 +331,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                   </div>
                   {accountPositions.length > 0 && (
                     <button type="button"
-                      onClick={() => { setTickerDirect(false); set("ticker", ""); setTickerQuery(""); setTickerSuggestions([]); setShowTickerSuggestions(false); }}
+                      onClick={() => { setTickerDirect(false); set("ticker", ""); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false); }}
                       className="shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap">
                       ← 목록
                     </button>

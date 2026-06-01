@@ -1,7 +1,6 @@
 """목표환율 / 리밸런싱 알림 체크 서비스."""
 from __future__ import annotations
 
-import asyncio
 import calendar
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
@@ -13,23 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.services.price_service import _sync_usdkrw
+from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
 
 _MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
 
 
-async def get_current_usd_krw() -> float:
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(None, _sync_usdkrw)
-
-
 async def check_and_trigger_alerts(db: AsyncSession) -> None:
     """활성 알림을 조회하고 조건 충족 시 이메일 발송 후 비활성화."""
     from app.services.email_service import send_exchange_rate_alert
 
-    current_rate = await get_current_usd_krw()
+    current_rate = await fetch_usd_krw(None, force_refresh=True)
     if current_rate <= 0:
         logger.warning("alert_check_skipped_no_rate")
         return

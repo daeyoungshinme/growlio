@@ -15,7 +15,8 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
-from app.models.asset import AssetAccount, RebalancingExecution
+from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
+from sqlalchemy.orm import selectinload
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
@@ -57,13 +58,18 @@ async def analyze_portfolio(
 ):
     """현재 자산과 목표 포트폴리오를 비교해 리밸런싱 제안을 반환한다."""
     portfolio = await db.scalar(
-        select(Portfolio).where(
+        select(Portfolio)
+        .options(
+            selectinload(Portfolio.linked_accounts),
+            selectinload(Portfolio.items),
+        )
+        .where(
             Portfolio.id == portfolio_id,
             Portfolio.user_id == current_user.id,
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     # query param 우선, 없으면 portfolio에 저장된 account_ids 사용, 그것도 없으면 전체 계좌
     saved_ids = getattr(portfolio, "account_ids", None)
@@ -155,7 +161,7 @@ async def execute_portfolio_rebalancing(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     from app.services.rebalancing_execution_service import execute_rebalancing
     return await execute_rebalancing(
@@ -191,7 +197,7 @@ async def quick_execute_rebalancing(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     alert_row = await db.scalar(
         select(RebalancingAlert).where(
@@ -288,17 +294,53 @@ async def get_rebalancing_execution_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """리밸런싱 실행 이력 상세 (주문 결과 포함)."""
-    execution = await db.scalar(
-        select(RebalancingExecution).where(
+    result = await db.execute(
+        select(RebalancingExecution)
+        .options(selectinload(RebalancingExecution.result_items))
+        .where(
             RebalancingExecution.id == execution_id,
             RebalancingExecution.user_id == current_user.id,
         )
     )
+    execution = result.scalar_one_or_none()
     if not execution:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="실행 이력을 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="실행 이력을 찾을 수 없습니다")
+
     detail = RebalancingExecutionDetail.model_validate(execution)
-    if execution.results:
-        detail.results = [ExecutionResult(**r) for r in execution.results]
+    # result_items를 계좌별 ExecutionResult로 재구성
+    if execution.result_items:
+        from collections import defaultdict
+        from app.schemas.rebalancing import OrderResult
+
+        by_account: dict[str, dict] = defaultdict(lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""})
+        for ri in execution.result_items:
+            key = ri.account_id or ""
+            by_account[key]["account_name"] = ri.account_name or ""
+            by_account[key]["is_mock"] = ri.is_mock
+            by_account[key]["executed_at"] = execution.executed_at.isoformat()
+            by_account[key]["orders"].append(OrderResult(
+                ticker=ri.ticker or "",
+                name=ri.name or "",
+                market=ri.market or "",
+                side=ri.action,
+                quantity=ri.quantity or 0,
+                status=ri.status,
+                order_no=ri.order_no,
+                error_msg=ri.error_message,
+                order_type=ri.order_type,
+            ))
+        detail.results = [
+            ExecutionResult(
+                account_id=acc_id,
+                account_name=data["account_name"],
+                is_mock=data["is_mock"],
+                orders=data["orders"],
+                success_count=sum(1 for o in data["orders"] if o.status == "SUCCESS"),
+                fail_count=sum(1 for o in data["orders"] if o.status == "FAILED"),
+                executed_at=data["executed_at"],
+            )
+            for acc_id, data in by_account.items()
+        ]
     return detail
 
 
@@ -401,9 +443,9 @@ async def get_broker_account_balance(
             account_id=str(account_id),
             user_id=str(current_user.id),
         )
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다")
     if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다")
 
     usd_rate = await get_usd_krw_rate(redis)
     try:

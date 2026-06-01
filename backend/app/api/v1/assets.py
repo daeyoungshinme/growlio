@@ -11,9 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
-from app.kis.client import KisApiError
+from app.exceptions import (
+    ProviderApiError,
+    ProviderCredentialError,
+    ProviderNetworkError,
+    ProviderTokenError,
+)
 from app.kis.constants import OVERSEAS_MARKETS
-from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
 from app.limiter import limiter
 from app.models.asset import VALID_MARKETS, AssetAccount, AssetSnapshot
 from app.models.user import User
@@ -24,13 +28,8 @@ from app.schemas.asset import (
     AssetAccountUpdate,
     AssetSnapshotResponse,
 )
-from app.services.asset_service import (
-    _upsert_snapshot,
-    sync_kis_account,
-    sync_kiwoom_account,
-    sync_manual_account,
-    sync_openbanking_account,
-)
+from app.services.asset_service import _upsert_snapshot
+from app.services.asset_service import sync_account as _sync_account_service
 from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
 from app.utils.currency import fetch_usd_krw
@@ -288,14 +287,30 @@ async def update_account(
             .order_by(AssetSnapshot.snapshot_date.desc())
             .limit(1)
         )
-        pos_list = (latest_snap.positions if latest_snap else None) or account.manual_positions or []
+        from app.models.asset import Position
+        from sqlalchemy import delete as sql_delete_pos
+
+        snap_id = latest_snap.id if latest_snap else None
+        if snap_id:
+            pos_result = await db.execute(
+                select(Position).where(Position.snapshot_id == snap_id)
+            )
+            pos_list = list(pos_result.scalars().all())
+        else:
+            cur_result = await db.execute(
+                select(Position).where(
+                    Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
+                )
+            )
+            pos_list = list(cur_result.scalars().all())
+
         pos_value = sum(
-            (p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0)
+            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
             for p in pos_list
         )
         usd_as_krw = float(account.deposit_usd or 0) * usd_rate
         total = pos_value + float(account.deposit_krw or 0) + usd_as_krw
-        await _upsert_snapshot(
+        new_snap = await _upsert_snapshot(
             db,
             account_id=account.id,
             user_id=account.user_id,
@@ -303,9 +318,19 @@ async def update_account(
             amount_krw=total,
             invested_amount=latest_snap.invested_amount if latest_snap else None,
             unrealized_pnl=latest_snap.unrealized_pnl if latest_snap else None,
-            positions=latest_snap.positions if latest_snap else None,
             source="MANUAL",
         )
+        # 스냅샷 포지션 복사 (기존 포지션 → 새 스냅샷)
+        if pos_list:
+            await db.execute(sql_delete_pos(Position).where(Position.snapshot_id == new_snap.id))
+            for p in pos_list:
+                db.add(Position(
+                    account_id=account.id, snapshot_id=new_snap.id,
+                    ticker=p.ticker, name=p.name, market=p.market,
+                    qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+                    current_price=p.current_price, value_krw=p.value_krw,
+                    currency=p.currency, usd_rate=p.usd_rate,
+                ))
         await db.commit()
     return _account_response(account)
 
@@ -386,65 +411,19 @@ async def sync_account(
         return await _do_sync(account, current_user, db, redis)
 
 
-def _raise_http_status_error(e: httpx.HTTPStatusError, provider: str, body_msg_key: str) -> None:
-    """httpx.HTTPStatusError를 FastAPI HTTPException으로 변환."""
-    if e.response.status_code >= 500:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"{provider} API 오류: 모의투자/실계좌 설정을 확인하세요.",
-        ) from e
-    try:
-        body = e.response.json()
-        msg = body.get(body_msg_key) or body.get("msg1") or str(e)
-    except Exception:
-        msg = str(e)
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"{provider} API 오류: {msg}") from e
-
 
 async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
     """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출."""
-    if account.data_source == "KIS_API":
-        try:
-            snapshot = await sync_kis_account(account, db, redis)
-        except httpx.HTTPStatusError as e:
-            _raise_http_status_error(e, "KIS", "msg1")
-        except KisApiError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형이 지원되지 않거나 API 권한이 없을 수 있습니다.",
-            ) from e
-        except (httpx.ConnectError, httpx.TimeoutException):
-            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from None
-        except (RuntimeError, ValueError) as e:
-            code = status.HTTP_400_BAD_REQUEST if isinstance(e, ValueError) else status.HTTP_502_BAD_GATEWAY
-            raise HTTPException(status_code=code, detail=str(e)) from e
-    elif account.data_source == "KIWOOM_API":
-        try:
-            snapshot = await sync_kiwoom_account(account, db, redis)
-        except httpx.HTTPStatusError as e:
-            _raise_http_status_error(e, "키움", "return_msg")
-        except KiwoomApiError as e:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})",
-            ) from e
-        except KiwoomTokenExpiredError:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="키움 토큰이 만료되었습니다. 잠시 후 다시 시도하세요.") from None
-        except (httpx.ConnectError, httpx.TimeoutException):
-            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="키움 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from None
-        except RuntimeError as e:
-            msg = str(e)
-            code = status.HTTP_400_BAD_REQUEST if "토큰 발급 실패" in msg else status.HTTP_502_BAD_GATEWAY
-            detail = f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요." if "토큰 발급 실패" in msg else msg
-            raise HTTPException(status_code=code, detail=detail) from e
-        except ValueError as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    elif account.data_source == "OPEN_BANKING":
-        snapshot = await sync_openbanking_account(account, db)
-    elif account.data_source == "MANUAL":
-        snapshot = await sync_manual_account(account, db, redis)
-    else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"지원하지 않는 데이터 소스: {account.data_source}")
+    try:
+        snapshot = await _sync_account_service(account, db, redis)
+    except ProviderCredentialError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except ProviderTokenError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except ProviderApiError as e:
+        raise HTTPException(status_code=e.http_status, detail=e.detail) from e
+    except ProviderNetworkError as e:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(e)) from e
 
     await redis.delete(f"dividend:by-ticker:{current_user.id}:{date.today().year}")
     return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}
@@ -457,8 +436,16 @@ async def get_positions(
     db: AsyncSession = Depends(get_db),
 ):
     """수동 종목 목록 조회 (매입합계·평가합계·수익률 포함)."""
+    from app.models.asset import Position
+
     account = await _get_owned_account(account_id, current_user.id, db)
-    positions = account.manual_positions or []
+    result = await db.execute(
+        select(Position).where(
+            Position.account_id == account.id,
+            Position.snapshot_id == None,  # noqa: E711
+        )
+    )
+    positions = [p.to_dict() for p in result.scalars().all()]
     return _enrich_positions(positions)
 
 
@@ -470,18 +457,35 @@ async def save_positions(
     db: AsyncSession = Depends(get_db),
 ):
     """수동 종목 저장 — 매입금액 합계를 manual_amount로 업데이트."""
+    from app.models.asset import Position
+    from sqlalchemy import delete as sql_delete_pos2
+
     account = await _get_owned_account(account_id, current_user.id, db)
-    raw = [p.model_dump() for p in positions]
-    account.manual_positions = raw
     total_invested = float(sum(Decimal(str(p.qty)) * Decimal(str(p.avg_price)) for p in positions))
     total_value = float(sum(Decimal(str(p.current_price or p.avg_price)) * Decimal(str(p.qty)) for p in positions))
-    account.manual_amount = total_value  # 평가금액 기준 (current_price 없으면 avg_price 대체)
+    account.manual_amount = total_value
     account.manual_updated_at = datetime.now(UTC)
+
+    await db.execute(sql_delete_pos2(Position).where(
+        Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
+    ))
+    for p in positions:
+        db.add(Position(
+            account_id=account.id, snapshot_id=None,
+            ticker=p.ticker, name=p.name, market=p.market,
+            qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+            current_price=p.current_price or p.avg_price,
+            value_krw=(p.current_price or p.avg_price) * p.qty,
+            currency="USD" if p.avg_price_usd else "KRW",
+            usd_rate=p.usd_rate,
+        ))
+
     usd_rate = 1.0
     if account.deposit_usd:
         redis = await get_redis()
         usd_rate = await fetch_usd_krw(redis)
-    await _upsert_snapshot(
+
+    snap = await _upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,
@@ -489,10 +493,23 @@ async def save_positions(
         amount_krw=total_value + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate,
         invested_amount=total_invested,
         unrealized_pnl=total_value - total_invested,
-        positions=raw,
         source="MANUAL",
     )
+    # 스냅샷 포지션도 동기화
+    await db.execute(sql_delete_pos2(Position).where(Position.snapshot_id == snap.id))
+    for p in positions:
+        db.add(Position(
+            account_id=account.id, snapshot_id=snap.id,
+            ticker=p.ticker, name=p.name, market=p.market,
+            qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+            current_price=p.current_price or p.avg_price,
+            value_krw=(p.current_price or p.avg_price) * p.qty,
+            currency="USD" if p.avg_price_usd else "KRW",
+            usd_rate=p.usd_rate,
+        ))
+
     await db.commit()
+    raw = [p.model_dump() for p in positions]
     return _enrich_positions(raw)
 
 
@@ -504,43 +521,49 @@ async def sync_position_prices(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """현재가를 조회해 manual_positions를 갱신하고 스냅샷을 저장한다."""
+    """현재가를 조회해 positions를 갱신하고 스냅샷을 저장한다."""
+    from app.models.asset import Position
+    from sqlalchemy import delete as sql_delete_sp, update as sql_update_sp
+
     account = await _get_owned_account(account_id, current_user.id, db)
-    positions = account.manual_positions or []
-    if not positions:
+    pos_result = await db.execute(
+        select(Position).where(
+            Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
+        )
+    )
+    pos_objs = pos_result.scalars().all()
+    if not pos_objs:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="저장된 종목이 없습니다")
 
     redis = await get_redis()
-    tickers = [(p["ticker"], p.get("market", "KOSPI")) for p in positions]
+    tickers = [(p.ticker, p.market) for p in pos_objs]
     price_map = await fetch_prices_batch(current_user.id, tickers, db, redis)
 
-    # 해외 종목이 있으면 환율 조회 (USD → KRW 변환)
-    has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
+    has_overseas = any(p.market in OVERSEAS_MARKETS for p in pos_objs)
     usd_rate: float | None = None
     if has_overseas or account.deposit_usd:
         usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
 
-    updated = []
-    for p in positions:
-        raw_price = price_map.get(p["ticker"])
-        if raw_price and p.get("market", "KOSPI") in OVERSEAS_MARKETS and usd_rate:
-            # yfinance에서 가져온 USD 가격 → KRW 변환
+    updated_dicts = []
+    for p in pos_objs:
+        raw_price = price_map.get(p.ticker)
+        if raw_price and p.market in OVERSEAS_MARKETS and usd_rate:
             price_krw = raw_price * usd_rate
         elif raw_price:
             price_krw = raw_price
         else:
-            price_krw = p.get("current_price") or p["avg_price"]
-        updated.append({**p, "current_price": price_krw})
+            price_krw = float(p.current_price or p.avg_price or 0)
+        p.current_price = price_krw
+        p.value_krw = price_krw * float(p.qty or 0)
+        updated_dicts.append(p.to_dict())
 
-    account.manual_positions = updated
     account.manual_updated_at = datetime.now(UTC)
 
-    # 평가금액 합계 → manual_amount 갱신 & 스냅샷 저장
-    total_value = float(sum(Decimal(str(p["current_price"])) * Decimal(str(p["qty"])) for p in updated))
-    total_invested = float(sum(Decimal(str(p["avg_price"])) * Decimal(str(p["qty"])) for p in updated))
+    total_value = float(sum(Decimal(str(p["current_price"])) * Decimal(str(p["qty"])) for p in updated_dicts))
+    total_invested = float(sum(Decimal(str(p["avg_price"])) * Decimal(str(p["qty"])) for p in updated_dicts))
     account.manual_amount = total_value
 
-    await _upsert_snapshot(
+    snap = await _upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,
@@ -548,12 +571,21 @@ async def sync_position_prices(
         amount_krw=total_value + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate or 1),
         invested_amount=total_invested,
         unrealized_pnl=total_value - total_invested,
-        positions=updated,
         source="MANUAL",
     )
+    # 스냅샷 포지션 저장
+    await db.execute(sql_delete_sp(Position).where(Position.snapshot_id == snap.id))
+    for p in pos_objs:
+        db.add(Position(
+            account_id=account.id, snapshot_id=snap.id,
+            ticker=p.ticker, name=p.name, market=p.market,
+            qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+            current_price=p.current_price, value_krw=p.value_krw,
+            currency=p.currency, usd_rate=p.usd_rate,
+        ))
     await db.commit()
 
-    return _enrich_positions(updated)
+    return _enrich_positions(updated_dicts)
 
 
 def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:

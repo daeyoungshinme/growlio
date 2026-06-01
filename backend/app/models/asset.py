@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -51,8 +51,8 @@ class AssetAccount(Base):
     manual_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     manual_currency: Mapped[str] = mapped_column(String(3), default="KRW")
     manual_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # 수동 주식 포지션 [{ticker, name, market, qty, avg_price, current_price}]
-    manual_positions: Mapped[list | None] = mapped_column(JSONB)
+    # 수동 주식 포지션 — JSONB 컬럼 제거됨, current_positions relationship 사용
+    # (하위 호환을 위해 컬럼 참조가 있는 코드 마이그레이션 기간 중 유지)
     # 예수금 (현금 잔고) — KIS sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
     deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
     # 외화 예수금 (USD) — KIS 해외 계좌 sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
@@ -69,6 +69,12 @@ class AssetAccount(Base):
     user: Mapped["User"] = relationship(back_populates="asset_accounts")  # type: ignore[name-defined]
     snapshots: Mapped[list["AssetSnapshot"]] = relationship(back_populates="account")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account")
+    current_positions: Mapped[list["Position"]] = relationship(
+        back_populates="account",
+        primaryjoin="and_(Position.account_id==AssetAccount.id, Position.snapshot_id==None)",
+        cascade="all, delete-orphan",
+        viewonly=False,
+    )
 
     __table_args__ = (Index("idx_asset_accounts_user_id", "user_id"),)
 
@@ -94,13 +100,16 @@ class AssetSnapshot(Base):
     # 주식 계좌 상세
     invested_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     unrealized_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
-    positions: Mapped[list | None] = mapped_column(JSONB)
 
     # MANUAL | KIS_API | KIWOOM_API | OPEN_BANKING
     source: Mapped[str] = mapped_column(String(20), default="MANUAL", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     account: Mapped["AssetAccount"] = relationship(back_populates="snapshots")
+    position_items: Mapped[list["Position"]] = relationship(
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
+    )
 
     __table_args__ = (
         UniqueConstraint("account_id", "snapshot_date", name="uq_snapshot_account_date"),
@@ -152,14 +161,44 @@ class RebalancingExecution(Base):
     triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     # FULL | BUY_ONLY
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="FULL")
-    # List[ExecutionResult] JSONB
-    results: Mapped[list | None] = mapped_column(JSONB)
     total_success: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_fail: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_skipped: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    result_items: Mapped[list["RebalancingExecutionResult"]] = relationship(
+        back_populates="execution",
+        cascade="all, delete-orphan",
+    )
+
     __table_args__ = (Index("idx_rebalancing_executions_user", "user_id", "executed_at"),)
+
+
+class RebalancingExecutionResult(Base):
+    """리밸런싱 실행 결과 — 계좌/주문 단위 결과 저장 (rebalancing_executions.results JSONB 대체)."""
+
+    __tablename__ = "rebalancing_execution_results"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    execution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("rebalancing_executions.id", ondelete="CASCADE"), nullable=False
+    )
+    account_id: Mapped[str | None] = mapped_column(String(50))
+    account_name: Mapped[str | None] = mapped_column(String(200))
+    is_mock: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    action: Mapped[str] = mapped_column(String(10), nullable=False)  # BUY | SELL | SKIPPED
+    ticker: Mapped[str | None] = mapped_column(String(20))
+    name: Mapped[str | None] = mapped_column(String(200))
+    market: Mapped[str | None] = mapped_column(String(20))
+    quantity: Mapped[int | None] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # SUCCESS | FAILED | SKIPPED
+    order_no: Mapped[str | None] = mapped_column(String(50))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    order_type: Mapped[str] = mapped_column(String(20), nullable=False, default="MARKET")
+
+    execution: Mapped["RebalancingExecution"] = relationship(back_populates="result_items")
+
+    __table_args__ = (Index("idx_rebalancing_results_execution", "execution_id"),)
 
 
 class UserTickerSettings(Base):
@@ -180,4 +219,63 @@ class UserTickerSettings(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "ticker", "market", name="uq_user_ticker_settings"),
         Index("idx_user_ticker_settings_user", "user_id"),
+    )
+
+
+class Position(Base):
+    """계좌 보유 포지션 — AssetAccount.manual_positions + AssetSnapshot.positions JSONB 대체.
+
+    snapshot_id IS NULL  → 계좌 현재 포지션 (manual_positions 대체)
+    snapshot_id NOT NULL → 스냅샷 시점 포지션 (snapshot.positions 대체)
+    """
+
+    __tablename__ = "positions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_snapshots.id", ondelete="CASCADE"), nullable=True
+    )
+    ticker: Mapped[str] = mapped_column(String(20), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    market: Mapped[str] = mapped_column(String(20), nullable=False)
+    qty: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
+    avg_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)       # 항상 KRW
+    avg_price_usd: Mapped[float | None] = mapped_column(Numeric(18, 4))            # 원본 USD 평단가 (해외)
+    current_price: Mapped[float | None] = mapped_column(Numeric(18, 2))            # 항상 KRW
+    value_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
+    currency: Mapped[str] = mapped_column(String(3), default="KRW", nullable=False)
+    usd_rate: Mapped[float | None] = mapped_column(Numeric(10, 4))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    account: Mapped["AssetAccount"] = relationship(
+        back_populates="current_positions",
+        foreign_keys="[Position.account_id]",
+    )
+    snapshot: Mapped["AssetSnapshot | None"] = relationship(back_populates="position_items")
+
+    def to_dict(self) -> dict:
+        """Position → 하위 호환 dict 형식 변환 (manual_positions JSONB 형식)."""
+        return {
+            "ticker": self.ticker,
+            "name": self.name,
+            "market": self.market,
+            "qty": float(self.qty),
+            "avg_price": float(self.avg_price),
+            "avg_price_usd": float(self.avg_price_usd) if self.avg_price_usd else None,
+            "current_price": float(self.current_price) if self.current_price else None,
+            "value_krw": float(self.value_krw) if self.value_krw else None,
+            "currency": self.currency,
+            "usd_rate": float(self.usd_rate) if self.usd_rate else None,
+        }
+
+    __table_args__ = (
+        Index("idx_positions_account_snapshot", "account_id", "snapshot_id"),
+        Index(
+            "idx_positions_snapshot_notnull",
+            "snapshot_id",
+            postgresql_where=text("snapshot_id IS NOT NULL"),
+        ),
     )

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -248,10 +248,10 @@ async def send_test_email_endpoint(
         await send_test_email(to_email)
     except RuntimeError as e:
         if "smtp_not_configured" in str(e):
-            raise HTTPException(status_code=503, detail="SMTP가 설정되지 않았습니다. 서버 관리자에게 문의하세요.")
-        raise HTTPException(status_code=500, detail="이메일 발송에 실패했습니다.")
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="SMTP가 설정되지 않았습니다. 서버 관리자에게 문의하세요")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="이메일 발송에 실패했습니다")
     except Exception:
-        raise HTTPException(status_code=500, detail="이메일 발송에 실패했습니다.")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="이메일 발송에 실패했습니다")
 
     return {"detail": f"{to_email}으로 테스트 이메일을 발송했습니다."}
 

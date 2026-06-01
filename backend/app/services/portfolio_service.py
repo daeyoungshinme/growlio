@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
-from app.models.asset import AssetAccount, AssetSnapshot
+from app.models.asset import AssetAccount, AssetSnapshot, Position
 
 ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -44,17 +45,18 @@ async def _fetch_latest_snapshots(
 
 
 def _calc_account_amounts(
-    acc: AssetAccount, snap: AssetSnapshot | None
-) -> tuple[float, float, float, list]:
-    """(amount_krw, invested_krw, unrealized_pnl, raw_positions) 계산."""
+    acc: AssetAccount,
+    snap: AssetSnapshot | None,
+    positions: list[Position],
+) -> tuple[float, float, float, list[Position]]:
+    """(amount_krw, invested_krw, unrealized_pnl, positions) 계산."""
     if snap:
         amount_krw = float(snap.amount_krw)
-        raw_positions = snap.positions or acc.manual_positions or []
         if snap.invested_amount is not None:
-            return amount_krw, float(snap.invested_amount), float(snap.unrealized_pnl or 0), raw_positions
-        invested = sum(p.get("avg_price", 0) * p.get("qty", 0) for p in raw_positions)
-        value = sum((p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0) for p in raw_positions)
-        return amount_krw, invested, (value - invested if raw_positions else 0.0), raw_positions
+            return amount_krw, float(snap.invested_amount), float(snap.unrealized_pnl or 0), positions
+        invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in positions)
+        value = sum((float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0) for p in positions)
+        return amount_krw, invested, (value - invested if positions else 0.0), positions
 
     if acc.manual_amount is not None:
         if acc.asset_type == "REAL_ESTATE":
@@ -62,44 +64,31 @@ def _calc_account_amounts(
             amount_krw = float(acc.manual_amount) - mortgage
         else:
             amount_krw = float(acc.manual_amount)
-        raw_positions = acc.manual_positions or []
-        invested = sum(p.get("avg_price", 0) * p.get("qty", 0) for p in raw_positions)
-        value = sum((p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0) for p in raw_positions)
-        return amount_krw, invested, (value - invested if raw_positions else 0.0), raw_positions
+        invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in positions)
+        value = sum((float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0) for p in positions)
+        return amount_krw, invested, (value - invested if positions else 0.0), positions
 
     return 0.0, 0.0, 0.0, []
 
 
 def _build_position_details(
-    acc: AssetAccount, raw_positions: list, snap: AssetSnapshot | None
+    acc: AssetAccount, raw_positions: list[Position], snap: AssetSnapshot | None
 ) -> list[dict]:
-    """주식 계좌의 종목 상세 목록을 계산해 반환한다 (USD→KRW 환산 포함)."""
+    """주식 계좌의 종목 상세 목록을 계산해 반환한다."""
     if acc.asset_type not in STOCK_TYPES or not raw_positions:
         return []
-    usd_rate = float(snap.usd_krw_rate) if snap and snap.usd_krw_rate else None
-    positions = []
+    result = []
     for p in raw_positions:
-        qty = int(p.get("qty", 0))
-        currency = p.get("currency", "KRW")
-        avg_out: float
-        cur_out: float
-        val_amt: float
-        inv_amt: float
-        if currency != "KRW" and usd_rate:
-            avg_out = float(round(float(p.get("avg_price", 0)) * usd_rate))
-            cur_out = float(round(float(p.get("current_price") or p.get("avg_price", 0)) * usd_rate))
-            val_amt = float(round(float(p.get("value_krw") or float(p.get("value_usd", 0)) * usd_rate)))
-            inv_amt = avg_out * qty
-        else:
-            avg_out = float(p.get("avg_price", 0))
-            cur_out = float(p.get("current_price") or p.get("avg_price", 0))
-            inv_amt = avg_out * qty
-            val_amt = cur_out * qty
+        qty = float(p.qty or 0)
+        avg_out = float(p.avg_price or 0)
+        cur_out = float(p.current_price or p.avg_price or 0)
+        val_amt = float(p.value_krw or cur_out * qty)
+        inv_amt = avg_out * qty
         pnl_p = val_amt - inv_amt
-        positions.append({
-            "ticker": p.get("ticker", ""),
-            "name": p.get("name", ""),
-            "market": p.get("market", "KOSPI"),
+        result.append({
+            "ticker": p.ticker,
+            "name": p.name or "",
+            "market": p.market,
             "qty": qty,
             "avg_price": avg_out,
             "current_price": cur_out,
@@ -107,11 +96,11 @@ def _build_position_details(
             "invested_krw": inv_amt,
             "pnl": pnl_p,
             "pnl_pct": round((pnl_p / inv_amt * 100) if inv_amt else 0.0, 2),
-            "currency": currency,
+            "currency": p.currency or "KRW",
             "account_id": str(acc.id),
             "account_name": acc.name,
         })
-    return positions
+    return result
 
 
 def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -> list[dict]:
@@ -165,6 +154,29 @@ async def build_portfolio_overview(
 
     snap_by_acc = await _fetch_latest_snapshots([a.id for a in accounts], db)
 
+    # 스냅샷 포지션 미리 로드 (snapshot_id → [Position])
+    snap_ids = [s.id for s in snap_by_acc.values()]
+    acc_ids = [a.id for a in accounts if a.asset_type in STOCK_TYPES]
+    snap_pos_map: dict[Any, list[Position]] = {}
+    cur_pos_map: dict[Any, list[Position]] = {}
+
+    if snap_ids:
+        sp_result = await db.execute(
+            select(Position).where(Position.snapshot_id.in_(snap_ids))
+        )
+        for pos in sp_result.scalars().all():
+            snap_pos_map.setdefault(pos.snapshot_id, []).append(pos)
+
+    if acc_ids:
+        cp_result = await db.execute(
+            select(Position).where(
+                Position.account_id.in_(acc_ids),
+                Position.snapshot_id == None,  # noqa: E711
+            )
+        )
+        for pos in cp_result.scalars().all():
+            cur_pos_map.setdefault(pos.account_id, []).append(pos)
+
     total_assets_krw = 0.0
     total_invested_krw = 0.0
     unrealized_pnl_krw = 0.0
@@ -174,7 +186,10 @@ async def build_portfolio_overview(
 
     for acc in accounts:
         snap = snap_by_acc.get(str(acc.id))
-        amount_krw, invested, pnl, raw_positions = _calc_account_amounts(acc, snap)
+        pos_list_db: list[Position] = (
+            snap_pos_map.get(snap.id, []) if snap else []
+        ) or cur_pos_map.get(acc.id, [])
+        amount_krw, invested, pnl, raw_positions = _calc_account_amounts(acc, snap, pos_list_db)
 
         if acc.include_in_total:
             total_assets_krw += amount_krw

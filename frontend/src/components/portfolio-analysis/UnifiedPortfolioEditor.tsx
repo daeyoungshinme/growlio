@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
-import { AssetAccount, searchStocks, StockSuggestion } from "../../api/assets";
+import { AssetAccount, type StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "../../constants/validation";
+import { useStockSearch } from "../../hooks/useStockSearch";
 
 interface Props {
   initial?: Portfolio | null;
@@ -22,11 +23,9 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   const [items, setItems] = useState<PortfolioItem[]>(
     initial?.items.length ? initial.items : [{ ...EMPTY_ITEM }]
   );
-  const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);
+  const { suggestions, search: runStockSearch, clearSuggestions } = useStockSearch();
   const [activeRow, setActiveRow] = useState<number | null>(null);
   const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchAbortController = useRef<AbortController | null>(null);
   const searchInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
   // 계좌 선택 상태: null이면 모든 계좌, 배열이면 선택된 계좌만
@@ -78,34 +77,16 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
     setItems((prev) => [...prev, { ticker: "REAL_ESTATE", name: "부동산", market: "KR_PROPERTY", weight: 0 }]);
   }
 
-  useEffect(() => {
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-      if (searchAbortController.current) searchAbortController.current.abort();
-    };
-  }, []);
-
   function handleTickerInput(idx: number, value: string) {
     updateItem(idx, { ticker: value });
-    if (searchTimer.current) clearTimeout(searchTimer.current);
-    if (searchAbortController.current) searchAbortController.current.abort();
-    if (value.length < 1) { setSuggestions([]); return; }
-    searchTimer.current = setTimeout(async () => {
-      const controller = new AbortController();
-      searchAbortController.current = controller;
-      setActiveRow(idx);
-      try {
-        const results = await searchStocks(value, controller.signal);
-        setSuggestions(results);
-      } catch (err) {
-        if ((err as Error)?.name !== "AbortError") setSuggestions([]);
-      }
-    }, 300);
+    if (value.length < 1) { clearSuggestions(); return; }
+    setActiveRow(idx);
+    runStockSearch(value);
   }
 
   function selectSuggestion(idx: number, s: StockSuggestion) {
     updateItem(idx, { ticker: s.ticker, name: s.name, market: s.market });
-    setSuggestions([]);
+    clearSuggestions();
     setActiveRow(null);
     setEditingRows((prev) => { const next = new Set(prev); next.delete(idx); return next; });
   }
@@ -113,7 +94,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   function startEditing(idx: number) {
     updateItem(idx, { ticker: "", name: "" });
     setEditingRows((prev) => new Set(prev).add(idx));
-    setSuggestions([]);
+    clearSuggestions();
     setTimeout(() => searchInputRefs.current.get(idx)?.focus(), 0);
   }
 
@@ -124,7 +105,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }
 
   useEffect(() => {
-    const handler = () => { setSuggestions([]); setActiveRow(null); };
+    const handler = () => { clearSuggestions(); setActiveRow(null); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);

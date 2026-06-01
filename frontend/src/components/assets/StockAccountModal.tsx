@@ -2,7 +2,8 @@ import { useState } from "react";
 import { X, CheckCircle, XCircle } from "lucide-react";
 import type { AssetAccountCreate } from "../../api/assets";
 import { verifyKisCredentials } from "../../api/assets";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
+import { useCurrencyInput } from "../../hooks/useCurrencyInput";
+import { useForm } from "../../hooks/useForm";
 import { extractErrorMessage } from "../../utils/error";
 import { fmtKrw } from "../../utils/format";
 
@@ -26,21 +27,17 @@ interface Props {
 }
 
 export default function StockAccountModal({ onClose, onSubmit, isLoading }: Props) {
-  const usdRate = useExchangeRate();
-  const [form, setForm] = useState<AssetAccountCreate>({
+  const { form, set } = useForm<AssetAccountCreate>({
     name: "",
     asset_type: "STOCK_KIS",
     data_source: "KIS_API",
     institution: "",
     is_mock_mode: true,
   });
-  const set = (k: keyof AssetAccountCreate, v: unknown) => setForm((f) => ({ ...f, [k]: v }));
-  const [depositKrw, setDepositKrw] = useState<number | undefined>(undefined);
-  const [depositUsd, setDepositUsd] = useState<number | undefined>(undefined);
-
-  const usdAsKrw = depositUsd != null && usdRate != null ? Math.round(depositUsd * usdRate) : 0;
-  const totalKrw = (depositKrw ?? 0) + usdAsKrw;
-  const hasAnyDeposit = (depositKrw ?? 0) > 0 || (depositUsd ?? 0) > 0;
+  const {
+    depositKrw, depositUsd, usdRate, usdAsKrw, totalKrw, hasAnyDeposit, usdPending,
+    setDepositKrw, setDepositUsd,
+  } = useCurrencyInput();
 
   const isKis = form.data_source === "KIS_API";
   const KIS_ACCOUNT_NO_REGEX = /^\d{8}-\d{2}$|^\d{10}$/;
@@ -123,7 +120,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">금융기관명</label>
             <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.institution ?? ""}
-              onChange={(e) => set("institution", e.target.value)} placeholder="예: 한국투자증권, LS증권" />
+              onChange={(e) => set("institution", e.target.value)} placeholder="예: 한국투자증권, 키움증권" />
           </div>
           {form.data_source === "MANUAL" && (
             <div className="space-y-2">
@@ -251,7 +248,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
         <div className="flex justify-end gap-3 mt-5">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
           <button onClick={handleSubmit}
-            disabled={isLoading || !form.name || !kisValid || (isKis && verifyState !== "ok") || (form.data_source === "MANUAL" && (depositUsd ?? 0) > 0 && usdRate == null)}
+            disabled={isLoading || !form.name || !kisValid || (isKis && verifyState !== "ok") || (form.data_source === "MANUAL" && usdPending)}
             className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {isLoading ? "저장 중..." : "저장"}
           </button>

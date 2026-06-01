@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.kis.auth import get_access_token
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
-from app.models.asset import AssetAccount, RebalancingExecution
+from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.credential_service import decrypt
 
@@ -184,12 +184,31 @@ async def execute_rebalancing(
             portfolio_id=portfolio_id,
             triggered_by=triggered_by,
             strategy=strategy,
-            results=[r.model_dump() for r in results],
             total_success=total_success,
             total_fail=total_fail,
             total_skipped=total_skipped,
         )
         db.add(execution)
+        await db.flush()  # execution.id 생성
+
+        for exec_result in results:
+            for placed in exec_result.orders:
+                db.add(RebalancingExecutionResult(
+                    execution_id=execution.id,
+                    account_id=exec_result.account_id,
+                    account_name=exec_result.account_name,
+                    is_mock=exec_result.is_mock,
+                    action=placed.side,
+                    ticker=placed.ticker,
+                    name=placed.name,
+                    market=placed.market,
+                    quantity=placed.quantity,
+                    status=placed.status,
+                    order_no=placed.order_no,
+                    error_message=placed.error_msg,
+                    order_type=placed.order_type,
+                ))
+
         await db.commit()
     except Exception as e:
         logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))

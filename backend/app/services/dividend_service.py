@@ -10,6 +10,7 @@ import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.kis.auth import get_access_token
@@ -211,6 +212,7 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
     )
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
+        .options(selectinload(AssetSnapshot.position_items))
         .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(
@@ -222,19 +224,18 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
 
     positions_map: dict[tuple[str, str], float] = {}
     for snap, _acc in rows:
-        if not snap.positions:
+        if not snap.position_items:
             continue
-        pos_list = snap.positions if isinstance(snap.positions, list) else []
-        for p in pos_list:
-            ticker = p.get("ticker", "")
-            market = (p.get("market") or "KOSPI").upper()
-            raw_value_krw = p.get("value_krw")
+        for p in snap.position_items:
+            ticker = p.ticker
+            market = (p.market or "KOSPI").upper()
+            raw_value_krw = p.value_krw
             if raw_value_krw and float(raw_value_krw) > 0:
                 value = float(raw_value_krw)
             else:
-                qty = float(p.get("qty") or 0)
-                price = float(p.get("current_price") or p.get("avg_price") or 0)
-                value = qty * price if qty > 0 and price > 0 else float(p.get("value_usd") or 0)
+                qty = float(p.qty or 0)
+                price = float(p.current_price or p.avg_price or 0)
+                value = qty * price if qty > 0 and price > 0 else 0.0
             if ticker and value > 0:
                 key = (ticker, market)
                 positions_map[key] = positions_map.get(key, 0) + value
@@ -255,6 +256,7 @@ async def _collect_positions_with_names(user_id: uuid.UUID, db: AsyncSession) ->
     )
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
+        .options(selectinload(AssetSnapshot.position_items))
         .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(
@@ -266,32 +268,27 @@ async def _collect_positions_with_names(user_id: uuid.UUID, db: AsyncSession) ->
 
     positions_map: dict[tuple[str, str], dict] = {}
     for snap, _acc in rows:
-        if not snap.positions:
+        if not snap.position_items:
             continue
-        pos_list = snap.positions if isinstance(snap.positions, list) else []
-        for p in pos_list:
-            ticker = p.get("ticker", "")
-            market = (p.get("market") or "KOSPI").upper()
-            name = p.get("name", ticker)
-            raw_value_krw = p.get("value_krw")
+        for p in snap.position_items:
+            ticker = p.ticker
+            market = (p.market or "KOSPI").upper()
+            name = p.name or ticker
+            raw_value_krw = p.value_krw
             if raw_value_krw and float(raw_value_krw) > 0:
                 value = float(raw_value_krw)
             else:
-                qty = float(p.get("qty") or 0)
-                price = float(p.get("current_price") or p.get("avg_price") or 0)
-                value = qty * price if qty > 0 and price > 0 else float(p.get("value_usd") or 0)
-            raw_invested = p.get("invested_krw")
-            if raw_invested and float(raw_invested) > 0:
-                invested = float(raw_invested)
-            else:
-                invested = float(p.get("avg_price") or 0) * float(p.get("qty") or 0)
+                qty = float(p.qty or 0)
+                price = float(p.current_price or p.avg_price or 0)
+                value = qty * price if qty > 0 and price > 0 else 0.0
+            invested = float(p.avg_price or 0) * float(p.qty or 0)
             if ticker and value > 0:
                 key = (ticker, market)
                 if key not in positions_map:
                     positions_map[key] = {"value_krw": 0.0, "name": name, "invested_krw": 0.0, "qty": 0.0}
                 positions_map[key]["value_krw"] += value
                 positions_map[key]["invested_krw"] += invested
-                positions_map[key]["qty"] += float(p.get("qty") or 0)
+                positions_map[key]["qty"] += float(p.qty or 0)
 
     return positions_map
 

@@ -61,7 +61,7 @@ class PortfolioResponse(BaseModel):
     name: str
     items: list[PortfolioItem]
     base_type: str
-    account_ids: list[str] | None = None
+    account_ids: list[str] | None = None  # Portfolio.account_ids property에서 자동 변환
     sort_order: int = 0
     created_at: datetime
     updated_at: datetime

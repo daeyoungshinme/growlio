@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import UTC, date, datetime, timedelta
+from dataclasses import asdict
+from datetime import date, timedelta
 from typing import Any
 
 import structlog
@@ -11,310 +12,93 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.exceptions import BadRequestError, CredentialMissingError
-from app.kis.auth import get_access_token
-from app.kis.balance import get_domestic_balance, get_overseas_balance
-from app.kis.client import KisTokenExpiredError
-from app.kis.overseas_quote import get_overseas_price
-from app.models.asset import AssetAccount, AssetSnapshot, Transaction
-from app.services.credential_service import decrypt
-from app.utils.currency import cache_usd_krw_rate, fetch_usd_krw, get_usd_krw_rate
+from sqlalchemy import delete
+
+from app.models.asset import AssetAccount, AssetSnapshot, Position, Transaction
+from app.providers.base import BrokerProvider
+from app.providers.kis_provider import KISProvider
+from app.providers.kiwoom_provider import KiwoomProvider
+from app.providers.manual_provider import ManualProvider
+from app.providers.openbanking_provider import OpenBankingProvider
+from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
 
-
-def _to_manual_position(p: dict, usd_krw_rate: float) -> dict:
-    """KIS 잔고 포지션을 manual_positions 형식으로 변환 (모든 가격 KRW)."""
-    if p.get("currency") == "USD":
-        avg_usd = float(p.get("avg_price", 0))
-        cur_usd = float(p.get("current_price", 0))
-        return {
-            "ticker": p["ticker"], "name": p["name"], "market": p["market"],
-            "qty": p["qty"],
-            "avg_price": avg_usd * usd_krw_rate,
-            "avg_price_usd": avg_usd,
-            "usd_rate": usd_krw_rate,
-            "current_price": cur_usd * usd_krw_rate,
-        }
-    return {
-        "ticker": p["ticker"], "name": p["name"], "market": p["market"],
-        "qty": p["qty"],
-        "avg_price": float(p.get("avg_price", 0)),
-        "avg_price_usd": None,
-        "usd_rate": None,
-        "current_price": float(p["current_price"]) if p.get("current_price") else None,
-    }
+_PROVIDERS: dict[str, BrokerProvider] = {
+    "KIS_API": KISProvider(),
+    "KIWOOM_API": KiwoomProvider(),
+    "OPEN_BANKING": OpenBankingProvider(),
+    "MANUAL": ManualProvider(),
+}
 
 
-async def sync_kis_account(
-    account: AssetAccount,
-    db: AsyncSession,
-    redis,
-) -> AssetSnapshot:
-    """KIS 계좌 잔고를 API로 조회해 스냅샷을 저장한다.
+async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> AssetSnapshot:
+    """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
-    account.kis_app_key/kis_app_secret 필수. 미설정 시 ValueError 발생.
+    SyncError 계층 예외를 그대로 전파한다. API 레이어에서 HTTPException으로 변환.
     """
-    if not account.kis_app_key or not account.kis_app_secret:
-        raise CredentialMissingError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
-    app_key = decrypt(account.kis_app_key)
-    app_secret = decrypt(account.kis_app_secret)
-    is_mock = account.is_mock_mode
-    token_account_id = str(account.id)
-    token_user_id = str(account.user_id)
+    from app.exceptions import ProviderCredentialError
 
-    logger.info("kis_sync_start", account_no=account.kis_account_no, is_mock=is_mock, has_own_creds=bool(account.kis_app_key))
+    provider = _PROVIDERS.get(account.data_source)
+    if provider is None:
+        raise ProviderCredentialError(f"지원하지 않는 데이터 소스: {account.data_source}")
+    balance = await provider.sync(account, db, redis)
 
-    access_token = await get_access_token(
-        app_key,
-        app_secret,
-        is_mock=is_mock,
-        redis=redis,
-        db=db,
-        user_id=token_user_id,
-        account_id=token_account_id,
-    )
+    if balance.deposit_krw:
+        account.deposit_krw = balance.deposit_krw
+    if balance.deposit_foreign:
+        account.deposit_usd = balance.deposit_foreign
 
-    try:
-        domestic = await get_domestic_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
-        overseas = await get_overseas_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
-    except KisTokenExpiredError:
-        logger.warning("kis_token_expired_refreshing", account_no=account.kis_account_no, is_mock=is_mock)
-        access_token = await get_access_token(
-            app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-            user_id=token_user_id, account_id=token_account_id, force_refresh=True,
+    if balance.positions:
+        # 계좌 현재 포지션 교체 (snapshot_id IS NULL)
+        await db.execute(
+            delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711
         )
-        domestic = await get_domestic_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
-        overseas = await get_overseas_balance(app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock)
-
-    # USD → KRW 환산 (Redis 캐시 우선, API 조회 후 캐시 업데이트)
-    usd_krw_rate = await get_usd_krw_rate(redis)
-    if overseas["positions"]:
-        sample_ticker = overseas["positions"][0]["ticker"]
-        sample_market = overseas["positions"][0]["market"]
-        try:
-            quote = await get_overseas_price(app_key, app_secret, access_token, sample_ticker, sample_market, is_mock=is_mock)
-            usd_krw_rate = quote["usd_krw_rate"]
-            await cache_usd_krw_rate(redis, usd_krw_rate)
-        except Exception as e:
-            logger.warning("usd_krw_rate_fetch_failed", ticker=sample_ticker, error=str(e))
-
-    overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate  # 해외 주식 총평가액
-    overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate   # 외화 예수금 (주식 아님)
-    overseas_invested_krw = sum(
-        float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate
-        for p in overseas["positions"]
-    )
-
-    stock_value_krw = domestic["total_value_krw"] + overseas_value_krw   # 주식만 (예수금 제외)
-    total_value_krw = stock_value_krw + domestic["deposit_krw"] + overseas_deposit_krw  # 전체 자산
-    total_invested = domestic["invested_krw"] + overseas_invested_krw    # 국내 + 해외 투자금
-    unrealized_pnl = stock_value_krw - total_invested  # 정확한 주식 손익
-
-    all_positions = domestic["positions"] + [
-        {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas["positions"]
-    ]
-
-    account.deposit_krw = domestic["deposit_krw"]
-    account.deposit_usd = overseas["deposit_usd"]
-    account.manual_positions = [_to_manual_position(p, usd_krw_rate) for p in all_positions]
+        for p in balance.positions:
+            db.add(Position(
+                account_id=account.id,
+                snapshot_id=None,
+                ticker=p.ticker, name=p.name, market=p.market,
+                qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+                current_price=p.current_price,
+                value_krw=p.value_krw,
+                currency=p.currency, usd_rate=p.usd_rate,
+            ))
     await db.commit()
 
-    today = date.today()
+    today = balance.extra.get("snapshot_date", date.today())
+    source = balance.extra.get("source", account.data_source)
+
     snapshot = await _upsert_snapshot(
         db,
         account_id=account.id,
         user_id=account.user_id,
         snapshot_date=today,
-        amount_krw=total_value_krw,
-        invested_amount=total_invested,
-        unrealized_pnl=unrealized_pnl,
-        positions=all_positions,
-        usd_krw_rate=usd_krw_rate,
-        source="KIS_API",
+        amount_krw=balance.total_value_krw,
+        invested_amount=balance.invested_krw or None,
+        unrealized_pnl=balance.pnl_krw or None,
+        usd_krw_rate=balance.usd_krw_rate if balance.usd_krw_rate != 1300.0 else None,
+        source=source,
     )
-    logger.info("kis_account_synced", account_id=str(account.id), total_krw=total_value_krw)
-    return snapshot
 
-
-async def sync_kiwoom_account(
-    account: AssetAccount,
-    db: AsyncSession,
-    redis,
-) -> AssetSnapshot:
-    """키움증권 OpenAPI+ 계좌 잔고를 API로 조회해 스냅샷을 저장한다.
-
-    키움은 전역 자격증명 폴백 없음 — kiwoom_app_key/secret이 없으면 즉시 오류.
-    """
-    from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
-    from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
-    from app.kiwoom.client import KiwoomTokenExpiredError
-
-    if not account.kiwoom_app_key or not account.kiwoom_app_secret:
-        raise CredentialMissingError("키움 API 자격증명이 설정되지 않았습니다")
-    if not account.kiwoom_account_no:
-        raise CredentialMissingError("키움 계좌번호가 설정되지 않았습니다")
-
-    app_key = decrypt(account.kiwoom_app_key)
-    app_secret = decrypt(account.kiwoom_app_secret)
-    is_mock = account.is_mock_mode
-
-    logger.info("kiwoom_sync_start", account_no=account.kiwoom_account_no, is_mock=is_mock)
-
-    async def _do_sync() -> dict:
-        token = await kiwoom_get_access_token(
-            app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-            user_id=str(account.user_id), account_id=str(account.id),
+    # 스냅샷 포지션 저장 (기존 snapshot의 포지션 교체)
+    if balance.positions:
+        await db.execute(
+            delete(Position).where(Position.snapshot_id == snapshot.id)
         )
-        try:
-            return await kiwoom_get_domestic_balance(
-                token, account.kiwoom_account_no, is_mock=is_mock
-            )
-        except KiwoomTokenExpiredError:
-            logger.warning("kiwoom_token_expired_refreshing", account_no=account.kiwoom_account_no)
-            refreshed = await kiwoom_get_access_token(
-                app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-                user_id=str(account.user_id), account_id=str(account.id), force_refresh=True,
-            )
-            return await kiwoom_get_domestic_balance(
-                refreshed, account.kiwoom_account_no, is_mock=is_mock
-            )
+        for p in balance.positions:
+            db.add(Position(
+                account_id=account.id,
+                snapshot_id=snapshot.id,
+                ticker=p.ticker, name=p.name, market=p.market,
+                qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
+                current_price=p.current_price,
+                value_krw=p.value_krw,
+                currency=p.currency, usd_rate=p.usd_rate,
+            ))
+        await db.commit()
 
-    try:
-        domestic = await asyncio.wait_for(_do_sync(), timeout=50.0)
-    except TimeoutError:
-        logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
-        raise RuntimeError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from None
-
-    usd_krw_rate = await get_usd_krw_rate(redis)
-    total_value_krw = domestic["total_value_krw"] + domestic["deposit_krw"]
-    total_invested = domestic["invested_krw"]
-    unrealized_pnl = domestic["total_value_krw"] - total_invested
-
-    account.deposit_krw = domestic["deposit_krw"]
-    account.manual_positions = [_to_manual_position(p, usd_krw_rate) for p in domestic["positions"]]
-    await db.commit()
-
-    snapshot = await _upsert_snapshot(
-        db,
-        account_id=account.id,
-        user_id=account.user_id,
-        snapshot_date=date.today(),
-        amount_krw=total_value_krw,
-        invested_amount=total_invested,
-        unrealized_pnl=unrealized_pnl,
-        positions=domestic["positions"],
-        usd_krw_rate=usd_krw_rate,
-        source="KIWOOM_API",
-    )
-    logger.info("kiwoom_account_synced", account_id=str(account.id), total_krw=total_value_krw)
-    return snapshot
-
-
-async def sync_openbanking_account(account: AssetAccount, db: AsyncSession) -> AssetSnapshot:
-    """오픈뱅킹 계좌 잔액을 조회해 스냅샷을 저장한다."""
-    import secrets
-
-    from app.providers.openbanking import ensure_ob_token_fresh, get_account_balance
-
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
-    if not settings_row or not settings_row.ob_access_token:
-        raise CredentialMissingError("오픈뱅킹 토큰이 없습니다. 다시 연결해주세요.")
-
-    if not account.ob_fintech_use_no:
-        raise CredentialMissingError("오픈뱅킹 핀테크이용번호가 없습니다")
-
-    access_token = await ensure_ob_token_fresh(settings_row, db)
-
-    bank_tran_id = f"M{date.today().year:04d}00001U{secrets.token_hex(4).upper()}"
-    data = await get_account_balance(
-        access_token=access_token,
-        fintech_use_no=account.ob_fintech_use_no,
-        bank_tran_id=bank_tran_id,
-    )
-
-    balance_amt = float(data.get("balance_amt", 0))
-    today = date.today()
-    snapshot = await _upsert_snapshot(
-        db,
-        account_id=account.id,
-        user_id=account.user_id,
-        snapshot_date=today,
-        amount_krw=balance_amt,
-        source="OPEN_BANKING",
-    )
-    logger.info("openbanking_account_synced", account_id=str(account.id), balance=balance_amt)
-    return snapshot
-
-
-async def sync_manual_account(account: AssetAccount, db: AsyncSession, redis=None) -> AssetSnapshot:
-    """수동 금액/종목으로 스냅샷을 저장한다. redis가 있으면 현재가도 갱신한다."""
-    from app.kis.constants import OVERSEAS_MARKETS
-
-    positions = account.manual_positions or []
-
-    if positions and redis is not None:
-        from app.services.price_service import fetch_prices_batch
-
-        tickers = [(p["ticker"], p.get("market", "KOSPI")) for p in positions]
-        price_map = await fetch_prices_batch(account.user_id, tickers, db, redis)
-
-        has_overseas = any(p.get("market", "KOSPI") in OVERSEAS_MARKETS for p in positions)
-        usd_rate: float | None = None
-        if has_overseas:
-            usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
-
-        updated = []
-        for p in positions:
-            raw_price = price_map.get(p["ticker"])
-            if raw_price and p.get("market", "KOSPI") in OVERSEAS_MARKETS and usd_rate:
-                price_krw = raw_price * usd_rate
-            elif raw_price:
-                price_krw = raw_price
-            else:
-                price_krw = p.get("current_price") or p["avg_price"]
-            updated.append({**p, "current_price": price_krw})
-
-        account.manual_positions = updated
-        account.manual_updated_at = datetime.now(UTC)
-        positions = updated
-
-    invested = _invested_value(positions)
-    value = _eval_value(positions)
-    pnl = value - invested if positions else 0.0
-
-    if positions:
-        usd_rate_val = await fetch_usd_krw(redis)
-        deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate_val
-        amount_krw = (value if value else invested) + deposit
-        account.manual_amount = amount_krw
-    elif account.asset_type == "REAL_ESTATE":
-        # 부동산: 순자산(시세 - 담보대출)을 스냅샷에 저장
-        gross = float(account.manual_amount or 0)
-        mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-        amount_krw = gross - mortgage
-        if gross == 0:
-            raise BadRequestError("부동산 시세(manual_amount)가 설정되지 않았습니다")
-    elif account.deposit_krw is not None or account.deposit_usd is not None:
-        usd_rate = await fetch_usd_krw(redis)
-        amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
-    else:
-        amount_krw = float(account.manual_amount or 0)
-        if amount_krw == 0:
-            raise BadRequestError("수동 금액이 설정되지 않았습니다")
-
-    today = date.today()
-    snapshot = await _upsert_snapshot(
-        db,
-        account_id=account.id,
-        user_id=account.user_id,
-        snapshot_date=today,
-        amount_krw=amount_krw,
-        source="MANUAL",
-        positions=positions if positions else None,
-        invested_amount=invested if invested else None,
-        unrealized_pnl=pnl if positions else None,
-    )
+    logger.info("account_synced", account_id=str(account.id), source=source, total_krw=balance.total_value_krw)
     return snapshot
 
 
@@ -322,11 +106,19 @@ _STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
 
 
 def _eval_value(pos_list: list) -> float:
-    return sum((p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0) for p in pos_list)
+    def _val(p: Any) -> float:
+        if isinstance(p, dict):
+            return (p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0)
+        return float(p.current_price or p.avg_price or 0) * float(p.qty or 0)
+    return sum(_val(p) for p in pos_list)
 
 
 def _invested_value(pos_list: list) -> float:
-    return sum(p.get("avg_price", 0) * p.get("qty", 0) for p in pos_list)
+    def _inv(p: Any) -> float:
+        if isinstance(p, dict):
+            return p.get("avg_price", 0) * p.get("qty", 0)
+        return float(p.avg_price or 0) * float(p.qty or 0)
+    return sum(_inv(p) for p in pos_list)
 
 
 async def _build_asset_totals(
@@ -378,11 +170,35 @@ async def _build_asset_totals(
     stock_value = 0.0
     by_type: dict[str, float] = {}
 
+    # 스냅샷 ID → Position 목록 사전 로드 (쿼리 최소화)
+    snap_ids = [snap.id for snap, acc in rows if acc.asset_type in _STOCK_TYPES]
+    snap_positions: dict[Any, list] = {}
+    if snap_ids:
+        pos_result = await db.execute(
+            select(Position).where(Position.snapshot_id.in_(snap_ids))
+        )
+        for pos in pos_result.scalars().all():
+            snap_positions.setdefault(pos.snapshot_id, []).append(pos)
+
+    # 계좌 ID → 현재 Position 목록 사전 로드
+    stock_acc_ids = [acc.id for _, acc in rows if acc.asset_type in _STOCK_TYPES]
+    stock_acc_ids += [acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES]
+    current_positions: dict[Any, list] = {}
+    if stock_acc_ids:
+        cur_result = await db.execute(
+            select(Position).where(
+                Position.account_id.in_(stock_acc_ids),
+                Position.snapshot_id == None,  # noqa: E711
+            )
+        )
+        for pos in cur_result.scalars().all():
+            current_positions.setdefault(pos.account_id, []).append(pos)
+
     for snap, acc in rows:
         if not acc.include_in_total:
             continue
         if acc.asset_type in _STOCK_TYPES:
-            pos_list = snap.positions or acc.manual_positions or []
+            pos_list = snap_positions.get(snap.id) or current_positions.get(acc.id) or []
             amount = float(snap.amount_krw)
             stock_equity = _eval_value(pos_list) if pos_list else amount
             cash = amount - stock_equity
@@ -400,7 +216,7 @@ async def _build_asset_totals(
         if not acc.include_in_total:
             continue
         if acc.asset_type in _STOCK_TYPES:
-            pos_list = acc.manual_positions or []
+            pos_list = current_positions.get(acc.id) or []
             pos_equity = _eval_value(pos_list) if pos_list else 0.0
             deposit = float(acc.deposit_krw or 0) + float(acc.deposit_usd or 0) * usd_rate
             computed = pos_equity + deposit

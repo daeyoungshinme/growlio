@@ -2,13 +2,14 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.models.asset import AssetAccount
-from app.models.portfolio import Portfolio
+from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.user import User
 from app.schemas.portfolio import PortfolioCreate, PortfolioReorderRequest, PortfolioResponse, PortfolioUpdate
 
@@ -38,6 +39,13 @@ async def _validate_account_ids(
         )
 
 
+def _with_relations(q):
+    return q.options(
+        selectinload(Portfolio.items),
+        selectinload(Portfolio.linked_accounts),
+    )
+
+
 @router.get("", response_model=list[PortfolioResponse])
 async def list_portfolios(
     current_user: User = Depends(get_current_user),
@@ -45,9 +53,11 @@ async def list_portfolios(
 ):
     """저장된 포트폴리오 목록."""
     rows = await db.execute(
-        select(Portfolio)
-        .where(Portfolio.user_id == current_user.id)
-        .order_by(Portfolio.sort_order, Portfolio.created_at)
+        _with_relations(
+            select(Portfolio)
+            .where(Portfolio.user_id == current_user.id)
+            .order_by(Portfolio.sort_order, Portfolio.created_at)
+        )
     )
     return rows.scalars().all()
 
@@ -63,14 +73,31 @@ async def create_portfolio(
     portfolio = Portfolio(
         user_id=current_user.id,
         name=body.name,
-        items=[i.model_dump() for i in body.items],
         base_type=body.base_type,
-        account_ids=[str(aid) for aid in body.account_ids] if body.account_ids else None,
     )
     db.add(portfolio)
+    await db.flush()  # id 생성
+
+    for idx, item in enumerate(body.items):
+        db.add(PortfolioItem(
+            portfolio_id=portfolio.id,
+            ticker=item.ticker,
+            name=item.name,
+            market=item.market,
+            weight=item.weight,
+            sort_order=idx,
+        ))
+
+    if body.account_ids:
+        for aid in body.account_ids:
+            db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
+
     await db.commit()
-    await db.refresh(portfolio)
-    return portfolio
+
+    result = await db.execute(
+        _with_relations(select(Portfolio).where(Portfolio.id == portfolio.id))
+    )
+    return result.scalar_one()
 
 
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)
@@ -81,29 +108,48 @@ async def update_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """포트폴리오 수정."""
-    portfolio = await db.scalar(
-        select(Portfolio).where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
+    result = await db.execute(
+        _with_relations(
+            select(Portfolio).where(
+                Portfolio.id == portfolio_id,
+                Portfolio.user_id == current_user.id,
+            )
         )
     )
+    portfolio = result.scalar_one_or_none()
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     if body.account_ids is not None:
         await _validate_account_ids(body.account_ids, current_user.id, db)
     if body.name is not None:
         portfolio.name = body.name
-    if body.items is not None:
-        portfolio.items = [i.model_dump() for i in body.items]
     if body.base_type is not None:
         portfolio.base_type = body.base_type
+
+    if body.items is not None:
+        await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))
+        for idx, item in enumerate(body.items):
+            db.add(PortfolioItem(
+                portfolio_id=portfolio.id,
+                ticker=item.ticker,
+                name=item.name,
+                market=item.market,
+                weight=item.weight,
+                sort_order=idx,
+            ))
+
     if body.account_ids is not None:
-        portfolio.account_ids = [str(aid) for aid in body.account_ids] if body.account_ids else None
+        await db.execute(delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id))
+        for aid in body.account_ids:
+            db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
 
     await db.commit()
-    await db.refresh(portfolio)
-    return portfolio
+
+    result2 = await db.execute(
+        _with_relations(select(Portfolio).where(Portfolio.id == portfolio_id))
+    )
+    return result2.scalar_one()
 
 
 @router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -120,7 +166,7 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     await db.delete(portfolio)
     await db.commit()

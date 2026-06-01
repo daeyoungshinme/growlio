@@ -74,7 +74,7 @@ async def update_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     if body.name is not None:
         portfolio.name = body.name
@@ -100,7 +100,7 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     await db.delete(portfolio)
     await db.commit()
@@ -119,7 +119,7 @@ async def run_backtest_endpoint(
 ):
     """백테스팅 실행. yfinance 호출로 수 초 소요될 수 있습니다."""
     if not body.portfolio_ids and not body.include_spy and not body.include_real_portfolio:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="최소 1개의 포트폴리오 또는 벤치마크를 선택해주세요.")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="최소 1개의 포트폴리오 또는 벤치마크를 선택해주세요")
 
     redis = await get_redis()
     param_hash = hashlib.md5(

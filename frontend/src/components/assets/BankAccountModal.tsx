@@ -1,7 +1,7 @@
-import { useState } from "react";
 import { X } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate } from "../../api/assets";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
+import { useCurrencyInput } from "../../hooks/useCurrencyInput";
+import { useForm } from "../../hooks/useForm";
 import { fmtKrw } from "../../utils/format";
 
 interface Props {
@@ -14,31 +14,20 @@ interface Props {
 export default function BankAccountModal({ initialAccount, onClose, onSubmit, isLoading }: Props) {
   const isEdit = !!initialAccount;
 
-  const [form, setForm] = useState({
+  const { form, set } = useForm({
     name: initialAccount?.name ?? "",
     institution: initialAccount?.institution ?? "",
     asset_type: initialAccount?.asset_type ?? "BANK_ACCOUNT",
     notes: initialAccount?.notes ?? "",
   });
 
-  const [depositKrw, setDepositKrw] = useState<number | undefined>(
-    initialAccount?.deposit_krw != null
-      ? initialAccount.deposit_krw
-      : initialAccount?.manual_amount != null
-        ? initialAccount.manual_amount
-        : undefined
+  const {
+    depositKrw, depositUsd, usdRate, usdAsKrw, totalKrw, usdPending,
+    setDepositKrw, setDepositUsd,
+  } = useCurrencyInput(
+    initialAccount?.deposit_krw ?? initialAccount?.manual_amount ?? undefined,
+    initialAccount?.deposit_usd ?? undefined,
   );
-  const [depositUsd, setDepositUsd] = useState<number | undefined>(
-    initialAccount?.deposit_usd != null && initialAccount.deposit_usd > 0
-      ? initialAccount.deposit_usd
-      : undefined
-  );
-
-  const usdRate = useExchangeRate();
-  const usdAsKrw = depositUsd && usdRate ? Math.round(depositUsd * usdRate) : 0;
-  const totalKrw = (depositKrw ?? 0) + usdAsKrw;
-
-  const usdPending = (depositUsd ?? 0) > 0 && usdRate == null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,21 +58,21 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 별칭 *</label>
             <input type="text" required value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              onChange={(e) => set("name", e.target.value)}
               placeholder="예: 국민은행 주계좌"
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">은행명</label>
             <input type="text" value={form.institution}
-              onChange={(e) => setForm({ ...form, institution: e.target.value })}
+              onChange={(e) => set("institution", e.target.value)}
               placeholder="예: 국민은행"
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           {!isEdit && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 종류</label>
-              <select value={form.asset_type} onChange={(e) => setForm({ ...form, asset_type: e.target.value })}
+              <select value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)}
                 className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="BANK_ACCOUNT">입출금</option>
                 <option value="DEPOSIT">예·적금</option>
@@ -131,7 +120,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">메모</label>
-            <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)}
               placeholder="선택 입력" rows={2}
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
           </div>

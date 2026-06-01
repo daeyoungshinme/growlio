@@ -28,8 +28,17 @@ def mock_db() -> AsyncMock:
     """AsyncSession mock."""
     session = AsyncMock(spec=AsyncSession)
     session.scalar = AsyncMock(return_value=None)
-    session.execute = AsyncMock()
+
+    # execute 결과: scalars().all() 체이닝 지원
+    execute_result = MagicMock()
+    execute_result.scalars.return_value.all.return_value = []
+    execute_result.scalar_one.return_value = MagicMock()
+    execute_result.scalar_one_or_none.return_value = None
+    execute_result.all.return_value = []
+    session.execute = AsyncMock(return_value=execute_result)
+
     session.add = MagicMock()
+    session.flush = AsyncMock()
     session.commit = AsyncMock()
     session.refresh = AsyncMock()
     return session

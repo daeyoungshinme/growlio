@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
 
@@ -92,6 +93,7 @@ async def _calc_stock_unrealized(
     )
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
+        .options(selectinload(AssetSnapshot.position_items))
         .join(
             subq,
             (AssetSnapshot.account_id == subq.c.account_id)
@@ -110,12 +112,11 @@ async def _calc_stock_unrealized(
     domestic_value = 0.0
 
     for snap, _acc in rows:
-        positions = snap.positions or []
-        for pos in positions:
-            market = pos.get("market", "")
-            qty = float(pos.get("qty", 0))
-            avg = float(pos.get("avg_price", 0))
-            cur = float(pos.get("current_price") or avg)
+        for pos in snap.position_items:
+            market = pos.market
+            qty = float(pos.qty or 0)
+            avg = float(pos.avg_price or 0)
+            cur = float(pos.current_price or avg)
 
             if market in _OVERSEAS_MARKETS:
                 overseas_value += cur * qty

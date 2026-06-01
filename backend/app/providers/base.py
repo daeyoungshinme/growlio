@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models.asset import AssetAccount, AssetSnapshot
 
 
 @dataclass
@@ -13,12 +18,14 @@ class Position:
     name: str
     market: str
     qty: int
-    avg_price: float
-    current_price: float
-    currency: str  # KRW | USD
+    avg_price: float        # 항상 KRW
+    current_price: float    # 항상 KRW
+    currency: str           # KRW | USD (원본 통화)
     value_krw: float = 0.0
     pnl: float = 0.0
     pnl_pct: float = 0.0
+    avg_price_usd: float | None = None   # 해외 종목 원본 USD 평단가 (표시용)
+    usd_rate: float | None = None        # 평단가 환산에 사용한 환율 (표시용)
 
 
 @dataclass
@@ -50,3 +57,22 @@ class FinancialProvider(ABC):
     @abstractmethod
     async def get_current_price(self, credentials: dict[str, str], ticker: str, market: str) -> float:
         """종목 현재가를 조회한다."""
+
+
+class BrokerProvider(ABC):
+    """증권사 동기화 공통 인터페이스.
+
+    구현체는 SyncError 계층 예외만 raise해야 한다. 증권사별 내부 예외는 내부에서 변환.
+    """
+
+    PROVIDER_ID: str = ""
+    PROVIDER_NAME: str = ""
+
+    @abstractmethod
+    async def sync(
+        self,
+        account: "AssetAccount",
+        db: "AsyncSession",
+        redis: Any,
+    ) -> BalanceResult:
+        """잔고·보유종목을 조회해 BalanceResult를 반환한다."""

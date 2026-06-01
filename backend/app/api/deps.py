@@ -1,5 +1,3 @@
-from collections.abc import AsyncGenerator
-
 import structlog
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select

@@ -1,6 +1,6 @@
 import { api } from "./client";
 
-export interface AllocationItem {
+export interface DashboardAllocationItem {
   type: string;
   amount_krw: number;
   pct: number;
@@ -18,7 +18,7 @@ export interface DividendMonthlyBreakdown {
 
 export interface DashboardData {
   total_assets_krw: number;
-  asset_allocation: AllocationItem[];
+  asset_allocation: DashboardAllocationItem[];
   goal_amount: number | null;
   goal_achievement_pct: number | null;
   stock_return_pct: number;

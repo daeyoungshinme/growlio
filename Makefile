@@ -39,7 +39,7 @@ lint:
 
 typecheck:
 	cd backend && uv run mypy app/
-	cd frontend && npm run build
+	cd frontend && npx tsc --noEmit
 
 clean:
 	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache

@@ -94,19 +94,19 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
         account_id=str(account_id),
     )
 
-    # 현재가 조회
-    tickers = [(item["ticker"], item.get("market", "KOSPI")) for item in items]
+    # 현재가 조회 (PortfolioItem 모델 → attribute 접근)
+    tickers = [(item.ticker, item.market) for item in items]
     price_map = await fetch_prices_batch(user_id, tickers, db, redis)
 
     # 종목별 배분 및 매수
-    total_weight = sum(float(item.get("weight", 0)) for item in items)
+    total_weight = sum(float(item.weight) for item in items)
     if total_weight <= 0:
         return
 
     for item in items:
-        ticker = item["ticker"]
-        market = item.get("market", "KOSPI")
-        weight = float(item.get("weight", 0)) / total_weight
+        ticker = item.ticker
+        market = item.market
+        weight = float(item.weight) / total_weight
         alloc_amount = total_amount * weight
 
         price = price_map.get(ticker)
