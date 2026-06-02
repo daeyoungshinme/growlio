@@ -208,21 +208,21 @@ export default function InvestPlanPage() {
       </div>
 
       {isConfigured && data && (
-        <>
-          <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
           <DCAProjectionChart data={data.projection_months} />
-          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:items-start">
+          <div className="space-y-5">
+            <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
             <YearlyAchievementTable data={data.yearly_achievements} />
             <MonthlyAchievementTable data={data.projection_months} />
           </div>
-        </>
+        </div>
       )}
 
       {/* 세금 추정 섹션 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         <button
           onClick={() => setShowTax((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="w-full flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
           <div className="flex items-center gap-2">
             <span className="text-base font-semibold text-gray-800 dark:text-gray-200">세금 추정</span>
@@ -231,7 +231,7 @@ export default function InvestPlanPage() {
           {showTax ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
         </button>
         {showTax && (
-          <div className="px-5 pb-5 space-y-4 border-t border-gray-100 dark:border-gray-800">
+          <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-gray-800">
             <div className="flex items-center gap-3 pt-4">
               <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>
               <select
