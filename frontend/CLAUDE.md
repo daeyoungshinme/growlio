@@ -192,7 +192,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
-- `["stock-price-alerts"]`는 위 유틸 없음 — CUD 후 직접 `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })` 호출.
+> **예외:** `["stock-price-alerts"]`는 `queryInvalidation.ts` 유틸 없음 — CUD 후 직접 `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })` 호출.
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 - `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
@@ -206,6 +206,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 **카드 컨테이너**
 ```
 bg-white rounded-2xl border border-gray-200 p-5
+dark:bg-gray-800 dark:border-gray-700
 ```
 
 **아이콘 버튼 (hover 효과 포함)**

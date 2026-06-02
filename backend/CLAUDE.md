@@ -203,3 +203,15 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 **Pydantic v2 스타일**
 - ORM 모델 매핑 스키마는 `model_config = {"from_attributes": True}` 필수.
 - `Optional[X]` 대신 `X | None` 사용.
+
+**새 라우터/모델 추가**
+- 새 라우터는 `api/v1/router.py`에 `include_router()`로 등록 필수.
+- 새 모델은 `alembic/env.py`에 import 필요 — 누락 시 autogenerate가 해당 테이블 변경 감지 못함.
+
+**Rate Limiting**
+- `@limiter.limit("X/minute")` 데코레이터 적용 시 함수 시그니처에 `request: Request` 파라미터 필수.
+  ```python
+  @router.get("/endpoint")
+  @limiter.limit("60/minute")
+  async def my_endpoint(request: Request, ...):
+  ```
