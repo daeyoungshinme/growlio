@@ -249,7 +249,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
     base = bank_total + total_invested
     annualized_return, cumulative_return = await _calc_returns(user_id, total_assets_krw, base, db)
 
-    xirr_pct = await _calc_xirr(user_id, total_assets_krw, db)
+    xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 
     from sqlalchemy import func as sqlfunc
     first_snap_result = await db.execute(
@@ -281,6 +281,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         "annual_return_pct": annualized_return,
         "cumulative_return_pct": cumulative_return,
         "xirr_pct": xirr_pct,
+        "xirr_is_estimated": xirr_is_estimated,
         "benchmark_kospi_pct": benchmarks.get("kospi_pct"),
         "benchmark_sp500_pct": benchmarks.get("sp500_pct"),
         "goal_annual_return_pct": goal_annual_return_pct,
@@ -398,17 +399,24 @@ def _xirr(cashflows: list[tuple[date, float]]) -> float | None:
         except (ZeroDivisionError, OverflowError):
             return None
         if abs(dnpv) < 1e-12:
-            break
+            max_cf = max(abs(cf) for cf, _ in pairs)
+            if max_cf > 0 and abs(npv) / max_cf < 1e-6:
+                return round(rate * 100, 2)
+            return None
         new_rate = rate - npv / dnpv
         if abs(new_rate - rate) < 1e-7:
-            return round(new_rate * 100, 2)
-        rate = max(new_rate, -0.99)
+            result = round(new_rate * 100, 2)
+            return result if -99 < result < 1000 else None
+        rate = min(max(new_rate, -0.99), 10.0)
     return None
 
 
-async def _calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) -> float | None:
-    """Transaction 기반 XIRR 계산. 트랜잭션 없으면 None."""
-    from sqlalchemy import asc
+async def _calc_xirr(
+    user_id: uuid.UUID, current_total: float, db: AsyncSession
+) -> tuple[float | None, bool]:
+    """Transaction 기반 XIRR 계산. 트랜잭션 없으면 스냅샷으로 추정.
+    반환: (xirr_pct, is_estimated) — is_estimated=True이면 스냅샷 기반 근사값."""
+    from sqlalchemy import asc, func
 
     result = await db.execute(
         select(Transaction.transaction_date, Transaction.transaction_type, Transaction.amount)
@@ -419,10 +427,35 @@ async def _calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession)
         .order_by(asc(Transaction.transaction_date))
     )
     rows = result.all()
-    if not rows:
-        return None
 
-    cashflows: list[tuple[date, float]] = []
+    if not rows:
+        # 거래내역 없음 → 가장 오래된 스냅샷의 총액을 최초 투자로 가정해 단일 기간 XIRR 추정
+        snap_result = await db.execute(
+            select(
+                AssetSnapshot.snapshot_date,
+                func.sum(AssetSnapshot.amount_krw).label("total"),
+            )
+            .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
+            .where(
+                AssetSnapshot.user_id == user_id,
+                AssetAccount.is_active == True,  # noqa: E712
+                AssetAccount.include_in_total == True,  # noqa: E712
+            )
+            .group_by(AssetSnapshot.snapshot_date)
+            .order_by(asc(AssetSnapshot.snapshot_date))
+            .limit(1)
+        )
+        first = snap_result.first()
+        today = date.today()
+        if not first or float(first.total) <= 0 or first.snapshot_date >= today:
+            return None, False
+        cashflows: list[tuple[date, float]] = [
+            (first.snapshot_date, -float(first.total)),
+            (today, current_total),
+        ]
+        return _xirr(cashflows), True
+
+    cashflows = []
     for row in rows:
         if row.transaction_type == "DEPOSIT":
             cashflows.append((row.transaction_date, -float(row.amount)))
@@ -430,7 +463,7 @@ async def _calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession)
             cashflows.append((row.transaction_date, float(row.amount)))
 
     cashflows.append((date.today(), current_total))
-    return _xirr(cashflows)
+    return _xirr(cashflows), False
 
 
 async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:
