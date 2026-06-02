@@ -84,7 +84,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
             ) : (
               <>
                 {account.institution && (
-                  <span className="text-base text-gray-400 dark:text-gray-500 shrink-0">{account.institution} ·</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{account.institution} ·</span>
                 )}
                 <span className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">{account.name}</span>
                 <button
