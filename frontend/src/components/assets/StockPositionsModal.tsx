@@ -4,6 +4,7 @@ import { api } from "../../api/client";
 import { fetchStockPrice } from "../../api/assets";
 import { useExchangeRate } from "../../hooks/useExchangeRate";
 import { useStockSearch } from "../../hooks/useStockSearch";
+import { isOverseasMarket } from "../../constants/markets";
 import { extractErrorMessage } from "../../utils/error";
 import { fmtKrwShort } from "../../utils/format";
 import Modal from "../common/Modal";
@@ -24,8 +25,17 @@ interface PositionsResponse {
 const EMPTY_ROW: Position = {
   ticker: "", name: "", market: "KOSPI",
   qty: 0, avg_price: 0, avg_price_usd: null,
-  usd_rate: null, current_price: null,
+  usd_rate: null, current_price: null, current_price_usd: null,
 };
+
+const enrichPositions = (positions: Position[]): Position[] =>
+  positions.map((p) => ({
+    ...p,
+    current_price_usd:
+      isOverseasMarket(p.market) && p.current_price && p.usd_rate
+        ? +(p.current_price / p.usd_rate).toFixed(4)
+        : (p.current_price_usd ?? null),
+  }));
 
 export default function StockPositionsModal({
   accountId,
@@ -52,7 +62,8 @@ export default function StockPositionsModal({
 
   useEffect(() => {
     api.get<PositionsResponse>(`/assets/${accountId}/positions`).then((r) => {
-      setRows(r.data.positions.length ? r.data.positions : (readonly ? [] : [{ ...EMPTY_ROW }]));
+      const positions = r.data.positions;
+      setRows(enrichPositions(positions.length ? positions : (readonly ? [] : [{ ...EMPTY_ROW }])));
       setSummary(r.data.summary);
     }).finally(() => setLoading(false));
   }, [accountId, readonly]);
@@ -75,6 +86,7 @@ export default function StockPositionsModal({
       if (result.price_krw) {
         setRow(i, {
           current_price: result.price_krw,
+          current_price_usd: result.price_usd ?? null,
           ...(result.usd_rate ? { usd_rate: result.usd_rate } : {}),
         });
       }
@@ -112,6 +124,12 @@ export default function StockPositionsModal({
     setRow(i, { avg_price_usd: usd || null, usd_rate: usdRate, avg_price: krw });
   };
 
+  const handleCurrentPriceUsd = (i: number, usdVal: string) => {
+    const usd = usdVal === "" ? null : parseFloat(usdVal) || null;
+    const krw = usd && usdRate ? Math.round(usd * usdRate) : null;
+    setRow(i, { current_price_usd: usd, current_price: krw });
+  };
+
   const liveRows = rows.map((r) => {
     const cur = r.current_price ?? r.avg_price;
     const invested = r.qty * r.avg_price;
@@ -139,7 +157,7 @@ export default function StockPositionsModal({
     setSaving(true); setError(null);
     try {
       const r = await api.put<PositionsResponse>(`/assets/${accountId}/positions`, valid);
-      setRows(r.data.positions); setSummary(r.data.summary);
+      setRows(enrichPositions(r.data.positions)); setSummary(r.data.summary);
     } catch { setError("저장에 실패했습니다"); }
     finally { setSaving(false); }
   };
@@ -148,7 +166,7 @@ export default function StockPositionsModal({
     setSyncing(true); setError(null);
     try {
       const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
-      setRows(r.data.positions); setSummary(r.data.summary);
+      setRows(enrichPositions(r.data.positions)); setSummary(r.data.summary);
     } catch (e: unknown) {
       setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally { setSyncing(false); }
@@ -231,6 +249,7 @@ export default function StockPositionsModal({
             removeRow={removeRow}
             addRow={addRow}
             handleAvgPriceUsd={handleAvgPriceUsd}
+            handleCurrentPriceUsd={handleCurrentPriceUsd}
           />
         )}
       </div>

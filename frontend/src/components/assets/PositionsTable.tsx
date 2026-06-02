@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { StockSuggestion } from "../../api/assets";
 import { fmtKrwShort } from "../../utils/format";
@@ -12,6 +14,7 @@ export interface Position {
   avg_price_usd: number | null;
   usd_rate: number | null;
   current_price: number | null;
+  current_price_usd?: number | null;
   invested_amount?: number;
   value_amount?: number;
   pnl?: number;
@@ -35,6 +38,7 @@ interface Props {
   removeRow: (i: number) => void;
   addRow: () => void;
   handleAvgPriceUsd: (i: number, usdVal: string) => void;
+  handleCurrentPriceUsd: (i: number, usdVal: string) => void;
 }
 
 const MARKETS = ["KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX"] as const;
@@ -49,13 +53,46 @@ function PnlCell({ val, pct }: { val: number; pct: number }) {
   );
 }
 
-function SuggestionDropdown({ i, suggestions, onSelect }: {
+function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
   i: number;
   suggestions: StockSuggestion[];
+  anchorEl: HTMLInputElement | null;
   onSelect: (i: number, s: StockSuggestion) => void;
 }) {
-  return (
-    <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-52 overflow-y-auto">
+  const [pos, setPos] = useState<{
+    top?: number; bottom?: number; left: number; width: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!anchorEl) { setPos(null); return; }
+
+    const update = () => {
+      const rect = anchorEl.getBoundingClientRect();
+      const vh = window.visualViewport?.height ?? window.innerHeight;
+      const spaceBelow = vh - rect.bottom;
+      setPos(
+        spaceBelow < 200
+          ? { bottom: vh - rect.top + 4, left: rect.left, width: rect.width }
+          : { top: rect.bottom + 4, left: rect.left, width: rect.width }
+      );
+    };
+
+    update();
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
+  }, [anchorEl]);
+
+  if (!pos) return null;
+
+  return createPortal(
+    <div
+      style={{ position: "fixed", zIndex: 9999, ...pos }}
+      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+    >
       {suggestions.map((s, si) => (
         <button
           key={si}
@@ -69,7 +106,8 @@ function SuggestionDropdown({ i, suggestions, onSelect }: {
           <span className="text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5 ml-2 shrink-0 text-xs">{s.market}</span>
         </button>
       ))}
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -94,8 +132,10 @@ export function PositionsTable({
   rows, liveRows, readonly, usdRate,
   suggestions, suggestIdx, searchLoading, priceLoadingRows,
   setSuggestIdx, handleNameChange, handleNameBlur, handleSelectSuggestion,
-  setRow, removeRow, addRow, handleAvgPriceUsd,
+  setRow, removeRow, addRow, handleAvgPriceUsd, handleCurrentPriceUsd,
 }: Props) {
+  const nameInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+
   const handleMarketChange = (i: number, newMarket: string, currentMarket: string) => {
     const wasOverseas = isOverseasMarket(currentMarket);
     const nowOverseas = isOverseasMarket(newMarket);
@@ -117,6 +157,10 @@ export function PositionsTable({
             <div key={i} className="py-4 space-y-3">
               <div className="relative">
                 <input
+                  ref={(el) => {
+                    if (el) nameInputRefs.current.set(i, el);
+                    else nameInputRefs.current.delete(i);
+                  }}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 disabled:bg-gray-50 dark:disabled:bg-gray-900 disabled:text-gray-500"
                   value={row.name}
                   onChange={(e) => handleNameChange(i, e.target.value)}
@@ -132,7 +176,12 @@ export function PositionsTable({
                   </span>
                 )}
                 {suggestIdx === i && suggestions.length > 0 && (
-                  <SuggestionDropdown i={i} suggestions={suggestions} onSelect={handleSelectSuggestion} />
+                  <SuggestionDropdown
+                    i={i}
+                    suggestions={suggestions}
+                    anchorEl={nameInputRefs.current.get(i) ?? null}
+                    onSelect={handleSelectSuggestion}
+                  />
                 )}
               </div>
               <div className="flex items-center justify-between">
@@ -188,15 +237,32 @@ export function PositionsTable({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">현재가(원)</p>
-                  <div className="relative">
-                    <input type="number"
-                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-                      value={priceLoading ? "" : (rows[i].current_price ?? "")}
-                      onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
-                      placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} disabled={priceLoading} />
-                    {priceLoading && <span className="absolute right-3 top-3"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
-                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{overseas ? "현재가($)" : "현재가(원)"}</p>
+                  {overseas ? (
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-sm text-gray-400 dark:text-gray-500 pointer-events-none">$</span>
+                      <input type="number"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg pl-6 pr-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                        value={priceLoading ? "" : (rows[i].current_price_usd ?? "")}
+                        onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
+                        placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} step="0.01" disabled={priceLoading} />
+                      {priceLoading && <span className="absolute right-3 top-3"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
+                      {usdRate && (rows[i].current_price_usd ?? 0) > 0 && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
+                          ≈ ₩{Math.round((rows[i].current_price_usd ?? 0) * usdRate).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <input type="number"
+                        className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                        value={priceLoading ? "" : (rows[i].current_price ?? "")}
+                        onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
+                        placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} disabled={priceLoading} />
+                      {priceLoading && <span className="absolute right-3 top-3"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">매입금액</p>
@@ -227,7 +293,7 @@ export function PositionsTable({
               <th className="text-right pb-2 pr-3 font-medium w-24">보유수량</th>
               <th className="text-right pb-2 pr-3 font-medium w-32">평단가</th>
               <th className="text-right pb-2 pr-3 font-medium">매입금액</th>
-              <th className="text-right pb-2 pr-3 font-medium w-32">현재가(원)</th>
+              <th className="text-right pb-2 pr-3 font-medium w-32">현재가</th>
               <th className="text-right pb-2 pr-3 font-medium">평가금액</th>
               <th className="text-right pb-2 font-medium">수익률</th>
               <th className="w-8" />
@@ -309,14 +375,31 @@ export function PositionsTable({
                     {fmtKrwShort(row.invested_amount ?? 0)}원
                   </td>
                   <td className="py-2 pr-3">
-                    <div className="relative">
-                      <input type="number"
-                        className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-                        value={priceLoading ? "" : (rows[i].current_price ?? "")}
-                        onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
-                        placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} disabled={priceLoading} />
-                      {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
-                    </div>
+                    {overseas ? (
+                      <div className="relative">
+                        <span className="absolute left-2 top-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">$</span>
+                        <input type="number"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded pl-5 pr-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                          value={priceLoading ? "" : (rows[i].current_price_usd ?? "")}
+                          onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
+                          placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} step="0.01" disabled={priceLoading} />
+                        {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
+                        {usdRate && (rows[i].current_price_usd ?? 0) > 0 && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
+                            ≈ ₩{Math.round((rows[i].current_price_usd ?? 0) * usdRate).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <input type="number"
+                          className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
+                          value={priceLoading ? "" : (rows[i].current_price ?? "")}
+                          onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
+                          placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} disabled={priceLoading} />
+                        {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 pr-3 text-right text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">
                     {fmtKrwShort(row.value_amount ?? 0)}원

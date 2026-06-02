@@ -180,7 +180,7 @@ export default function DashboardPage() {
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-2 sm:gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
                 <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
@@ -190,46 +190,6 @@ export default function DashboardPage() {
                 }`}>
                   {fmtPct(data.cumulative_return_pct)}
                 </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">실질수익률 (XIRR)</p>
-                {data.xirr_pct == null ? (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">입출금 내역 등록 필요</p>
-                ) : (
-                  <p className={`text-lg sm:text-xl font-bold mt-0.5 ${pnlColor(data.xirr_pct)}`}>
-                    {fmtPct(data.xirr_pct)}
-                    {data.xirr_is_estimated && (
-                      <span
-                        className="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500"
-                        title="입출금 내역 등록 시 정확한 XIRR이 계산됩니다"
-                      >
-                        (추정)
-                      </span>
-                    )}
-                  </p>
-                )}
-                {data.xirr_pct != null && (data.benchmark_kospi_pct != null || data.benchmark_sp500_pct != null) && (
-                  <div className="flex gap-2 mt-1 flex-wrap">
-                    {data.benchmark_kospi_pct != null && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        data.xirr_pct >= data.benchmark_kospi_pct
-                          ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                          : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                      }`}>
-                        KOSPI {data.xirr_pct >= data.benchmark_kospi_pct ? "▲" : "▼"}{Math.abs(data.xirr_pct - data.benchmark_kospi_pct).toFixed(1)}%p
-                      </span>
-                    )}
-                    {data.benchmark_sp500_pct != null && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                        data.xirr_pct >= data.benchmark_sp500_pct
-                          ? "bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400"
-                          : "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                      }`}>
-                        S&P500 {data.xirr_pct >= data.benchmark_sp500_pct ? "▲" : "▼"}{Math.abs(data.xirr_pct - data.benchmark_sp500_pct).toFixed(1)}%p
-                      </span>
-                    )}
-                  </div>
-                )}
               </div>
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
