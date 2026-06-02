@@ -59,8 +59,9 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
   anchorEl: HTMLInputElement | null;
   onSelect: (i: number, s: StockSuggestion) => void;
 }) {
+  const MAX_DROPDOWN_H = 208; // max-h-52 = 13rem
   const [pos, setPos] = useState<{
-    top?: number; bottom?: number; left: number; width: number;
+    top: number; maxHeight: number; left: number; width: number;
   } | null>(null);
 
   useEffect(() => {
@@ -70,11 +71,14 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
       const rect = anchorEl.getBoundingClientRect();
       const vh = window.visualViewport?.height ?? window.innerHeight;
       const spaceBelow = vh - rect.bottom;
-      setPos(
-        spaceBelow < 200
-          ? { bottom: vh - rect.top + 4, left: rect.left, width: rect.width }
-          : { top: rect.bottom + 4, left: rect.left, width: rect.width }
-      );
+      const spaceAbove = rect.top - 8;
+
+      if (spaceBelow < 200) {
+        const maxH = Math.min(MAX_DROPDOWN_H, Math.max(0, spaceAbove));
+        setPos({ top: rect.top - maxH - 4, maxHeight: maxH, left: rect.left, width: rect.width });
+      } else {
+        setPos({ top: rect.bottom + 4, maxHeight: Math.min(MAX_DROPDOWN_H, spaceBelow - 8), left: rect.left, width: rect.width });
+      }
     };
 
     update();
@@ -90,8 +94,8 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
 
   return createPortal(
     <div
-      style={{ position: "fixed", zIndex: 9999, ...pos }}
-      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+      style={{ position: "fixed", zIndex: 9999, top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
+      className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-y-auto"
     >
       {suggestions.map((s, si) => (
         <button
