@@ -7,6 +7,7 @@ import { useStockSearch } from "../../hooks/useStockSearch";
 import { isOverseasMarket } from "../../constants/markets";
 import { extractErrorMessage } from "../../utils/error";
 import { fmtKrwShort } from "../../utils/format";
+import { pnlColor } from "../../utils/colors";
 import Modal from "../common/Modal";
 import { PositionsTable, type Position } from "./PositionsTable";
 
@@ -200,22 +201,25 @@ export default function StockPositionsModal({
       )}
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
-        {[
-          { label: "매입금액", val: displaySummary.total_invested, color: "" },
-          { label: "평가금액", val: displaySummary.total_value, color: "" },
-          { label: "평가손익", val: displaySummary.total_pnl, color: displaySummary.total_pnl >= 0 ? "text-red-500" : "text-blue-500" },
-        ].map(({ label, val, color }) => (
-          <div key={label}>
-            <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">{label}</p>
-            <p className={`font-bold ${color || "text-gray-900 dark:text-gray-50"}`}>
-              {val >= 0 && color ? "+" : ""}{fmtKrwShort(val)}원
-            </p>
-          </div>
-        ))}
+      <div className="grid grid-cols-3 gap-2 px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
         <div>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">수익률</p>
-          <p className={`font-bold text-base sm:text-xl ${displaySummary.total_pnl_pct >= 0 ? "text-red-500" : "text-blue-500"}`}>
+          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">매입금액</p>
+          <p className="font-bold text-base text-gray-900 dark:text-gray-50">
+            {fmtKrwShort(displaySummary.total_invested)}원
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">평가금액</p>
+          <p className="font-bold text-base text-gray-900 dark:text-gray-50">
+            {fmtKrwShort(displaySummary.total_value)}원
+          </p>
+        </div>
+        <div>
+          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">평가손익(수익률)</p>
+          <p className={`font-bold text-base ${pnlColor(displaySummary.total_pnl)}`}>
+            {displaySummary.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(displaySummary.total_pnl)}원
+          </p>
+          <p className={`text-xs ${pnlColor(displaySummary.total_pnl_pct)}`}>
             {displaySummary.total_pnl_pct >= 0 ? "+" : ""}{displaySummary.total_pnl_pct.toFixed(2)}%
           </p>
         </div>
