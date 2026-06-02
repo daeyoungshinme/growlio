@@ -51,8 +51,6 @@ class AssetAccount(Base):
     manual_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     manual_currency: Mapped[str] = mapped_column(String(3), default="KRW")
     manual_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    # 수동 주식 포지션 — JSONB 컬럼 제거됨, current_positions relationship 사용
-    # (하위 호환을 위해 컬럼 참조가 있는 코드 마이그레이션 기간 중 유지)
     # 예수금 (현금 잔고) — KIS sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력
     deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
     # 외화 예수금 (USD) — KIS 해외 계좌 sync 시 자동 갱신, 수동 계좌는 사용자 직접 입력

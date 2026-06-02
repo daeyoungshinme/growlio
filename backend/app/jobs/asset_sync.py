@@ -1,3 +1,5 @@
+import asyncio
+
 import structlog
 from sqlalchemy import select
 
@@ -19,15 +21,22 @@ async def run_daily_asset_sync() -> None:
         accounts = result.scalars().all()
 
     failed: list[tuple[str, str, str]] = []  # (account_id, name, error)
+    sem = asyncio.Semaphore(3)
 
-    for account in accounts:
-        try:
-            async with AsyncSessionLocal() as db:
-                await sync_account(account, db, redis)
-            logger.info("account_synced", account_id=str(account.id), name=account.name)
-        except Exception as e:
-            logger.error("account_sync_failed", account_id=str(account.id), name=account.name, error=str(e))
-            failed.append((str(account.id), account.name, str(e)))
+    async def sync_one(account: AssetAccount) -> None:
+        async with sem:
+            try:
+                async with AsyncSessionLocal() as db:
+                    await sync_account(account, db, redis)
+                logger.info("account_synced", account_id=str(account.id), name=account.name)
+            except Exception as e:
+                logger.error(
+                    "account_sync_failed",
+                    account_id=str(account.id), name=account.name, error=str(e),
+                )
+                failed.append((str(account.id), account.name, str(e)))
+
+    await asyncio.gather(*(sync_one(account) for account in accounts))
 
     if failed:
         logger.warning(

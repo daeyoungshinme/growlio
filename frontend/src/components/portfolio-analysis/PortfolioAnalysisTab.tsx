@@ -184,7 +184,7 @@ export default function PortfolioAnalysisTab() {
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-6">
       {/* ── 포트폴리오 목록 (모바일: 상단 전체폭, 데스크톱: 좌측 고정) ── */}
-      <div className="w-full md:w-64 md:flex-shrink-0 space-y-3">
+      <div className="w-full md:w-72 lg:w-80 md:flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
           <button
@@ -216,7 +216,7 @@ export default function PortfolioAnalysisTab() {
                 <SortablePortfolioItem key={p.id} id={p.id}>
                   {({ dragHandleListeners }) => (
                     <div
-                      className={`rounded-xl border p-3 cursor-pointer transition-colors ${
+                      className={`rounded-xl border p-3.5 cursor-pointer transition-colors ${
                         selectedIds.has(p.id)
                           ? "border-blue-400 bg-blue-50 dark:bg-blue-950"
                           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -241,7 +241,7 @@ export default function PortfolioAnalysisTab() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-1">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
                                 {p.name}
                               </p>
                               <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
@@ -255,7 +255,7 @@ export default function PortfolioAnalysisTab() {
                                 const top = sorted.slice(0, 5);
                                 const rest = sorted.slice(5).reduce((s, i) => s + i.weight, 0);
                                 return (
-                                  <div className="mt-1.5 flex h-1.5 rounded-full overflow-hidden gap-px">
+                                  <div className="mt-1.5 flex h-2 rounded-full overflow-hidden gap-px">
                                     {top.map((item, ci) => (
                                       <div
                                         key={item.ticker}
@@ -273,16 +273,10 @@ export default function PortfolioAnalysisTab() {
                                 );
                               })()}
                             </div>
-                            <div className="flex gap-0.5 shrink-0">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
-                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
-                              >
-                                <Edit2 size={12} />
-                              </button>
+                            <div className="flex gap-0.5 shrink-0 items-center">
                               {alertPortfolioIds.has(p.id) && (
                                 <span
-                                  className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                                  className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
                                     alertByPortfolioId[p.id]?.mode === "AUTO"
                                       ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
                                       : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
@@ -292,6 +286,12 @@ export default function PortfolioAnalysisTab() {
                                 </span>
                               )}
                               <button
+                                onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
+                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                              >
+                                <Edit2 size={13} />
+                              </button>
+                              <button
                                 onClick={(e) => { e.stopPropagation(); setAlertModalPortfolioId(p.id); }}
                                 className={`p-1.5 rounded-lg transition-colors ${
                                   alertPortfolioIds.has(p.id)
@@ -300,7 +300,7 @@ export default function PortfolioAnalysisTab() {
                                 }`}
                                 title="리밸런싱 알림 설정"
                               >
-                                <Bell size={12} />
+                                <Bell size={13} />
                               </button>
                               <button
                                 onClick={(e) => {
@@ -309,7 +309,7 @@ export default function PortfolioAnalysisTab() {
                                 }}
                                 className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={13} />
                               </button>
                             </div>
                           </div>

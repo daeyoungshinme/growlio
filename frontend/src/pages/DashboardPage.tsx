@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { api } from "../api/client";
 import { fetchAccounts } from "../api/assets";
 import { fetchDashboard } from "../api/dashboard";
 import { fetchDCAAnalysis } from "../api/invest";
+import { fetchPortfolioOverview } from "../api/portfolios";
 import { useExchangeRate } from "../hooks/useExchangeRate";
 import { fmtKrw, fmtMonth, fmtPct } from "../utils/format";
 import DividendSection from "../components/dashboard/DividendSection";
@@ -18,10 +18,6 @@ import { ASSET_TYPE_LABELS } from "../constants";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../utils/colors";
 import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
-import type { PortfolioOverview } from "../types";
-
-const fetchOverviewSummary = () =>
-  api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -37,7 +33,7 @@ export default function DashboardPage() {
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchOverviewSummary,
+    queryFn: fetchPortfolioOverview,
     staleTime: STALE_TIME.MEDIUM,
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: true,

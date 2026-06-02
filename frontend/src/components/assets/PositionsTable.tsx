@@ -1,6 +1,7 @@
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { StockSuggestion } from "../../api/assets";
 import { fmtKrwShort } from "../../utils/format";
+import { isOverseasMarket } from "../../constants/markets";
 
 export interface Position {
   ticker: string;
@@ -35,8 +36,6 @@ interface Props {
   addRow: () => void;
   handleAvgPriceUsd: (i: number, usdVal: string) => void;
 }
-
-const OVERSEAS = new Set(["NYSE", "NASDAQ", "AMEX"]);
 
 const MARKETS = ["KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX"] as const;
 
@@ -98,8 +97,8 @@ export function PositionsTable({
   setRow, removeRow, addRow, handleAvgPriceUsd,
 }: Props) {
   const handleMarketChange = (i: number, newMarket: string, currentMarket: string) => {
-    const wasOverseas = OVERSEAS.has(currentMarket);
-    const nowOverseas = OVERSEAS.has(newMarket);
+    const wasOverseas = isOverseasMarket(currentMarket);
+    const nowOverseas = isOverseasMarket(newMarket);
     if (wasOverseas !== nowOverseas) {
       setRow(i, { market: newMarket, avg_price: 0, avg_price_usd: null, usd_rate: null });
     } else {
@@ -112,7 +111,7 @@ export function PositionsTable({
       {/* ── 모바일 카드 뷰 (sm 미만) ── */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {liveRows.map((row, i) => {
-          const overseas = OVERSEAS.has(row.market);
+          const overseas = isOverseasMarket(row.market);
           const priceLoading = priceLoadingRows.has(i);
           return (
             <div key={i} className="py-4 space-y-3">
@@ -236,7 +235,7 @@ export function PositionsTable({
           </thead>
           <tbody>
             {liveRows.map((row, i) => {
-              const overseas = OVERSEAS.has(row.market);
+              const overseas = isOverseasMarket(row.market);
               const priceLoading = priceLoadingRows.has(i);
               return (
                 <tr key={i} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 align-top">

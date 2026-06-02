@@ -19,6 +19,7 @@ import { invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
 import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
 import { STALE_TIME } from "../../constants/queryConfig";
+import { QUERY_KEYS } from "../../constants/queryKeys";
 
 interface Props {
   accountId: string;
@@ -57,7 +58,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   } | null>(null);
 
   const { data: txList, isLoading } = useQuery<Transaction[]>({
-    queryKey: ["transactions", accountId],
+    queryKey: QUERY_KEYS.transactions(accountId),
     queryFn: () => fetchTransactions({ account_id: accountId }),
   });
 

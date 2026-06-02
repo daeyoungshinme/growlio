@@ -1,4 +1,8 @@
 import { api } from "./client";
+import type { PortfolioOverview } from "../types";
+
+export const fetchPortfolioOverview = () =>
+  api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
 export interface PortfolioItem {
   ticker: string;

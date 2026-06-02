@@ -300,8 +300,7 @@ export default function RebalancingTable({
               <th className="text-right py-2 px-3 font-medium">현재 비중</th>
               <th className="text-left py-2 px-3 font-medium">목표 비중</th>
               <th className="text-right py-2 px-3 font-medium">차이</th>
-              <th className="text-right py-2 px-3 font-medium">현재 금액</th>
-              <th className="text-right py-2 px-3 font-medium">목표 금액</th>
+              <th className="text-right py-2 px-3 font-medium">현재/목표</th>
               <th className="text-right py-2 px-3 font-medium">매수/매도</th>
               <th className="text-right py-2 px-3 font-medium">주수</th>
               <th className="text-right py-2 px-3 font-medium">10년 수익률</th>
@@ -311,32 +310,34 @@ export default function RebalancingTable({
             {analysis.items.map((item, idx) => {
               const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
               return (
-              <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
-                <td className="py-3 px-3 sticky left-0 bg-gray-900 hover:bg-gray-700 transition-colors">
-                  <div className="font-medium text-gray-100 truncate max-w-[120px]">{item.name}</div>
+              <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700 group">
+                <td className="py-3.5 px-3 sticky left-0 bg-gray-900 group-hover:bg-gray-700 transition-colors">
+                  <div className="font-medium text-gray-100 truncate max-w-[160px]">{item.name}</div>
                   <div className="text-xs text-gray-400">{item.ticker}</div>
                   {isUntracked && (
                     <div className="text-xs text-amber-500 mt-0.5">목표 외</div>
                   )}
                 </td>
-                <td className="py-3 px-3 text-right text-gray-300">
+                <td className="py-3.5 px-3 text-right text-gray-300">
                   {item.current_weight_pct.toFixed(1)}%
                 </td>
-                <td className="py-3 px-3">
+                <td className="py-3.5 px-3">
                   <WeightBar current={item.current_weight_pct} target={item.target_weight_pct} />
                 </td>
-                <td className="py-3 px-3 text-right">
+                <td className="py-3.5 px-3 text-right">
                   <WeightDiffBadge diff={item.weight_diff_pct} />
                 </td>
-                <td className="py-3 px-3 text-right text-gray-300">{fmtKrw(item.current_value_krw)}</td>
-                <td className="py-3 px-3 text-right text-gray-300">{fmtKrw(item.target_value_krw)}</td>
-                <td className="py-3 px-3 text-right">
+                <td className="py-3.5 px-3 text-right">
+                  <div className="text-xs text-gray-300">{fmtKrw(item.current_value_krw)}</div>
+                  <div className="text-xs text-gray-500">→ {fmtKrw(item.target_value_krw)}</div>
+                </td>
+                <td className="py-3.5 px-3 text-right">
                   <DiffCell diff={item.diff_krw} />
                 </td>
-                <td className="py-3 px-3 text-right">
+                <td className="py-3.5 px-3 text-right">
                   <SharesCell item={item} />
                 </td>
-                <td className="py-3 px-3">
+                <td className="py-3.5 px-3">
                   <Return10yCell item={item} />
                 </td>
               </tr>

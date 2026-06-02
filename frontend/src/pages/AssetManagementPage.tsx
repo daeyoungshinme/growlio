@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
 import {
   fetchAccounts,
@@ -10,6 +9,7 @@ import {
   syncAccount,
   type AssetAccount,
 } from "../api/assets";
+import { fetchPortfolioOverview } from "../api/portfolios";
 import { fetchTransactions } from "../api/transactions";
 import { extractErrorMessage } from "../utils/error";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
@@ -36,16 +36,6 @@ import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = typeof TABS[number];
 
-interface StockOverview {
-  total_stock_krw: number;
-  total_invested_krw: number;
-  unrealized_pnl_krw: number;
-  stock_return_pct: number;
-  accounts: { id: string; amount_krw: number; invested_krw: number; unrealized_pnl: number }[];
-}
-
-const fetchStockOverview = () =>
-  api.get<StockOverview>("/portfolio/overview").then((r) => r.data);
 
 export default function AssetManagementPage() {
   const [tab, setTab] = useState<Tab>("은행계좌");
@@ -70,7 +60,7 @@ export default function AssetManagementPage() {
 
   const { data: overview } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchStockOverview,
+    queryFn: fetchPortfolioOverview,
     enabled: tab === "증권계좌",
   });
 

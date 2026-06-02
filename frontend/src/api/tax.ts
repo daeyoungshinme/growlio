@@ -1,5 +1,25 @@
 import { api } from "./client";
 
+export interface OverseasPositionDetail {
+  ticker: string;
+  name: string;
+  market: string;
+  currency: string;
+  account_id: string;
+  account_name: string;
+  qty: number;
+  avg_price_krw: number;
+  current_price_krw: number;
+  avg_price_usd: number | null;
+  value_krw: number;
+  invested_krw: number;
+  unrealized_pnl_krw: number;
+  unrealized_pnl_pct: number;
+}
+
+export const fetchOverseasPositionsTax = () =>
+  api.get<OverseasPositionDetail[]>("/tax/overseas-positions").then((r) => r.data);
+
 export interface TaxSummary {
   year: number;
   dividend_income_krw: number;

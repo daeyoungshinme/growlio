@@ -61,17 +61,16 @@ async def _sum_transactions(user_id: uuid.UUID, db: AsyncSession, tx_type: str, 
 
 
 async def _monthly_dividend_breakdown(user_id: uuid.UUID, db: AsyncSession, year: int) -> list[dict]:
+    month_col = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
     result = await db.execute(
-        text("""
-            SELECT to_char(transaction_date, 'YYYY-MM') AS month, SUM(amount) AS total
-            FROM transactions
-            WHERE user_id = :uid
-              AND transaction_type = 'DIVIDEND'
-              AND EXTRACT(year FROM transaction_date) = :yr
-            GROUP BY 1
-            ORDER BY 1
-        """),
-        {"uid": str(user_id), "yr": year},
+        select(month_col, func.sum(Transaction.amount).label("total"))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == "DIVIDEND",
+            func.extract("year", Transaction.transaction_date) == year,
+        )
+        .group_by(month_col)
+        .order_by(month_col)
     )
     return [{"month": row.month, "amount": float(row.total)} for row in result]
 

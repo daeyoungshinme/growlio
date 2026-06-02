@@ -62,6 +62,71 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     }
 
 
+async def get_overseas_positions_detail(
+    user_id: uuid.UUID, db: AsyncSession
+) -> list[dict]:
+    """해외 종목별 미실현 손익 목록 반환.
+
+    최신 스냅샷 기준. 수익·손실 종목 모두 포함.
+    """
+    subq = (
+        select(
+            AssetSnapshot.account_id,
+            func.max(AssetSnapshot.snapshot_date).label("max_date"),
+        )
+        .where(AssetSnapshot.user_id == user_id)
+        .group_by(AssetSnapshot.account_id)
+        .subquery()
+    )
+    result = await db.execute(
+        select(AssetSnapshot, AssetAccount)
+        .options(selectinload(AssetSnapshot.position_items))
+        .join(
+            subq,
+            (AssetSnapshot.account_id == subq.c.account_id)
+            & (AssetSnapshot.snapshot_date == subq.c.max_date),
+        )
+        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
+        .where(
+            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
+        )
+    )
+    rows = result.all()
+
+    positions: list[dict] = []
+    for snap, acc in rows:
+        for pos in snap.position_items:
+            if pos.market not in _OVERSEAS_MARKETS:
+                continue
+            qty = float(pos.qty or 0)
+            avg = float(pos.avg_price or 0)
+            cur = float(pos.current_price or avg)
+            invested = avg * qty
+            value = cur * qty
+            pnl = value - invested
+            pnl_pct = (pnl / invested * 100) if invested else 0.0
+            positions.append(
+                {
+                    "ticker": pos.ticker,
+                    "name": pos.name or pos.ticker,
+                    "market": pos.market,
+                    "currency": pos.currency or "USD",
+                    "account_id": str(acc.id),
+                    "account_name": acc.name,
+                    "qty": qty,
+                    "avg_price_krw": avg,
+                    "current_price_krw": cur,
+                    "avg_price_usd": float(pos.avg_price_usd) if pos.avg_price_usd else None,
+                    "value_krw": value,
+                    "invested_krw": invested,
+                    "unrealized_pnl_krw": pnl,
+                    "unrealized_pnl_pct": pnl_pct,
+                }
+            )
+    return positions
+
+
 async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
     result = await db.execute(
         select(func.sum(Transaction.amount).label("total"))

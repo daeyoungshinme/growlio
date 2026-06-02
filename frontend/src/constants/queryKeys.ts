@@ -20,4 +20,5 @@ export const QUERY_KEYS = {
   rebalancingAlert: (portfolioId: string) => ["rebalancing-alert", portfolioId] as const,
   rebalancingHistory: ["rebalancing-history"] as const,
   taxSummary: (year: number) => ["tax-summary", year] as const,
+  overseasPositionsTax: ["overseas-positions-tax"] as const,
 } as const;

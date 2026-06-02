@@ -71,7 +71,7 @@ jobs:
         run: .venv/bin/pytest -x -q
 
       - name: Security scan (bandit)
-        run: .venv/bin/bandit -r app/ -ll -q
+        run: .venv/bin/bandit -r app/ -l -q
 
       - name: Dependency vulnerability check (pip-audit)
         run: .venv/bin/pip-audit --skip-editable -q
@@ -113,6 +113,9 @@ jobs:
 
       - name: Lint (eslint)
         run: npm run lint
+
+      - name: Test (vitest)
+        run: npm run test -- --run
 
       - name: Build + typecheck (tsc + vite)
         run: npm run build

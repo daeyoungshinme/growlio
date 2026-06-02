@@ -3,16 +3,13 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from dataclasses import asdict
 from datetime import date, timedelta
 from typing import Any
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-
-from sqlalchemy import delete
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position, Transaction
 from app.providers.base import BrokerProvider
@@ -106,19 +103,11 @@ _STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
 
 
 def _eval_value(pos_list: list) -> float:
-    def _val(p: Any) -> float:
-        if isinstance(p, dict):
-            return (p.get("current_price") or p.get("avg_price", 0)) * p.get("qty", 0)
-        return float(p.current_price or p.avg_price or 0) * float(p.qty or 0)
-    return sum(_val(p) for p in pos_list)
+    return sum(float(p.current_price or p.avg_price or 0) * float(p.qty or 0) for p in pos_list)
 
 
 def _invested_value(pos_list: list) -> float:
-    def _inv(p: Any) -> float:
-        if isinstance(p, dict):
-            return p.get("avg_price", 0) * p.get("qty", 0)
-        return float(p.avg_price or 0) * float(p.qty or 0)
-    return sum(_inv(p) for p in pos_list)
+    return sum(float(p.avg_price or 0) * float(p.qty or 0) for p in pos_list)
 
 
 async def _build_asset_totals(

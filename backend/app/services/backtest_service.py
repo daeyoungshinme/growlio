@@ -486,7 +486,9 @@ async def compute_correlation(
 ) -> CorrelationResult:
     """포트폴리오 내 종목 간 월별 수익률 상관관계 분석."""
     result = await db.execute(
-        select(Portfolio).where(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(
             Portfolio.user_id == user_id,
             Portfolio.id.in_(req.portfolio_ids),
         )
