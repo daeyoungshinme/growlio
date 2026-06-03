@@ -1,4 +1,5 @@
 """키움증권 REST API OAuth2 토큰 발급 — Redis 캐시 → DB → API 순으로 시도."""
+import json
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -90,7 +91,7 @@ async def _fetch_and_store_token(
         if resp.status_code >= 400:
             try:
                 err_body = resp.json()
-            except Exception:
+            except (ValueError, json.JSONDecodeError):
                 err_body = resp.text
             logger.error(
                 "kiwoom_token_http_error",

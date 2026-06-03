@@ -6,6 +6,18 @@ const apiDomain = process.env.VITE_API_DOMAIN ?? "growlio-api.onrender.com";
 const apiPattern = new RegExp(`^https://${apiDomain.replace(/\./g, "\\.")}/.*`);
 
 export default defineConfig({
+  build: {
+    sourcemap: "hidden",
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-charts": ["recharts"],
+          "vendor-query": ["@tanstack/react-query"],
+          "vendor-dnd": ["@dnd-kit/core", "@dnd-kit/sortable"],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

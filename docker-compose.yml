@@ -59,8 +59,8 @@ services:
 
   frontend:
     build:
-      context: .
-      dockerfile: frontend/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "5173:5173"
     volumes:
@@ -69,6 +69,12 @@ services:
     environment:
       VITE_API_BASE_URL: http://localhost:8000
     command: npm run dev -- --host 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5173 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   # Production nginx — run: docker compose --profile production up
   # Build frontend first: docker compose build frontend && docker compose run --rm frontend npm run build

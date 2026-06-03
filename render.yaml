@@ -7,7 +7,8 @@ services:
     plan: free
     region: singapore
     healthCheckPath: /health
-    startCommand: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
     envVars:
       - key: APP_ENV
         value: production

@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.redis_client import get_redis
+from app.utils.cache_keys import USD_KRW_RATE as _USD_KRW_KEY
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -113,9 +114,9 @@ async def search_stocks(
 @limiter.limit("10/minute")
 async def get_exchange_rate(request: Request, redis: aioredis.Redis = Depends(get_redis)):
     """현재 USD/KRW 환율 조회 (Redis 캐시 → yfinance, ~15분 지연)."""
-    from app.services.price_service import _sync_usdkrw
+    from app.services.yahoo_price import _sync_usdkrw
 
-    cached = await redis.get("usd_krw_rate")
+    cached = await redis.get(_USD_KRW_KEY)
     if cached:
         return {"usd_krw": float(cached)}
     loop = asyncio.get_running_loop()
@@ -137,7 +138,7 @@ async def get_stock_price(
     """단일 종목 현재가 조회 (인증 불필요 — Yahoo Finance).
     해외 종목은 USD → KRW 변환 후 반환.
     """
-    from app.services.price_service import _sync_usdkrw, _sync_yahoo_price
+    from app.services.yahoo_price import _sync_usdkrw, _sync_yahoo_price
 
     loop = asyncio.get_running_loop()
     price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))

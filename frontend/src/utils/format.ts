@@ -37,6 +37,25 @@ export function fmtKrwShort(n: number): string {
 }
 
 /**
+ * USD → KRW 환산 (반올림). rate가 없으면 0 반환.
+ * 예: convertUsdToKrw(100, 1350) → 135000
+ */
+export function convertUsdToKrw(usd: number | null | undefined, rate: number | null | undefined): number {
+  if (!usd || !rate) return 0;
+  return Math.round(usd * rate);
+}
+
+/**
+ * USD → KRW 환산 후 포맷. rate가 없으면 null 반환.
+ * 예: formatUsdAsKrw(100, 1350) → "≈ ₩135,000"
+ */
+export function formatUsdAsKrw(usd: number | null | undefined, rate: number | null | undefined): string | null {
+  const krw = convertUsdToKrw(usd, rate);
+  if (!krw) return null;
+  return `≈ ₩${krw.toLocaleString()}`;
+}
+
+/**
  * "YYYY-MM" 형식을 "YYYY년 M월"로 변환
  * 예: "2025-05" → "2025년 5월"
  */

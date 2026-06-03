@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sun, Moon, LogOut } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { type SettingsData } from "../api/settings";
 import { toast } from "../utils/toast";
@@ -10,6 +11,8 @@ import { ExchangeRateAlertSection } from "../components/settings/ExchangeRateAle
 import { StockPriceAlertSection } from "../components/settings/StockPriceAlertSection";
 import { DCASettingsSection } from "../components/settings/DCASettingsSection";
 import { SectionCard, ConnectedBadge } from "../components/settings/shared";
+import { QUERY_KEYS } from "../constants/queryKeys";
+import { STALE_TIME } from "../constants/queryConfig";
 
 const inputClass =
   "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
@@ -18,22 +21,24 @@ const labelClass = "text-sm font-medium text-gray-700 dark:text-gray-300";
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
   const { logout } = useAuthStore();
-  const [current, setCurrent] = useState<SettingsData | null>(null);
+  const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);
 
-  const loadSettings = () => {
-    api.get<SettingsData>("/settings").then((r) => setCurrent(r.data));
-  };
+  const { data: current } = useQuery({
+    queryKey: QUERY_KEYS.settings,
+    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
+    staleTime: STALE_TIME.LONG,
+  });
 
-  useEffect(() => { loadSettings(); }, []);
+  const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 
   const saveDart = async () => {
     setSaving("dart");
     try {
       await api.put("/settings/dart", { api_key: dart.api_key });
       toast("DART API 키가 저장되었습니다", "success");
-      loadSettings();
+      invalidateSettings();
     } catch {
       toast("저장에 실패했습니다", "error");
     } finally {
@@ -44,7 +49,7 @@ export default function SettingsPage() {
   const deleteDart = async () => {
     await api.delete("/settings/dart");
     toast("DART API 키가 삭제되었습니다", "success");
-    loadSettings();
+    invalidateSettings();
   };
 
   const connectOpenBanking = async () => {
@@ -55,7 +60,7 @@ export default function SettingsPage() {
   const disconnectOpenBanking = async () => {
     await api.delete("/open-banking/disconnect");
     toast("오픈뱅킹 연결이 해제되었습니다", "success");
-    loadSettings();
+    invalidateSettings();
   };
 
   return (
@@ -123,12 +128,12 @@ export default function SettingsPage() {
 
       <ExchangeRateAlertSection
         userEmail={current?.user_email}
-        onSettingsChange={loadSettings}
+        onSettingsChange={invalidateSettings}
       />
 
       <StockPriceAlertSection />
 
-      <DCASettingsSection current={current} onSettingsChange={loadSettings} />
+      <DCASettingsSection current={current ?? null} onSettingsChange={invalidateSettings} />
 
       {/* 리밸런싱 자동화 */}
       <SectionCard title="리밸런싱 자동화">
@@ -136,7 +141,7 @@ export default function SettingsPage() {
           리밸런싱 알림·자동 실행은 포트폴리오별로 설정합니다. 알림 주기, 이탈 임계값, 자동 주문 실행 여부를 포트폴리오 분석 탭에서 개별 설정할 수 있습니다.
         </p>
         <Link
-          to="/portfolio?tab=포트폴리오분석"
+          to="/portfolio?tab=포트폴리오 분석"
           className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           포트폴리오 분석 탭에서 설정하기 →

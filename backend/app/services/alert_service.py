@@ -61,7 +61,7 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
                 current_rate=current_rate,
             )
         except Exception as exc:
-            logger.warning("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+            logger.error("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
             continue
 
         alert.trigger_count += 1
@@ -127,8 +127,8 @@ def _already_fired_today(alert: RebalancingAlert) -> bool:
 
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
-    from app.api.v1.portfolio import _build_portfolio_overview
     from app.services.email_service import send_rebalancing_alert
+    from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing_service import analyze_rebalancing
 
     result = await db.execute(
@@ -157,17 +157,17 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         )
 
         try:
-            overview = await _build_portfolio_overview(
+            overview = await build_portfolio_overview(
                 alert.user_id, db, account_ids=effective_account_ids
             )
         except Exception as exc:
-            logger.warning("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
+            logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
             continue
 
         try:
             analysis = analyze_rebalancing(portfolio, overview)
         except Exception as exc:
-            logger.warning("rebalancing_alert_analysis_failed", alert_id=str(alert.id), error=str(exc))
+            logger.error("rebalancing_alert_analysis_failed", alert_id=str(alert.id), error=str(exc))
             continue
 
         threshold = float(alert.threshold_pct)
@@ -232,7 +232,8 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                         strategy=strategy,
                     )
                 except Exception as exc:
-                    logger.warning("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
+                    logger.error("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
+                    continue
         else:
             # 5b. NOTIFY 모드: 이메일 알림만
             try:
@@ -246,7 +247,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                     schedule_type=getattr(alert, "schedule_type", "DAILY"),
                 )
             except Exception as exc:
-                logger.warning("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+                logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
                 continue
 
         alert.last_triggered_at = datetime.now(tz=UTC)
@@ -307,7 +308,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
                 direction=alert.direction,
             )
         except Exception as exc:
-            logger.warning("stock_price_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+            logger.error("stock_price_alert_email_failed", error=str(exc), alert_id=str(alert.id))
             continue
 
         alert.trigger_count += 1

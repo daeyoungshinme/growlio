@@ -47,7 +47,7 @@ make dev-frontend   # 터미널 2 (localhost:5173)
 make up               # docker compose up -d db redis
 make down             # docker compose down
 make migrate          # cd backend && alembic upgrade head
-make install-backend  # cd backend && pip install uv && uv pip install -e ".[dev]"
+make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]"
 make install-frontend # cd frontend && npm install
 make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
 make dev-backend      # 백엔드만 (localhost:8000)
@@ -55,7 +55,7 @@ make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && pytest
 make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
-make typecheck        # mypy (backend) + tsc build (frontend)
+make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff --fix (backend) + prettier --write (frontend)
 make db-reset         # docker compose down -v + up + migrate (데이터 초기화)

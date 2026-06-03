@@ -111,10 +111,10 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }, []);
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 sm:p-4 pb-[env(safe-area-inset-bottom)]">
-      <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85vh] sm:max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0">
+      <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col">
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 dark:border-gray-700">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
           <h2 className="font-semibold text-gray-800 dark:text-gray-50">
             {initial ? "포트폴리오 수정" : "새 포트폴리오 만들기"}
           </h2>
@@ -123,7 +123,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-6 space-y-5">
           {/* 이름 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">포트폴리오 이름</label>
@@ -348,7 +348,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
         </div>
 
         {/* 하단 버튼 */}
-        <div className="flex gap-3 px-4 py-4 sm:px-6 border-t border-gray-100 dark:border-gray-700">
+        <div className="flex gap-3 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4 border-t border-gray-100 dark:border-gray-700 shrink-0">
           <button
             onClick={onClose}
             className="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

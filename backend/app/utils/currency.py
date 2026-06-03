@@ -5,8 +5,7 @@ import asyncio
 import contextlib
 
 from app.config import settings
-
-_REDIS_USD_KRW_KEY = "usd_krw_rate"
+from app.utils.cache_keys import USD_KRW_RATE as _REDIS_USD_KRW_KEY
 
 
 async def get_usd_krw_rate(redis, fallback_rate: float | None = None) -> float:
@@ -40,7 +39,7 @@ async def fetch_usd_krw(redis, *, force_refresh: bool = False) -> float:
     if not force_refresh:
         return await get_usd_krw_rate(redis)
 
-    from app.services.price_service import _sync_usdkrw  # 순환 import 방지
+    from app.services.yahoo_price import _sync_usdkrw  # 순환 import 방지
 
     loop = asyncio.get_running_loop()
     fetched = await loop.run_in_executor(None, _sync_usdkrw)

@@ -66,6 +66,11 @@ class Settings(BaseSettings):
             raise ValueError("APP_SECRET_KEY must be at least 32 characters")
         if not re.fullmatch(r"[0-9a-fA-F]{64}", self.kis_cred_encryption_key):
             raise ValueError("KIS_CRED_ENCRYPTION_KEY must be exactly 64 hex characters")
+        if all(c == "0" for c in self.kis_cred_encryption_key):
+            raise ValueError(
+                "KIS_CRED_ENCRYPTION_KEY must not be all zeros — "
+                "generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+            )
         # supabase_jwt_secret은 RS256 JWKS 방식 사용 시 불필요 (선택적)
         return self
 

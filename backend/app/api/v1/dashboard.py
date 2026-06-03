@@ -7,7 +7,7 @@ from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import DashboardResponse
-from app.services.asset_service import get_dashboard_summary
+from app.services.asset_aggregator import get_dashboard_summary
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

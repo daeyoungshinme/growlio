@@ -5,10 +5,11 @@ from functools import partial
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.config import settings
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
@@ -38,7 +39,8 @@ from app.services.dividend_providers import (
 )
 from app.services.dividend_service import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
-from app.services.price_service import _to_yahoo_symbol, get_historical_returns
+from app.services.price_service import get_historical_returns
+from app.services.yahoo_price import _to_yahoo_symbol
 from app.services.rebalancing_service import analyze_rebalancing
 from app.utils.currency import get_usd_krw_rate
 
@@ -277,7 +279,6 @@ async def get_rebalancing_history(
     db: AsyncSession = Depends(get_db),
 ):
     """리밸런싱 실행 이력 목록을 반환한다 (최신순)."""
-    from sqlalchemy import desc
     result = await db.execute(
         select(RebalancingExecution)
         .where(RebalancingExecution.user_id == current_user.id)
@@ -371,7 +372,7 @@ async def _fetch_broker_balance(
         overseas = await get_overseas_balance(
             app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
         )
-        rate = usd_rate or 1350.0
+        rate = usd_rate or settings.usd_krw_fallback_rate
         positions: list[KisBalancePosition] = []
         for p in domestic.get("positions", []):
             positions.append(KisBalancePosition(
@@ -424,7 +425,9 @@ async def _fetch_broker_balance(
 
 
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)
+@limiter.limit("10/minute")
 async def get_broker_account_balance(
+    request: Request,
     account_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -455,7 +458,9 @@ async def get_broker_account_balance(
 
 
 @router.get("/broker-balance-all", response_model=list[KisBalanceResponse])
+@limiter.limit("5/minute")
 async def get_all_broker_balances(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),

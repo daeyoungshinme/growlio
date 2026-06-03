@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "../format";
+import { convertUsdToKrw, formatUsdAsKrw, fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "../format";
 
 describe("fmtKrw", () => {
   it("억원 단위 변환", () => {
@@ -77,5 +77,30 @@ describe("fmtPct", () => {
 
   it("digits 파라미터 적용", () => {
     expect(fmtPct(5.2345, 1)).toBe("+5.2%");
+  });
+});
+
+describe("convertUsdToKrw", () => {
+  it("정상 변환", () => {
+    expect(convertUsdToKrw(100, 1350)).toBe(135000);
+  });
+  it("반올림 적용", () => {
+    expect(convertUsdToKrw(1.5, 1333)).toBe(2000);
+  });
+  it("usd가 null이면 0 반환", () => {
+    expect(convertUsdToKrw(null, 1350)).toBe(0);
+  });
+  it("rate가 null이면 0 반환", () => {
+    expect(convertUsdToKrw(100, null)).toBe(0);
+  });
+});
+
+describe("formatUsdAsKrw", () => {
+  it("정상 포맷", () => {
+    expect(formatUsdAsKrw(100, 1350)).toBe("≈ ₩135,000");
+  });
+  it("변환 결과가 0이면 null 반환", () => {
+    expect(formatUsdAsKrw(null, 1350)).toBeNull();
+    expect(formatUsdAsKrw(100, null)).toBeNull();
   });
 });

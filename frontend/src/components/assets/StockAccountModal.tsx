@@ -5,7 +5,7 @@ import { verifyKisCredentials } from "../../api/assets";
 import { useCurrencyInput } from "../../hooks/useCurrencyInput";
 import { useForm } from "../../hooks/useForm";
 import { extractErrorMessage } from "../../utils/error";
-import { fmtKrw } from "../../utils/format";
+import { convertUsdToKrw, fmtKrw } from "../../utils/format";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -20,6 +20,11 @@ function defaultAssetTypeForSource(source: string): string {
   return "STOCK_OTHER";
 }
 
+const INSTITUTION_FOR_SOURCE: Record<string, string> = {
+  KIS_API: "한국투자증권",
+  KIWOOM_API: "키움증권",
+};
+
 interface Props {
   onClose: () => void;
   onSubmit: (data: AssetAccountCreate) => void;
@@ -31,7 +36,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
     name: "",
     asset_type: "STOCK_KIS",
     data_source: "KIS_API",
-    institution: "",
+    institution: "한국투자증권",
     is_mock_mode: true,
   });
   const {
@@ -68,6 +73,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
   const handleSourceChange = (source: string) => {
     set("data_source", source);
     set("asset_type", defaultAssetTypeForSource(source));
+    set("institution", INSTITUTION_FOR_SOURCE[source] ?? "");
     if (source !== "MANUAL") {
       set("manual_amount", undefined);
       setDepositKrw(undefined);
@@ -78,7 +84,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
   const handleSubmit = () => {
     let submitForm = form;
     if (form.data_source === "MANUAL") {
-      const usdConverted = depositUsd != null && usdRate != null ? Math.round(depositUsd * usdRate) : 0;
+      const usdConverted = convertUsdToKrw(depositUsd, usdRate);
       const total = (depositKrw ?? 0) + usdConverted;
       submitForm = { ...form, manual_amount: total > 0 ? total : undefined };
     }

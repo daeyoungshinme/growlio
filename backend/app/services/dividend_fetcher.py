@@ -27,7 +27,7 @@ from app.services.dividend_providers import (
     sync_pykrx_etf_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.price_service import _to_yahoo_symbol
+from app.services.yahoo_price import _to_yahoo_symbol
 
 logger = structlog.get_logger()
 

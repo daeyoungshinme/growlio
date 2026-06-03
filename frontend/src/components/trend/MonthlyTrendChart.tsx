@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { chartTooltipStyle } from "../../utils/chart";
@@ -7,7 +7,7 @@ interface Props {
   data: { month: string; total_krw: number }[];
 }
 
-export default function MonthlyTrendChart({ data }: Props) {
+const MonthlyTrendChart = memo(function MonthlyTrendChart({ data }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const chartData = useMemo(
     () => data.map((d) => {
@@ -35,4 +35,6 @@ export default function MonthlyTrendChart({ data }: Props) {
       </BarChart>
     </ResponsiveContainer>
   );
-}
+});
+
+export default MonthlyTrendChart;

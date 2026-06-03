@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { chartTooltipStyle } from "../../utils/chart";
@@ -9,7 +10,7 @@ interface Props {
   compact?: boolean;
 }
 
-export default function AssetAllocationChart({ data, compact = false }: Props) {
+const AssetAllocationChart = memo(function AssetAllocationChart({ data, compact = false }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const height = compact ? 164 : 400;
   const innerRadius = compact ? 36 : 100;
@@ -58,4 +59,6 @@ export default function AssetAllocationChart({ data, compact = false }: Props) {
       )}
     </div>
   );
-}
+});
+
+export default AssetAllocationChart;

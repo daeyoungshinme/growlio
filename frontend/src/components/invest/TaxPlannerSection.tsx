@@ -1,99 +1,34 @@
-import { useState, useMemo } from "react";
 import { Info, TrendingUp, TrendingDown, Lightbulb, Calculator } from "lucide-react";
 import { OverseasPositionDetail } from "../../api/tax";
 import { fmtKrw, fmtPct } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
-
-const DEDUCTION = 2_500_000;
-const TAX_RATE = 0.22;
+import { useTaxSimulation, posKey, TAX_DEDUCTION, TAX_RATE } from "../../hooks/useTaxSimulation";
 
 interface Props {
   positions: OverseasPositionDetail[];
 }
 
-function calcTax(realizedGain: number): number {
-  return Math.round(Math.max(0, realizedGain - DEDUCTION) * TAX_RATE);
-}
-
-const posKey = (pos: OverseasPositionDetail) => `${pos.account_id}-${pos.ticker}`;
-
 export default function TaxPlannerSection({ positions }: Props) {
-  const [alreadyRealizedInput, setAlreadyRealizedInput] = useState("");
-  const [sellQtyMap, setSellQtyMap] = useState<Record<string, number>>({});
-
-  const alreadyRealized = useMemo(() => {
-    const v = parseFloat(alreadyRealizedInput.replace(/,/g, ""));
-    return isNaN(v) ? 0 : v;
-  }, [alreadyRealizedInput]);
-
-  const profitPositions = useMemo(
-    () => positions.filter((p) => p.unrealized_pnl_krw > 0).sort((a, b) => a.unrealized_pnl_krw - b.unrealized_pnl_krw),
-    [positions]
-  );
-  const lossPositions = useMemo(
-    () => positions.filter((p) => p.unrealized_pnl_krw <= 0).sort((a, b) => a.unrealized_pnl_krw - b.unrealized_pnl_krw),
-    [positions]
-  );
-
-  const totalLoss = useMemo(
-    () => lossPositions.reduce((s, p) => s + p.unrealized_pnl_krw, 0),
-    [lossPositions]
-  );
-
-  const remainingDeduction = Math.max(0, DEDUCTION - alreadyRealized);
-  const maxTaxFreeProfit = remainingDeduction + Math.abs(totalLoss);
-  const currentTax = calcTax(alreadyRealized);
-  const deductionUsedPct = Math.min(100, (Math.max(0, alreadyRealized) / DEDUCTION) * 100);
-
-  const totalSimPnl = useMemo(
-    () =>
-      [...profitPositions, ...lossPositions].reduce((s, p) => {
-        const qty = sellQtyMap[posKey(p)] ?? 0;
-        const pnlPs = p.qty > 0 ? p.unrealized_pnl_krw / p.qty : 0;
-        return s + pnlPs * qty;
-      }, 0),
-    [sellQtyMap, profitPositions, lossPositions]
-  );
-
-  const hasAnyQtyInput = Object.values(sellQtyMap).some((q) => q > 0);
-  const simTotalRealized = alreadyRealized + totalSimPnl;
-  const simTax = calcTax(simTotalRealized);
-  const simTaxDiff = simTax - currentTax;
-
-  const recommendations = useMemo(() => {
-    if (hasAnyQtyInput) return [];
-    const recs: { pos: OverseasPositionDetail; label: string; taxSaved: number }[] = [];
-    let budget = maxTaxFreeProfit;
-    for (const pos of profitPositions) {
-      if (pos.unrealized_pnl_krw <= budget) {
-        recs.push({
-          pos,
-          label: `전량(${pos.qty.toLocaleString()}주) 매도`,
-          taxSaved: Math.round(pos.unrealized_pnl_krw * TAX_RATE),
-        });
-        budget -= pos.unrealized_pnl_krw;
-      } else if (budget > 0 && pos.qty > 0) {
-        const pnlPerShare = pos.unrealized_pnl_krw / pos.qty;
-        if (pnlPerShare > 0) {
-          const shares = Math.floor(budget / pnlPerShare);
-          if (shares > 0) {
-            recs.push({
-              pos,
-              label: `${shares.toLocaleString()}주 매도`,
-              taxSaved: Math.round(shares * pnlPerShare * TAX_RATE),
-            });
-          }
-        }
-        break;
-      }
-    }
-    return recs;
-  }, [hasAnyQtyInput, profitPositions, maxTaxFreeProfit]);
-
-  const handleQtyChange = (pos: OverseasPositionDetail, value: string) => {
-    const n = Math.max(0, Math.min(pos.qty, parseInt(value) || 0));
-    setSellQtyMap((prev) => ({ ...prev, [posKey(pos)]: n }));
-  };
+  const {
+    alreadyRealizedInput,
+    setAlreadyRealizedInput,
+    sellQtyMap,
+    alreadyRealized,
+    profitPositions,
+    lossPositions,
+    totalLoss,
+    remainingDeduction,
+    maxTaxFreeProfit,
+    currentTax,
+    deductionUsedPct,
+    totalSimPnl,
+    hasAnyQtyInput,
+    simTotalRealized,
+    simTax,
+    simTaxDiff,
+    recommendations,
+    handleQtyChange,
+  } = useTaxSimulation(positions);
 
   if (positions.length === 0) {
     return (
@@ -156,7 +91,7 @@ export default function TaxPlannerSection({ positions }: Props) {
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400">공제 사용 현황</span>
             <span className="font-medium text-gray-700 dark:text-gray-300">
-              {fmtKrw(Math.max(0, alreadyRealized))} / {fmtKrw(DEDUCTION)}
+              {fmtKrw(Math.max(0, alreadyRealized))} / {fmtKrw(TAX_DEDUCTION)}
             </span>
           </div>
           <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
@@ -173,7 +108,7 @@ export default function TaxPlannerSection({ positions }: Props) {
           </div>
           <div className="flex flex-wrap items-start justify-between gap-y-1">
             <div className="flex-1 min-w-0">
-              {alreadyRealized < DEDUCTION ? (
+              {alreadyRealized < TAX_DEDUCTION ? (
                 <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                   공제 잔여 {fmtKrw(remainingDeduction)} — 세금 없이 이만큼 더 수익 실현 가능
                 </span>
@@ -518,7 +453,7 @@ export default function TaxPlannerSection({ positions }: Props) {
             <span className="text-gray-500 dark:text-gray-400">통산 실현 손익</span>
             <span className={`text-right font-medium ${pnlColor(simTotalRealized)}`}>{fmtKrw(simTotalRealized)}</span>
             <span className="text-gray-500 dark:text-gray-400">250만원 공제</span>
-            <span className="text-right text-gray-600 dark:text-gray-300">−{fmtKrw(Math.min(DEDUCTION, Math.max(0, simTotalRealized)))}</span>
+            <span className="text-right text-gray-600 dark:text-gray-300">−{fmtKrw(Math.min(TAX_DEDUCTION, Math.max(0, simTotalRealized)))}</span>
             <span className={`font-semibold ${simTax === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}`}>
               예상 납부 세금
             </span>

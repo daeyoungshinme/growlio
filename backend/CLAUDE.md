@@ -98,7 +98,7 @@ API Request
         ├── auth.py           # 로그인/회원가입/토큰 refresh
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
-        ├── dashboard.py      # 대시보드 집계 (get_dashboard_summary)
+        ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
         ├── dividends.py      # 배당금 요약 + 예상 배당금
         ├── invest.py         # DCA 분석
         ├── open_banking.py   # 오픈뱅킹 계좌 연결
@@ -111,7 +111,7 @@ API Request
         └── transactions.py   # 입출금/배당 내역 CRUD
 
 services/
-  ├── asset_service.py        # 계좌별 sync 함수 + 대시보드 집계
+  ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alert_service.py        # 알림 생성·조회
   ├── backtest_service.py     # 백테스트 엔진
@@ -124,22 +124,36 @@ services/
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
-  ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS → LS 우선순위)
+  ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
   ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
-  └── rebalancing_service.py  # 리밸런싱 추천
+  ├── rebalancing_service.py  # 리밸런싱 추천
+  ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
+  ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
+  ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions)
+  └── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
 
 kis/                          # KIS OpenAPI 클라이언트
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)
-providers/                    # 오픈뱅킹 provider (base.py + openbanking.py)
+providers/                    # 금융 데이터 provider
+  ├── base.py                 # Provider 추상 베이스
+  ├── http_client.py          # 공통 HTTP 클라이언트
+  ├── kis_provider.py         # KIS API provider
+  ├── kiwoom_provider.py      # 키움증권 API provider
+  ├── manual_provider.py      # 수동 입력 provider
+  ├── openbanking.py          # 오픈뱅킹 토큰 갱신 (`ensure_ob_token_fresh`)
+  └── openbanking_provider.py # 오픈뱅킹 계좌 조회 provider
 utils/
+  ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
   └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
                               # 예: @limiter.limit("60/minute") — request: Request 파라미터 필수
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
+  ├── dca_auto_buy.py         # DCA 자동매수 정기 작업
   ├── exchange_rate_alert.py  # 환율 알림 정기 작업
   ├── rebalancing_alert.py    # 매일 18:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
+  ├── stock_price_alert.py    # 주가 알림 정기 작업
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
 ```
 

@@ -6,6 +6,7 @@ import { useExchangeRate } from "../../hooks/useExchangeRate";
 import { useStockSearch } from "../../hooks/useStockSearch";
 import { isOverseasMarket } from "../../constants/markets";
 import { extractErrorMessage } from "../../utils/error";
+import { toast } from "../../utils/toast";
 import { fmtKrwShort } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import Modal from "../common/Modal";
@@ -66,6 +67,8 @@ export default function StockPositionsModal({
       const positions = r.data.positions;
       setRows(enrichPositions(positions.length ? positions : (readonly ? [] : [{ ...EMPTY_ROW }])));
       setSummary(r.data.summary);
+    }).catch((e) => {
+      setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
     }).finally(() => setLoading(false));
   }, [accountId, readonly]);
 
@@ -91,8 +94,8 @@ export default function StockPositionsModal({
           ...(result.usd_rate ? { usd_rate: result.usd_rate } : {}),
         });
       }
-    } catch {
-      // 조회 실패 시 무시
+    } catch (e: unknown) {
+      toast(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally {
       setPriceLoadingRows((prev) => { const s = new Set(prev); s.delete(i); return s; });
     }

@@ -65,6 +65,8 @@ make build-android-release         # APK Release 빌드
 **컴포넌트 디렉토리 (`src/components/`):**
 assets, backtest, common, dashboard, invest, layout, portfolio-analysis, portfolios, rebalancing, transactions, trend
 
+`components/common/` 주요 파일: `ConfirmModal.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `TreemapCell.tsx`
+
 **데이터 흐름:**
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
@@ -73,7 +75,14 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-**hooks/** — `useExchangeRate.ts` (환율 조회). 새 커스텀 훅은 이 디렉토리에 추가.
+**hooks/**
+- `useExchangeRate.ts` — 환율 조회
+- `useForm.ts` — 폼 상태 관리
+- `useStockSearch.ts` — 종목 검색
+- `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
+- `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
+
+새 커스텀 훅은 이 디렉토리에 추가.
 
 **테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트만 존재: `format.test.ts`, `error.test.ts`, `colors.test.ts`.
 

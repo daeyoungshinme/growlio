@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { StockSuggestion } from "../../api/assets";
-import { fmtKrwShort } from "../../utils/format";
+import { convertUsdToKrw, fmtKrwShort } from "../../utils/format";
 import { isOverseasMarket } from "../../constants/markets";
+import PriceCell from "../common/PriceCell";
 import { pnlColor } from "../../utils/colors";
 
 export interface Position {
@@ -62,7 +63,7 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
 }) {
   const MAX_DROPDOWN_H = 208;
   const [pos, setPos] = useState<{
-    top: number; maxHeight: number; left: number; width: number;
+    top?: number; bottom?: number; maxHeight: number; left: number; width: number;
   } | null>(null);
 
   useEffect(() => {
@@ -76,7 +77,7 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
 
       if (spaceBelow < 200) {
         const maxH = Math.min(MAX_DROPDOWN_H, Math.max(0, spaceAbove));
-        setPos({ top: rect.top - maxH - 4, maxHeight: maxH, left: rect.left, width: rect.width });
+        setPos({ bottom: vh - rect.top + 4, maxHeight: maxH, left: rect.left, width: rect.width });
       } else {
         setPos({ top: rect.bottom + 4, maxHeight: Math.min(MAX_DROPDOWN_H, spaceBelow - 8), left: rect.left, width: rect.width });
       }
@@ -95,7 +96,7 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
 
   return createPortal(
     <div
-      style={{ position: "fixed", zIndex: 9999, top: pos.top, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
+      style={{ position: "fixed", zIndex: 9999, top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
       className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-y-auto"
     >
       {suggestions.map((s, si) => (
@@ -184,31 +185,13 @@ function ReadonlyDesktopRow({ row }: { row: Position }) {
         <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{row.qty.toLocaleString()}</span>
       </td>
       <td className="py-3 pr-3 text-right">
-        {overseas && row.avg_price_usd ? (
-          <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">${row.avg_price_usd.toFixed(2)}</p>
-            {row.avg_price > 0 && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">₩{row.avg_price.toLocaleString()}</p>
-            )}
-          </div>
-        ) : (
-          <span className="text-sm text-gray-700 dark:text-gray-300">{(row.avg_price ?? 0).toLocaleString()}원</span>
-        )}
+        <PriceCell krw={row.avg_price} usd={row.avg_price_usd} isOverseas={overseas} />
       </td>
       <td className="py-3 pr-3 text-right text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
         {fmtKrwShort(row.invested_amount ?? 0)}원
       </td>
       <td className="py-3 pr-3 text-right">
-        {overseas && row.current_price_usd ? (
-          <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">${row.current_price_usd.toFixed(2)}</p>
-            {row.current_price && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">₩{row.current_price.toLocaleString()}</p>
-            )}
-          </div>
-        ) : (
-          <span className="text-sm text-gray-700 dark:text-gray-300">{(row.current_price ?? 0).toLocaleString()}원</span>
-        )}
+        <PriceCell krw={row.current_price} usd={row.current_price_usd} isOverseas={overseas} />
       </td>
       <td className="py-3 pr-3 text-right text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
         {fmtKrwShort(row.value_amount ?? 0)}원
@@ -313,9 +296,9 @@ export function PositionsTable({
                             value={row.avg_price_usd ?? ""} onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
                             placeholder="0.00" min={0} step="0.01" />
                         </div>
-                        {usdRate && (row.avg_price_usd ?? 0) > 0 && (
+                        {convertUsdToKrw(row.avg_price_usd, usdRate) > 0 && (
                           <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                            ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
+                            ≈ ₩{convertUsdToKrw(row.avg_price_usd, usdRate).toLocaleString()}
                           </div>
                         )}
                       </div>
@@ -339,9 +322,9 @@ export function PositionsTable({
                           onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
                           placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} step="0.01" disabled={priceLoading} />
                         {priceLoading && <span className="absolute right-3 top-3"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
-                        {usdRate && (rows[i].current_price_usd ?? 0) > 0 && (
+                        {convertUsdToKrw(rows[i].current_price_usd, usdRate) > 0 && (
                           <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                            ≈ ₩{Math.round((rows[i].current_price_usd ?? 0) * usdRate).toLocaleString()}
+                            ≈ ₩{convertUsdToKrw(rows[i].current_price_usd, usdRate).toLocaleString()}
                           </div>
                         )}
                       </div>
@@ -453,9 +436,9 @@ export function PositionsTable({
                               value={row.avg_price_usd ?? ""} onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
                               placeholder="0.00" min={0} step="0.01" />
                           </div>
-                          {usdRate && (row.avg_price_usd ?? 0) > 0 && (
+                          {convertUsdToKrw(row.avg_price_usd, usdRate) > 0 && (
                             <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                              ≈ ₩{Math.floor((row.avg_price_usd ?? 0) * usdRate).toLocaleString()}
+                              ≈ ₩{convertUsdToKrw(row.avg_price_usd, usdRate).toLocaleString()}
                             </div>
                           )}
                         </div>
@@ -479,9 +462,9 @@ export function PositionsTable({
                             onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
                             placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} step="0.01" disabled={priceLoading} />
                           {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
-                          {usdRate && (rows[i].current_price_usd ?? 0) > 0 && (
+                          {convertUsdToKrw(rows[i].current_price_usd, usdRate) > 0 && (
                             <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
-                              ≈ ₩{Math.round((rows[i].current_price_usd ?? 0) * usdRate).toLocaleString()}
+                              ≈ ₩{convertUsdToKrw(rows[i].current_price_usd, usdRate).toLocaleString()}
                             </div>
                           )}
                         </div>

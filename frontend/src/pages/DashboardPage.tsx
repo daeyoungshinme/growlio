@@ -1,13 +1,9 @@
 import { useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown, TrendingDown, TrendingUp, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { fetchAccounts } from "../api/assets";
-import { fetchDashboard } from "../api/dashboard";
-import { fetchDCAAnalysis } from "../api/invest";
-import { fetchPortfolioOverview } from "../api/portfolios";
-import { useExchangeRate } from "../hooks/useExchangeRate";
 import { fmtKrw, fmtMonth, fmtPct } from "../utils/format";
+import { useDashboardData } from "../hooks/useDashboardData";
 import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
@@ -16,43 +12,13 @@ import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { ASSET_TYPE_LABELS } from "../constants";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../utils/colors";
-import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
 
 export default function DashboardPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [showMonthlyDetail, setShowMonthlyDetail] = useState(false);
-  const { data, isLoading, error } = useQuery({
-    queryKey: QUERY_KEYS.dashboard,
-    queryFn: fetchDashboard,
-    staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchPortfolioOverview,
-    staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
-    refetchOnWindowFocus: true,
-  });
-
-  const { data: dcaData } = useQuery({
-    queryKey: QUERY_KEYS.investDca,
-    queryFn: fetchDCAAnalysis,
-    staleTime: STALE_TIME.MEDIUM,
-    refetchInterval: REFETCH_INTERVAL.DASHBOARD,
-  });
-
-  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
-  });
-
-  const exchangeRate = useExchangeRate();
+  const { data, isLoading, error, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate } = useDashboardData();
 
   const reversedMonthlyTrend = useMemo(
     () => [...(data?.monthly_trend ?? [])].reverse(),

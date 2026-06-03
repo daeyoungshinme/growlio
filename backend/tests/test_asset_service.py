@@ -18,10 +18,10 @@ class TestUpsertSnapshot:
     """
 
     @pytest.mark.asyncio
-    async def test_executes_upsert_and_commits(self, mock_db):
-        """pg_insert upsert가 db.execute()와 db.commit()을 호출한다."""
+    async def test_executes_upsert_without_committing(self, mock_db):
+        """pg_insert upsert를 실행하되 commit은 호출자가 처리한다."""
         from types import SimpleNamespace
-        from app.services.asset_service import _upsert_snapshot
+        from app.services.snapshot_service import _upsert_snapshot
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()
@@ -45,14 +45,14 @@ class TestUpsertSnapshot:
         )
 
         mock_db.execute.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.commit.assert_not_called()
         assert result.amount_krw == 5_000_000.0
 
     @pytest.mark.asyncio
     async def test_upsert_passes_correct_amount(self, mock_db):
         """upsert 호출 시 amount_krw가 올바르게 전달된다."""
         from types import SimpleNamespace
-        from app.services.asset_service import _upsert_snapshot
+        from app.services.snapshot_service import _upsert_snapshot
 
         account_id = uuid.uuid4()
         user_id = uuid.uuid4()

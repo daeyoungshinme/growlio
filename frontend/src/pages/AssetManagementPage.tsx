@@ -1,16 +1,13 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
 import {
-  fetchAccounts,
   createAccount,
   updateAccount,
   deleteAccount,
   syncAccount,
   type AssetAccount,
 } from "../api/assets";
-import { fetchPortfolioOverview } from "../api/portfolios";
-import { fetchTransactions } from "../api/transactions";
 import { extractErrorMessage } from "../utils/error";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
 import TransactionModal from "../components/assets/TransactionModal";
@@ -29,8 +26,7 @@ import { fmtKrw, fmtPct } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { useExchangeRate } from "../hooks/useExchangeRate";
+import { useAssetManagementData } from "../hooks/useAssetManagementData";
 import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
 
 const TABS = ASSET_MANAGEMENT_TABS;
@@ -52,25 +48,9 @@ export default function AssetManagementPage() {
   const [txAccount, setTxAccount] = useState<{ id: string; name: string; depositKrw: number } | null>(null);
 
   const queryClient = useQueryClient();
+  const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);
 
-  const { data: accounts = [], isLoading } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-  });
-
-  const { data: overview } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchPortfolioOverview,
-    enabled: tab === "증권계좌",
-  });
-
-  const { data: allTx = [] } = useQuery({
-    queryKey: QUERY_KEYS.transactionsAll,
-    queryFn: () => fetchTransactions(),
-    enabled: tab === "증권계좌",
-  });
-
-  const invalidateAll = () => invalidateAccountData(queryClient);
+  const invalidateAll = useCallback(() => invalidateAccountData(queryClient), [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: createAccount,
@@ -106,16 +86,16 @@ export default function AssetManagementPage() {
     onError: () => toast("계좌 삭제에 실패했습니다"),
   });
 
-  const handleDelete = (id: string) => {
+  const handleDelete = useCallback((id: string) => {
     setConfirmDeleteId(id);
-  };
+  }, []);
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = useCallback(() => {
     if (!confirmDeleteId) return;
     setDeletingId(confirmDeleteId);
     deleteMutation.mutate(confirmDeleteId);
     setConfirmDeleteId(null);
-  };
+  }, [confirmDeleteId, deleteMutation]);
 
   const updateBankMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
@@ -148,7 +128,7 @@ export default function AssetManagementPage() {
     onError: () => toast("부동산 정보 수정에 실패했습니다"),
   });
 
-  const handleSyncBank = async (id: string) => {
+  const handleSyncBank = useCallback(async (id: string) => {
     setSyncingBankId(id);
     try {
       await syncAccount(id);
@@ -156,9 +136,9 @@ export default function AssetManagementPage() {
     } finally {
       setSyncingBankId(null);
     }
-  };
+  }, [invalidateAll]);
 
-  const handleSyncKisAccount = async (id: string) => {
+  const handleSyncKisAccount = useCallback(async (id: string) => {
     const acc = accounts.find((a) => a.id === id);
     setSyncingStockIds((prev) => new Set(prev).add(id));
     try {
@@ -175,9 +155,7 @@ export default function AssetManagementPage() {
         return next;
       });
     }
-  };
-
-  const usdRate = useExchangeRate();
+  }, [accounts, queryClient]);
 
   const bankAccounts = accounts.filter((a) => BANK_TYPES.includes(a.asset_type));
   const stockAccounts = accounts.filter((a) => STOCK_TYPES.includes(a.asset_type));

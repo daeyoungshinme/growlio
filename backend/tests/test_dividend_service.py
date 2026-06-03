@@ -15,15 +15,15 @@ class TestGetDividendSummary:
     async def test_returns_zero_when_no_transactions(self, mock_db, override_settings):
         """배당 내역 없으면 연간 수령액 0, 예상 배당금 0."""
         from unittest.mock import patch
-        from app.services.dividend_service import get_dividend_summary
+        from app.services.dividend_aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
 
         with (
-            patch("app.services.dividend_service._sum_transactions", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.dividend_service._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator._sum_transactions", new_callable=AsyncMock, return_value=0.0),
+            patch("app.services.dividend_aggregator._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=[]),
         ):
             summary = await get_dividend_summary(user_id, mock_db)
 
@@ -35,15 +35,15 @@ class TestGetDividendSummary:
     async def test_sums_annual_received_correctly(self, mock_db, override_settings):
         """_sum_transactions 결과가 annual_received에 반영된다."""
         from unittest.mock import patch
-        from app.services.dividend_service import get_dividend_summary
+        from app.services.dividend_aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
 
         with (
-            patch("app.services.dividend_service._sum_transactions", new_callable=AsyncMock, return_value=80_000.0),
-            patch("app.services.dividend_service._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator._sum_transactions", new_callable=AsyncMock, return_value=80_000.0),
+            patch("app.services.dividend_aggregator._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=[]),
         ):
             summary = await get_dividend_summary(user_id, mock_db)
 
@@ -53,7 +53,7 @@ class TestGetDividendSummary:
     async def test_estimated_annual_from_ticker_summaries(self, mock_db, override_settings):
         """ticker_summaries의 estimated_annual_krw 합계가 estimated_annual에 반영된다."""
         from unittest.mock import patch
-        from app.services.dividend_service import get_dividend_summary
+        from app.services.dividend_aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
         ticker_data = [
@@ -62,10 +62,10 @@ class TestGetDividendSummary:
         ]
 
         with (
-            patch("app.services.dividend_service._sum_transactions", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.dividend_service._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
-            patch("app.services.dividend_service.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=ticker_data),
+            patch("app.services.dividend_aggregator._sum_transactions", new_callable=AsyncMock, return_value=0.0),
+            patch("app.services.dividend_aggregator._monthly_dividend_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator._monthly_dividend_ticker_breakdown", new_callable=AsyncMock, return_value=[]),
+            patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new_callable=AsyncMock, return_value=ticker_data),
         ):
             summary = await get_dividend_summary(user_id, mock_db)
 

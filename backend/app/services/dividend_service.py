@@ -1,4 +1,7 @@
-"""배당금 집계 및 예상 배당금 계산 서비스."""
+"""배당금 예상 조회 및 종목별 배당 데이터 서비스.
+
+트랜잭션 기반 집계(수령액) → dividend_aggregator.py
+"""
 
 from __future__ import annotations
 
@@ -6,6 +9,7 @@ import asyncio
 import json
 import uuid
 from datetime import date
+
 import structlog
 from sqlalchemy import func, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -15,82 +19,16 @@ from sqlalchemy.orm import selectinload
 from app.config import settings
 from app.kis.auth import get_access_token
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
-from app.models.asset import AssetAccount, AssetSnapshot, Transaction, UserTickerSettings
+from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
 from app.models.user import UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt, get_kis_user_credentials
-from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES, is_korean_etf
+from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES, is_korean_etf
 from app.services.dividend_fetcher import fetch_ticker_dividend_info
+from app.utils.cache_keys import dividend_ticker_summary_key
 from app.utils.currency import get_usd_krw_rate
 
 logger = structlog.get_logger()
-
-
-async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
-    current_year = date.today().year
-
-    annual_received = await _sum_transactions(user_id, db, "DIVIDEND", current_year)
-    monthly_breakdown = await _monthly_dividend_breakdown(user_id, db, current_year)
-    monthly_ticker_breakdown = await _monthly_dividend_ticker_breakdown(user_id, db, current_year)
-
-    # 종목별 테이블과 동일한 소스 사용 → StatBox와 per-ticker 합산 일치 보장 + Redis 캐시 재사용
-    ticker_summaries = await get_ticker_dividend_summary(user_id, db)
-    estimated_annual = sum(
-        item["estimated_annual_krw"]
-        for item in ticker_summaries
-        if item.get("estimated_annual_krw", 0) > 0
-    )
-
-    return {
-        "annual_received": annual_received,
-        "monthly_breakdown": monthly_breakdown,
-        "monthly_ticker_breakdown": monthly_ticker_breakdown,
-        "estimated_annual": estimated_annual,
-    }
-
-
-async def _sum_transactions(user_id: uuid.UUID, db: AsyncSession, tx_type: str, year: int) -> float:
-    result = await db.execute(
-        select(func.sum(Transaction.amount)).where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == tx_type,
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-    )
-    return float(result.scalar() or 0)
-
-
-async def _monthly_dividend_breakdown(user_id: uuid.UUID, db: AsyncSession, year: int) -> list[dict]:
-    month_col = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
-    result = await db.execute(
-        select(month_col, func.sum(Transaction.amount).label("total"))
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == "DIVIDEND",
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-        .group_by(month_col)
-        .order_by(month_col)
-    )
-    return [{"month": row.month, "amount": float(row.total)} for row in result]
-
-
-async def _monthly_dividend_ticker_breakdown(user_id: uuid.UUID, db: AsyncSession, year: int) -> list[dict]:
-    result = await db.execute(
-        text("""
-            SELECT to_char(transaction_date, 'YYYY-MM') AS month,
-                   ticker,
-                   SUM(amount) AS total
-            FROM transactions
-            WHERE user_id = :uid
-              AND transaction_type = 'DIVIDEND'
-              AND EXTRACT(year FROM transaction_date) = :yr
-            GROUP BY 1, 2
-            ORDER BY 1, 2
-        """),
-        {"uid": str(user_id), "yr": year},
-    )
-    return [{"month": row.month, "ticker": row.ticker, "amount": float(row.total)} for row in result]
 
 
 async def _get_dart_key(user_id: uuid.UUID, db: AsyncSession) -> str:
@@ -101,12 +39,14 @@ async def _get_dart_key(user_id: uuid.UUID, db: AsyncSession) -> str:
     return settings.dart_api_key
 
 
-async def _get_kis_dividend_fallback(
+async def _call_kis_dividend_api(
     ticker: str,
     user_id: uuid.UUID,
     db: AsyncSession,
+    fetch_fn,
+    log_name: str,
 ) -> dict | None:
-    """사용자의 KIS 계좌로 국내 종목 배당 정보 조회. KIS 계좌 없거나 데이터 없으면 None 반환."""
+    """KIS 계좌를 통해 배당 API를 호출하는 공통 헬퍼."""
     account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.user_id == user_id,
@@ -131,7 +71,7 @@ async def _get_kis_dividend_fallback(
             user_id=str(user_id),
             account_id=str(account.id),
         )
-        result = await get_domestic_dividend_info(
+        result = await fetch_fn(
             app_key=app_key,
             app_secret=app_secret,
             access_token=access_token,
@@ -139,12 +79,23 @@ async def _get_kis_dividend_fallback(
             is_mock=account.is_mock_mode,
         )
         if result["dps"] > 0 or result["dividend_yield"] > 0:
-            logger.info("kis_dividend_fallback_used", ticker=ticker)
+            logger.info(f"{log_name}_used", ticker=ticker)
             return result
         return None
     except Exception as e:
-        logger.warning("kis_dividend_fallback_failed", ticker=ticker, error=str(e))
+        logger.warning(f"{log_name}_failed", ticker=ticker, error=str(e))
         return None
+
+
+async def _get_kis_dividend_fallback(
+    ticker: str,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> dict | None:
+    """사용자의 KIS 계좌로 국내 종목 배당 정보 조회. KIS 계좌 없거나 데이터 없으면 None 반환."""
+    return await _call_kis_dividend_api(
+        ticker, user_id, db, get_domestic_dividend_info, "kis_dividend_fallback"
+    )
 
 
 async def _get_kis_etf_dividend_fallback(
@@ -153,44 +104,9 @@ async def _get_kis_etf_dividend_fallback(
     db: AsyncSession,
 ) -> dict | None:
     """국내 ETF 전용 KIS API(FHPET01010000)로 분배율 조회. 자격증명 없거나 데이터 없으면 None 반환."""
-    account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
-            AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.kis_app_key != None,  # noqa: E711
-        )
+    return await _call_kis_dividend_api(
+        ticker, user_id, db, get_domestic_etf_dividend_info, "kis_etf_dividend_fallback"
     )
-    if not account:
-        return None
-
-    try:
-        redis = await get_redis()
-        app_key = decrypt(account.kis_app_key)
-        app_secret = decrypt(account.kis_app_secret)
-        access_token = await get_access_token(
-            app_key,
-            app_secret,
-            is_mock=account.is_mock_mode,
-            redis=redis,
-            db=db,
-            user_id=str(user_id),
-            account_id=str(account.id),
-        )
-        result = await get_domestic_etf_dividend_info(
-            app_key=app_key,
-            app_secret=app_secret,
-            access_token=access_token,
-            ticker=ticker,
-            is_mock=account.is_mock_mode,
-        )
-        if result["dps"] > 0 or result["dividend_yield"] > 0:
-            logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
-            return result
-        return None
-    except Exception as e:
-        logger.warning("kis_etf_dividend_fallback_failed", ticker=ticker, error=str(e))
-        return None
 
 
 async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
@@ -198,52 +114,8 @@ async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | N
 
 
 
-async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], float]:
-    """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → value_krw 수집."""
-    subq = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .where(AssetSnapshot.user_id == user_id)
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .options(selectinload(AssetSnapshot.position_items))
-        .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.asset_type.like("STOCK%"),
-        )
-    )
-    rows = result.all()
-
-    positions_map: dict[tuple[str, str], float] = {}
-    for snap, _acc in rows:
-        if not snap.position_items:
-            continue
-        for p in snap.position_items:
-            ticker = p.ticker
-            market = (p.market or "KOSPI").upper()
-            raw_value_krw = p.value_krw
-            if raw_value_krw and float(raw_value_krw) > 0:
-                value = float(raw_value_krw)
-            else:
-                qty = float(p.qty or 0)
-                price = float(p.current_price or p.avg_price or 0)
-                value = qty * price if qty > 0 and price > 0 else 0.0
-            if ticker and value > 0:
-                key = (ticker, market)
-                positions_map[key] = positions_map.get(key, 0) + value
-
-    return positions_map
-
-
-async def _collect_positions_with_names(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
-    """최신 스냅샷에서 (ticker, market) → {value_krw, name, invested_krw} 수집."""
+async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
+    """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → {value_krw, name, invested_krw, qty} 수집."""
     subq = (
         select(
             AssetSnapshot.account_id,
@@ -310,7 +182,7 @@ async def _load_user_overrides(user_id: uuid.UUID, db: AsyncSession) -> dict[tup
 async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """종목별 실수령(올해) + 예상 배당금 통합. Redis 24h 캐시."""
     current_year = date.today().year
-    cache_key = f"dividend:by-ticker:{user_id}:{current_year}"
+    cache_key = dividend_ticker_summary_key(user_id, current_year)
 
     redis = await get_redis()
     cached = await redis.get(cache_key)
@@ -332,7 +204,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
     )
     received_map: dict[str, float] = {row.ticker_key: float(row.total) for row in result}
 
-    positions = await _collect_positions_with_names(user_id, db)
+    positions = await _collect_positions(user_id, db)
 
     # 거래 기록에 종목명으로 저장된 경우를 종목코드로 정규화
     name_to_ticker: dict[str, str] = {}
@@ -515,7 +387,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
 async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """보유 종목별 배당수익률과 예상 배당금을 반환한다."""
-    positions = await _collect_positions_with_names(user_id, db)
+    positions = await _collect_positions(user_id, db)
     overrides = await _load_user_overrides(user_id, db)
     dart_key = await _get_dart_key(user_id, db)
 
@@ -611,7 +483,7 @@ async def upsert_ticker_settings(
 
     redis = await get_redis()
     current_year = date.today().year
-    await redis.delete(f"dividend:by-ticker:{user_id}:{current_year}")
+    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
     await redis.delete(f"dividend:info:{ticker}:{market}")
     logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
 
@@ -635,7 +507,7 @@ async def delete_ticker_settings(
 
     redis = await get_redis()
     current_year = date.today().year
-    await redis.delete(f"dividend:by-ticker:{user_id}:{current_year}")
+    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
     await redis.delete(f"dividend:months:{ticker}:{market}")
     await redis.delete(f"dividend:info:{ticker}:{market}")
     logger.info("ticker_settings_deleted", user_id=str(user_id), ticker=ticker, market=market)

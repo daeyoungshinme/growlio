@@ -2,7 +2,7 @@ import { useState } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { type AssetAccount } from "../../api/assets";
 import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { fmtKrw, fmtPct } from "../../utils/format";
+import { convertUsdToKrw, fmtKrw, fmtPct } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import { STOCK_TYPE_LABELS } from "../../constants";
 
@@ -181,8 +181,8 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                   />
                   <span className="text-xs text-gray-400 shrink-0">USD</span>
                 </div>
-                {usdRate && Number(editUsdValue) > 0 && (
-                  <p className="text-xs text-gray-400">≈ {fmtKrw(Math.round(Number(editUsdValue) * usdRate))}</p>
+                {convertUsdToKrw(Number(editUsdValue), usdRate) > 0 && (
+                  <p className="text-xs text-gray-400">≈ {fmtKrw(convertUsdToKrw(Number(editUsdValue), usdRate))}</p>
                 )}
                 <div className="flex gap-2">
                   <button onClick={handleSave} className="text-xs text-blue-500 hover:text-blue-700">저장</button>
@@ -196,7 +196,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                     const krw = account.deposit_krw ?? 0;
                     const usd = account.deposit_usd ?? 0;
                     const hasUsd = usd > 0;
-                    const usdAsKrw = hasUsd && usdRate ? Math.round(usd * usdRate) : 0;
+                    const usdAsKrw = convertUsdToKrw(hasUsd ? usd : null, usdRate);
                     const total = krw + usdAsKrw;
                     return (
                       <>

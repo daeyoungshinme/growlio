@@ -1,16 +1,16 @@
 """배당금 현황 API."""
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.limiter import limiter
 from app.models.user import User
+from app.services.dividend_aggregator import get_dividend_summary
 from app.services.dividend_service import (
     delete_ticker_settings,
-    get_dividend_summary,
     get_position_dividend_yields,
     get_ticker_dividend_summary,
     get_ticker_settings,
@@ -51,6 +51,16 @@ async def ticker_dividend_summary(
 class TickerSettingsRequest(BaseModel):
     market: str
     dividend_months: list[int]
+
+    @field_validator("dividend_months")
+    @classmethod
+    def months_valid(cls, v: list[int]) -> list[int]:
+        if not v:
+            raise ValueError("배당월을 하나 이상 입력하세요")
+        invalid = [m for m in v if not (1 <= m <= 12)]
+        if invalid:
+            raise ValueError(f"배당월은 1~12 범위여야 합니다: {invalid}")
+        return sorted(set(v))
 
 
 @router.get("/ticker-settings/{ticker}")
