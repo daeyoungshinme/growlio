@@ -123,7 +123,7 @@ export default function PortfolioPage() {
   if (isLoading) return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-        <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+        <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
           {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
         </div>
       </div>

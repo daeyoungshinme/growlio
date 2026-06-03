@@ -130,7 +130,7 @@ export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) 
           </div>
         </div>
         {/* 모바일: 컴팩트 도넛 차트 (우측 고정) */}
-        <div className="lg:hidden w-32 sm:w-40 shrink-0">
+        <div className="lg:hidden w-24 sm:w-32 shrink-0">
           {allocationChartData.length > 0 ? (
             <AssetAllocationChart data={allocationChartData} compact />
           ) : (
@@ -152,7 +152,7 @@ export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) 
       </div>
       {/* 목표 달성 전망 */}
       <div className="border-t border-gray-100 dark:border-gray-700 pt-3 space-y-3">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">현재 진행율</p>
             <p className={`text-sm sm:text-base lg:text-lg font-bold ${progressColor}`}>

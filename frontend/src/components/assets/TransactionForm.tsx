@@ -120,7 +120,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   };
 
   const isPending = editingTx ? updateMut.isPending : createMut.isPending;
-  const inputCls = "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelCls = "text-sm font-medium text-gray-700 dark:text-gray-300";
 
   return (
@@ -133,7 +133,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
           {(["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const).map((t) => (
             <button key={t} type="button"
               onClick={() => { setField("transaction_type", t); setCurrency("KRW"); setAmountUsd(0); resetTicker(); }}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              className={`flex-1 py-3 text-sm font-medium rounded-lg border transition-colors ${
                 form.transaction_type === t
                   ? "bg-blue-600 text-white border-blue-600"
                   : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300 dark:hover:border-blue-600"
@@ -142,7 +142,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             </button>
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>계좌 선택</label>
             <select value={form.account_id}
@@ -159,7 +159,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               className={inputCls} />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <div className="flex items-center justify-between">
               <label className={labelCls}>금액 *</label>
@@ -168,7 +168,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                   {(["KRW", "USD"] as const).map((c) => (
                     <button key={c} type="button"
                       onClick={() => { setCurrency(c); setAmountUsd(0); }}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}>
+                      className={`px-2.5 py-1.5 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}>
                       {c}
                     </button>
                   ))}

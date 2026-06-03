@@ -12,14 +12,14 @@ interface Props {
 
 const AssetAllocationChart = memo(function AssetAllocationChart({ data, compact = false }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  const height = compact ? 164 : 400;
-  const innerRadius = compact ? 36 : 100;
-  const outerRadius = compact ? 62 : 158;
+  const height = compact ? 130 : 400;
+  const innerRadius = compact ? 20 : 100;
+  const outerRadius = compact ? 44 : 158;
 
   return (
     <div className="flex flex-col">
       <ResponsiveContainer width="100%" height={height}>
-        <PieChart>
+        <PieChart margin={compact ? { top: 0, right: 0, bottom: 0, left: 0 } : undefined}>
           <Pie
             data={data}
             cx="50%"

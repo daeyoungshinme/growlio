@@ -181,10 +181,10 @@ export default function StockPositionsModal({
   return (
     <Modal size="xl" onClose={onClose}>
       {/* 헤더 */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 dark:border-gray-700">
         <div>
-          <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">종목 관리</h2>
-          <p className="text-sm text-gray-400 dark:text-gray-500">{accountName}</p>
+          <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">종목 관리</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{accountName}</p>
         </div>
         <div className="flex items-center gap-3">
           {usdRate && (
@@ -204,22 +204,22 @@ export default function StockPositionsModal({
       )}
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-2 px-4 sm:px-6 py-3 sm:py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
+      <div className="grid grid-cols-3 gap-2 px-4 sm:px-6 py-2 sm:py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 text-center text-sm">
         <div>
           <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">매입금액</p>
-          <p className="font-bold text-base text-gray-900 dark:text-gray-50">
+          <p className="font-bold text-sm text-gray-900 dark:text-gray-50">
             {fmtKrwShort(displaySummary.total_invested)}원
           </p>
         </div>
         <div>
           <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">평가금액</p>
-          <p className="font-bold text-base text-gray-900 dark:text-gray-50">
+          <p className="font-bold text-sm text-gray-900 dark:text-gray-50">
             {fmtKrwShort(displaySummary.total_value)}원
           </p>
         </div>
         <div>
-          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">평가손익(수익률)</p>
-          <p className={`font-bold text-base ${pnlColor(displaySummary.total_pnl)}`}>
+          <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">손익/수익률</p>
+          <p className={`font-bold text-sm ${pnlColor(displaySummary.total_pnl)}`}>
             {displaySummary.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(displaySummary.total_pnl)}원
           </p>
           <p className={`text-xs ${pnlColor(displaySummary.total_pnl_pct)}`}>
@@ -229,7 +229,7 @@ export default function StockPositionsModal({
       </div>
 
       {/* 종목 목록 */}
-      <div className="flex-1 min-h-0 overflow-auto px-4 sm:px-6 py-4">
+      <div className="flex-1 min-h-0 overflow-auto px-4 sm:px-6 py-2">
         {loading ? (
           <div className="text-gray-400 dark:text-gray-500 text-sm py-8 text-center flex items-center justify-center gap-2">
             <Loader2 size={16} className="animate-spin" /> 불러오는 중...
@@ -268,7 +268,7 @@ export default function StockPositionsModal({
       )}
 
       {/* 하단 버튼 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
         <button
           onClick={handleSyncAll}
           disabled={syncing || rows.every((r) => !r.ticker)}
