@@ -76,7 +76,6 @@ export default function DashboardPage() {
       {/* Row 1: Hero Card — 자산 현황 + 목표 달성 전망 */}
       <HeroSummaryCard
         data={data}
-        overview={overview}
         dcaData={dcaData}
         exchangeRate={exchangeRate}
       />

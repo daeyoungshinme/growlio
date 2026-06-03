@@ -5,12 +5,10 @@ import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
 import { ASSET_TYPE_LABELS } from "../../constants";
 import AssetAllocationChart from "./AssetAllocationChart";
 import type { DashboardData } from "../../api/dashboard";
-import type { PortfolioOverview } from "../../types";
 import type { DCAAnalysisData } from "../../api/invest";
 
 interface Props {
   data: DashboardData;
-  overview: PortfolioOverview | undefined;
   dcaData: DCAAnalysisData | undefined;
   exchangeRate: number | null;
 }

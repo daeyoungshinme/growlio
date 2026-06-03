@@ -2,22 +2,18 @@ import { useEffect, useReducer } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "../api/assets";
 import { extractErrorMessage } from "../utils/error";
-import { toast } from "../utils/toast";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { fetchStockPrice } from "../api/assets";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { OVERSEAS_MARKET_SET, isOverseasMarket } from "../constants/markets";
 import {
   ExecutionOrderItem,
   ExecutionResult,
   KisBalancePosition,
-  KisBalanceResponse,
   RebalancingAnalysis,
   RebalancingItem,
   executeRebalancing,
-  fetchAllBrokerBalances,
-  fetchBrokerBalance,
 } from "../api/rebalancing";
+import { useRebalancingBalances } from "./useRebalancingBalances";
+import { useRebalancingPrices } from "./useRebalancingPrices";
 
 export type Phase = "confirm" | "executing" | "result";
 export type BalanceLoadState = "idle" | "loading" | "loaded" | "error" | "not_found";
@@ -253,6 +249,8 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
   const { liveBalances, qtyOverrides, buyAccounts, selected, orderType, limitPriceOverrides, livePricesKrw, livePricesUsd, globalUsdRate } = state;
 
   const actionableItems = getActionableItems(analysis);
+  const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(dispatch, kisAccounts);
+  const { loadAllPrices } = useRebalancingPrices(dispatch, analysis);
 
   function getAccountQuantity(ticker: string, accountId: string): number {
     const livePos = liveBalances[accountId]?.find((p) => p.ticker === ticker);
@@ -355,78 +353,6 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     const sells = getSellRows(accountId).filter((r) => selected.has(`sell_${r.item.ticker}_${accountId}`)).length;
     const buys = getBuyRows(accountId).filter((r) => selected.has(`buy_${r.item.ticker}_${accountId}`)).length;
     return { sells, buys };
-  }
-
-  async function loadLiveBalance(accountId: string) {
-    dispatch({ type: "BALANCE_LOADING", accountId });
-    try {
-      const res: KisBalanceResponse = await fetchBrokerBalance(accountId);
-      dispatch({ type: "BALANCE_LOADED", accountId, positions: res.positions, deposit: res.deposit_krw });
-    } catch (err: unknown) {
-      const is404 = (err as { response?: { status?: number } }).response?.status === 404;
-      dispatch({ type: "BALANCE_ERROR", accountId, is404 });
-      if (is404) {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
-      } else {
-        toast(extractErrorMessage(err, "잔고 조회에 실패했습니다"), "error");
-      }
-    }
-  }
-
-  async function loadAllLiveBalances() {
-    if (kisAccounts.length === 0) return;
-    dispatch({ type: "BALANCES_START", accountIds: kisAccounts.map((a) => a.id) });
-    try {
-      const responses: KisBalanceResponse[] = await fetchAllBrokerBalances();
-      const balances: Record<string, KisBalancePosition[]> = {};
-      const deposits: Record<string, number> = {};
-      const states: Record<string, BalanceLoadState> = {};
-      responses.forEach((res) => {
-        if (res.error) {
-          states[res.account_id] = "error";
-        } else {
-          balances[res.account_id] = res.positions;
-          deposits[res.account_id] = res.deposit_krw;
-          states[res.account_id] = "loaded";
-        }
-      });
-      dispatch({ type: "BALANCES_LOADED", balances, deposits, states });
-    } catch {
-      dispatch({ type: "BALANCES_ERROR", accountIds: kisAccounts.map((a) => a.id) });
-    }
-  }
-
-  async function loadAllPrices() {
-    const tickerMarketMap = new Map<string, string>();
-    actionableItems.forEach((i) => { if (i.ticker !== "CASH") tickerMarketMap.set(i.ticker, i.market); });
-    analysis.untracked_holdings.forEach((h) => tickerMarketMap.set(h.ticker, h.market));
-    if (tickerMarketMap.size === 0) return;
-
-    const entries = Array.from(tickerMarketMap.entries());
-    dispatch({ type: "PRICES_START", total: entries.length });
-
-    let loaded = 0;
-    const priceResults = await Promise.allSettled(
-      entries.map(async ([ticker, market]) => {
-        const result = await fetchStockPrice(ticker, market);
-        dispatch({ type: "PRICES_PROGRESS", loaded: ++loaded });
-        return result;
-      })
-    );
-
-    const newKrw: Record<string, number> = {};
-    const newUsd: Record<string, number> = {};
-    let latestUsdRate: number | null = null;
-    priceResults.forEach((result, idx) => {
-      const [ticker] = entries[idx];
-      if (result.status === "fulfilled") {
-        const { price_krw, price_usd, usd_rate } = result.value;
-        if (price_krw != null) newKrw[ticker] = price_krw;
-        if (price_usd != null) newUsd[ticker] = price_usd;
-        if (usd_rate != null) latestUsdRate = usd_rate;
-      }
-    });
-    dispatch({ type: "PRICES_DONE", krw: newKrw, usd: newUsd, usdRate: latestUsdRate });
   }
 
   useEffect(() => {

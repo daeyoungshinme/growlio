@@ -7,6 +7,16 @@ interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
+type QueueEntry = { resolve: (token: string) => void; reject: (err: unknown) => void };
+
+let isRefreshing = false;
+let failedQueue: QueueEntry[] = [];
+
+function processQueue(error: unknown, token: string | null = null) {
+  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token!)));
+  failedQueue = [];
+}
+
 export const api = axios.create({
   baseURL: "/api/v1",
   headers: { "Content-Type": "application/json" },
@@ -32,18 +42,36 @@ api.interceptors.response.use(
     const status = error.response?.status as number | undefined;
 
     if (status === 401 && config && !config._retry && !isAuthEndpoint) {
+      // 이미 refresh 중이면 큐에 등록하고 refresh 완료 후 재시도
+      if (isRefreshing) {
+        return new Promise<string>((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then((token) => {
+          config.headers["Authorization"] = `Bearer ${token}`;
+          return api.request(config);
+        });
+      }
+
       config._retry = true;
+      isRefreshing = true;
+
       try {
         const {
           data: { session },
         } = await supabase.auth.refreshSession();
         if (session?.access_token) {
           config.headers["Authorization"] = `Bearer ${session.access_token}`;
+          processQueue(null, session.access_token);
           return api.request(config);
         }
-      } catch {
-        // 리프레시 실패 시 세션 만료 이벤트 발행 → App.tsx에서 logout() 처리
+        processQueue(error);
+      } catch (refreshError) {
+        processQueue(refreshError);
+      } finally {
+        isRefreshing = false;
       }
+
+      // refresh 실패 또는 세션 없음 → 로그아웃 처리
       if (window.location.pathname !== "/login") {
         toast("세션이 만료되었습니다. 다시 로그인해 주세요.", "error");
         window.dispatchEvent(new CustomEvent("growlio:session-expired"));

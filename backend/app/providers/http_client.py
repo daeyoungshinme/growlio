@@ -37,32 +37,41 @@ async def broker_request(
         check_api_error: (data, path) → None. API 오류 시 예외 발생.
         token_expired_exc: 토큰 만료 시 발생할 예외 클래스.
     """
-    async with semaphore:
+    async with semaphore, httpx.AsyncClient(timeout=30.0, verify=ssl_verify) as client:
         for attempt in range(retries):
             try:
-                async with httpx.AsyncClient(timeout=30.0, verify=ssl_verify) as client:
-                    response = await client.request(
-                        method,
-                        f"{base_url}{path}",
-                        headers=headers,
-                        params=params,
-                        json=json,
-                    )
-                    if response.status_code >= 400:
-                        try:
-                            error_body = response.json()
-                            logger.error(f"{log_prefix}_http_error", status=response.status_code, body=error_body, path=path)
-                            if check_token_expired(error_body, response.status_code):
-                                raise token_expired_exc()
-                        except token_expired_exc:
-                            raise
-                        except Exception:
-                            logger.error(f"{log_prefix}_http_error", status=response.status_code, body=response.text, path=path)
-                        response.raise_for_status()
-                    data = response.json()
-                    check_api_error(data, path)
-                    await asyncio.sleep(0.05)
-                    return data
+                response = await client.request(
+                    method,
+                    f"{base_url}{path}",
+                    headers=headers,
+                    params=params,
+                    json=json,
+                )
+                if response.status_code >= 400:
+                    try:
+                        error_body = response.json()
+                        logger.error(
+                            f"{log_prefix}_http_error",
+                            status=response.status_code,
+                            body=error_body,
+                            path=path,
+                        )
+                        if check_token_expired(error_body, response.status_code):
+                            raise token_expired_exc()
+                    except token_expired_exc:
+                        raise
+                    except Exception:
+                        logger.error(
+                            f"{log_prefix}_http_error",
+                            status=response.status_code,
+                            body=response.text,
+                            path=path,
+                        )
+                    response.raise_for_status()
+                data = response.json()
+                check_api_error(data, path)
+                await asyncio.sleep(0.05)
+                return data
 
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import date
 from typing import Any
 
@@ -20,6 +21,7 @@ from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
 from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.utils.cache_keys import monthly_trend_key
 
 logger = structlog.get_logger()
 
@@ -50,7 +52,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
 
     if balance.positions:
         await db.execute(
-            sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711
+            sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711, E501
         )
         for p in balance.positions:
             db.add(Position(
@@ -62,7 +64,10 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
                 value_krw=p.value_krw,
                 currency=p.currency, usd_rate=p.usd_rate,
             ))
-    await db.commit()
+
+    # 현재 포지션 업데이트·스냅샷 생성·스냅샷 포지션 복사를 단일 트랜잭션으로 처리.
+    # 중간 실패 시 전체 롤백되어 부분 동기화 상태를 방지한다.
+    await db.flush()
 
     today = balance.extra.get("snapshot_date", date.today())
     source = balance.extra.get("source", account.data_source)
@@ -85,5 +90,14 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
         )
     await db.commit()
 
-    logger.info("account_synced", account_id=str(account.id), source=source, total_krw=balance.total_value_krw)
+    # sync 완료 후 월별 추이 캐시 무효화 — sync 직후에도 최신 데이터 표시
+    with contextlib.suppress(Exception):
+        await redis.delete(monthly_trend_key(account.user_id))
+
+    logger.info(
+        "account_synced",
+        account_id=str(account.id),
+        source=source,
+        total_krw=balance.total_value_krw,
+    )
     return snapshot

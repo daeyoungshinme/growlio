@@ -6,7 +6,6 @@ import {
   updateAccount,
   deleteAccount,
   syncAccount,
-  type AssetAccount,
 } from "../api/assets";
 import { extractErrorMessage } from "../utils/error";
 import StockPositionsModal from "../components/assets/StockPositionsModal";
@@ -27,6 +26,7 @@ import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalid
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
 import { useAssetManagementData } from "../hooks/useAssetManagementData";
+import { useAssetModals } from "../hooks/useAssetModals";
 import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
 
 const TABS = ASSET_MANAGEMENT_TABS;
@@ -35,17 +35,20 @@ type Tab = typeof TABS[number];
 
 export default function AssetManagementPage() {
   const [tab, setTab] = useState<Tab>("은행계좌");
-  const [showBankModal, setShowBankModal] = useState(false);
-  const [showStockModal, setShowStockModal] = useState(false);
-  const [showRealEstateModal, setShowRealEstateModal] = useState(false);
-  const [editingRealEstate, setEditingRealEstate] = useState<AssetAccount | null>(null);
-  const [editingBankAccount, setEditingBankAccount] = useState<AssetAccount | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
   const [syncingStockIds, setSyncingStockIds] = useState<Set<string>>(new Set());
-  const [positionsAccount, setPositionsAccount] = useState<{ id: string; name: string; dataSource: string } | null>(null);
-  const [txAccount, setTxAccount] = useState<{ id: string; name: string; depositKrw: number } | null>(null);
+
+  const {
+    showBankModal, setShowBankModal,
+    showStockModal, setShowStockModal,
+    showRealEstateModal, setShowRealEstateModal,
+    editingRealEstate, setEditingRealEstate,
+    editingBankAccount, setEditingBankAccount,
+    confirmDeleteId, setConfirmDeleteId,
+    positionsAccount, setPositionsAccount,
+    txAccount, setTxAccount,
+  } = useAssetModals();
 
   const queryClient = useQueryClient();
   const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);

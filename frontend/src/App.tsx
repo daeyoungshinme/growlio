@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, LazyExoticComponent, Suspense, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PageLoader from "./components/common/PageLoader";
@@ -25,10 +26,21 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
+function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.JSX.Element> }) {
+  return (
+    <ErrorBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Component />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 export default function App() {
   const isDark = useThemeStore((s) => s.isDark);
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const logout = useAuthStore((s) => s.logout);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
@@ -39,10 +51,13 @@ export default function App() {
   }, [checkAuth]);
 
   useEffect(() => {
-    const handleSessionExpired = () => logout();
+    const handleSessionExpired = () => {
+      queryClient.clear();
+      logout();
+    };
     window.addEventListener("growlio:session-expired", handleSessionExpired);
     return () => window.removeEventListener("growlio:session-expired", handleSessionExpired);
-  }, [logout]);
+  }, [logout, queryClient]);
 
   return (
     <>
@@ -63,11 +78,11 @@ export default function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><DashboardPage /></Suspense></ErrorBoundary>} />
-          <Route path="portfolio" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><PortfolioPage /></Suspense></ErrorBoundary>} />
-          <Route path="asset-management" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><AssetManagementPage /></Suspense></ErrorBoundary>} />
-          <Route path="invest-plan" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><InvestPlanPage /></Suspense></ErrorBoundary>} />
-          <Route path="settings" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><SettingsPage /></Suspense></ErrorBoundary>} />
+          <Route path="dashboard" element={<LazyRoute Component={DashboardPage} />} />
+          <Route path="portfolio" element={<LazyRoute Component={PortfolioPage} />} />
+          <Route path="asset-management" element={<LazyRoute Component={AssetManagementPage} />} />
+          <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
+          <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
           {/* 구 URL 리다이렉트 */}
           <Route path="assets" element={<Navigate to="/portfolio" replace />} />
           <Route path="trend" element={<Navigate to="/dashboard" replace />} />

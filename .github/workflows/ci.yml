@@ -67,6 +67,12 @@ jobs:
       - name: Typecheck (mypy)
         run: .venv/bin/mypy app/
 
+      - name: Migrate (alembic upgrade head)
+        run: .venv/bin/alembic upgrade head
+
+      - name: Rollback check (alembic downgrade -1)
+        run: .venv/bin/alembic downgrade -1
+
       - name: Test (pytest)
         run: .venv/bin/pytest -x -q --tb=short
 

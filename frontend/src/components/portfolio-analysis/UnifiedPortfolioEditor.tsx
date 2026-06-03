@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { AssetAccount, type StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "../../constants/validation";
 import { useStockSearch } from "../../hooks/useStockSearch";
+import PortfolioWeightChart from "./PortfolioWeightChart";
+import PortfolioAccountSelector from "./PortfolioAccountSelector";
 
 interface Props {
   initial?: Portfolio | null;
@@ -15,7 +16,6 @@ interface Props {
 }
 
 const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weight: 0 };
-const PIE_COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 
 export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave, onClose, saving }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -245,40 +245,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
             </div>
 
             {/* 비중 도넛차트 */}
-            {(() => {
-              const validItems = items.filter((i) => (Number(i.weight) || 0) > 0 && i.ticker);
-              if (!validItems.length) return null;
-              const usedWeight = validItems.reduce((s, i) => s + (Number(i.weight) || 0), 0);
-              const remaining = Math.max(0, 100 - usedWeight);
-              const maxWeight = Math.max(...validItems.map((i) => Number(i.weight) || 0));
-              const pieData = [
-                ...validItems.map((i) => ({ name: i.name || i.ticker, value: Number(i.weight) || 0 })),
-                ...(remaining > 0.1 ? [{ name: "미배분", value: remaining }] : []),
-              ];
-              return (
-                <div className="mt-3 flex flex-col items-center gap-2">
-                  {maxWeight > 50 && (
-                    <div className="w-full text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-lg px-3 py-1.5 text-center">
-                      단일 종목 비중 {maxWeight.toFixed(1)}% — 집중 투자 위험이 있습니다
-                    </div>
-                  )}
-                  <PieChart width={130} height={130}>
-                    <Pie data={pieData} cx={60} cy={60} innerRadius={38} outerRadius={58} paddingAngle={2} dataKey="value" startAngle={90} endAngle={-270}>
-                      {pieData.map((_, i) => {
-                        const isRemainder = remaining > 0.1 && i === pieData.length - 1;
-                        return <Cell key={i} fill={isRemainder ? "#9CA3AF" : PIE_COLORS[i % PIE_COLORS.length]} opacity={isRemainder ? 0.4 : 1} />;
-                      })}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value: unknown, name: string) =>
-                        typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name]
-                      }
-                      contentStyle={{ fontSize: 11, padding: "4px 8px", borderRadius: 6 }}
-                    />
-                  </PieChart>
-                </div>
-              );
-            })()}
+            <PortfolioWeightChart items={items} />
 
             <div className="flex flex-wrap gap-2 mt-3">
               <button
@@ -305,39 +272,13 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
           </div>
           {/* 분석 대상 계좌 — 주식 계좌가 2개 이상일 때만 표시 */}
           {accounts.length > 1 && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">분석 대상 계좌</label>
-                {!isAllSelected && (
-                  <button
-                    type="button"
-                    onClick={() => setUserOverrideIds(null)}
-                    className="text-xs text-blue-600 hover:underline"
-                  >
-                    전체 선택
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-x-3 sm:gap-x-5 gap-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-                {accounts.map((acc) => (
-                  <label key={acc.id} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedAccountIds.has(acc.id)}
-                      onChange={() => toggleAccount(acc.id)}
-                      className="rounded text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">{acc.name}</span>
-                    {acc.is_mock_mode && (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">(모의)</span>
-                    )}
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                {isAllSelected ? "모든 주식 계좌가 리밸런싱 분석에 포함됩니다." : `${selectedAccountIds.size}개 계좌만 분석에 포함됩니다.`}
-              </p>
-            </div>
+            <PortfolioAccountSelector
+              accounts={accounts}
+              selectedAccountIds={selectedAccountIds}
+              isAllSelected={isAllSelected}
+              onToggleAccount={toggleAccount}
+              onSelectAll={() => setUserOverrideIds(null)}
+            />
           )}
         </div>
 
