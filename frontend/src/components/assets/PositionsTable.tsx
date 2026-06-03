@@ -71,15 +71,24 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
 
     const update = () => {
       const rect = anchorEl.getBoundingClientRect();
-      const vh = window.visualViewport?.height ?? window.innerHeight;
+      const vv = window.visualViewport;
+      const vh = vv?.height ?? window.innerHeight;
+      const vvOffsetTop = vv?.offsetTop ?? 0;
+      const vvOffsetLeft = vv?.offsetLeft ?? 0;
+      const layoutH = window.innerHeight;
+
+      // input이 비주얼 뷰포트 밖이면 드롭다운 숨김
+      if (rect.top >= vh || rect.bottom <= 0) { setPos(null); return; }
+
       const spaceBelow = vh - rect.bottom;
       const spaceAbove = rect.top - 8;
 
       if (spaceBelow < 200) {
         const maxH = Math.min(MAX_DROPDOWN_H, Math.max(0, spaceAbove));
-        setPos({ bottom: vh - rect.top + 4, maxHeight: maxH, left: rect.left, width: rect.width });
+        // fixed bottom은 레이아웃 뷰포트 하단 기준 → innerHeight 사용 (adjustPan 대응)
+        setPos({ bottom: layoutH - rect.top - vvOffsetTop + 4, maxHeight: maxH, left: rect.left + vvOffsetLeft, width: rect.width });
       } else {
-        setPos({ top: rect.bottom + 4, maxHeight: Math.min(MAX_DROPDOWN_H, spaceBelow - 8), left: rect.left, width: rect.width });
+        setPos({ top: rect.bottom + vvOffsetTop + 4, maxHeight: Math.min(MAX_DROPDOWN_H, spaceBelow - 8), left: rect.left + vvOffsetLeft, width: rect.width });
       }
     };
 
@@ -239,7 +248,12 @@ export function PositionsTable({
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                     value={row.name}
                     onChange={(e) => handleNameChange(i, e.target.value)}
-                    onFocus={(e) => { setActiveInputEl(e.currentTarget); if (row.name && suggestions.length) setSuggestIdx(i); }}
+                    onFocus={(e) => {
+                      setActiveInputEl(e.currentTarget);
+                      if (row.name && suggestions.length) setSuggestIdx(i);
+                      const el = e.currentTarget;
+                      setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
+                    }}
                     onBlur={(e) => { setActiveInputEl(null); handleNameBlur(i); void e; }}
                     placeholder="종목명 또는 코드 검색..."
                     autoComplete="off"
