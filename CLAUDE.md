@@ -58,7 +58,7 @@ make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
 make format           # ruff --fix (backend) + prettier --write (frontend)
-make db-reset         # docker compose down -v + up + migrate (데이터 초기화)
+make db-reset         # docker compose down -v + up + migrate (**데이터 전체 삭제** — 개발 환경 전용)
 make build-android-debug    # npm build + cap sync + gradlew assembleDebug
 make build-android-release  # npm build + cap sync + gradlew assembleRelease
 # Android 빌드 전제: JDK 17+, Android Studio (SDK 설치 포함) 필요

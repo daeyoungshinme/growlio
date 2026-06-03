@@ -84,6 +84,15 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 새 커스텀 훅은 이 디렉토리에 추가.
 
+**기타 상수 (`src/constants/`):**
+- `defaults.ts` — 백테스트 기본 날짜 상수 (`BACKTEST_DEFAULT_START_DATE` 등)
+- `tabs.ts` — 자산관리·포트폴리오 탭 배열 + 타입 (`ASSET_MANAGEMENT_TABS`, `PORTFOLIO_TABS`)
+- `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
+- `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
+- `index.ts` — 상수 re-export
+
+**타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
+
 **테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트만 존재: `format.test.ts`, `error.test.ts`, `colors.test.ts`.
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
