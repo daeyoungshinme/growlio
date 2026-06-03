@@ -66,8 +66,8 @@ export default function BankAccountCard({ account, usdRate, onDelete, onEditModa
               <button
                 onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
                 title="계좌명 수정"
-                className="p-0.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
-                <Pencil size={10} />
+                className="p-2 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
+                <Pencil size={16} />
               </button>
             </>
           )}

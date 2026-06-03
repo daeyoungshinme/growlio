@@ -68,12 +68,12 @@ export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-3 lg:gap-4">
       <div className="flex flex-row gap-3 lg:gap-6">
-        {/* 좌측: 자산 총액 + 누적 수익률 + 3개 미니 지표 */}
+        {/* 좌측: 자산 총액 + 누적 수익률 + 보조 지표 */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">
           <div className="flex flex-col gap-4">
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-              <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 dark:text-gray-50 mt-1">
+              <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-1">
                 {fmtKrw(Math.floor(data.total_assets_krw))}
               </p>
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
@@ -129,12 +129,12 @@ export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) 
             </div>
           </div>
         </div>
-        {/* 모바일: 컴팩트 도넛 차트 (우측 고정) */}
-        <div className="lg:hidden w-24 sm:w-32 shrink-0">
+        {/* 모바일: 확대된 compact 도넛 차트 (우측 고정) */}
+        <div className="lg:hidden w-36 sm:w-44 shrink-0">
           {allocationChartData.length > 0 ? (
-            <AssetAllocationChart data={allocationChartData} compact />
+            <AssetAllocationChart data={allocationChartData} size="compact" />
           ) : (
-            <div className="flex items-center justify-center h-32 text-gray-300 dark:text-gray-600 text-xs text-center">
+            <div className="flex items-center justify-center h-44 text-gray-300 dark:text-gray-600 text-xs text-center">
               자산<br />없음
             </div>
           )}

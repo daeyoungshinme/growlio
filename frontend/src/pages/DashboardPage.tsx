@@ -53,13 +53,13 @@ export default function DashboardPage() {
 
   if (accounts.length === 0) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center max-w-md w-full">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center max-w-xs sm:max-w-md w-full">
         <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
         <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
           등록된 자산이 없습니다
         </h2>
         <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-          자산관리에서 계좌를 등록하면<br />대시보드에서 자산 현황을 확인할 수 있습니다.
+          자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
         </p>
         <button
           onClick={() => navigate("/asset-management")}

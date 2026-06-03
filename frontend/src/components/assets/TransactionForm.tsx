@@ -120,7 +120,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   };
 
   const isPending = editingTx ? updateMut.isPending : createMut.isPending;
-  const inputCls = "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500";
   const labelCls = "text-sm font-medium text-gray-700 dark:text-gray-300";
 
   return (
@@ -232,7 +232,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                       onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowTickerSuggestions(false), 150)}
                       placeholder="종목명 또는 코드 검색"
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                     {tickerSearchLoading && (
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">검색 중...</span>

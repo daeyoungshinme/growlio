@@ -151,7 +151,7 @@ export default function PortfolioPage() {
 
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
-        <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
+        <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600">
           {fmtKrwPrice(data.total_stock_krw)}
         </p>
@@ -166,7 +166,7 @@ export default function PortfolioPage() {
       <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none">
         {TABS.map((t) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`px-3 sm:px-5 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+            className={`px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
               tab === t ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
             }`}>
             {t}

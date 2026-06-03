@@ -20,7 +20,7 @@ export default function BottomNav() {
           key={to}
           to={to}
           className={({ isActive }) =>
-            `flex flex-col items-center justify-center gap-0.5 px-2 py-3 sm:px-4 min-w-0 flex-1 text-[10px] sm:text-xs font-medium transition-colors ${
+            `flex flex-col items-center justify-center gap-0.5 px-2 py-3 sm:px-4 min-w-0 flex-1 text-xs font-medium transition-colors ${
               isActive
                 ? "text-blue-600 dark:text-blue-400 border-t-2 border-blue-600 dark:border-blue-400 -mt-px"
                 : "text-gray-500 dark:text-gray-400 border-t-2 border-transparent -mt-px"

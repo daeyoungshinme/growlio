@@ -19,7 +19,7 @@ export default function ConfirmModal({
 }: Props) {
   return (
     <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4"
       onClick={onCancel}
     >
       <div

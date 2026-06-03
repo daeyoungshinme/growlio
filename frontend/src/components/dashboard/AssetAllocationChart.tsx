@@ -5,21 +5,25 @@ import { chartTooltipStyle } from "../../utils/chart";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
 
+const CONFIG = {
+  compact: { height: 180, innerRadius: 38, outerRadius: 70 },
+  mobile:  { height: 220, innerRadius: 60, outerRadius: 100 },
+  full:    { height: 400, innerRadius: 100, outerRadius: 158 },
+};
+
 interface Props {
   data: { name: string; value: number; pct: number }[];
-  compact?: boolean;
+  size?: "compact" | "mobile" | "full";
 }
 
-const AssetAllocationChart = memo(function AssetAllocationChart({ data, compact = false }: Props) {
+const AssetAllocationChart = memo(function AssetAllocationChart({ data, size = "full" }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  const height = compact ? 130 : 400;
-  const innerRadius = compact ? 20 : 100;
-  const outerRadius = compact ? 44 : 158;
+  const { height, innerRadius, outerRadius } = CONFIG[size];
 
   return (
     <div className="flex flex-col">
       <ResponsiveContainer width="100%" height={height}>
-        <PieChart margin={compact ? { top: 0, right: 0, bottom: 0, left: 0 } : undefined}>
+        <PieChart margin={size === "full" ? undefined : { top: 0, right: 0, bottom: 0, left: 0 }}>
           <Pie
             data={data}
             cx="50%"
@@ -39,18 +43,33 @@ const AssetAllocationChart = memo(function AssetAllocationChart({ data, compact 
               `${(value / 1e4).toFixed(0)}만원 (${data.find((d) => d.value === value)?.pct.toFixed(1)}%)`
             }
           />
-          {!compact && <Legend />}
+          {size === "full" && <Legend />}
         </PieChart>
       </ResponsiveContainer>
-      {compact && (
+      {size === "compact" && (
         <div className="flex flex-col gap-0.5 mt-1">
           {data.map((item, i) => (
             <div key={i} className="flex items-center gap-1">
               <span
-                className="inline-block w-2 h-2 rounded-sm shrink-0"
+                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                 style={{ backgroundColor: COLORS[i % COLORS.length] }}
               />
-              <span className="text-[10px] text-gray-600 dark:text-gray-400 truncate leading-tight">
+              <span className="text-xs text-gray-600 dark:text-gray-400 truncate leading-tight">
+                {item.name} {item.pct.toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {size === "mobile" && (
+        <div className="flex flex-row flex-wrap justify-center gap-x-3 gap-y-1 mt-2">
+          {data.map((item, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-400">
                 {item.name} {item.pct.toFixed(0)}%
               </span>
             </div>

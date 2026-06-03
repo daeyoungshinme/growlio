@@ -268,22 +268,22 @@ export default function StockPositionsModal({
       )}
 
       {/* 하단 버튼 */}
-      <div className="flex-shrink-0 flex items-center justify-between px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
+      <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
         <button
           onClick={handleSyncAll}
           disabled={syncing || rows.every((r) => !r.ticker)}
-          className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors"
+          className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors w-full sm:w-auto"
         >
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
           전체 현재가 갱신
         </button>
-        <div className="flex gap-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-white dark:hover:bg-gray-700">닫기</button>
+        <div className="flex gap-3 sm:justify-end">
+          <button onClick={onClose} className="flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-white dark:hover:bg-gray-700">닫기</button>
           {!readonly && (
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
+              className="flex-1 sm:flex-none px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 font-medium"
             >
               {saving ? "저장 중..." : "저장"}
             </button>
