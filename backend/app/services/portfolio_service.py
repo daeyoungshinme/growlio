@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import uuid
+from collections import defaultdict
+from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
@@ -263,3 +265,92 @@ def _empty_overview() -> dict:
         "all_positions": [],
         "accounts": [],
     }
+
+
+_EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
+    AssetType.BANK_ACCOUNT: "통장잔고",
+    AssetType.DEPOSIT: "예금/적금",
+    AssetType.STOCK_KIS: "주식",
+    AssetType.STOCK_KIWOOM: "주식",
+    AssetType.STOCK_OTHER: "주식",
+    AssetType.CASH_OTHER: "예수금",
+    AssetType.CASH_STOCK: "예수금",
+    AssetType.OTHER: "기타자산",
+    AssetType.REAL_ESTATE: "부동산",
+}
+
+
+async def get_allocation_history(
+    user_id: uuid.UUID, db: AsyncSession, months: int = 12
+) -> list[dict]:
+    """월별 자산 유형별 배분 이력 조회.
+
+    각 월의 마지막 스냅샷 기준으로 asset_type별 금액/비중을 반환한다.
+    is_active = TRUE 필터 필수 — 비활성 계좌 스냅샷 합산 방지.
+    """
+    today = date.today()
+    # months=12이면 현재 월 포함 12개월 (오늘 기준 11개월 전 1일)
+    start_month = today.month - (months - 1)
+    start_year = today.year
+    while start_month <= 0:
+        start_month += 12
+        start_year -= 1
+    start_date = date(start_year, start_month, 1)
+
+    result = await db.execute(
+        text("""
+            WITH ranked AS (
+                SELECT
+                    date_trunc('month', s.snapshot_date)::date AS month,
+                    a.asset_type,
+                    s.amount_krw,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY s.account_id, date_trunc('month', s.snapshot_date)
+                        ORDER BY s.snapshot_date DESC
+                    ) AS rn
+                FROM asset_snapshots s
+                JOIN asset_accounts a ON a.id = s.account_id
+                WHERE s.user_id = :uid
+                    AND a.is_active = TRUE
+                    AND a.include_in_total = TRUE
+                    AND s.snapshot_date >= :start_date
+            )
+            SELECT month, asset_type, SUM(amount_krw) AS amount_krw
+            FROM ranked
+            WHERE rn = 1
+            GROUP BY month, asset_type
+            ORDER BY month, asset_type
+        """),
+        {"uid": str(user_id), "start_date": start_date},
+    )
+    rows = result.all()
+
+    # 월별로 그룹화
+    monthly: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    for row in rows:
+        month_str = str(row.month)
+        monthly[month_str][row.asset_type] += float(row.amount_krw)
+
+    output = []
+    for month_str in sorted(monthly.keys()):
+        type_amounts = monthly[month_str]
+        total_krw = sum(type_amounts.values())
+        if total_krw <= 0:
+            continue
+
+        allocations = []
+        for asset_type, amount_krw in sorted(type_amounts.items()):
+            allocations.append({
+                "asset_type": asset_type,
+                "label": _EXTENDED_ASSET_TYPE_LABELS.get(asset_type, asset_type),
+                "amount_krw": round(amount_krw, 2),
+                "weight_pct": round(amount_krw / total_krw * 100, 2),
+            })
+
+        output.append({
+            "month": month_str,
+            "total_krw": round(total_krw, 2),
+            "allocations": allocations,
+        })
+
+    return output

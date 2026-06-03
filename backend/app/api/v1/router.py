@@ -5,6 +5,7 @@ from app.api.v1 import (
     assets,
     auth,
     backtest,
+    dart,
     dashboard,
     dividends,
     invest,
@@ -35,3 +36,4 @@ router.include_router(backtest.router)
 router.include_router(rebalancing.router)
 router.include_router(alerts.router)
 router.include_router(tax.router)
+router.include_router(dart.router)

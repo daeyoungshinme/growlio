@@ -4,6 +4,22 @@ import type { PortfolioOverview } from "../types";
 export const fetchPortfolioOverview = () =>
   api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
+export interface AllocationTypeItem {
+  asset_type: string;
+  label: string;
+  amount_krw: number;
+  weight_pct: number;
+}
+
+export interface AllocationHistoryPoint {
+  month: string;
+  total_krw: number;
+  allocations: AllocationTypeItem[];
+}
+
+export const fetchAllocationHistory = (months: number) =>
+  api.get<AllocationHistoryPoint[]>("/portfolio/allocation-history", { params: { months } }).then((r) => r.data);
+
 export interface PortfolioItem {
   ticker: string;
   name: string;    // 빈 문자열 가능 (백테스트 전용 항목 등)

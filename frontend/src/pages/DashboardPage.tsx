@@ -8,6 +8,8 @@ import DividendSection from "../components/dashboard/DividendSection";
 import MonthlyTrendChart from "../components/trend/MonthlyTrendChart";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
 import AssetAllocationChart from "../components/dashboard/AssetAllocationChart";
+import AllocationHistoryChart from "../components/dashboard/AllocationHistoryChart";
+import DisclosureFeedCard from "../components/dashboard/DisclosureFeedCard";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import { ASSET_TYPE_LABELS } from "../constants";
@@ -376,6 +378,12 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* Row 4: 자산 배분 추이 */}
+      <AllocationHistoryChart />
+
+      {/* Row 5: 보유 종목 DART 공시 피드 */}
+      <DisclosureFeedCard />
     </div>
   );
 }

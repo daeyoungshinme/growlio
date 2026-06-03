@@ -157,7 +157,9 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
 
             # DPS 합리성 검증: 주당 배당금이 100만원 초과이면 합계/총액 행으로 판단하고 스킵
             if dps > 1_000_000:
-                logger.warning("dart_dps_abnormal_skipped", ticker=ticker, dps=dps, se=item.get("se"))
+                logger.warning(
+                    "dart_dps_abnormal_skipped", ticker=ticker, dps=dps, se=item.get("se")
+                )
                 continue
 
             if yld > 0:
@@ -175,3 +177,90 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
             continue
 
     return None
+
+
+# ── 공시 목록 조회 ─────────────────────────────────────────────
+_DART_DISCLOSURE_SEM = asyncio.Semaphore(5)
+
+
+async def fetch_disclosures_for_tickers(
+    tickers: list[str],
+    api_key: str,
+    days: int = 30,
+) -> list[dict]:
+    """보유 국내 종목의 DART 공시 목록 조회.
+
+    tickers: KOSPI/KOSDAQ 6자리 종목코드 목록
+    returns: rcept_dt 내림차순 정렬된 공시 항목 목록
+    """
+    if not api_key or not tickers:
+        return []
+
+    from datetime import timedelta
+
+    corp_map = await _ensure_corp_code_map(api_key)
+
+    bgn_de = (datetime.utcnow() - timedelta(days=days)).strftime("%Y%m%d")
+    end_de = datetime.utcnow().strftime("%Y%m%d")
+
+    ticker_corp_pairs: list[tuple[str, str]] = []
+    for ticker in tickers:
+        corp_code = corp_map.get(ticker.zfill(6))
+        if corp_code:
+            ticker_corp_pairs.append((ticker, corp_code))
+
+    if not ticker_corp_pairs:
+        return []
+
+    async def _fetch_one(ticker: str, corp_code: str) -> list[dict]:
+        async with _DART_DISCLOSURE_SEM:
+            try:
+                async with httpx.AsyncClient(timeout=15.0) as client:
+                    resp = await client.get(
+                        f"{DART_BASE}/list.json",
+                        params={
+                            "crtfc_key": api_key,
+                            "corp_code": corp_code,
+                            "bgn_de": bgn_de,
+                            "end_de": end_de,
+                            "page_count": 20,
+                            "sort": "date",
+                            "sort_mth": "desc",
+                        },
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+            except Exception as e:
+                logger.warning("dart_disclosures_fetch_failed", ticker=ticker, error=str(e))
+                return []
+
+            if data.get("status") != "000":
+                return []
+
+            items = []
+            for item in data.get("list", []):
+                rcept_no = item.get("rcept_no", "")
+                items.append({
+                    "rcept_no": rcept_no,
+                    "corp_name": item.get("corp_name", ""),
+                    "ticker": ticker,
+                    "report_nm": item.get("report_nm", ""),
+                    "rcept_dt": item.get("rcept_dt", ""),
+                    "rm": item.get("rm", ""),
+                    "dart_url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
+                })
+            return items
+
+    tasks = [_fetch_one(ticker, corp_code) for ticker, corp_code in ticker_corp_pairs]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    all_items: list[dict] = []
+    for r in results:
+        if isinstance(r, list):
+            all_items.extend(r)
+
+    all_items.sort(key=lambda x: x.get("rcept_dt", ""), reverse=True)
+    logger.info(
+        "dart_disclosures_fetched", ticker_count=len(ticker_corp_pairs), total=len(all_items)
+    )
+    return all_items

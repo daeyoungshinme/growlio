@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,9 +16,19 @@ from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User
 from app.services.credential_service import get_kis_user_credentials
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+
+
+@router.get("/allocation-history")
+async def portfolio_allocation_history(
+    months: int = Query(default=12, ge=3, le=36),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """월별 자산 유형별 배분 이력 — 최근 N개월."""
+    return await get_allocation_history(current_user.id, db, months=months)
 
 
 @router.get("/overview")
