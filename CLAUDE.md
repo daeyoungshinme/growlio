@@ -34,11 +34,11 @@ cp frontend/.env.example frontend/.env  # 값 채우기 (frontend/CLAUDE.md Envi
 make migrate
 
 # 5. 개발 서버 실행
-# Windows (Git Bash)
-bash dev.sh         # 또는: make dev (백엔드 + 프론트엔드 동시 실행)
-# macOS / Linux — 터미널 2개에서 각각 실행:
-make dev-backend    # 터미널 1 (localhost:8000)
-make dev-frontend   # 터미널 2 (localhost:5173)
+# macOS / Linux — 터미널 2개:
+make dev-backend    # 터미널 1 → localhost:8000
+make dev-frontend   # 터미널 2 → localhost:5173
+# Windows Git Bash — 터미널 1개:
+bash dev.sh         # (또는 make dev)
 ```
 
 ## Makefile 단축 명령

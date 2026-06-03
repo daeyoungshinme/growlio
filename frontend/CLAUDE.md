@@ -75,7 +75,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **데이터 흐름:**
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
-  └── api/{alerts,assets,backtest,dashboard,invest,portfolios,rebalancing,transactions}.ts
+  └── api/{alerts,assets,backtest,dashboard,dart,invest,portfolios,rebalancing,tax,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
