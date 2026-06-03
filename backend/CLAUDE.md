@@ -4,6 +4,7 @@
 
 ### 설치
 ```bash
+# Python 3.11+ required
 # 가상환경 생성 (최초 1회)
 cd backend && uv venv
 
@@ -99,6 +100,7 @@ API Request
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
         ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
+        ├── dart.py           # DART OpenAPI 공시 라우터 (dart_service.py 연동)
         ├── dividends.py      # 배당금 요약 + 예상 배당금
         ├── invest.py         # DCA 분석
         ├── open_banking.py   # 오픈뱅킹 계좌 연결

@@ -17,6 +17,9 @@ cd frontend && npm run dev
 ```bash
 # 프로덕션 빌드 (tsc -b && vite build)
 cd frontend && npm run build
+
+# 타입 체크만 (빌드 산출물 없음)
+cd frontend && npx tsc --noEmit
 ```
 
 ### 린트 & 테스트
@@ -63,7 +66,7 @@ make build-android-release         # APK Release 빌드
 > 구 URL 리다이렉트: `/assets` → `/portfolio`
 
 **컴포넌트 디렉토리 (`src/components/`):**
-assets, backtest, common, dashboard, invest, layout, portfolio-analysis, portfolios, rebalancing, transactions, trend
+assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, trend
 
 `components/common/` 주요 파일: `ConfirmModal.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `TreemapCell.tsx`
 
@@ -81,6 +84,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
+- `useAssetManagementData.ts` — 자산관리 페이지 전용 데이터 훅 (accounts + portfolio overview + transactions 통합)
+- `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
 
 새 커스텀 훅은 이 디렉토리에 추가.
 

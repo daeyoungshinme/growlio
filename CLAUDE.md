@@ -74,7 +74,7 @@ growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
 │   └── android/      # Capacitor Android 프로젝트
-├── nginx/            # nginx 리버스 프록시 (포트 80 → frontend 정적파일 + /api/* → backend:8000)
+├── nginx/            # nginx 리버스 프록시 (프로덕션/Docker 전용 — 로컬 개발에서는 미사용; Vite dev server가 /api/* 프록시 처리)
 ├── .github/          # GitHub Actions (CI: lint/test/build, Android APK)
 ├── render.yaml       # Render 백엔드 배포 설정
 ├── docker-compose.yml
