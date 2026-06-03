@@ -71,12 +71,16 @@ target-version = "py311"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "ASYNC", "PT"]
 ignore = [
     "E712",   # SQLAlchemy boolean 비교 (Model.is_active == True) 허용
     "B008",   # FastAPI Depends() 호출 허용
     "SIM108", # 삼항 연산자 강제 변환 비활성화
+    "PT001",  # pytest fixture 괄호 스타일 유연하게
 ]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 "alembic/*" = ["F401", "F811"]

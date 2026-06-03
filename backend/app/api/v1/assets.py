@@ -4,9 +4,10 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
-from sqlalchemy import delete as sql_delete, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -29,9 +30,9 @@ from app.schemas.asset import (
     AssetSnapshotResponse,
 )
 from app.services.asset_service import sync_account as _sync_account_service
-from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
+from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import dividend_ticker_summary_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.redis_lock import redis_lock
@@ -54,6 +55,16 @@ class ManualPosition(BaseModel):
     avg_price_usd: float | None = None   # 원본 달러 입력값 (표시용)
     usd_rate: float | None = None        # 평단가 환산에 사용한 환율
     current_price: float | None = None   # 항상 KRW
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("종목명은 빈 값일 수 없습니다")
+        if len(stripped) > 200:
+            raise ValueError("종목명은 200자 이하여야 합니다")
+        return stripped
 
     @field_validator("ticker")
     @classmethod
@@ -212,8 +223,8 @@ _MAX_SNAPSHOTS_LIMIT = 365
 async def get_snapshots(
     start_date: date | None = None,
     end_date: date | None = None,
-    limit: int = _MAX_SNAPSHOTS_LIMIT,
-    skip: int = 0,
+    limit: int = Query(default=_MAX_SNAPSHOTS_LIMIT, ge=1, le=_MAX_SNAPSHOTS_LIMIT),
+    skip: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

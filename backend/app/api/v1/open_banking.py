@@ -67,7 +67,14 @@ async def open_banking_callback(
         logger.warning("ob_callback_user_not_found", user_id=user_id)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 
-    token_data = await exchange_code_for_token(code)
+    try:
+        token_data = await exchange_code_for_token(code)
+    except Exception as e:
+        logger.error("ob_token_exchange_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="금융결제원 토큰 교환에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        ) from e
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
     user_seq_no = token_data.get("user_seq_no")

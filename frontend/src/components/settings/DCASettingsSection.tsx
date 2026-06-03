@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { api } from "../../api/client";
 import { fetchAccounts } from "../../api/assets";
 import { fetchPortfolios } from "../../api/portfolios";
 import { updateAutoDca, type SettingsData } from "../../api/settings";
@@ -15,13 +14,13 @@ interface Props {
 }
 
 export function DCASettingsSection({ current, onSettingsChange }: Props) {
-  const [dcaForm, setDcaForm] = useState({
-    enabled: false,
-    day: "1",
-    amount: "",
-    portfolio_id: "",
-    account_id: "",
-  });
+  const [dcaForm, setDcaForm] = useState(() => ({
+    enabled: current?.auto_dca_enabled ?? false,
+    day: current?.auto_dca_day ? String(current.auto_dca_day) : "1",
+    amount: current?.auto_dca_amount ? String(current.auto_dca_amount) : "",
+    portfolio_id: current?.auto_dca_portfolio_id ?? "",
+    account_id: current?.auto_dca_account_id ?? "",
+  }));
 
   const { data: portfolios = [] } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -37,16 +36,6 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
 
   const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" && a.is_active);
 
-  useEffect(() => {
-    if (!current) return;
-    setDcaForm({
-      enabled: current.auto_dca_enabled,
-      day: current.auto_dca_day ? String(current.auto_dca_day) : "1",
-      amount: current.auto_dca_amount ? String(current.auto_dca_amount) : "",
-      portfolio_id: current.auto_dca_portfolio_id ?? "",
-      account_id: current.auto_dca_account_id ?? "",
-    });
-  }, [current]);
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -157,5 +146,3 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
   );
 }
 
-// Needed for DCA section to call api directly for settings refresh
-export { api };

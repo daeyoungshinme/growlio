@@ -1,7 +1,21 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import ARRAY, Boolean, Date, DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import (
+    ARRAY,
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,7 +88,13 @@ class AssetAccount(Base):
         viewonly=False,
     )
 
-    __table_args__ = (Index("idx_asset_accounts_user_id", "user_id"),)
+    __table_args__ = (
+        Index("idx_asset_accounts_user_id", "user_id"),
+        Index("idx_asset_accounts_user", "user_id"),
+        Index("idx_asset_accounts_user_active", "user_id", "is_active"),
+        Index("idx_asset_accounts_user_active_include", "user_id", "is_active", "include_in_total"),
+        Index("idx_asset_accounts_user_active_type", "user_id", "is_active", "asset_type"),
+    )
 
 
 class AssetSnapshot(Base):
@@ -112,6 +132,18 @@ class AssetSnapshot(Base):
     __table_args__ = (
         UniqueConstraint("account_id", "snapshot_date", name="uq_snapshot_account_date"),
         Index("idx_snapshots_user_date", "user_id", "snapshot_date"),
+        Index("idx_snapshots_user_id", "user_id"),
+        Index("idx_asset_snapshots_account_date", "account_id", "snapshot_date"),
+        Index(
+            "idx_snapshots_account_date_desc",
+            "account_id", "snapshot_date",
+            postgresql_ops={"snapshot_date": "DESC"},
+        ),
+        Index(
+            "idx_asset_snapshots_user_account_date",
+            "user_id", "account_id", "snapshot_date",
+            postgresql_ops={"snapshot_date": "DESC"},
+        ),
     )
 
 
@@ -140,6 +172,16 @@ class Transaction(Base):
     __table_args__ = (
         Index("idx_transactions_user_date", "user_id", "transaction_date"),
         Index("idx_transactions_account", "account_id"),
+        Index("idx_transactions_user_type", "user_id", "transaction_type"),
+        Index("idx_transactions_user_type_date", "user_id", "transaction_type", "transaction_date"),
+        Index(
+            "uq_div_account_ticker_date",
+            "account_id", "ticker", "transaction_date",
+            unique=True,
+            postgresql_where=text(
+                "transaction_type = 'DIVIDEND' AND account_id IS NOT NULL AND ticker IS NOT NULL"
+            ),
+        ),
     )
 
 
@@ -275,5 +317,11 @@ class Position(Base):
             "idx_positions_snapshot_notnull",
             "snapshot_id",
             postgresql_where=text("snapshot_id IS NOT NULL"),
+        ),
+        Index("idx_positions_snapshot_id", "snapshot_id"),
+        Index(
+            "idx_positions_account_no_snapshot",
+            "account_id",
+            postgresql_where=text("snapshot_id IS NULL"),
         ),
     )

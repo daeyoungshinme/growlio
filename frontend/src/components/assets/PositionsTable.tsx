@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import type { StockSuggestion } from "../../api/assets";
@@ -67,7 +67,7 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
   } | null>(null);
 
   useEffect(() => {
-    if (!anchorEl) { setPos(null); return; }
+    if (!anchorEl) return;
 
     const update = () => {
       const rect = anchorEl.getBoundingClientRect();
@@ -92,7 +92,7 @@ function SuggestionDropdown({ i, suggestions, anchorEl, onSelect }: {
     };
   }, [anchorEl]);
 
-  if (!pos) return null;
+  if (!anchorEl || !pos) return null;
 
   return createPortal(
     <div
@@ -210,7 +210,7 @@ export function PositionsTable({
   setSuggestIdx, handleNameChange, handleNameBlur, handleSelectSuggestion,
   setRow, removeRow, addRow, handleAvgPriceUsd, handleCurrentPriceUsd,
 }: Props) {
-  const nameInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
+  const [activeInputEl, setActiveInputEl] = useState<HTMLInputElement | null>(null);
 
   const handleMarketChange = (i: number, newMarket: string, currentMarket: string) => {
     const wasOverseas = isOverseasMarket(currentMarket);
@@ -236,15 +236,11 @@ export function PositionsTable({
               <div key={i} className="py-4 space-y-3">
                 <div className="relative">
                   <input
-                    ref={(el) => {
-                      if (el) nameInputRefs.current.set(i, el);
-                      else nameInputRefs.current.delete(i);
-                    }}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                     value={row.name}
                     onChange={(e) => handleNameChange(i, e.target.value)}
-                    onFocus={() => { if (row.name && suggestions.length) setSuggestIdx(i); }}
-                    onBlur={() => handleNameBlur(i)}
+                    onFocus={(e) => { setActiveInputEl(e.currentTarget); if (row.name && suggestions.length) setSuggestIdx(i); }}
+                    onBlur={(e) => { setActiveInputEl(null); handleNameBlur(i); void e; }}
                     placeholder="종목명 또는 코드 검색..."
                     autoComplete="off"
                   />
@@ -257,7 +253,7 @@ export function PositionsTable({
                     <SuggestionDropdown
                       i={i}
                       suggestions={suggestions}
-                      anchorEl={nameInputRefs.current.get(i) ?? null}
+                      anchorEl={activeInputEl}
                       onSelect={handleSelectSuggestion}
                     />
                   )}

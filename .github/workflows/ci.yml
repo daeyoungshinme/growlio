@@ -68,7 +68,7 @@ jobs:
         run: .venv/bin/mypy app/
 
       - name: Test (pytest)
-        run: .venv/bin/pytest -x -q
+        run: .venv/bin/pytest -x -q --tb=short
 
       - name: Security scan (bandit)
         run: .venv/bin/bandit -r app/ -l -q

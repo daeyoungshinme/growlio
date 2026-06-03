@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
@@ -55,7 +55,7 @@ export default function InvestPlanPage() {
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [autoOpenTriggered, setAutoOpenTriggered] = useState(false);
+  const autoOpenTriggeredRef = useRef(false);
   const [form, setForm] = useState<GoalForm>({
     monthly_deposit_amount: "",
     goal_annual_return_pct: "",
@@ -66,7 +66,7 @@ export default function InvestPlanPage() {
     retirement_target_year: "",
   });
 
-  const openEdit = async () => {
+  const openEdit = useCallback(async () => {
     const s = data?.settings;
     let annual_deposit_goal = "";
     let retirement_target_year = "";
@@ -85,21 +85,21 @@ export default function InvestPlanPage() {
       retirement_target_year,
     });
     setEditing(true);
-  };
+  }, [data]);
 
   useEffect(() => {
-    if (location.state?.openEdit && !autoOpenTriggered && !isLoading && data) {
-      setAutoOpenTriggered(true);
-      openEdit();
+    if (location.state?.openEdit && !autoOpenTriggeredRef.current && !isLoading && data) {
+      autoOpenTriggeredRef.current = true;
+      void openEdit();
     }
-  }, [location.state, isLoading, data]);
+  }, [location.state, isLoading, data, openEdit]);
 
   useEffect(() => {
-    if (!isLoading && !autoOpenTriggered && data && !data.is_configured) {
-      setAutoOpenTriggered(true);
-      openEdit();
+    if (!isLoading && !autoOpenTriggeredRef.current && data && !data.is_configured) {
+      autoOpenTriggeredRef.current = true;
+      void openEdit();
     }
-  }, [isLoading, data, autoOpenTriggered]);
+  }, [isLoading, data, openEdit]);
 
   const saveSettings = async () => {
     setSaving(true);

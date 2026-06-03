@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -66,10 +66,13 @@ export default function PortfolioAnalysisTab() {
     queryFn: fetchPortfolios,
   });
 
-  const [sortedPortfolios, setSortedPortfolios] = useState<Portfolio[]>([]);
-  useEffect(() => {
-    setSortedPortfolios(portfolios);
-  }, [portfolios]);
+  const [localOrder, setLocalOrder] = useState<string[]>([]);
+
+  const sortedPortfolios = useMemo(() => {
+    if (!localOrder.length || localOrder.length !== portfolios.length) return portfolios;
+    const orderMap = new Map(localOrder.map((id, i) => [id, i]));
+    return [...portfolios].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+  }, [portfolios, localOrder]);
 
   const { data: accounts = [] } = useQuery({
     queryKey: QUERY_KEYS.accounts,
@@ -104,14 +107,14 @@ export default function PortfolioAnalysisTab() {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const snapshot = sortedPortfolios;
-    const oldIndex = snapshot.findIndex((p) => p.id === active.id);
-    const newIndex = snapshot.findIndex((p) => p.id === over.id);
-    const reordered = arrayMove(snapshot, oldIndex, newIndex);
+    const currentIds = sortedPortfolios.map((p) => p.id);
+    const oldIndex = currentIds.indexOf(active.id as string);
+    const newIndex = currentIds.indexOf(over.id as string);
+    const newOrder = arrayMove(currentIds, oldIndex, newIndex);
 
-    setSortedPortfolios(reordered);
-    reorderPortfolios(reordered.map((p, i) => ({ id: p.id, sort_order: i }))).catch(() => {
-      setSortedPortfolios(snapshot);
+    setLocalOrder(newOrder);
+    reorderPortfolios(newOrder.map((id, i) => ({ id, sort_order: i }))).catch(() => {
+      setLocalOrder(currentIds);
       toast("순서 변경에 실패했습니다");
     });
   }
@@ -352,6 +355,7 @@ export default function PortfolioAnalysisTab() {
       )}
       {alertModalPortfolioId && (
         <RebalancingAlertModal
+          key={alertModalPortfolioId}
           portfolioId={alertModalPortfolioId}
           portfolioName={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
           onClose={() => setAlertModalPortfolioId(null)}

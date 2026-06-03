@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import Modal from "../common/Modal";
@@ -74,18 +74,12 @@ const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL"
 const inputClass =
   "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
+import type { RebalancingAlert } from "../../api/alerts";
+import type { AssetAccount } from "../../api/assets";
+import type { QueryClient } from "@tanstack/react-query";
+
 export default function RebalancingAlertModal({ portfolioId, portfolioName, onClose }: Props) {
   const qc = useQueryClient();
-
-  const [scheduleType, setScheduleType] = useState<ScheduleType>("DAILY");
-  const [dayOfWeek, setDayOfWeek] = useState(0);
-  const [dayOfMonth, setDayOfMonth] = useState(1);
-  const [onlyWhenDrift, setOnlyWhenDrift] = useState(true);
-  const [threshold, setThreshold] = useState(5);
-  const [mode, setMode] = useState<"NOTIFY" | "AUTO">("NOTIFY");
-  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">("BUY_ONLY");
-  const [accountId, setAccountId] = useState<string>("");
-  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
 
   const { data: alert, isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlert(portfolioId),
@@ -107,18 +101,50 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
     (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
   );
 
-  useEffect(() => {
-    if (!alert) return;
-    setScheduleType(alert.schedule_type);
-    setDayOfWeek(alert.schedule_day_of_week ?? 0);
-    setDayOfMonth(alert.schedule_day_of_month ?? 1);
-    setOnlyWhenDrift(alert.only_when_drift);
-    setThreshold(alert.threshold_pct);
-    setMode(alert.mode ?? "NOTIFY");
-    setStrategy(alert.strategy ?? "BUY_ONLY");
-    setAccountId(alert.account_id ?? "");
-    setOrderType(alert.order_type ?? "MARKET");
-  }, [alert]);
+  return (
+    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
+      <div className="p-6 space-y-5">
+        {isLoading ? (
+          <div className="flex justify-center py-4">
+            <Loader2 size={20} className="animate-spin text-gray-400" />
+          </div>
+        ) : (
+          <AlertFormBody
+            key={alert?.id ?? "new"}
+            alert={alert ?? null}
+            brokerAccounts={brokerAccounts}
+            portfolioId={portfolioId}
+            qc={qc}
+            onClose={onClose}
+          />
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+function AlertFormBody({
+  alert,
+  brokerAccounts,
+  portfolioId,
+  qc,
+  onClose,
+}: {
+  alert: RebalancingAlert | null;
+  brokerAccounts: AssetAccount[];
+  portfolioId: string;
+  qc: QueryClient;
+  onClose: () => void;
+}) {
+  const [scheduleType, setScheduleType] = useState<ScheduleType>(alert?.schedule_type ?? "DAILY");
+  const [dayOfWeek, setDayOfWeek] = useState(alert?.schedule_day_of_week ?? 0);
+  const [dayOfMonth, setDayOfMonth] = useState(alert?.schedule_day_of_month ?? 1);
+  const [onlyWhenDrift, setOnlyWhenDrift] = useState(alert?.only_when_drift ?? true);
+  const [threshold, setThreshold] = useState(alert?.threshold_pct ?? 5);
+  const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
+  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">(alert?.strategy ?? "BUY_ONLY");
+  const [accountId, setAccountId] = useState<string>(alert?.account_id ?? "");
+  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">(alert?.order_type ?? "MARKET");
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -155,15 +181,8 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
   const hasAlert = !!alert;
 
   return (
-    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
-      <div className="p-6 space-y-5">
-        {isLoading ? (
-          <div className="flex justify-center py-4">
-            <Loader2 size={20} className="animate-spin text-gray-400" />
-          </div>
-        ) : (
-          <>
-            {/* ── 알림 주기 ── */}
+    <>
+      {/* ── 알림 주기 ── */}
             <div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
               <div className="flex flex-wrap gap-1.5">
@@ -439,10 +458,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
                   설정 해제
                 </button>
               )}
-            </div>
-          </>
-        )}
-      </div>
-    </Modal>
+    </div>
+    </>
   );
 }

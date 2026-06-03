@@ -133,7 +133,11 @@ export default function SettingsPage() {
 
       <StockPriceAlertSection />
 
-      <DCASettingsSection current={current ?? null} onSettingsChange={invalidateSettings} />
+      <DCASettingsSection
+        key={current ? "dca-loaded" : "dca-loading"}
+        current={current ?? null}
+        onSettingsChange={invalidateSettings}
+      />
 
       {/* 리밸런싱 자동화 */}
       <SectionCard title="리밸런싱 자동화">

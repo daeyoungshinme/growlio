@@ -28,29 +28,23 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   const [editingRows, setEditingRows] = useState<Set<number>>(new Set());
   const searchInputRefs = useRef<Map<number, HTMLInputElement>>(new Map());
 
-  // 계좌 선택 상태: null이면 모든 계좌, 배열이면 선택된 계좌만
-  const [selectedAccountIds, setSelectedAccountIds] = useState<Set<string>>(() => {
-    if (initial?.account_ids?.length) {
-      return new Set(initial.account_ids);
-    }
-    return new Set(accounts.map((a) => a.id));
-  });
+  // null = 모든 계좌 (동적), Set = 사용자가 명시적으로 선택한 계좌
+  const [userOverrideIds, setUserOverrideIds] = useState<Set<string> | null>(() =>
+    initial?.account_ids?.length ? new Set(initial.account_ids) : null
+  );
 
-  const accountIdKey = useMemo(() => accounts.map((a) => a.id).sort().join(","), [accounts]);
+  // accounts가 바뀌어도 userOverrideIds가 null이면 항상 전체 계좌를 반영
+  const selectedAccountIds = useMemo(() => {
+    if (userOverrideIds === null) return new Set(accounts.map((a) => a.id));
+    return userOverrideIds;
+  }, [accounts, userOverrideIds]);
 
-  // accounts prop이 바뀌면 새 계좌를 기본 선택에 추가
-  useEffect(() => {
-    if (!initial?.account_ids?.length) {
-      setSelectedAccountIds(new Set(accounts.map((a) => a.id)));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- initial은 마운트 후 변경되지 않는 고정 prop
-  }, [accountIdKey]);
-
-  const isAllSelected = accounts.length === 0 || accounts.every((a) => selectedAccountIds.has(a.id));
+  const isAllSelected = userOverrideIds === null || accounts.every((a) => selectedAccountIds.has(a.id));
 
   function toggleAccount(id: string) {
-    setSelectedAccountIds((prev) => {
-      const next = new Set(prev);
+    setUserOverrideIds((prev) => {
+      const base = prev === null ? new Set(accounts.map((a) => a.id)) : prev;
+      const next = new Set(base);
       if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
@@ -108,7 +102,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
     const handler = () => { clearSuggestions(); setActiveRow(null); };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  }, [clearSuggestions]);
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0">
@@ -317,7 +311,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
                 {!isAllSelected && (
                   <button
                     type="button"
-                    onClick={() => setSelectedAccountIds(new Set(accounts.map((a) => a.id)))}
+                    onClick={() => setUserOverrideIds(null)}
                     className="text-xs text-blue-600 hover:underline"
                   >
                     전체 선택

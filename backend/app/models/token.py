@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,6 +32,17 @@ class KisToken(Base):
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    __table_args__ = (
+        Index(
+            "uq_kis_token_account", "account_id",
+            unique=True, postgresql_where="account_id IS NOT NULL",
+        ),
+        Index(
+            "uq_kis_token_user_mode", "user_id", "is_mock_mode",
+            unique=True, postgresql_where="account_id IS NULL",
+        ),
+    )
+
 
 class KiwoomToken(Base):
     """키움 OpenAPI+ OAuth2 액세스 토큰 (DB 영속화 — Redis 만료 시 fallback)
@@ -54,3 +65,5 @@ class KiwoomToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     is_mock_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (Index("uq_kiwoom_token_account", "account_id", unique=True),)

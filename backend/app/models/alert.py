@@ -38,6 +38,8 @@ class ExchangeRateAlert(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
+    __table_args__ = (Index("idx_exchange_rate_alerts_user", "user_id"),)
+
 
 class RebalancingAlert(Base):
     __tablename__ = "rebalancing_alerts"
@@ -75,6 +77,7 @@ class RebalancingAlert(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "portfolio_id", name="uq_rebalancing_alert_user_portfolio"),
+        Index("idx_rebalancing_alerts_user_active", "user_id", "is_active"),
     )
 
 
