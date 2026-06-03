@@ -217,7 +217,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
-> **예외:** `["stock-price-alerts"]`는 `queryInvalidation.ts` 유틸 없음 — CUD 후 직접 `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })` 호출.
+> **⚠️ 예외 — stock-price-alerts:** `queryInvalidation.ts` 유틸 미존재. CUD 후 직접 호출 필수:
+> `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })`
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 - `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)

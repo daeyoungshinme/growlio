@@ -48,7 +48,7 @@ cd backend && uv run pytest --tb=short         # 짧은 트레이스백 (출력 
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
 
-**테스트 파일:** `test_asset_aggregator.py`, `test_asset_service.py`, `test_auth_api.py`, `test_credential_service.py`, `test_dividend_service.py`, `test_portfolio_summary.py`, `test_price_service.py`, `test_rebalancing_service.py`, `test_security.py`
+**테스트 위치:** `backend/tests/` — 현재 목록은 `cd backend && uv run pytest --collect-only -q` 확인.
 
 ### Lint & Type Check
 ```bash
