@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X, CheckCircle, XCircle } from "lucide-react";
 import type { AssetAccountCreate } from "../../api/assets";
+import { INPUT_SM } from "../../constants/inputStyles";
 import { verifyKisCredentials } from "../../api/assets";
 import { useCurrencyInput } from "../../hooks/useCurrencyInput";
 import { useForm } from "../../hooks/useForm";
@@ -104,12 +105,12 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
         <div className="space-y-3">
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">계좌명 *</label>
-            <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.name}
+            <input className={`mt-1 w-full ${INPUT_SM}`} value={form.name}
               onChange={(e) => set("name", e.target.value)} placeholder="예: KIS 주식계좌" />
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">데이터 소스</label>
-            <select className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.data_source}
+            <select className={`mt-1 w-full ${INPUT_SM}`} value={form.data_source}
               onChange={(e) => handleSourceChange(e.target.value)}>
               <option value="MANUAL">수동 입력</option>
               <option value="KIS_API">KIS 한국투자증권 (자동)</option>
@@ -118,14 +119,14 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">자산 유형 *</label>
-            <select className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.asset_type}
+            <select className={`mt-1 w-full ${INPUT_SM}`} value={form.asset_type}
               onChange={(e) => set("asset_type", e.target.value)}>
               {Object.entries(STOCK_ASSET_TYPE_OPTIONS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">금융기관명</label>
-            <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.institution ?? ""}
+            <input className={`mt-1 w-full ${INPUT_SM}`} value={form.institution ?? ""}
               onChange={(e) => set("institution", e.target.value)} placeholder="예: 한국투자증권, 키움증권" />
           </div>
           {form.data_source === "MANUAL" && (
@@ -166,7 +167,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS 계좌번호 *</label>
-                <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.kis_account_no ?? ""}
+                <input className={`mt-1 w-full ${INPUT_SM}`} value={form.kis_account_no ?? ""}
                   onChange={(e) => set("kis_account_no", e.target.value)} placeholder="12345678-01" />
                 {isKis && form.kis_account_no && !kisAccountNoValid && (
                   <p className="mt-1 text-xs text-red-500">형식 오류: 12345678-01 형식으로 입력하세요</p>
@@ -176,7 +177,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS App Key *</label>
                 <input
                   type="password"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`mt-1 w-full ${INPUT_SM}`}
                   value={form.kis_app_key ?? ""}
                   onChange={(e) => { set("kis_app_key", e.target.value); resetVerify(); }}
                   placeholder="KIS 앱 키"
@@ -186,7 +187,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">KIS App Secret *</label>
                 <input
                   type="password"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`mt-1 w-full ${INPUT_SM}`}
                   value={form.kis_app_secret ?? ""}
                   onChange={(e) => { set("kis_app_secret", e.target.value); resetVerify(); }}
                   placeholder="KIS 앱 시크릿"
@@ -218,14 +219,14 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">키움 계좌번호 *</label>
-                <input className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" value={form.kiwoom_account_no ?? ""}
+                <input className={`mt-1 w-full ${INPUT_SM}`} value={form.kiwoom_account_no ?? ""}
                   onChange={(e) => set("kiwoom_account_no", e.target.value)} placeholder="12345678-01" />
               </div>
               <div>
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">키움 App Key *</label>
                 <input
                   type="password"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`mt-1 w-full ${INPUT_SM}`}
                   value={form.kiwoom_app_key ?? ""}
                   onChange={(e) => set("kiwoom_app_key", e.target.value || undefined)}
                   placeholder="키움 앱 키"
@@ -235,7 +236,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">키움 App Secret *</label>
                 <input
                   type="password"
-                  className="mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`mt-1 w-full ${INPUT_SM}`}
                   value={form.kiwoom_app_secret ?? ""}
                   onChange={(e) => set("kiwoom_app_secret", e.target.value || undefined)}
                   placeholder="키움 앱 시크릿"

@@ -13,10 +13,10 @@ import { DCASettingsSection } from "../components/settings/DCASettingsSection";
 import { SectionCard, ConnectedBadge } from "../components/settings/shared";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { STALE_TIME } from "../constants/queryConfig";
+import { INPUT_MD, LABEL_MD } from "../constants/inputStyles";
 
-const inputClass =
-  "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500";
-const labelClass = "text-sm font-medium text-gray-700 dark:text-gray-300";
+const inputClass = `mt-1 w-full ${INPUT_MD}`;
+const labelClass = LABEL_MD;
 
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();

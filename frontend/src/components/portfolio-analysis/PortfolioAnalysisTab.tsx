@@ -29,6 +29,7 @@ import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import { AnalysisPanel } from "./AnalysisPanel";
 import { toast } from "../../utils/toast";
+import { extractErrorMessage } from "../../utils/error";
 import { invalidatePortfolioData } from "../../utils/queryInvalidation";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { fetchRebalancingAlerts } from "../../api/alerts";
@@ -126,7 +127,7 @@ export default function PortfolioAnalysisTab() {
       invalidatePortfolioData(qc);
       setEditorOpen(false);
     },
-    onError: () => toast("포트폴리오 저장에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });
 
   const updateMut = useMutation({
@@ -137,7 +138,7 @@ export default function PortfolioAnalysisTab() {
       setEditingPortfolio(null);
       setEditorOpen(false);
     },
-    onError: () => toast("포트폴리오 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 수정에 실패했습니다"), "error"),
   });
 
   const deleteMut = useMutation({
@@ -150,7 +151,7 @@ export default function PortfolioAnalysisTab() {
         return next;
       });
     },
-    onError: () => toast("포트폴리오 삭제에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 삭제에 실패했습니다"), "error"),
   });
 
   const toggleSelect = (id: string) =>

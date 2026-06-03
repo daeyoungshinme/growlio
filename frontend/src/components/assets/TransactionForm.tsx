@@ -15,6 +15,8 @@ import { invalidateTransactionData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
 import { TX_LABELS } from "../../constants/transaction";
 import { STALE_TIME } from "../../constants/queryConfig";
+import { INPUT_MD, LABEL_MD } from "../../constants/inputStyles";
+import { extractErrorMessage } from "../../utils/error";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -90,7 +92,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
       invalidateTransactionData(qc);
       onSuccess(vars.account_id as string ?? "", vars.amount ?? 0, vars.transaction_type);
     },
-    onError: () => toast("내역 저장에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 저장에 실패했습니다"), "error"),
   });
 
   const updateMut = useMutation({
@@ -100,7 +102,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
       invalidateTransactionData(qc);
       onSuccess(vars.data?.account_id as string ?? "", vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
     },
-    onError: () => toast("내역 수정에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 수정에 실패했습니다"), "error"),
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -120,8 +122,8 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   };
 
   const isPending = editingTx ? updateMut.isPending : createMut.isPending;
-  const inputCls = "mt-1 w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-blue-500";
-  const labelCls = "text-sm font-medium text-gray-700 dark:text-gray-300";
+  const inputCls = `mt-1 w-full ${INPUT_MD}`;
+  const labelCls = LABEL_MD;
 
   return (
     <>

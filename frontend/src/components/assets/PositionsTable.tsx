@@ -6,22 +6,9 @@ import { convertUsdToKrw, fmtKrwShort } from "../../utils/format";
 import { isOverseasMarket } from "../../constants/markets";
 import PriceCell from "../common/PriceCell";
 import { pnlColor } from "../../utils/colors";
+import type { Position } from "../../hooks/usePositionsEditor";
 
-export interface Position {
-  ticker: string;
-  name: string;
-  market: string;
-  qty: number;
-  avg_price: number;
-  avg_price_usd: number | null;
-  usd_rate: number | null;
-  current_price: number | null;
-  current_price_usd?: number | null;
-  invested_amount?: number;
-  value_amount?: number;
-  pnl?: number;
-  pnl_pct?: number;
-}
+export type { Position };
 
 interface Props {
   rows: Position[];

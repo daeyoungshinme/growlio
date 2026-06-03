@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Loader2, RefreshCw, X } from "lucide-react";
 import { api } from "../../api/client";
-import { fetchStockPrice } from "../../api/assets";
 import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { useStockSearch } from "../../hooks/useStockSearch";
-import { isOverseasMarket } from "../../constants/markets";
+import { usePositionsEditor } from "../../hooks/usePositionsEditor";
 import { extractErrorMessage } from "../../utils/error";
-import { toast } from "../../utils/toast";
 import { fmtKrwShort } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import Modal from "../common/Modal";
-import { PositionsTable, type Position } from "./PositionsTable";
+import { PositionsTable } from "./PositionsTable";
+import type { Position } from "../../hooks/usePositionsEditor";
+import { useState } from "react";
 
 interface Summary {
   total_invested: number;
@@ -30,15 +29,6 @@ const EMPTY_ROW: Position = {
   usd_rate: null, current_price: null, current_price_usd: null,
 };
 
-const enrichPositions = (positions: Position[]): Position[] =>
-  positions.map((p) => ({
-    ...p,
-    current_price_usd:
-      isOverseasMarket(p.market) && p.current_price && p.usd_rate
-        ? +(p.current_price / p.usd_rate).toFixed(4)
-        : (p.current_price_usd ?? null),
-  }));
-
 export default function StockPositionsModal({
   accountId,
   accountName,
@@ -50,7 +40,6 @@ export default function StockPositionsModal({
   onClose: () => void;
   readonly?: boolean;
 }) {
-  const [rows, setRows] = useState<Position[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,92 +47,20 @@ export default function StockPositionsModal({
   const [error, setError] = useState<string | null>(null);
   const usdRate = useExchangeRate();
 
-  const { suggestions, isSearching: searchLoading, search: runStockSearch, clearSuggestions } = useStockSearch();
-  const [suggestIdx, setSuggestIdx] = useState<number | null>(null);
-  const [priceLoadingRows, setPriceLoadingRows] = useState<Set<number>>(new Set());
+  const editor = usePositionsEditor([], usdRate);
 
   useEffect(() => {
     api.get<PositionsResponse>(`/assets/${accountId}/positions`).then((r) => {
       const positions = r.data.positions;
-      setRows(enrichPositions(positions.length ? positions : (readonly ? [] : [{ ...EMPTY_ROW }])));
+      editor.setRows(editor.enrichRows(positions.length ? positions : (readonly ? [] : [{ ...EMPTY_ROW }])));
       setSummary(r.data.summary);
     }).catch((e) => {
       setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
     }).finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, readonly]);
 
-  const setRow = (i: number, patch: Partial<Position>) =>
-    setRows((prev) => prev.map((r, idx) => idx === i ? { ...r, ...patch } : r));
-
-  const addRow = () => setRows((prev) => [...prev, { ...EMPTY_ROW }]);
-
-  const removeRow = (i: number) => {
-    setRows((prev) => prev.filter((_, idx) => idx !== i));
-    if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); }
-  };
-
-  const loadPrice = async (i: number, ticker: string, market: string) => {
-    if (!ticker) return;
-    setPriceLoadingRows((prev) => new Set([...prev, i]));
-    try {
-      const result = await fetchStockPrice(ticker, market);
-      if (result.price_krw) {
-        setRow(i, {
-          current_price: result.price_krw,
-          current_price_usd: result.price_usd ?? null,
-          ...(result.usd_rate ? { usd_rate: result.usd_rate } : {}),
-        });
-      }
-    } catch (e: unknown) {
-      toast(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
-    } finally {
-      setPriceLoadingRows((prev) => { const s = new Set(prev); s.delete(i); return s; });
-    }
-  };
-
-  const handleNameChange = (i: number, value: string) => {
-    setRow(i, { name: value });
-    if (!value.trim()) { clearSuggestions(); setSuggestIdx(null); return; }
-    setSuggestIdx(i);
-    runStockSearch(value);
-  };
-
-  const handleSelectSuggestion = (i: number, s: { ticker: string; name: string; market: string }) => {
-    setRows((prev) => prev.map((r, idx) => idx === i
-      ? { ...r, ticker: s.ticker, name: s.name, market: s.market }
-      : r
-    ));
-    clearSuggestions();
-    setSuggestIdx(null);
-    loadPrice(i, s.ticker, s.market);
-  };
-
-  const handleNameBlur = (i: number) => {
-    setTimeout(() => { if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); } }, 150);
-  };
-
-  const handleAvgPriceUsd = (i: number, usdVal: string) => {
-    const usd = usdVal === "" ? 0 : parseFloat(usdVal) || 0;
-    const krw = usdRate ? Math.floor(usd * usdRate) : 0;
-    setRow(i, { avg_price_usd: usd || null, usd_rate: usdRate, avg_price: krw });
-  };
-
-  const handleCurrentPriceUsd = (i: number, usdVal: string) => {
-    const usd = usdVal === "" ? null : parseFloat(usdVal) || null;
-    const krw = usd && usdRate ? Math.round(usd * usdRate) : null;
-    setRow(i, { current_price_usd: usd, current_price: krw });
-  };
-
-  const liveRows = rows.map((r) => {
-    const cur = r.current_price ?? r.avg_price;
-    const invested = r.qty * r.avg_price;
-    const value = r.qty * cur;
-    const pnl = value - invested;
-    const pnl_pct = invested ? (pnl / invested) * 100 : 0;
-    return { ...r, current_price: cur, invested_amount: invested, value_amount: value, pnl, pnl_pct };
-  });
-
-  const liveSummary: Summary = liveRows.reduce(
+  const liveSummary: Summary = editor.liveRows.reduce(
     (acc, r) => ({
       total_invested: acc.total_invested + (r.invested_amount ?? 0),
       total_value: acc.total_value + (r.value_amount ?? 0),
@@ -157,12 +74,12 @@ export default function StockPositionsModal({
   }
 
   const handleSave = async () => {
-    const valid = rows.filter((r) => r.ticker || r.name || r.qty || r.avg_price);
+    const valid = editor.rows.filter((r) => r.ticker || r.name || r.qty || r.avg_price);
     setSaving(true); setError(null);
     try {
       const r = await api.put<PositionsResponse>(`/assets/${accountId}/positions`, valid);
-      setRows(enrichPositions(r.data.positions)); setSummary(r.data.summary);
-    } catch { setError("저장에 실패했습니다"); }
+      editor.setRows(editor.enrichRows(r.data.positions)); setSummary(r.data.summary);
+    } catch (e) { setError(extractErrorMessage(e, "저장에 실패했습니다")); }
     finally { setSaving(false); }
   };
 
@@ -170,7 +87,7 @@ export default function StockPositionsModal({
     setSyncing(true); setError(null);
     try {
       const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
-      setRows(enrichPositions(r.data.positions)); setSummary(r.data.summary);
+      editor.setRows(editor.enrichRows(r.data.positions)); setSummary(r.data.summary);
     } catch (e: unknown) {
       setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally { setSyncing(false); }
@@ -234,29 +151,29 @@ export default function StockPositionsModal({
           <div className="text-gray-400 dark:text-gray-500 text-sm py-8 text-center flex items-center justify-center gap-2">
             <Loader2 size={16} className="animate-spin" /> 불러오는 중...
           </div>
-        ) : readonly && rows.length === 0 ? (
+        ) : readonly && editor.rows.length === 0 ? (
           <div className="text-gray-400 dark:text-gray-500 text-sm py-12 text-center">
             동기화 후 보유종목이 표시됩니다
           </div>
         ) : (
           <PositionsTable
-            rows={rows}
-            liveRows={liveRows}
+            rows={editor.rows}
+            liveRows={editor.liveRows}
             readonly={readonly}
             usdRate={usdRate}
-            suggestions={suggestions}
-            suggestIdx={suggestIdx}
-            searchLoading={searchLoading}
-            priceLoadingRows={priceLoadingRows}
-            setSuggestIdx={setSuggestIdx}
-            handleNameChange={handleNameChange}
-            handleNameBlur={handleNameBlur}
-            handleSelectSuggestion={handleSelectSuggestion}
-            setRow={setRow}
-            removeRow={removeRow}
-            addRow={addRow}
-            handleAvgPriceUsd={handleAvgPriceUsd}
-            handleCurrentPriceUsd={handleCurrentPriceUsd}
+            suggestions={editor.suggestions}
+            suggestIdx={editor.suggestIdx}
+            searchLoading={editor.searchLoading}
+            priceLoadingRows={editor.priceLoadingRows}
+            setSuggestIdx={editor.setSuggestIdx}
+            handleNameChange={editor.handleNameChange}
+            handleNameBlur={editor.handleNameBlur}
+            handleSelectSuggestion={editor.handleSelectSuggestion}
+            setRow={editor.setRow}
+            removeRow={editor.removeRow}
+            addRow={editor.addRow}
+            handleAvgPriceUsd={editor.handleAvgPriceUsd}
+            handleCurrentPriceUsd={editor.handleCurrentPriceUsd}
           />
         )}
       </div>
@@ -271,7 +188,7 @@ export default function StockPositionsModal({
       <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-6 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-b-2xl">
         <button
           onClick={handleSyncAll}
-          disabled={syncing || rows.every((r) => !r.ticker)}
+          disabled={syncing || editor.rows.every((r) => !r.ticker)}
           className="flex items-center justify-center gap-2 text-sm text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg hover:bg-white dark:hover:bg-gray-700 disabled:opacity-40 transition-colors w-full sm:w-auto"
         >
           <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />

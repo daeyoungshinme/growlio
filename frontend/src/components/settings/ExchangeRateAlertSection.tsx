@@ -11,6 +11,7 @@ import {
 import { useExchangeRate } from "../../hooks/useExchangeRate";
 import { invalidateAlertData } from "../../utils/queryInvalidation";
 import { toast } from "../../utils/toast";
+import { extractErrorMessage } from "../../utils/error";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { SectionCard, inputClass, labelClass } from "./shared";
 
@@ -54,7 +55,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
       setAlertForm({ target_rate: "", direction: "BELOW", max_trigger_count: "1" });
       toast("알림이 등록되었습니다", "success");
     },
-    onError: () => toast("알림 등록에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "알림 등록에 실패했습니다"), "error"),
   });
 
   const reactivateAlertMutation = useMutation({
@@ -63,7 +64,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
       invalidateAlertData(queryClient);
       toast("알림이 재활성화되었습니다", "success");
     },
-    onError: () => toast("재활성화에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "재활성화에 실패했습니다"), "error"),
   });
 
   const deleteAlertMutation = useMutation({

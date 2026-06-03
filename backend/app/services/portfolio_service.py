@@ -8,11 +8,12 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
+from app.services._snapshot_queries import latest_snapshot_subquery
 
 _ALLOC_HISTORY_TTL = 24 * 3600  # 24시간
 
@@ -33,12 +34,7 @@ async def _fetch_latest_snapshots(
     acc_ids: list[uuid.UUID], db: AsyncSession
 ) -> dict[str, AssetSnapshot]:
     """계좌 ID 목록의 최신 스냅샷을 {account_id_str: snapshot} 딕셔너리로 반환한다."""
-    subq = (
-        select(AssetSnapshot.account_id, func.max(AssetSnapshot.snapshot_date).label("max_date"))
-        .where(AssetSnapshot.account_id.in_(acc_ids))
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
+    subq = latest_snapshot_subquery(account_ids=acc_ids)
     result = await db.execute(
         select(AssetSnapshot).join(
             subq,

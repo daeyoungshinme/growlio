@@ -48,6 +48,11 @@ export function invalidateAlertData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.exchangeRateAlerts });
 }
 
+/** 주가 알림 CUD 후 */
+export function invalidateStockPriceAlertData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts });
+}
+
 /** 리밸런싱 알림 CUD 후 */
 export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: string) {
   return Promise.all([

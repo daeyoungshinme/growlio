@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position, Transaction
 from app.models.user import UserSettings
+from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.dividend_aggregator import get_dividend_summary
 from app.utils.cache_keys import benchmark_key, monthly_trend_key
 from app.utils.currency import fetch_usd_krw
@@ -37,15 +38,7 @@ async def _get_latest_snapshot_rows(
     user_id: uuid.UUID, db: AsyncSession
 ) -> tuple[list, set]:
     """활성 계좌의 최신 스냅샷 행과 스냅샷이 있는 계좌 ID 집합을 반환한다."""
-    subq = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .where(AssetSnapshot.user_id == user_id)
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
+    subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))

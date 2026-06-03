@@ -4,6 +4,7 @@ import { fetchAccounts } from "../../api/assets";
 import { fetchPortfolios } from "../../api/portfolios";
 import { updateAutoDca, type SettingsData } from "../../api/settings";
 import { toast } from "../../utils/toast";
+import { extractErrorMessage } from "../../utils/error";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { STALE_TIME } from "../../constants/queryConfig";
 import { SectionCard, inputClass, labelClass } from "./shared";
@@ -50,7 +51,7 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
       toast("자동 정기매수 설정이 저장되었습니다", "success");
       onSettingsChange();
     },
-    onError: () => toast("저장에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "저장에 실패했습니다"), "error"),
   });
 
   return (

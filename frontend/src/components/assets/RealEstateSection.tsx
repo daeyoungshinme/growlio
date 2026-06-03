@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
+import { INPUT_SM } from "../../constants/inputStyles";
 
 const PROPERTY_TYPE_OPTIONS = ["아파트", "오피스텔", "상가", "토지", "단독주택", "기타"];
 
@@ -48,7 +49,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
     });
   };
 
-  const inputCls = "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = `w-full ${INPUT_SM}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -177,7 +178,7 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
     });
   };
 
-  const inputCls = "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+  const inputCls = `w-full ${INPUT_SM}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">

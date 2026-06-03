@@ -13,6 +13,8 @@ import { invalidateAccountData, invalidateTransactionData } from "../../utils/qu
 import { toast } from "../../utils/toast";
 import { STOCK_TYPES } from "../../constants";
 import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
+import { INPUT_SM } from "../../constants/inputStyles";
+import { extractErrorMessage } from "../../utils/error";
 
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - i);
@@ -43,7 +45,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   const deleteMut = useMutation({
     mutationFn: deleteTransaction,
     onSuccess: () => invalidateTransactionData(qc),
-    onError: () => toast("내역 삭제에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "내역 삭제에 실패했습니다"), "error"),
   });
 
   const triggerDepositPrompt = (accId: string, amt: number, txType: string) => {
@@ -113,19 +115,19 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
       <div className="flex flex-wrap items-center gap-2">
         <select value={filterAccountId} onChange={(e) => setFilterAccountId(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          className={INPUT_SM}>
           <option value="">전체 계좌</option>
           {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          className={INPUT_SM}>
           <option value="">전체 유형</option>
           <option value="DEPOSIT">입금</option>
           <option value="WITHDRAWAL">출금</option>
           <option value="DIVIDEND">배당</option>
         </select>
         <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+          className={INPUT_SM}>
           {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}년</option>)}
         </select>
         <button onClick={() => setShowForm((v) => !v)}

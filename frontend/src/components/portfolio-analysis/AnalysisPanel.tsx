@@ -58,7 +58,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         reinvest_dividends: reinvestDividends,
       }),
     onSuccess: (data) => setBacktestResult(data),
-    onError: () => toast("백테스트 실행에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "백테스트 실행에 실패했습니다"), "error"),
   });
 
   async function handleRebalancingAnalysis() {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
+import { INPUT_SM } from "../../constants/inputStyles";
 import Modal from "../common/Modal";
 import {
   fetchRebalancingAlert,
@@ -71,8 +72,7 @@ function buildDescription(
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
-const inputClass =
-  "w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
+const inputClass = `w-full ${INPUT_SM}`;
 
 import type { RebalancingAlert } from "../../api/alerts";
 import type { AssetAccount } from "../../api/assets";

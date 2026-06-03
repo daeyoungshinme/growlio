@@ -83,7 +83,7 @@ export default function AssetManagementPage() {
       invalidateAll();
       setDeletingId(null);
     },
-    onError: () => toast("계좌 삭제에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "계좌 삭제에 실패했습니다"), "error"),
   });
 
   const handleDelete = useCallback((id: string) => {
@@ -101,21 +101,21 @@ export default function AssetManagementPage() {
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
     onSuccess: () => { invalidateAll(); setEditingBankAccount(null); },
-    onError: () => toast("계좌 수정에 실패했습니다", "error"),
+    onError: (e) => toast(extractErrorMessage(e, "계좌 수정에 실패했습니다"), "error"),
   });
 
   const updateDepositMutation = useMutation({
     mutationFn: ({ id, deposit_krw, deposit_usd }: { id: string; deposit_krw: number; deposit_usd?: number }) =>
       updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
     onSuccess: () => invalidateAll(),
-    onError: () => toast("예수금 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "예수금 수정에 실패했습니다"), "error"),
   });
 
   const updateNameMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateAccount(id, { name }),
     onSuccess: () => invalidateAll(),
-    onError: () => toast("계좌명 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
   });
 
   const updateRealEstateMutation = useMutation({
@@ -125,7 +125,7 @@ export default function AssetManagementPage() {
       invalidateAll();
       setEditingRealEstate(null);
     },
-    onError: () => toast("부동산 정보 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "부동산 정보 수정에 실패했습니다"), "error"),
   });
 
   const handleSyncBank = useCallback(async (id: string) => {

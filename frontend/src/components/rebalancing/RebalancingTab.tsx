@@ -15,6 +15,7 @@ import UnifiedPortfolioEditor from "../portfolio-analysis/UnifiedPortfolioEditor
 import RebalancingTable from "./RebalancingTable";
 import RebalancingHistoryTab from "./RebalancingHistoryTab";
 import { toast } from "../../utils/toast";
+import { extractErrorMessage } from "../../utils/error";
 import { invalidatePortfolioData } from "../../utils/queryInvalidation";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import ConfirmModal from "../common/ConfirmModal";
@@ -78,7 +79,7 @@ export default function RebalancingTab() {
       invalidatePortfolioData(queryClient);
       setEditorOpen(false);
     },
-    onError: () => toast("포트폴리오 저장에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });
 
   const updateMutation = useMutation({
@@ -90,7 +91,7 @@ export default function RebalancingTab() {
       setEditingPortfolio(null);
       setAnalysis(null);
     },
-    onError: () => toast("포트폴리오 수정에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 수정에 실패했습니다"), "error"),
   });
 
   const deleteMutation = useMutation({
@@ -102,7 +103,7 @@ export default function RebalancingTab() {
         setAnalysis(null);
       }
     },
-    onError: () => toast("포트폴리오 삭제에 실패했습니다"),
+    onError: (e) => toast(extractErrorMessage(e, "포트폴리오 삭제에 실패했습니다"), "error"),
   });
 
   function handleSave(name: string, items: PortfolioItem[], baseType: string) {

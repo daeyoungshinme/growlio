@@ -2,7 +2,7 @@ import React from "react";
 import { RebalancingItem } from "../../api/rebalancing";
 import { fmtKrw, fmtKrwPrice } from "../../utils/format";
 import { SideBadge } from "./RebalancingBadges";
-import { ExecutionAction, OrderType, PriceLoadState, RebalancingExecutionHook, isOverseasMarket } from "./useRebalancingExecution";
+import { ExecutionAction, OrderType, PriceLoadState, RebalancingExecutionHook, isOverseasMarket } from "../../hooks/useRebalancingExecution";
 
 // ─── 하위 컴포넌트 ─────────────────────────────────────────────────────────────
 

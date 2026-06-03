@@ -3,6 +3,7 @@ import type { AssetAccount, AssetAccountCreate } from "../../api/assets";
 import { useCurrencyInput } from "../../hooks/useCurrencyInput";
 import { useForm } from "../../hooks/useForm";
 import { fmtKrw } from "../../utils/format";
+import { INPUT_SM, TEXTAREA_SM } from "../../constants/inputStyles";
 
 interface Props {
   initialAccount?: AssetAccount;
@@ -60,20 +61,20 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             <input type="text" required value={form.name}
               onChange={(e) => set("name", e.target.value)}
               placeholder="예: 국민은행 주계좌"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className={`w-full ${INPUT_SM}`} />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">은행명</label>
             <input type="text" value={form.institution}
               onChange={(e) => set("institution", e.target.value)}
               placeholder="예: 국민은행"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              className={`w-full ${INPUT_SM}`} />
           </div>
           {!isEdit && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 종류</label>
               <select value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)}
-                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className={`w-full ${INPUT_SM}`}>
                 <option value="BANK_ACCOUNT">입출금</option>
                 <option value="DEPOSIT">예·적금</option>
                 <option value="CASH_OTHER">현금/기타</option>
@@ -90,7 +91,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
                 onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))}
                 placeholder="0"
                 min="0"
-                className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`flex-1 ${INPUT_SM}`}
               />
             </div>
             <div className="flex items-center gap-2">
@@ -102,7 +103,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
                 placeholder="0"
                 min="0"
                 step="0.01"
-                className="flex-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`flex-1 ${INPUT_SM}`}
               />
             </div>
             {(depositUsd ?? 0) > 0 && (
@@ -122,7 +123,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">메모</label>
             <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)}
               placeholder="선택 입력" rows={2}
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" />
+              className={`w-full ${TEXTAREA_SM}`} />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose}

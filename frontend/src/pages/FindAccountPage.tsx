@@ -2,6 +2,7 @@ import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
+import { INPUT_SM } from "../constants/inputStyles";
 
 export default function FindAccountPage() {
   const [displayName, setDisplayName] = useState("");
@@ -45,7 +46,7 @@ export default function FindAccountPage() {
               onChange={(e) => setDisplayName(e.target.value)}
               required
               placeholder="가입 시 사용한 이름"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full ${INPUT_SM}`}
             />
           </div>
 

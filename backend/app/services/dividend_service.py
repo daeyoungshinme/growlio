@@ -22,8 +22,10 @@ from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_
 from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
 from app.models.user import UserSettings
 from app.redis_client import get_redis
+from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import decrypt, get_kis_user_credentials
-from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES, is_korean_etf
+from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
+from app.services.dividend_constants import is_korean_etf
 from app.services.dividend_fetcher import fetch_ticker_dividend_info
 from app.utils.cache_keys import dividend_ticker_summary_key
 from app.utils.currency import get_usd_krw_rate
@@ -116,15 +118,7 @@ async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | N
 
 async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
     """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → {value_krw, name, invested_krw, qty} 수집."""
-    subq = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .where(AssetSnapshot.user_id == user_id)
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
+    subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -442,7 +436,14 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
         fetch_one(ticker, market, info["value_krw"], info["invested_krw"], info.get("qty", 0.0))
         for (ticker, market), info in positions.items()
     ]
-    return list(await asyncio.gather(*tasks))
+    raw = await asyncio.gather(*tasks, return_exceptions=True)
+    results = []
+    for item in raw:
+        if isinstance(item, Exception):
+            logger.warning("position_yield_fetch_failed", error=str(item))
+            continue
+        results.append(item)
+    return results
 
 
 # ── ticker 설정 CRUD ───────────────────────────────────────
