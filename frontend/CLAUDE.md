@@ -43,6 +43,8 @@ make build-android-release         # APK Release 빌드
 `frontend/.env` (`.env.example` 참고):
 - `VITE_SUPABASE_URL` — Supabase Project URL
 - `VITE_SUPABASE_ANON_KEY` — Supabase Anon Key (JWT)
+- `VITE_REDIRECT_URL` — OAuth/이메일 인증 후 리다이렉트 URL (예: https://yourdomain.com)
+- `VITE_API_DOMAIN` — API 서버 도메인 (Vite 프록시 설정에 사용, 예: localhost:8000)
 
 > `src/lib/supabase.ts`에서 import됨. `.env` 없으면 Supabase 클라이언트 초기화 실패.
 
