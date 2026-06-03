@@ -16,7 +16,7 @@ const FormInput = forwardRef<HTMLInputElement, FormInputProps>(
   ({ label, hint, prefix, suffix, inputSize = "md", className = "", ...props }, ref) => {
     const sizeClass = inputSize === "sm"
       ? "px-2 py-1.5 text-xs"
-      : "px-3 py-2 text-sm";
+      : "px-3 py-3 text-sm";
     const baseClass =
       `border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ` +
       `text-gray-900 dark:text-gray-50 rounded-lg ${sizeClass} ` +

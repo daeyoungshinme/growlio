@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, date
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ import uuid as uuid_mod
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.services.credential_service import encrypt
@@ -78,6 +79,8 @@ class AutoDcaUpdate(BaseModel):
     def validate_amount(cls, v: float | None) -> float | None:
         if v is not None and v <= 0:
             raise ValueError("매수 금액은 0보다 커야 합니다")
+        if v is not None and v > 1_000_000_000:
+            raise ValueError("매수 금액은 10억 원을 초과할 수 없습니다")
         return v
 
 
@@ -102,7 +105,9 @@ class SettingsResponse(BaseModel):
 
 
 @router.get("", response_model=SettingsResponse)
+@limiter.limit("30/minute")
 async def get_settings(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -152,7 +157,9 @@ async def get_settings(
 
 
 @router.put("/dart")
+@limiter.limit("10/minute")
 async def update_dart_api_key(
+    request: Request,
     req: DartApiKeyUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -165,7 +172,9 @@ async def update_dart_api_key(
 
 
 @router.delete("/dart")
+@limiter.limit("10/minute")
 async def delete_dart_api_key(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -177,7 +186,9 @@ async def delete_dart_api_key(
 
 
 @router.put("/goal")
+@limiter.limit("20/minute")
 async def update_goal(
+    request: Request,
     req: GoalUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -204,7 +215,9 @@ async def update_goal(
 
 
 @router.put("/notification-email")
+@limiter.limit("10/minute")
 async def update_notification_email(
+    request: Request,
     req: NotificationEmailUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -217,7 +230,9 @@ async def update_notification_email(
 
 
 @router.put("/auto-dca")
+@limiter.limit("10/minute")
 async def update_auto_dca(
+    request: Request,
     req: AutoDcaUpdate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -234,7 +249,9 @@ async def update_auto_dca(
 
 
 @router.post("/test-email")
+@limiter.limit("3/minute")
 async def send_test_email_endpoint(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

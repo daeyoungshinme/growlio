@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections import defaultdict
 from datetime import date
@@ -12,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
+
+_ALLOC_HISTORY_TTL = 24 * 3600  # 24시간
 
 ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -281,13 +284,19 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
 
 
 async def get_allocation_history(
-    user_id: uuid.UUID, db: AsyncSession, months: int = 12
+    user_id: uuid.UUID, db: AsyncSession, months: int = 12, redis=None
 ) -> list[dict]:
     """월별 자산 유형별 배분 이력 조회.
 
     각 월의 마지막 스냅샷 기준으로 asset_type별 금액/비중을 반환한다.
     is_active = TRUE 필터 필수 — 비활성 계좌 스냅샷 합산 방지.
     """
+    if redis is not None:
+        cache_key = f"alloc_history:{user_id}:{months}"
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
     today = date.today()
     # months=12이면 현재 월 포함 12개월 (오늘 기준 11개월 전 1일)
     start_month = today.month - (months - 1)
@@ -352,5 +361,9 @@ async def get_allocation_history(
             "total_krw": round(total_krw, 2),
             "allocations": allocations,
         })
+
+    if redis is not None:
+        cache_key = f"alloc_history:{user_id}:{months}"
+        await redis.set(cache_key, json.dumps(output), ex=_ALLOC_HISTORY_TTL)
 
     return output

@@ -39,6 +39,12 @@ def _validate_positive(v: float | None) -> float | None:
     return v
 
 
+def _validate_non_negative(v: float | None) -> float | None:
+    if v is not None and v < 0:
+        raise ValueError("금액은 0 이상이어야 합니다")
+    return v
+
+
 class AssetAccountCreate(BaseModel):
     name: str
     asset_type: AssetType
@@ -61,6 +67,11 @@ class AssetAccountCreate(BaseModel):
     sort_order: int = 0
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool = True
+
+    @field_validator("deposit_krw", "deposit_usd")
+    @classmethod
+    def deposit_non_negative(cls, v: float | None) -> float | None:
+        return _validate_non_negative(v)
 
     @field_validator("kis_account_no")
     @classmethod
@@ -106,6 +117,11 @@ class AssetAccountUpdate(BaseModel):
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
         return _validate_positive(v)
+
+    @field_validator("deposit_krw", "deposit_usd")
+    @classmethod
+    def deposit_non_negative(cls, v: float | None) -> float | None:
+        return _validate_non_negative(v)
 
 
 class AssetAccountResponse(BaseModel):

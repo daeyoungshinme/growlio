@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
 from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
@@ -18,7 +19,9 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 
 
 @router.get("", response_model=list[TransactionResponse])
+@limiter.limit("60/minute")
 async def list_transactions(
+    request: Request,
     account_id: UUID | None = None,
     year: int | None = Query(None, ge=1900, le=2100),
     transaction_type: str | None = None,
@@ -44,7 +47,9 @@ async def list_transactions(
 
 
 @router.post("", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_transaction(
+    request: Request,
     req: TransactionCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -65,7 +70,9 @@ async def create_transaction(
 
 
 @router.get("/{tx_id}", response_model=TransactionResponse)
+@limiter.limit("60/minute")
 async def get_transaction(
+    request: Request,
     tx_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -75,7 +82,9 @@ async def get_transaction(
 
 
 @router.put("/{tx_id}", response_model=TransactionResponse)
+@limiter.limit("30/minute")
 async def update_transaction(
+    request: Request,
     tx_id: UUID,
     req: TransactionUpdate,
     current_user: User = Depends(get_current_user),
@@ -98,7 +107,9 @@ async def update_transaction(
 
 
 @router.delete("/{tx_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 async def delete_transaction(
+    request: Request,
     tx_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

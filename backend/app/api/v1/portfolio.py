@@ -15,6 +15,7 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User
+from app.redis_client import get_redis
 from app.services.credential_service import get_kis_user_credentials
 from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
 
@@ -22,13 +23,16 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
 
 @router.get("/allocation-history")
+@limiter.limit("20/minute")
 async def portfolio_allocation_history(
+    request: Request,
     months: int = Query(default=12, ge=3, le=36),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """월별 자산 유형별 배분 이력 — 최근 N개월."""
-    return await get_allocation_history(current_user.id, db, months=months)
+    redis = await get_redis()
+    return await get_allocation_history(current_user.id, db, months=months, redis=redis)
 
 
 @router.get("/overview")
@@ -43,7 +47,9 @@ async def portfolio_overview(
 
 
 @router.get("/summary")
+@limiter.limit("5/minute")
 async def portfolio_summary(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

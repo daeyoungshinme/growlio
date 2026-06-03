@@ -92,6 +92,20 @@ class ManualPosition(BaseModel):
             raise ValueError("평균단가는 0보다 커야 합니다")
         return v
 
+    @field_validator("avg_price_usd")
+    @classmethod
+    def avg_price_usd_positive(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("달러 평균단가는 0보다 커야 합니다")
+        return v
+
+    @field_validator("usd_rate")
+    @classmethod
+    def usd_rate_range(cls, v: float | None) -> float | None:
+        if v is not None and not (0 < v < 10000):
+            raise ValueError("환율은 0 초과 10,000 미만이어야 합니다")
+        return v
+
     @field_validator("market")
     @classmethod
     def market_valid(cls, v: str) -> str:

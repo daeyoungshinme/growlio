@@ -19,7 +19,7 @@ export function useDashboardData() {
   const { data: overview, isLoading: overviewLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchPortfolioOverview,
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 포트폴리오 요약은 자주 변하지 않음
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: false,
   });
@@ -27,14 +27,14 @@ export function useDashboardData() {
   const { data: dcaData } = useQuery({
     queryKey: QUERY_KEYS.investDca,
     queryFn: fetchDCAAnalysis,
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — DCA 분석은 자주 변하지 않음
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
   });
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 계좌 목록은 자주 변하지 않음
   });
 
   const exchangeRate = useExchangeRate();

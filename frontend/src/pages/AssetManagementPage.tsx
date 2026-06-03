@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
 import {
@@ -20,9 +20,9 @@ import {
 } from "../components/assets/RealEstateSection";
 import BankAccountCard from "../components/assets/BankAccountCard";
 import StockAccountCard, { type AccountStats } from "../components/assets/StockAccountCard";
+import StockAccountSummaryCard from "../components/assets/StockAccountSummaryCard";
 import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
 import ConfirmModal from "../components/common/ConfirmModal";
-import { fmtKrw, fmtPct } from "../utils/format";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
@@ -162,6 +162,33 @@ export default function AssetManagementPage() {
   const realEstateAccounts = accounts.filter((a) => REAL_ESTATE_TYPES.includes(a.asset_type));
   const currentBankOrStock = tab === "은행계좌" ? bankAccounts : stockAccounts;
 
+  const stockAccountStats = useMemo(() => {
+    const portfolioAccMap = Object.fromEntries(
+      (overview?.accounts ?? []).map((a) => [a.id, a])
+    );
+    const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
+    for (const t of allTx) {
+      if (!t.account_id) continue;
+      if (!txByAcc[t.account_id]) txByAcc[t.account_id] = { deposit: 0, dividend: 0 };
+      if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.amount;
+      if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.amount;
+    }
+    return stockAccounts.map((account) => {
+      const pa = portfolioAccMap[account.id];
+      const tx = txByAcc[account.id] ?? { deposit: 0, dividend: 0 };
+      return {
+        account,
+        stats: {
+          amount_krw: pa?.amount_krw ?? 0,
+          invested_krw: pa?.invested_krw ?? 0,
+          unrealized_pnl: pa?.unrealized_pnl ?? 0,
+          deposit_total: tx.deposit,
+          dividend_total: tx.dividend,
+        } as AccountStats,
+      };
+    });
+  }, [stockAccounts, overview, allTx]);
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
@@ -266,81 +293,24 @@ export default function AssetManagementPage() {
           ) : (
             <div className="space-y-3">
               {/* 증권계좌 전체 요약 */}
-              {(() => {
-                const totalDeposit = allTx.filter((t) => t.transaction_type === "DEPOSIT").reduce((s, t) => s + t.amount, 0);
-                const totalDividend = allTx.filter((t) => t.transaction_type === "DIVIDEND").reduce((s, t) => s + t.amount, 0);
-                const pnl = overview?.unrealized_pnl_krw ?? 0;
-                const ret = overview?.stock_return_pct ?? 0;
-                const pnlColor = pnl >= 0 ? "text-red-500" : "text-blue-500";
-                const totalDepositKrw = stockAccounts.reduce(
-                  (s, a) => s + (a.deposit_krw ?? 0) + (a.deposit_usd ?? 0) * (usdRate ?? 1),
-                  0
-                );
-                return (
-                  <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">증권계좌 전체 요약</p>
-                    <div className="grid grid-cols-3 gap-x-6 gap-y-3">
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(overview?.total_stock_krw ?? 0)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
-                        <p className={`text-sm font-semibold mt-0.5 ${pnlColor}`}>
-                          {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}({fmtPct(ret)})
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(totalDepositKrw)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
-                        <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{fmtKrw(totalDeposit)}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
-                        <p className="text-sm font-semibold text-green-600 dark:text-green-400 mt-0.5">{fmtKrw(totalDividend)}</p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
+              <StockAccountSummaryCard
+                stockAccounts={stockAccounts}
+                overview={overview}
+                allTx={allTx}
+                usdRate={usdRate}
+              />
               {/* 계좌별 카드 */}
-              {(() => {
-                const portfolioAccMap = Object.fromEntries(
-                  (overview?.accounts ?? []).map((a) => [a.id, a])
-                );
-                const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
-                for (const t of allTx) {
-                  if (!t.account_id) continue;
-                  if (!txByAcc[t.account_id]) txByAcc[t.account_id] = { deposit: 0, dividend: 0 };
-                  if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.amount;
-                  if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.amount;
-                }
-                return stockAccounts.map((account) => {
-                  const pa = portfolioAccMap[account.id];
-                  const tx = txByAcc[account.id] ?? { deposit: 0, dividend: 0 };
-                  const stats: AccountStats = {
-                    amount_krw: pa?.amount_krw ?? 0,
-                    invested_krw: pa?.invested_krw ?? 0,
-                    unrealized_pnl: pa?.unrealized_pnl ?? 0,
-                    deposit_total: tx.deposit,
-                    dividend_total: tx.dividend,
-                  };
-                  return (
-                    <StockAccountCard key={account.id} account={account} stats={stats}
-                      onDelete={handleDelete}
-                      onManagePositions={setPositionsAccount}
-                      onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
-                      onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
-                      onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
-                      onSync={handleSyncKisAccount}
-                      isSyncing={syncingStockIds.has(account.id)}
-                      isDeleting={deletingId === account.id && deleteMutation.isPending} />
-                  );
-                });
-              })()}
+              {stockAccountStats.map(({ account, stats }) => (
+                <StockAccountCard key={account.id} account={account} stats={stats}
+                  onDelete={handleDelete}
+                  onManagePositions={setPositionsAccount}
+                  onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
+                  onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
+                  onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
+                  onSync={handleSyncKisAccount}
+                  isSyncing={syncingStockIds.has(account.id)}
+                  isDeleting={deletingId === account.id && deleteMutation.isPending} />
+              ))}
             </div>
           )}
         </>

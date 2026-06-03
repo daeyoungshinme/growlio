@@ -28,6 +28,7 @@ router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
 _OB_STATE_PREFIX = "ob_state:"
 _OB_STATE_TTL = 600  # 10분
+_OB_TOKEN_DEFAULT_TTL = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
 
 
 @router.get("/connect")
@@ -78,7 +79,6 @@ async def open_banking_callback(
     access_token = token_data.get("access_token")
     refresh_token = token_data.get("refresh_token")
     user_seq_no = token_data.get("user_seq_no")
-    _OB_TOKEN_DEFAULT_TTL = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
     expires_in = int(token_data.get("expires_in", _OB_TOKEN_DEFAULT_TTL))
 
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == uid))

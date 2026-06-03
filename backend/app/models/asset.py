@@ -94,6 +94,7 @@ class AssetAccount(Base):
         Index("idx_asset_accounts_user_active", "user_id", "is_active"),
         Index("idx_asset_accounts_user_active_include", "user_id", "is_active", "include_in_total"),
         Index("idx_asset_accounts_user_active_type", "user_id", "is_active", "asset_type"),
+        Index("idx_asset_accounts_data_source", "user_id", "data_source"),
     )
 
 
@@ -174,6 +175,7 @@ class Transaction(Base):
         Index("idx_transactions_account", "account_id"),
         Index("idx_transactions_user_type", "user_id", "transaction_type"),
         Index("idx_transactions_user_type_date", "user_id", "transaction_type", "transaction_date"),
+        Index("idx_transactions_account_type_date", "account_id", "transaction_type", "transaction_date"),
         Index(
             "uq_div_account_ticker_date",
             "account_id", "ticker", "transaction_date",

@@ -90,7 +90,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                 <button
                   onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
                   title="계좌명 수정"
-                  className="p-1.5 sm:p-0.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
+                  className="p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
                   <Pencil size={12} />
                 </button>
               </>
@@ -220,7 +220,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                     setEditUsdValue(account.deposit_usd ? String(account.deposit_usd) : "");
                     setEditDepositMode(true);
                   }}
-                  className="p-1.5 sm:p-0.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0">
+                  className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0">
                   <Pencil size={12} />
                 </button>
               </div>

@@ -91,39 +91,44 @@ async def analyze_portfolio(
 
     # 목표 포트폴리오 종목 중 현재 미보유(dividend_map에 없음)인 종목 배당수익률 보완
     loop = asyncio.get_running_loop()
-    for raw_item in portfolio.items:
+    _sem = asyncio.Semaphore(3)
+
+    async def _fetch_dividend(raw_item) -> None:
         ticker = raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker
         market = raw_item["market"] if isinstance(raw_item, dict) else raw_item.market
         if ticker == "CASH" or market == "KR_PROPERTY":
-            continue
+            return
         key = (ticker, market)
         if key in dividend_map:
-            continue
+            return
         is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
         try:
-            if is_korean:
-                is_etf = is_korean_etf(ticker, market)
-                fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-                naver_info = await loop.run_in_executor(None, partial(fn, ticker))
-                if naver_info["dividend_yield"] > 0:
-                    dividend_map[key] = {
-                        "ticker": ticker,
-                        "market": market,
-                        "dividend_yield": naver_info["dividend_yield"] * 100,  # % 단위
-                        "estimated_annual_krw": 0.0,
-                    }
-            else:
-                yahoo_sym = _to_yahoo_symbol(ticker, market)
-                info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
-                if info["dividend_yield"] > 0:
-                    dividend_map[key] = {
-                        "ticker": ticker,
-                        "market": market,
-                        "dividend_yield": info["dividend_yield"] * 100,  # % 단위
-                        "estimated_annual_krw": 0.0,
-                    }
+            async with _sem:
+                if is_korean:
+                    is_etf = is_korean_etf(ticker, market)
+                    fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
+                    naver_info = await loop.run_in_executor(None, partial(fn, ticker))
+                    if naver_info["dividend_yield"] > 0:
+                        dividend_map[key] = {
+                            "ticker": ticker,
+                            "market": market,
+                            "dividend_yield": naver_info["dividend_yield"] * 100,
+                            "estimated_annual_krw": 0.0,
+                        }
+                else:
+                    yahoo_sym = _to_yahoo_symbol(ticker, market)
+                    info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+                    if info["dividend_yield"] > 0:
+                        dividend_map[key] = {
+                            "ticker": ticker,
+                            "market": market,
+                            "dividend_yield": info["dividend_yield"] * 100,
+                            "estimated_annual_krw": 0.0,
+                        }
         except Exception as e:
             logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
+
+    await asyncio.gather(*[_fetch_dividend(item) for item in portfolio.items])
 
     # 목표 포트폴리오 종목 10년 수익률 수집 (CASH 제외)
     target_tickers = [
