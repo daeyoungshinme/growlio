@@ -10,12 +10,12 @@ import TreemapChart from "../components/portfolio/TreemapChart";
 import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
 import { fmtKrwPrice } from "../utils/format";
-import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { pnlColor } from "../utils/colors";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { DOMESTIC_MARKETS } from "../constants";
 import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
@@ -42,6 +42,7 @@ export default function PortfolioPage() {
     : "종목 현황";
   const [tab, setTab] = useState<Tab>(initialTab);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
@@ -76,16 +77,27 @@ export default function PortfolioPage() {
       (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER"
     );
     setSyncingAll(true);
+    setSyncProgress({ done: 0, total: accounts.length });
     try {
-      for (const acc of accounts) {
-        await syncAccount(acc.id);
-      }
+      const results = await Promise.allSettled(
+        accounts.map(async (acc) => {
+          try {
+            await syncAccount(acc.id);
+          } finally {
+            setSyncProgress((p) => ({ ...p, done: p.done + 1 }));
+          }
+        })
+      );
       await invalidateSyncData(qc);
-      toast("전체 동기화 완료", "success");
-    } catch (e: unknown) {
-      toast(extractErrorMessage(e, "일부 계좌 동기화에 실패했습니다"), "error");
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed > 0) {
+        toast(`${failed}개 계좌 동기화에 실패했습니다`, "error");
+      } else {
+        toast("전체 동기화 완료", "success");
+      }
     } finally {
       setSyncingAll(false);
+      setSyncProgress({ done: 0, total: 0 });
     }
   };
 
@@ -143,7 +155,9 @@ export default function PortfolioPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
-            {syncingAll ? "갱신 중..." : "전체 갱신"}
+            {syncingAll
+              ? `${syncProgress.done}/${syncProgress.total} 갱신 중...`
+              : "전체 갱신"}
           </button>
           <span className="text-xs text-gray-400 dark:text-gray-500">{stockAccounts.length}개 증권사 계좌</span>
         </div>
@@ -205,7 +219,11 @@ export default function PortfolioPage() {
         />
       )}
 
-      {tab === "포트폴리오 분석" && <PortfolioAnalysisTab />}
+      {tab === "포트폴리오 분석" && (
+        <ErrorBoundary variant="section">
+          <PortfolioAnalysisTab />
+        </ErrorBoundary>
+      )}
     </div>
   );
 }

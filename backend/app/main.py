@@ -3,10 +3,12 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
+import sentry_sdk
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
@@ -21,6 +23,14 @@ from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
 
 logger = structlog.get_logger()
+
+if settings.sentry_dsn:
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.app_env,
+        traces_sample_rate=0.1,
+    )
+    logger.info("sentry_initialized", env=settings.app_env)
 
 _SECRET_PATTERN = re.compile(
     r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
@@ -59,6 +69,8 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs" if settings.app_env == "development" else None,
 )
+
+Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

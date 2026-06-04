@@ -18,7 +18,7 @@ from app.models.asset import AssetAccount, AssetSnapshot, Position, Transaction
 from app.models.user import UserSettings
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.dividend_aggregator import get_dividend_summary
-from app.utils.cache_keys import benchmark_key, monthly_trend_key
+from app.utils.cache_keys import TTL_BENCHMARK, TTL_MONTHLY_TREND, benchmark_key, monthly_trend_key
 from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
@@ -289,7 +289,7 @@ async def _get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis=None) -
 
     if redis:
         with contextlib.suppress(Exception):
-            await redis.set(cache_key, json.dumps(data), ex=300)
+            await redis.set(cache_key, json.dumps(data), ex=TTL_MONTHLY_TREND)
 
     return data
 
@@ -416,9 +416,90 @@ async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:
         data = {"kospi_pct": None, "sp500_pct": None}
 
     if redis:
-        await redis.set(cache_key, json.dumps(data), ex=86400)
+        await redis.set(cache_key, json.dumps(data), ex=TTL_BENCHMARK)
 
     return data
+
+
+async def get_benchmark_comparison(
+    user_id: uuid.UUID,
+    months: int,
+    indices: list[str],
+    db: AsyncSession,
+    redis,
+) -> list[dict]:
+    """월별 사용자 자산 수익률 vs 벤치마크 수익률 비교.
+
+    각 월의 값을 첫 번째 월 대비 누적 수익률(%)로 반환.
+    """
+    monthly = await _get_monthly_trend(user_id, db, redis)
+    if len(monthly) < 2:
+        return []
+
+    symbol_map = {
+        "KOSPI": "^KS11",
+        "SP500": "^GSPC",
+        "NASDAQ": "^IXIC",
+    }
+    requested = {k: symbol_map[k] for k in indices if k in symbol_map}
+
+    first_month = monthly[0]["month"]
+    try:
+        start_dt = date.fromisoformat(first_month)
+    except ValueError:
+        start_dt = date(int(first_month[:4]), int(first_month[5:7]), 1)
+
+    end_dt = date.today() + timedelta(days=1)
+
+    def _fetch_monthly_closes() -> dict[str, list[float | None]]:
+        import yfinance as yf  # type: ignore[import-untyped]
+
+        result: dict[str, list[float | None]] = {}
+        for key, symbol in requested.items():
+            try:
+                hist = yf.Ticker(symbol).history(start=start_dt, end=end_dt, interval="1mo")
+                if hist.empty:
+                    result[key] = [None] * len(monthly)
+                    continue
+                closes: list[float | None] = []
+                for point in monthly:
+                    m = point["month"][:7]
+                    matched = [
+                        float(r["Close"])
+                        for idx, r in hist.iterrows()
+                        if str(idx)[:7] == m
+                    ]
+                    closes.append(matched[0] if matched else None)
+                result[key] = closes
+            except Exception:
+                result[key] = [None] * len(monthly)
+        return result
+
+    loop = asyncio.get_running_loop()
+    try:
+        closes_map = await asyncio.wait_for(
+            loop.run_in_executor(None, _fetch_monthly_closes), timeout=20.0
+        )
+    except Exception:
+        closes_map = {k: [None] * len(monthly) for k in requested}
+
+    user_base = monthly[0]["total_krw"]
+    output: list[dict] = []
+    for i, point in enumerate(monthly):
+        entry: dict = {
+            "month": point["month"][:7],
+            "user_pct": round((point["total_krw"] / user_base - 1) * 100, 2) if user_base else None,
+        }
+        for key, closes in closes_map.items():
+            base_close = next((c for c in closes if c is not None), None)
+            cur = closes[i] if i < len(closes) else None
+            entry[key.lower() + "_pct"] = (
+                round((cur / base_close - 1) * 100, 2)
+                if cur is not None and base_close and base_close > 0
+                else None
+            )
+        output.append(entry)
+    return output
 
 
 async def _calc_net_deposits_this_year(user_id: uuid.UUID, db: AsyncSession) -> float:

@@ -10,6 +10,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Text,
     UniqueConstraint,
     func,
 )
@@ -105,4 +106,25 @@ class StockPriceAlert(Base):
 
     __table_args__ = (
         Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),
+    )
+
+
+class AlertHistory(Base):
+    """알림 발송 이력 — 환율/리밸런싱/주가 알림 발송 시 자동 저장."""
+
+    __tablename__ = "alert_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # EXCHANGE_RATE | REBALANCING | STOCK_PRICE
+    alert_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index("idx_alert_history_user_created", "user_id", "created_at"),
     )

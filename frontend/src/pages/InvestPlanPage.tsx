@@ -8,6 +8,7 @@ import { fetchDCAAnalysis } from "../api/invest";
 import { fetchTaxSummary, fetchOverseasPositionsTax } from "../api/tax";
 import DCAProjectionChart from "../components/invest/DCAProjectionChart";
 import TaxPlannerSection from "../components/invest/TaxPlannerSection";
+import ErrorBoundary from "../components/ErrorBoundary";
 import GoalTimelineCard from "../components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "../components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "../components/invest/YearlyAchievementTable";
@@ -208,14 +209,16 @@ export default function InvestPlanPage() {
       </div>
 
       {isConfigured && data && (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
-          <DCAProjectionChart data={data.projection_months} />
-          <div className="space-y-5">
-            <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
-            <YearlyAchievementTable data={data.yearly_achievements} />
-            <MonthlyAchievementTable data={data.projection_months} />
+        <ErrorBoundary variant="section">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
+            <DCAProjectionChart data={data.projection_months} />
+            <div className="space-y-5">
+              <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
+              <YearlyAchievementTable data={data.yearly_achievements} />
+              <MonthlyAchievementTable data={data.projection_months} />
+            </div>
           </div>
-        </div>
+        </ErrorBoundary>
       )}
 
       {/* 세금 추정 섹션 */}
@@ -305,7 +308,9 @@ export default function InvestPlanPage() {
               </div>
             )}
             {showTax && !posLoading && positionsData && (
-              <TaxPlannerSection positions={positionsData} />
+              <ErrorBoundary variant="section">
+                <TaxPlannerSection positions={positionsData} />
+              </ErrorBoundary>
             )}
           </div>
         )}

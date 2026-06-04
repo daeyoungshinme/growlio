@@ -291,6 +291,7 @@ export default function PortfolioAnalysisTab() {
                               )}
                               <button
                                 onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
+                                aria-label="포트폴리오 수정"
                                 className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
                               >
                                 <Edit2 size={13} />
@@ -303,6 +304,7 @@ export default function PortfolioAnalysisTab() {
                                     : "text-gray-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
                                 }`}
                                 title="리밸런싱 알림 설정"
+                                aria-label="리밸런싱 알림 설정"
                               >
                                 <Bell size={13} />
                               </button>
@@ -311,6 +313,7 @@ export default function PortfolioAnalysisTab() {
                                   e.stopPropagation();
                                   setConfirmDeleteId(p.id);
                                 }}
+                                aria-label="포트폴리오 삭제"
                                 className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
                               >
                                 <Trash2 size={13} />

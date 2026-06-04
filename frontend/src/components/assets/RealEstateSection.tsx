@@ -56,7 +56,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 추가</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="닫기" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -185,7 +185,7 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 수정</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="닫기" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -299,11 +299,11 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
           {re?.purchase_date && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">매입일: {re.purchase_date}</p>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => onEdit(account)} title="수정"
+          <button onClick={() => onEdit(account)} title="수정" aria-label="수정"
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
             <Pencil size={15} />
           </button>
-          <button onClick={() => onDelete(account.id)} disabled={isDeleting} title="삭제"
+          <button onClick={() => onDelete(account.id)} disabled={isDeleting} title="삭제" aria-label="삭제"
             className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50">
             <Trash2 size={15} />
           </button>

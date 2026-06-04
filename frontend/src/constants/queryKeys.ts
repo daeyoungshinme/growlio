@@ -23,4 +23,6 @@ export const QUERY_KEYS = {
   overseasPositionsTax: ["overseas-positions-tax"] as const,
   dartDisclosures: (days: number) => ["dart-disclosures", days] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
+  alertHistory: ["alert-history"] as const,
+  benchmark: (indices: string, months: number) => ["benchmark", indices, months] as const,
 } as const;

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.models.asset import AssetAccount, AssetSnapshot
+    from app.models.asset import AssetAccount
 
 
 @dataclass
@@ -40,25 +40,6 @@ class BalanceResult:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
-class FinancialProvider(ABC):
-    """모든 금융기관 제공자의 공통 인터페이스."""
-
-    PROVIDER_ID: str = ""
-    PROVIDER_NAME: str = ""
-
-    @abstractmethod
-    async def get_access_token(self, credentials: dict[str, str]) -> str:
-        """OAuth2 액세스 토큰을 획득한다."""
-
-    @abstractmethod
-    async def get_balance(self, credentials: dict[str, str], account_no: str) -> BalanceResult:
-        """잔고·보유종목을 조회한다."""
-
-    @abstractmethod
-    async def get_current_price(self, credentials: dict[str, str], ticker: str, market: str) -> float:
-        """종목 현재가를 조회한다."""
-
-
 class BrokerProvider(ABC):
     """증권사 동기화 공통 인터페이스.
 
@@ -71,8 +52,8 @@ class BrokerProvider(ABC):
     @abstractmethod
     async def sync(
         self,
-        account: "AssetAccount",
-        db: "AsyncSession",
+        account: AssetAccount,
+        db: AsyncSession,
         redis: Any,
     ) -> BalanceResult:
         """잔고·보유종목을 조회해 BalanceResult를 반환한다."""

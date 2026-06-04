@@ -117,3 +117,13 @@ export const reactivateStockPriceAlert = (id: string) =>
 
 export const deleteStockPriceAlert = (id: string) =>
   api.delete(`/alerts/stock-price/${id}`).then((r) => r.data);
+
+export interface AlertHistoryItem {
+  id: string;
+  alert_type: "EXCHANGE_RATE" | "REBALANCING" | "STOCK_PRICE";
+  message: string;
+  created_at: string;
+}
+
+export const fetchAlertHistory = (params?: { skip?: number; limit?: number }) =>
+  api.get<AlertHistoryItem[]>("/alerts/history", { params }).then((r) => r.data);

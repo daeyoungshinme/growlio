@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.database import get_db
 from app.limiter import limiter
-from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
+from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User
 
@@ -448,3 +448,32 @@ async def delete_stock_price_alert(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
     await db.delete(alert)
     await db.commit()
+
+
+class AlertHistoryItem(BaseModel):
+    id: uuid.UUID
+    alert_type: str
+    message: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+@router.get("/history", response_model=list[AlertHistoryItem])
+@limiter.limit("30/minute")
+async def list_alert_history(
+    request: Request,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """알림 발송 이력 조회 (최신순)."""
+    result = await db.execute(
+        select(AlertHistory)
+        .where(AlertHistory.user_id == current_user.id)
+        .order_by(AlertHistory.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()

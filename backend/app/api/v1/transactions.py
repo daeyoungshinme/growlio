@@ -62,6 +62,7 @@ async def create_transaction(
         transaction_date=req.transaction_date,
         ticker=req.ticker,
         notes=req.notes,
+        fee=req.fee,
     )
     db.add(tx)
     await db.commit()
@@ -101,6 +102,8 @@ async def update_transaction(
         tx.ticker = req.ticker
     if req.notes is not None:
         tx.notes = req.notes
+    if req.fee is not None:
+        tx.fee = req.fee
     await db.commit()
     await db.refresh(tx)
     return tx

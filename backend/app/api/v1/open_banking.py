@@ -21,13 +21,12 @@ from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt, encrypt
+from app.utils.cache_keys import TTL_OB_STATE, ob_state_key
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
-_OB_STATE_PREFIX = "ob_state:"
-_OB_STATE_TTL = 600  # 10분
 _OB_TOKEN_DEFAULT_TTL = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
 
 
@@ -38,7 +37,7 @@ async def connect_open_banking(
 ):
     """오픈뱅킹 OAuth2 인증 시작 — 금융결제원 인증 페이지로 리다이렉트."""
     state = secrets.token_urlsafe(16)
-    await redis.setex(f"{_OB_STATE_PREFIX}{state}", _OB_STATE_TTL, str(current_user.id))
+    await redis.setex(ob_state_key(state), TTL_OB_STATE, str(current_user.id))
     redirect_url = get_authorize_url(state)
     return {"authorize_url": redirect_url}
 
@@ -51,8 +50,7 @@ async def open_banking_callback(
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
-    redis_key = f"{_OB_STATE_PREFIX}{state}"
-    user_id = await redis.getdel(redis_key)
+    user_id = await redis.getdel(ob_state_key(state))
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 

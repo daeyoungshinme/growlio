@@ -34,6 +34,7 @@ from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import dividend_ticker_summary_key
+from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
 from app.utils.redis_lock import redis_lock
 
@@ -447,6 +448,8 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
         raise HTTPException(status_code=e.http_status, detail=e.detail) from e
     except ProviderNetworkError as e:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(e)) from e
+    except CircuitOpenError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
 
     await redis.delete(dividend_ticker_summary_key(current_user.id, date.today().year))
     return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}

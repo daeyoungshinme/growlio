@@ -42,6 +42,10 @@ dependencies = [
     "slowapi>=0.1.9",
     # Retry logic for external APIs
     "tenacity>=8.3.0",
+    # Error tracking
+    "sentry-sdk[fastapi]>=2.0.0",
+    # Metrics
+    "prometheus-fastapi-instrumentator>=6.1.0",
 ]
 
 [project.optional-dependencies]
@@ -54,6 +58,7 @@ dev = [
     "mypy>=1.10.0",
     "bandit>=1.7.0",
     "pip-audit>=2.7.0",
+    "pytest-cov>=5.0.0",
 ]
 
 [build-system]

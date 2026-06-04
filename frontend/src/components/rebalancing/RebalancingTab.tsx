@@ -221,6 +221,7 @@ export default function RebalancingTab() {
                 <div className="flex gap-1 ml-2">
                   <button
                     onClick={(e) => { e.stopPropagation(); openEdit(p); }}
+                    aria-label="포트폴리오 수정"
                     className="p-1 text-gray-500 hover:text-blue-400 hover:bg-gray-700 rounded transition-colors"
                   >
                     <Edit2 size={13} />
@@ -230,6 +231,7 @@ export default function RebalancingTab() {
                       e.stopPropagation();
                       setConfirmDeleteId(p.id);
                     }}
+                    aria-label="포트폴리오 삭제"
                     className="p-1 text-gray-500 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                   >
                     <Trash2 size={13} />

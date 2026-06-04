@@ -13,7 +13,9 @@ from typing import Any
 import structlog
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BrokerProvider
 from app.providers.kis_provider import KISProvider
@@ -22,6 +24,8 @@ from app.providers.manual_provider import ManualProvider
 from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import monthly_trend_key
+from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit
+from app.utils.metrics import broker_sync_duration
 
 logger = structlog.get_logger()
 
@@ -32,18 +36,53 @@ _PROVIDERS: dict[str, BrokerProvider] = {
     "MANUAL": ManualProvider(),
 }
 
+_CIRCUITS: dict[str, CircuitBreaker] = {
+    "KIS_API": kis_circuit,
+    "KIWOOM_API": kiwoom_circuit,
+}
 
-async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> AssetSnapshot:
-    """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
-    SyncError 계층 예외를 그대로 전파한다. API 레이어에서 HTTPException으로 변환.
+def get_provider(account: AssetAccount) -> BrokerProvider:
+    """data_source에 맞는 BrokerProvider를 반환한다.
+
+    지원하지 않는 데이터 소스면 ProviderCredentialError를 raise한다.
     """
     from app.exceptions import ProviderCredentialError
 
     provider = _PROVIDERS.get(account.data_source)
     if provider is None:
         raise ProviderCredentialError(f"지원하지 않는 데이터 소스: {account.data_source}")
-    balance = await provider.sync(account, db, redis)
+    return provider
+
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    retry=retry_if_exception_type(ProviderNetworkError),
+    reraise=True,
+)
+async def _retry_provider_sync(
+    provider: BrokerProvider, account: AssetAccount, db: AsyncSession, redis: Any
+) -> Any:
+    """ProviderNetworkError에 한해 지수 백오프(2s→4s→8s, 최대 30s) 재시도."""
+    return await provider.sync(account, db, redis)
+
+
+async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> AssetSnapshot:
+    """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
+
+    SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다. API 레이어에서 HTTPException으로 변환.
+    """
+    import time as _time
+
+    _sync_start = _time.monotonic()
+    provider = get_provider(account)
+    circuit = _CIRCUITS.get(account.data_source)
+
+    if circuit:
+        balance = await circuit.call(_retry_provider_sync, provider, account, db, redis)
+    else:
+        balance = await _retry_provider_sync(provider, account, db, redis)
 
     if balance.deposit_krw:
         account.deposit_krw = balance.deposit_krw
@@ -94,6 +133,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
     with contextlib.suppress(Exception):
         await redis.delete(monthly_trend_key(account.user_id))
 
+    broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
+        _time.monotonic() - _sync_start
+    )
     logger.info(
         "account_synced",
         account_id=str(account.id),

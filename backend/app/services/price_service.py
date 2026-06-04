@@ -27,7 +27,13 @@ from app.services.yahoo_price import (
     _sync_yahoo_price,
     _yfinance_sem,
 )
-from app.utils.cache_keys import current_price_key, price_return_key
+from app.utils.cache_keys import (
+    TTL_PRICE_CURRENT,
+    TTL_PRICE_RETURN,
+    current_price_key,
+    price_return_key,
+)
+from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
 
@@ -53,8 +59,13 @@ async def fetch_current_price(
 
     loop = asyncio.get_running_loop()
 
-    async with _yfinance_sem:
-        price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
+    if yahoo_circuit.is_available():
+        async with _yfinance_sem:
+            price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
+        if price:
+            yahoo_circuit.record_success()
+        else:
+            yahoo_circuit.record_failure()
 
     if not price:
         account = await _get_any_kis_account(user_id, db)
@@ -66,7 +77,7 @@ async def fetch_current_price(
 
     if price and redis:
         with contextlib.suppress(Exception):
-            await redis.set(cache_key, str(price), ex=900)
+            await redis.set(cache_key, str(price), ex=TTL_PRICE_CURRENT)
 
     return price
 
@@ -86,10 +97,17 @@ async def fetch_prices_batch(
 
     loop = asyncio.get_running_loop()
 
-    async with _yfinance_sem:
-        price_map: dict[str, float] = await loop.run_in_executor(
-            None, partial(_sync_yahoo_batch, tickers)
-        )
+    if yahoo_circuit.is_available():
+        async with _yfinance_sem:
+            price_map: dict[str, float] = await loop.run_in_executor(
+                None, partial(_sync_yahoo_batch, tickers)
+            )
+        if price_map:
+            yahoo_circuit.record_success()
+        else:
+            yahoo_circuit.record_failure()
+    else:
+        price_map = {}
 
     missing = [(t, m) for t, m in tickers if t not in price_map or price_map[t] == 0]
     if missing:
@@ -126,14 +144,19 @@ async def get_historical_returns(
                 if cached:
                     return json.loads(cached)
 
+        if not yahoo_circuit.is_available():
+            return None
+
         async with _yfinance_sem:
             result = await loop.run_in_executor(
                 None, partial(_sync_calc_return, ticker, market, years)
             )
+        if result:
+            yahoo_circuit.record_success()
 
         if result and redis:
             with contextlib.suppress(Exception):
-                await redis.setex(cache_key, 86400, json.dumps(result))
+                await redis.setex(cache_key, TTL_PRICE_RETURN, json.dumps(result))
 
         return result
 

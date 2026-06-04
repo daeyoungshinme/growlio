@@ -4,11 +4,12 @@ from typing import Any
 import structlog
 
 from app.kis.constants import KIS_MOCK_BASE_URL, KIS_REAL_BASE_URL
-from app.providers.http_client import broker_request
+from app.providers.http_client import AsyncRateLimiter, broker_request
 
 logger = structlog.get_logger()
 
-_semaphore = asyncio.Semaphore(5)
+_semaphore = asyncio.Semaphore(1)
+_rate_limiter = AsyncRateLimiter(rate=0.9)  # 1.11s 간격 — KIS 1s 제한 대비 11% 버퍼
 
 
 class KisTokenExpiredError(Exception):
@@ -44,9 +45,10 @@ async def kis_request(
     headers: dict[str, str],
     params: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
-    retries: int = 3,
+    retries: int = 5,
 ) -> dict[str, Any]:
     """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함."""
+    await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
     return await broker_request(
         method,
         path,
@@ -57,6 +59,7 @@ async def kis_request(
         retries=retries,
         ssl_verify=not is_mock,
         semaphore=_semaphore,
+        post_request_delay=0.0,
         log_prefix="kis",
         check_token_expired=_check_kis_token_expired,
         check_api_error=_check_kis_api_error,

@@ -90,6 +90,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                 <button
                   onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
                   title="계좌명 수정"
+                  aria-label="계좌명 수정"
                   className="p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
                   <Pencil size={12} />
                 </button>
@@ -115,22 +116,26 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
             <button onClick={() => onSync(account.id)} disabled={isSyncing}
               title={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
+              aria-label={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
               className="p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50">
               {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
           )}
           <button onClick={() => onManagePositions({ id: account.id, name: account.name, dataSource: account.data_source })}
             title="종목 관리"
+            aria-label="종목 관리"
             className="p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors">
             <BarChart2 size={16} />
           </button>
           <button onClick={() => onTransactions({ id: account.id, name: account.name })}
             title="입출금 내역"
+            aria-label="입출금 내역"
             className="p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors">
             <Receipt size={16} />
           </button>
           <button onClick={() => onDelete(account.id)} disabled={isDeleting}
             title="계좌 삭제"
+            aria-label="계좌 삭제"
             className="p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50">
             <Trash2 size={16} />
           </button>
@@ -220,6 +225,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                     setEditUsdValue(account.deposit_usd ? String(account.deposit_usd) : "");
                     setEditDepositMode(true);
                   }}
+                  aria-label="예수금 수정"
                   className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0">
                   <Pencil size={12} />
                 </button>

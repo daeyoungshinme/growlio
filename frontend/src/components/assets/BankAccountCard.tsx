@@ -66,6 +66,7 @@ export default function BankAccountCard({ account, usdRate, onDelete, onEditModa
               <button
                 onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
                 title="계좌명 수정"
+                aria-label="계좌명 수정"
                 className="p-2 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
                 <Pencil size={16} />
               </button>
@@ -92,6 +93,7 @@ export default function BankAccountCard({ account, usdRate, onDelete, onEditModa
           <button
             onClick={() => onEditModal(account.id)}
             title="금액 수정"
+            aria-label="금액 수정"
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
             <Pencil size={15} />
           </button>
@@ -101,13 +103,15 @@ export default function BankAccountCard({ account, usdRate, onDelete, onEditModa
             onClick={() => onSync(account.id)}
             disabled={isSyncing}
             title="잔액 새로고침"
+            aria-label="잔액 새로고침"
             className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-40">
             <RefreshCw size={15} className={isSyncing ? "animate-spin" : ""} />
           </button>
         )}
         <button onClick={() => onDelete(account.id)} disabled={isDeleting}
           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
-          title="계좌 삭제">
+          title="계좌 삭제"
+          aria-label="계좌 삭제">
           <Trash2 size={16} />
         </button>
       </div>

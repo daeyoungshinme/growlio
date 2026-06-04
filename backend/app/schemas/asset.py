@@ -172,11 +172,17 @@ class TransactionCreate(BaseModel):
     transaction_date: date
     ticker: str | None = None
     notes: str | None = None
+    fee: float | None = None
 
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float) -> float:
         return _validate_positive(v)  # type: ignore[return-value]
+
+    @field_validator("fee")
+    @classmethod
+    def fee_non_negative(cls, v: float | None) -> float | None:
+        return _validate_non_negative(v)
 
 
 class TransactionUpdate(BaseModel):
@@ -185,11 +191,17 @@ class TransactionUpdate(BaseModel):
     transaction_date: date | None = None
     ticker: str | None = None
     notes: str | None = None
+    fee: float | None = None
 
     @field_validator("amount")
     @classmethod
     def amount_positive(cls, v: float | None) -> float | None:
         return _validate_positive(v)
+
+    @field_validator("fee")
+    @classmethod
+    def fee_non_negative(cls, v: float | None) -> float | None:
+        return _validate_non_negative(v)
 
 
 class TransactionResponse(BaseModel):
@@ -197,6 +209,7 @@ class TransactionResponse(BaseModel):
     account_id: UUID | None
     transaction_type: TransactionType
     amount: float
+    fee: float | None
     transaction_date: date
     ticker: str | None
     notes: str | None

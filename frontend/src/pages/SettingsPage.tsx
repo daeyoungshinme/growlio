@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Sun, Moon, LogOut } from "lucide-react";
+import { Sun, Moon, LogOut, Bell } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api/client";
 import { type SettingsData } from "../api/settings";
+import { fetchAlertHistory, type AlertHistoryItem } from "../api/alerts";
 import { toast } from "../utils/toast";
 import { useThemeStore } from "../stores/themeStore";
 import { useAuthStore } from "../stores/authStore";
@@ -14,6 +15,59 @@ import { SectionCard, ConnectedBadge } from "../components/settings/shared";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { STALE_TIME } from "../constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "../constants/inputStyles";
+
+const ALERT_TYPE_LABELS: Record<string, string> = {
+  EXCHANGE_RATE: "환율 알림",
+  REBALANCING: "리밸런싱 알림",
+  STOCK_PRICE: "주가 알림",
+};
+
+function AlertHistorySection() {
+  const { data: history, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.alertHistory,
+    queryFn: () => fetchAlertHistory({ limit: 50 }),
+    staleTime: STALE_TIME.SHORT,
+  });
+
+  return (
+    <SectionCard title="알림 발송 이력">
+      {isLoading ? (
+        <div className="h-20 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
+      ) : !history || history.length === 0 ? (
+        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">발송된 알림 이력이 없습니다.</p>
+      ) : (
+        <div className="max-h-64 overflow-y-auto space-y-2">
+          {history.map((item: AlertHistoryItem) => (
+            <div
+              key={item.id}
+              className="flex items-start gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+            >
+              <Bell size={13} className="text-blue-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                    {ALERT_TYPE_LABELS[item.alert_type] ?? item.alert_type}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {new Date(item.created_at).toLocaleString("ko-KR", {
+                      month: "numeric",
+                      day: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 leading-relaxed">
+                  {item.message}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionCard>
+  );
+}
 
 const inputClass = `mt-1 w-full ${INPUT_MD}`;
 const labelClass = LABEL_MD;
@@ -132,6 +186,8 @@ export default function SettingsPage() {
       />
 
       <StockPriceAlertSection />
+
+      <AlertHistorySection />
 
       <DCASettingsSection
         key={current ? "dca-loaded" : "dca-loading"}

@@ -2,7 +2,7 @@ import React from "react";
 import { RebalancingItem } from "../../api/rebalancing";
 import { fmtKrw, fmtKrwPrice } from "../../utils/format";
 import { SideBadge } from "./RebalancingBadges";
-import { ExecutionAction, OrderType, PriceLoadState, RebalancingExecutionHook, isOverseasMarket } from "../../hooks/useRebalancingExecution";
+import { CashAnalysis, ExecutionAction, OrderType, PriceLoadState, RebalancingExecutionHook, isOverseasMarket } from "../../hooks/useRebalancingExecution";
 
 // ─── 하위 컴포넌트 ─────────────────────────────────────────────────────────────
 
@@ -621,6 +621,7 @@ function RebalancingOrderTable({
                           }
                           disabled={isOnlyAccount}
                           title="이 계좌에서 제거"
+                          aria-label="이 계좌에서 제거"
                           className="text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
                         >
                           ×
@@ -635,6 +636,42 @@ function RebalancingOrderTable({
         </table>
       </div>
     </>
+  );
+}
+
+function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
+  const { deposit, sellProceeds, totalAvailable, buyCost, surplus } = analysis;
+  if (deposit === null) return null;
+  const hasSell = sellProceeds !== null && sellProceeds > 0;
+  const hasBuy = buyCost !== null && buyCost > 0;
+  const surplusKnown = surplus !== null;
+  return (
+    <div className="px-4 py-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] bg-gray-900/20 border-b border-gray-700/30">
+      <span className="text-gray-500">
+        예수금 <span className="text-gray-300">{fmtKrwPrice(deposit)}</span>
+      </span>
+      {hasSell && (
+        <span className="text-gray-500">
+          + 매도예상 <span className="text-blue-400">+{fmtKrwPrice(sellProceeds!)}</span>
+        </span>
+      )}
+      {hasSell && totalAvailable !== null && (
+        <span className="text-gray-500">
+          = 사용가능 <span className="text-gray-200">{fmtKrwPrice(totalAvailable)}</span>
+        </span>
+      )}
+      {hasBuy && <span className="text-gray-600">|</span>}
+      {hasBuy && (
+        <span className="text-gray-500">
+          매수필요 <span className="text-red-400">{fmtKrwPrice(buyCost!)}</span>
+        </span>
+      )}
+      {surplusKnown && hasBuy && (
+        <span className={surplus! >= 0 ? "text-green-400" : "text-amber-400"}>
+          {surplus! >= 0 ? `여유 +${fmtKrwPrice(surplus!)}` : `부족 ${fmtKrwPrice(Math.abs(surplus!))}`}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -747,6 +784,7 @@ export function RebalancingConfirmStep({ exec, ordersCount }: Props) {
             const hasData =
               sellRows.length > 0 || buyRows.length > 0 || unassignedBuyItems.length > 0;
             const { sells, buys } = getAccountSummary(acc.id);
+            const cashAnalysis = exec.getCashAnalysis(acc.id);
 
             return (
               <div key={acc.id} className="border border-gray-700 rounded-xl overflow-hidden">
@@ -801,6 +839,8 @@ export function RebalancingConfirmStep({ exec, ordersCount }: Props) {
                     </button>
                   </div>
                 </div>
+
+                <CashSummaryBar analysis={cashAnalysis} />
 
                 {!hasData && bState !== "loaded" && (
                   <div className="px-4 py-3 text-xs text-gray-500 text-center">

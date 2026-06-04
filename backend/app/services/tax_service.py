@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from typing import Any
 
@@ -27,8 +28,12 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     - 해외 양도세: 미실현 손익 기준 추정치 (250만원 공제 후 22%)
     - 국내 양도세: 대주주 요건(10억) 초과 시 경고
     - 금융소득 종합과세 경계(2000만원) 경고
+    - 연간 거래 수수료 합계 (fee 컬럼)
     """
-    dividend_income = await _calc_dividend_income(user_id, year, db)
+    dividend_income, total_fees = await asyncio.gather(
+        _calc_dividend_income(user_id, year, db),
+        _calc_total_fees(user_id, year, db),
+    )
     dividend_tax = dividend_income * _DIVIDEND_TAX_RATE
 
     overseas_unrealized, domestic_stock_krw = await _calc_stock_unrealized(user_id, db)
@@ -39,6 +44,9 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
 
     total_financial_income = dividend_income + max(0.0, overseas_unrealized)
     comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
+
+    positions = await get_overseas_positions_detail(user_id, db)
+    harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable)
 
     return {
         "year": year,
@@ -51,6 +59,8 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
         "domestic_large_holder_warning": domestic_large_holder_warning,
         "comprehensive_tax_warning": comprehensive_tax_warning,
         "total_estimated_tax_krw": round(dividend_tax + overseas_tax_estimated, 0),
+        "total_fees_krw": round(total_fees, 0),
+        "harvesting_recommendations": harvesting,
         "note": (
             "해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. "
             "실제 납부액은 실현 손익 기준으로 계산됩니다."
@@ -125,6 +135,54 @@ async def get_overseas_positions_detail(
                 }
             )
     return positions
+
+
+def _build_harvesting_recommendations(
+    positions: list[dict], current_taxable_gain: float
+) -> list[dict]:
+    """손실 수확(Tax-Loss Harvesting) 추천 목록.
+
+    현재 과세 대상 이익이 있을 때, 손실 종목 전량 매도로 절세 가능한 금액을 계산.
+    """
+    if current_taxable_gain <= 0:
+        return []
+
+    loss_positions = [p for p in positions if p["unrealized_pnl_krw"] < 0]
+    loss_positions.sort(key=lambda p: p["unrealized_pnl_krw"])
+
+    recommendations: list[dict] = []
+    remaining_gain = current_taxable_gain
+    for pos in loss_positions:
+        loss = abs(pos["unrealized_pnl_krw"])
+        offset = min(loss, remaining_gain)
+        tax_saved = round(offset * _OVERSEAS_TAX_RATE, 0)
+        recommendations.append(
+            {
+                "ticker": pos["ticker"],
+                "name": pos["name"],
+                "market": pos["market"],
+                "unrealized_loss_krw": round(pos["unrealized_pnl_krw"], 0),
+                "tax_saved_krw": tax_saved,
+                "qty": pos["qty"],
+            }
+        )
+        remaining_gain -= loss
+        if remaining_gain <= 0:
+            break
+    return recommendations
+
+
+async def _calc_total_fees(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
+    result = await db.execute(
+        select(func.sum(Transaction.fee).label("total"))
+        .where(
+            Transaction.user_id == user_id,
+            Transaction.fee.is_not(None),
+            func.extract("year", Transaction.transaction_date) == year,
+        )
+    )
+    total = result.scalar()
+    return float(total) if total else 0.0
 
 
 async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:

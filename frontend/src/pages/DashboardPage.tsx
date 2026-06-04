@@ -8,9 +8,9 @@ import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
 import AllocationHistoryChart from "../components/dashboard/AllocationHistoryChart";
 import DisclosureFeedCard from "../components/dashboard/DisclosureFeedCard";
 import HeroSummaryCard from "../components/dashboard/HeroSummaryCard";
-import MonthlyTrendSection from "../components/dashboard/MonthlyTrendSection";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { QUERY_KEYS } from "../constants/queryKeys";
 
 export default function DashboardPage() {
@@ -121,14 +121,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: 월별 자산 추이 */}
-      <MonthlyTrendSection monthlyTrend={data.monthly_trend ?? []} />
-
-      {/* Row 4: 자산 배분 추이 */}
-      <AllocationHistoryChart />
+      {/* Row 3: 자산 추이 */}
+      <ErrorBoundary variant="section">
+        <AllocationHistoryChart />
+      </ErrorBoundary>
 
       {/* Row 5: 보유 종목 DART 공시 피드 */}
-      <DisclosureFeedCard />
+      <ErrorBoundary variant="section">
+        <DisclosureFeedCard />
+      </ErrorBoundary>
     </div>
   );
 }

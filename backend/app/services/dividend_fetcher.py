@@ -28,6 +28,12 @@ from app.services.dividend_providers import (
     sync_yahoo_dividend_info,
 )
 from app.services.yahoo_price import _to_yahoo_symbol
+from app.utils.cache_keys import (
+    TTL_DIVIDEND_INFO,
+    TTL_DIVIDEND_MONTHS,
+    dividend_info_key,
+    dividend_months_key,
+)
 
 logger = structlog.get_logger()
 
@@ -68,8 +74,8 @@ async def fetch_ticker_dividend_info(
             months = []
             need_months_fetch = True
 
-    months_cache_key = f"dividend:months:{ticker}:{market}"
-    info_cache_key = f"dividend:info:{ticker}:{market}"
+    months_cache_key = dividend_months_key(ticker, market)
+    info_cache_key = dividend_info_key(ticker, market)
 
     if need_months_fetch:
         cached_months = await redis.get(months_cache_key)
@@ -191,10 +197,10 @@ async def fetch_ticker_dividend_info(
                 months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
 
     if need_months_fetch:
-        await redis.setex(months_cache_key, 604800, json.dumps(months))  # 7일 캐시
+        await redis.setex(months_cache_key, TTL_DIVIDEND_MONTHS, json.dumps(months))
 
     if dps > 0 or yield_decimal > 0:
-        await redis.setex(info_cache_key, 86400, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
+        await redis.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 

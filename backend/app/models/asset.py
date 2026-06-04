@@ -168,6 +168,8 @@ class Transaction(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
+    fee: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+
     account: Mapped["AssetAccount | None"] = relationship(back_populates="transactions")
 
     __table_args__ = (

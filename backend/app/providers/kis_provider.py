@@ -13,7 +13,9 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
 from app.providers.base import BalanceResult, BrokerProvider, Position
+from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
+from app.utils.cache_keys import TTL_HAS_OVERSEAS_FALSE, TTL_HAS_OVERSEAS_TRUE, has_overseas_key
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -45,8 +47,8 @@ class KISProvider(BrokerProvider):
                 domestic = await get_domestic_balance(
                     app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
                 )
-                overseas = await get_overseas_balance(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+                overseas = await _fetch_overseas_cached(
+                    app_key, app_secret, access_token, account.kis_account_no, is_mock, account.id, redis
                 )
             except KisTokenExpiredError:
                 logger.warning("kis_token_expired_refreshing", account_no=account.kis_account_no)
@@ -57,12 +59,16 @@ class KISProvider(BrokerProvider):
                 domestic = await get_domestic_balance(
                     app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
                 )
-                overseas = await get_overseas_balance(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+                overseas = await _fetch_overseas_cached(
+                    app_key, app_secret, access_token, account.kis_account_no, is_mock, account.id, redis
                 )
         except KisApiError as e:
             raise ProviderApiError(
                 f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형이 지원되지 않거나 API 권한이 없을 수 있습니다."
+            ) from e
+        except MaxRetriesExceededError as e:
+            raise ProviderApiError(
+                "KIS API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429
             ) from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code >= 500:
@@ -117,6 +123,40 @@ class KISProvider(BrokerProvider):
             usd_krw_rate=usd_krw_rate,
             extra={"source": "KIS_API", "snapshot_date": date.today()},
         )
+
+
+_EMPTY_OVERSEAS: dict = {"positions": [], "total_value_usd": 0.0, "deposit_usd": 0.0}
+
+
+async def _fetch_overseas_cached(
+    app_key: str, app_secret: str, access_token: str,
+    account_no: str, is_mock: bool, account_id: Any, redis: Any,
+) -> dict:
+    """해외 잔고 조회 — Redis 캐시로 국내 전용 계좌의 해외 API 호출을 건너뛴다."""
+    cached = await redis.get(has_overseas_key(account_id))
+    if cached == b"0":
+        return dict(_EMPTY_OVERSEAS)
+    result = await _safe_overseas(app_key, app_secret, access_token, account_no, is_mock)
+    has_ov = bool(result["positions"])
+    await redis.setex(
+        has_overseas_key(account_id),
+        TTL_HAS_OVERSEAS_TRUE if has_ov else TTL_HAS_OVERSEAS_FALSE,
+        "1" if has_ov else "0",
+    )
+    return result
+
+
+async def _safe_overseas(
+    app_key: str, app_secret: str, access_token: str, account_no: str, is_mock: bool
+) -> dict:
+    """해외 잔고 조회. KisTokenExpiredError는 re-raise, 나머지 오류는 warn 후 빈 결과 반환."""
+    try:
+        return await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
+    except KisTokenExpiredError:
+        raise
+    except Exception as e:
+        logger.warning("kis_overseas_fetch_failed", account_no=account_no, error=str(e))
+        return dict(_EMPTY_OVERSEAS)
 
 
 def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:

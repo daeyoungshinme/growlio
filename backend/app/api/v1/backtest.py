@@ -23,6 +23,7 @@ from app.schemas.backtest import (
     CorrelationResult,
 )
 from app.services.backtest_service import compute_correlation, run_backtest
+from app.utils.cache_keys import TTL_BACKTEST, backtest_key, correlation_key
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])
 
@@ -106,7 +107,6 @@ async def delete_portfolio(
     await db.commit()
 
 
-_BACKTEST_CACHE_TTL = 86400  # 24시간
 
 
 @router.post("/run", response_model=BacktestResult)
@@ -125,14 +125,14 @@ async def run_backtest_endpoint(
     param_hash = hashlib.md5(
         json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
     ).hexdigest()
-    cache_key = f"backtest:{current_user.id}:{param_hash}"
+    cache_key = backtest_key(current_user.id, param_hash)
 
     cached = await redis.get(cache_key)
     if cached:
         return BacktestResult.model_validate_json(cached)
 
     result = await run_backtest(current_user.id, body, db)
-    await redis.setex(cache_key, _BACKTEST_CACHE_TTL, result.model_dump_json())
+    await redis.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
     return result
 
 
@@ -155,12 +155,12 @@ async def run_correlation_endpoint(
     param_hash = hashlib.md5(
         json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
     ).hexdigest()
-    cache_key = f"correlation:{current_user.id}:{param_hash}"
+    cache_key = correlation_key(current_user.id, param_hash)
 
     cached = await redis.get(cache_key)
     if cached:
         return CorrelationResult.model_validate_json(cached)
 
     result = await compute_correlation(current_user.id, body, db)
-    await redis.setex(cache_key, _BACKTEST_CACHE_TTL, result.model_dump_json())
+    await redis.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
     return result

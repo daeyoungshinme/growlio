@@ -13,6 +13,7 @@ from app.kis.order import is_overseas_market, place_domestic_order, place_overse
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services.credential_service import decrypt
+from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()
 
@@ -213,6 +214,7 @@ async def execute_rebalancing(
     except Exception as e:
         logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))
 
+    rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
     return results
 
 

@@ -17,6 +17,7 @@ from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 from app.services.dart_service import fetch_disclosures_for_tickers
+from app.utils.cache_keys import TTL_DART, dart_disclosures_key
 
 router = APIRouter(prefix="/dart", tags=["dart"])
 
@@ -49,7 +50,7 @@ async def get_disclosures(
         ) from None
 
     redis = await get_redis()
-    cache_key = f"dart:disclosures:{current_user.id}:{days}"
+    cache_key = dart_disclosures_key(current_user.id, days)
     try:
         cached = await redis.get(cache_key)
         if cached:
@@ -76,6 +77,6 @@ async def get_disclosures(
     items = await fetch_disclosures_for_tickers(tickers, api_key, days=days)
 
     with contextlib.suppress(Exception):
-        await redis.set(cache_key, json.dumps(items, ensure_ascii=False), ex=3600)
+        await redis.set(cache_key, json.dumps(items, ensure_ascii=False), ex=TTL_DART)
 
     return items

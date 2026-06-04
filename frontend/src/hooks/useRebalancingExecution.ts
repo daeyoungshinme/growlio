@@ -20,6 +20,14 @@ export type BalanceLoadState = "idle" | "loading" | "loaded" | "error" | "not_fo
 export type OrderType = "MARKET" | "LIMIT";
 export type PriceLoadState = "idle" | "loading" | "loaded" | "error";
 
+export interface CashAnalysis {
+  deposit: number | null;
+  sellProceeds: number | null;
+  totalAvailable: number | null;
+  buyCost: number | null;
+  surplus: number | null;
+}
+
 export interface ExecutionState {
   liveBalances: Record<string, KisBalancePosition[]>;
   balanceState: Record<string, BalanceLoadState>;
@@ -349,6 +357,31 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     return orders;
   }
 
+  function getCashAnalysis(accountId: string): CashAnalysis {
+    const deposit = state.depositKrw[accountId] ?? null;
+    let sellProceeds: number | null = 0;
+    for (const { item, suggestedQty } of getSellRows(accountId)) {
+      const key = `sell_${item.ticker}_${accountId}`;
+      if (!selected.has(key)) continue;
+      const qty = qtyOverrides[key] ?? suggestedQty;
+      const est = getEstimateKrw(key, item.ticker, item.market, qty);
+      if (est === null) { sellProceeds = null; break; }
+      sellProceeds = (sellProceeds ?? 0) + est;
+    }
+    let buyCost: number | null = 0;
+    for (const { item, suggestedQty } of getBuyRows(accountId)) {
+      const key = `buy_${item.ticker}_${accountId}`;
+      if (!selected.has(key)) continue;
+      const qty = qtyOverrides[key] ?? suggestedQty;
+      const est = getEstimateKrw(key, item.ticker, item.market, qty);
+      if (est === null) { buyCost = null; break; }
+      buyCost = (buyCost ?? 0) + est;
+    }
+    const totalAvailable = deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
+    const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
+    return { deposit, sellProceeds, totalAvailable, buyCost, surplus };
+  }
+
   function getAccountSummary(accountId: string) {
     const sells = getSellRows(accountId).filter((r) => selected.has(`sell_${r.item.ticker}_${accountId}`)).length;
     const buys = getBuyRows(accountId).filter((r) => selected.has(`buy_${r.item.ticker}_${accountId}`)).length;
@@ -391,6 +424,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     getBuyRows,
     getBuyTotalInfo,
     getAccountSummary,
+    getCashAnalysis,
     getLimitPriceNative,
     getEstimateKrw,
     loadLiveBalance,

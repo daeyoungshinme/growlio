@@ -9,7 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 
-revision: str = "ab1_add_data_source_and_account_type_indexes"
+revision: str = "ab1_add_ds_account_type_idx"
 down_revision: Union[str, None] = "2142c5b6b44a"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None

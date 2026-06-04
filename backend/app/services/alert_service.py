@@ -9,14 +9,24 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
+from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.utils.currency import fetch_usd_krw
+from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
 
 _MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
+
+
+async def _save_alert_history(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    alert_type: str,
+    message: str,
+) -> None:
+    db.add(AlertHistory(user_id=user_id, alert_type=alert_type, message=message))
 
 
 async def check_and_trigger_alerts(db: AsyncSession) -> None:
@@ -68,10 +78,18 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
+        direction_label = "이하" if alert.direction == "BELOW" else "이상"
+        await _save_alert_history(
+            db,
+            alert.user_id,
+            "EXCHANGE_RATE",
+            f"환율 알림: USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+        )
         triggered_count += 1
 
     if triggered_count:
         await db.commit()
+        alert_trigger_count.labels(alert_type="exchange_rate").inc(triggered_count)
         logger.info("exchange_rate_alerts_triggered", count=triggered_count, current_rate=current_rate)
 
 
@@ -250,11 +268,19 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                 logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
                 continue
 
+        drift_desc = f"{len(drifting)}개 종목 드리프트" if drifting else "정기 보고"
+        await _save_alert_history(
+            db,
+            alert.user_id,
+            "REBALANCING",
+            f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type})",
+        )
         alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1
 
     if triggered_count:
         await db.commit()
+        alert_trigger_count.labels(alert_type="rebalancing").inc(triggered_count)
         logger.info("rebalancing_alerts_triggered", count=triggered_count)
 
 
@@ -315,8 +341,19 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
+        direction_label = "이하" if alert.direction == "BELOW" else "이상"
+        await _save_alert_history(
+            db,
+            alert.user_id,
+            "STOCK_PRICE",
+            (
+                f"주가 알림: {alert.name}({alert.ticker})"
+                f" {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})"
+            ),
+        )
         triggered_count += 1
 
     if triggered_count:
         await db.commit()
+        alert_trigger_count.labels(alert_type="stock_price").inc(triggered_count)
         logger.info("stock_price_alerts_triggered", count=triggered_count)

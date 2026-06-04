@@ -204,11 +204,11 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrw(tx.amount)}</p>
-                      <button onClick={() => startEdit(tx)}
+                      <button onClick={() => startEdit(tx)} aria-label="수정"
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
                         <Pencil size={14} />
                       </button>
-                      <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending}
+                      <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending} aria-label="삭제"
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
                         <Trash2 size={14} />
                       </button>
@@ -248,11 +248,11 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                     </td>
                     <td className="px-3 py-3 text-right">
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => startEdit(tx)}
+                        <button onClick={() => startEdit(tx)} aria-label="수정"
                           className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
                           <Pencil size={15} />
                         </button>
-                        <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending}
+                        <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending} aria-label="삭제"
                           className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
                           <Trash2 size={15} />
                         </button>

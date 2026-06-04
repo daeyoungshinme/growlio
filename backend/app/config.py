@@ -51,6 +51,9 @@ class Settings(BaseSettings):
 
     frontend_url: str = "http://localhost:5173"
 
+    # Sentry 에러 추적 (비어 있으면 비활성화)
+    sentry_dsn: str = ""
+
     @property
     def allowed_origins_list(self) -> list[str]:
         origins = [o.strip() for o in self.allowed_origins.split(",")]

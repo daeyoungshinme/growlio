@@ -24,6 +24,7 @@ const EMPTY_FORM: TransactionCreate = {
   account_id: "",
   transaction_type: "DEPOSIT",
   amount: 0,
+  fee: undefined,
   transaction_date: today,
   ticker: "",
   notes: "",
@@ -45,6 +46,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         account_id: editingTx.account_id ?? "",
         transaction_type: editingTx.transaction_type,
         amount: editingTx.amount,
+        fee: editingTx.fee ?? undefined,
         transaction_date: editingTx.transaction_date,
         ticker: editingTx.ticker ?? "",
         notes: editingTx.notes ?? "",
@@ -278,6 +280,18 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               placeholder="메모 입력" className={`${inputCls} mt-1`} />
           </div>
         )}
+        <div>
+          <label className={labelCls}>거래 수수료 (선택)</label>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={form.fee ?? ""}
+            onChange={(e) => setField("fee", e.target.value ? Number(e.target.value) : undefined)}
+            placeholder="예: 350"
+            className={`${inputCls} mt-1`}
+          />
+        </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCancel}
             className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>

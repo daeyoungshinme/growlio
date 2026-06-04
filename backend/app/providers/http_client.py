@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import random
 from collections.abc import Callable
 from typing import Any
 
@@ -12,6 +13,42 @@ import structlog
 logger = structlog.get_logger()
 
 _DEFAULT_SEMAPHORE_LIMIT = 5
+
+
+class MaxRetriesExceededError(RuntimeError):
+    """broker_request 모든 재시도 소진 시 발생."""
+
+
+class AsyncRateLimiter:
+    """토큰 버킷 방식 비동기 레이트 리미터 — 요청 시작 사이 최소 interval 보장."""
+
+    def __init__(self, rate: float) -> None:
+        self._interval = 1.0 / rate
+        self._next_allowed: float = 0.0
+        self._lock: asyncio.Lock | None = None  # 이벤트 루프 내 지연 초기화
+
+    def _get_lock(self) -> asyncio.Lock:
+        # asyncio 단일 스레드 → 경합 없이 안전한 지연 초기화
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
+
+    async def acquire(self) -> None:
+        loop = asyncio.get_running_loop()  # get_event_loop() deprecated 대체
+        async with self._get_lock():
+            now = loop.time()
+            wait = self._next_allowed - now
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._next_allowed = loop.time() + self._interval
+
+
+def _is_rate_limit_body(response: httpx.Response) -> bool:
+    """KIS EGW00201 (초당 거래건수 초과) 응답 감지."""
+    try:
+        return response.json().get("msg_cd") == "EGW00201"
+    except Exception:
+        return False
 
 
 async def broker_request(
@@ -29,6 +66,7 @@ async def broker_request(
     check_token_expired: Callable[[dict[str, Any], int], bool],
     check_api_error: Callable[[dict[str, Any], str], None],
     token_expired_exc: type[Exception],
+    post_request_delay: float = 0.05,
 ) -> dict[str, Any]:
     """KIS/Kiwoom 공통 HTTP 요청 함수 — 속도제한(429) 지수 백오프 + 재시도 포함.
 
@@ -50,12 +88,20 @@ async def broker_request(
                 if response.status_code >= 400:
                     try:
                         error_body = response.json()
-                        logger.error(
-                            f"{log_prefix}_http_error",
-                            status=response.status_code,
-                            body=error_body,
-                            path=path,
-                        )
+                        if _is_rate_limit_body(response):
+                            # EGW00201 — 재시도 가능한 rate limit, WARNING으로 처리
+                            logger.warning(
+                                f"{log_prefix}_rate_limit_response",
+                                status=response.status_code,
+                                path=path,
+                            )
+                        else:
+                            logger.error(
+                                f"{log_prefix}_http_error",
+                                status=response.status_code,
+                                body=error_body,
+                                path=path,
+                            )
                         if check_token_expired(error_body, response.status_code):
                             raise token_expired_exc()
                     except token_expired_exc:
@@ -70,18 +116,25 @@ async def broker_request(
                     response.raise_for_status()
                 data = response.json()
                 check_api_error(data, path)
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(post_request_delay)
                 return data
 
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 429:
-                    wait = 2 ** attempt
-                    logger.warning(f"{log_prefix}_rate_limit", attempt=attempt, wait=wait)
+                is_api_rate_limit = _is_rate_limit_body(e.response)
+                if e.response.status_code == 429 or is_api_rate_limit:
+                    if attempt >= retries - 1:
+                        raise MaxRetriesExceededError(
+                            f"{log_prefix} API 속도 제한 초과 (재시도 {retries}회)"
+                        ) from e
+                    # 기저 2s 추가 — KIS rate limit 윈도우 확실히 벗어나도록
+                    wait = 2.0 + (2 ** attempt) + (random.uniform(0, 1) if is_api_rate_limit else 0)
+                    label = "api_rate_limit" if is_api_rate_limit else "rate_limit"
+                    logger.warning(f"{log_prefix}_{label}", attempt=attempt, wait=round(wait, 2), path=path)
                     await asyncio.sleep(wait)
                 elif 400 <= e.response.status_code < 500:
                     raise
                 elif attempt < retries - 1:
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1 + random.uniform(0, 0.5))
                 else:
                     raise
             except httpx.RequestError as e:
@@ -90,4 +143,4 @@ async def broker_request(
                 else:
                     raise RuntimeError(f"{log_prefix} API 요청 실패: {e}") from e
 
-    raise RuntimeError(f"{log_prefix} API 최대 재시도 초과")
+    raise MaxRetriesExceededError(f"{log_prefix} API 최대 재시도 초과")

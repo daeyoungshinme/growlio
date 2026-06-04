@@ -5,6 +5,7 @@ export interface Transaction {
   account_id: string | null;
   transaction_type: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
   amount: number;
+  fee: number | null;
   transaction_date: string;
   ticker: string | null;
   notes: string | null;
@@ -15,6 +16,7 @@ export interface TransactionCreate {
   account_id?: string;
   transaction_type: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
   amount: number;
+  fee?: number;
   transaction_date: string;
   ticker?: string;
   notes?: string;
