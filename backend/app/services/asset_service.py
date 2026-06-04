@@ -23,7 +23,7 @@ from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
 from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
-from app.utils.cache_keys import monthly_trend_key
+from app.utils.cache_keys import dashboard_summary_key, monthly_trend_key
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit
 from app.utils.metrics import broker_sync_duration
 
@@ -129,9 +129,10 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
         )
     await db.commit()
 
-    # sync 완료 후 월별 추이 캐시 무효화 — sync 직후에도 최신 데이터 표시
+    # sync 완료 후 대시보드 관련 캐시 무효화 — sync 직후에도 최신 데이터 표시
     with contextlib.suppress(Exception):
         await redis.delete(monthly_trend_key(account.user_id))
+        await redis.delete(dashboard_summary_key(account.user_id))
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         _time.monotonic() - _sync_start

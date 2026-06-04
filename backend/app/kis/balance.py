@@ -5,6 +5,8 @@ from app.kis.constants import (
     OVERSEAS_MARKET_CODES,
     TR_DOMESTIC_BALANCE_MOCK,
     TR_DOMESTIC_BALANCE_REAL,
+    TR_DOMESTIC_INQUIRE_PSBL_ORDER_MOCK,
+    TR_DOMESTIC_INQUIRE_PSBL_ORDER_REAL,
     TR_OVERSEAS_BALANCE_MOCK,
     TR_OVERSEAS_BALANCE_REAL,
 )
@@ -82,6 +84,38 @@ async def get_domestic_balance(
         "invested_krw": float(summary.get("pchs_amt_smtl_amt", 0)),
         "pnl_krw": float(summary.get("evlu_pfls_smtl_amt", 0)),
     }
+
+
+async def get_orderable_cash(
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    *,
+    is_mock: bool,
+) -> float:
+    """주문가능금액 조회 — 미수없는 매수가능금액 (nrcvb_buy_amt)."""
+    cano, acnt_prdt_cd = account_no[:8], account_no[8:].lstrip("-") or "01"
+    tr_id = TR_DOMESTIC_INQUIRE_PSBL_ORDER_MOCK if is_mock else TR_DOMESTIC_INQUIRE_PSBL_ORDER_REAL
+    headers = _auth_headers(app_key, app_secret, access_token, tr_id)
+
+    data = await kis_request(
+        "GET",
+        "/uapi/domestic-stock/v1/trading/inquire-psbl-order",
+        is_mock=is_mock,
+        headers=headers,
+        params={
+            "CANO": cano,
+            "ACNT_PRDT_CD": acnt_prdt_cd,
+            "PDNO": "",
+            "ORD_UNPR": "0",
+            "ORD_DVSN": "01",
+            "CMA_EVLU_AMT_ICLD_YN": "Y",
+            "OVRS_ICLD_YN": "N",
+        },
+    )
+    output = data.get("output", {})
+    return float(output.get("nrcvb_buy_amt", 0))
 
 
 async def get_overseas_balance(

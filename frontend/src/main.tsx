@@ -18,7 +18,13 @@ if (SENTRY_DSN) {
 }
 
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: STALE_TIME.SHORT, retry: 1 } },
+  defaultOptions: {
+    queries: {
+      staleTime: STALE_TIME.SHORT,
+      retry: 1,
+      gcTime: 30 * 60 * 1000,
+    },
+  },
 });
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

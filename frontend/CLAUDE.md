@@ -139,8 +139,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 | 배당금 티커별 | `["dividend-by-ticker"]` |
 | 배당금 요약 | `["dividend-summary"]` |
 | 배당금 포지션 | `["dividend-positions"]` |
-| DCA 분석 (InvestPlanPage) | `["dca-analysis"]` |
-| DCA 분석 (DashboardPage) | `["invest-dca"]` |
+| DCA 분석 (InvestPlanPage + DashboardPage) | `["dca-analysis"]` |
 | 설정 | `["settings"]` |
 | 현재 환율 | `["exchange-rate"]` |
 | 환율 알림 목록 | `["exchange-rate-alerts"]` |
@@ -219,7 +218,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios 무효화.
-- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + invest-dca + settings + dashboard 무효화.
+- DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.

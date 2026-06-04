@@ -33,11 +33,10 @@ export function invalidatePortfolioData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
 }
 
-/** DCA 목표 변경 후 — dca-analysis + invest-dca + settings + dashboard */
+/** DCA 목표 변경 후 — dca-analysis + settings + dashboard */
 export function invalidateDcaData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.investDca }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
   ]);

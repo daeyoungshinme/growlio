@@ -36,7 +36,7 @@ export default function InvestPlanPage() {
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEYS.dcaAnalysis,
     queryFn: fetchDCAAnalysis,
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
   });
 
   const [taxYear, setTaxYear] = useState(currentYear);

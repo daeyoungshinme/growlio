@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+import contextlib
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_owned_resource
 from app.database import get_db
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
+from app.redis_client import get_redis
 from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -67,6 +70,12 @@ async def create_transaction(
     db.add(tx)
     await db.commit()
     await db.refresh(tx)
+    redis = await get_redis()
+    with contextlib.suppress(Exception):
+        await redis.delete(
+            dashboard_summary_key(current_user.id),
+            dividend_summary_key(current_user.id),
+        )
     return tx
 
 
@@ -106,6 +115,12 @@ async def update_transaction(
         tx.fee = req.fee
     await db.commit()
     await db.refresh(tx)
+    redis = await get_redis()
+    with contextlib.suppress(Exception):
+        await redis.delete(
+            dashboard_summary_key(current_user.id),
+            dividend_summary_key(current_user.id),
+        )
     return tx
 
 
@@ -120,12 +135,13 @@ async def delete_transaction(
     tx = await _get_owned_tx(tx_id, current_user.id, db)
     await db.delete(tx)
     await db.commit()
+    redis = await get_redis()
+    with contextlib.suppress(Exception):
+        await redis.delete(
+            dashboard_summary_key(current_user.id),
+            dividend_summary_key(current_user.id),
+        )
 
 
 async def _get_owned_tx(tx_id: UUID, user_id, db: AsyncSession) -> Transaction:
-    tx = await db.scalar(
-        select(Transaction).where(Transaction.id == tx_id, Transaction.user_id == user_id)
-    )
-    if not tx:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="트랜잭션을 찾을 수 없습니다")
-    return tx
+    return await get_owned_resource(Transaction, tx_id, user_id, db)

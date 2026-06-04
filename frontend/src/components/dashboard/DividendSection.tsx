@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { fmtKrwShort } from "../../utils/format";
 
 interface Props {
@@ -7,7 +8,7 @@ interface Props {
   overallDividendYield?: number | null;
 }
 
-export default function DividendSection({ annualReceived, estimatedAnnual, estimatedMonthly, overallDividendYield }: Props) {
+export default memo(function DividendSection({ annualReceived, estimatedAnnual, estimatedMonthly, overallDividendYield }: Props) {
   return (
     <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
       <div className="px-2 py-3 sm:px-4 text-center min-w-0">
@@ -37,4 +38,4 @@ export default function DividendSection({ annualReceived, estimatedAnnual, estim
       </div>
     </div>
   );
-}
+});

@@ -2,7 +2,7 @@ import React from "react";
 import { RebalancingItem } from "../../api/rebalancing";
 import { fmtKrw, fmtKrwPrice } from "../../utils/format";
 import { SideBadge } from "./RebalancingBadges";
-import { CashAnalysis, ExecutionAction, OrderType, PriceLoadState, RebalancingExecutionHook, isOverseasMarket } from "../../hooks/useRebalancingExecution";
+import { CashAnalysis, ExecutionAction, OrderType, PriceLoadState, isOverseasMarket, useRebalancingExecutionContext } from "../../hooks/useRebalancingExecution";
 
 // ─── 하위 컴포넌트 ─────────────────────────────────────────────────────────────
 
@@ -640,7 +640,7 @@ function RebalancingOrderTable({
 }
 
 function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
-  const { deposit, sellProceeds, totalAvailable, buyCost, surplus } = analysis;
+  const { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus } = analysis;
   if (deposit === null) return null;
   const hasSell = sellProceeds !== null && sellProceeds > 0;
   const hasBuy = buyCost !== null && buyCost > 0;
@@ -648,7 +648,11 @@ function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
   return (
     <div className="px-4 py-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] bg-gray-900/20 border-b border-gray-700/30">
       <span className="text-gray-500">
-        예수금 <span className="text-gray-300">{fmtKrwPrice(deposit)}</span>
+        {isOrderableKnown ? "주문가능" : "예수금"}{" "}
+        <span className="text-gray-300">{fmtKrwPrice(deposit)}</span>
+        {!isOrderableKnown && (
+          <span className="text-gray-600 ml-1">(미체결 주문 시 차이 발생)</span>
+        )}
       </span>
       {hasSell && (
         <span className="text-gray-500">
@@ -678,11 +682,11 @@ function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
 // ─── 메인 컴포넌트 ──────────────────────────────────────────────────────────────
 
 interface Props {
-  exec: RebalancingExecutionHook;
   ordersCount: number;
 }
 
-export function RebalancingConfirmStep({ exec, ordersCount }: Props) {
+export function RebalancingConfirmStep({ ordersCount }: Props) {
+  const exec = useRebalancingExecutionContext();
   const {
     kisAccounts,
     actionableItems,
@@ -816,10 +820,12 @@ export function RebalancingConfirmStep({ exec, ordersCount }: Props) {
                       {sells > 0 && buys > 0 && <span className="text-gray-600 mx-1">|</span>}
                       {buys > 0 && <span className="text-red-400">매수 {buys}건</span>}
                     </span>
-                    {depositKrw[acc.id] != null && (
+                    {(state.orderableKrw[acc.id] != null || depositKrw[acc.id] != null) && (
                       <span className="text-[11px] text-gray-500">
-                        예수금{" "}
-                        <span className="text-gray-300">{fmtKrw(depositKrw[acc.id])}</span>
+                        {state.orderableKrw[acc.id] != null ? "주문가능" : "예수금"}{" "}
+                        <span className="text-gray-300">
+                          {fmtKrwPrice(state.orderableKrw[acc.id] ?? depositKrw[acc.id])}
+                        </span>
                       </span>
                     )}
                     <button

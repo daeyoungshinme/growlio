@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtMonth, fmtPct } from "../../utils/format";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
@@ -13,7 +13,7 @@ interface Props {
   exchangeRate: number | null;
 }
 
-export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) {
+export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) {
   const currentYear = new Date().getFullYear();
 
   const allocationChartData = useMemo(() => {
@@ -213,4 +213,4 @@ export default function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) 
       </div>
     </div>
   );
-}
+});

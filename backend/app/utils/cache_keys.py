@@ -10,6 +10,7 @@ from datetime import date
 # ---------------------------------------------------------------------------
 TTL_PRICE_CURRENT = 900          # 현재가 15분
 TTL_MONTHLY_TREND = 300          # 월별 추이 5분
+TTL_DASHBOARD_SUMMARY = 300      # 대시보드 전체 응답 5분
 TTL_BENCHMARK = 86400            # 벤치마크 수익률 1일
 TTL_PRICE_RETURN = 86400         # 기간 수익률 1일
 TTL_BACKTEST = 86400             # 백테스트 결과 1일
@@ -20,6 +21,7 @@ TTL_DIVIDEND_MONTHS = 604800     # 배당 월별 데이터 7일
 TTL_OB_STATE = 600               # 오픈뱅킹 OAuth state 10분
 TTL_HAS_OVERSEAS_TRUE = 21600    # 해외 보유 중 6시간
 TTL_HAS_OVERSEAS_FALSE = 900     # 해외 없음 15분 (신규 매수 시 빠른 반영)
+TTL_DIVIDEND_SUMMARY = 3600      # 배당 집계 1시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -37,6 +39,10 @@ def current_price_key(ticker: str, market: str) -> str:
 
 def price_return_key(years: int, ticker: str, market: str) -> str:
     return f"return:{years}y:{ticker}:{market}"
+
+
+def dashboard_summary_key(user_id: uuid.UUID) -> str:
+    return f"dashboard_summary:{user_id}"
 
 
 def monthly_trend_key(user_id: uuid.UUID) -> str:
@@ -81,3 +87,7 @@ def ob_state_key(state: str) -> str:
 
 def has_overseas_key(account_id: int) -> str:
     return f"has_overseas:{account_id}"
+
+
+def dividend_summary_key(user_id: uuid.UUID) -> str:
+    return f"dividend_summary:{user_id}"

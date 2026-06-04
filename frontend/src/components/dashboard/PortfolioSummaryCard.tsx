@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
@@ -30,7 +30,7 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
 }
 
 
-export default function PortfolioSummaryCard({ overview, isLoading, stockAllocation }: Props) {
+export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAllocation }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
 
   const chartData = useMemo(
@@ -91,4 +91,4 @@ export default function PortfolioSummaryCard({ overview, isLoading, stockAllocat
 
     </div>
   );
-}
+});

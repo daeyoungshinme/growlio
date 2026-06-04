@@ -25,6 +25,11 @@ export default function DashboardPage() {
     return null;
   }, [data?.estimated_annual_dividends, overview?.total_invested_krw]);
 
+  const estimatedMonthly = useMemo(
+    () => data?.estimated_annual_dividends != null ? Math.round(data.estimated_annual_dividends / 12) : null,
+    [data?.estimated_annual_dividends]
+  );
+
   if (isLoading || accountsLoading) return (
     <div className="space-y-6">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
@@ -111,11 +116,7 @@ export default function DashboardPage() {
           <DividendSection
             annualReceived={data.annual_dividends_received ?? null}
             estimatedAnnual={data.estimated_annual_dividends ?? null}
-            estimatedMonthly={
-              data.estimated_annual_dividends != null
-                ? Math.round(data.estimated_annual_dividends / 12)
-                : null
-            }
+            estimatedMonthly={estimatedMonthly}
             overallDividendYield={overallDividendYield}
           />
         </div>

@@ -20,7 +20,7 @@ export function useRebalancingBalances(
     dispatch({ type: "BALANCE_LOADING", accountId });
     try {
       const res: KisBalanceResponse = await fetchBrokerBalance(accountId);
-      dispatch({ type: "BALANCE_LOADED", accountId, positions: res.positions, deposit: res.deposit_krw });
+      dispatch({ type: "BALANCE_LOADED", accountId, positions: res.positions, deposit: res.deposit_krw, orderable: res.orderable_krw });
     } catch (err: unknown) {
       const is404 = (err as { response?: { status?: number } }).response?.status === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
@@ -39,6 +39,7 @@ export function useRebalancingBalances(
       const responses: KisBalanceResponse[] = await fetchAllBrokerBalances();
       const balances: Record<string, import("../api/rebalancing").KisBalancePosition[]> = {};
       const deposits: Record<string, number> = {};
+      const orderables: Record<string, number> = {};
       const states: Record<string, import("./useRebalancingExecution").BalanceLoadState> = {};
       responses.forEach((res) => {
         if (res.error) {
@@ -46,10 +47,13 @@ export function useRebalancingBalances(
         } else {
           balances[res.account_id] = res.positions;
           deposits[res.account_id] = res.deposit_krw;
+          if (res.orderable_krw !== null && res.orderable_krw !== undefined) {
+            orderables[res.account_id] = res.orderable_krw;
+          }
           states[res.account_id] = "loaded";
         }
       });
-      dispatch({ type: "BALANCES_LOADED", balances, deposits, states });
+      dispatch({ type: "BALANCES_LOADED", balances, deposits, orderables, states });
     } catch {
       dispatch({ type: "BALANCES_ERROR", accountIds: kisAccounts.map((a) => a.id) });
     }

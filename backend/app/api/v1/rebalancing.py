@@ -12,7 +12,7 @@ from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
 from app.kis.auth import get_access_token
-from app.kis.balance import get_domestic_balance, get_overseas_balance
+from app.kis.balance import get_domestic_balance, get_orderable_cash
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
@@ -374,28 +374,25 @@ async def _fetch_broker_balance(
         domestic = await get_domestic_balance(
             app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
         )
-        overseas = await get_overseas_balance(
-            app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-        )
-        rate = usd_rate or settings.usd_krw_fallback_rate
-        positions: list[KisBalancePosition] = []
-        for p in domestic.get("positions", []):
-            positions.append(KisBalancePosition(
+        try:
+            orderable = await get_orderable_cash(
+                app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+            )
+        except Exception:
+            orderable = None
+        positions: list[KisBalancePosition] = [
+            KisBalancePosition(
                 ticker=p["ticker"], name=p["name"], market=p["market"],
                 quantity=int(p["qty"]), avg_price=float(p["avg_price"]),
                 current_price=float(p["current_price"]), value_krw=float(p["value_krw"]),
-            ))
-        for p in overseas.get("positions", []):
-            positions.append(KisBalancePosition(
-                ticker=p["ticker"], name=p["name"], market=p["market"],
-                quantity=int(p["qty"]),
-                avg_price=round(float(p["avg_price"]) * rate),
-                current_price=round(float(p["current_price"]) * rate),
-                value_krw=round(float(p.get("value_usd", 0)) * rate),
-            ))
+            )
+            for p in domestic.get("positions", [])
+        ]
         return KisBalanceResponse(
             account_id=str(account.id), account_name=account.name, is_mock=is_mock,
-            positions=positions, deposit_krw=float(domestic.get("deposit_krw", 0)),
+            positions=positions,
+            deposit_krw=float(domestic.get("deposit_krw", 0)),
+            orderable_krw=orderable,
         )
 
     if account.asset_type == "STOCK_KIWOOM":
@@ -423,7 +420,8 @@ async def _fetch_broker_balance(
         ]
         return KisBalanceResponse(
             account_id=str(account.id), account_name=account.name, is_mock=is_mock,
-            positions=positions, deposit_krw=float(domestic.get("deposit_krw", 0)),
+            positions=positions,
+            deposit_krw=float(domestic.get("deposit_krw", 0)),
         )
 
     raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")

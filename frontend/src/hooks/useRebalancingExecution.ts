@@ -1,4 +1,4 @@
-import { useEffect, useReducer } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "../api/assets";
 import { extractErrorMessage } from "../utils/error";
@@ -22,6 +22,7 @@ export type PriceLoadState = "idle" | "loading" | "loaded" | "error";
 
 export interface CashAnalysis {
   deposit: number | null;
+  isOrderableKnown: boolean;
   sellProceeds: number | null;
   totalAvailable: number | null;
   buyCost: number | null;
@@ -32,6 +33,7 @@ export interface ExecutionState {
   liveBalances: Record<string, KisBalancePosition[]>;
   balanceState: Record<string, BalanceLoadState>;
   depositKrw: Record<string, number>;
+  orderableKrw: Record<string, number>;
   priceState: PriceLoadState;
   priceLoadProgress: { loaded: number; total: number };
   livePricesKrw: Record<string, number>;
@@ -50,10 +52,10 @@ export interface ExecutionState {
 
 export type ExecutionAction =
   | { type: "BALANCES_START"; accountIds: string[] }
-  | { type: "BALANCES_LOADED"; balances: Record<string, KisBalancePosition[]>; deposits: Record<string, number>; states: Record<string, BalanceLoadState> }
+  | { type: "BALANCES_LOADED"; balances: Record<string, KisBalancePosition[]>; deposits: Record<string, number>; orderables: Record<string, number>; states: Record<string, BalanceLoadState> }
   | { type: "BALANCES_ERROR"; accountIds: string[] }
   | { type: "BALANCE_LOADING"; accountId: string }
-  | { type: "BALANCE_LOADED"; accountId: string; positions: KisBalancePosition[]; deposit: number }
+  | { type: "BALANCE_LOADED"; accountId: string; positions: KisBalancePosition[]; deposit: number; orderable: number | null }
   | { type: "BALANCE_ERROR"; accountId: string; is404: boolean }
   | { type: "PRICES_START"; total: number }
   | { type: "PRICES_PROGRESS"; loaded: number }
@@ -82,6 +84,7 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         ...state,
         liveBalances: action.balances,
         depositKrw: action.deposits,
+        orderableKrw: action.orderables,
         balanceState: { ...state.balanceState, ...action.states },
       };
     case "BALANCES_ERROR":
@@ -91,13 +94,17 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
       };
     case "BALANCE_LOADING":
       return { ...state, balanceState: { ...state.balanceState, [action.accountId]: "loading" } };
-    case "BALANCE_LOADED":
+    case "BALANCE_LOADED": {
+      const nextOrderable = { ...state.orderableKrw };
+      if (action.orderable !== null) nextOrderable[action.accountId] = action.orderable;
       return {
         ...state,
         liveBalances: { ...state.liveBalances, [action.accountId]: action.positions },
         depositKrw: { ...state.depositKrw, [action.accountId]: action.deposit },
+        orderableKrw: nextOrderable,
         balanceState: { ...state.balanceState, [action.accountId]: "loaded" },
       };
+    }
     case "BALANCE_ERROR":
       return {
         ...state,
@@ -236,6 +243,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
         liveBalances: {},
         balanceState: {},
         depositKrw: {},
+        orderableKrw: {},
         priceState: "idle" as PriceLoadState,
         priceLoadProgress: { loaded: 0, total: 0 },
         livePricesKrw: {},
@@ -317,6 +325,18 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       }));
   }
 
+  const sellRowsByAccount = useMemo(() => {
+    const map: Record<string, ReturnType<typeof getSellRows>> = {};
+    for (const acc of kisAccounts) map[acc.id] = getSellRows(acc.id);
+    return map;
+  }, [actionableItems, liveBalances, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const buyRowsByAccount = useMemo(() => {
+    const map: Record<string, ReturnType<typeof getBuyRows>> = {};
+    for (const acc of kisAccounts) map[acc.id] = getBuyRows(acc.id);
+    return map;
+  }, [actionableItems, liveBalances, buyAccounts, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
     const item = actionableItems.find((i) => i.ticker === ticker);
     const needed = Math.abs(Math.round(item?.shares_to_trade ?? 0));
@@ -331,7 +351,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
   function buildOrders(): ExecutionOrderItem[] {
     const orders: ExecutionOrderItem[] = [];
     kisAccounts.forEach((acc) => {
-      getSellRows(acc.id).forEach(({ item, suggestedQty }) => {
+      (sellRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
         const key = `sell_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
@@ -342,7 +362,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
             limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, item.ticker, item.market) || null : null,
           });
       });
-      getBuyRows(acc.id).forEach(({ item, suggestedQty }) => {
+      (buyRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
         const key = `buy_${item.ticker}_${acc.id}`;
         if (!selected.has(key)) return;
         const qty = qtyOverrides[key] ?? suggestedQty;
@@ -358,9 +378,12 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
   }
 
   function getCashAnalysis(accountId: string): CashAnalysis {
-    const deposit = state.depositKrw[accountId] ?? null;
+    const isOrderableKnown = accountId in state.orderableKrw;
+    const deposit = isOrderableKnown
+      ? (state.orderableKrw[accountId] ?? null)
+      : (state.depositKrw[accountId] ?? null);
     let sellProceeds: number | null = 0;
-    for (const { item, suggestedQty } of getSellRows(accountId)) {
+    for (const { item, suggestedQty } of (sellRowsByAccount[accountId] ?? [])) {
       const key = `sell_${item.ticker}_${accountId}`;
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
@@ -369,7 +392,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       sellProceeds = (sellProceeds ?? 0) + est;
     }
     let buyCost: number | null = 0;
-    for (const { item, suggestedQty } of getBuyRows(accountId)) {
+    for (const { item, suggestedQty } of (buyRowsByAccount[accountId] ?? [])) {
       const key = `buy_${item.ticker}_${accountId}`;
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
@@ -379,12 +402,12 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     }
     const totalAvailable = deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
     const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
-    return { deposit, sellProceeds, totalAvailable, buyCost, surplus };
+    return { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus };
   }
 
   function getAccountSummary(accountId: string) {
-    const sells = getSellRows(accountId).filter((r) => selected.has(`sell_${r.item.ticker}_${accountId}`)).length;
-    const buys = getBuyRows(accountId).filter((r) => selected.has(`buy_${r.item.ticker}_${accountId}`)).length;
+    const sells = (sellRowsByAccount[accountId] ?? []).filter((r) => selected.has(`sell_${r.item.ticker}_${accountId}`)).length;
+    const buys = (buyRowsByAccount[accountId] ?? []).filter((r) => selected.has(`buy_${r.item.ticker}_${accountId}`)).length;
     return { sells, buys };
   }
 
@@ -412,6 +435,9 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     }
   }
 
+  function getSellRowsCached(accountId: string) { return sellRowsByAccount[accountId] ?? []; }
+  function getBuyRowsCached(accountId: string) { return buyRowsByAccount[accountId] ?? []; }
+
   return {
     state,
     dispatch,
@@ -420,8 +446,8 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     orders,
     hasRealAccount,
     getAccountQuantity,
-    getSellRows,
-    getBuyRows,
+    getSellRows: getSellRowsCached,
+    getBuyRows: getBuyRowsCached,
     getBuyTotalInfo,
     getAccountSummary,
     getCashAnalysis,
@@ -433,3 +459,11 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
 }
 
 export type RebalancingExecutionHook = ReturnType<typeof useRebalancingExecution>;
+
+export const RebalancingExecutionContext = createContext<RebalancingExecutionHook | null>(null);
+
+export function useRebalancingExecutionContext(): RebalancingExecutionHook {
+  const ctx = useContext(RebalancingExecutionContext);
+  if (!ctx) throw new Error("useRebalancingExecutionContext must be used inside RebalancingExecutionModal");
+  return ctx;
+}

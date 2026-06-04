@@ -127,6 +127,7 @@ export interface KisBalanceResponse {
   is_mock: boolean;
   positions: KisBalancePosition[];
   deposit_krw: number;
+  orderable_krw: number | null;
   error?: string | null;
 }
 

@@ -110,6 +110,7 @@ class KisBalanceResponse(BaseModel):
     is_mock: bool
     positions: list[KisBalancePosition]
     deposit_krw: float
+    orderable_krw: float | None = None  # KIS만 지원 (nrcvb_buy_amt), 키움=None
     error: str | None = None  # 일괄 조회 시 계좌별 오류 메시지
 
 

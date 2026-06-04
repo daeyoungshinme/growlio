@@ -18,20 +18,21 @@ from app.models.asset import AssetAccount, AssetSnapshot, Position, Transaction
 from app.models.user import UserSettings
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.dividend_aggregator import get_dividend_summary
-from app.utils.cache_keys import TTL_BENCHMARK, TTL_MONTHLY_TREND, benchmark_key, monthly_trend_key
+from app.utils.cache_keys import (
+    TTL_BENCHMARK,
+    TTL_DASHBOARD_SUMMARY,
+    TTL_MONTHLY_TREND,
+    benchmark_key,
+    dashboard_summary_key,
+    monthly_trend_key,
+)
 from app.utils.currency import fetch_usd_krw
+from app.utils.pnl import eval_value as _eval_value
+from app.utils.pnl import invested_value as _invested_value
 
 logger = structlog.get_logger()
 
 _STOCK_TYPES = {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER}
-
-
-def _eval_value(pos_list: list) -> float:
-    return sum(float(p.current_price or p.avg_price or 0) * float(p.qty or 0) for p in pos_list)
-
-
-def _invested_value(pos_list: list) -> float:
-    return sum(float(p.avg_price or 0) * float(p.qty or 0) for p in pos_list)
 
 
 async def _get_latest_snapshot_rows(
@@ -166,6 +167,11 @@ async def _build_asset_totals(
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
+    if redis:
+        cached = await redis.get(dashboard_summary_key(user_id))
+        if cached:
+            return json.loads(cached)
+
     # first_snap_date를 먼저 조회 후 벤치마크 백그라운드 태스크 시작
     # _get_benchmarks는 run_in_executor(스레드풀)를 사용하므로 DB 쿼리와 진정한 병렬 실행 가능
     first_snap_date = await _get_first_snap_date(user_id, db)
@@ -180,7 +186,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
     total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, redis)
     monthly_trend = await _get_monthly_trend(user_id, db, redis)
     net_deposits_ytd = await _calc_net_deposits_this_year(user_id, db)
-    div_summary = await get_dividend_summary(user_id, db)
+    div_summary = await get_dividend_summary(user_id, db, redis)
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 
     try:
@@ -200,7 +206,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
     goal_annual_return_pct = float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
     retirement_target_year = settings_row.retirement_target_year if settings_row else None
 
-    return {
+    result: dict[str, Any] = {
         "total_assets_krw": total_assets_krw,
         "asset_allocation": [
             {"type": k, "amount_krw": v, "pct": v / total_assets_krw * 100 if total_assets_krw else 0}
@@ -224,6 +230,12 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         "estimated_annual_dividends": div_summary["estimated_annual"],
         "dividend_monthly_breakdown": div_summary["monthly_breakdown"],
     }
+    if redis:
+        with contextlib.suppress(Exception):
+            await redis.setex(
+                dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result)
+            )
+    return result
 
 
 async def _no_benchmarks() -> dict[str, float | None]:

@@ -11,7 +11,7 @@ export function useDashboardData() {
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 백엔드 Redis TTL(5분)과 동기화
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: false,
   });
@@ -25,7 +25,7 @@ export function useDashboardData() {
   });
 
   const { data: dcaData } = useQuery({
-    queryKey: QUERY_KEYS.investDca,
+    queryKey: QUERY_KEYS.dcaAnalysis,
     queryFn: fetchDCAAnalysis,
     staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — DCA 분석은 자주 변하지 않음
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,

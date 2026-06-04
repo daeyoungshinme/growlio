@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import contextlib
+import json
 import uuid
 from datetime import date
+from typing import Any
 
 import structlog
 from sqlalchemy import func, select, text
@@ -11,11 +14,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import Transaction
 from app.services.dividend_service import get_ticker_dividend_summary
+from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key
 
 logger = structlog.get_logger()
 
 
-async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
+async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Any = None) -> dict:
+    if redis:
+        cached = await redis.get(dividend_summary_key(user_id))
+        if cached:
+            return json.loads(cached)
+
     current_year = date.today().year
 
     annual_received = await _sum_transactions(user_id, db, "DIVIDEND", current_year)
@@ -29,12 +38,20 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> dict:
         if item.get("estimated_annual_krw", 0) > 0
     )
 
-    return {
+    result = {
         "annual_received": annual_received,
         "monthly_breakdown": monthly_breakdown,
         "monthly_ticker_breakdown": monthly_ticker_breakdown,
         "estimated_annual": estimated_annual,
     }
+
+    if redis:
+        with contextlib.suppress(Exception):
+            await redis.setex(
+                dividend_summary_key(user_id), TTL_DIVIDEND_SUMMARY, json.dumps(result)
+            )
+
+    return result
 
 
 async def _sum_transactions(user_id: uuid.UUID, db: AsyncSession, tx_type: str, year: int) -> float:
@@ -48,7 +65,9 @@ async def _sum_transactions(user_id: uuid.UUID, db: AsyncSession, tx_type: str, 
     return float(result.scalar() or 0)
 
 
-async def _monthly_dividend_breakdown(user_id: uuid.UUID, db: AsyncSession, year: int) -> list[dict]:
+async def _monthly_dividend_breakdown(
+    user_id: uuid.UUID, db: AsyncSession, year: int
+) -> list[dict]:
     month_col = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
     result = await db.execute(
         select(month_col, func.sum(Transaction.amount).label("total"))
@@ -63,7 +82,9 @@ async def _monthly_dividend_breakdown(user_id: uuid.UUID, db: AsyncSession, year
     return [{"month": row.month, "amount": float(row.total)} for row in result]
 
 
-async def _monthly_dividend_ticker_breakdown(user_id: uuid.UUID, db: AsyncSession, year: int) -> list[dict]:
+async def _monthly_dividend_ticker_breakdown(
+    user_id: uuid.UUID, db: AsyncSession, year: int
+) -> list[dict]:
     result = await db.execute(
         text("""
             SELECT to_char(transaction_date, 'YYYY-MM') AS month,
@@ -78,4 +99,7 @@ async def _monthly_dividend_ticker_breakdown(user_id: uuid.UUID, db: AsyncSessio
         """),
         {"uid": str(user_id), "yr": year},
     )
-    return [{"month": row.month, "ticker": row.ticker, "amount": float(row.total)} for row in result]
+    return [
+        {"month": row.month, "ticker": row.ticker, "amount": float(row.total)}
+        for row in result
+    ]

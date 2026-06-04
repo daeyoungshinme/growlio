@@ -8,6 +8,7 @@ from app.api.deps import get_current_user
 from app.database import get_db
 from app.limiter import limiter
 from app.models.user import User
+from app.redis_client import get_redis
 from app.services.dividend_aggregator import get_dividend_summary
 from app.services.dividend_service import (
     delete_ticker_settings,
@@ -24,8 +25,9 @@ router = APIRouter(prefix="/dividends", tags=["dividends"])
 async def dividend_summary(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
-    return await get_dividend_summary(current_user.id, db)
+    return await get_dividend_summary(current_user.id, db, redis)
 
 
 @router.get("/positions")

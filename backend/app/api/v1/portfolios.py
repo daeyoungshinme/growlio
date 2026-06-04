@@ -2,7 +2,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -11,7 +11,12 @@ from app.database import get_db
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.user import User
-from app.schemas.portfolio import PortfolioCreate, PortfolioReorderRequest, PortfolioResponse, PortfolioUpdate
+from app.schemas.portfolio import (
+    PortfolioCreate,
+    PortfolioReorderRequest,
+    PortfolioResponse,
+    PortfolioUpdate,
+)
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -179,10 +184,18 @@ async def reorder_portfolios(
     db: AsyncSession = Depends(get_db),
 ):
     """포트폴리오 순서 일괄 업데이트."""
-    for item in body.items:
-        await db.execute(
-            update(Portfolio)
-            .where(Portfolio.id == item.id, Portfolio.user_id == current_user.id)
-            .values(sort_order=item.sort_order)
+    if not body.items:
+        return
+    sort_case = case(
+        *[(Portfolio.id == item.id, item.sort_order) for item in body.items],
+        else_=Portfolio.sort_order,
+    )
+    await db.execute(
+        update(Portfolio)
+        .where(
+            Portfolio.user_id == current_user.id,
+            Portfolio.id.in_([item.id for item in body.items]),
         )
+        .values(sort_order=sort_case)
+    )
     await db.commit()
