@@ -67,6 +67,10 @@ make build-android-release         # APK Release 빌드
 
 > 구 URL 리다이렉트: `/assets` → `/portfolio`
 
+**최상위 컴포넌트 (`src/`):**
+- `ErrorBoundary.tsx` — React 에러 바운더리 (App.tsx에서 전체를 감쌈)
+- `Toaster.tsx` — `growlio:toast` 이벤트 구독 전역 토스트 UI
+
 **컴포넌트 디렉토리 (`src/components/`):**
 assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, trend
 
@@ -87,7 +91,12 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
 - `useAssetManagementData.ts` — 자산관리 페이지 전용 데이터 훅 (accounts + portfolio overview + transactions 통합)
+- `useAssetModals.ts` — 자산관리 페이지 모달 열기/닫기 상태 통합 관리
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
+- `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
+- `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
+- `useRebalancingExecution.ts` — 리밸런싱 주문 실행 뮤테이션
+- `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 
 새 커스텀 훅은 이 디렉토리에 추가.
 
@@ -200,6 +209,15 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `yieldBadgeClass(yield)` — 배당수익률에 따른 Tailwind 뱃지 클래스 반환 (≥7%: 초록, ≥4%: 에메랄드, ≥2%: 황색).
 - `dividendFreqInfo(months, isManual)` — 월 배열로 배당 주기 레이블·색상 반환 (월배당/분기배당/반기배당/연배당).
 - `weightBarColor(pct)` — 포트폴리오 비중 막대 색상 반환. 인라인 클래스 직접 작성 금지.
+
+**입력 스타일 상수 (`src/constants/inputStyles.ts`)**
+- 인라인 Tailwind 입력 스타일 직접 작성 금지. 상수 import해 사용:
+  ```ts
+  import { INPUT_SM, INPUT_MD, LABEL_SM, LABEL_MD, SELECT_SM, TEXTAREA_SM } from "../constants/inputStyles";
+  ```
+- `INPUT_SM` / `INPUT_MD` — `text-sm` / `text-base` 입력 필드 (border, bg, focus ring 포함)
+- `LABEL_SM` / `LABEL_MD` — `text-xs` / `text-sm font-medium` 레이블
+- `SELECT_SM` — INPUT_SM과 동일 (select 요소용), `TEXTAREA_SM` — resize-none 포함
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.

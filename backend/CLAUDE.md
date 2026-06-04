@@ -123,7 +123,10 @@ services/
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
   ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
   ├── dividend_providers.py   # 배당 데이터 제공자 추상화
-  ├── dividend_service.py     # 배당금 집계 + yfinance 배당수익률 추정
+  ├── dividend/               # 배당 서비스 패키지 (리팩토링됨)
+  │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
+  │   └── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
+  ├── dividend_service.py     # 하위 호환 re-export (실제 구현은 dividend/ 패키지)
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
@@ -134,6 +137,7 @@ services/
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions)
+  ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼
   └── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
 
 kis/                          # KIS OpenAPI 클라이언트
@@ -148,7 +152,11 @@ providers/                    # 금융 데이터 provider
   └── openbanking_provider.py # 오픈뱅킹 계좌 조회 provider
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
-  └── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 — 외부 API 장애 시 fast fail/자동 복구 (CircuitOpenError)
+  ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
+  ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등)
+  ├── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
+  └── redis_lock.py           # Redis 분산 락 — 동일 계좌 동시 sync 방지
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
                               # 예: @limiter.limit("60/minute") — request: Request 파라미터 필수
 jobs/                         # APScheduler 정기 작업
