@@ -751,9 +751,22 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
           ))}
         </div>
         {priceState === "loading" && (
-          <span className="text-xs text-gray-500 w-full sm:w-auto">
-            현재가 조회 중... ({priceLoadProgress.loaded}/{priceLoadProgress.total})
-          </span>
+          <div className="w-full sm:w-48 space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>현재가 조회 중...</span>
+              <span>{priceLoadProgress.loaded}/{priceLoadProgress.total}</span>
+            </div>
+            <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                style={{
+                  width: priceLoadProgress.total > 0
+                    ? `${(priceLoadProgress.loaded / priceLoadProgress.total) * 100}%`
+                    : "0%"
+                }}
+              />
+            </div>
+          </div>
         )}
         {priceState === "error" && (
           <span className="text-xs text-amber-400 w-full sm:w-auto">

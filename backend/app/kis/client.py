@@ -3,13 +3,14 @@ from typing import Any
 
 import structlog
 
+from app.config import settings
 from app.kis.constants import KIS_MOCK_BASE_URL, KIS_REAL_BASE_URL
 from app.providers.http_client import AsyncRateLimiter, broker_request
 
 logger = structlog.get_logger()
 
 _semaphore = asyncio.Semaphore(1)
-_rate_limiter = AsyncRateLimiter(rate=0.9)  # 1.11s 간격 — KIS 1s 제한 대비 11% 버퍼
+_rate_limiter = AsyncRateLimiter(rate=settings.kis_rate_per_second)
 
 
 class KisTokenExpiredError(Exception):

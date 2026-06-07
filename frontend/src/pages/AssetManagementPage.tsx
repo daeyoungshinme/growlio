@@ -22,12 +22,15 @@ import StockAccountCard, { type AccountStats } from "../components/assets/StockA
 import StockAccountSummaryCard from "../components/assets/StockAccountSummaryCard";
 import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
 import ConfirmModal from "../components/common/ConfirmModal";
+import SkeletonCard from "../components/common/SkeletonCard";
+import EmptyState from "../components/common/EmptyState";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
 import { useAssetManagementData } from "../hooks/useAssetManagementData";
 import { useAssetModals } from "../hooks/useAssetModals";
 import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
+import Tabs from "../components/common/Tabs";
 
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = typeof TABS[number];
@@ -198,16 +201,7 @@ export default function AssetManagementPage() {
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">계좌를 등록하고 입출금·배당 내역을 관리합니다.</p>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-full sm:w-fit mb-6 overflow-x-auto scrollbar-none">
-        {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`shrink-0 whitespace-nowrap px-3 py-2 sm:px-5 rounded-lg text-sm font-medium transition-colors ${
-              tab === t ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}>
-            {t}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} variant="pill" className="w-full sm:w-fit mb-6" />
 
       {tab === "입출금·배당" && <TransactionHistoryTab accounts={accounts} />}
 
@@ -227,14 +221,13 @@ export default function AssetManagementPage() {
             </button>
           </div>
           {isLoading ? (
-            <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            <SkeletonCard rows={3} />
           ) : realEstateAccounts.length === 0 ? (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center">
-              <p className="text-gray-400 dark:text-gray-500 text-sm">등록된 부동산이 없습니다.</p>
-              <button onClick={() => setShowRealEstateModal(true)}
-                className="mt-3 text-blue-600 dark:text-blue-400 text-sm hover:underline">
-                + 부동산 추가하기
-              </button>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <EmptyState
+                title="등록된 부동산이 없습니다."
+                action={{ label: "+ 부동산 추가하기", onClick: () => setShowRealEstateModal(true) }}
+              />
             </div>
           ) : (
             <div className="space-y-3">
@@ -267,15 +260,16 @@ export default function AssetManagementPage() {
           </div>
 
           {isLoading ? (
-            <div className="text-center py-12 text-gray-400 text-sm">불러오는 중...</div>
+            <SkeletonCard rows={3} />
           ) : currentBankOrStock.length === 0 ? (
-            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-12 text-center">
-              <p className="text-gray-400 dark:text-gray-500 text-sm">등록된 {tab}이 없습니다.</p>
-              <button
-                onClick={() => tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true)}
-                className="mt-3 text-blue-600 dark:text-blue-400 text-sm hover:underline">
-                + 계좌 추가하기
-              </button>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
+              <EmptyState
+                title={`등록된 ${tab}이 없습니다.`}
+                action={{
+                  label: "+ 계좌 추가하기",
+                  onClick: () => tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true),
+                }}
+              />
             </div>
           ) : tab === "은행계좌" ? (
             <div className="space-y-3">

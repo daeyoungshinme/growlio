@@ -6,6 +6,7 @@ import MonthlyDividendChart from "./MonthlyDividendChart";
 import MonthlyTickerDetail from "./MonthlyTickerDetail";
 import type { DividendByTicker, DividendYield } from "../../types";
 import { MONTH_LABELS, dividendFreqInfo, weightBarColor, yieldBadgeClass } from "../../utils/dividendUtils";
+import EmptyState from "../common/EmptyState";
 
 interface DividendSummary {
   annual_received: number;
@@ -318,7 +319,7 @@ export default function DividendTab({ dividendData, divLoading: _divLoading, div
         </div>
       )}
       {divSubTab === "종목별 배당" && dividendChartData.length === 0 && (
-        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-10">배당 데이터가 없습니다.</p>
+        <EmptyState title="배당 데이터가 없습니다." compact />
       )}
 
       {divSubTab === "월별 배당" && (

@@ -14,6 +14,33 @@ logger = structlog.get_logger()
 
 _DEFAULT_SEMAPHORE_LIMIT = 5
 
+_LIMITS = httpx.Limits(max_connections=20, max_keepalive_connections=10)
+_ssl_client: httpx.AsyncClient | None = None
+_nossl_client: httpx.AsyncClient | None = None
+
+
+def _get_client(ssl_verify: bool) -> httpx.AsyncClient:
+    global _ssl_client, _nossl_client
+    if ssl_verify:
+        if _ssl_client is None:
+            _ssl_client = httpx.AsyncClient(timeout=30.0, verify=True, limits=_LIMITS)
+        return _ssl_client
+    else:
+        if _nossl_client is None:
+            _nossl_client = httpx.AsyncClient(timeout=30.0, verify=False, limits=_LIMITS)
+        return _nossl_client
+
+
+async def close_http_client() -> None:
+    """앱 종료 시 싱글턴 HTTP 클라이언트를 닫는다."""
+    global _ssl_client, _nossl_client
+    if _ssl_client is not None:
+        await _ssl_client.aclose()
+        _ssl_client = None
+    if _nossl_client is not None:
+        await _nossl_client.aclose()
+        _nossl_client = None
+
 
 class MaxRetriesExceededError(RuntimeError):
     """broker_request 모든 재시도 소진 시 발생."""
@@ -75,7 +102,8 @@ async def broker_request(
         check_api_error: (data, path) → None. API 오류 시 예외 발생.
         token_expired_exc: 토큰 만료 시 발생할 예외 클래스.
     """
-    async with semaphore, httpx.AsyncClient(timeout=30.0, verify=ssl_verify) as client:
+    client = _get_client(ssl_verify)
+    async with semaphore:
         for attempt in range(retries):
             try:
                 response = await client.request(

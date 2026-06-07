@@ -13,12 +13,14 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.api.v1.router import router
 from app.config import settings
 from app.database import get_db
 from app.exceptions import AppError
 from app.limiter import limiter
+from app.providers.http_client import close_http_client
 from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
 
@@ -59,6 +61,7 @@ async def lifespan(app: FastAPI):
     logger.info("app_started", env=settings.app_env)
     yield
     scheduler.shutdown()
+    await close_http_client()
     await close_redis()
     logger.info("app_stopped")
 
@@ -82,6 +85,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.include_router(router)
 
@@ -101,6 +105,8 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    if settings.app_env == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 

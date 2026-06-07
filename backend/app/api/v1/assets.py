@@ -33,7 +33,7 @@ from app.services.asset_service import sync_account as _sync_account_service
 from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
-from app.utils.cache_keys import dividend_ticker_summary_key
+from app.utils.cache_keys import dashboard_summary_key, dividend_ticker_summary_key, portfolio_overview_key
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_position_pnl
@@ -452,7 +452,11 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
     except CircuitOpenError as e:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
 
-    await redis.delete(dividend_ticker_summary_key(current_user.id, date.today().year))
+    await redis.delete(
+        dividend_ticker_summary_key(current_user.id, date.today().year),
+        dashboard_summary_key(current_user.id),
+        portfolio_overview_key(current_user.id),
+    )
     return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}
 
 

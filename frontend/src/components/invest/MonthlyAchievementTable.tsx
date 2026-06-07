@@ -1,5 +1,6 @@
 import type { DCAProjectionPoint } from "../../api/invest";
 import { fmtKrw } from "../../utils/format";
+import EmptyState from "../common/EmptyState";
 
 function pctColor(pct: number) {
   if (pct >= 100) return "text-red-500";
@@ -19,7 +20,7 @@ export default function MonthlyAchievementTable({ data }: Props) {
     return (
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">월별 달성율</h3>
-        <p className="text-sm text-gray-400 dark:text-gray-500">스냅샷 데이터가 없습니다.</p>
+        <EmptyState title="스냅샷 데이터가 없습니다." compact />
       </div>
     );
   }

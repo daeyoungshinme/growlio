@@ -2,7 +2,6 @@
 import json
 from datetime import UTC, datetime, timedelta
 
-import httpx
 import structlog
 
 from app.kiwoom.constants import (
@@ -11,6 +10,7 @@ from app.kiwoom.constants import (
     REDIS_KIWOOM_TOKEN_KEY,
     REDIS_TOKEN_TTL_BUFFER,
 )
+from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
 
@@ -82,27 +82,27 @@ async def _fetch_and_store_token(
 ) -> str:
     base_url = KIWOOM_MOCK_BASE_URL if is_mock else KIWOOM_REAL_BASE_URL
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{base_url}/oauth2/token",
-            json={"grant_type": "client_credentials", "appkey": app_key, "secretkey": app_secret},
-            headers={"Content-Type": "application/json;charset=UTF-8"},
+    client = _get_client(ssl_verify=True)
+    resp = await client.post(
+        f"{base_url}/oauth2/token",
+        json={"grant_type": "client_credentials", "appkey": app_key, "secretkey": app_secret},
+        headers={"Content-Type": "application/json;charset=UTF-8"},
+    )
+    if resp.status_code >= 400:
+        try:
+            err_body = resp.json()
+        except (ValueError, json.JSONDecodeError):
+            err_body = resp.text
+        logger.error(
+            "kiwoom_token_http_error",
+            status=resp.status_code,
+            return_code=err_body.get("return_code") if isinstance(err_body, dict) else None,
+            return_msg=err_body.get("return_msg") if isinstance(err_body, dict) else err_body,
+            is_mock=is_mock,
+            base_url=base_url,
         )
-        if resp.status_code >= 400:
-            try:
-                err_body = resp.json()
-            except (ValueError, json.JSONDecodeError):
-                err_body = resp.text
-            logger.error(
-                "kiwoom_token_http_error",
-                status=resp.status_code,
-                return_code=err_body.get("return_code") if isinstance(err_body, dict) else None,
-                return_msg=err_body.get("return_msg") if isinstance(err_body, dict) else err_body,
-                is_mock=is_mock,
-                base_url=base_url,
-            )
-        resp.raise_for_status()
-        data = resp.json()
+    resp.raise_for_status()
+    data = resp.json()
 
     if str(data.get("return_code", "0")) != "0":
         raise RuntimeError(f"키움 토큰 발급 실패: {data.get('return_msg')}")

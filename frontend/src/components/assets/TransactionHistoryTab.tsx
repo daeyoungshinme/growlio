@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
+import EmptyState from "../common/EmptyState";
 import { updateAccount, type AssetAccount } from "../../api/assets";
 import {
   fetchTransactions,
@@ -183,9 +184,9 @@ export default function TransactionHistoryTab({ accounts }: Props) {
 
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
         {isLoading ? (
-          <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">불러오는 중...</div>
+          <EmptyState title="불러오는 중..." compact />
         ) : filtered.length === 0 ? (
-          <div className="py-12 text-center text-gray-400 dark:text-gray-500 text-sm">등록된 내역이 없습니다.</div>
+          <EmptyState title="등록된 내역이 없습니다." compact />
         ) : (
           <>
             {/* 모바일 카드 뷰 */}

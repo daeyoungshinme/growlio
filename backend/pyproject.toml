@@ -31,7 +31,7 @@ dependencies = [
     # Date utils
     "python-dateutil>=2.9.0",
     # Stock price data (API 키 불필요 — Yahoo Finance)
-    "yfinance>=0.2.40,<0.3.0",
+    "yfinance==0.2.66",
     # KRX 공식 데이터 (ETF 분배금 이력 조회 — 인증 불필요)
     "pykrx>=1.0.47,<2.0.0",
     # ETF 분배금/배당율 fallback 데이터 소스 (네이버 금융 기반, import: FinanceDataReader)

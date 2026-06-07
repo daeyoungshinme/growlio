@@ -2,19 +2,26 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import uuid
 from collections import defaultdict
 from datetime import date
 from typing import Any
 
+from redis.exceptions import RedisError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
-from app.utils.cache_keys import TTL_ALLOC_HISTORY, alloc_history_key
+from app.utils.cache_keys import (
+    TTL_ALLOC_HISTORY,
+    TTL_PORTFOLIO_OVERVIEW,
+    alloc_history_key,
+    portfolio_overview_key,
+)
 from app.utils.pnl import calc_position_pnl
 
 ASSET_TYPE_LABELS: dict[str, str] = {
@@ -138,8 +145,15 @@ async def build_portfolio_overview(
     user_id: uuid.UUID,
     db: AsyncSession,
     account_ids: list[uuid.UUID] | None = None,
-) -> dict:
+    redis=None,
+) -> dict[str, Any]:
     """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용)."""
+    if redis and not account_ids:
+        with contextlib.suppress(RedisError):
+            cached = await redis.get(portfolio_overview_key(user_id))
+            if cached:
+                return json.loads(cached)
+
     query = (
         select(AssetAccount)
         .where(AssetAccount.user_id == user_id, AssetAccount.is_active == True)  # noqa: E712
@@ -236,7 +250,7 @@ async def build_portfolio_overview(
         for t, v in sorted(asset_type_totals.items(), key=lambda x: -x[1])
     ]
 
-    return {
+    overview = {
         "total_assets_krw": total_assets_krw,
         "total_stock_krw": stock_total_krw,
         "total_non_stock_krw": total_assets_krw - stock_total_krw,
@@ -249,8 +263,16 @@ async def build_portfolio_overview(
         "accounts": account_rows,
     }
 
+    if redis and not account_ids:
+        with contextlib.suppress(RedisError):
+            await redis.setex(
+                portfolio_overview_key(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview)
+            )
 
-def _empty_overview() -> dict:
+    return overview
+
+
+def _empty_overview() -> dict[str, Any]:
     return {
         "total_assets_krw": 0,
         "total_stock_krw": 0,

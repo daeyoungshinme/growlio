@@ -16,11 +16,13 @@ import urllib.parse
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
-import httpx
 import structlog
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 from app.config import settings
+from app.providers.http_client import _get_client
 from app.services.credential_service import decrypt, encrypt
+from app.utils.circuit_breaker import openbanking_circuit
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -42,44 +44,48 @@ def get_authorize_url(state: str) -> str:
     return f"{settings.open_banking_base_url}/oauth/2.0/authorize?" + urllib.parse.urlencode(params)
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
 async def exchange_code_for_token(code: str) -> dict[str, Any]:
     """인증 코드 → 액세스 토큰 교환."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{settings.open_banking_base_url}/oauth/2.0/token",
-            data={
-                "code": code,
-                "client_id": settings.open_banking_client_id,
-                "client_secret": settings.open_banking_client_secret,
-                "redirect_uri": settings.open_banking_redirect_uri,
-                "grant_type": "authorization_code",
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        resp.raise_for_status()
-        return resp.json()
+    client = _get_client(ssl_verify=True)
+    resp = await client.post(
+        f"{settings.open_banking_base_url}/oauth/2.0/token",
+        data={
+            "code": code,
+            "client_id": settings.open_banking_client_id,
+            "client_secret": settings.open_banking_client_secret,
+            "redirect_uri": settings.open_banking_redirect_uri,
+            "grant_type": "authorization_code",
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
 async def refresh_access_token(refresh_token: str) -> dict[str, Any]:
     """리프레시 토큰으로 액세스 토큰 갱신."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.post(
-            f"{settings.open_banking_base_url}/oauth/2.0/token",
-            data={
-                "refresh_token": refresh_token,
-                "client_id": settings.open_banking_client_id,
-                "client_secret": settings.open_banking_client_secret,
-                "grant_type": "refresh_token",
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        resp.raise_for_status()
-        return resp.json()
+    client = _get_client(ssl_verify=True)
+    resp = await client.post(
+        f"{settings.open_banking_base_url}/oauth/2.0/token",
+        data={
+            "refresh_token": refresh_token,
+            "client_id": settings.open_banking_client_id,
+            "client_secret": settings.open_banking_client_secret,
+            "grant_type": "refresh_token",
+        },
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    resp.raise_for_status()
+    return resp.json()
 
 
 async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
     """연결된 은행 계좌 목록 조회 (핀테크이용번호 포함)."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
+    async def _call() -> list[dict]:
+        client = _get_client(ssl_verify=True)
         resp = await client.get(
             f"{settings.open_banking_base_url}/v2.0/user/me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -87,8 +93,9 @@ async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
         )
         resp.raise_for_status()
         data = resp.json()
+        return data.get("res_list", [])
 
-    return data.get("res_list", [])
+    return await openbanking_circuit.call(_call)
 
 
 async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession") -> str:
@@ -137,7 +144,10 @@ async def get_account_balance(
     bank_tran_id: 이용기관코드(8자리) + 거래고유번호(9자리)
     """
     tran_dtime = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    async with httpx.AsyncClient(timeout=30.0) as client:
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
+    async def _call() -> dict[str, Any]:
+        client = _get_client(ssl_verify=True)
         resp = await client.get(
             f"{settings.open_banking_base_url}/v2.0/account/balance/fin_num",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -149,3 +159,5 @@ async def get_account_balance(
         )
         resp.raise_for_status()
         return resp.json()
+
+    return await openbanking_circuit.call(_call)

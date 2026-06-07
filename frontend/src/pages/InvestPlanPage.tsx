@@ -17,6 +17,8 @@ import { toast } from "../utils/toast";
 import { STALE_TIME } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { invalidateDcaData } from "../utils/queryInvalidation";
+import FormInput from "../components/common/FormInput";
+import ConfirmModal from "../components/common/ConfirmModal";
 
 interface GoalForm {
   monthly_deposit_amount: string;
@@ -56,7 +58,9 @@ export default function InvestPlanPage() {
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const autoOpenTriggeredRef = useRef(false);
+  const initialFormRef = useRef<GoalForm | null>(null);
   const [form, setForm] = useState<GoalForm>({
     monthly_deposit_amount: "",
     goal_annual_return_pct: "",
@@ -67,6 +71,18 @@ export default function InvestPlanPage() {
     retirement_target_year: "",
   });
 
+  const isDirty = editing && initialFormRef.current !== null
+    ? JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+    : false;
+
+  const handleCloseModal = () => {
+    if (isDirty) {
+      setShowCloseConfirm(true);
+    } else {
+      setEditing(false);
+    }
+  };
+
   const openEdit = useCallback(async () => {
     const s = data?.settings;
     let annual_deposit_goal = "";
@@ -76,7 +92,7 @@ export default function InvestPlanPage() {
       annual_deposit_goal = settingsData.annual_deposit_goal ? String(settingsData.annual_deposit_goal) : "";
       retirement_target_year = settingsData.retirement_target_year ? String(settingsData.retirement_target_year) : "";
     }
-    setForm({
+    const newForm: GoalForm = {
       monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
       goal_annual_return_pct: s?.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
       goal_amount: s?.goal_amount ? String(s.goal_amount) : "",
@@ -84,7 +100,9 @@ export default function InvestPlanPage() {
       goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
       annual_deposit_goal,
       retirement_target_year,
-    });
+    };
+    setForm(newForm);
+    initialFormRef.current = newForm;
     setEditing(true);
   }, [data]);
 
@@ -127,24 +145,30 @@ export default function InvestPlanPage() {
   const s = data?.settings;
   const isConfigured = data?.is_configured;
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-16 text-gray-400 dark:text-gray-500 text-sm">
+        불러오는 중…
+      </div>
+    );
+  }
+
+  if (isError && !data) {
+    return (
+      <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
+        <span>데이터를 불러오지 못했습니다.</span>
+        <button
+          onClick={() => invalidateDcaData(queryClient)}
+          className="underline font-medium ml-2"
+        >
+          다시 시도
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {isLoading && (
-        <div className="flex items-center justify-center h-16 text-gray-400 dark:text-gray-500 text-sm">
-          불러오는 중…
-        </div>
-      )}
-      {isError && (
-        <div className="p-3 bg-red-50 dark:bg-red-950 rounded-lg text-sm text-red-700 dark:text-red-400 flex items-center justify-between">
-          <span>데이터를 불러오지 못했습니다.</span>
-          <button
-            onClick={() => invalidateDcaData(queryClient)}
-            className="underline font-medium ml-2"
-          >
-            다시 시도
-          </button>
-        </div>
-      )}
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">적립식 DCA 복리계산 및 월/년 목표달성율</p>
@@ -318,8 +342,14 @@ export default function InvestPlanPage() {
 
       {/* 설정 편집 모달 */}
       {editing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto">
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+          onClick={handleCloseModal}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">투자 목표 설정</h2>
 
             <div className="space-y-4">
@@ -332,23 +362,21 @@ export default function InvestPlanPage() {
                 { label: "연간 입금 목표 (원)", key: "annual_deposit_goal", placeholder: "24000000", hint: "대시보드 입금 달성률에 표시" },
                 { label: "은퇴 목표시점 (연도)", key: "retirement_target_year", placeholder: "2045", hint: "대시보드 은퇴 카운트다운에 표시" },
               ].map(({ label, key, placeholder, type, hint }) => (
-                <div key={key}>
-                  <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</label>
-                  <input
-                    type={type ?? "number"}
-                    value={form[key as keyof GoalForm]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                    className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  {hint && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{hint}</p>}
-                </div>
+                <FormInput
+                  key={key}
+                  label={label}
+                  type={type ?? "number"}
+                  value={form[key as keyof GoalForm]}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  hint={hint}
+                />
               ))}
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3 pt-4">
               <button
-                onClick={() => setEditing(false)}
+                onClick={handleCloseModal}
                 className="flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 취소
@@ -363,6 +391,17 @@ export default function InvestPlanPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showCloseConfirm && (
+        <ConfirmModal
+          message="저장하지 않은 변경사항이 있습니다. 닫으시겠습니까?"
+          confirmLabel="닫기"
+          cancelLabel="계속 편집"
+          danger={false}
+          onConfirm={() => { setShowCloseConfirm(false); setEditing(false); }}
+          onCancel={() => setShowCloseConfirm(false)}
+        />
       )}
     </div>
   );

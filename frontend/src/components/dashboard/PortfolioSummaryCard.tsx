@@ -1,11 +1,14 @@
 import { memo, useMemo } from "react";
-import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
+import { ResponsiveContainer, Tooltip as RechartsTooltip, Treemap } from "recharts";
 import { useThemeStore } from "../../stores/themeStore";
 import { fmtKrw } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import type { AllocationItem } from "../../types";
 import TreemapCell from "../common/TreemapCell";
 import { chartTooltipStyle } from "../../utils/chart";
+import SkeletonStatBox from "../common/SkeletonStatBox";
+import SkeletonCard from "../common/SkeletonCard";
+import HoverTooltip from "../common/Tooltip";
 
 interface Overview {
   total_stock_krw: number;
@@ -42,7 +45,16 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
   );
 
   if (isLoading) {
-    return <div className="py-6 text-center text-gray-300 dark:text-gray-600 text-sm">로딩 중...</div>;
+    return (
+      <div className="space-y-4">
+        <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+          <div className="flex-1 px-2"><SkeletonStatBox /></div>
+          <div className="flex-1 px-2"><SkeletonStatBox /></div>
+          <div className="flex-1 px-2"><SkeletonStatBox /></div>
+        </div>
+        <SkeletonCard rows={4} />
+      </div>
+    );
   }
 
   if (!overview) {
@@ -62,11 +74,15 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
           value={`${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`}
           color={pnlColorClass}
         />
-        <StatBox
-          label="주식 수익률"
-          value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
-          color={retColorClass}
-        />
+        <HoverTooltip content="미실현 수익률 = (평가액 - 투자원금) / 투자원금 × 100">
+          <span>
+            <StatBox
+              label="주식 수익률"
+              value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
+              color={retColorClass}
+            />
+          </span>
+        </HoverTooltip>
       </div>
 
       {/* 종목별 비중 트리차트 */}
@@ -75,7 +91,7 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
           <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-2">종목별 비중</p>
           <ResponsiveContainer width="100%" height={180}>
             <Treemap data={chartData} dataKey="value" content={<TreemapCell />}>
-              <Tooltip
+              <RechartsTooltip
                 {...chartTooltipStyle(isDark)}
                 formatter={(value: number, _name: string, props) => [
                   `${fmtKrw(value)} (${(props.payload?.pct ?? 0).toFixed(1)}%)`,

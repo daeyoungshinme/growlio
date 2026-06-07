@@ -6,20 +6,20 @@ import contextlib
 import json
 import uuid
 from datetime import date
-from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import Transaction
 from app.services.dividend_service import get_ticker_dividend_summary
 from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key
 
 logger = structlog.get_logger()
 
 
-async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Any = None) -> dict:
+async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redis | None = None) -> dict:
     if redis:
         cached = await redis.get(dividend_summary_key(user_id))
         if cached:
@@ -27,9 +27,9 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Any 
 
     current_year = date.today().year
 
-    annual_received = await _sum_transactions(user_id, db, "DIVIDEND", current_year)
-    monthly_breakdown = await _monthly_dividend_breakdown(user_id, db, current_year)
-    monthly_ticker_breakdown = await _monthly_dividend_ticker_breakdown(user_id, db, current_year)
+    annual_received, monthly_breakdown, monthly_ticker_breakdown = await _fetch_dividend_aggregates(
+        user_id, db, current_year
+    )
 
     ticker_summaries = await get_ticker_dividend_summary(user_id, db)
     estimated_annual = sum(
@@ -46,7 +46,7 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Any 
     }
 
     if redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             await redis.setex(
                 dividend_summary_key(user_id), TTL_DIVIDEND_SUMMARY, json.dumps(result)
             )
@@ -54,52 +54,59 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Any 
     return result
 
 
-async def _sum_transactions(user_id: uuid.UUID, db: AsyncSession, tx_type: str, year: int) -> float:
-    result = await db.execute(
-        select(func.sum(Transaction.amount)).where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == tx_type,
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-    )
-    return float(result.scalar() or 0)
-
-
-async def _monthly_dividend_breakdown(
+async def _fetch_dividend_aggregates(
     user_id: uuid.UUID, db: AsyncSession, year: int
-) -> list[dict]:
-    month_col = func.to_char(Transaction.transaction_date, "YYYY-MM").label("month")
-    result = await db.execute(
-        select(month_col, func.sum(Transaction.amount).label("total"))
-        .where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == "DIVIDEND",
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-        .group_by(month_col)
-        .order_by(month_col)
-    )
-    return [{"month": row.month, "amount": float(row.total)} for row in result]
-
-
-async def _monthly_dividend_ticker_breakdown(
-    user_id: uuid.UUID, db: AsyncSession, year: int
-) -> list[dict]:
+) -> tuple[float, list[dict], list[dict]]:
+    """연간 배당 합계·월별 내역·월별 종목 내역을 단일 DB 왕복으로 조회한다."""
     result = await db.execute(
         text("""
-            SELECT to_char(transaction_date, 'YYYY-MM') AS month,
-                   ticker,
-                   SUM(amount) AS total
-            FROM transactions
-            WHERE user_id = :uid
-              AND transaction_type = 'DIVIDEND'
-              AND EXTRACT(year FROM transaction_date) = :yr
-            GROUP BY 1, 2
-            ORDER BY 1, 2
+            WITH base AS (
+                SELECT
+                    to_char(transaction_date, 'YYYY-MM') AS month,
+                    ticker,
+                    amount
+                FROM transactions
+                WHERE user_id = :uid
+                  AND transaction_type = 'DIVIDEND'
+                  AND EXTRACT(year FROM transaction_date) = :yr
+            ),
+            annual AS (
+                SELECT SUM(amount) AS total FROM base
+            ),
+            monthly AS (
+                SELECT month, SUM(amount) AS total
+                FROM base
+                GROUP BY month
+                ORDER BY month
+            ),
+            monthly_ticker AS (
+                SELECT month, ticker, SUM(amount) AS total
+                FROM base
+                GROUP BY month, ticker
+                ORDER BY month, ticker
+            )
+            SELECT 'annual'         AS kind, NULL  AS month, NULL   AS ticker, total FROM annual
+            UNION ALL
+            SELECT 'monthly',                month,           NULL,            total FROM monthly
+            UNION ALL
+            SELECT 'monthly_ticker',         month,           ticker,          total FROM monthly_ticker
         """),
         {"uid": str(user_id), "yr": year},
     )
-    return [
-        {"month": row.month, "ticker": row.ticker, "amount": float(row.total)}
-        for row in result
-    ]
+    rows = result.all()
+
+    annual_received = 0.0
+    monthly_breakdown: list[dict] = []
+    monthly_ticker_breakdown: list[dict] = []
+
+    for row in rows:
+        if row.kind == "annual":
+            annual_received = float(row.total or 0)
+        elif row.kind == "monthly":
+            monthly_breakdown.append({"month": row.month, "amount": float(row.total)})
+        else:
+            monthly_ticker_breakdown.append(
+                {"month": row.month, "ticker": row.ticker, "amount": float(row.total)}
+            )
+
+    return annual_received, monthly_breakdown, monthly_ticker_breakdown

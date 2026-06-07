@@ -4,12 +4,13 @@ from typing import Any
 
 import structlog
 
+from app.config import settings
 from app.kiwoom.constants import KIWOOM_MOCK_BASE_URL, KIWOOM_REAL_BASE_URL
 from app.providers.http_client import broker_request
 
 logger = structlog.get_logger()
 
-_semaphore = asyncio.Semaphore(5)
+_semaphore = asyncio.Semaphore(settings.kiwoom_semaphore_limit)
 
 
 class KiwoomTokenExpiredError(Exception):
@@ -45,7 +46,7 @@ async def kiwoom_request(
     headers: dict[str, str],
     params: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
-    retries: int = 1,
+    retries: int | None = None,
 ) -> dict[str, Any]:
     """키움 OpenAPI+ 기본 HTTP 클라이언트."""
     return await broker_request(
@@ -55,7 +56,7 @@ async def kiwoom_request(
         headers=headers,
         params=params,
         json=json,
-        retries=retries,
+        retries=retries if retries is not None else settings.kiwoom_default_retries,
         ssl_verify=True,
         semaphore=_semaphore,
         log_prefix="kiwoom",

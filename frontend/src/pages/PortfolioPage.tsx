@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
+import Tabs from "../components/common/Tabs";
 import { api } from "../api/client";
 import { syncAccount } from "../api/assets";
 import PortfolioAnalysisTab from "../components/portfolio-analysis/PortfolioAnalysisTab";
@@ -187,16 +188,7 @@ export default function PortfolioPage() {
       </div>
 
       {/* 탭 */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none">
-        {TABS.map((t) => (
-          <button key={t} onClick={() => setTab(t)}
-            className={`px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
-              tab === t ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50" : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}>
-            {t}
-          </button>
-        ))}
-      </div>
+      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} variant="pill" />
 
       {tab === "종목 현황" && (
         <ErrorBoundary variant="section">

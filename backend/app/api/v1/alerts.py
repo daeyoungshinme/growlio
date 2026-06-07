@@ -52,19 +52,6 @@ class AlertResponse(BaseModel):
     triggered_at: datetime | None
     created_at: datetime
 
-    @classmethod
-    def from_orm_row(cls, row: ExchangeRateAlert) -> AlertResponse:
-        return cls(
-            id=row.id,
-            target_rate=float(row.target_rate),
-            direction=row.direction,
-            is_active=row.is_active,
-            max_trigger_count=row.max_trigger_count,
-            trigger_count=row.trigger_count,
-            triggered_at=row.triggered_at,
-            created_at=row.created_at,
-        )
-
 
 @router.get("/exchange-rate", response_model=list[AlertResponse])
 async def list_exchange_rate_alerts(
@@ -82,7 +69,7 @@ async def list_exchange_rate_alerts(
         .limit(limit)
     )
     alerts = result.scalars().all()
-    return [AlertResponse.from_orm_row(a) for a in alerts]
+    return [AlertResponse.model_validate(a) for a in alerts]
 
 
 @router.post("/exchange-rate", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
@@ -103,7 +90,7 @@ async def create_exchange_rate_alert(
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
-    return AlertResponse.from_orm_row(alert)
+    return AlertResponse.model_validate(alert)
 
 
 @router.patch("/exchange-rate/{alert_id}/reactivate", response_model=AlertResponse)
@@ -125,7 +112,7 @@ async def reactivate_exchange_rate_alert(
     alert.trigger_count = 0
     await db.commit()
     await db.refresh(alert)
-    return AlertResponse.from_orm_row(alert)
+    return AlertResponse.model_validate(alert)
 
 
 @router.delete("/exchange-rate/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -354,22 +341,6 @@ class StockPriceAlertResponse(BaseModel):
     triggered_at: datetime | None
     created_at: datetime
 
-    @classmethod
-    def from_orm_row(cls, row: StockPriceAlert) -> StockPriceAlertResponse:
-        return cls(
-            id=row.id,
-            ticker=row.ticker,
-            market=row.market,
-            name=row.name,
-            target_price=float(row.target_price),
-            direction=row.direction,
-            is_active=row.is_active,
-            max_trigger_count=row.max_trigger_count,
-            trigger_count=row.trigger_count,
-            triggered_at=row.triggered_at,
-            created_at=row.created_at,
-        )
-
 
 @router.get("/stock-price", response_model=list[StockPriceAlertResponse])
 async def list_stock_price_alerts(
@@ -386,7 +357,7 @@ async def list_stock_price_alerts(
         .offset(skip)
         .limit(min(limit, 500))
     )
-    return [StockPriceAlertResponse.from_orm_row(a) for a in result.scalars().all()]
+    return [StockPriceAlertResponse.model_validate(a) for a in result.scalars().all()]
 
 
 @router.post("/stock-price", response_model=StockPriceAlertResponse, status_code=status.HTTP_201_CREATED)
@@ -410,7 +381,7 @@ async def create_stock_price_alert(
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
-    return StockPriceAlertResponse.from_orm_row(alert)
+    return StockPriceAlertResponse.model_validate(alert)
 
 
 @router.patch("/stock-price/{alert_id}/reactivate", response_model=StockPriceAlertResponse)
@@ -432,7 +403,7 @@ async def reactivate_stock_price_alert(
     alert.trigger_count = 0
     await db.commit()
     await db.refresh(alert)
-    return StockPriceAlertResponse.from_orm_row(alert)
+    return StockPriceAlertResponse.model_validate(alert)
 
 
 @router.delete("/stock-price/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)

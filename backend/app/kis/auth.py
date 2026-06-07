@@ -1,6 +1,5 @@
 from datetime import UTC, datetime, timedelta
 
-import httpx
 import structlog
 
 from app.kis.constants import (
@@ -9,6 +8,7 @@ from app.kis.constants import (
     REDIS_TOKEN_KEY,
     REDIS_TOKEN_TTL_BUFFER,
 )
+from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
 
@@ -95,13 +95,13 @@ async def _fetch_and_store_token(
     account_id: str | None = None,
 ) -> str:
     base_url = KIS_MOCK_BASE_URL if is_mock else KIS_REAL_BASE_URL
-    async with httpx.AsyncClient(timeout=30.0, verify=not is_mock) as client:
-        resp = await client.post(
-            f"{base_url}/oauth2/tokenP",
-            json={"grant_type": "client_credentials", "appkey": app_key, "appsecret": app_secret},
-        )
-        resp.raise_for_status()
-        data = resp.json()
+    client = _get_client(ssl_verify=not is_mock)
+    resp = await client.post(
+        f"{base_url}/oauth2/tokenP",
+        json={"grant_type": "client_credentials", "appkey": app_key, "appsecret": app_secret},
+    )
+    resp.raise_for_status()
+    data = resp.json()
 
     access_token: str = data["access_token"]
     expires_in: int = int(data.get("expires_in", 86400))

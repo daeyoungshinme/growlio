@@ -4,6 +4,8 @@ from __future__ import annotations
 import asyncio
 import contextlib
 
+from redis.exceptions import RedisError
+
 from app.config import settings
 from app.utils.cache_keys import USD_KRW_RATE as _REDIS_USD_KRW_KEY
 
@@ -13,12 +15,10 @@ async def get_usd_krw_rate(redis, fallback_rate: float | None = None) -> float:
     rate = fallback_rate if fallback_rate is not None else settings.usd_krw_fallback_rate
     if redis is None:
         return rate
-    try:
+    with contextlib.suppress(RedisError):
         cached = await redis.get(_REDIS_USD_KRW_KEY)
         if cached:
             return float(cached)
-    except Exception:
-        pass
     return rate
 
 
@@ -26,7 +26,7 @@ async def cache_usd_krw_rate(redis, rate: float) -> None:
     """USD/KRW 환율을 Redis에 캐싱."""
     if redis is None or rate <= 0:
         return
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(RedisError):
         await redis.setex(_REDIS_USD_KRW_KEY, settings.redis_cache_ttl_seconds, str(rate))
 
 

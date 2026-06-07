@@ -2,6 +2,7 @@ import { fetchStockPrice } from "../api/assets";
 import { RebalancingAnalysis } from "../api/rebalancing";
 import type { ExecutionAction } from "./useRebalancingExecution";
 import { getActionableItems } from "./useRebalancingExecution";
+import { toast } from "../utils/toast";
 
 // 백엔드 현재가 캐시(TTL_PRICE_CURRENT=900s)와 동기화하는 세션 캐시
 const PRICE_CACHE_TTL_MS = 900_000;
@@ -43,13 +44,18 @@ export function useRebalancingPrices(
     if (toFetch.length > 0) dispatch({ type: "PRICES_START", total: toFetch.length });
 
     let loaded = 0;
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       toFetch.map(async ([ticker, market]) => {
         const result = await fetchStockPrice(ticker, market);
         _priceCache.set(ticker, { ...result, fetchedAt: Date.now() });
         dispatch({ type: "PRICES_PROGRESS", loaded: ++loaded });
       })
     );
+
+    const failedCount = results.filter((r) => r.status === "rejected").length;
+    if (failedCount > 0 && failedCount < toFetch.length) {
+      toast(`${failedCount}개 종목 현재가 조회 실패`, "error");
+    }
 
     // 캐시(기존+신규)에서 최종 가격 맵 구성
     const newKrw: Record<string, number> = {};

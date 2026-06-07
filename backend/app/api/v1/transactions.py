@@ -6,6 +6,7 @@ import contextlib
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from redis.exceptions import RedisError
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,7 +72,7 @@ async def create_transaction(
     await db.commit()
     await db.refresh(tx)
     redis = await get_redis()
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(RedisError):
         await redis.delete(
             dashboard_summary_key(current_user.id),
             dividend_summary_key(current_user.id),
@@ -116,7 +117,7 @@ async def update_transaction(
     await db.commit()
     await db.refresh(tx)
     redis = await get_redis()
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(RedisError):
         await redis.delete(
             dashboard_summary_key(current_user.id),
             dividend_summary_key(current_user.id),
@@ -136,7 +137,7 @@ async def delete_transaction(
     await db.delete(tx)
     await db.commit()
     redis = await get_redis()
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(RedisError):
         await redis.delete(
             dashboard_summary_key(current_user.id),
             dividend_summary_key(current_user.id),

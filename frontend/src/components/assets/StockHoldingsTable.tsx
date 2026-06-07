@@ -4,6 +4,7 @@ import { fmtKrwShort } from "../../utils/format";
 import { groupPositionsByTicker } from "../../utils/portfolio";
 import { pnlColor } from "../../utils/colors";
 import type { PortfolioPosition, DividendYield } from "../../types";
+import EmptyState from "../common/EmptyState";
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 
@@ -66,7 +67,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
         <span className="text-xs text-gray-400 dark:text-gray-500">{aggregated.length}종목 · 총 {fmtKrwShort(totalStock)}원</span>
       </div>
       {aggregated.length === 0 ? (
-        <div className="py-12 text-center text-gray-300 dark:text-gray-600 text-sm">보유 종목이 없습니다</div>
+        <EmptyState title="보유 종목이 없습니다" compact />
       ) : (
         <>
         {/* 모바일 카드 뷰 */}

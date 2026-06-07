@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from typing import Any
 
 import structlog
+from redis.exceptions import RedisError
 from sqlalchemy import and_, asc, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -231,7 +232,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         "dividend_monthly_breakdown": div_summary["monthly_breakdown"],
     }
     if redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             await redis.setex(
                 dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result)
             )
@@ -267,7 +268,7 @@ def _calc_returns(
 async def _get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis=None) -> list[dict]:
     cache_key = monthly_trend_key(user_id)
     if redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
@@ -300,7 +301,7 @@ async def _get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis=None) -
     data = [{"month": str(row.month), "total_krw": float(row.total_krw)} for row in result]
 
     if redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             await redis.set(cache_key, json.dumps(data), ex=TTL_MONTHLY_TREND)
 
     return data
@@ -379,7 +380,8 @@ async def _calc_xirr(
             (first.snapshot_date, -float(first.total)),
             (today, current_total),
         ]
-        return _xirr(cashflows), True
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, _xirr, cashflows), True
 
     cashflows = []
     for row in rows:
@@ -389,7 +391,8 @@ async def _calc_xirr(
             cashflows.append((row.transaction_date, float(row.amount)))
 
     cashflows.append((date.today(), current_total))
-    return _xirr(cashflows), False
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, _xirr, cashflows), False
 
 
 async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:

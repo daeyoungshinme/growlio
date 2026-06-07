@@ -106,6 +106,7 @@ class StockPriceAlert(Base):
 
     __table_args__ = (
         Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),
+        Index("idx_stock_price_alerts_ticker", "ticker"),
     )
 
 

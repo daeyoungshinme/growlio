@@ -43,7 +43,8 @@ async def portfolio_overview(
     db: AsyncSession = Depends(get_db),
 ):
     """모든 계좌 자산을 통합해 포트폴리오 전체 현황을 반환한다."""
-    return await build_portfolio_overview(current_user.id, db)
+    redis = await get_redis()
+    return await build_portfolio_overview(current_user.id, db, redis=redis)
 
 
 @router.get("/summary")

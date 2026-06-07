@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     api_semaphore_limit: int = 5
     redis_cache_ttl_seconds: int = 3600
     usd_krw_fallback_rate: float = 1300.0
+    kis_rate_per_second: float = 0.9  # KIS 1s 제한 대비 11% 버퍼
+    kiwoom_semaphore_limit: int = 5
+    kiwoom_default_retries: int = 3
 
     # DB 커넥션 풀 설정
     database_pool_size: int = 10
