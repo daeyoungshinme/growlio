@@ -6,7 +6,7 @@ import { INPUT_SM } from "../constants/inputStyles";
 
 export default function FindAccountPage() {
   const [displayName, setDisplayName] = useState("");
-  const [results, setResults] = useState<string[] | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const findAccount = useAuthStore((s) => s.findAccount);
@@ -14,11 +14,11 @@ export default function FindAccountPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setResults(null);
+    setMessage(null);
     setLoading(true);
     try {
-      const emails = await findAccount(displayName.trim());
-      setResults(emails);
+      const msg = await findAccount(displayName.trim());
+      setMessage(msg);
     } catch {
       setError("조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     } finally {
@@ -61,24 +61,9 @@ export default function FindAccountPage() {
           </button>
         </form>
 
-        {results !== null && (
+        {message !== null && (
           <div className="mt-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-            {results.length === 0 ? (
-              <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                일치하는 계정을 찾을 수 없습니다.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">가입된 이메일 계정</p>
-                <ul className="space-y-1">
-                  {results.map((email, idx) => (
-                    <li key={idx} className="text-sm font-medium text-gray-800 dark:text-gray-100">
-                      {email}
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
+            <p className="text-sm text-gray-600 dark:text-gray-300 text-center">{message}</p>
           </div>
         )}
 

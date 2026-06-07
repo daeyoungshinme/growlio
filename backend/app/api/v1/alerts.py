@@ -375,12 +375,16 @@ class StockPriceAlertResponse(BaseModel):
 async def list_stock_price_alerts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    skip: int = 0,
+    limit: int = 200,
 ):
     """주가 목표 알림 목록 조회."""
     result = await db.execute(
         select(StockPriceAlert)
         .where(StockPriceAlert.user_id == current_user.id)
         .order_by(StockPriceAlert.created_at.desc())
+        .offset(skip)
+        .limit(min(limit, 500))
     )
     return [StockPriceAlertResponse.from_orm_row(a) for a in result.scalars().all()]
 

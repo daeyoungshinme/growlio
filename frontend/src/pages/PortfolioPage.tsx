@@ -143,7 +143,17 @@ export default function PortfolioPage() {
       <SkeletonCard rows={3} height="h-4" />
     </div>
   );
-  if (error || !data) return <div className="text-red-500 p-4">데이터를 불러오지 못했습니다</div>;
+  if (error || !data) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
+      <button
+        onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview })}
+        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+      >
+        다시 시도
+      </button>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -189,7 +199,7 @@ export default function PortfolioPage() {
       </div>
 
       {tab === "종목 현황" && (
-        <>
+        <ErrorBoundary variant="section">
           <DomesticForeignBar items={marketChartData} />
           <TreemapChart data={stockChartData} title="종목별 비중" />
           {(() => {
@@ -206,17 +216,19 @@ export default function PortfolioPage() {
               />
             );
           })()}
-        </>
+        </ErrorBoundary>
       )}
 
       {tab === "배당 현황" && (
-        <DividendTab
-          dividendData={dividendData}
-          divLoading={divLoading}
-          divSummary={divSummary}
-          dividendByTicker={dividendByTicker}
-          totalInvestedKrw={data?.total_invested_krw}
-        />
+        <ErrorBoundary variant="section">
+          <DividendTab
+            dividendData={dividendData}
+            divLoading={divLoading}
+            divSummary={divSummary}
+            dividendByTicker={dividendByTicker}
+            totalInvestedKrw={data?.total_invested_krw}
+          />
+        </ErrorBoundary>
       )}
 
       {tab === "포트폴리오 분석" && (

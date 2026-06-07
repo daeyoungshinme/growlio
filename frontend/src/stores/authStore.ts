@@ -12,7 +12,7 @@ interface AuthState {
   register: (email: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
-  findAccount: (displayName: string) => Promise<string[]>;
+  findAccount: (displayName: string) => Promise<string>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
 }
@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>((set) => {
 
     findAccount: async (displayName: string) => {
       const { data } = await api.post("/auth/find-account", { display_name: displayName });
-      return data.masked_emails as string[];
+      return data.message as string;
     },
 
     forgotPassword: async (email: string) => {

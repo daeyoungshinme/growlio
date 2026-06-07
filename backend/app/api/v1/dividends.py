@@ -22,7 +22,9 @@ router = APIRouter(prefix="/dividends", tags=["dividends"])
 
 
 @router.get("/summary")
+@limiter.limit("10/minute")
 async def dividend_summary(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
@@ -42,7 +44,9 @@ async def position_dividend_yields(
 
 
 @router.get("/by-ticker")
+@limiter.limit("10/minute")
 async def ticker_dividend_summary(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):

@@ -358,7 +358,7 @@ export default function InvestPlanPage() {
                 disabled={saving}
                 className="flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
-                {saving ? "저장 중…" : "저장"}
+                {saving ? "저장 중..." : "저장"}
               </button>
             </div>
           </div>

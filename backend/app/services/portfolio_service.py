@@ -15,6 +15,7 @@ from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.utils.cache_keys import TTL_ALLOC_HISTORY, alloc_history_key
+from app.utils.pnl import calc_position_pnl
 
 ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -83,8 +84,7 @@ def _build_position_details(
         avg_out = float(p.avg_price or 0)
         cur_out = float(p.current_price or p.avg_price or 0)
         val_amt = float(p.value_krw or cur_out * qty)
-        inv_amt = avg_out * qty
-        pnl_p = val_amt - inv_amt
+        inv_amt, _, pnl_p, rate = calc_position_pnl(qty, avg_out, cur_out)
         result.append({
             "ticker": p.ticker,
             "name": p.name or "",
@@ -95,7 +95,7 @@ def _build_position_details(
             "value_krw": val_amt,
             "invested_krw": inv_amt,
             "pnl": pnl_p,
-            "pnl_pct": round((pnl_p / inv_amt * 100) if inv_amt else 0.0, 2),
+            "pnl_pct": round(rate, 2),
             "currency": p.currency or "KRW",
             "account_id": str(acc.id),
             "account_name": acc.name,

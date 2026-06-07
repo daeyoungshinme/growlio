@@ -54,17 +54,9 @@ async def sync_profile(
     return user
 
 
-def _mask_email(email: str) -> str:
-    local, domain = email.rsplit("@", 1)
-    masked = local[0] + "***" if len(local) > 1 else local
-    return f"{masked}@{domain}"
-
-
 @router.post("/find-account", response_model=FindAccountResponse)
-@limiter.limit("1/minute")
-async def find_account(request: Request, req: FindAccountRequest, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(User).where(User.display_name == req.display_name, User.is_active == True)  # noqa: E712
-    )
-    users = result.scalars().all()
-    return FindAccountResponse(masked_emails=[_mask_email(u.email) for u in users])
+@limiter.limit("3/hour")
+async def find_account(request: Request, req: FindAccountRequest):
+    # 계정 존재 여부를 응답에서 노출하지 않음 (사용자 열거 방지)
+    msg = "가입 시 사용하신 이름과 이메일로 로그인을 시도해 보세요."
+    return FindAccountResponse(message=msg)

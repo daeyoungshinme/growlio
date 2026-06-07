@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     database_pool_size: int = 10
     database_max_overflow: int = 5
     database_pool_timeout: int = 30
+    slow_query_ms: int = 200  # 이 임계값(ms) 초과 쿼리는 경고 로그 출력
 
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 

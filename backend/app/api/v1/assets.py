@@ -36,6 +36,7 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import dividend_ticker_summary_key
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
+from app.utils.pnl import calc_position_pnl
 from app.utils.redis_lock import redis_lock
 
 
@@ -618,13 +619,10 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
     total_value = 0.0
 
     for p in positions:
-        qty = p.get("qty", 0)
-        avg = p.get("avg_price", 0.0)
-        cur = p.get("current_price") or avg
-        invested = qty * avg
-        value = qty * cur
-        pnl = value - invested
-        pnl_pct = (pnl / invested * 100) if invested else 0.0
+        qty = float(p.get("qty", 0))
+        avg = float(p.get("avg_price", 0.0))
+        cur = float(p.get("current_price") or avg)
+        invested, value, pnl, rate = calc_position_pnl(qty, avg, cur)
         total_invested += invested
         total_value += value
         items.append({
@@ -633,7 +631,7 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
             "invested_amount": invested,
             "value_amount": value,
             "pnl": pnl,
-            "pnl_pct": round(pnl_pct, 2),
+            "pnl_pct": round(rate, 2),
         })
 
     total_pnl = total_value - total_invested

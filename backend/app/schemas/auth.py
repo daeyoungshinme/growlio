@@ -12,7 +12,7 @@ class FindAccountRequest(BaseModel):
 
 
 class FindAccountResponse(BaseModel):
-    masked_emails: list[str]
+    message: str
 
 
 class UserResponse(BaseModel):

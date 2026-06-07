@@ -97,6 +97,10 @@ async def fetch_ticker_dividend_info(
         except (json.JSONDecodeError, TypeError, KeyError):
             await redis.delete(info_cache_key)
 
+    # 캐시에서 모든 필요한 데이터를 확보한 경우 네트워크 소스 체인 생략
+    if dps > 0 and yield_decimal > 0 and not need_months_fetch:
+        return yield_decimal, dps, months, ex_dividend_date
+
     async with sem:
         # 0순위: Naver Finance (국내 종목 전용, 인증 불필요)
         if is_korean:

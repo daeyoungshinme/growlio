@@ -79,11 +79,13 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Row 1: Hero Card — 자산 현황 + 목표 달성 전망 */}
-      <HeroSummaryCard
-        data={data}
-        dcaData={dcaData}
-        exchangeRate={exchangeRate}
-      />
+      <ErrorBoundary variant="section">
+        <HeroSummaryCard
+          data={data}
+          dcaData={dcaData}
+          exchangeRate={exchangeRate}
+        />
+      </ErrorBoundary>
 
       {/* Row 2: 포트폴리오 요약 + 배당 현황 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -97,11 +99,13 @@ export default function DashboardPage() {
               전체 보기 <ArrowRight size={14} />
             </Link>
           </div>
-          <PortfolioSummaryCard
-            overview={overview}
-            isLoading={overviewLoading}
-            stockAllocation={overview?.stock_allocation}
-          />
+          <ErrorBoundary variant="section">
+            <PortfolioSummaryCard
+              overview={overview}
+              isLoading={overviewLoading}
+              stockAllocation={overview?.stock_allocation}
+            />
+          </ErrorBoundary>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
@@ -113,12 +117,14 @@ export default function DashboardPage() {
               자세히 보기 <ArrowRight size={14} />
             </Link>
           </div>
-          <DividendSection
-            annualReceived={data.annual_dividends_received ?? null}
-            estimatedAnnual={data.estimated_annual_dividends ?? null}
-            estimatedMonthly={estimatedMonthly}
-            overallDividendYield={overallDividendYield}
-          />
+          <ErrorBoundary variant="section">
+            <DividendSection
+              annualReceived={data.annual_dividends_received ?? null}
+              estimatedAnnual={data.estimated_annual_dividends ?? null}
+              estimatedMonthly={estimatedMonthly}
+              overallDividendYield={overallDividendYield}
+            />
+          </ErrorBoundary>
         </div>
       </div>
 

@@ -33,7 +33,7 @@ def _before_cursor_execute(conn, cursor, statement, parameters, context, execute
 @event.listens_for(engine.sync_engine, "after_cursor_execute")
 def _after_cursor_execute(conn, cursor, statement, parameters, context, executemany):
     elapsed_ms = (time.monotonic() - conn.info.pop("_qstart", time.monotonic())) * 1000
-    if elapsed_ms > 200:
+    if elapsed_ms > settings.slow_query_ms:
         logger.warning("slow_query", duration_ms=round(elapsed_ms), sql=statement[:120])
 
 
