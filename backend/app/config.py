@@ -57,6 +57,11 @@ class Settings(BaseSettings):
 
     # Sentry 에러 추적 (비어 있으면 비활성화)
     sentry_dsn: str = ""
+    # release 태그 — CI/CD에서 git SHA 등으로 주입. 비어 있으면 미설정
+    sentry_release: str = ""
+
+    # Prometheus /metrics 엔드포인트 보호 토큰 (비어 있으면 인증 없음)
+    metrics_token: str = ""
 
     @property
     def allowed_origins_list(self) -> list[str]:

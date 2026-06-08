@@ -215,6 +215,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
               <button
                 onClick={() => { setBacktestResult(null); setCorrelationResult(null); runMut.mutate(); }}
                 disabled={!canRunBacktest || runMut.isPending}
+                aria-busy={runMut.isPending}
                 className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {runMut.isPending ? "계산 중..." : "▶ 백테스팅 실행"}

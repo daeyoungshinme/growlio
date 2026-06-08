@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 
 import redis.asyncio as aioredis
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.config import settings
 from app.database import get_db
+from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
@@ -31,7 +32,9 @@ _OB_TOKEN_DEFAULT_TTL = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효�
 
 
 @router.get("/connect")
+@limiter.limit("10/minute")
 async def connect_open_banking(
+    request: Request,
     current_user: User = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
 ):
@@ -43,7 +46,9 @@ async def connect_open_banking(
 
 
 @router.get("/callback")
+@limiter.limit("20/minute")
 async def open_banking_callback(
+    request: Request,
     code: str = Query(...),
     state: str = Query(...),
     db: AsyncSession = Depends(get_db),
@@ -52,19 +57,25 @@ async def open_banking_callback(
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
     user_id = await redis.getdel(ob_state_key(state))
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
+        )
 
     # state에 바인딩된 user_id가 실제로 DB에 존재하는지 검증
     try:
         uid = uuid.UUID(user_id)
     except ValueError:
         logger.warning("ob_callback_invalid_user_id", user_id=user_id)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다") from None
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
+        ) from None
 
     user_exists = await db.scalar(select(User).where(User.id == uid))
     if not user_exists:
         logger.warning("ob_callback_user_not_found", user_id=user_id)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
+        )
 
     try:
         token_data = await exchange_code_for_token(code)
@@ -96,14 +107,21 @@ async def open_banking_callback(
 
 
 @router.get("/accounts")
+@limiter.limit("30/minute")
 async def list_ob_accounts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """오픈뱅킹으로 연결된 은행 계좌 목록 조회."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    settings_row = await db.scalar(
+        select(UserSettings).where(UserSettings.user_id == current_user.id)
+    )
     if not settings_row or not settings_row.ob_access_token:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.",
+        )
 
     accounts = await get_user_accounts(
         access_token=decrypt(settings_row.ob_access_token),
@@ -117,7 +135,9 @@ async def list_ob_accounts(
 
 
 @router.post("/accounts/register")
+@limiter.limit("20/minute")
 async def register_ob_account(
+    request: Request,
     fintech_use_no: str,
     bank_code: str,
     bank_name: str,
@@ -152,12 +172,16 @@ async def register_ob_account(
 
 
 @router.delete("/disconnect")
+@limiter.limit("10/minute")
 async def disconnect_open_banking(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """오픈뱅킹 연결 해제."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    settings_row = await db.scalar(
+        select(UserSettings).where(UserSettings.user_id == current_user.id)
+    )
     if settings_row:
         settings_row.ob_access_token = None
         settings_row.ob_refresh_token = None

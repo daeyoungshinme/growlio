@@ -8,11 +8,12 @@ scheduler = AsyncIOScheduler(timezone="Asia/Seoul", job_defaults={"coalesce": Tr
 
 
 def init_scheduler() -> None:
+    from apscheduler.triggers.interval import IntervalTrigger
+
     from app.jobs.asset_sync import run_daily_asset_sync
-    from app.jobs.token_refresh import refresh_all_user_tokens
     from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
     from app.jobs.rebalancing_alert import run_rebalancing_alert_check
-    from apscheduler.triggers.interval import IntervalTrigger
+    from app.jobs.token_refresh import refresh_all_user_tokens
 
     scheduler.add_job(
         refresh_all_user_tokens,
@@ -50,6 +51,27 @@ def init_scheduler() -> None:
         run_stock_price_alert_check,
         IntervalTrigger(minutes=10),
         id="stock_price_alert_check",
+        replace_existing=True,
+    )
+    from app.jobs.price_publisher import run_price_broadcast
+    scheduler.add_job(
+        run_price_broadcast,
+        IntervalTrigger(seconds=30),
+        id="ws_price_broadcast",
+        replace_existing=True,
+    )
+    from app.jobs.monthly_report import run_monthly_report
+    scheduler.add_job(
+        run_monthly_report,
+        CronTrigger(day=1, hour=9, minute=0, timezone="Asia/Seoul"),
+        id="monthly_report_job",
+        replace_existing=True,
+    )
+    from app.jobs.goal_achievement import run_goal_achievement_check
+    scheduler.add_job(
+        run_goal_achievement_check,
+        CronTrigger(hour=18, minute=45, timezone="Asia/Seoul"),
+        id="goal_achievement_check_daily",
         replace_existing=True,
     )
     scheduler.start()

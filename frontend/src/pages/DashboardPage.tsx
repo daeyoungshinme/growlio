@@ -27,7 +27,7 @@ export default function DashboardPage() {
 
   const estimatedMonthly = useMemo(
     () => data?.estimated_annual_dividends != null ? Math.round(data.estimated_annual_dividends / 12) : null,
-    [data?.estimated_annual_dividends]
+    [data]
   );
 
   if (isLoading || accountsLoading) return (

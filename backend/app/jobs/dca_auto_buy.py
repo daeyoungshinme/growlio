@@ -57,8 +57,8 @@ async def run_dca_auto_execution() -> None:
 async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis) -> None:
     portfolio_id = settings.auto_dca_portfolio_id
     account_id = settings.auto_dca_account_id
-    total_amount = float(settings.auto_dca_amount)  # type: ignore[arg-type]
-    user_id: uuid.UUID = settings.user_id  # type: ignore[assignment]
+    total_amount = float(settings.auto_dca_amount)
+    user_id: uuid.UUID = settings.user_id
 
     # 포트폴리오 종목 비중 조회
     portfolio = await db.scalar(select(Portfolio).where(Portfolio.id == portfolio_id))

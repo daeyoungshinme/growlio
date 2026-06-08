@@ -253,6 +253,242 @@ async def send_stock_price_alert(
         raise
 
 
+_ASSET_TYPE_LABEL: dict[str, str] = {
+    "BANK_ACCOUNT": "예금/적금",
+    "DEPOSIT": "예치금",
+    "STOCK_KIS": "주식(KIS)",
+    "STOCK_KIWOOM": "주식(키움)",
+    "STOCK_OTHER": "주식(기타)",
+    "CASH_STOCK": "주식 현금",
+    "CASH_OTHER": "현금(기타)",
+    "REAL_ESTATE": "부동산",
+    "OTHER": "기타",
+}
+
+
+async def send_monthly_report_email(
+    to_email: str,
+    report_month: str,
+    total_assets_krw: float,
+    mom_change_krw: float | None,
+    mom_change_pct: float | None,
+    annual_return_pct: float | None,
+    xirr_pct: float | None,
+    goal_amount: float | None,
+    goal_achievement_pct: float | None,
+    annual_deposit_goal: float | None,
+    deposit_achievement_pct: float | None,
+    annual_dividends_received: float,
+    asset_allocation: list[dict],
+) -> None:
+    """월별 포트폴리오 요약 리포트 이메일 발송."""
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return
+
+    subject = f"[Growlio] {report_month} 월간 포트폴리오 리포트"
+
+    mom_row = ""
+    if mom_change_krw is not None and mom_change_pct is not None:
+        mom_color = "#16a34a" if mom_change_krw >= 0 else "#dc2626"
+        mom_sign = "+" if mom_change_krw >= 0 else ""
+        mom_row = (
+            f"<tr><td style='padding:8px;background:#f1f5f9;font-weight:bold;'>전월 대비</td>"
+            f"<td style='padding:8px;color:{mom_color};font-weight:bold;'>"
+            f"{mom_sign}{mom_change_krw:,.0f}원 ({mom_sign}{mom_change_pct:.1f}%)</td></tr>"
+        )
+
+    return_rows = ""
+    if annual_return_pct is not None:
+        ret_color = "#16a34a" if annual_return_pct >= 0 else "#dc2626"
+        ret_sign = "+" if annual_return_pct >= 0 else ""
+        return_rows += (
+            f"<tr><td style='padding:8px;background:#f1f5f9;font-weight:bold;'>연환산 수익률</td>"
+            f"<td style='padding:8px;color:{ret_color};'>"
+            f"{ret_sign}{annual_return_pct:.1f}%</td></tr>"
+        )
+    if xirr_pct is not None:
+        xirr_color = "#16a34a" if xirr_pct >= 0 else "#dc2626"
+        xirr_sign = "+" if xirr_pct >= 0 else ""
+        return_rows += (
+            "<tr>"
+            f"<td style='padding:8px;background:#f1f5f9;font-weight:bold;'>XIRR (내부수익률)</td>"
+            f"<td style='padding:8px;color:{xirr_color};'>{xirr_sign}{xirr_pct:.1f}%</td></tr>"
+        )
+
+    _td_label = "style='padding:8px;background:#f1f5f9;font-weight:bold;'"
+    goal_rows = ""
+    if goal_amount and goal_achievement_pct is not None:
+        goal_color = "#16a34a" if goal_achievement_pct >= 100 else "#1d4ed8"
+        goal_rows += (
+            f"<tr><td {_td_label}>총 자산 목표</td>"
+            f"<td style='padding:8px;'>{goal_amount:,.0f}원 → "
+            f"<span style='color:{goal_color};font-weight:bold;'>"
+            f"{goal_achievement_pct:.1f}% 달성</span></td></tr>"
+        )
+    if annual_deposit_goal and deposit_achievement_pct is not None:
+        dep_color = "#16a34a" if deposit_achievement_pct >= 100 else "#1d4ed8"
+        goal_rows += (
+            f"<tr><td {_td_label}>연간 입금 목표</td>"
+            f"<td style='padding:8px;'>{annual_deposit_goal:,.0f}원 → "
+            f"<span style='color:{dep_color};font-weight:bold;'>"
+            f"{deposit_achievement_pct:.1f}% 달성</span></td></tr>"
+        )
+
+    goal_section = (
+        f"<h3 style='color:#374151;margin-top:24px;margin-bottom:8px;'>목표 달성</h3>"
+        f"<table style='width:100%;border-collapse:collapse;'>{goal_rows}</table>"
+        if goal_rows
+        else ""
+    )
+
+    sorted_alloc = sorted(
+        asset_allocation, key=lambda x: x.get("amount_krw", 0), reverse=True
+    )[:5]
+    _td = "padding:6px 8px;border-bottom:1px solid #e2e8f0;"
+    alloc_rows = "".join(
+        f"<tr>"
+        f"<td style='{_td}'>"
+        f"{_ASSET_TYPE_LABEL.get(item['type'], item['type'])}</td>"
+        f"<td style='{_td}text-align:right;'>{item.get('amount_krw', 0):,.0f}원</td>"
+        f"<td style='{_td}text-align:right;'>{item.get('pct', 0):.1f}%</td>"
+        f"</tr>"
+        for item in sorted_alloc
+    )
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;">{report_month} 월간 포트폴리오 리포트</h2>
+      <h3 style="color:#374151;margin-top:24px;margin-bottom:8px;">자산 현황</h3>
+      <table style="width:100%;border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px;background:#f1f5f9;font-weight:bold;">총 자산</td>
+          <td style="padding:8px;font-size:18px;font-weight:bold;
+            color:#1d4ed8;">{total_assets_krw:,.0f}원</td>
+        </tr>
+        {mom_row}
+        {return_rows}
+        <tr>
+          <td style="padding:8px;background:#f1f5f9;font-weight:bold;">연간 배당금</td>
+          <td style="padding:8px;">{annual_dividends_received:,.0f}원</td>
+        </tr>
+      </table>
+      {goal_section}
+      <h3 style="color:#374151;margin-top:24px;margin-bottom:8px;">자산 배분 (상위 5개)</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:8px;text-align:left;">유형</th>
+            <th style="padding:8px;text-align:right;">금액</th>
+            <th style="padding:8px;text-align:right;">비중</th>
+          </tr>
+        </thead>
+        <tbody>{alloc_rows}</tbody>
+      </table>
+      <p style="margin-top:24px;color:#64748b;font-size:13px;">
+        Growlio 앱에서 상세 내역을 확인하세요.<br>
+        이 리포트는 매월 1일 자동으로 발송됩니다.
+      </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        ctx = ssl.create_default_context()
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user,
+            password=settings.smtp_password,
+            start_tls=True,
+            tls_context=ctx,
+        )
+        logger.info("monthly_report_email_sent", to=to_email, month=report_month)
+    except Exception as e:
+        logger.error("monthly_report_email_failed", to=to_email, error=str(e))
+        raise
+
+
+async def send_goal_achievement_email(
+    to_email: str,
+    goal_type: str,
+    goal_amount: float,
+    current_amount: float,
+    achievement_pct: float,
+) -> None:
+    """투자 목표 달성 알림 이메일 발송. goal_type: 'ASSET' | 'DEPOSIT'."""
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return
+
+    if goal_type == "ASSET":
+        subject = f"[Growlio] 목표 자산 달성! — {achievement_pct:.1f}% 달성"
+        heading = "총 자산 목표 달성"
+        goal_label = "총 자산 목표"
+        current_label = "현재 총 자산"
+    else:
+        subject = f"[Growlio] 연간 입금 목표 달성! — {achievement_pct:.1f}% 달성"
+        heading = "연간 입금 목표 달성"
+        goal_label = "연간 입금 목표"
+        current_label = "올해 순 입금액"
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;">
+      <h2 style="color:#16a34a;">{heading}</h2>
+      <p style="color:#374151;margin-top:8px;">설정하신 투자 목표를 달성했습니다!</p>
+      <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+        <tr>
+          <td style="padding:8px;background:#f1f5f9;font-weight:bold;">{goal_label}</td>
+          <td style="padding:8px;">{goal_amount:,.0f}원</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;background:#f1f5f9;font-weight:bold;">{current_label}</td>
+          <td style="padding:8px;font-weight:bold;color:#16a34a;">{current_amount:,.0f}원</td>
+        </tr>
+        <tr>
+          <td style="padding:8px;background:#f1f5f9;font-weight:bold;">달성률</td>
+          <td style="padding:8px;font-size:20px;font-weight:bold;
+            color:#16a34a;">{achievement_pct:.1f}%</td>
+        </tr>
+      </table>
+      <p style="margin-top:20px;color:#64748b;font-size:13px;">
+        Growlio 앱에서 새 목표를 설정하거나 상세 내역을 확인하세요.
+      </p>
+    </div>
+    """
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    try:
+        ctx = ssl.create_default_context()
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_user,
+            password=settings.smtp_password,
+            start_tls=True,
+            tls_context=ctx,
+        )
+        logger.info(
+            "goal_achievement_email_sent",
+            to=to_email, goal_type=goal_type, pct=achievement_pct,
+        )
+    except Exception as e:
+        logger.error("goal_achievement_email_failed", to=to_email, error=str(e))
+        raise
+
+
 async def send_test_email(to_email: str) -> None:
     """이메일 설정 확인용 테스트 이메일 발송."""
     if not settings.smtp_host or not settings.smtp_user:

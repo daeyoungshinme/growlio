@@ -1,9 +1,13 @@
 import httpx
+import structlog
 
 from app.kis.client import kis_request
-from app.kis.constants import DOMESTIC_MARKET_DIV, DOMESTIC_MARKET_DIV_ETF, TR_DOMESTIC_ETF_PRICE, TR_DOMESTIC_PRICE
-
-import structlog
+from app.kis.constants import (
+    DOMESTIC_MARKET_DIV,
+    DOMESTIC_MARKET_DIV_ETF,
+    TR_DOMESTIC_ETF_PRICE,
+    TR_DOMESTIC_PRICE,
+)
 
 logger = structlog.get_logger()
 

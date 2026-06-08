@@ -134,6 +134,7 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
       <button
         onClick={() => saveMutation.mutate()}
         disabled={saveMutation.isPending}
+        aria-busy={saveMutation.isPending}
         className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
       >
         {saveMutation.isPending ? "저장 중..." : "저장"}

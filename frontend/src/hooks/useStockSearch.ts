@@ -31,7 +31,7 @@ export function useStockSearch(debounceMs = 300) {
       setIsSearchError(false);
       try {
         setSuggestions(await searchStocks(query.trim(), controller.signal));
-      } catch (e) {
+      } catch {
         setSuggestions([]);
         if (!controller.signal.aborted) {
           setIsSearchError(true);

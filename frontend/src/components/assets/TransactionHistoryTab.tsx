@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
 import EmptyState from "../common/EmptyState";
@@ -101,6 +102,19 @@ export default function TransactionHistoryTab({ accounts }: Props) {
     [accounts],
   );
 
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 10,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom = virtualItems.length > 0
+    ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+    : 0;
+
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
@@ -190,7 +204,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         ) : (
           <>
             {/* 모바일 카드 뷰 */}
-            <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+            <div className="sm:hidden overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700" style={{ maxHeight: "70vh" }}>
               {filtered.map((tx: Transaction) => (
                 <div key={tx.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
@@ -220,49 +234,60 @@ export default function TransactionHistoryTab({ accounts }: Props) {
               ))}
             </div>
 
-            {/* 데스크탑 테이블 */}
-            <table className="hidden sm:table w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
-                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
-                  <th className="text-right px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
-                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">계좌</th>
-                  <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
-                  <th className="px-3 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((tx: Transaction) => (
-                  <tr key={tx.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{tx.transaction_date}</td>
-                    <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
-                      <span>{TX_LABELS[tx.transaction_type]}</span>
-                      {tx.ticker && <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">{tx.ticker}</span>}
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">{fmtKrw(tx.amount)}</td>
-                    <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
-                      {tx.account_id ? (accountMap[tx.account_id] ?? "—") : "—"}
-                    </td>
-                    <td className="px-3 py-3 text-gray-400 dark:text-gray-500 text-sm">
-                      <div className="max-w-[160px] truncate">{tx.notes || "—"}</div>
-                    </td>
-                    <td className="px-3 py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button onClick={() => startEdit(tx)} aria-label="수정"
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
-                          <Pencil size={15} />
-                        </button>
-                        <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending} aria-label="삭제"
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+            {/* 데스크탑 테이블 — 가상화 (패딩-행 방식으로 native 레이아웃 유지) */}
+            <div
+              ref={tableContainerRef}
+              className="hidden sm:block overflow-auto"
+              style={{ maxHeight: "640px" }}
+            >
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+                  <tr className="border-b border-gray-100 dark:border-gray-700">
+                    <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
+                    <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
+                    <th className="text-right px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
+                    <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">계좌</th>
+                    <th className="text-left px-3 py-3 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
+                    <th className="px-3 py-3" />
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {paddingTop > 0 && <tr><td colSpan={6} style={{ height: paddingTop }} /></tr>}
+                  {virtualItems.map((virtualRow) => {
+                    const tx = filtered[virtualRow.index];
+                    return (
+                      <tr key={tx.id} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">{tx.transaction_date}</td>
+                        <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
+                          <span>{TX_LABELS[tx.transaction_type]}</span>
+                          {tx.ticker && <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">{tx.ticker}</span>}
+                        </td>
+                        <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">{fmtKrw(tx.amount)}</td>
+                        <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs whitespace-nowrap">
+                          {tx.account_id ? (accountMap[tx.account_id] ?? "—") : "—"}
+                        </td>
+                        <td className="px-3 py-3 text-gray-400 dark:text-gray-500 text-sm">
+                          <div className="max-w-[160px] truncate">{tx.notes || "—"}</div>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <div className="flex justify-end gap-1">
+                            <button onClick={() => startEdit(tx)} aria-label="수정"
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
+                              <Pencil size={15} />
+                            </button>
+                            <button onClick={() => deleteMut.mutate(tx.id)} disabled={deleteMut.isPending} aria-label="삭제"
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors">
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {paddingBottom > 0 && <tr><td colSpan={6} style={{ height: paddingBottom }} /></tr>}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </div>

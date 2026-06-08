@@ -22,6 +22,15 @@ cd frontend && npm run build
 cd frontend && npx tsc --noEmit
 ```
 
+### API 타입 자동 생성
+```bash
+# 백엔드 서버(localhost:8000) 실행 중인 상태에서 실행
+cd frontend && npm run generate:api-types
+# → src/types/api.generated.ts 생성 (gitignore 대상 — 빌드 시 재생성)
+# 생성된 타입 사용법: import type { paths, components } from "../types/api.generated";
+# 예: components["schemas"]["DashboardSummary"]
+```
+
 ### 린트 & 테스트
 ```bash
 cd frontend && npm run lint    # ESLint (eslint src)

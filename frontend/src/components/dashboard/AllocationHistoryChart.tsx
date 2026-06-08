@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
@@ -50,7 +50,7 @@ const BENCHMARK_LABELS: Record<string, string> = {
   nasdaq_pct: "NASDAQ",
 };
 
-export default function AllocationHistoryChart() {
+function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
@@ -299,3 +299,5 @@ export default function AllocationHistoryChart() {
     </div>
   );
 }
+
+export default memo(AllocationHistoryChart);

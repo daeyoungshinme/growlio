@@ -406,7 +406,7 @@ async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:
             return json.loads(cached)
 
     def _fetch() -> dict[str, float | None]:
-        import yfinance as yf  # type: ignore[import-untyped]
+        import yfinance as yf
 
         result: dict[str, float | None] = {}
         for symbol, key in [("^KS11", "kospi_pct"), ("^GSPC", "sp500_pct")]:
@@ -467,7 +467,7 @@ async def get_benchmark_comparison(
     end_dt = date.today() + timedelta(days=1)
 
     def _fetch_monthly_closes() -> dict[str, list[float | None]]:
-        import yfinance as yf  # type: ignore[import-untyped]
+        import yfinance as yf
 
         result: dict[str, list[float | None]] = {}
         for key, symbol in requested.items():

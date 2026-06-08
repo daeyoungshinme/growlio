@@ -1,3 +1,4 @@
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
@@ -7,6 +8,7 @@ const apiPattern = new RegExp(`^https://${apiDomain.replace(/\./g, "\\.")}/.*`);
 
 export default defineConfig({
   build: {
+    // "hidden": 소스맵 생성하되 번들에 참조 주석 미포함 — Sentry 업로드 후 삭제
     sourcemap: "hidden",
     rollupOptions: {
       output: {
@@ -20,6 +22,19 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    // SENTRY_AUTH_TOKEN이 있을 때만 빌드 시 소스맵 Sentry 업로드
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG,
+            project: process.env.SENTRY_PROJECT,
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            release: { name: process.env.SENTRY_RELEASE },
+            sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+            telemetry: false,
+          }),
+        ]
+      : []),
     VitePWA({
       registerType: "autoUpdate",
       manifest: {

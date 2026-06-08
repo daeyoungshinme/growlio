@@ -60,7 +60,7 @@ export default function InvestPlanPage() {
   const [saving, setSaving] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
   const autoOpenTriggeredRef = useRef(false);
-  const initialFormRef = useRef<GoalForm | null>(null);
+  const [initialForm, setInitialForm] = useState<GoalForm | null>(null);
   const [form, setForm] = useState<GoalForm>({
     monthly_deposit_amount: "",
     goal_annual_return_pct: "",
@@ -71,8 +71,8 @@ export default function InvestPlanPage() {
     retirement_target_year: "",
   });
 
-  const isDirty = editing && initialFormRef.current !== null
-    ? JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+  const isDirty = editing && initialForm !== null
+    ? JSON.stringify(form) !== JSON.stringify(initialForm)
     : false;
 
   const handleCloseModal = () => {
@@ -102,7 +102,7 @@ export default function InvestPlanPage() {
       retirement_target_year,
     };
     setForm(newForm);
-    initialFormRef.current = newForm;
+    setInitialForm(newForm);
     setEditing(true);
   }, [data]);
 

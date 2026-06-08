@@ -1,13 +1,14 @@
 """통합 포트폴리오 CRUD API (백테스팅·리밸런싱 공용)."""
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.database import get_db
+from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.user import User
@@ -52,7 +53,9 @@ def _with_relations(q):
 
 
 @router.get("", response_model=list[PortfolioResponse])
+@limiter.limit("60/minute")
 async def list_portfolios(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -68,7 +71,9 @@ async def list_portfolios(
 
 
 @router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_portfolio(
+    request: Request,
     body: PortfolioCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -106,7 +111,9 @@ async def create_portfolio(
 
 
 @router.put("/{portfolio_id}", response_model=PortfolioResponse)
+@limiter.limit("30/minute")
 async def update_portfolio(
+    request: Request,
     portfolio_id: uuid.UUID,
     body: PortfolioUpdate,
     current_user: User = Depends(get_current_user),
@@ -123,7 +130,9 @@ async def update_portfolio(
     )
     portfolio = result.scalar_one_or_none()
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다"
+        )
 
     if body.account_ids is not None:
         await _validate_account_ids(body.account_ids, current_user.id, db)
@@ -145,7 +154,9 @@ async def update_portfolio(
             ))
 
     if body.account_ids is not None:
-        await db.execute(delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id))
+        await db.execute(
+            delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id)
+        )
         for aid in body.account_ids:
             db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
 
@@ -158,7 +169,9 @@ async def update_portfolio(
 
 
 @router.delete("/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 async def delete_portfolio(
+    request: Request,
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -171,14 +184,18 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다"
+        )
 
     await db.delete(portfolio)
     await db.commit()
 
 
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 async def reorder_portfolios(
+    request: Request,
     body: PortfolioReorderRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

@@ -147,33 +147,22 @@ class TestSyncProfile:
 class TestFindAccount:
     """POST /api/v1/auth/find-account"""
 
-    def test_find_account_returns_masked_emails(self):
-        """display_name으로 검색하면 마스킹된 이메일 목록을 반환한다."""
-        from app.main import app
-        from app.database import get_db
-        from sqlalchemy.ext.asyncio import AsyncSession
+    @pytest.mark.asyncio
+    async def test_find_account_returns_fixed_message(self, override_settings):
+        """display_name 검색 시 사용자 열거 방지를 위해 항상 고정 메시지를 반환한다."""
+        from app.api.v1.auth import find_account
+        from app.schemas.auth import FindAccountRequest
+        from starlette.requests import Request
 
-        user = _make_user(email="hong@example.com")
-        user.display_name = "홍길동"
+        scope = {
+            "type": "http", "method": "POST", "path": "/api/v1/auth/find-account",
+            "query_string": b"", "headers": [], "client": ("127.0.0.1", 12345),
+        }
+        mock_req = Request(scope=scope)
+        body = FindAccountRequest(display_name="홍길동")
 
-        db = AsyncMock(spec=AsyncSession)
-        mock_result = MagicMock()
-        mock_result.scalars.return_value.all.return_value = [user]
-        db.execute = AsyncMock(return_value=mock_result)
+        # __wrapped__ bypasses @limiter.limit decorator (slowapi uses @wraps)
+        result = await find_account.__wrapped__(request=mock_req, req=body)
 
-        async def override_db():
-            yield db
-
-        app.dependency_overrides[get_db] = override_db
-        try:
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.post(
-                    "/api/v1/auth/find-account",
-                    json={"display_name": "홍길동"},
-                )
-            assert resp.status_code == 200
-            body = resp.json()
-            assert len(body["masked_emails"]) == 1
-            assert "***" in body["masked_emails"][0]
-        finally:
-            app.dependency_overrides.pop(get_db, None)
+        assert result.message
+        assert len(result.message) > 0

@@ -295,7 +295,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onCancel}
             className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
-          <button type="submit" disabled={isPending || !form.amount}
+          <button type="submit" disabled={isPending || !form.amount} aria-busy={isPending}
             className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {isPending ? "저장 중..." : editingTx ? "수정" : "추가"}
           </button>

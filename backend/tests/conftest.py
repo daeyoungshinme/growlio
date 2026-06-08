@@ -125,3 +125,48 @@ def make_user_settings(make_user_id):
         monthly_deposit_amount=None,
         retirement_target_year=None,
     )
+
+
+@pytest.fixture
+def mock_request():
+    """slowapi @limiter.limit() 테스트에서 필요한 최소 Starlette Request 객체."""
+    from starlette.requests import Request
+    scope = {
+        "type": "http",
+        "method": "GET",
+        "path": "/test",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 12345),
+        "server": ("localhost", 8000),
+    }
+    return Request(scope=scope)
+
+
+@pytest.fixture(autouse=True)
+def _mock_redis_singleton():
+    """Redis singleton을 AsyncMock으로 교체 — Docker 없이 모든 테스트 실행 가능."""
+    import app.redis_client as _rc
+
+    redis_mock = AsyncMock()
+    redis_mock.ping = AsyncMock(return_value=True)
+    redis_mock.get = AsyncMock(return_value=None)
+    redis_mock.set = AsyncMock()
+    redis_mock.setex = AsyncMock()
+    redis_mock.delete = AsyncMock()
+    redis_mock.exists = AsyncMock(return_value=0)
+    redis_mock.expire = AsyncMock()
+
+    old = _rc.redis_client
+    _rc.redis_client = redis_mock
+    yield redis_mock
+    _rc.redis_client = old
+
+
+@pytest.fixture
+def mock_redis_for_app():
+    """FastAPI app lifespan의 Redis 연결을 무력화하는 패치 컨텍스트."""
+    from unittest.mock import AsyncMock, patch
+    redis_mock = AsyncMock()
+    redis_mock.ping = AsyncMock(return_value=True)
+    return patch("app.redis_client.get_redis", return_value=redis_mock)

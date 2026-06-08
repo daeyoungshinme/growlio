@@ -48,7 +48,7 @@ def _validate_non_negative(v: float | None) -> float | None:
 class AssetAccountCreate(BaseModel):
     name: str
     asset_type: AssetType
-    data_source: DataSource = "MANUAL"
+    data_source: DataSource = DataSource.MANUAL
     institution: str | None = None
     kis_account_no: str | None = None
     kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)

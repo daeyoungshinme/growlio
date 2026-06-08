@@ -12,6 +12,7 @@ if (SENTRY_DSN) {
   Sentry.init({
     dsn: SENTRY_DSN,
     environment: import.meta.env.MODE,
+    release: import.meta.env.VITE_SENTRY_RELEASE as string | undefined,
     integrations: [Sentry.browserTracingIntegration()],
     tracesSampleRate: 0.1,
   });
@@ -23,6 +24,7 @@ const queryClient = new QueryClient({
       staleTime: STALE_TIME.SHORT,
       retry: 1,
       gcTime: 30 * 60 * 1000,
+      refetchIntervalInBackground: false,
     },
   },
 });

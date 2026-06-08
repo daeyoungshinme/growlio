@@ -33,7 +33,11 @@ from app.services.asset_service import sync_account as _sync_account_service
 from app.services.credential_service import encrypt
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
-from app.utils.cache_keys import dashboard_summary_key, dividend_ticker_summary_key, portfolio_overview_key
+from app.utils.cache_keys import (
+    dashboard_summary_key,
+    dividend_ticker_summary_key,
+    portfolio_overview_key,
+)
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_position_pnl

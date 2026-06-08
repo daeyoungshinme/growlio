@@ -7,6 +7,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
 from app.config import settings
@@ -17,7 +18,6 @@ from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
-from sqlalchemy.orm import selectinload
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
@@ -40,8 +40,8 @@ from app.services.dividend_providers import (
 from app.services.dividend_service import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
-from app.services.yahoo_price import _to_yahoo_symbol
 from app.services.rebalancing_service import analyze_rebalancing
+from app.services.yahoo_price import _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
@@ -316,6 +316,7 @@ async def get_rebalancing_execution_detail(
     # result_items를 계좌별 ExecutionResult로 재구성
     if execution.result_items:
         from collections import defaultdict
+
         from app.schemas.rebalancing import OrderResult
 
         by_account: dict[str, dict] = defaultdict(lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""})

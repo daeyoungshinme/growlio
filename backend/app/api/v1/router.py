@@ -17,6 +17,7 @@ from app.api.v1 import (
     stocks,
     tax,
     transactions,
+    ws_prices,
 )
 
 router = APIRouter(prefix="/api/v1")
@@ -37,3 +38,4 @@ router.include_router(rebalancing.router)
 router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(dart.router)
+router.include_router(ws_prices.router)

@@ -7,7 +7,8 @@ from typing import Any
 from sqlalchemy import select
 
 from app.exceptions import BadRequestError
-from app.providers.base import BalanceResult, BrokerProvider, Position as ProviderPosition
+from app.providers.base import BalanceResult, BrokerProvider
+from app.providers.base import Position as ProviderPosition
 from app.utils.currency import fetch_usd_krw
 
 

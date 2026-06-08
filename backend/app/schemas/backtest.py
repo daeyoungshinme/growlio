@@ -1,6 +1,7 @@
 """백테스팅 Pydantic 스키마."""
 import uuid
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, field_validator
 
@@ -55,7 +56,7 @@ class BacktestRunRequest(BaseModel):
 
     @field_validator("end_date")
     @classmethod
-    def validate_dates(cls, v: date, info) -> date:
+    def validate_dates(cls, v: date, info: Any) -> date:
         start = info.data.get("start_date")
         if start and v <= start:
             raise ValueError("end_date는 start_date 이후여야 합니다.")
@@ -90,7 +91,7 @@ class CorrelationRequest(BaseModel):
 
     @field_validator("end_date")
     @classmethod
-    def validate_dates(cls, v: date, info) -> date:
+    def validate_dates(cls, v: date, info: Any) -> date:
         start = info.data.get("start_date")
         if start and v <= start:
             raise ValueError("end_date는 start_date 이후여야 합니다.")

@@ -1,6 +1,7 @@
 import re
 import time
 import uuid
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -14,6 +15,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
+from starlette.responses import Response
 
 from app.api.v1.router import router
 from app.config import settings
@@ -30,9 +32,15 @@ if settings.sentry_dsn:
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.app_env,
+        release=settings.sentry_release or None,
         traces_sample_rate=0.1,
+        send_default_pii=False,
     )
-    logger.info("sentry_initialized", env=settings.app_env)
+    logger.info(
+        "sentry_initialized",
+        env=settings.app_env,
+        release=settings.sentry_release or "unset",
+    )
 
 _SECRET_PATTERN = re.compile(
     r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
@@ -51,7 +59,7 @@ async def lifespan(app: FastAPI):
     # Redis 연결 확인 — 실패 시 즉시 종료
     try:
         redis = await get_redis()
-        await redis.ping()
+        await redis.ping()  # type: ignore[misc]  # redis-py stub returns bool|Awaitable[bool]
         logger.info("redis_connected")
     except Exception as e:
         logger.error("redis_startup_failed", error=str(e))
@@ -76,7 +84,7 @@ app = FastAPI(
 Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # slowapi handler signature
 
 app.add_middleware(
     CORSMiddleware,
@@ -127,6 +135,15 @@ async def log_requests(request: Request, call_next):
     return response
 
 
+@app.middleware("http")
+async def protect_metrics_endpoint(request: Request, call_next: Callable) -> Response:
+    if request.url.path == "/metrics" and settings.metrics_token:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {settings.metrics_token}":
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    return await call_next(request)
+
+
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -136,7 +153,12 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     if isinstance(exc, StarletteHTTPException):
         return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-    logger.error("unhandled_exception", path=str(request.url.path), error=_sanitize(str(exc)), exc_info=True)
+    logger.error(
+        "unhandled_exception",
+        path=str(request.url.path),
+        error=_sanitize(str(exc)),
+        exc_info=True,
+    )
     return JSONResponse(status_code=500, content={"detail": "서버 오류가 발생했습니다."})
 
 

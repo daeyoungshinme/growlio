@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
+import uuid as uuid_mod
 from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import uuid as uuid_mod
 
 from app.api.deps import get_current_user
 from app.database import get_db

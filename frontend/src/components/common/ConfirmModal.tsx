@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { useId } from "react";
 
 interface Props {
   message: string;
@@ -17,6 +18,8 @@ export default function ConfirmModal({
   onCancel,
   danger = true,
 }: Props) {
+  const msgId = useId();
+
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70] p-4"
@@ -25,14 +28,15 @@ export default function ConfirmModal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby={msgId}
         className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3 mb-5">
           {danger && (
-            <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" />
+            <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           )}
-          <p className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">{message}</p>
+          <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">{message}</p>
         </div>
         <div className="flex gap-3 justify-end">
           <button

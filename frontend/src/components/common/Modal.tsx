@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useEffect, useId, useRef } from "react";
 
 const SIZE_CLASSES = {
   sm: "max-w-sm",
@@ -21,6 +21,7 @@ interface Props {
 export default function Modal({ children, onClose, title, size = "md", closeOnBackdrop = false }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
+  const titleId = useId();
   useEffect(() => { onCloseRef.current = onClose; });
 
   useEffect(() => {
@@ -59,13 +60,13 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-labelledby={title != null ? titleId : undefined}
         className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[90dvh] flex flex-col`}
         onClick={(e) => e.stopPropagation()}
       >
         {title != null && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">{title}</h2>
+            <h2 id={titleId} className="text-lg font-bold text-gray-900 dark:text-gray-50">{title}</h2>
             <button
               onClick={onClose}
               aria-label="닫기"

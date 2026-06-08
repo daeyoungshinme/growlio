@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
+import redis.asyncio as aioredis
 import structlog
 
 logger = structlog.get_logger()
@@ -12,7 +13,7 @@ logger = structlog.get_logger()
 
 @asynccontextmanager
 async def redis_lock(
-    redis,
+    redis: aioredis.Redis,
     key: str,
     ttl: int = 60,
 ) -> AsyncGenerator[bool, None]:

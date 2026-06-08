@@ -435,6 +435,7 @@ function AlertFormBody({
               <button
                 onClick={() => upsertMut.mutate()}
                 disabled={isPending}
+                aria-busy={upsertMut.isPending}
                 className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {upsertMut.isPending ? (

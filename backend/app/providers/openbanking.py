@@ -26,6 +26,7 @@ from app.utils.circuit_breaker import openbanking_circuit
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.models.user import UserSettings
 
 logger = structlog.get_logger()

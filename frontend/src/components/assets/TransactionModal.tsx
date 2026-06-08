@@ -20,6 +20,7 @@ import { toast } from "../../utils/toast";
 import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
 import { STALE_TIME } from "../../constants/queryConfig";
 import { QUERY_KEYS } from "../../constants/queryKeys";
+import { transactionSchema } from "../../schemas/transaction";
 
 interface TransactionListProps {
   txList: Transaction[] | undefined;
@@ -136,6 +137,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   const qc = useQueryClient();
   const { form, set, setForm } = useForm<TransactionCreate>({ ...EMPTY_FORM, account_id: accountId });
 
+  const [formError, setFormError] = useState<string | null>(null);
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState<number>(0);
   const usdRate = useExchangeRate();
@@ -169,6 +171,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
 
   const resetForm = () => {
     setForm({ ...EMPTY_FORM, account_id: accountId });
+    setFormError(null);
     setCurrency("KRW"); setAmountUsd(0);
     setTickerDirect(false); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false);
   };
@@ -233,7 +236,18 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
   };
 
   const handleSubmit = () => {
-    if (!form.amount || form.amount <= 0) return;
+    const result = transactionSchema.safeParse({
+      transaction_type: form.transaction_type,
+      amount: form.amount,
+      transaction_date: form.transaction_date,
+      ticker: form.ticker || undefined,
+      notes: form.notes || undefined,
+    });
+    if (!result.success) {
+      setFormError(result.error.issues[0]?.message ?? "입력값을 확인해주세요");
+      return;
+    }
+    setFormError(null);
     const payload = {
       ...form,
       ticker: form.transaction_type === "DIVIDEND" && form.ticker ? form.ticker : undefined,
@@ -472,9 +486,15 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
             />
           </div>
 
+          {formError && (
+            <p role="alert" className="text-xs text-red-500 dark:text-red-400">
+              {formError}
+            </p>
+          )}
           <button
             onClick={handleSubmit}
-            disabled={(editingTx ? updateMut.isPending : createMut.isPending) || !form.amount}
+            disabled={(editingTx ? updateMut.isPending : createMut.isPending)}
+            aria-busy={(editingTx ? updateMut.isPending : createMut.isPending)}
             className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {(editingTx ? updateMut.isPending : createMut.isPending) ? "저장 중..." : editingTx ? "수정" : "내역 추가"}

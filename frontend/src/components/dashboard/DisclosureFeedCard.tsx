@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -17,7 +17,7 @@ function formatDate(rcept_dt: string): string {
   return `${rcept_dt.slice(0, 4)}.${rcept_dt.slice(4, 6)}.${rcept_dt.slice(6, 8)}`;
 }
 
-export default function DisclosureFeedCard() {
+function DisclosureFeedCard() {
   const [days, setDays] = useState(30);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -116,3 +116,5 @@ export default function DisclosureFeedCard() {
     </div>
   );
 }
+
+export default memo(DisclosureFeedCard);
