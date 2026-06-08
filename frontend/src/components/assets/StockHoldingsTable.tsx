@@ -1,10 +1,14 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { fmtKrwShort } from "../../utils/format";
 import { groupPositionsByTicker } from "../../utils/portfolio";
 import { pnlColor } from "../../utils/colors";
 import type { PortfolioPosition, DividendYield } from "../../types";
 import EmptyState from "../common/EmptyState";
+
+const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 30;
+const MOBILE_CARD_HEIGHT = 80; // 카드 평균 높이 (px)
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";
 
@@ -51,6 +55,16 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
   const aggregated = useMemo(() => groupPositionsByTicker(positions), [positions]);
   const sorted = useMemo(() => [...aggregated].sort((a, b) => b[sort] - a[sort]), [aggregated, sort]);
 
+  const mobileContainerRef = useRef<HTMLDivElement>(null);
+  const useVirtualMobile = sorted.length >= MOBILE_CARD_VIRTUALIZE_THRESHOLD;
+  const mobileVirtualizer = useVirtualizer({
+    count: sorted.length,
+    getScrollElement: () => mobileContainerRef.current,
+    estimateSize: () => MOBILE_CARD_HEIGHT,
+    overscan: 5,
+    enabled: useVirtualMobile,
+  });
+
   const toggle = (key: string) => {
     setExpandedSet((prev) => {
       const next = new Set(prev);
@@ -71,40 +85,89 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
       ) : (
         <>
         {/* 모바일 카드 뷰 */}
-        <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
-          {sorted.map((agg) => {
-            const key = `${agg.ticker}-${agg.market}`;
-            const divData = dividendMap[key];
-            return (
-              <div key={key} className="px-4 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
+        <div
+          ref={mobileContainerRef}
+          className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700"
+          style={useVirtualMobile ? { maxHeight: "70vh", overflowY: "auto" } : undefined}
+        >
+          {useVirtualMobile ? (
+            <div style={{ height: `${mobileVirtualizer.getTotalSize()}px`, position: "relative" }}>
+              {mobileVirtualizer.getVirtualItems().map((virtualItem) => {
+                const agg = sorted[virtualItem.index];
+                const key = `${agg.ticker}-${agg.market}`;
+                const divData = dividendMap[key];
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${virtualItem.start}px)`,
+                    }}
+                    className="px-4 py-3 border-b border-gray-100 dark:border-gray-700"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
+                        <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
+                          {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
-                    <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
-                      {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
-                  <span>{agg.total_qty.toLocaleString()}주</span>
-                  <span>·</span>
-                  <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
-                  {!divLoading && !divError && divData?.investment_yield > 0 && (
-                    <>
+                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+                      <span>{agg.total_qty.toLocaleString()}주</span>
                       <span>·</span>
-                      <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
-                    </>
-                  )}
+                      <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
+                      {!divLoading && !divError && divData?.investment_yield > 0 && (
+                        <>
+                          <span>·</span>
+                          <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            sorted.map((agg) => {
+              const key = `${agg.ticker}-${agg.market}`;
+              const divData = dividendMap[key];
+              return (
+                <div key={key} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
+                      <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
+                        {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+                    <span>{agg.total_qty.toLocaleString()}주</span>
+                    <span>·</span>
+                    <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
+                    {!divLoading && !divError && divData?.investment_yield > 0 && (
+                      <>
+                        <span>·</span>
+                        <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
 
         {/* 데스크탑 테이블 */}

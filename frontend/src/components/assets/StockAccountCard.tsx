@@ -2,6 +2,7 @@ import { useState } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
 import { type AssetAccount } from "../../api/assets";
 import { useExchangeRate } from "../../hooks/useExchangeRate";
+import { useHaptic } from "../../hooks/useHaptic";
 import { convertUsdToKrw, fmtKrw, fmtPct } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import { STOCK_TYPE_LABELS } from "../../constants";
@@ -39,6 +40,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   const [editKrwValue, setEditKrwValue] = useState("");
   const [editUsdValue, setEditUsdValue] = useState("");
   const usdRate = useExchangeRate();
+  const { impact } = useHaptic();
 
   const handleSaveName = () => {
     const trimmed = editNameValue.trim();
@@ -114,7 +116,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
-            <button onClick={() => onSync(account.id)} disabled={isSyncing}
+            <button onClick={() => { impact("light"); onSync(account.id); }} disabled={isSyncing}
               title={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
               aria-label={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
               className="p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50">

@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount } from "../api/assets";
 import { extractErrorMessage } from "../utils/error";
 import { invalidateSyncData } from "../utils/queryInvalidation";
+import { triggerHaptic } from "./useHaptic";
 import { OVERSEAS_MARKET_SET, isOverseasMarket } from "../constants/markets";
 import {
   ExecutionOrderItem,
@@ -428,9 +429,11 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     try {
       const res = await executeRebalancing(portfolioId, { account_id: null, orders });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
+      void triggerHaptic("success");
       await invalidateSyncData(queryClient);
       onExecuted?.(res);
     } catch (e: unknown) {
+      void triggerHaptic("error");
       dispatch({ type: "EXECUTE_ERROR", msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다.") });
     }
   }

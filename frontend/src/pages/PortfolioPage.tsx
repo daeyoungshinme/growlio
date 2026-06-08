@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import Tabs from "../components/common/Tabs";
@@ -12,6 +12,7 @@ import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
 import { fmtKrwPrice } from "../utils/format";
 import { invalidateSyncData } from "../utils/queryInvalidation";
+import { useRegisterRefresh } from "../hooks/useRegisterRefresh";
 import { toast } from "../utils/toast";
 import { pnlColor } from "../utils/colors";
 import SkeletonCard from "../components/common/SkeletonCard";
@@ -37,6 +38,12 @@ type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
+
+  const handleRefresh = useCallback(async () => {
+    await invalidateSyncData(qc);
+  }, [qc]);
+  useRegisterRefresh(handleRefresh);
+
   const [searchParams] = useSearchParams();
   const initialTab = TABS.includes(searchParams.get("tab") as Tab)
     ? (searchParams.get("tab") as Tab)

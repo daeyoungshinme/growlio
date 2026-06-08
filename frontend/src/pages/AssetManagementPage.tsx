@@ -25,6 +25,7 @@ import ConfirmModal from "../components/common/ConfirmModal";
 import SkeletonCard from "../components/common/SkeletonCard";
 import EmptyState from "../components/common/EmptyState";
 import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
+import { useRegisterRefresh } from "../hooks/useRegisterRefresh";
 import { toast } from "../utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
 import { useAssetManagementData } from "../hooks/useAssetManagementData";
@@ -54,6 +55,11 @@ export default function AssetManagementPage() {
   } = useAssetModals();
 
   const queryClient = useQueryClient();
+
+  const handleRefresh = useCallback(async () => {
+    await invalidateAccountData(queryClient);
+  }, [queryClient]);
+  useRegisterRefresh(handleRefresh);
   const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);
 
   const invalidateAll = useCallback(() => invalidateAccountData(queryClient), [queryClient]);

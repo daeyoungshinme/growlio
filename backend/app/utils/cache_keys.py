@@ -22,7 +22,7 @@ TTL_OB_STATE = 600               # 오픈뱅킹 OAuth state 10분
 TTL_HAS_OVERSEAS_TRUE = 21600    # 해외 보유 중 6시간
 TTL_HAS_OVERSEAS_FALSE = 900     # 해외 없음 15분 (신규 매수 시 빠른 반영)
 TTL_DIVIDEND_SUMMARY = 3600      # 배당 집계 1시간
-TTL_PORTFOLIO_OVERVIEW = 60      # 포트폴리오 overview 1분
+TTL_PORTFOLIO_OVERVIEW = 300     # 포트폴리오 overview 5분
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키

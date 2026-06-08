@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDashboardData } from "../hooks/useDashboardData";
+import { useRegisterRefresh } from "../hooks/useRegisterRefresh";
+import { invalidateSyncData } from "../utils/queryInvalidation";
 import DividendSection from "../components/dashboard/DividendSection";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
 import AllocationHistoryChart from "../components/dashboard/AllocationHistoryChart";
@@ -16,6 +18,12 @@ import { QUERY_KEYS } from "../constants/queryKeys";
 export default function DashboardPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+
+  const handleRefresh = useCallback(async () => {
+    await invalidateSyncData(qc);
+    await qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+  }, [qc]);
+  useRegisterRefresh(handleRefresh);
   const { data, isLoading, error, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate } = useDashboardData();
 
   const overallDividendYield = useMemo(() => {
