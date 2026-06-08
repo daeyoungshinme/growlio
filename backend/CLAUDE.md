@@ -153,6 +153,7 @@ providers/                    # 금융 데이터 provider
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). 임계값: KIS/Kiwoom 5회 실패→60s 차단, Yahoo/DART 5회→120s, OpenBanking 3회→90s
+  #                             새 외부 API 추가 시: `get_circuit_breaker(name, fail_threshold, reset_timeout)` 호출 후 `try/except CircuitOpenError` 패턴으로 감쌈.
   ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등)
   ├── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)

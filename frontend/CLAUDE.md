@@ -128,6 +128,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
 
+> **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
+
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리:** Zustand — `authStore.ts`(인증), `themeStore.ts`(다크모드). 서버 상태는 React Query 전담.
@@ -172,6 +174,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 계좌 CUD (자산관리에서) → `["accounts"]` + `["portfolio-overview"]` + `["dashboard"]` 동시 무효화.
 
 > 수동 `invalidateQueries` 호출 금지 — `src/utils/queryInvalidation.ts`의 유틸 함수 사용 (하단 참고).
+
+> **⚠️ 예외 — stock-price-alerts:** `queryInvalidation.ts` 유틸 미존재. CUD 후 직접 호출 필수:
+> `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })`
 
 **포맷팅 유틸리티 (`src/utils/format.ts`)**
 - 모든 포맷 함수는 `src/utils/format.ts`에서 import. 로컬 재정의 금지.
@@ -247,8 +252,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
-> **⚠️ 예외 — stock-price-alerts:** `queryInvalidation.ts` 유틸 미존재. CUD 후 직접 호출 필수:
-> `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })`
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 - `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
