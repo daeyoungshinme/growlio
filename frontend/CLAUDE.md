@@ -66,6 +66,7 @@ make build-android-release         # APK Release 빌드
 - `/trend` — `/dashboard`로 리다이렉트 (TrendPage 제거됨)
 
 > 구 URL 리다이렉트: `/assets` → `/portfolio`
+> 새 페이지 추가 시 `src/App.tsx`에 `<Route>` 등록 필수.
 
 **최상위 컴포넌트 (`src/`):**
 - `ErrorBoundary.tsx` — React 에러 바운더리 (App.tsx에서 전체를 감쌈)
@@ -126,12 +127,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 ---
 
 ## Absolute Rules
-
-**stock-price-alerts 직접 무효화 (예외 규칙)**
-- `queryInvalidation.ts`에 유틸 함수 없음 — CUD 후 반드시 직접 호출:
-  ```ts
-  qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })
-  ```
 
 **수익/손실 색상 (한국 주식 관례)**
 - 수익(양수) → `text-red-500`, 손실(음수) → `text-blue-500`.
