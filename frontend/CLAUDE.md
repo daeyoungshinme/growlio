@@ -107,6 +107,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 뮤테이션
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
+- `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 
 새 커스텀 훅은 이 디렉토리에 추가.
 
