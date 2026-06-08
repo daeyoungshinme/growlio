@@ -35,7 +35,7 @@ export default function MonthlyTickerDetail({
   const sorted = sortByMonthlyAmount(selectedMonthTickers);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="card-overflow">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 dark:text-gray-200">
           {MONTH_LABELS[selectedMonth - 1]} 배당 종목

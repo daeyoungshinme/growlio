@@ -13,6 +13,26 @@ from app.config import settings
 logger = structlog.get_logger()
 
 
+async def _send_html_email(to_email: str, subject: str, html: str) -> None:
+    """HTML 이메일을 SMTP로 발송한다. 실패 시 예외를 그대로 전파한다."""
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = settings.smtp_from
+    msg["To"] = to_email
+    msg.attach(MIMEText(html, "html", "utf-8"))
+
+    ctx = ssl.create_default_context()
+    await aiosmtplib.send(
+        msg,
+        hostname=settings.smtp_host,
+        port=settings.smtp_port,
+        username=settings.smtp_user,
+        password=settings.smtp_password,
+        start_tls=True,
+        tls_context=ctx,
+    )
+
+
 async def send_exchange_rate_alert(
     to_email: str,
     target_rate: float,
@@ -47,23 +67,8 @@ async def send_exchange_rate_alert(
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info("exchange_rate_alert_email_sent", to=to_email, target_rate=target_rate, current_rate=current_rate)
     except Exception as e:
         logger.error("exchange_rate_alert_email_failed", to=to_email, error=str(e))
@@ -161,23 +166,8 @@ async def send_rebalancing_alert(
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info(
             "rebalancing_alert_email_sent",
             to=to_email,
@@ -230,23 +220,8 @@ async def send_stock_price_alert(
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info("stock_price_alert_email_sent", to=to_email, ticker=ticker, current_price=current_price)
     except Exception as e:
         logger.error("stock_price_alert_email_failed", to=to_email, error=str(e))
@@ -392,23 +367,8 @@ async def send_monthly_report_email(
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info("monthly_report_email_sent", to=to_email, month=report_month)
     except Exception as e:
         logger.error("monthly_report_email_failed", to=to_email, error=str(e))
@@ -463,23 +423,8 @@ async def send_goal_achievement_email(
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info(
             "goal_achievement_email_sent",
             to=to_email, goal_type=goal_type, pct=achievement_pct,
@@ -508,23 +453,8 @@ async def send_test_email(to_email: str) -> None:
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info("test_email_sent", to=to_email)
     except Exception as e:
         logger.error("test_email_failed", to=to_email, error=str(e))
@@ -563,23 +493,8 @@ async def send_password_reset_email(to_email: str, reset_link: str) -> None:
     </div>
     """
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = settings.smtp_from
-    msg["To"] = to_email
-    msg.attach(MIMEText(html, "html", "utf-8"))
-
     try:
-        ctx = ssl.create_default_context()
-        await aiosmtplib.send(
-            msg,
-            hostname=settings.smtp_host,
-            port=settings.smtp_port,
-            username=settings.smtp_user,
-            password=settings.smtp_password,
-            start_tls=True,
-            tls_context=ctx,
-        )
+        await _send_html_email(to_email, subject, html)
         logger.info("password_reset_email_sent", to=to_email)
     except Exception as e:
         logger.error("password_reset_email_failed", to=to_email, error=str(e))

@@ -15,7 +15,7 @@ export default function DomesticForeignBar({ items }: Props) {
   const foreign = items.find((i) => i.name === "해외 주식");
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">국내/해외 비중</h3>
 
       {items.length === 0 ? (

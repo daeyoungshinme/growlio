@@ -234,7 +234,5 @@ class DashboardResponse(BaseModel):
     cumulative_return_pct: float | None = None
     xirr_pct: float | None = Field(None, ge=-99, le=1000)
     xirr_is_estimated: bool = False
-    benchmark_kospi_pct: float | None = None
-    benchmark_sp500_pct: float | None = None
     goal_annual_return_pct: float | None = None
     retirement_target_year: int | None = None

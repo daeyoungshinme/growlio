@@ -3,6 +3,7 @@ import { X, Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
 import { INPUT_SM } from "../../constants/inputStyles";
+import { REAL_ESTATE_ASSET_TYPE } from "../../constants/assets";
 
 const PROPERTY_TYPE_OPTIONS = ["아파트", "오피스텔", "상가", "토지", "단독주택", "기타"];
 
@@ -41,7 +42,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
     };
     onSubmit({
       name: form.name,
-      asset_type: "REAL_ESTATE",
+      asset_type: REAL_ESTATE_ASSET_TYPE,
       data_source: "MANUAL",
       manual_amount: marketValue || undefined,
       real_estate_details: details,
@@ -283,7 +284,7 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
   const appreciation = purchasePrice > 0 ? marketValue - purchasePrice : null;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">

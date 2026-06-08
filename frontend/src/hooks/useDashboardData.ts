@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchAccounts } from "../api/assets";
 import { fetchDashboard } from "../api/dashboard";
 import { fetchDCAAnalysis } from "../api/invest";
-import { fetchPortfolioOverview } from "../api/portfolios";
+import { fetchPortfolioOverviewLite } from "../api/portfolios";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
@@ -17,9 +17,9 @@ export function useDashboardData() {
   });
 
   const { data: overview, isLoading: overviewLoading } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchPortfolioOverview,
-    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 포트폴리오 요약은 자주 변하지 않음
+    queryKey: QUERY_KEYS.portfolioOverviewLite,
+    queryFn: fetchPortfolioOverviewLite,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: false,
   });

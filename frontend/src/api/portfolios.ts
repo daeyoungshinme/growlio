@@ -4,6 +4,9 @@ import type { PortfolioOverview } from "../types";
 export const fetchPortfolioOverview = () =>
   api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 
+export const fetchPortfolioOverviewLite = () =>
+  api.get<PortfolioOverview>("/portfolio/overview", { params: { lite: true } }).then((r) => r.data);
+
 export interface AllocationTypeItem {
   asset_type: string;
   label: string;
@@ -19,17 +22,6 @@ export interface AllocationHistoryPoint {
 
 export const fetchAllocationHistory = (months: number) =>
   api.get<AllocationHistoryPoint[]>("/portfolio/allocation-history", { params: { months } }).then((r) => r.data);
-
-export interface BenchmarkPoint {
-  month: string;
-  user_pct: number | null;
-  kospi_pct: number | null;
-  sp500_pct: number | null;
-  nasdaq_pct: number | null;
-}
-
-export const fetchBenchmark = (indices = "KOSPI,SP500", months = 12) =>
-  api.get<BenchmarkPoint[]>("/dashboard/benchmark", { params: { indices, months } }).then((r) => r.data);
 
 export interface PortfolioItem {
   ticker: string;

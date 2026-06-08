@@ -36,7 +36,7 @@ export default function StockAccountSummaryCard({ stockAccounts, overview, allTx
   const pnlColor = pnl >= 0 ? "text-red-500" : "text-blue-500";
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">증권계좌 전체 요약</p>
       <div className="grid grid-cols-3 gap-x-6 gap-y-3">
         <div>

@@ -131,7 +131,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
 
       {/* 백테스팅 설정 패널 */}
       {analysisMode === "backtest" && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">기간</span>
@@ -232,7 +232,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
 
       {/* 리밸런싱 결과 */}
       {analysisMode === "rebalancing" && analysis && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
               {analysis.portfolio_name} — 리밸런싱 분석
@@ -291,7 +291,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
 
       {/* 백테스팅 결과 */}
       {analysisMode === "backtest" && backtestResult && backtestResult.dates.length > 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-6">
+        <div className="card space-y-6">
           <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
             <BacktestMetricsTable metrics={backtestResult.metrics} />
@@ -329,7 +329,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         </div>
       )}
       {analysisMode === "backtest" && backtestResult && backtestResult.dates.length === 0 && (
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 text-center text-sm text-gray-400 dark:text-gray-600 py-8">
+        <div className="card text-center text-sm text-gray-400 dark:text-gray-600 py-8">
           해당 기간의 가격 데이터가 없습니다. 기간을 조정해보세요.
         </div>
       )}

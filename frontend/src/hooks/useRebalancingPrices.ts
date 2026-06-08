@@ -1,4 +1,5 @@
 import { fetchStockPrice } from "../api/assets";
+import { CASH_TICKER } from "../constants/assets";
 import { RebalancingAnalysis } from "../api/rebalancing";
 import type { ExecutionAction } from "./useRebalancingExecution";
 import { getActionableItems } from "./useRebalancingExecution";
@@ -31,7 +32,7 @@ export function useRebalancingPrices(
   async function loadAllPrices() {
     const tickerMarketMap = new Map<string, string>();
     getActionableItems(analysis).forEach((i) => {
-      if (i.ticker !== "CASH") tickerMarketMap.set(i.ticker, i.market);
+      if (i.ticker !== CASH_TICKER) tickerMarketMap.set(i.ticker, i.market);
     });
     analysis.untracked_holdings.forEach((h) => tickerMarketMap.set(h.ticker, h.market));
     if (tickerMarketMap.size === 0) return;

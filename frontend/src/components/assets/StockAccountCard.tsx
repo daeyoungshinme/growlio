@@ -62,7 +62,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* 줄1: 증권사명 · 계좌명 + 편집버튼 */}

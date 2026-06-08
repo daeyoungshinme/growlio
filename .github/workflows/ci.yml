@@ -79,7 +79,7 @@ jobs:
         run: .venv/bin/alembic downgrade -1
 
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -q --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing
+        run: .venv/bin/pytest -x -q --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=50
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'
@@ -93,7 +93,7 @@ jobs:
           default-branch: main
 
       - name: Security scan (bandit)
-        run: .venv/bin/bandit -r app/ -l -q
+        run: .venv/bin/bandit -r app/ -ll -q
 
       - name: Dependency vulnerability check (pip-audit)
         run: .venv/bin/pip-audit --skip-editable -q

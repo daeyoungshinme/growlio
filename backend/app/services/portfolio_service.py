@@ -21,6 +21,7 @@ from app.utils.cache_keys import (
     TTL_PORTFOLIO_OVERVIEW,
     alloc_history_key,
     portfolio_overview_key,
+    portfolio_overview_lite_key,
 )
 from app.utils.pnl import calc_position_pnl
 
@@ -146,11 +147,17 @@ async def build_portfolio_overview(
     db: AsyncSession,
     account_ids: list[uuid.UUID] | None = None,
     redis=None,
+    lite: bool = False,
 ) -> dict[str, Any]:
-    """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용)."""
+    """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용).
+
+    lite=True 시 all_positions / accounts[].positions 를 생략해 응답 크기를 대폭 줄인다.
+    대시보드에서 사용하며, 전체 종목 목록이 필요한 포트폴리오 페이지는 lite=False(기본값) 사용.
+    """
+    cache_key_fn = portfolio_overview_lite_key if lite else portfolio_overview_key
     if redis and not account_ids:
         with contextlib.suppress(RedisError):
-            cached = await redis.get(portfolio_overview_key(user_id))
+            cached = await redis.get(cache_key_fn(user_id))
             if cached:
                 return json.loads(cached)
 
@@ -196,6 +203,8 @@ async def build_portfolio_overview(
     unrealized_pnl_krw = 0.0
     asset_type_totals: dict[str, float] = {}
     all_positions: list[dict] = []
+    # lite 모드에서 stock_allocation 계산용 최소 필드만 수집
+    lite_stock_items: list[dict] = []
     account_rows: list[dict] = []
 
     for acc in accounts:
@@ -212,8 +221,18 @@ async def build_portfolio_overview(
             total_invested_krw += invested
             unrealized_pnl_krw += pnl
 
-        pos_list = _build_position_details(acc, raw_positions, snap)
-        all_positions.extend(pos_list)
+        if lite:
+            pos_list: list[dict] = []
+            if acc.asset_type in STOCK_TYPES:
+                for p in raw_positions:
+                    cur_p = float(p.current_price or p.avg_price or 0)
+                    val = float(p.value_krw or cur_p * float(p.qty or 0))
+                    lite_stock_items.append(
+                        {"ticker": p.ticker, "name": p.name or "", "market": p.market, "value_krw": val}
+                    )
+        else:
+            pos_list = _build_position_details(acc, raw_positions, snap)
+            all_positions.extend(pos_list)
 
         account_row: dict = {
             "id": str(acc.id),
@@ -225,7 +244,7 @@ async def build_portfolio_overview(
             "amount_krw": amount_krw,
             "invested_krw": invested,
             "unrealized_pnl": pnl,
-            "position_count": len(pos_list),
+            "position_count": len(raw_positions),
             "positions": pos_list,
             "include_in_total": acc.include_in_total,
         }
@@ -250,6 +269,7 @@ async def build_portfolio_overview(
         for t, v in sorted(asset_type_totals.items(), key=lambda x: -x[1])
     ]
 
+    stock_alloc_source = lite_stock_items if lite else all_positions
     overview = {
         "total_assets_krw": total_assets_krw,
         "total_stock_krw": stock_total_krw,
@@ -258,7 +278,7 @@ async def build_portfolio_overview(
         "unrealized_pnl_krw": unrealized_pnl_krw,
         "stock_return_pct": round(stock_return_pct, 2),
         "asset_type_allocation": asset_type_allocation,
-        "stock_allocation": _build_stock_allocation(all_positions, stock_total_krw),
+        "stock_allocation": _build_stock_allocation(stock_alloc_source, stock_total_krw),
         "all_positions": all_positions,
         "accounts": account_rows,
     }
@@ -266,7 +286,7 @@ async def build_portfolio_overview(
     if redis and not account_ids:
         with contextlib.suppress(RedisError):
             await redis.setex(
-                portfolio_overview_key(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview)
+                cache_key_fn(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview)
             )
 
     return overview

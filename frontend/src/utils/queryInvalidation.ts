@@ -5,6 +5,7 @@ import { QUERY_KEYS } from "../constants/queryKeys";
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummary }),
@@ -16,6 +17,7 @@ export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
   ]);
 }

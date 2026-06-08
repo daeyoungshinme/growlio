@@ -64,7 +64,7 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Pr
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data.goal_amount;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-3 lg:gap-4">
+    <div className="card flex flex-col gap-3 lg:gap-4">
       <div className="flex flex-row gap-3 lg:gap-6">
         {/* 좌측: 자산 총액 + 누적 수익률 + 보조 지표 */}
         <div className="flex-1 min-w-0 flex flex-col justify-between">

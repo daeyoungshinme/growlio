@@ -3,6 +3,13 @@ import { Plus, Trash2, X } from "lucide-react";
 import { AssetAccount, type StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "../../constants/validation";
+import {
+  BASE_TYPE_STOCK_ONLY,
+  BASE_TYPE_TOTAL_ASSETS,
+  CASH_TICKER,
+  KR_PROPERTY_MARKET,
+  REAL_ESTATE_ASSET_TYPE,
+} from "../../constants/assets";
 import { useStockSearch } from "../../hooks/useStockSearch";
 import PortfolioWeightChart from "./PortfolioWeightChart";
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
@@ -19,7 +26,7 @@ const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weigh
 
 export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave, onClose, saving }: Props) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [baseType, setBaseType] = useState(initial?.base_type ?? "STOCK_ONLY");
+  const [baseType, setBaseType] = useState(initial?.base_type ?? BASE_TYPE_STOCK_ONLY);
   const [items, setItems] = useState<PortfolioItem[]>(
     initial?.items.length ? initial.items : [{ ...EMPTY_ITEM }]
   );
@@ -62,13 +69,13 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }
 
   function addCash() {
-    if (items.some((i) => i.ticker === "CASH")) return;
-    setItems((prev) => [...prev, { ticker: "CASH", name: "현금", market: "KRW", weight: 0 }]);
+    if (items.some((i) => i.ticker === CASH_TICKER)) return;
+    setItems((prev) => [...prev, { ticker: CASH_TICKER, name: "현금", market: "KRW", weight: 0 }]);
   }
 
   function addRealEstate() {
-    if (items.some((i) => i.market === "KR_PROPERTY")) return;
-    setItems((prev) => [...prev, { ticker: "REAL_ESTATE", name: "부동산", market: "KR_PROPERTY", weight: 0 }]);
+    if (items.some((i) => i.market === KR_PROPERTY_MARKET)) return;
+    setItems((prev) => [...prev, { ticker: REAL_ESTATE_ASSET_TYPE, name: "부동산", market: KR_PROPERTY_MARKET, weight: 0 }]);
   }
 
   function handleTickerInput(idx: number, value: string) {
@@ -134,8 +141,8 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">리밸런싱 기준 자산</label>
             <div className="flex gap-4">
               {[
-                { value: "STOCK_ONLY", label: "주식 자산만" },
-                { value: "TOTAL_ASSETS", label: "전체 자산" },
+                { value: BASE_TYPE_STOCK_ONLY, label: "주식 자산만" },
+                { value: BASE_TYPE_TOTAL_ASSETS, label: "전체 자산" },
               ].map(({ value, label }) => (
                 <label key={value} className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -165,12 +172,12 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
             <div className="space-y-2">
               {items.map((item, idx) => (
                 <div key={idx} className="relative flex items-center gap-2">
-                  {item.ticker === "CASH" ? (
+                  {item.ticker === CASH_TICKER ? (
                     <div className="flex-1 flex items-center gap-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
                       <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">현금</span>
                       <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">KRW 현금</span>
                     </div>
-                  ) : item.market === "KR_PROPERTY" ? (
+                  ) : item.market === KR_PROPERTY_MARKET ? (
                     <div className="flex-1 flex items-center gap-2 border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
                       <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded">부동산</span>
                       <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">REAL_ESTATE (순자산 합산)</span>

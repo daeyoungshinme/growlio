@@ -31,7 +31,7 @@ function DisclosureFeedCard() {
     isError && (error as { response?: { status?: number } })?.response?.status === 422;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <FileText size={16} className="text-gray-400 dark:text-gray-500" />

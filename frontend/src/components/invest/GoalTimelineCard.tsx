@@ -41,7 +41,7 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">목표 달성 전망</h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>

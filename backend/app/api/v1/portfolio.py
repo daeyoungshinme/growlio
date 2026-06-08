@@ -39,12 +39,13 @@ async def portfolio_allocation_history(
 @limiter.limit("10/minute")
 async def portfolio_overview(
     request: Request,
+    lite: bool = Query(default=False),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """모든 계좌 자산을 통합해 포트폴리오 전체 현황을 반환한다."""
     redis = await get_redis()
-    return await build_portfolio_overview(current_user.id, db, redis=redis)
+    return await build_portfolio_overview(current_user.id, db, redis=redis, lite=lite)
 
 
 @router.get("/summary")

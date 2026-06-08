@@ -21,7 +21,7 @@ interface Props {
 
 export default function MonthlyDividendChart({ barData, currentYear, selectedMonth, isDark, onMonthSelect }: Props) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">
         월별 배당 현황 ({currentYear})
       </h3>

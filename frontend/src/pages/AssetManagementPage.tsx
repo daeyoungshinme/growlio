@@ -281,7 +281,6 @@ export default function AssetManagementPage() {
             <div className="space-y-3">
               {bankAccounts.map((account) => (
                 <BankAccountCard key={account.id} account={account}
-                  usdRate={usdRate}
                   onDelete={handleDelete}
                   onEditModal={(id) => {
                     const acc = bankAccounts.find((a) => a.id === id);

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import contextlib
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from redis.exceptions import RedisError
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +15,7 @@ from app.models.asset import Transaction
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
-from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key
+from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -71,12 +69,7 @@ async def create_transaction(
     db.add(tx)
     await db.commit()
     await db.refresh(tx)
-    redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await redis.delete(
-            dashboard_summary_key(current_user.id),
-            dividend_summary_key(current_user.id),
-        )
+    await _invalidate_tx_caches(current_user.id)
     return tx
 
 
@@ -116,12 +109,7 @@ async def update_transaction(
         tx.fee = req.fee
     await db.commit()
     await db.refresh(tx)
-    redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await redis.delete(
-            dashboard_summary_key(current_user.id),
-            dividend_summary_key(current_user.id),
-        )
+    await _invalidate_tx_caches(current_user.id)
     return tx
 
 
@@ -136,13 +124,17 @@ async def delete_transaction(
     tx = await _get_owned_tx(tx_id, current_user.id, db)
     await db.delete(tx)
     await db.commit()
+    await _invalidate_tx_caches(current_user.id)
+
+
+async def _invalidate_tx_caches(user_id: UUID) -> None:
     redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await redis.delete(
-            dashboard_summary_key(current_user.id),
-            dividend_summary_key(current_user.id),
-        )
+    await invalidate_user_caches(
+        redis,
+        dashboard_summary_key(user_id),
+        dividend_summary_key(user_id),
+    )
 
 
-async def _get_owned_tx(tx_id: UUID, user_id, db: AsyncSession) -> Transaction:
+async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:
     return await get_owned_resource(Transaction, tx_id, user_id, db)

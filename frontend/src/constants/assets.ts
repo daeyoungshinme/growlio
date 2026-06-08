@@ -1,0 +1,5 @@
+export const CASH_TICKER = "CASH";
+export const REAL_ESTATE_ASSET_TYPE = "REAL_ESTATE";
+export const KR_PROPERTY_MARKET = "KR_PROPERTY";
+export const BASE_TYPE_STOCK_ONLY = "STOCK_ONLY";
+export const BASE_TYPE_TOTAL_ASSETS = "TOTAL_ASSETS";

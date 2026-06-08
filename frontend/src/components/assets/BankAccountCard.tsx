@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pencil, Trash2, RefreshCw } from "lucide-react";
 import type { AssetAccount } from "../../api/assets";
 import { fmtKrw } from "../../utils/format";
+import { useExchangeRateContext } from "../../context/ExchangeRateContext";
 
 const BANK_TYPE_LABELS: Record<string, string> = {
   BANK_ACCOUNT: "입출금",
@@ -11,7 +12,6 @@ const BANK_TYPE_LABELS: Record<string, string> = {
 
 interface Props {
   account: AssetAccount;
-  usdRate: number | null;
   onDelete: (id: string) => void;
   onEditModal: (id: string) => void;
   onEditName: (id: string, name: string) => void;
@@ -20,7 +20,8 @@ interface Props {
   isSyncing: boolean;
 }
 
-export default function BankAccountCard({ account, usdRate, onDelete, onEditModal, onEditName, onSync, isDeleting, isSyncing }: Props) {
+export default function BankAccountCard({ account, onDelete, onEditModal, onEditName, onSync, isDeleting, isSyncing }: Props) {
+  const usdRate = useExchangeRateContext();
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const [editNameMode, setEditNameMode] = useState(false);
   const [editNameValue, setEditNameValue] = useState(account.name);
@@ -41,7 +42,7 @@ export default function BankAccountCard({ account, usdRate, onDelete, onEditModa
   const showAmount = hasDepositFields ? displayTotal > 0 : account.manual_amount != null;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 flex items-start justify-between gap-4">
+    <div className="card flex items-start justify-between gap-4">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           {editNameMode ? (

@@ -15,7 +15,9 @@ import json
 import uuid
 from functools import partial
 
+import redis.asyncio as aioredis
 import structlog
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,14 +47,14 @@ async def fetch_current_price(
     ticker: str,
     market: str,
     db: AsyncSession,
-    redis=None,
+    redis: aioredis.Redis | None = None,
 ) -> float | None:
     """단일 종목 현재가 조회.
     Redis 15분 캐시 → Yahoo Finance → KIS 순으로 시도한다.
     """
     cache_key = current_price_key(ticker, market)
     if redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             cached = await redis.get(cache_key)
             if cached:
                 return float(cached)
@@ -76,7 +78,7 @@ async def fetch_current_price(
                 logger.warning("kis_price_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
 
     if price and redis:
-        with contextlib.suppress(Exception):
+        with contextlib.suppress(RedisError):
             await redis.set(cache_key, str(price), ex=TTL_PRICE_CURRENT)
 
     return price
@@ -139,7 +141,7 @@ async def get_historical_returns(
     async def _get_one(ticker: str, market: str) -> dict | None:
         cache_key = price_return_key(years, ticker, market)
         if redis:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(RedisError):
                 cached = await redis.get(cache_key)
                 if cached:
                     return json.loads(cached)
@@ -155,7 +157,7 @@ async def get_historical_returns(
             yahoo_circuit.record_success()
 
         if result and redis:
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(RedisError):
                 await redis.setex(cache_key, TTL_PRICE_RETURN, json.dumps(result))
 
         return result

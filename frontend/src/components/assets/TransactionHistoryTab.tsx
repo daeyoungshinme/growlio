@@ -118,11 +118,11 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{selectedYear}년 입금 합계</p>
           <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{fmtKrw(yearDeposit)}</p>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{selectedYear}년 배당 합계</p>
           <p className="text-xl font-bold text-green-600 dark:text-green-400">{fmtKrw(yearDividend)}</p>
         </div>
@@ -196,7 +196,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         </div>
       )}
 
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="card-overflow">
         {isLoading ? (
           <EmptyState title="불러오는 중..." compact />
         ) : filtered.length === 0 ? (

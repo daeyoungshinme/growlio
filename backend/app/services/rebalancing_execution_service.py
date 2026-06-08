@@ -97,12 +97,12 @@ async def execute_rebalancing(
         is_mock = account.is_mock_mode
 
         if account.asset_type == "STOCK_KIWOOM":
-            from app.kiwoom.auth import get_access_token as kiwoom_get_token
+            from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
             from app.kiwoom.order import place_domestic_order as kiwoom_place_order
 
             app_key, app_secret = await _load_kiwoom_credentials(account)
             account_no = account.kiwoom_account_no
-            access_token = await kiwoom_get_token(
+            access_token = await kiwoom_get_access_token(
                 app_key, app_secret,
                 is_mock=is_mock, redis=redis, db=db,
                 user_id=str(user_id), account_id=str(acc_uuid),

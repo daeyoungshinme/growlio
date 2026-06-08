@@ -1,6 +1,7 @@
 export const QUERY_KEYS = {
   dashboard: ["dashboard"] as const,
   portfolioOverview: ["portfolio-overview"] as const,
+  portfolioOverviewLite: ["portfolio-overview", "lite"] as const,
   portfolios: ["portfolios"] as const,
   accounts: ["accounts"] as const,
   accountPositions: (accountId: string) => ["account-positions", accountId] as const,
@@ -23,5 +24,4 @@ export const QUERY_KEYS = {
   dartDisclosures: (days: number) => ["dart-disclosures", days] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
   alertHistory: ["alert-history"] as const,
-  benchmark: (indices: string, months: number) => ["benchmark", indices, months] as const,
 } as const;

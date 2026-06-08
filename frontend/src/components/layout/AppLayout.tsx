@@ -6,6 +6,7 @@ import { useAuthStore } from "../../stores/authStore";
 import { toast } from "../../utils/toast";
 import { usePullToRefresh } from "../../hooks/usePullToRefresh";
 import { useSwipeNavigation } from "../../hooks/useSwipeNavigation";
+import { ExchangeRateProvider } from "../../context/ExchangeRateContext";
 
 // 페이지 컴포넌트가 새로고침 콜백을 AppLayout에 등록하기 위한 컨텍스트
 interface RefreshContextValue {
@@ -54,6 +55,7 @@ export default function AppLayout() {
   };
 
   return (
+    <ExchangeRateProvider>
     <RefreshContext.Provider value={{ registerRefresh }}>
       <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
         <Sidebar />
@@ -98,6 +100,7 @@ export default function AppLayout() {
         <BottomNav />
       </div>
     </RefreshContext.Provider>
+    </ExchangeRateProvider>
   );
 }
 

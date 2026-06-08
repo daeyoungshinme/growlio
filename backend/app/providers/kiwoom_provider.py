@@ -23,7 +23,7 @@ class KiwoomProvider(BrokerProvider):
     PROVIDER_NAME = "키움증권 OpenAPI+"
 
     async def sync(self, account: Any, db: Any, redis: Any) -> BalanceResult:
-        from app.kiwoom.auth import get_access_token as kiwoom_get_token
+        from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
         from app.kiwoom.balance import get_domestic_balance as kiwoom_get_balance
         from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
 
@@ -38,7 +38,7 @@ class KiwoomProvider(BrokerProvider):
         logger.info("kiwoom_sync_start", account_no=account.kiwoom_account_no, is_mock=is_mock)
 
         async def _do() -> dict:
-            token = await kiwoom_get_token(
+            token = await kiwoom_get_access_token(
                 app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
                 user_id=str(account.user_id), account_id=str(account.id),
             )
@@ -46,7 +46,7 @@ class KiwoomProvider(BrokerProvider):
                 return await kiwoom_get_balance(token, account.kiwoom_account_no, is_mock=is_mock)
             except KiwoomTokenExpiredError:
                 logger.warning("kiwoom_token_expired_refreshing", account_no=account.kiwoom_account_no)
-                refreshed = await kiwoom_get_token(
+                refreshed = await kiwoom_get_access_token(
                     app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
                     user_id=str(account.user_id), account_id=str(account.id), force_refresh=True,
                 )

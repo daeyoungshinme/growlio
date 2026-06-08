@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from datetime import date
 from typing import Any
 
@@ -17,7 +16,7 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.providers.base import BrokerProvider
+from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
@@ -26,6 +25,7 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import (
     alloc_history_key,
     dashboard_summary_key,
+    invalidate_user_caches,
     monthly_trend_key,
     portfolio_overview_key,
 )
@@ -68,7 +68,7 @@ def get_provider(account: AssetAccount) -> BrokerProvider:
 )
 async def _retry_provider_sync(
     provider: BrokerProvider, account: AssetAccount, db: AsyncSession, redis: Any
-) -> Any:
+) -> BalanceResult:
     """ProviderNetworkError에 한해 지수 백오프(2s→4s→8s, 최대 30s) 재시도."""
     return await provider.sync(account, db, redis)
 
@@ -76,7 +76,8 @@ async def _retry_provider_sync(
 async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> AssetSnapshot:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
-    SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다. API 레이어에서 HTTPException으로 변환.
+    SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.
+    API 레이어에서 HTTPException으로 변환.
     """
     import time as _time
 
@@ -135,12 +136,13 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    with contextlib.suppress(Exception):
-        await redis.delete(monthly_trend_key(account.user_id))
-        await redis.delete(dashboard_summary_key(account.user_id))
-        await redis.delete(portfolio_overview_key(account.user_id))
-        # alloc_history는 months 파라미터가 있어 패턴 삭제 (12개월이 기본값)
-        await redis.delete(alloc_history_key(account.user_id, 12))
+    await invalidate_user_caches(
+        redis,
+        monthly_trend_key(account.user_id),
+        dashboard_summary_key(account.user_id),
+        portfolio_overview_key(account.user_id),
+        alloc_history_key(account.user_id, 12),
+    )
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         _time.monotonic() - _sync_start

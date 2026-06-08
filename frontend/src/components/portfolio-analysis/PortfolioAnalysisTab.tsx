@@ -28,6 +28,7 @@ import {
 import { fetchAccounts } from "../../api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import { AnalysisPanel } from "./AnalysisPanel";
+import ErrorBoundary from "../ErrorBoundary";
 import { toast } from "../../utils/toast";
 import { extractErrorMessage } from "../../utils/error";
 import { invalidatePortfolioData } from "../../utils/queryInvalidation";
@@ -332,13 +333,15 @@ export default function PortfolioAnalysisTab() {
       </div>
 
       {/* ── 우측: 분석 패널 ──────────────────────────────────────── */}
-      <AnalysisPanel
-        selectedIds={selectedIds}
-        selectedNames={selectedNames}
-        portfolios={sortedPortfolios}
-        activeAccounts={activeAccounts}
-        onOpenAlertModal={setAlertModalPortfolioId}
-      />
+      <ErrorBoundary variant="section">
+        <AnalysisPanel
+          selectedIds={selectedIds}
+          selectedNames={selectedNames}
+          portfolios={sortedPortfolios}
+          activeAccounts={activeAccounts}
+          onOpenAlertModal={setAlertModalPortfolioId}
+        />
+      </ErrorBoundary>
       {/* 포트폴리오 에디터 모달 */}
       {editorOpen && (
         <UnifiedPortfolioEditor

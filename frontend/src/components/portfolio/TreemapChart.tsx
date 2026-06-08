@@ -21,7 +21,7 @@ interface Props {
 export default function TreemapChart({ data, title, isLoading }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">{title}</h3>
       {isLoading ? (
         <SkeletonCard rows={4} height="h-10" />

@@ -183,7 +183,7 @@ export default function InvestPlanPage() {
       </div>
 
       {/* 현재 설정 요약 */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="card">
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
           적립 계획 설정
         </h2>
@@ -246,7 +246,7 @@ export default function InvestPlanPage() {
       )}
 
       {/* 세금 추정 섹션 */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="card-overflow">
         <button
           onClick={() => setShowTax((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"

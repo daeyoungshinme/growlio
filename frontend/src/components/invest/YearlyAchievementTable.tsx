@@ -17,7 +17,7 @@ export default function YearlyAchievementTable({ data }: Props) {
 
   if (past.length === 0) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="card">
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">연별 달성율</h3>
         <EmptyState title="스냅샷 데이터가 없습니다." compact />
       </div>
@@ -25,7 +25,7 @@ export default function YearlyAchievementTable({ data }: Props) {
   }
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">연별 달성율</h3>
       {/* 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">

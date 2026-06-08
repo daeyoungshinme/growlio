@@ -2,10 +2,9 @@ import React, { memo, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
-  ComposedChart,
+  BarChart,
   CartesianGrid,
   Legend,
-  Line,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,12 +12,13 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useThemeStore } from "../../stores/themeStore";
-import { fetchAllocationHistory, fetchBenchmark } from "../../api/portfolios";
+import { fetchAllocationHistory } from "../../api/portfolios";
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import { STALE_TIME } from "../../constants/queryConfig";
 import { chartTooltipStyle } from "../../utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
+import { REAL_ESTATE_ASSET_TYPE } from "../../constants/assets";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -28,7 +28,7 @@ const TYPE_COLORS: Record<string, string> = {
   STOCK_OTHER: "#60A5FA",
   BANK_ACCOUNT: "#16A34A",
   DEPOSIT: "#4ADE80",
-  REAL_ESTATE: "#D97706",
+  [REAL_ESTATE_ASSET_TYPE]: "#D97706",
   CASH_OTHER: "#6B7280",
   CASH_STOCK: "#9CA3AF",
   OTHER: "#A855F7",
@@ -36,35 +36,14 @@ const TYPE_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = "#94A3B8";
 
-const BENCHMARK_COLORS: Record<string, string> = {
-  user_pct: "#6366F1",
-  kospi_pct: "#F59E0B",
-  sp500_pct: "#10B981",
-  nasdaq_pct: "#EF4444",
-};
-
-const BENCHMARK_LABELS: Record<string, string> = {
-  user_pct: "내 자산",
-  kospi_pct: "KOSPI",
-  sp500_pct: "S&P500",
-  nasdaq_pct: "NASDAQ",
-};
-
 function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
-  const [showBenchmark, setShowBenchmark] = useState(false);
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.allocationHistory(12),
     queryFn: () => fetchAllocationHistory(12),
-    staleTime: STALE_TIME.MEDIUM,
-  });
-  const { data: benchmarkData } = useQuery({
-    queryKey: QUERY_KEYS.benchmark("KOSPI,SP500", 12),
-    queryFn: () => fetchBenchmark("KOSPI,SP500", 12),
-    staleTime: STALE_TIME.LONG,
-    enabled: showBenchmark,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
   });
 
   const { chartData, allTypes } = useMemo(() => {
@@ -74,12 +53,7 @@ function AllocationHistoryChart() {
     data.forEach((point) => point.allocations.forEach((a) => typeSet.add(a.asset_type)));
     const types = Array.from(typeSet);
 
-    const bmByMonth = Object.fromEntries(
-      (benchmarkData ?? []).map((b) => [b.month.slice(0, 7), b])
-    );
-
     const points = data.map((point) => {
-      const monthKey = point.month.slice(0, 7);
       const entry: Record<string, unknown> = {
         month: point.month.slice(2, 7).replace("-", "."),
       };
@@ -87,17 +61,11 @@ function AllocationHistoryChart() {
       types.forEach((t) => {
         entry[t] = byType[t] ?? 0;
       });
-      if (showBenchmark && bmByMonth[monthKey]) {
-        const bm = bmByMonth[monthKey];
-        entry.user_pct = bm.user_pct;
-        entry.kospi_pct = bm.kospi_pct;
-        entry.sp500_pct = bm.sp500_pct;
-      }
       return entry;
     });
 
     return { chartData: points, allTypes: types };
-  }, [data, benchmarkData, showBenchmark]);
+  }, [data]);
 
   const labelMap = useMemo(() => {
     if (!data || data.length === 0) return {} as Record<string, string>;
@@ -115,7 +83,7 @@ function AllocationHistoryChart() {
 
   if (isLoading) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="card">
         <div className="h-4 w-40 bg-gray-100 dark:bg-gray-800 rounded animate-pulse mb-4" />
         <div className="h-52 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
       </div>
@@ -125,24 +93,14 @@ function AllocationHistoryChart() {
   if (!chartData.length) return null;
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+    <div className="card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
           자산 추이 (최근 12개월)
         </h2>
-        <button
-          onClick={() => setShowBenchmark((v) => !v)}
-          className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
-            showBenchmark
-              ? "bg-indigo-50 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-700 text-indigo-600 dark:text-indigo-400"
-              : "border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300 dark:hover:border-gray-600"
-          }`}
-        >
-          벤치마크 비교
-        </button>
       </div>
       <ResponsiveContainer width="100%" height={220}>
-        <ComposedChart data={chartData} margin={{ top: 4, right: showBenchmark ? 40 : 8, left: 0, bottom: 0 }}>
+        <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
             stroke={isDark ? "#374151" : "#F3F4F6"}
@@ -155,38 +113,21 @@ function AllocationHistoryChart() {
             axisLine={false}
           />
           <YAxis
-            yAxisId="left"
             tickFormatter={(v: number) => fmtKrwShort(v)}
             tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
             tickLine={false}
             axisLine={false}
             width={52}
           />
-          {showBenchmark && (
-            <YAxis
-              yAxisId="right"
-              orientation="right"
-              tickFormatter={(v: number) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
-              tick={{ fontSize: 10, fill: isDark ? "#6B7280" : "#9CA3AF" }}
-              tickLine={false}
-              axisLine={false}
-              width={40}
-            />
-          )}
           <Tooltip
             contentStyle={contentStyle}
             labelStyle={labelStyle}
             itemStyle={itemStyle}
             cursor={{ fill: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" }}
-            formatter={(value: number, key: string) => {
-              if (key.endsWith("_pct")) {
-                return [`${value > 0 ? "+" : ""}${value?.toFixed(2)}%`, BENCHMARK_LABELS[key] ?? key];
-              }
-              return [fmtKrwShort(value), labelMap[key] ?? key];
-            }}
+            formatter={(value: number, key: string) => [fmtKrwShort(value), labelMap[key] ?? key]}
           />
           <Legend
-            formatter={(value: string) => BENCHMARK_LABELS[value] ?? labelMap[value] ?? value}
+            formatter={(value: string) => labelMap[value] ?? value}
             wrapperStyle={{ fontSize: 11 }}
           />
           {allTypes.map((type, idx) => (
@@ -196,17 +137,9 @@ function AllocationHistoryChart() {
               stackId="1"
               fill={TYPE_COLORS[type] ?? DEFAULT_COLOR}
               radius={idx === allTypes.length - 1 ? [3, 3, 0, 0] : undefined}
-              yAxisId="left"
             />
           ))}
-          {showBenchmark && (
-            <>
-              <Line yAxisId="right" type="monotone" dataKey="user_pct" stroke={BENCHMARK_COLORS.user_pct} strokeWidth={2} dot={false} name="내 자산" />
-              <Line yAxisId="right" type="monotone" dataKey="kospi_pct" stroke={BENCHMARK_COLORS.kospi_pct} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="KOSPI" />
-              <Line yAxisId="right" type="monotone" dataKey="sp500_pct" stroke={BENCHMARK_COLORS.sp500_pct} strokeWidth={1.5} dot={false} strokeDasharray="4 2" name="S&P500" />
-            </>
-          )}
-        </ComposedChart>
+        </BarChart>
       </ResponsiveContainer>
 
       <button

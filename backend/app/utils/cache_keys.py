@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # TTL 상수 (초)
@@ -11,7 +11,6 @@ from datetime import date
 TTL_PRICE_CURRENT = 900          # 현재가 15분
 TTL_MONTHLY_TREND = 300          # 월별 추이 5분
 TTL_DASHBOARD_SUMMARY = 300      # 대시보드 전체 응답 5분
-TTL_BENCHMARK = 86400            # 벤치마크 수익률 1일
 TTL_PRICE_RETURN = 86400         # 기간 수익률 1일
 TTL_BACKTEST = 86400             # 백테스트 결과 1일
 TTL_ALLOC_HISTORY = 86400        # 포트폴리오 배분 이력 1일
@@ -48,10 +47,6 @@ def dashboard_summary_key(user_id: uuid.UUID) -> str:
 
 def monthly_trend_key(user_id: uuid.UUID) -> str:
     return f"monthly_trend:{user_id}"
-
-
-def benchmark_key(start: date, end: date) -> str:
-    return f"benchmark:{start}:{end}"
 
 
 def dividend_ticker_summary_key(user_id: uuid.UUID, year: int) -> str:
@@ -96,3 +91,17 @@ def dividend_summary_key(user_id: uuid.UUID) -> str:
 
 def portfolio_overview_key(user_id: uuid.UUID) -> str:
     return f"portfolio_overview:{user_id}"
+
+
+def portfolio_overview_lite_key(user_id: uuid.UUID) -> str:
+    return f"portfolio_overview_lite:{user_id}"
+
+
+async def invalidate_user_caches(redis: Any, *keys: str) -> None:
+    """주어진 캐시 키들을 RedisError 무시하며 일괄 삭제한다."""
+    import contextlib
+
+    from redis.exceptions import RedisError
+
+    with contextlib.suppress(RedisError):
+        await redis.delete(*keys)

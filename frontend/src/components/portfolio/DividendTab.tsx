@@ -193,7 +193,7 @@ export default function DividendTab({ dividendData, divLoading: _divLoading, div
       {divSubTab === "종목별 배당" && dividendChartData.length > 0 && (
         <div className="space-y-4">
           <TreemapChart data={dividendChartData} title="종목별 배당 비중 (예상 연간 기준)" />
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="card-overflow">
             <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700">
               <h3 className="font-semibold text-gray-800 dark:text-gray-200">종목별 배당 내역</h3>
             </div>

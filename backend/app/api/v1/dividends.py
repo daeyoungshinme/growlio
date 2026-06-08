@@ -1,5 +1,6 @@
 """배당금 현황 API."""
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +28,7 @@ async def dividend_summary(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     return await get_dividend_summary(current_user.id, db, redis)
 

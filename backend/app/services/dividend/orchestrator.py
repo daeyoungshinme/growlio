@@ -279,7 +279,6 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
     overrides = await _load_user_overrides(user_id, db)
     dart_key = await _get_dart_key(user_id, db)
     sem = asyncio.Semaphore(5)
-    loop = asyncio.get_running_loop()
     kis_creds = await _get_kis_credentials(user_id, db)
     usd_krw_rate: float = await get_usd_krw_rate(redis)
 
@@ -288,7 +287,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
     ) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, _ = await fetch_ticker_dividend_info(
-            ticker, market, redis, sem, loop, kis_creds, dart_key, overrides
+            ticker, market, redis, sem, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
             ticker=ticker, market=market,
@@ -374,14 +373,13 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
     sem = asyncio.Semaphore(5)
     redis = await get_redis()
-    loop = asyncio.get_running_loop()
 
     async def fetch_one(
         ticker: str, market: str, value_krw: float, invested_krw: float, qty: float
     ) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
-            ticker, market, redis, sem, loop, kis_creds, dart_key, overrides
+            ticker, market, redis, sem, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
             ticker=ticker, market=market,

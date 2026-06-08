@@ -6,7 +6,7 @@ import asyncio
 import contextlib
 import json
 import uuid
-from datetime import date, timedelta
+from datetime import date
 from typing import Any
 
 import structlog
@@ -20,10 +20,8 @@ from app.models.user import UserSettings
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.dividend_aggregator import get_dividend_summary
 from app.utils.cache_keys import (
-    TTL_BENCHMARK,
     TTL_DASHBOARD_SUMMARY,
     TTL_MONTHLY_TREND,
-    benchmark_key,
     dashboard_summary_key,
     monthly_trend_key,
 )
@@ -173,14 +171,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         if cached:
             return json.loads(cached)
 
-    # first_snap_date를 먼저 조회 후 벤치마크 백그라운드 태스크 시작
-    # _get_benchmarks는 run_in_executor(스레드풀)를 사용하므로 DB 쿼리와 진정한 병렬 실행 가능
     first_snap_date = await _get_first_snap_date(user_id, db)
-    benchmark_task: asyncio.Task[dict[str, float | None]] = asyncio.create_task(
-        _get_benchmarks(first_snap_date, redis)
-        if first_snap_date
-        else _no_benchmarks()
-    )
 
     # DB 쿼리는 같은 세션을 공유하므로 순차 실행 (SQLAlchemy AsyncSession 안전 요구사항)
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
@@ -189,11 +180,6 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
     net_deposits_ytd = await _calc_net_deposits_this_year(user_id, db)
     div_summary = await get_dividend_summary(user_id, db, redis)
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
-
-    try:
-        benchmarks = await benchmark_task
-    except Exception:
-        benchmarks = await _no_benchmarks()
 
     bank_total = total_assets_krw - stock_value
     base = bank_total + total_invested
@@ -220,8 +206,6 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         "cumulative_return_pct": cumulative_return,
         "xirr_pct": xirr_pct,
         "xirr_is_estimated": xirr_is_estimated,
-        "benchmark_kospi_pct": benchmarks.get("kospi_pct"),
-        "benchmark_sp500_pct": benchmarks.get("sp500_pct"),
         "goal_annual_return_pct": goal_annual_return_pct,
         "retirement_target_year": retirement_target_year,
         "monthly_trend": monthly_trend,
@@ -237,10 +221,6 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
                 dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result)
             )
     return result
-
-
-async def _no_benchmarks() -> dict[str, float | None]:
-    return {"kospi_pct": None, "sp500_pct": None}
 
 
 async def _get_first_snap_date(user_id: uuid.UUID, db: AsyncSession) -> date | None:
@@ -393,128 +373,6 @@ async def _calc_xirr(
     cashflows.append((date.today(), current_total))
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, _xirr, cashflows), False
-
-
-async def _get_benchmarks(start_date: date, redis) -> dict[str, float | None]:
-    """KOSPI·S&P500의 start_date~오늘 수익률 조회. Redis 24h 캐시."""
-    end_date = date.today()
-    cache_key = benchmark_key(start_date, end_date)
-
-    if redis:
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
-
-    def _fetch() -> dict[str, float | None]:
-        import yfinance as yf
-
-        result: dict[str, float | None] = {}
-        for symbol, key in [("^KS11", "kospi_pct"), ("^GSPC", "sp500_pct")]:
-            try:
-                hist = yf.Ticker(symbol).history(
-                    start=start_date,
-                    end=end_date + timedelta(days=1),
-                )
-                if len(hist) >= 2:
-                    pct = (hist["Close"].iloc[-1] / hist["Close"].iloc[0] - 1) * 100
-                    result[key] = round(float(pct), 2)
-                else:
-                    result[key] = None
-            except Exception:
-                result[key] = None
-        return result
-
-    loop = asyncio.get_running_loop()
-    try:
-        data = await asyncio.wait_for(loop.run_in_executor(None, _fetch), timeout=15.0)
-    except Exception:
-        data = {"kospi_pct": None, "sp500_pct": None}
-
-    if redis:
-        await redis.set(cache_key, json.dumps(data), ex=TTL_BENCHMARK)
-
-    return data
-
-
-async def get_benchmark_comparison(
-    user_id: uuid.UUID,
-    months: int,
-    indices: list[str],
-    db: AsyncSession,
-    redis,
-) -> list[dict]:
-    """월별 사용자 자산 수익률 vs 벤치마크 수익률 비교.
-
-    각 월의 값을 첫 번째 월 대비 누적 수익률(%)로 반환.
-    """
-    monthly = await _get_monthly_trend(user_id, db, redis)
-    if len(monthly) < 2:
-        return []
-
-    symbol_map = {
-        "KOSPI": "^KS11",
-        "SP500": "^GSPC",
-        "NASDAQ": "^IXIC",
-    }
-    requested = {k: symbol_map[k] for k in indices if k in symbol_map}
-
-    first_month = monthly[0]["month"]
-    try:
-        start_dt = date.fromisoformat(first_month)
-    except ValueError:
-        start_dt = date(int(first_month[:4]), int(first_month[5:7]), 1)
-
-    end_dt = date.today() + timedelta(days=1)
-
-    def _fetch_monthly_closes() -> dict[str, list[float | None]]:
-        import yfinance as yf
-
-        result: dict[str, list[float | None]] = {}
-        for key, symbol in requested.items():
-            try:
-                hist = yf.Ticker(symbol).history(start=start_dt, end=end_dt, interval="1mo")
-                if hist.empty:
-                    result[key] = [None] * len(monthly)
-                    continue
-                closes: list[float | None] = []
-                for point in monthly:
-                    m = point["month"][:7]
-                    matched = [
-                        float(r["Close"])
-                        for idx, r in hist.iterrows()
-                        if str(idx)[:7] == m
-                    ]
-                    closes.append(matched[0] if matched else None)
-                result[key] = closes
-            except Exception:
-                result[key] = [None] * len(monthly)
-        return result
-
-    loop = asyncio.get_running_loop()
-    try:
-        closes_map = await asyncio.wait_for(
-            loop.run_in_executor(None, _fetch_monthly_closes), timeout=20.0
-        )
-    except Exception:
-        closes_map = {k: [None] * len(monthly) for k in requested}
-
-    user_base = monthly[0]["total_krw"]
-    output: list[dict] = []
-    for i, point in enumerate(monthly):
-        entry: dict = {
-            "month": point["month"][:7],
-            "user_pct": round((point["total_krw"] / user_base - 1) * 100, 2) if user_base else None,
-        }
-        for key, closes in closes_map.items():
-            base_close = next((c for c in closes if c is not None), None)
-            cur = closes[i] if i < len(closes) else None
-            entry[key.lower() + "_pct"] = (
-                round((cur / base_close - 1) * 100, 2)
-                if cur is not None and base_close and base_close > 0
-                else None
-            )
-        output.append(entry)
-    return output
 
 
 async def _calc_net_deposits_this_year(user_id: uuid.UUID, db: AsyncSession) -> float:

@@ -75,7 +75,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
   };
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="card-overflow">
       <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-semibold text-gray-800 dark:text-gray-200">전체 보유 종목</h3>
         <span className="text-xs text-gray-400 dark:text-gray-500">{aggregated.length}종목 · 총 {fmtKrwShort(totalStock)}원</span>

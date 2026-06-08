@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from app.models.asset import AssetAccount
@@ -54,6 +55,6 @@ class BrokerProvider(ABC):
         self,
         account: AssetAccount,
         db: AsyncSession,
-        redis: Any,
+        redis: aioredis.Redis | None,
     ) -> BalanceResult:
         """잔고·보유종목을 조회해 BalanceResult를 반환한다."""

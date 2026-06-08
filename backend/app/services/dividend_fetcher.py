@@ -43,7 +43,6 @@ async def fetch_ticker_dividend_info(
     market: str,
     redis: Any,
     sem: asyncio.Semaphore,
-    loop: asyncio.AbstractEventLoop,
     kis_creds: dict | None,
     dart_key: str,
     overrides: dict[tuple[str, str], list[int]],
@@ -53,6 +52,7 @@ async def fetch_ticker_dividend_info(
     Returns: (yield_decimal, dps, months, ex_dividend_date)
     소스 우선순위: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
     """
+    loop = asyncio.get_running_loop()
     is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
     is_etf = is_korean_etf(ticker, market)
     yahoo_sym = _to_yahoo_symbol(ticker, market)

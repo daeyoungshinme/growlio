@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { lazy, Suspense, useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -7,13 +7,14 @@ import { useRegisterRefresh } from "../hooks/useRegisterRefresh";
 import { invalidateSyncData } from "../utils/queryInvalidation";
 import DividendSection from "../components/dashboard/DividendSection";
 import PortfolioSummaryCard from "../components/dashboard/PortfolioSummaryCard";
-import AllocationHistoryChart from "../components/dashboard/AllocationHistoryChart";
-import DisclosureFeedCard from "../components/dashboard/DisclosureFeedCard";
 import HeroSummaryCard from "../components/dashboard/HeroSummaryCard";
 import SkeletonCard from "../components/common/SkeletonCard";
 import SkeletonStatBox from "../components/common/SkeletonStatBox";
 import ErrorBoundary from "../components/ErrorBoundary";
 import { QUERY_KEYS } from "../constants/queryKeys";
+
+const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
+const DisclosureFeedCard = lazy(() => import("../components/dashboard/DisclosureFeedCard"));
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -38,9 +39,9 @@ export default function DashboardPage() {
     [data]
   );
 
-  if (isLoading || accountsLoading) return (
+  if (isLoading) return (
     <div className="space-y-6">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+      <div className="card">
         <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
           {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
         </div>
@@ -64,7 +65,7 @@ export default function DashboardPage() {
     </div>
   );
 
-  if (accounts.length === 0) return (
+  if (!accountsLoading && accounts.length === 0) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center max-w-xs sm:max-w-md w-full">
         <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
@@ -97,7 +98,7 @@ export default function DashboardPage() {
 
       {/* Row 2: 포트폴리오 요약 + 배당 현황 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+        <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">주식 포트폴리오 요약</h2>
             <Link
@@ -115,7 +116,7 @@ export default function DashboardPage() {
             />
           </ErrorBoundary>
         </div>
-        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="card-overflow">
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
             <Link
@@ -138,12 +139,16 @@ export default function DashboardPage() {
 
       {/* Row 3: 자산 추이 */}
       <ErrorBoundary variant="section">
-        <AllocationHistoryChart />
+        <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
+          <AllocationHistoryChart />
+        </Suspense>
       </ErrorBoundary>
 
       {/* Row 5: 보유 종목 DART 공시 피드 */}
       <ErrorBoundary variant="section">
-        <DisclosureFeedCard />
+        <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
+          <DisclosureFeedCard />
+        </Suspense>
       </ErrorBoundary>
     </div>
   );
