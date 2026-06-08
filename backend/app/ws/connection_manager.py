@@ -23,7 +23,7 @@ class ConnectionManager:
         self._lock = asyncio.Lock()
 
     async def connect(self, ws: WebSocket) -> str:
-        await ws.accept()
+        """이미 accept()된 WebSocket을 등록하고 ws_id를 반환한다."""
         ws_id = str(uuid.uuid4())
         async with self._lock:
             self._connections[ws_id] = ws

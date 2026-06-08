@@ -44,11 +44,16 @@ export default function PortfolioPage() {
   }, [qc]);
   useRegisterRefresh(handleRefresh);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = TABS.includes(searchParams.get("tab") as Tab)
     ? (searchParams.get("tab") as Tab)
     : "종목 현황";
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  const handleTabChange = useCallback((next: Tab) => {
+    setTab(next);
+    setSearchParams({ tab: next }, { replace: true });
+  }, [setSearchParams]);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
 
@@ -195,7 +200,7 @@ export default function PortfolioPage() {
       </div>
 
       {/* 탭 */}
-      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} variant="pill" />
+      <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="pill" />
 
       {tab === "종목 현황" && (
         <ErrorBoundary variant="section">

@@ -7,7 +7,7 @@ import { pnlColor } from "../../utils/colors";
 import type { PortfolioPosition, DividendYield } from "../../types";
 import EmptyState from "../common/EmptyState";
 
-const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 30;
+const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 80; // 카드 평균 높이 (px)
 
 type AggSortKey = "total_value_krw" | "pnl_pct" | "total_pnl" | "weight_in_stock";

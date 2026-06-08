@@ -1,6 +1,6 @@
 """배당금 현황 API."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,22 +36,28 @@ async def dividend_summary(
 @limiter.limit("5/minute")
 async def position_dividend_yields(
     request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=200, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """보유 종목별 배당수익률 및 예상 배당금 (yfinance, 비실시간)."""
-    return await get_position_dividend_yields(current_user.id, db)
+    result = await get_position_dividend_yields(current_user.id, db)
+    return result[skip : skip + limit]
 
 
 @router.get("/by-ticker")
 @limiter.limit("10/minute")
 async def ticker_dividend_summary(
     request: Request,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=200, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """종목별 실수령(올해) + 예상 배당금 통합 (Redis 24h 캐시)."""
-    return await get_ticker_dividend_summary(current_user.id, db)
+    result = await get_ticker_dividend_summary(current_user.id, db)
+    return result[skip : skip + limit]
 
 
 class TickerSettingsRequest(BaseModel):
@@ -91,7 +97,9 @@ async def put_ticker_setting(
     db: AsyncSession = Depends(get_db),
 ):
     """배당월 수동 override 저장."""
-    return await upsert_ticker_settings(current_user.id, ticker, body.market, body.dividend_months, db)
+    return await upsert_ticker_settings(
+        current_user.id, ticker, body.market, body.dividend_months, db
+    )
 
 
 @router.delete("/ticker-settings/{ticker}")
@@ -104,5 +112,7 @@ async def del_ticker_setting(
     """배당월 override 삭제 (자동 감지로 복구)."""
     deleted = await delete_ticker_settings(current_user.id, ticker, market, db)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다"
+        )
     return {"deleted": True}

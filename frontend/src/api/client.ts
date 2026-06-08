@@ -2,6 +2,7 @@ import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 import { supabase } from "../lib/supabase";
 import { toast } from "../utils/toast";
+import { getApiBaseUrl } from "../utils/platform";
 
 interface RetryableConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -18,7 +19,9 @@ function processQueue(error: unknown, token: string | null = null) {
 }
 
 export const api = axios.create({
-  baseURL: "/api/v1",
+  // 네이티브 앱: https://growlio-api.onrender.com/api/v1
+  // 웹(PWA/dev): /api/v1 (상대 경로 — Vite 프록시 또는 nginx 처리)
+  baseURL: `${getApiBaseUrl()}/api/v1`,
   headers: { "Content-Type": "application/json" },
   timeout: 60_000,
 });

@@ -1,5 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useId } from "react";
+import { triggerHaptic } from "../../hooks/useHaptic";
 
 interface Props {
   message: string;
@@ -46,7 +47,10 @@ export default function ConfirmModal({
             {cancelLabel}
           </button>
           <button
-            onClick={onConfirm}
+            onClick={() => {
+              void triggerHaptic(danger ? "heavy" : "medium");
+              onConfirm();
+            }}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
               danger
                 ? "bg-red-600 text-white hover:bg-red-700"

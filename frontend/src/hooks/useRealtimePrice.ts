@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { isNativePlatform } from "../utils/platform";
 
 export interface TickerInfo {
   ticker: string;
@@ -19,12 +20,15 @@ interface UseRealtimePriceOptions {
 }
 
 /** WebSocket 재연결 대기시간 (ms) — 지수 백오프 */
-const RECONNECT_DELAYS = [1_000, 3_000, 10_000];
+const RECONNECT_DELAYS = [1_000, 2_000, 4_000, 8_000];
 
 function getWsBaseUrl(): string {
+  if (isNativePlatform()) {
+    const domain = (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "growlio-api.onrender.com";
+    return `wss://${domain}`;
+  }
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const apiDomain = (import.meta.env.VITE_API_DOMAIN as string | undefined) || window.location.host;
-  return `${proto}//${apiDomain}`;
+  return `${proto}//${window.location.host}`;
 }
 
 /**
@@ -49,6 +53,8 @@ export function useRealtimePrice({
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
+  // 이전 tickers 내용 추적 — 배열 참조만 바뀐 경우 재구독 방지
+  const tickersKeyRef = useRef<string>("");
 
   useEffect(() => {
     enabledRef.current = enabled;
@@ -73,12 +79,15 @@ export function useRealtimePrice({
     } = await supabase.auth.getSession();
     if (!session?.access_token || !mountedRef.current) return;
 
-    const url = `${getWsBaseUrl()}/api/v1/ws/prices?token=${encodeURIComponent(session.access_token)}`;
+    const url = `${getWsBaseUrl()}/api/v1/ws/prices`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    const token = session.access_token;
     ws.onopen = () => {
       reconnectAttemptRef.current = 0;
+      // 토큰을 URL이 아닌 첫 번째 메시지로 전달 (로그/히스토리 노출 방지)
+      ws.send(JSON.stringify({ type: "auth", token }));
       sendSubscribe(ws);
     };
 
@@ -135,8 +144,11 @@ export function useRealtimePrice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, connect]);
 
-  // 종목 목록 변경 시 재구독
+  // 종목 목록 내용 변경 시에만 재구독 (배열 참조 변경은 무시)
   useEffect(() => {
+    const key = JSON.stringify(tickers);
+    if (key === tickersKeyRef.current) return;
+    tickersKeyRef.current = key;
     const ws = wsRef.current;
     if (ws?.readyState === WebSocket.OPEN) {
       sendSubscribe(ws);

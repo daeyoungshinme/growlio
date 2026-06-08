@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { triggerHaptic } from "./useHaptic";
 
 const NAV_ORDER = [
   "/dashboard",
@@ -55,10 +56,10 @@ export function useSwipeNavigation(containerRef: React.RefObject<HTMLElement | n
       if (currentIndex === -1) return;
 
       if (deltaX < 0 && currentIndex < NAV_ORDER.length - 1) {
-        // 왼쪽 스와이프 → 다음 탭
+        void triggerHaptic("light");
         navigate(NAV_ORDER[currentIndex + 1]);
       } else if (deltaX > 0 && currentIndex > 0) {
-        // 오른쪽 스와이프 → 이전 탭
+        void triggerHaptic("light");
         navigate(NAV_ORDER[currentIndex - 1]);
       }
     },
