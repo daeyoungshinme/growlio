@@ -85,7 +85,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               </>
             ) : (
               <>
-                <span className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">{account.name}</span>
+                <span className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate" title={account.notes ? `${account.name} — ${account.notes}` : account.name}>{account.name}</span>
                 <button
                   onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
                   title="계좌명 수정"
@@ -96,23 +96,21 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               </>
             )}
           </div>
-          {/* 줄2: 금융기관명 + 계좌번호 + 배지 */}
-          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-            {account.institution && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{account.institution} ·</span>
+          {/* 줄2: 텍스트 정보(truncate) + 배지(항상 표시) */}
+          <div className="flex items-center gap-1.5 mt-1 min-w-0">
+            {(account.institution || accountNo) && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 truncate min-w-0">
+                {[account.institution, accountNo].filter(Boolean).join(" · ")}
+              </span>
             )}
-            {accountNo && (
-              <span className="text-xs text-gray-400 dark:text-gray-500">{accountNo}</span>
-            )}
-            <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full">{typeLabel}</span>
+            <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">{typeLabel}</span>
             {account.has_own_kis_credentials && (
-              <span className="px-2 py-0.5 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full">전용 API 키</span>
+              <span className="px-2 py-0.5 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">전용 API 키</span>
             )}
             {account.has_own_kiwoom_credentials && (
-              <span className="px-2 py-0.5 border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full">키움 API 키</span>
+              <span className="px-2 py-0.5 border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">키움 API 키</span>
             )}
           </div>
-          {account.notes && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 truncate">{account.notes}</p>}
         </div>
         <div className="flex items-center gap-1 shrink-0">
           {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
