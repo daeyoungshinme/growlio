@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "growlio@example.com"
+    smtp_timeout: int = 10  # SMTP 연결 타임아웃(초)
 
     frontend_url: str = "http://localhost:5173"
 

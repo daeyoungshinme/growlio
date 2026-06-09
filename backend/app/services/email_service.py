@@ -7,12 +7,24 @@ from email.mime.text import MIMEText
 
 import aiosmtplib
 import structlog
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.config import settings
 
 logger = structlog.get_logger()
 
 
+@retry(
+    retry=retry_if_exception_type((aiosmtplib.SMTPConnectError, TimeoutError, OSError)),
+    stop=stop_after_attempt(2),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 async def _send_html_email(to_email: str, subject: str, html: str) -> None:
     """HTML 이메일을 SMTP로 발송한다. 실패 시 예외를 그대로 전파한다."""
     msg = MIMEMultipart("alternative")
@@ -30,6 +42,7 @@ async def _send_html_email(to_email: str, subject: str, html: str) -> None:
         password=settings.smtp_password,
         start_tls=True,
         tls_context=ctx,
+        timeout=settings.smtp_timeout,
     )
 
 
