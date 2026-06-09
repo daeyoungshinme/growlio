@@ -65,7 +65,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
     <div className="card">
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          {/* 줄1: 증권사명 · 계좌명 + 편집버튼 */}
+          {/* 줄1: 계좌명 + 편집버튼 */}
           <div className="flex items-center gap-1.5 min-w-0">
             {editNameMode ? (
               <>
@@ -85,9 +85,6 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               </>
             ) : (
               <>
-                {account.institution && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{account.institution} ·</span>
-                )}
                 <span className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate">{account.name}</span>
                 <button
                   onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
@@ -99,8 +96,11 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               </>
             )}
           </div>
-          {/* 줄2: 계좌번호 + 배지 */}
+          {/* 줄2: 금융기관명 + 계좌번호 + 배지 */}
           <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            {account.institution && (
+              <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{account.institution} ·</span>
+            )}
             {accountNo && (
               <span className="text-xs text-gray-400 dark:text-gray-500">{accountNo}</span>
             )}
