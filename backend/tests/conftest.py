@@ -21,6 +21,18 @@ def override_settings(monkeypatch):
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")
 
 
+@pytest.fixture(autouse=True)
+def reset_rate_limiter():
+    """slowapi 인메모리 레이트 리미터 카운터를 각 테스트 전에 초기화한다.
+
+    레이트 리미터가 모듈 싱글톤으로 작동하므로 전체 스위트 실행 시
+    카운터가 누적되어 포트폴리오 요약 등 다수 호출 테스트가 오동작한다.
+    """
+    from app.limiter import limiter
+    limiter._storage.reset()
+    yield
+
+
 # ── DB 세션 Mock ────────────────────────────────────────────
 
 @pytest.fixture
@@ -124,6 +136,7 @@ def make_user_settings(make_user_id):
         annual_deposit_goal=None,
         monthly_deposit_amount=None,
         retirement_target_year=None,
+        monthly_report_enabled=True,
     )
 
 

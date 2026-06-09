@@ -9,6 +9,7 @@ vi.mock("../api/dashboard", () => ({
 
 vi.mock("../api/portfolios", () => ({
   fetchPortfolioOverview: vi.fn(),
+  fetchPortfolioOverviewLite: vi.fn(),
 }));
 
 vi.mock("../api/invest", () => ({
@@ -50,11 +51,12 @@ describe("useDashboardData", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { fetchDashboard } = await import("../api/dashboard");
-    const { fetchPortfolioOverview } = await import("../api/portfolios");
+    const { fetchPortfolioOverview, fetchPortfolioOverviewLite } = await import("../api/portfolios");
     const { fetchDCAAnalysis } = await import("../api/invest");
     const { fetchAccounts, fetchExchangeRate } = await import("../api/assets");
     vi.mocked(fetchDashboard).mockResolvedValue(mockDashboardData as never);
     vi.mocked(fetchPortfolioOverview).mockResolvedValue(mockOverview as never);
+    vi.mocked(fetchPortfolioOverviewLite).mockResolvedValue(mockOverview as never);
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([]);
     vi.mocked(fetchExchangeRate).mockResolvedValue({ usd_krw: 1350 });

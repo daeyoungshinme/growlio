@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
 import { AssetAccount, type StockSuggestion } from "../../api/assets";
 import { Portfolio, PortfolioItem } from "../../api/portfolios";
@@ -11,7 +11,7 @@ import {
   REAL_ESTATE_ASSET_TYPE,
 } from "../../constants/assets";
 import { useStockSearch } from "../../hooks/useStockSearch";
-import PortfolioWeightChart from "./PortfolioWeightChart";
+const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
 
 interface Props {
@@ -253,7 +253,9 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
             </div>
 
             {/* 비중 도넛차트 */}
-            <PortfolioWeightChart items={items} />
+            <Suspense fallback={<div className="h-32" />}>
+              <PortfolioWeightChart items={items} />
+            </Suspense>
 
             <div className="flex flex-wrap gap-2 mt-3">
               <button

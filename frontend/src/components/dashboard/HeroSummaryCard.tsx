@@ -1,11 +1,12 @@
-import { memo, useMemo } from "react";
+import { lazy, memo, Suspense, useMemo } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtMonth, fmtPct } from "../../utils/format";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
 import { ASSET_TYPE_LABELS } from "../../constants";
-import AssetAllocationChart from "./AssetAllocationChart";
 import type { DashboardData } from "../../api/dashboard";
 import type { DCAAnalysisData } from "../../api/invest";
+
+const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
 
 interface Props {
   data: DashboardData;
@@ -130,7 +131,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Pr
         {/* 모바일: 확대된 compact 도넛 차트 (우측 고정) */}
         <div className="lg:hidden w-36 sm:w-44 shrink-0">
           {allocationChartData.length > 0 ? (
-            <AssetAllocationChart data={allocationChartData} size="compact" />
+            <Suspense fallback={<div className="h-44" />}>
+              <AssetAllocationChart data={allocationChartData} size="compact" />
+            </Suspense>
           ) : (
             <div className="flex items-center justify-center h-44 text-gray-300 dark:text-gray-600 text-xs text-center">
               자산<br />없음
@@ -140,7 +143,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Pr
         {/* 데스크탑: 풀사이즈 도넛 차트 */}
         <div className="hidden lg:block lg:w-[460px] shrink-0">
           {allocationChartData.length > 0 ? (
-            <AssetAllocationChart data={allocationChartData} />
+            <Suspense fallback={<div className="h-40" />}>
+              <AssetAllocationChart data={allocationChartData} />
+            </Suspense>
           ) : (
             <div className="flex items-center justify-center h-40 text-gray-300 dark:text-gray-600 text-sm">
               자산 데이터 없음

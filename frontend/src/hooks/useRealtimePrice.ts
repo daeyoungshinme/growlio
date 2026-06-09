@@ -144,6 +144,40 @@ export function useRealtimePrice({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, connect]);
 
+  // 앱 포그라운드 복귀 시 즉시 재연결 (Android 백그라운드 전환 대응)
+  useEffect(() => {
+    const handleVisible = () => {
+      if (!enabledRef.current || tickersRef.current.length === 0) return;
+      reconnectAttemptRef.current = 0;
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      const ws = wsRef.current;
+      if (!ws || ws.readyState === WebSocket.CLOSED || ws.readyState === WebSocket.CLOSING) {
+        void connect();
+      }
+    };
+
+    const handleHidden = () => {
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      wsRef.current?.close();
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) handleHidden();
+      else handleVisible();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [connect]);
+
   // 종목 목록 내용 변경 시에만 재구독 (배열 참조 변경은 무시)
   useEffect(() => {
     const key = JSON.stringify(tickers);

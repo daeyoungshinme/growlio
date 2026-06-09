@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
@@ -6,7 +6,9 @@ import { api } from "../api/client";
 import { fetchSettings } from "../api/settings";
 import { fetchDCAAnalysis } from "../api/invest";
 import { fetchTaxSummary, fetchOverseasPositionsTax } from "../api/tax";
-import DCAProjectionChart from "../components/invest/DCAProjectionChart";
+import SkeletonCard from "../components/common/SkeletonCard";
+
+const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 import TaxPlannerSection from "../components/invest/TaxPlannerSection";
 import ErrorBoundary from "../components/ErrorBoundary";
 import GoalTimelineCard from "../components/invest/GoalTimelineCard";
@@ -235,7 +237,9 @@ export default function InvestPlanPage() {
       {isConfigured && data && (
         <ErrorBoundary variant="section">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
-            <DCAProjectionChart data={data.projection_months} />
+            <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+              <DCAProjectionChart data={data.projection_months} />
+            </Suspense>
             <div className="space-y-5">
               <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
               <YearlyAchievementTable data={data.yearly_achievements} />

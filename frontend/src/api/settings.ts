@@ -18,6 +18,7 @@ export interface SettingsData {
   auto_dca_portfolio_id: string | null;
   auto_dca_account_id: string | null;
   auto_dca_last_executed_at: string | null;
+  fcm_token_stored: boolean;
 }
 
 export interface AutoDcaPayload {
@@ -33,3 +34,6 @@ export const fetchSettings = (): Promise<SettingsData> =>
 
 export const updateAutoDca = (payload: AutoDcaPayload) =>
   api.put("/settings/auto-dca", payload).then((r) => r.data);
+
+export const registerPushToken = (fcm_token: string | null) =>
+  api.put("/settings/push-token", { fcm_token }).then((r) => r.data);

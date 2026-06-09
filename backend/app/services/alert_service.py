@@ -30,8 +30,9 @@ async def _save_alert_history(
 
 
 async def check_and_trigger_alerts(db: AsyncSession) -> None:
-    """활성 알림을 조회하고 조건 충족 시 이메일 발송 후 비활성화."""
+    """활성 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
     from app.services.email_service import send_exchange_rate_alert
+    from app.services.push_service import send_push_to_user
 
     current_rate = await fetch_usd_krw(None, force_refresh=True)
     if current_rate <= 0:
@@ -39,7 +40,10 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         return
 
     result = await db.execute(
-        select(ExchangeRateAlert, User.email, UserSettings.notification_email)
+        select(
+            ExchangeRateAlert, User.email,
+            UserSettings.notification_email, UserSettings.fcm_token,
+        )
         .join(User, User.id == ExchangeRateAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .where(ExchangeRateAlert.is_active == True)  # noqa: E712
@@ -47,7 +51,7 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
     rows = result.all()
 
     triggered_count = 0
-    for alert, user_email, notification_email in rows:
+    for alert, user_email, notification_email, fcm_token in rows:
         email = notification_email or user_email
         target = float(alert.target_rate)
         should_trigger = (
@@ -74,11 +78,18 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
             logger.error("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
             continue
 
+        direction_label = "이하" if alert.direction == "BELOW" else "이상"
+        await send_push_to_user(
+            user_id=alert.user_id,
+            title="환율 알림",
+            body=f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+            fcm_token=fcm_token,
+        )
+
         alert.trigger_count += 1
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
-        direction_label = "이하" if alert.direction == "BELOW" else "이상"
         await _save_alert_history(
             db,
             alert.user_id,
@@ -285,12 +296,16 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
 
 async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
-    """활성 주가 알림을 조회하고 조건 충족 시 이메일 발송 후 비활성화."""
+    """활성 주가 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
     from app.services.email_service import send_stock_price_alert
     from app.services.price_service import fetch_prices_batch
+    from app.services.push_service import send_push_to_user
 
     result = await db.execute(
-        select(StockPriceAlert, User.email, UserSettings.notification_email)
+        select(
+            StockPriceAlert, User.email,
+            UserSettings.notification_email, UserSettings.fcm_token,
+        )
         .join(User, User.id == StockPriceAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .where(StockPriceAlert.is_active == True)  # noqa: E712
@@ -301,11 +316,11 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
 
     # ticker별 그룹화 후 배치 조회 (user_id는 첫 번째 유저 기준)
     sample_user_id = rows[0][0].user_id
-    unique_tickers = list({(a.ticker, a.market) for a, _, _ in rows})
+    unique_tickers = list({(a.ticker, a.market) for a, _, _, _ in rows})
     price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, redis)
 
     triggered_count = 0
-    for alert, user_email, notification_email in rows:
+    for alert, user_email, notification_email, fcm_token in rows:
         price = price_map.get(alert.ticker)
         if not price:
             continue
@@ -337,11 +352,18 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
             logger.error("stock_price_alert_email_failed", error=str(exc), alert_id=str(alert.id))
             continue
 
+        direction_label = "이하" if alert.direction == "BELOW" else "이상"
+        await send_push_to_user(
+            user_id=alert.user_id,
+            title=f"주가 알림: {alert.name}",
+            body=f"{price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
+            fcm_token=fcm_token,
+        )
+
         alert.trigger_count += 1
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
-        direction_label = "이하" if alert.direction == "BELOW" else "이상"
         await _save_alert_history(
             db,
             alert.user_id,

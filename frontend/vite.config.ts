@@ -4,7 +4,10 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 const apiDomain = process.env.VITE_API_DOMAIN ?? "growlio-api.onrender.com";
-const apiPattern = new RegExp(`^https://${apiDomain.replace(/\./g, "\\.")}/.*`);
+const apiBase = `^https://${apiDomain.replace(/\./g, "\\.")}`;
+const apiPattern = new RegExp(`${apiBase}/.*`);
+const dashboardPattern = new RegExp(`${apiBase}/api/v1/dashboard(\\?.*)?$`);
+const portfolioOverviewPattern = new RegExp(`${apiBase}/api/v1/portfolio/overview(\\?.*)?$`);
 
 export default defineConfig({
   build: {
@@ -58,6 +61,22 @@ export default defineConfig({
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
+            urlPattern: dashboardPattern,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "api-dashboard",
+              expiration: { maxAgeSeconds: 86400, maxEntries: 5 },
+            },
+          },
+          {
+            urlPattern: portfolioOverviewPattern,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "api-portfolio",
+              expiration: { maxAgeSeconds: 86400, maxEntries: 5 },
+            },
+          },
+          {
             urlPattern: apiPattern,
             handler: "NetworkOnly",
           },
@@ -78,5 +97,23 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     exclude: ["**/node_modules/**", "**/e2e/**"],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "lcov"],
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "src/test/**",
+        "src/types/**",
+        "src/**/*.d.ts",
+        "src/main.tsx",
+        "src/lib/**",
+      ],
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 60,
+        statements: 60,
+      },
+    },
   },
 });

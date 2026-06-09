@@ -7,6 +7,7 @@ import structlog
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
+from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.asset_aggregator import get_dashboard_summary
@@ -35,6 +36,11 @@ async def run_monthly_report() -> None:
         users = result.all()
 
     for user, settings_row in users:
+        # monthly_report_enabled=False이면 이메일 및 인앱 알림 건너뜀
+        if not getattr(settings_row, "monthly_report_enabled", True):
+            logger.info("monthly_report_skipped_disabled", user_id=str(user.id))
+            continue
+
         to_email = settings_row.notification_email or user.email
         try:
             async with AsyncSessionLocal() as db:
@@ -64,6 +70,16 @@ async def run_monthly_report() -> None:
                 annual_dividends_received=float(summary.get("annual_dividends_received") or 0),
                 asset_allocation=summary.get("asset_allocation") or [],
             )
+
+            # 이메일 발송 성공 후 인앱 AlertHistory 저장
+            async with AsyncSessionLocal() as db:
+                db.add(AlertHistory(
+                    user_id=user.id,
+                    alert_type="MONTHLY_REPORT",
+                    message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
+                ))
+                await db.commit()
+
             logger.info(
                 "monthly_report_sent",
                 user_id=str(user.id), to=to_email, month=report_month,

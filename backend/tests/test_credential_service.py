@@ -2,7 +2,22 @@
 
 import pytest
 
-from app.services import credential_service
+
+@pytest.fixture(autouse=True)
+def patch_encryption_key(monkeypatch):
+    """KIS_CRED_ENCRYPTION_KEY를 테스트용 값으로 직접 패치한다.
+
+    importlib.reload(app.config) 대신 속성 직접 패치를 사용한다.
+    reload는 새 Settings() 인스턴스를 생성해 다른 모듈의 settings 참조를 끊어
+    monkeypatch 격리가 깨지는 부작용이 있다.
+    """
+    import app.config as config_mod
+    import app.services.credential_service as cs_mod
+
+    test_key = "a" * 64
+    monkeypatch.setattr(config_mod.settings, "kis_cred_encryption_key", test_key)
+    # credential_service도 같은 settings 객체를 사용하지만, 혹시 다른 참조가 있을 경우 패치
+    monkeypatch.setattr(cs_mod.settings, "kis_cred_encryption_key", test_key)
 
 
 @pytest.mark.parametrize("plaintext", [
@@ -11,56 +26,37 @@ from app.services import credential_service
     "한국어-키값-테스트",  # 유니코드
     "special!@#$%^&*()",
 ])
-def test_encrypt_decrypt_roundtrip(plaintext, override_settings):
+def test_encrypt_decrypt_roundtrip(plaintext):
     """암호화 후 복호화하면 원문이 복원된다."""
-    # config를 재로드하도록 강제 (monkeypatch 적용 후)
-    import importlib
-    import app.config
-    importlib.reload(app.config)
-    import app.services.credential_service as cs
-    importlib.reload(cs)
+    from app.services.credential_service import decrypt, encrypt
 
-    ciphertext = cs.encrypt(plaintext)
+    ciphertext = encrypt(plaintext)
     assert ciphertext != plaintext
-    assert cs.decrypt(ciphertext) == plaintext
+    assert decrypt(ciphertext) == plaintext
 
 
-def test_encrypt_produces_different_ciphertext_each_time(override_settings):
+def test_encrypt_produces_different_ciphertext_each_time():
     """같은 평문도 매번 다른 암호문을 생성한다 (nonce 무작위)."""
-    import importlib
-    import app.config
-    importlib.reload(app.config)
-    import app.services.credential_service as cs
-    importlib.reload(cs)
+    from app.services.credential_service import decrypt, encrypt
 
     plaintext = "same-key-value"
-    c1 = cs.encrypt(plaintext)
-    c2 = cs.encrypt(plaintext)
-    assert c1 != c2  # nonce가 다르므로 암호문도 다름
-    # 하지만 복호화하면 동일한 값
-    assert cs.decrypt(c1) == cs.decrypt(c2) == plaintext
+    c1 = encrypt(plaintext)
+    c2 = encrypt(plaintext)
+    assert c1 != c2
+    assert decrypt(c1) == decrypt(c2) == plaintext
 
 
-def test_decrypt_invalid_ciphertext_raises(override_settings):
+def test_decrypt_invalid_ciphertext_raises():
     """손상된 암호문 복호화 시 예외 발생."""
-    import importlib
-    import app.config
-    importlib.reload(app.config)
-    import app.services.credential_service as cs
-    importlib.reload(cs)
+    from app.services.credential_service import decrypt
 
     with pytest.raises(Exception):
-        cs.decrypt("invalid_hex_data_that_cannot_be_decrypted_0000")
+        decrypt("invalid_hex_data_that_cannot_be_decrypted_0000")
 
 
-def test_ciphertext_is_hex_string(override_settings):
+def test_ciphertext_is_hex_string():
     """암호문이 hex 문자열 형태여야 한다."""
-    import importlib
-    import app.config
-    importlib.reload(app.config)
-    import app.services.credential_service as cs
-    importlib.reload(cs)
+    from app.services.credential_service import encrypt
 
-    ciphertext = cs.encrypt("test-value")
-    # hex 문자열 검증: 모든 문자가 0-9, a-f
+    ciphertext = encrypt("test-value")
     assert all(c in "0123456789abcdef" for c in ciphertext.lower())

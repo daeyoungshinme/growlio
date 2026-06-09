@@ -83,6 +83,10 @@ class AutoDcaUpdate(BaseModel):
         return v
 
 
+class PushTokenUpdate(BaseModel):
+    fcm_token: str | None = None
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -101,6 +105,7 @@ class SettingsResponse(BaseModel):
     auto_dca_portfolio_id: str | None = None
     auto_dca_account_id: str | None = None
     auto_dca_last_executed_at: str | None = None
+    fcm_token_stored: bool = False
 
 
 @router.get("", response_model=SettingsResponse)
@@ -152,6 +157,7 @@ async def get_settings(
         auto_dca_portfolio_id=str(row.auto_dca_portfolio_id) if row.auto_dca_portfolio_id else None,
         auto_dca_account_id=str(row.auto_dca_account_id) if row.auto_dca_account_id else None,
         auto_dca_last_executed_at=row.auto_dca_last_executed_at.isoformat() if row.auto_dca_last_executed_at else None,
+        fcm_token_stored=bool(row.fcm_token),
     )
 
 
@@ -245,6 +251,22 @@ async def update_auto_dca(
     row.auto_dca_account_id = uuid_mod.UUID(req.account_id) if req.account_id else None
     await db.commit()
     return {"detail": "자동 정기매수 설정이 저장되었습니다"}
+
+
+@router.put("/push-token")
+@limiter.limit("10/minute")
+async def update_push_token(
+    request: Request,
+    req: PushTokenUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """FCM 푸시 알림 토큰 등록/삭제. fcm_token=null 전달 시 토큰 삭제."""
+    row = await _get_or_create_settings(current_user.id, db)
+    row.fcm_token = req.fcm_token or None
+    await db.commit()
+    msg = "푸시 알림 토큰이 저장되었습니다" if req.fcm_token else "푸시 알림 토큰이 삭제되었습니다"
+    return {"detail": msg}
 
 
 @router.post("/test-email")

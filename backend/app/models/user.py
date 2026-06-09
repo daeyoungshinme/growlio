@@ -48,6 +48,8 @@ class UserSettings(Base):
     ob_user_seq_no: Mapped[str | None] = mapped_column(String(20))
     # 알림 설정
     notification_email: Mapped[str | None] = mapped_column(String(255))
+    monthly_report_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    fcm_token: Mapped[str | None] = mapped_column(String(512))
     # 자동 DCA (정기매수)
     auto_dca_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     auto_dca_day: Mapped[int | None] = mapped_column(Integer, nullable=True)

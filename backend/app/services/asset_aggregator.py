@@ -164,6 +164,38 @@ async def _build_asset_totals(
     return total_assets_krw, total_invested, stock_value, by_type
 
 
+async def _get_scalar_init_data(
+    user_id: uuid.UUID, db: AsyncSession
+) -> tuple[date | None, float]:
+    """first_snap_date + net_deposits_ytd를 CTE 단일 쿼리로 조회 (2 round-trip → 1)."""
+    year = date.today().year
+    row = (
+        await db.execute(
+            text("""
+                WITH
+                  fs AS (
+                    SELECT MIN(snapshot_date) AS first_date
+                    FROM asset_snapshots WHERE user_id = :uid
+                  ),
+                  nd AS (
+                    SELECT COALESCE(
+                      SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
+                    ) AS net
+                    FROM transactions
+                    WHERE user_id = :uid
+                      AND EXTRACT(YEAR FROM transaction_date) = :year
+                      AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+                  )
+                SELECT fs.first_date, nd.net FROM fs, nd
+            """),
+            {"uid": str(user_id), "year": year},
+        )
+    ).first()
+    first_snap = row.first_date if row else None
+    net_deposits = float(row.net) if row else 0.0
+    return first_snap, net_deposits
+
+
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
     if redis:
@@ -171,13 +203,13 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None
         if cached:
             return json.loads(cached)
 
-    first_snap_date = await _get_first_snap_date(user_id, db)
-
-    # DB 쿼리는 같은 세션을 공유하므로 순차 실행 (SQLAlchemy AsyncSession 안전 요구사항)
+    # first_snap_date + net_deposits_ytd를 CTE 단일 쿼리로 묶어 round-trip 절감
+    first_snap_date, net_deposits_ytd = await _get_scalar_init_data(user_id, db)
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, redis)
+    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(
+        user_id, db, redis
+    )
     monthly_trend = await _get_monthly_trend(user_id, db, redis)
-    net_deposits_ytd = await _calc_net_deposits_this_year(user_id, db)
     div_summary = await get_dividend_summary(user_id, db, redis)
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 

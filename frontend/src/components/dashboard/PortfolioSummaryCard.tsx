@@ -1,14 +1,12 @@
-import { memo, useMemo } from "react";
-import { ResponsiveContainer, Tooltip as RechartsTooltip, Treemap } from "recharts";
-import { useThemeStore } from "../../stores/themeStore";
+import { lazy, memo, Suspense, useMemo } from "react";
 import { fmtKrw } from "../../utils/format";
 import { pnlColor } from "../../utils/colors";
 import type { AllocationItem } from "../../types";
-import TreemapCell from "../common/TreemapCell";
-import { chartTooltipStyle } from "../../utils/chart";
 import SkeletonStatBox from "../common/SkeletonStatBox";
 import SkeletonCard from "../common/SkeletonCard";
 import HoverTooltip from "../common/Tooltip";
+
+const PortfolioTreemapChart = lazy(() => import("./PortfolioTreemapChart"));
 
 interface Overview {
   total_stock_krw: number;
@@ -34,12 +32,10 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
 
 
 export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAllocation }: Props) {
-  const isDark = useThemeStore((s) => s.isDark);
-
   const chartData = useMemo(
     () =>
       stockAllocation && stockAllocation.length > 0
-        ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw, pct: item.pct }))
+        ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw ?? 0, pct: item.pct }))
         : null,
     [stockAllocation],
   );
@@ -87,22 +83,9 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
 
       {/* 종목별 비중 트리차트 */}
       {chartData ? (
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-2">종목별 비중</p>
-          <ResponsiveContainer width="100%" height={180}>
-            <Treemap data={chartData} dataKey="value" content={<TreemapCell />}>
-              <RechartsTooltip
-                {...chartTooltipStyle(isDark)}
-                formatter={(value: number, _name: string, props) => [
-                  `${fmtKrw(value)} (${(props.payload?.pct ?? 0).toFixed(1)}%)`,
-                  props.payload?.ticker
-                    ? `${props.payload.name} (${props.payload.ticker})`
-                    : props.payload?.name,
-                ]}
-              />
-            </Treemap>
-          </ResponsiveContainer>
-        </div>
+        <Suspense fallback={<SkeletonCard rows={4} />}>
+          <PortfolioTreemapChart data={chartData} />
+        </Suspense>
       ) : null}
 
     </div>

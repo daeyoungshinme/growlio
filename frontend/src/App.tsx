@@ -7,6 +7,7 @@ import PageLoader from "./components/common/PageLoader";
 import Toaster from "./components/Toaster";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import FindAccountPage from "./pages/FindAccountPage";
@@ -41,6 +42,7 @@ export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const logout = useAuthStore((s) => s.logout);
   const queryClient = useQueryClient();
+  usePushNotifications();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);
