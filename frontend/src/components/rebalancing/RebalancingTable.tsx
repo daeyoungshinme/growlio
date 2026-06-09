@@ -444,13 +444,13 @@ export default function RebalancingTable({
       {hasDividendData && <RebalancingDividendSection analysis={analysis} />}
 
       {/* 미추적 보유 종목 */}
-      {analysis.untracked_holdings.length > 0 && (
+      {(analysis.untracked_holdings ?? []).length > 0 && (
         <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl p-4">
           <div className="text-xs font-medium text-amber-400 mb-2">
-            포트폴리오 미포함 보유 종목 ({analysis.untracked_holdings.length}개)
+            포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
           </div>
           <div className="space-y-1.5">
-            {analysis.untracked_holdings.map((h, idx) => (
+            {(analysis.untracked_holdings ?? []).map((h, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs">
                 <div className="min-w-0">
                   <span className="font-medium text-gray-200 truncate">{h.name}</span>

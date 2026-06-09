@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "../../api/backtest";
@@ -6,9 +6,8 @@ import { analyzePortfolio, RebalancingAnalysis } from "../../api/rebalancing";
 import { fetchRebalancingAlerts } from "../../api/alerts";
 import type { Portfolio } from "../../api/portfolios";
 import type { AssetAccount } from "../../api/assets";
-import SkeletonCard from "../common/SkeletonCard";
 
-const BacktestResultChart = lazy(() => import("../backtest/BacktestResultChart"));
+import BacktestResultChart from "../backtest/BacktestResultChart";
 import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
 import CorrelationHeatmap from "../backtest/CorrelationHeatmap";
 import RebalancingTable from "../rebalancing/RebalancingTable";
@@ -294,9 +293,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       {/* 백테스팅 결과 */}
       {analysisMode === "backtest" && backtestResult && backtestResult.dates.length > 0 && (
         <div className="card space-y-6">
-          <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-            <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
-          </Suspense>
+          <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
             <BacktestMetricsTable metrics={backtestResult.metrics} />
           </div>
