@@ -37,6 +37,7 @@ from app.utils.cache_keys import (
     dashboard_summary_key,
     dividend_ticker_summary_key,
     portfolio_overview_key,
+    portfolio_overview_lite_key,
 )
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
@@ -460,6 +461,7 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
         dividend_ticker_summary_key(current_user.id, date.today().year),
         dashboard_summary_key(current_user.id),
         portfolio_overview_key(current_user.id),
+        portfolio_overview_lite_key(current_user.id),
     )
     return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}
 

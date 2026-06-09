@@ -1,14 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import Tabs from "../components/common/Tabs";
 import { api } from "../api/client";
 import { syncAccount } from "../api/assets";
-import PortfolioAnalysisTab from "../components/portfolio-analysis/PortfolioAnalysisTab";
 import StockHoldingsTable from "../components/assets/StockHoldingsTable";
-import TreemapChart from "../components/portfolio/TreemapChart";
-import DomesticForeignBar from "../components/portfolio/DomesticForeignBar";
 import DividendTab from "../components/portfolio/DividendTab";
 import { fmtKrwPrice } from "../utils/format";
 import { invalidateSyncData } from "../utils/queryInvalidation";
@@ -21,7 +18,12 @@ import ErrorBoundary from "../components/ErrorBoundary";
 import { DOMESTIC_MARKETS } from "../constants";
 import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
+import { PORTFOLIO_TABS } from "../constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "../types";
+
+const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
+const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
+const PortfolioAnalysisTab = lazy(() => import("../components/portfolio-analysis/PortfolioAnalysisTab"));
 
 interface DividendSummary {
   annual_received: number;
@@ -31,8 +33,6 @@ interface DividendSummary {
 }
 
 const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
-
-import { PORTFOLIO_TABS } from "../constants/tabs";
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
@@ -60,13 +60,14 @@ export default function PortfolioPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchOverview,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
     refetchInterval: REFETCH_INTERVAL.PORTFOLIO,
   });
 
   const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
-    enabled: tab === "종목 현황" || tab === "배당 현황",
+    enabled: !isLoading && (tab === "종목 현황" || tab === "배당 현황"),
     staleTime: STALE_TIME.LONG,
   });
 
@@ -204,8 +205,10 @@ export default function PortfolioPage() {
 
       {tab === "종목 현황" && (
         <ErrorBoundary variant="section">
-          <DomesticForeignBar items={marketChartData} />
-          <TreemapChart data={stockChartData} title="종목별 비중" />
+          <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+            <DomesticForeignBar items={marketChartData} />
+            <TreemapChart data={stockChartData} title="종목별 비중" />
+          </Suspense>
           {(() => {
             const dividendMap = Object.fromEntries(
               dividendData.map((d) => [`${d.ticker}-${d.market}`, d])
@@ -237,7 +240,9 @@ export default function PortfolioPage() {
 
       {tab === "포트폴리오 분석" && (
         <ErrorBoundary variant="section">
-          <PortfolioAnalysisTab />
+          <Suspense fallback={<SkeletonCard rows={5} height="h-4" />}>
+            <PortfolioAnalysisTab />
+          </Suspense>
         </ErrorBoundary>
       )}
     </div>

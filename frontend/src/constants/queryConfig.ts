@@ -7,5 +7,5 @@ export const STALE_TIME = {
 
 export const REFETCH_INTERVAL = {
   DASHBOARD: 300_000,
-  PORTFOLIO: 60_000,
+  PORTFOLIO: 300_000,
 } as const;
