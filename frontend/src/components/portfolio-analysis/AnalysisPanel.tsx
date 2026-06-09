@@ -41,11 +41,12 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
-  const { data: rebalancingAlerts = [] } = useQuery({
+  const { data: rebalancingAlertsRaw } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlerts,
     queryFn: fetchRebalancingAlerts,
     staleTime: STALE_TIME.MEDIUM,
   });
+  const rebalancingAlerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
   const alertByPortfolioId = Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a]));
 
   const runMut = useMutation({

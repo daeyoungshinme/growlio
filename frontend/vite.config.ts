@@ -18,7 +18,7 @@ export default defineConfig({
         manualChunks: {
           "vendor-charts": ["recharts"],
           "vendor-query": ["@tanstack/react-query"],
-          "vendor-dnd": ["@dnd-kit/core", "@dnd-kit/sortable"],
+          "vendor-dnd": ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
         },
       },
     },

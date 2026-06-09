@@ -63,10 +63,11 @@ function SortablePortfolioItem({
 export default function PortfolioAnalysisTab() {
   const qc = useQueryClient();
 
-  const { data: portfolios = [], isLoading } = useQuery({
+  const { data: portfoliosRaw, isLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
+  const portfolios = Array.isArray(portfoliosRaw) ? portfoliosRaw : [];
 
   const [localOrder, setLocalOrder] = useState<string[]>([]);
 
