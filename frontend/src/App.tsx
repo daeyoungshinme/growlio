@@ -7,6 +7,7 @@ import PageLoader from "./components/common/PageLoader";
 import Toaster from "./components/Toaster";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
+import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -55,6 +56,7 @@ export default function App() {
   useEffect(() => {
     const handleSessionExpired = () => {
       queryClient.clear();
+      window.localStorage.removeItem(PERSIST_CACHE_KEY);
       logout();
     };
     window.addEventListener("growlio:session-expired", handleSessionExpired);

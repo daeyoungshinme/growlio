@@ -1,3 +1,5 @@
+export const PERSIST_CACHE_KEY = "rq-persist-cache";
+
 export const STALE_TIME = {
   SHORT: 30_000,
   MEDIUM: 60_000,

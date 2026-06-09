@@ -7,7 +7,7 @@ import { type SettingsData } from "../api/settings";
 import { fetchAlertHistory, type AlertHistoryItem } from "../api/alerts";
 import { toast } from "../utils/toast";
 import { useThemeStore } from "../stores/themeStore";
-import { useAuthStore } from "../stores/authStore";
+import { useLogout } from "../hooks/useLogout";
 import { ExchangeRateAlertSection } from "../components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "../components/settings/StockPriceAlertSection";
 import { DCASettingsSection } from "../components/settings/DCASettingsSection";
@@ -74,7 +74,7 @@ const labelClass = LABEL_MD;
 
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
-  const { logout } = useAuthStore();
+  const logout = useLogout();
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);

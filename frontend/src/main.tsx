@@ -7,7 +7,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { STALE_TIME } from "./constants/queryConfig";
+import { STALE_TIME, PERSIST_CACHE_KEY } from "./constants/queryConfig";
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN as string | undefined;
 if (SENTRY_DSN) {
@@ -34,7 +34,7 @@ const queryClient = new QueryClient({
 // 앱 재시작 시 대시보드·포트폴리오·계좌 캐시를 즉시 표시하기 위한 persistence (24h TTL)
 const persister = createSyncStoragePersister({
   storage: typeof window !== "undefined" ? window.localStorage : undefined,
-  key: "rq-persist-cache",
+  key: PERSIST_CACHE_KEY,
   throttleTime: 2000,
 });
 
