@@ -11,10 +11,10 @@ export const ASSET_TYPE_LABELS: Record<string, string> = {
 };
 
 export const STOCK_TYPE_LABELS: Record<string, string> = {
-  STOCK_KIS: "주식 (KIS)",
-  STOCK_KIWOOM: "주식 (키움)",
-  STOCK_OTHER: "주식 (타증권사)",
-  CASH_OTHER: "예수금 (기타)",
+  STOCK_KIS: "KIS",
+  STOCK_KIWOOM: "키움",
+  STOCK_OTHER: "타증권사",
+  CASH_OTHER: "예수금",
 };
 
 export const DATA_SOURCE_LABELS: Record<string, string> = {

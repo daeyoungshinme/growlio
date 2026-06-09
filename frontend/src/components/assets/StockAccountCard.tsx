@@ -105,7 +105,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
             )}
             <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[11px] rounded-full shrink-0">{typeLabel}</span>
             {account.has_own_kis_credentials && (
-              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-[11px] rounded-full shrink-0">전용 API 키</span>
+              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-[11px] rounded-full shrink-0">API 키</span>
             )}
             {account.has_own_kiwoom_credentials && (
               <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-[11px] rounded-full shrink-0">키움 API 키</span>
