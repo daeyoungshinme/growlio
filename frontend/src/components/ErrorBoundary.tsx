@@ -13,6 +13,14 @@ interface State {
   error: Error | null;
 }
 
+function isChunkLoadError(error: Error | null): boolean {
+  if (!error) return false;
+  return (
+    error.name === "ChunkLoadError" ||
+    /Loading chunk|failed to fetch dynamically imported module/i.test(error.message)
+  );
+}
+
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, error: null };
 
@@ -29,6 +37,7 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (this.state.hasError) {
       const isDev = import.meta.env.DEV;
       if (this.props.variant === "section") {
+        const chunkError = isChunkLoadError(this.state.error);
         return (
           <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
             <p className="text-gray-500 dark:text-gray-400 text-sm">이 섹션을 불러올 수 없습니다.</p>
@@ -37,12 +46,21 @@ export default class ErrorBoundary extends Component<Props, State> {
                 {this.state.error.message}
               </p>
             )}
-            <button
-              onClick={() => this.setState({ hasError: false, error: null })}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              다시 시도
-            </button>
+            {chunkError ? (
+              <button
+                onClick={() => window.location.reload()}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                새로고침
+              </button>
+            ) : (
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                다시 시도
+              </button>
+            )}
           </div>
         );
       }

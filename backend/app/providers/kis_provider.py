@@ -1,6 +1,7 @@
 """KIS(한국투자증권) 브로커 프로바이더."""
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 from typing import Any
 
@@ -44,11 +45,15 @@ class KISProvider(BrokerProvider):
                 user_id=user_id_str, account_id=account_id_str,
             )
             try:
-                domestic = await get_domestic_balance(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-                )
-                overseas = await _fetch_overseas_cached(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock, account.id, redis
+                domestic, overseas = await asyncio.gather(
+                    get_domestic_balance(
+                        app_key, app_secret, access_token,
+                        account.kis_account_no, is_mock=is_mock,
+                    ),
+                    _fetch_overseas_cached(
+                        app_key, app_secret, access_token,
+                        account.kis_account_no, is_mock, account.id, redis,
+                    ),
                 )
             except KisTokenExpiredError:
                 logger.warning("kis_token_expired_refreshing", account_no=account.kis_account_no)
@@ -56,11 +61,15 @@ class KISProvider(BrokerProvider):
                     app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
                     user_id=user_id_str, account_id=account_id_str, force_refresh=True,
                 )
-                domestic = await get_domestic_balance(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-                )
-                overseas = await _fetch_overseas_cached(
-                    app_key, app_secret, access_token, account.kis_account_no, is_mock, account.id, redis
+                domestic, overseas = await asyncio.gather(
+                    get_domestic_balance(
+                        app_key, app_secret, access_token,
+                        account.kis_account_no, is_mock=is_mock,
+                    ),
+                    _fetch_overseas_cached(
+                        app_key, app_secret, access_token,
+                        account.kis_account_no, is_mock, account.id, redis,
+                    ),
                 )
         except KisApiError as e:
             raise ProviderApiError(

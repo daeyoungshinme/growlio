@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import Tabs from "../components/common/Tabs";
@@ -20,10 +20,10 @@ import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
 import { QUERY_KEYS } from "../constants/queryKeys";
 import { PORTFOLIO_TABS } from "../constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "../types";
+import PortfolioAnalysisTab from "../components/portfolio-analysis/PortfolioAnalysisTab";
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
-const PortfolioAnalysisTab = lazy(() => import("../components/portfolio-analysis/PortfolioAnalysisTab"));
 
 interface DividendSummary {
   annual_received: number;
@@ -67,7 +67,7 @@ export default function PortfolioPage() {
   const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
-    enabled: !isLoading && (tab === "종목 현황" || tab === "배당 현황"),
+    enabled: !isLoading,
     staleTime: STALE_TIME.LONG,
   });
 
@@ -84,6 +84,20 @@ export default function PortfolioPage() {
     enabled: tab === "배당 현황",
     staleTime: STALE_TIME.LONG,
   });
+
+  useEffect(() => {
+    if (isLoading || !data) return;
+    qc.prefetchQuery({
+      queryKey: QUERY_KEYS.dividendSummary,
+      queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
+      staleTime: STALE_TIME.LONG,
+    });
+    qc.prefetchQuery({
+      queryKey: QUERY_KEYS.dividendByTicker,
+      queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
+      staleTime: STALE_TIME.LONG,
+    });
+  }, [isLoading, data, qc]);
 
   const handleSyncAll = async () => {
     if (!data) return;
@@ -240,9 +254,7 @@ export default function PortfolioPage() {
 
       {tab === "포트폴리오 분석" && (
         <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={5} height="h-4" />}>
-            <PortfolioAnalysisTab />
-          </Suspense>
+          <PortfolioAnalysisTab />
         </ErrorBoundary>
       )}
     </div>
