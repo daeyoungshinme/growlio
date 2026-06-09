@@ -41,7 +41,7 @@ export default class ErrorBoundary extends Component<Props, State> {
         return (
           <div className="flex flex-col items-center justify-center gap-2 py-6 px-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700">
             <p className="text-gray-500 dark:text-gray-400 text-sm">이 섹션을 불러올 수 없습니다.</p>
-            {isDev && this.state.error && (
+            {this.state.error && (
               <p className="text-xs text-red-400 bg-red-50 dark:bg-red-950 rounded p-2 max-w-xs text-center break-all">
                 {this.state.error.message}
               </p>

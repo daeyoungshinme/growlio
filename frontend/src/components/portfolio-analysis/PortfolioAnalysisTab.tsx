@@ -76,10 +76,11 @@ export default function PortfolioAnalysisTab() {
     return [...portfolios].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
   }, [portfolios, localOrder]);
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accountsRaw } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
+  const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
   const activeAccounts = accounts.filter((a) => a.is_active);
   const stockAccounts = activeAccounts.filter((a) =>
     ["STOCK_KIS", "STOCK_OTHER"].includes(a.asset_type)
@@ -92,11 +93,12 @@ export default function PortfolioAnalysisTab() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
 
-  const { data: rebalancingAlerts = [] } = useQuery({
+  const { data: rebalancingAlertsRaw } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlerts,
     queryFn: fetchRebalancingAlerts,
     staleTime: STALE_TIME.MEDIUM,
   });
+  const rebalancingAlerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
   const alertPortfolioIds = new Set(rebalancingAlerts.map((a) => a.portfolio_id));
   const alertByPortfolioId = Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a]));
 
