@@ -99,16 +99,16 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           {/* 줄2: 텍스트 정보(truncate) + 배지(항상 표시) */}
           <div className="flex items-center gap-1.5 mt-1 min-w-0">
             {(account.institution || accountNo) && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 truncate min-w-0">
+              <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate min-w-0">
                 {[account.institution, accountNo].filter(Boolean).join(" · ")}
               </span>
             )}
-            <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">{typeLabel}</span>
+            <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[11px] rounded-full shrink-0">{typeLabel}</span>
             {account.has_own_kis_credentials && (
-              <span className="px-2 py-0.5 border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">전용 API 키</span>
+              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-[11px] rounded-full shrink-0">전용 API 키</span>
             )}
             {account.has_own_kiwoom_credentials && (
-              <span className="px-2 py-0.5 border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">키움 API 키</span>
+              <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-[11px] rounded-full shrink-0">키움 API 키</span>
             )}
           </div>
         </div>
