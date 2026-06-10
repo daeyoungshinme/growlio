@@ -69,7 +69,7 @@ async def _search_naver(q: str, limit: int) -> list[dict]:
 async def _search_yahoo(q: str, limit: int) -> list[dict]:
     """Yahoo Finance 검색 — 영문명·티커 검색용."""
     url = "https://query1.finance.yahoo.com/v1/finance/search"
-    params = {"q": q, "quotesCount": limit, "newsCount": 0, "listsCount": 0}
+    params: dict[str, str | int] = {"q": q, "quotesCount": limit, "newsCount": 0, "listsCount": 0}
     headers = {"User-Agent": "Mozilla/5.0"}
     try:
         async with httpx.AsyncClient(timeout=5) as client:

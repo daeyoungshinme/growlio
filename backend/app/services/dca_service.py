@@ -52,7 +52,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
 
     start_date: date = start_dt.date() if isinstance(start_dt, datetime) else start_dt  # type: ignore[assignment]
     today = datetime.now(timezone.utc).date()
-    r = annual_return_pct / 12 / 100  # 월 이자율
+    r = annual_return_pct / 12 / 100  # type: ignore[operator]  # is_configured 가드 통과 후 non-None 보장
 
     if manual_initial is not None:
         initial_value = manual_initial

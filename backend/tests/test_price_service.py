@@ -81,3 +81,123 @@ class TestFetchPricesBatch:
 
         result = await fetch_prices_batch(uuid.uuid4(), [], mock_db, mock_redis)
         assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_yahoo_circuit_open_returns_empty(self, mock_db, mock_redis, override_settings):
+        """Yahoo 서킷 OPEN 상태이면 price_map이 빈 dict로 시작."""
+        import uuid
+        from unittest.mock import patch, AsyncMock, MagicMock
+
+        user_id = uuid.uuid4()
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
+            mock_circuit.is_available.return_value = False
+
+            from app.services.price_service import fetch_prices_batch
+            result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis)
+
+        assert isinstance(result, dict)
+
+    @pytest.mark.asyncio
+    async def test_yahoo_returns_prices(self, mock_db, mock_redis, override_settings):
+        """Yahoo 배치 조회 성공 시 price_map 반환."""
+        import uuid
+        from unittest.mock import patch, AsyncMock
+
+        user_id = uuid.uuid4()
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with (
+            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.price_service._yfinance_sem"),
+        ):
+            mock_circuit.is_available.return_value = True
+
+            loop_mock = AsyncMock()
+            loop_mock.run_in_executor = AsyncMock(return_value={"AAPL": 180.0})
+
+            with patch("asyncio.get_running_loop", return_value=loop_mock):
+                from app.services.price_service import fetch_prices_batch
+                result = await fetch_prices_batch(
+                    user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis
+                )
+
+        assert result.get("AAPL") == 180.0
+
+
+# ── get_historical_returns ────────────────────────────────────
+
+class TestGetHistoricalReturns:
+    @pytest.mark.asyncio
+    async def test_empty_tickers_returns_empty(self, override_settings):
+        from app.services.price_service import get_historical_returns
+        result = await get_historical_returns([])
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_cache_hit_returns_cached(self, override_settings):
+        import json
+        from unittest.mock import AsyncMock, patch
+
+        redis = AsyncMock()
+        cached_data = {"cumulative_pct": 120.0, "annual_pct": 8.5}
+        redis.get = AsyncMock(return_value=json.dumps(cached_data).encode())
+
+        from app.services.price_service import get_historical_returns
+        result = await get_historical_returns([("AAPL", "NASDAQ")], redis=redis)
+
+        assert ("AAPL", "NASDAQ") in result
+        assert result[("AAPL", "NASDAQ")]["cumulative_pct"] == 120.0
+
+    @pytest.mark.asyncio
+    async def test_circuit_open_returns_empty(self, override_settings):
+        from unittest.mock import patch, AsyncMock
+
+        with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
+            mock_circuit.is_available.return_value = False
+
+            from app.services.price_service import get_historical_returns
+            result = await get_historical_returns([("AAPL", "NASDAQ")])
+
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_yahoo_returns_result(self, override_settings):
+        """Yahoo Finance 결과 반환 시 return_map에 저장."""
+        from unittest.mock import patch, AsyncMock
+
+        ret_data = {"cumulative_pct": 200.0, "annual_pct": 10.0}
+
+        with (
+            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.price_service._yfinance_sem"),
+        ):
+            mock_circuit.is_available.return_value = True
+
+            loop_mock = AsyncMock()
+            loop_mock.run_in_executor = AsyncMock(return_value=ret_data)
+
+            with patch("asyncio.get_running_loop", return_value=loop_mock):
+                from app.services.price_service import get_historical_returns
+                result = await get_historical_returns([("AAPL", "NASDAQ")])
+
+        assert ("AAPL", "NASDAQ") in result
+
+
+# ── fetch_current_price cache hit ─────────────────────────────
+
+class TestFetchCurrentPriceCacheHit:
+    @pytest.mark.asyncio
+    async def test_returns_cached_price(self, mock_db, override_settings):
+        import uuid
+        from unittest.mock import AsyncMock
+
+        user_id = uuid.uuid4()
+        redis = AsyncMock()
+        redis.get = AsyncMock(return_value=b"75000.0")
+
+        from app.services.price_service import fetch_current_price
+        price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, redis)
+
+        assert price == 75000.0

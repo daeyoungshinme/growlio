@@ -152,7 +152,7 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
     )
 
-    @retry(**_NAVER_RETRY)
+    @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
         r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
@@ -183,7 +183,11 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
             "dividend_months": months,
         }
     except _req_exc.HTTPError as exc:
-        logger.warning("naver_etf_dividend_http_error", ticker=ticker, status=exc.response.status_code if exc.response else None)
+        logger.warning(
+            "naver_etf_dividend_http_error",
+            ticker=ticker,
+            status=exc.response.status_code if exc.response else None,
+        )
         return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
     except _req_exc.RequestException as exc:
         logger.warning("naver_etf_dividend_network_error", ticker=ticker, error=str(exc))
@@ -203,7 +207,7 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
         "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
     )
 
-    @retry(**_NAVER_RETRY)
+    @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/summary"
         r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
@@ -219,7 +223,11 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
         logger.info("naver_stock_dividend_fetched", ticker=ticker, yield_pct=yield_pct)
         return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
     except _req_exc.HTTPError as exc:
-        logger.warning("naver_stock_dividend_http_error", ticker=ticker, status=exc.response.status_code if exc.response else None)
+        logger.warning(
+            "naver_stock_dividend_http_error",
+            ticker=ticker,
+            status=exc.response.status_code if exc.response else None,
+        )
         return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
     except _req_exc.RequestException as exc:
         logger.warning("naver_stock_dividend_network_error", ticker=ticker, error=str(exc))
@@ -244,8 +252,8 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
                 ex_m = ex_date.month if hasattr(ex_date, "month") else int(str(ex_date)[5:7])
                 pay_m = pay_date.month if hasattr(pay_date, "month") else int(str(pay_date)[5:7])
                 offset_months = (pay_m - ex_m) % 12
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("yfinance_calendar_parse_failed", symbol=yahoo_symbol, error=str(e))
 
         divs = t.dividends
         if divs is None or len(divs) == 0:
@@ -257,5 +265,6 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
                 payment_month = ((int(ts.month) - 1 + offset_months) % 12) + 1
                 months.add(payment_month)
         return sorted(months)
-    except Exception:
+    except Exception as e:
+        logger.warning("yfinance_dividend_months_failed", symbol=yahoo_symbol, error=str(e))
         return []

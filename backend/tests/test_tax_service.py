@@ -7,8 +7,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from unittest.mock import MagicMock
+
 from app.services.tax_service import (
     _build_harvesting_recommendations,
+    _calc_dividend_income,
+    _calc_total_fees,
     get_tax_summary,
 )
 
@@ -229,3 +233,59 @@ class TestGetTaxSummary:
             result = await get_tax_summary(user_id, 2024, mock_db)
 
         assert result["year"] == 2024
+
+
+# ── _calc_total_fees / _calc_dividend_income DB 헬퍼 ────────
+
+class TestCalcTotalFeesDb:
+    @pytest.mark.asyncio
+    async def test_returns_sum_when_fees_exist(self, mock_db, override_settings):
+        execute_result = MagicMock()
+        execute_result.scalar.return_value = 50_000.0
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
+
+        assert result == pytest.approx(50_000.0)
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_fees(self, mock_db, override_settings):
+        execute_result = MagicMock()
+        execute_result.scalar.return_value = None
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
+
+        assert result == 0.0
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_scalar_zero(self, mock_db, override_settings):
+        execute_result = MagicMock()
+        execute_result.scalar.return_value = 0
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
+
+        assert result == 0.0
+
+
+class TestCalcDividendIncomeDb:
+    @pytest.mark.asyncio
+    async def test_returns_sum_when_dividends_exist(self, mock_db, override_settings):
+        execute_result = MagicMock()
+        execute_result.scalar.return_value = 1_500_000.0
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
+
+        assert result == pytest.approx(1_500_000.0)
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_dividends(self, mock_db, override_settings):
+        execute_result = MagicMock()
+        execute_result.scalar.return_value = None
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
+
+        assert result == 0.0

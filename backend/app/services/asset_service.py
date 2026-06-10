@@ -14,6 +14,7 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.config import settings
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -128,7 +129,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> A
         amount_krw=balance.total_value_krw,
         invested_amount=balance.invested_krw or None,
         unrealized_pnl=balance.pnl_krw or None,
-        usd_krw_rate=balance.usd_krw_rate if balance.usd_krw_rate != 1300.0 else None,
+        usd_krw_rate=(
+            balance.usd_krw_rate if balance.usd_krw_rate != settings.usd_krw_fallback_rate else None
+        ),
         source=source,
     )
 

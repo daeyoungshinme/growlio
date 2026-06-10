@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, Loader2, RefreshCw } from "lucide-react";
+import { Bell, ClipboardList, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "@/api/backtest";
 import { analyzePortfolio, RebalancingAnalysis } from "@/api/rebalancing";
 import { fetchRebalancingAlerts } from "@/api/alerts";
@@ -11,6 +11,7 @@ import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import CorrelationHeatmap from "@/components/backtest/CorrelationHeatmap";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
+import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -25,7 +26,7 @@ interface Props {
   onOpenAlertModal: (portfolioId: string) => void;
 }
 
-type AnalysisMode = "rebalancing" | "backtest";
+type AnalysisMode = "rebalancing" | "backtest" | "diagnosis";
 
 export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal }: Props) {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
@@ -121,6 +122,17 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           }`}
         >
           백테스팅
+        </button>
+
+        <button
+          onClick={() => setAnalysisMode("diagnosis")}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            analysisMode === "diagnosis"
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          }`}
+        >
+          <ClipboardList size={14} /> 포트폴리오 진단
         </button>
 
         {selectedIds.size > 0 && (
@@ -334,6 +346,13 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         <div className="card text-center text-sm text-gray-400 dark:text-gray-600 py-8">
           해당 기간의 가격 데이터가 없습니다. 기간을 조정해보세요.
         </div>
+      )}
+
+      {/* 포트폴리오 진단 */}
+      {analysisMode === "diagnosis" && (
+        <PortfolioDiagnosisCard
+          portfolioName={selectedIds.size === 1 ? selectedNames : undefined}
+        />
       )}
 
       {/* Empty state */}

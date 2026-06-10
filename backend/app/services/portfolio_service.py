@@ -256,8 +256,8 @@ async def build_portfolio_overview(
     stock_total_krw = total_invested_krw + unrealized_pnl_krw
     stock_return_pct = (unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw else 0.0
 
-    for p in all_positions:
-        p["weight_in_stock"] = round(p["value_krw"] / stock_total_krw * 100, 2) if stock_total_krw else 0
+    for alloc in all_positions:
+        alloc["weight_in_stock"] = round(alloc["value_krw"] / stock_total_krw * 100, 2) if stock_total_krw else 0
 
     asset_type_allocation = [
         {

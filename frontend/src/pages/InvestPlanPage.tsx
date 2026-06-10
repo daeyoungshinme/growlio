@@ -1,11 +1,8 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
-import { api } from "@/api/client";
-import { fetchSettings } from "@/api/settings";
-import { fetchDCAAnalysis } from "@/api/invest";
-import { fetchTaxSummary, fetchOverseasPositionsTax } from "@/api/tax";
+import { useQueryClient } from "@tanstack/react-query";
+import { useGoalSettings } from "@/hooks/useGoalSettings";
+import { useTaxPlanner } from "@/hooks/useTaxPlanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
@@ -15,134 +12,40 @@ import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import { fmtKrw } from "@/utils/format";
-import { toast } from "@/utils/toast";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
 
-interface GoalForm {
-  monthly_deposit_amount: string;
-  goal_annual_return_pct: string;
-  goal_amount: string;
-  goal_start_date: string;
-  goal_initial_amount: string;
-  annual_deposit_goal: string;
-  retirement_target_year: string;
-}
-
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
-  const location = useLocation();
-  const currentYear = new Date().getFullYear();
 
-  const { data, isLoading, isError } = useQuery({
-    queryKey: QUERY_KEYS.dcaAnalysis,
-    queryFn: fetchDCAAnalysis,
-    staleTime: STALE_TIME.EXCHANGE_RATE,
-  });
+  const {
+    data,
+    isLoading,
+    isError,
+    editing,
+    saving,
+    showCloseConfirm,
+    form,
+    setForm,
+    setShowCloseConfirm,
+    setEditing,
+    handleCloseModal,
+    openEdit,
+    saveSettings,
+  } = useGoalSettings();
 
-  const [taxYear, setTaxYear] = useState(currentYear);
-  const [showTax, setShowTax] = useState(false);
-  const { data: taxData, isLoading: taxLoading } = useQuery({
-    queryKey: QUERY_KEYS.taxSummary(taxYear),
-    queryFn: () => fetchTaxSummary(taxYear),
-    staleTime: STALE_TIME.LONG,
-    enabled: showTax,
-  });
-  const { data: positionsData, isLoading: posLoading } = useQuery({
-    queryKey: QUERY_KEYS.overseasPositionsTax,
-    queryFn: fetchOverseasPositionsTax,
-    staleTime: STALE_TIME.MEDIUM,
-    enabled: showTax,
-  });
-
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const autoOpenTriggeredRef = useRef(false);
-  const [initialForm, setInitialForm] = useState<GoalForm | null>(null);
-  const [form, setForm] = useState<GoalForm>({
-    monthly_deposit_amount: "",
-    goal_annual_return_pct: "",
-    goal_amount: "",
-    goal_start_date: "",
-    goal_initial_amount: "",
-    annual_deposit_goal: "",
-    retirement_target_year: "",
-  });
-
-  const isDirty = editing && initialForm !== null
-    ? JSON.stringify(form) !== JSON.stringify(initialForm)
-    : false;
-
-  const handleCloseModal = () => {
-    if (isDirty) {
-      setShowCloseConfirm(true);
-    } else {
-      setEditing(false);
-    }
-  };
-
-  const openEdit = useCallback(async () => {
-    const s = data?.settings;
-    let annual_deposit_goal = "";
-    let retirement_target_year = "";
-    if (data) {
-      const settingsData = await fetchSettings();
-      annual_deposit_goal = settingsData.annual_deposit_goal ? String(settingsData.annual_deposit_goal) : "";
-      retirement_target_year = settingsData.retirement_target_year ? String(settingsData.retirement_target_year) : "";
-    }
-    const newForm: GoalForm = {
-      monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
-      goal_annual_return_pct: s?.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
-      goal_amount: s?.goal_amount ? String(s.goal_amount) : "",
-      goal_start_date: s?.goal_start_date ?? "",
-      goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
-      annual_deposit_goal,
-      retirement_target_year,
-    };
-    setForm(newForm);
-    setInitialForm(newForm);
-    setEditing(true);
-  }, [data]);
-
-  useEffect(() => {
-    if (location.state?.openEdit && !autoOpenTriggeredRef.current && !isLoading && data) {
-      autoOpenTriggeredRef.current = true;
-      void openEdit();
-    }
-  }, [location.state, isLoading, data, openEdit]);
-
-  useEffect(() => {
-    if (!isLoading && !autoOpenTriggeredRef.current && data && !data.is_configured) {
-      autoOpenTriggeredRef.current = true;
-      void openEdit();
-    }
-  }, [isLoading, data, openEdit]);
-
-  const saveSettings = async () => {
-    setSaving(true);
-    try {
-      await api.put("/settings/goal", {
-        monthly_deposit_amount: form.monthly_deposit_amount ? Number(form.monthly_deposit_amount) : null,
-        goal_annual_return_pct: form.goal_annual_return_pct ? Number(form.goal_annual_return_pct) : null,
-        goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
-        goal_start_date: form.goal_start_date || null,
-        goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
-        annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
-        retirement_target_year: form.retirement_target_year ? Number(form.retirement_target_year) : null,
-      });
-      toast("설정이 저장되었습니다", "success");
-      setEditing(false);
-      await invalidateDcaData(queryClient);
-    } catch {
-      toast("저장에 실패했습니다", "error");
-    } finally {
-      setSaving(false);
-    }
-  };
+  const {
+    currentYear,
+    taxYear,
+    setTaxYear,
+    showTax,
+    setShowTax,
+    taxData,
+    taxLoading,
+    positionsData,
+    posLoading,
+  } = useTaxPlanner();
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
@@ -282,7 +185,6 @@ export default function InvestPlanPage() {
 
             {taxData && !taxLoading && (
               <div className="space-y-4">
-                {/* 경고 배너 */}
                 {(taxData.domestic_large_holder_warning || taxData.comprehensive_tax_warning) && (
                   <div className="space-y-2">
                     {taxData.domestic_large_holder_warning && (
@@ -304,7 +206,6 @@ export default function InvestPlanPage() {
                   </div>
                 )}
 
-                {/* 세금 항목 카드 */}
                 <div className="flex divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
                   <div className="flex-1 min-w-0 px-3 py-2.5">
                     <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">배당소득세</p>
@@ -370,7 +271,7 @@ export default function InvestPlanPage() {
                   key={key}
                   label={label}
                   type={type ?? "number"}
-                  value={form[key as keyof GoalForm]}
+                  value={form[key as keyof typeof form]}
                   onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                   placeholder={placeholder}
                   hint={hint}

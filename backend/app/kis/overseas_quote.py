@@ -1,3 +1,4 @@
+from app.config import settings
 from app.kis.client import kis_request
 from app.kis.constants import OVERSEAS_MARKET_CODES, TR_OVERSEAS_PRICE
 
@@ -30,5 +31,5 @@ async def get_overseas_price(
     output = data.get("output", {})
     return {
         "price_usd": float(output.get("last", 0)),
-        "usd_krw_rate": float(output.get("rate", 1300)),
+        "usd_krw_rate": float(output.get("rate", settings.usd_krw_fallback_rate)),
     }

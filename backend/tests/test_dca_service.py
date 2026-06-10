@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date
+from datetime import date, datetime
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,6 +11,7 @@ import pytest
 from app.services.dca_service import (
     _build_projection_curve,
     _build_yearly_achievements,
+    _calc_goal_timeline,
     _calc_months_to_goal,
     _elapsed_months,
     _month_key,
@@ -226,3 +227,158 @@ class TestGetDcaAnalysis:
         result = await get_dca_analysis(uuid.uuid4(), mock_db)
 
         assert result["is_configured"] is False
+
+
+# ── _calc_goal_timeline ──────────────────────────────────────
+
+class TestCalcGoalTimeline:
+    def test_returns_required_keys(self, override_settings):
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 50_000_000.0, 0.0, date(2024, 1, 1), 50)
+        for key in ("months_to_goal", "expected_goal_date", "actual_expected_goal_date",
+                    "current_progress_pct", "on_track", "lead_lag_months"):
+            assert key in result
+
+    def test_none_months_to_goal_gives_no_expected_date(self, override_settings):
+        result = _calc_goal_timeline(0.0, 1.0, 0.0, 1e15, 0.0, date(2024, 1, 1), None)
+        assert result["months_to_goal"] is None
+        assert result["expected_goal_date"] is None
+
+    def test_expected_goal_date_set_when_months_given(self, override_settings):
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 12_000_000.0, 0.0, date(2024, 1, 1), 12)
+        assert result["months_to_goal"] == 12
+        assert result["expected_goal_date"] is not None
+
+    def test_progress_pct_half_goal(self, override_settings):
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 10_000_000.0, 5_000_000.0, date(2024, 1, 1), None)
+        assert result["current_progress_pct"] == 50.0
+
+    def test_zero_goal_amount_gives_none_progress(self, override_settings):
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 0.0, 1_000_000.0, date(2024, 1, 1), None)
+        assert result["current_progress_pct"] is None
+
+    def test_with_return_rate(self, override_settings):
+        result = _calc_goal_timeline(
+            initial_value=10_000_000.0, pmt=500_000.0, r=0.005,
+            goal_amount=100_000_000.0, current_actual=12_000_000.0,
+            start_date=date(2020, 1, 1), months_to_goal=120,
+        )
+        assert result["months_to_goal"] == 120
+        assert result["on_track"] is not None
+
+    def test_lead_lag_computed_when_near_goal(self, override_settings):
+        result = _calc_goal_timeline(
+            initial_value=0.0, pmt=1_000_000.0, r=0.0,
+            goal_amount=10_000_000.0, current_actual=9_000_000.0,
+            start_date=date(2024, 1, 1), months_to_goal=10,
+        )
+        assert result["lead_lag_months"] is not None or result["actual_expected_goal_date"] is not None
+
+    def test_no_lead_lag_when_zero_current_actual(self, override_settings):
+        result = _calc_goal_timeline(
+            initial_value=0.0, pmt=1_000_000.0, r=0.0,
+            goal_amount=50_000_000.0, current_actual=0.0,
+            start_date=date(2024, 1, 1), months_to_goal=50,
+        )
+        assert result["lead_lag_months"] is None
+
+
+# ── get_dca_analysis (설정된 케이스) ─────────────────────────
+
+class TestGetDcaAnalysisConfigured:
+    @pytest.mark.asyncio
+    async def test_configured_returns_projection(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=7.0,
+            goal_amount=50_000_000.0,
+            goal_start_date=datetime(2020, 1, 1),
+            goal_initial_amount=None,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        assert result["is_configured"] is True
+        assert isinstance(result["projection_months"], list)
+        assert len(result["projection_months"]) > 0
+        assert "goal_timeline" in result
+
+    @pytest.mark.asyncio
+    async def test_configured_with_initial_value_from_db(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=500_000,
+            goal_annual_return_pct=5.0,
+            goal_amount=10_000_000.0,
+            goal_start_date=datetime(2023, 1, 1),
+            goal_initial_amount=None,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        snap_row = SimpleNamespace(total=5_000_000.0)
+        execute_result = MagicMock()
+        execute_result.first.return_value = snap_row
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        assert result["is_configured"] is True
+
+    @pytest.mark.asyncio
+    async def test_configured_with_manual_initial_amount(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=5.0,
+            goal_amount=50_000_000.0,
+            goal_start_date=datetime(2024, 1, 1),
+            goal_initial_amount=10_000_000,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        assert result["is_configured"] is True
+
+    @pytest.mark.asyncio
+    async def test_configured_zero_return_rate(self, mock_db, override_settings):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=0.0,
+            goal_amount=12_000_000.0,
+            goal_start_date=datetime(2024, 1, 1),
+            goal_initial_amount=0,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        # goal_annual_return_pct=0.0 is falsy → is_configured=False (no projection)
+        assert result["is_configured"] is False
+        assert result["projection_months"] == []

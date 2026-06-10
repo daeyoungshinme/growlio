@@ -16,9 +16,13 @@ from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User
 from app.redis_client import get_redis
-from app.services.credential_service import get_kis_user_credentials
 from app.schemas.portfolio import PortfolioSummaryResponse
+from app.services.credential_service import get_kis_user_credentials
 from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
+from app.services.risk_service import (
+    get_currency_exposure,
+    get_portfolio_risk_metrics,
+)
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -82,7 +86,7 @@ async def portfolio_summary(
         o = await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
         return account_no, d, o
 
-    results = await asyncio.gather(*[_fetch(acc.kis_account_no) for acc in kis_accounts])
+    results = await asyncio.gather(*[_fetch(acc.kis_account_no) for acc in kis_accounts])  # type: ignore[arg-type]
 
     merged_domestic: dict = {"total_value_krw": 0.0, "invested_krw": 0.0, "pnl_krw": 0.0, "deposit_krw": 0.0, "positions": []}
     merged_overseas: dict = {"total_value_usd": 0.0, "deposit_usd": 0.0, "positions": []}
@@ -112,3 +116,43 @@ async def portfolio_summary(
         "is_mock": is_mock,
         "accounts": account_details,
     }
+
+
+# ---------------------------------------------------------------------------
+# 위험 분석
+# ---------------------------------------------------------------------------
+
+@router.get("/risk")
+@limiter.limit("5/minute")
+async def portfolio_risk(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 포트폴리오 위험 지표 — VaR, 베타, 변동성, 분산도."""
+    redis = await get_redis()
+    return await get_portfolio_risk_metrics(current_user.id, db, redis)
+
+
+@router.get("/risk/{portfolio_id}")
+@limiter.limit("5/minute")
+async def portfolio_risk_by_id(
+    request: Request,
+    portfolio_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """특정 포트폴리오 위험 지표."""
+    redis = await get_redis()
+    return await get_portfolio_risk_metrics(current_user.id, db, redis, portfolio_id=portfolio_id)
+
+
+@router.get("/currency-exposure")
+@limiter.limit("10/minute")
+async def portfolio_currency_exposure(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """KRW/USD/기타 통화 비중 분석."""
+    return await get_currency_exposure(current_user.id, db)

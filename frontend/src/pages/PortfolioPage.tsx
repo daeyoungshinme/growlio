@@ -21,6 +21,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
 import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
+const AIAnalysisTab = lazy(() => import("@/components/portfolio-analysis/AIAnalysisTab"));
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -255,6 +256,14 @@ export default function PortfolioPage() {
       {tab === "포트폴리오 분석" && (
         <ErrorBoundary variant="section">
           <PortfolioAnalysisTab />
+        </ErrorBoundary>
+      )}
+
+      {tab === "AI 분석" && (
+        <ErrorBoundary variant="section">
+          <Suspense fallback={<SkeletonCard />}>
+            <AIAnalysisTab />
+          </Suspense>
         </ErrorBoundary>
       )}
     </div>

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
 import { api } from "@/api/client";
+import { getHttpStatus } from "@/utils/error";
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -79,7 +80,7 @@ export const useAuthStore = create<AuthState>((set) => {
           setLoggedIn(session.user, data.needs_password_reset ?? false);
         } catch (err) {
           // 세션은 있지만 앱 DB에 user 없음 (이메일 인증 후 첫 접속)
-          const httpStatus = (err as { response?: { status?: number } })?.response?.status;
+          const httpStatus = getHttpStatus(err);
           if (httpStatus === 401) {
             try {
               await api.post("/auth/sync-profile", { display_name: null });

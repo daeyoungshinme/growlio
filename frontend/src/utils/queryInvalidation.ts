@@ -1,7 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-/** 계좌 sync 후 — portfolio + dashboard + 배당 데이터 */
+/** 계좌 sync 후 — portfolio + dashboard + 배당 데이터 + 인사이트 */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
@@ -9,6 +9,8 @@ export function invalidateSyncData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummary }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk() }),
   ]);
 }
 

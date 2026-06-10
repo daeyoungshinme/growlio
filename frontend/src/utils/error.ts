@@ -1,5 +1,16 @@
 type FastApiDetail = string | { msg: string; loc?: unknown[]; type?: string }[];
 
+export interface AxiosLikeError {
+  response?: {
+    status?: number;
+    data?: { detail?: FastApiDetail };
+  };
+}
+
+export function getHttpStatus(error: unknown): number | undefined {
+  return (error as AxiosLikeError)?.response?.status;
+}
+
 function parseDetail(detail: FastApiDetail): string {
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) {

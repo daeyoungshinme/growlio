@@ -6,6 +6,8 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
 import MonthlyTickerDetail from "./MonthlyTickerDetail";
+import DRIPSimulationChart from "./DRIPSimulationChart";
+import MonthlyOptimizationCard from "./MonthlyOptimizationCard";
 import type { DividendByTicker, DividendYield } from "@/types";
 import { MONTH_LABELS, dividendFreqInfo, weightBarColor, yieldBadgeClass } from "@/utils/dividendUtils";
 import EmptyState from "@/components/common/EmptyState";
@@ -25,7 +27,7 @@ interface Props {
   totalInvestedKrw?: number;
 }
 
-const DIV_SUBTABS = ["종목별 배당", "월별 배당"] as const;
+const DIV_SUBTABS = ["종목별 배당", "월별 배당", "DRIP 분석"] as const;
 type DivSubTab = (typeof DIV_SUBTABS)[number];
 
 export default function DividendTab({ dividendData, divLoading: _divLoading, divSummary, dividendByTicker, totalInvestedKrw }: Props) {
@@ -345,6 +347,20 @@ export default function DividendTab({ dividendData, divLoading: _divLoading, div
             monthlyEstimate={monthlyEstimateByMonth[selectedMonth - 1]}
             monthTickerActualMap={monthTickerActualMap}
           />
+        </div>
+      )}
+
+      {divSubTab === "DRIP 분석" && (
+        <div className="space-y-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-1">DRIP 재투자 시뮬레이션</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">배당금 재투자 vs 현금 수령 시 장기 자산 변화를 비교합니다.</p>
+            <DRIPSimulationChart />
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5">
+            <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">월별 균등화 추천</h3>
+            <MonthlyOptimizationCard />
+          </div>
         </div>
       )}
 

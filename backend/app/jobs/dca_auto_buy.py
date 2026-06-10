@@ -57,7 +57,7 @@ async def run_dca_auto_execution() -> None:
 async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis) -> None:
     portfolio_id = settings.auto_dca_portfolio_id
     account_id = settings.auto_dca_account_id
-    total_amount = float(settings.auto_dca_amount)
+    total_amount = float(settings.auto_dca_amount or 0)
     user_id: uuid.UUID = settings.user_id
 
     # 포트폴리오 종목 비중 조회
@@ -122,14 +122,14 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
             if is_overseas_market(market):
                 await place_overseas_order(
                     app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",
+                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
                     ticker=ticker, market=market,
                     quantity=qty, is_mock=account.is_mock_mode,
                 )
             else:
                 await place_domestic_order(
                     app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",
+                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
                     ticker=ticker, quantity=qty,
                     is_mock=account.is_mock_mode,
                 )

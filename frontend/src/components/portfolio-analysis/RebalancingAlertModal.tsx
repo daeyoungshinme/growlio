@@ -14,7 +14,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 
 interface Props {
   portfolioId: string;
@@ -86,7 +86,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
     queryFn: () => fetchRebalancingAlert(portfolioId),
     staleTime: STALE_TIME.MEDIUM,
     retry: (failureCount, error: unknown) => {
-      const status = (error as { response?: { status?: number } })?.response?.status;
+      const status = getHttpStatus(error);
       return status === 404 ? false : failureCount < 2;
     },
   });

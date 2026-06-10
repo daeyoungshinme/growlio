@@ -6,6 +6,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from app.config import settings
+
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,7 +39,7 @@ class BalanceResult:
     deposit_foreign: float = 0.0      # 해외 예수금 (원화 환산 전)
     invested_krw: float = 0.0         # 매입금액
     pnl_krw: float = 0.0              # 평가손익
-    usd_krw_rate: float = 1300.0
+    usd_krw_rate: float = field(default_factory=lambda: settings.usd_krw_fallback_rate)
     extra: dict[str, Any] = field(default_factory=dict)
 
 

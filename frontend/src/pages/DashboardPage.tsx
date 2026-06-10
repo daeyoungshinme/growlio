@@ -6,12 +6,14 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
+import InsightsPanel from "@/components/dashboard/InsightsPanel";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { PORTFOLIO_TABS } from "@/constants/tabs";
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 const DisclosureFeedCard = lazy(() => import("../components/dashboard/DisclosureFeedCard"));
@@ -120,7 +122,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
             <Link
-              to="/portfolio?tab=배당+현황"
+              to={`/portfolio?tab=${encodeURIComponent(PORTFOLIO_TABS[1])}`}
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               자세히 보기 <ArrowRight size={14} />
@@ -137,7 +139,12 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: 자산 추이 */}
+      {/* Row 3: 포트폴리오 진단 인사이트 */}
+      <ErrorBoundary variant="section">
+        <InsightsPanel />
+      </ErrorBoundary>
+
+      {/* Row 4: 자산 추이 */}
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
           <AllocationHistoryChart />

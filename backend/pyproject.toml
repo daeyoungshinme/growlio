@@ -48,6 +48,8 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=6.1.0",
     # FCM 푸시 알림 (선택적 — FIREBASE_CREDENTIALS_JSON 환경변수 설정 시 활성화)
     "firebase-admin>=6.5.0",
+    # AI 분석 (선택적 — GOOGLE_API_KEY 환경변수 설정 시 활성화)
+    "google-genai>=1.16.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -125,22 +127,3 @@ disallow_untyped_defs = true
 disallow_incomplete_defs = true
 warn_return_any = true
 
-# str | None 타입 이슈 및 서드파티 스텁 미지원 — 순차 정리 대상
-# TODO: 각 파일 수정 후 항목 제거
-[[tool.mypy.overrides]]
-module = [
-    "app.services.price_service",
-    "app.services.rebalancing_execution_service",
-    "app.services.asset_aggregator",
-    "app.services.dividend_providers",
-    "app.services.rebalancing_service",
-    "app.services.dca_service",
-    "app.services.credential_service",
-    "app.api.v1.portfolio",
-    "app.api.v1.rebalancing",
-    "app.api.v1.stocks",
-    "app.api.deps",
-    "app.jobs.dca_auto_buy",
-    "app.jobs.token_refresh",
-]
-ignore_errors = true

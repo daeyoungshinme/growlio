@@ -24,4 +24,10 @@ export const QUERY_KEYS = {
   dartDisclosures: (days: number) => ["dart-disclosures", days] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
   alertHistory: ["alert-history"] as const,
+  insights: ["insights"] as const,
+  insightsSummary: ["insights", "summary"] as const,
+  dripSimulation: ["drip-simulation"] as const,
+  monthlyOptimization: ["monthly-optimization"] as const,
+  portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
+  aiAnalysis: ["ai-analysis"] as const,
 } as const;

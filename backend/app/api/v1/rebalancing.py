@@ -409,7 +409,7 @@ async def _fetch_broker_balance(
             user_id=str(account.user_id), account_id=str(account.id),
         )
         domestic = await kiwoom_get_domestic_balance(
-            access_token, account.kiwoom_account_no, is_mock=is_mock
+            access_token, account.kiwoom_account_no, is_mock=is_mock  # type: ignore[arg-type]
         )
         positions = [
             KisBalancePosition(

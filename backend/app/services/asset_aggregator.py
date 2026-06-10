@@ -47,7 +47,7 @@ async def _get_latest_snapshot_rows(
     )
     rows = result.all()
     snapped_ids = {acc.id for _, acc in rows}
-    return rows, snapped_ids
+    return list(rows), snapped_ids
 
 
 async def _get_no_snap_accounts(

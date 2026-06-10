@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { fetchDartDisclosures } from "@/api/dart";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { getHttpStatus } from "@/utils/error";
 
 const DAYS_OPTIONS = [
   { label: "7일", value: 7 },
@@ -28,7 +29,7 @@ function DisclosureFeedCard() {
   });
 
   const isDartKeyMissing =
-    isError && (error as { response?: { status?: number } })?.response?.status === 422;
+    isError && getHttpStatus(error) === 422;
 
   return (
     <div className="card">

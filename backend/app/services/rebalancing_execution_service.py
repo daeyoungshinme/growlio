@@ -115,7 +115,7 @@ async def execute_rebalancing(
             for order in sells + buys:
                 account_results.append(
                     await _execute_kiwoom_single_order(
-                        order, access_token, account_no, is_mock,
+                        order, access_token, account_no, is_mock,  # type: ignore[arg-type]
                         kiwoom_place_order,
                     )
                 )
@@ -137,7 +137,7 @@ async def execute_rebalancing(
             for order in sells + buys:
                 account_results.append(
                     await _execute_single_order(
-                        order, app_key, app_secret, access_token, account_no, is_mock
+                        order, app_key, app_secret, access_token, account_no, is_mock  # type: ignore[arg-type]
                     )
                 )
 

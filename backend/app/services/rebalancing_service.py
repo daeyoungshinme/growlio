@@ -198,7 +198,7 @@ def _calc_portfolio_cagrs(
         target_w_sum = sum(i.target_weight_pct for i in items_with_return)
         if target_w_sum > 0:
             target_weighted_cagr = round(
-                sum(i.target_weight_pct * i.cagr_10y_pct for i in items_with_return)  # type: ignore[operator]
+                sum(i.target_weight_pct * i.cagr_10y_pct for i in items_with_return)  # type: ignore[operator, misc]
                 / target_w_sum,
                 2,
             )

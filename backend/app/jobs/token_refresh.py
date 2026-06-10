@@ -48,8 +48,8 @@ async def refresh_all_user_tokens() -> None:
 
     for account in accounts_with_creds:
         try:
-            app_key = decrypt(account.kis_app_key)
-            app_secret = decrypt(account.kis_app_secret)
+            app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
+            app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
             async with AsyncSessionLocal() as db:
                 await _fetch_and_store_token(
                     app_key,

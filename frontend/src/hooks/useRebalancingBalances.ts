@@ -6,7 +6,7 @@ import {
   fetchBrokerBalance,
 } from "@/api/rebalancing";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import type { ExecutionAction } from "./useRebalancingExecution";
 
@@ -22,7 +22,7 @@ export function useRebalancingBalances(
       const res: KisBalanceResponse = await fetchBrokerBalance(accountId);
       dispatch({ type: "BALANCE_LOADED", accountId, positions: res.positions, deposit: res.deposit_krw, orderable: res.orderable_krw });
     } catch (err: unknown) {
-      const is404 = (err as { response?: { status?: number } }).response?.status === 404;
+      const is404 = getHttpStatus(err) === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
       if (is404) {
         queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });

@@ -58,7 +58,7 @@ async def send_push(
         return False
 
     try:
-        from firebase_admin import messaging  # type: ignore[import-untyped]
+        from firebase_admin import messaging
 
         message = messaging.Message(
             notification=messaging.Notification(title=title, body=body),

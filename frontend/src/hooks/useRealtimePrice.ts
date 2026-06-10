@@ -19,8 +19,8 @@ interface UseRealtimePriceOptions {
   onPrice?: (ticker: string, data: RealtimePriceData) => void;
 }
 
-/** WebSocket 재연결 대기시간 (ms) — 지수 백오프 */
-const RECONNECT_DELAYS = [1_000, 2_000, 4_000, 8_000];
+/** WebSocket 재연결 대기시간 (ms) — 최대 3회 지수 백오프(1s/3s/10s) */
+const RECONNECT_DELAYS = [1_000, 3_000, 10_000];
 
 function getWsBaseUrl(): string {
   if (isNativePlatform()) {

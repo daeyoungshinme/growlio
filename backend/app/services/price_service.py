@@ -198,8 +198,8 @@ async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db, r
 async def _price_via_kis(account: AssetAccount, ticker: str, market: str, db, redis) -> float | None:
     from app.kis.auth import get_access_token
 
-    app_key = decrypt(account.kis_app_key)
-    app_secret = decrypt(account.kis_app_secret)
+    app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
+    app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
     is_mock = account.is_mock_mode
     token = await get_access_token(
         app_key, app_secret,

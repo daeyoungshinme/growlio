@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # FCM 푸시 알림 — 서비스 계정 JSON 전체 문자열 (비어 있으면 푸시 비활성화)
     firebase_credentials_json: str = ""
 
+    # AI 분석 — Google Gemini API 키 (비어 있으면 AI 분석 비활성화)
+    google_api_key: str = ""
+
     @property
     def allowed_origins_list(self) -> list[str]:
         origins = [o.strip() for o in self.allowed_origins.split(",")]

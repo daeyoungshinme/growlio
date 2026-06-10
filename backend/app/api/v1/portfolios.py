@@ -2,6 +2,7 @@
 import json
 import uuid
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +22,8 @@ from app.schemas.portfolio import (
     PortfolioUpdate,
 )
 from app.utils.cache_keys import TTL_PORTFOLIO_LIST, invalidate_user_caches, portfolio_list_key
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -69,8 +72,8 @@ async def list_portfolios(
         cached = await redis.get(cache_key)
         if cached:
             return json.loads(cached)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("portfolio_cache_read_failed", key=cache_key, error=str(e))
 
     rows = await db.execute(
         _with_relations(
@@ -84,8 +87,8 @@ async def list_portfolios(
 
     try:
         await redis.setex(cache_key, TTL_PORTFOLIO_LIST, json.dumps(result))
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("portfolio_cache_write_failed", key=cache_key, error=str(e))
 
     return result
 
