@@ -8,7 +8,70 @@ from app.enums import PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
+# ---------------------------------------------------------------------------
+# KIS 실시간 포트폴리오 서머리 (/portfolio/summary) 응답 스키마
+# ---------------------------------------------------------------------------
+
+class DomesticPosition(BaseModel):
+    ticker: str
+    name: str
+    market: str
+    qty: int
+    avg_price: float
+    current_price: float
+    value_krw: float
+    pnl: float
+    pnl_pct: float
+    currency: str = "KRW"
+
+
+class OverseasPosition(BaseModel):
+    ticker: str
+    name: str
+    market: str
+    qty: int
+    avg_price: float
+    current_price: float
+    value_usd: float
+    pnl_usd: float
+    pnl_pct: float
+    currency: str = "USD"
+
+
+class DomesticBalance(BaseModel):
+    total_value_krw: float
+    invested_krw: float
+    pnl_krw: float
+    deposit_krw: float
+    positions: list[DomesticPosition]
+
+
+class OverseasBalance(BaseModel):
+    total_value_usd: float
+    deposit_usd: float
+    positions: list[OverseasPosition]
+
+
+class KisAccountDetail(BaseModel):
+    account_no: str
+    domestic: DomesticBalance
+    overseas: OverseasBalance
+
+
+class PortfolioSummaryResponse(BaseModel):
+    domestic: DomesticBalance
+    overseas: OverseasBalance
+    total_value_krw: float
+    total_invested_krw: float
+    unrealized_pnl_krw: float
+    stock_return_pct: float
+    is_mock: bool
+    accounts: list[KisAccountDetail]
+
+
 class PortfolioItem(BaseModel):
+    model_config = {"from_attributes": True}
+
     ticker: str
     name: str = ""   # 자동완성 없이 추가 시 빈 문자열 허용
     market: str

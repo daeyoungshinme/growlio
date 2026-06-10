@@ -1,4 +1,4 @@
-import { AssetAccount } from "../../api/assets";
+import { AssetAccount } from "@/api/assets";
 
 interface Props {
   accounts: AssetAccount[];

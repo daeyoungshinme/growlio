@@ -1,7 +1,7 @@
-import { RebalancingItem } from "../../api/rebalancing";
-import { fmtKrw } from "../../utils/format";
-import { PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
-import { CASH_TICKER } from "../../constants/assets";
+import { RebalancingItem } from "@/api/rebalancing";
+import { fmtKrw } from "@/utils/format";
+import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
+import { CASH_TICKER } from "@/constants/assets";
 
 export function DiffCell({ diff }: { diff: number }) {
   if (diff === 0) return <span className="text-gray-400">-</span>;

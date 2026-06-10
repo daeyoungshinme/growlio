@@ -1,10 +1,10 @@
 import { lazy, memo, Suspense, useMemo } from "react";
 import { TrendingDown, TrendingUp } from "lucide-react";
-import { fmtKrw, fmtMonth, fmtPct } from "../../utils/format";
-import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
-import { ASSET_TYPE_LABELS } from "../../constants";
-import type { DashboardData } from "../../api/dashboard";
-import type { DCAAnalysisData } from "../../api/invest";
+import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
+import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
+import { ASSET_TYPE_LABELS } from "@/constants";
+import type { DashboardData } from "@/api/dashboard";
+import type { DCAAnalysisData } from "@/api/invest";
 
 const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
 

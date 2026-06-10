@@ -1,22 +1,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
-import type { AssetAccount } from "../../api/assets";
+import { api } from "@/api/client";
+import type { AssetAccount } from "@/api/assets";
 import {
   createTransaction,
   updateTransaction,
   type Transaction,
   type TransactionCreate,
-} from "../../api/transactions";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { useForm } from "../../hooks/useForm";
-import { useStockSearch } from "../../hooks/useStockSearch";
-import { invalidateTransactionData } from "../../utils/queryInvalidation";
-import { toast } from "../../utils/toast";
-import { TX_LABELS } from "../../constants/transaction";
-import { STALE_TIME } from "../../constants/queryConfig";
-import { INPUT_MD, LABEL_MD } from "../../constants/inputStyles";
-import { extractErrorMessage } from "../../utils/error";
+} from "@/api/transactions";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useForm } from "@/hooks/useForm";
+import { useStockSearch } from "@/hooks/useStockSearch";
+import { invalidateTransactionData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+import { TX_LABELS } from "@/constants/transaction";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
+import { extractErrorMessage } from "@/utils/error";
 
 const today = new Date().toISOString().slice(0, 10);
 

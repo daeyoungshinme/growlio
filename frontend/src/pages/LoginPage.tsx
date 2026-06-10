@@ -1,8 +1,8 @@
 import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthStore } from "../stores/authStore";
-import { INPUT_SM } from "../constants/inputStyles";
+import { useAuthStore } from "@/stores/authStore";
+import { INPUT_SM } from "@/constants/inputStyles";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

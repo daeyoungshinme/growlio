@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AssetAccount } from "../api/assets";
+import type { AssetAccount } from "@/api/assets";
 
 export interface PositionsAccountInfo {
   id: string;

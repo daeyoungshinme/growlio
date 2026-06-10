@@ -1,4 +1,4 @@
-import { fmtKrw } from "../../utils/format";
+import { fmtKrw } from "@/utils/format";
 
 interface Props {
   current: number;

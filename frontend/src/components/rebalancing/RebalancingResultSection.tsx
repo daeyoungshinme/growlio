@@ -1,4 +1,4 @@
-import type { ExecutionResult } from "../../api/rebalancing";
+import type { ExecutionResult } from "@/api/rebalancing";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
 interface Props {

@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchExchangeRate } from "../api/assets";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { STALE_TIME } from "../constants/queryConfig";
-import { toast } from "../utils/toast";
+import { fetchExchangeRate } from "@/api/assets";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { toast } from "@/utils/toast";
 
 export function useExchangeRate() {
   const { data, isError } = useQuery({

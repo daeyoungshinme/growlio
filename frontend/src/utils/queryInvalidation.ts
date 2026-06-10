@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { QUERY_KEYS } from "../constants/queryKeys";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 
 /** 계좌 sync 후 — portfolio + dashboard + 배당 데이터 */
 export function invalidateSyncData(qc: QueryClient) {

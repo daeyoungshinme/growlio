@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "../lib/supabase";
-import { isNativePlatform } from "../utils/platform";
+import { supabase } from "@/lib/supabase";
+import { isNativePlatform } from "@/utils/platform";
 
 export interface TickerInfo {
   ticker: string;

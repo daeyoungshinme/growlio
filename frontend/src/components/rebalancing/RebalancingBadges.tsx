@@ -1,4 +1,4 @@
-import type { OrderResult } from "../../api/rebalancing";
+import type { OrderResult } from "@/api/rebalancing";
 
 export function SideBadge({ isBuy }: { isBuy: boolean }) {
   return (

@@ -7,10 +7,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { DCAProjectionPoint } from "../../api/invest";
-import { useThemeStore } from "../../stores/themeStore";
-import { fmtKrw, fmtKrwShort } from "../../utils/format";
-import { chartTooltipStyle } from "../../utils/chart";
+import type { DCAProjectionPoint } from "@/api/invest";
+import { useThemeStore } from "@/stores/themeStore";
+import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { chartTooltipStyle } from "@/utils/chart";
 
 interface Props {
   data: DCAProjectionPoint[];

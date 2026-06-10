@@ -2,9 +2,9 @@ import { memo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-import { fetchDartDisclosures } from "../../api/dart";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { STALE_TIME } from "../../constants/queryConfig";
+import { fetchDartDisclosures } from "@/api/dart";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 const DAYS_OPTIONS = [
   { label: "7일", value: 7 },

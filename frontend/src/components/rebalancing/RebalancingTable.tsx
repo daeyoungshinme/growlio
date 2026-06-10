@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "../../api/rebalancing";
-import { AssetAccount } from "../../api/assets";
-import { RebalancingAlert } from "../../api/alerts";
-import { fmtKrw } from "../../utils/format";
-import { PROFIT_COLOR, LOSS_COLOR } from "../../utils/colors";
+import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
+import { AssetAccount } from "@/api/assets";
+import { RebalancingAlert } from "@/api/alerts";
+import { fmtKrw } from "@/utils/format";
+import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { Bell } from "lucide-react";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
-import ErrorBoundary from "../ErrorBoundary";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   CagrCard,
   DiffCell,

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { searchStocks, type StockSuggestion } from "../api/assets";
-import { toast } from "../utils/toast";
+import { searchStocks, type StockSuggestion } from "@/api/assets";
+import { toast } from "@/utils/toast";
 
 export function useStockSearch(debounceMs = 300) {
   const [suggestions, setSuggestions] = useState<StockSuggestion[]>([]);

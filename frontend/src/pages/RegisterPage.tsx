@@ -1,9 +1,9 @@
 import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuthStore } from "../stores/authStore";
-import { toast } from "../utils/toast";
-import { INPUT_SM } from "../constants/inputStyles";
+import { useAuthStore } from "@/stores/authStore";
+import { toast } from "@/utils/toast";
+import { INPUT_SM } from "@/constants/inputStyles";
 
 export default function RegisterPage() {
   const [email, setEmail] = useState("");

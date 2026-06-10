@@ -1,12 +1,12 @@
 import { useCallback, useState } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
-import { TickerDividendItem, updateTickerDividendMonths, deleteTickerDividendMonths } from "../../api/dashboard";
+import { TickerDividendItem, updateTickerDividendMonths, deleteTickerDividendMonths } from "@/api/dashboard";
 import DividendMonthsModal from "./DividendMonthsModal";
-import { fmtKrwShort } from "../../utils/format";
-import { toast } from "../../utils/toast";
-import { dividendFreqInfo, weightBarColor, yieldBadgeClass } from "../../utils/dividendUtils";
-import { QUERY_KEYS } from "../../constants/queryKeys";
+import { fmtKrwShort } from "@/utils/format";
+import { toast } from "@/utils/toast";
+import { dividendFreqInfo, weightBarColor, yieldBadgeClass } from "@/utils/dividendUtils";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 
 interface Props {
   items: TickerDividendItem[];

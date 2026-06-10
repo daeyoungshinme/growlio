@@ -2,21 +2,21 @@ import { useState, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, ChevronUp, Pencil, Trash2 } from "lucide-react";
-import EmptyState from "../common/EmptyState";
-import { updateAccount, type AssetAccount } from "../../api/assets";
+import EmptyState from "@/components/common/EmptyState";
+import { updateAccount, type AssetAccount } from "@/api/assets";
 import {
   fetchTransactions,
   deleteTransaction,
   type Transaction,
-} from "../../api/transactions";
+} from "@/api/transactions";
 import { TransactionForm } from "./TransactionForm";
-import { fmtKrw } from "../../utils/format";
-import { invalidateAccountData, invalidateTransactionData } from "../../utils/queryInvalidation";
-import { toast } from "../../utils/toast";
-import { STOCK_TYPES } from "../../constants";
-import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
-import { INPUT_SM } from "../../constants/inputStyles";
-import { extractErrorMessage } from "../../utils/error";
+import { fmtKrw } from "@/utils/format";
+import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+import { STOCK_TYPES } from "@/constants";
+import { TX_LABELS, TX_COLORS } from "@/constants/transaction";
+import { INPUT_SM } from "@/constants/inputStyles";
+import { extractErrorMessage } from "@/utils/error";
 
 const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 5 }, (_, i) => currentYear - i);

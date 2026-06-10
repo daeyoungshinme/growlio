@@ -1,5 +1,5 @@
-import { PortfolioMetrics } from "../../api/backtest";
-import { pnlColor, LOSS_COLOR } from "../../utils/colors";
+import { PortfolioMetrics } from "@/api/backtest";
+import { pnlColor, LOSS_COLOR } from "@/utils/colors";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 

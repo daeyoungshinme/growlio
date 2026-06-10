@@ -5,8 +5,8 @@ import {
   fetchRebalancingExecutionDetail,
   fetchRebalancingHistory,
   RebalancingExecutionSummary,
-} from "../../api/rebalancing";
-import { QUERY_KEYS } from "../../constants/queryKeys";
+} from "@/api/rebalancing";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 
 const TRIGGER_LABEL: Record<string, string> = {
   MANUAL: "수동",

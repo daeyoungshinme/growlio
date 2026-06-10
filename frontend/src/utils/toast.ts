@@ -1,4 +1,4 @@
-import { triggerHaptic } from "../hooks/useHaptic";
+import { triggerHaptic } from "@/hooks/useHaptic";
 
 export type ToastType = "error" | "success" | "info";
 

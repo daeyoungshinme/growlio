@@ -1,10 +1,10 @@
 import { lazy, memo, Suspense, useMemo } from "react";
-import { fmtKrw } from "../../utils/format";
-import { pnlColor } from "../../utils/colors";
-import type { AllocationItem } from "../../types";
-import SkeletonStatBox from "../common/SkeletonStatBox";
-import SkeletonCard from "../common/SkeletonCard";
-import HoverTooltip from "../common/Tooltip";
+import { fmtKrw } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import type { AllocationItem } from "@/types";
+import SkeletonStatBox from "@/components/common/SkeletonStatBox";
+import SkeletonCard from "@/components/common/SkeletonCard";
+import HoverTooltip from "@/components/common/Tooltip";
 
 const PortfolioTreemapChart = lazy(() => import("./PortfolioTreemapChart"));
 

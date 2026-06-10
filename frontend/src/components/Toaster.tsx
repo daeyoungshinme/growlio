@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ToastEvent } from "../utils/toast";
+import type { ToastEvent } from "@/utils/toast";
 
 const COLORS: Record<string, string> = {
   error: "bg-red-600",

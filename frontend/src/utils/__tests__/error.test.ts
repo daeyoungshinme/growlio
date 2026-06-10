@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractErrorMessage } from "../error";
+import { extractErrorMessage } from "@/utils/error";
 
 describe("extractErrorMessage", () => {
   it("axios 응답 detail 추출", () => {

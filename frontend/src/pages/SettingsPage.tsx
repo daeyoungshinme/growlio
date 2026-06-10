@@ -2,19 +2,19 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Sun, Moon, LogOut, Bell } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../api/client";
-import { type SettingsData } from "../api/settings";
-import { fetchAlertHistory, type AlertHistoryItem } from "../api/alerts";
-import { toast } from "../utils/toast";
-import { useThemeStore } from "../stores/themeStore";
-import { useLogout } from "../hooks/useLogout";
-import { ExchangeRateAlertSection } from "../components/settings/ExchangeRateAlertSection";
-import { StockPriceAlertSection } from "../components/settings/StockPriceAlertSection";
-import { DCASettingsSection } from "../components/settings/DCASettingsSection";
-import { SectionCard, ConnectedBadge } from "../components/settings/shared";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { STALE_TIME } from "../constants/queryConfig";
-import { INPUT_MD, LABEL_MD } from "../constants/inputStyles";
+import { api } from "@/api/client";
+import { type SettingsData } from "@/api/settings";
+import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
+import { toast } from "@/utils/toast";
+import { useThemeStore } from "@/stores/themeStore";
+import { useLogout } from "@/hooks/useLogout";
+import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
+import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
+import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
+import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",

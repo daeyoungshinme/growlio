@@ -1,6 +1,6 @@
 import { AlertTriangle } from "lucide-react";
 import { useId } from "react";
-import { triggerHaptic } from "../../hooks/useHaptic";
+import { triggerHaptic } from "@/hooks/useHaptic";
 
 interface Props {
   message: string;

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import type { StockSuggestion } from "../../api/assets";
+import type { StockSuggestion } from "@/api/assets";
 
 interface SuggestionDropdownProps {
   rowIndex: number;

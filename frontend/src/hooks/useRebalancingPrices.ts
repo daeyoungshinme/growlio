@@ -1,9 +1,9 @@
-import { fetchStockPrice } from "../api/assets";
-import { CASH_TICKER } from "../constants/assets";
-import { RebalancingAnalysis } from "../api/rebalancing";
+import { fetchStockPrice } from "@/api/assets";
+import { CASH_TICKER } from "@/constants/assets";
+import { RebalancingAnalysis } from "@/api/rebalancing";
 import type { ExecutionAction } from "./useRebalancingExecution";
 import { getActionableItems } from "./useRebalancingExecution";
-import { toast } from "../utils/toast";
+import { toast } from "@/utils/toast";
 
 // 백엔드 현재가 캐시(TTL_PRICE_CURRENT=900s)와 동기화하는 세션 캐시
 const PRICE_CACHE_TTL_MS = 900_000;

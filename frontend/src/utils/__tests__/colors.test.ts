@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "../colors";
+import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 
 describe("pnlColor (한국 주식 관례)", () => {
   it("양수 수익 → 빨간색 (PROFIT_COLOR)", () => {

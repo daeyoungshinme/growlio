@@ -1,6 +1,6 @@
-import { fmtKrw, fmtKrwShort } from "../../utils/format";
-import { MONTH_LABELS } from "../../utils/dividendUtils";
-import type { DividendByTicker } from "../../types";
+import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { MONTH_LABELS } from "@/utils/dividendUtils";
+import type { DividendByTicker } from "@/types";
 
 interface MonthlyActual {
   month: string;

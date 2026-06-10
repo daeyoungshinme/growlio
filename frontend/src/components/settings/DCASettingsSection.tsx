@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { fetchAccounts } from "../../api/assets";
-import { fetchPortfolios } from "../../api/portfolios";
-import { updateAutoDca, type SettingsData } from "../../api/settings";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { STALE_TIME } from "../../constants/queryConfig";
+import { fetchAccounts } from "@/api/assets";
+import { fetchPortfolios } from "@/api/portfolios";
+import { updateAutoDca, type SettingsData } from "@/api/settings";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import { SectionCard, inputClass, labelClass } from "./shared";
 
 interface Props {

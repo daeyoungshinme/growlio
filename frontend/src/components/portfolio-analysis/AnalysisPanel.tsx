@@ -1,21 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
-import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "../../api/backtest";
-import { analyzePortfolio, RebalancingAnalysis } from "../../api/rebalancing";
-import { fetchRebalancingAlerts } from "../../api/alerts";
-import type { Portfolio } from "../../api/portfolios";
-import type { AssetAccount } from "../../api/assets";
+import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "@/api/backtest";
+import { analyzePortfolio, RebalancingAnalysis } from "@/api/rebalancing";
+import { fetchRebalancingAlerts } from "@/api/alerts";
+import type { Portfolio } from "@/api/portfolios";
+import type { AssetAccount } from "@/api/assets";
 
-import BacktestResultChart from "../backtest/BacktestResultChart";
-import BacktestMetricsTable from "../backtest/BacktestMetricsTable";
-import CorrelationHeatmap from "../backtest/CorrelationHeatmap";
-import RebalancingTable from "../rebalancing/RebalancingTable";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { STALE_TIME } from "../../constants/queryConfig";
-import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "../../constants/defaults";
+import BacktestResultChart from "@/components/backtest/BacktestResultChart";
+import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
+import CorrelationHeatmap from "@/components/backtest/CorrelationHeatmap";
+import RebalancingTable from "@/components/rebalancing/RebalancingTable";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
 
 interface Props {
   selectedIds: Set<string>;

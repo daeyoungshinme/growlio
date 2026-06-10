@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { fmtKrwShort } from "../../utils/format";
+import { fmtKrwShort } from "@/utils/format";
 
 interface Props {
   annualReceived: number | null;

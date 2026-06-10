@@ -1,8 +1,8 @@
 import { Info, TrendingUp, TrendingDown, Lightbulb, Calculator } from "lucide-react";
-import { OverseasPositionDetail } from "../../api/tax";
-import { fmtKrw, fmtPct } from "../../utils/format";
-import { pnlColor } from "../../utils/colors";
-import { useTaxSimulation, posKey, TAX_DEDUCTION, TAX_RATE } from "../../hooks/useTaxSimulation";
+import { OverseasPositionDetail } from "@/api/tax";
+import { fmtKrw, fmtPct } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import { useTaxSimulation, posKey, TAX_DEDUCTION, TAX_RATE } from "@/hooks/useTaxSimulation";
 
 interface Props {
   positions: OverseasPositionDetail[];

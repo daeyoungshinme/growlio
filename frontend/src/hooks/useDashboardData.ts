@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAccounts } from "../api/assets";
-import { fetchDashboard } from "../api/dashboard";
-import { fetchDCAAnalysis } from "../api/invest";
-import { fetchPortfolioOverviewLite } from "../api/portfolios";
+import { fetchAccounts } from "@/api/assets";
+import { fetchDashboard } from "@/api/dashboard";
+import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { useExchangeRate } from "./useExchangeRate";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { STALE_TIME, REFETCH_INTERVAL } from "../constants/queryConfig";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 
 export function useDashboardData() {
   const { data, isLoading, error } = useQuery({

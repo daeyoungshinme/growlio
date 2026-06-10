@@ -2,25 +2,25 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
-import { api } from "../api/client";
-import { fetchSettings } from "../api/settings";
-import { fetchDCAAnalysis } from "../api/invest";
-import { fetchTaxSummary, fetchOverseasPositionsTax } from "../api/tax";
-import SkeletonCard from "../components/common/SkeletonCard";
+import { api } from "@/api/client";
+import { fetchSettings } from "@/api/settings";
+import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchTaxSummary, fetchOverseasPositionsTax } from "@/api/tax";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
-import TaxPlannerSection from "../components/invest/TaxPlannerSection";
-import ErrorBoundary from "../components/ErrorBoundary";
-import GoalTimelineCard from "../components/invest/GoalTimelineCard";
-import MonthlyAchievementTable from "../components/invest/MonthlyAchievementTable";
-import YearlyAchievementTable from "../components/invest/YearlyAchievementTable";
-import { fmtKrw } from "../utils/format";
-import { toast } from "../utils/toast";
-import { STALE_TIME } from "../constants/queryConfig";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import { invalidateDcaData } from "../utils/queryInvalidation";
-import FormInput from "../components/common/FormInput";
-import ConfirmModal from "../components/common/ConfirmModal";
+import TaxPlannerSection from "@/components/invest/TaxPlannerSection";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
+import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
+import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
+import { fmtKrw } from "@/utils/format";
+import { toast } from "@/utils/toast";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { invalidateDcaData } from "@/utils/queryInvalidation";
+import FormInput from "@/components/common/FormInput";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 interface GoalForm {
   monthly_deposit_amount: string;

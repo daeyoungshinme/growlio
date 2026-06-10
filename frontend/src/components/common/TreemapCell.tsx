@@ -1,4 +1,4 @@
-import { PIE_COLORS } from "../../utils/colors";
+import { PIE_COLORS } from "@/utils/colors";
 
 export default function TreemapCell(props: Record<string, unknown>) {
   const x = (props.x as number) ?? 0;

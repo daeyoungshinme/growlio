@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { fmtKrw, fmtPct } from "../../utils/format";
-import type { AssetAccount } from "../../api/assets";
-import type { PortfolioOverview } from "../../types";
+import { fmtKrw, fmtPct } from "@/utils/format";
+import type { AssetAccount } from "@/api/assets";
+import type { PortfolioOverview } from "@/types";
 
 interface Transaction {
   transaction_type: string;

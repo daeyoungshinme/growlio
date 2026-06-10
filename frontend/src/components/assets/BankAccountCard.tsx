@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Pencil, Trash2, RefreshCw } from "lucide-react";
-import type { AssetAccount } from "../../api/assets";
-import { fmtKrw } from "../../utils/format";
-import { useExchangeRateContext } from "../../context/ExchangeRateContext";
+import type { AssetAccount } from "@/api/assets";
+import { fmtKrw } from "@/utils/format";
+import { useExchangeRateContext } from "@/context/ExchangeRateContext";
 
 const BANK_TYPE_LABELS: Record<string, string> = {
   BANK_ACCOUNT: "입출금",
@@ -21,7 +21,7 @@ interface Props {
 }
 
 export default function BankAccountCard({ account, onDelete, onEditModal, onEditName, onSync, isDeleting, isSyncing }: Props) {
-  const usdRate = useExchangeRateContext();
+  const { rate: usdRate } = useExchangeRateContext();
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const [editNameMode, setEditNameMode] = useState(false);
   const [editNameValue, setEditNameValue] = useState(account.name);

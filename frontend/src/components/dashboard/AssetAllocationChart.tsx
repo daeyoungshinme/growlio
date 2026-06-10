@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { useThemeStore } from "../../stores/themeStore";
-import { chartTooltipStyle } from "../../utils/chart";
+import { useThemeStore } from "@/stores/themeStore";
+import { chartTooltipStyle } from "@/utils/chart";
 
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
 

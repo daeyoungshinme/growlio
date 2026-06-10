@@ -1,6 +1,6 @@
 import { TrendingDown, TrendingUp } from "lucide-react";
-import type { GoalTimeline } from "../../api/invest";
-import { fmtKrw, fmtMonth } from "../../utils/format";
+import type { GoalTimeline } from "@/api/invest";
+import { fmtKrw, fmtMonth } from "@/utils/format";
 
 interface Props {
   timeline: GoalTimeline;

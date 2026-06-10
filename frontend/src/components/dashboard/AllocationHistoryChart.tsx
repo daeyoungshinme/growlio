@@ -11,14 +11,14 @@ import {
   YAxis,
 } from "recharts";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useThemeStore } from "../../stores/themeStore";
-import { fetchAllocationHistory } from "../../api/portfolios";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { STALE_TIME } from "../../constants/queryConfig";
-import { chartTooltipStyle } from "../../utils/chart";
-import { fmtKrw, fmtKrwShort, fmtMonth } from "../../utils/format";
-import { pnlColor } from "../../utils/colors";
-import { REAL_ESTATE_ASSET_TYPE } from "../../constants/assets";
+import { useThemeStore } from "@/stores/themeStore";
+import { fetchAllocationHistory } from "@/api/portfolios";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { chartTooltipStyle } from "@/utils/chart";
+import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",

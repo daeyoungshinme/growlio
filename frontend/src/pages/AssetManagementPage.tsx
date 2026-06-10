@@ -6,32 +6,32 @@ import {
   updateAccount,
   deleteAccount,
   syncAccount,
-} from "../api/assets";
-import { extractErrorMessage } from "../utils/error";
-import StockPositionsModal from "../components/assets/StockPositionsModal";
-import TransactionModal from "../components/assets/TransactionModal";
-import BankAccountModal from "../components/assets/BankAccountModal";
-import StockAccountModal from "../components/assets/StockAccountModal";
+} from "@/api/assets";
+import { extractErrorMessage } from "@/utils/error";
+import StockPositionsModal from "@/components/assets/StockPositionsModal";
+import TransactionModal from "@/components/assets/TransactionModal";
+import BankAccountModal from "@/components/assets/BankAccountModal";
+import StockAccountModal from "@/components/assets/StockAccountModal";
 import {
   RealEstateAccountModal,
   RealEstateEditModal,
   RealEstateAccountCard,
-} from "../components/assets/RealEstateSection";
-import BankAccountCard from "../components/assets/BankAccountCard";
-import StockAccountCard, { type AccountStats } from "../components/assets/StockAccountCard";
-import StockAccountSummaryCard from "../components/assets/StockAccountSummaryCard";
-import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
-import ConfirmModal from "../components/common/ConfirmModal";
-import SkeletonCard from "../components/common/SkeletonCard";
-import EmptyState from "../components/common/EmptyState";
-import { invalidateAccountData, invalidateSyncData } from "../utils/queryInvalidation";
-import { useRegisterRefresh } from "../hooks/useRegisterRefresh";
-import { toast } from "../utils/toast";
-import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "../constants";
-import { useAssetManagementData } from "../hooks/useAssetManagementData";
-import { useAssetModals } from "../hooks/useAssetModals";
-import { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
-import Tabs from "../components/common/Tabs";
+} from "@/components/assets/RealEstateSection";
+import BankAccountCard from "@/components/assets/BankAccountCard";
+import StockAccountCard, { type AccountStats } from "@/components/assets/StockAccountCard";
+import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
+import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
+import ConfirmModal from "@/components/common/ConfirmModal";
+import SkeletonCard from "@/components/common/SkeletonCard";
+import EmptyState from "@/components/common/EmptyState";
+import { invalidateAccountData, invalidateSyncData } from "@/utils/queryInvalidation";
+import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
+import { toast } from "@/utils/toast";
+import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
+import { useAssetManagementData } from "@/hooks/useAssetManagementData";
+import { useAssetModals } from "@/hooks/useAssetModals";
+import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
+import Tabs from "@/components/common/Tabs";
 
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = typeof TABS[number];

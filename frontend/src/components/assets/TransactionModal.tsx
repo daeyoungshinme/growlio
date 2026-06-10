@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
 import { useState } from "react";
-import Modal from "../common/Modal";
-import { api } from "../../api/client";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { useForm } from "../../hooks/useForm";
-import { useStockSearch } from "../../hooks/useStockSearch";
+import Modal from "@/components/common/Modal";
+import { api } from "@/api/client";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useForm } from "@/hooks/useForm";
+import { useStockSearch } from "@/hooks/useStockSearch";
 import {
   createTransaction,
   deleteTransaction,
@@ -13,15 +13,15 @@ import {
   Transaction,
   TransactionCreate,
   updateTransaction,
-} from "../../api/transactions";
-import { convertUsdToKrw, fmtKrw } from "../../utils/format";
-import { invalidateTransactionData } from "../../utils/queryInvalidation";
-import { toast } from "../../utils/toast";
-import { TX_LABELS } from "../../constants/transaction";
+} from "@/api/transactions";
+import { convertUsdToKrw, fmtKrw } from "@/utils/format";
+import { invalidateTransactionData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+import { TX_LABELS } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
-import { STALE_TIME } from "../../constants/queryConfig";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { transactionSchema } from "../../schemas/transaction";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { transactionSchema } from "@/schemas/transaction";
 
 interface Props {
   accountId: string;
@@ -177,8 +177,8 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
             <h2 className="text-base font-bold text-gray-900 dark:text-gray-50">입출금 내역</h2>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{accountName}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X size={18} className="text-gray-500 dark:text-gray-400" />
+          <button onClick={onClose} aria-label="닫기" className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={18} aria-hidden="true" className="text-gray-500 dark:text-gray-400" />
           </button>
         </div>
 

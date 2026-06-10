@@ -1,11 +1,11 @@
 import { memo, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { fmtKrwShort } from "../../utils/format";
-import { groupPositionsByTicker } from "../../utils/portfolio";
-import { pnlColor } from "../../utils/colors";
-import type { PortfolioPosition, DividendYield } from "../../types";
-import EmptyState from "../common/EmptyState";
+import { fmtKrwShort } from "@/utils/format";
+import { groupPositionsByTicker } from "@/utils/portfolio";
+import { pnlColor } from "@/utils/colors";
+import type { PortfolioPosition, DividendYield } from "@/types";
+import EmptyState from "@/components/common/EmptyState";
 
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 80; // 카드 평균 높이 (px)

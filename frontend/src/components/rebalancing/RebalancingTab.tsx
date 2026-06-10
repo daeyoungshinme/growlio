@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit2, History, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
-import { analyzePortfolio, ExecutionResult, RebalancingAnalysis } from "../../api/rebalancing";
+import { analyzePortfolio, ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import {
   createPortfolio,
   deletePortfolio,
@@ -9,16 +9,16 @@ import {
   Portfolio,
   PortfolioItem,
   updatePortfolio,
-} from "../../api/portfolios";
-import { fetchAccounts } from "../../api/assets";
-import UnifiedPortfolioEditor from "../portfolio-analysis/UnifiedPortfolioEditor";
+} from "@/api/portfolios";
+import { fetchAccounts } from "@/api/assets";
+import UnifiedPortfolioEditor from "@/components/portfolio-analysis/UnifiedPortfolioEditor";
 import RebalancingTable from "./RebalancingTable";
 import RebalancingHistoryTab from "./RebalancingHistoryTab";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { invalidatePortfolioData } from "../../utils/queryInvalidation";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import ConfirmModal from "../common/ConfirmModal";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import ConfirmModal from "@/components/common/ConfirmModal";
 
 function applyExecutionResults(analysis: RebalancingAnalysis, results: ExecutionResult[]): RebalancingAnalysis {
   const successMap: Record<string, number> = {};

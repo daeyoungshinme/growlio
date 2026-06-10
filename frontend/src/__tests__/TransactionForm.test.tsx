@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
-import { TransactionForm } from "../components/assets/TransactionForm";
-import { renderWithProviders } from "../test/renderWithProviders";
-import type { AssetAccount } from "../api/assets";
+import { TransactionForm } from "@/components/assets/TransactionForm";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import type { AssetAccount } from "@/api/assets";
 
 vi.mock("../hooks/useExchangeRate", () => ({
   useExchangeRate: () => 1350,

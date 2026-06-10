@@ -1,5 +1,5 @@
 import type { InputHTMLAttributes } from "react";
-import { INPUT_SM, INPUT_MD, LABEL_SM, LABEL_MD } from "../../constants/inputStyles";
+import { INPUT_SM, INPUT_MD, LABEL_SM, LABEL_MD } from "@/constants/inputStyles";
 
 interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label: string;

@@ -1,4 +1,4 @@
-import { INPUT_SM, LABEL_MD } from "../../constants/inputStyles";
+import { INPUT_SM, LABEL_MD } from "@/constants/inputStyles";
 export const inputClass = `mt-1 w-full ${INPUT_SM}`;
 export const labelClass = LABEL_MD;
 

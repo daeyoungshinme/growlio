@@ -1,9 +1,9 @@
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
-import { useThemeStore } from "../../stores/themeStore";
-import { fmtKrwShort } from "../../utils/format";
-import { chartTooltipStyle } from "../../utils/chart";
-import TreemapCell from "../common/TreemapCell";
-import SkeletonCard from "../common/SkeletonCard";
+import { useThemeStore } from "@/stores/themeStore";
+import { fmtKrwShort } from "@/utils/format";
+import { chartTooltipStyle } from "@/utils/chart";
+import TreemapCell from "@/components/common/TreemapCell";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 interface TreemapItem {
   name: string;

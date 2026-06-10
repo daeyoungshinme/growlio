@@ -1,5 +1,5 @@
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
-import { PortfolioItem } from "../../api/portfolios";
+import { PortfolioItem } from "@/api/portfolios";
 
 const PIE_COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
 

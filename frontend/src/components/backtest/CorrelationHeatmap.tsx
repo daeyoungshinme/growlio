@@ -1,4 +1,4 @@
-import { CorrelationResult } from "../../api/backtest";
+import { CorrelationResult } from "@/api/backtest";
 
 interface Props {
   result: CorrelationResult;

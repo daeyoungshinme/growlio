@@ -7,9 +7,9 @@
 import { useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
-import { useAuthStore } from "../stores/authStore";
-import { toast } from "../utils/toast";
-import { registerPushToken } from "../api/settings";
+import { useAuthStore } from "@/stores/authStore";
+import { toast } from "@/utils/toast";
+import { registerPushToken } from "@/api/settings";
 
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

@@ -2,11 +2,11 @@ import { createContext, useCallback, useContext, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
-import { useAuthStore } from "../../stores/authStore";
-import { toast } from "../../utils/toast";
-import { usePullToRefresh } from "../../hooks/usePullToRefresh";
-import { useSwipeNavigation } from "../../hooks/useSwipeNavigation";
-import { ExchangeRateProvider } from "../../context/ExchangeRateContext";
+import { useAuthStore } from "@/stores/authStore";
+import { toast } from "@/utils/toast";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
+import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 
 // 페이지 컴포넌트가 새로고침 콜백을 AppLayout에 등록하기 위한 컨텍스트
 interface RefreshContextValue {

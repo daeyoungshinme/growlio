@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
-import { type AssetAccount } from "../../api/assets";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { useHaptic } from "../../hooks/useHaptic";
-import { convertUsdToKrw, fmtKrw, fmtPct } from "../../utils/format";
-import { pnlColor } from "../../utils/colors";
-import { STOCK_TYPE_LABELS } from "../../constants";
+import { type AssetAccount } from "@/api/assets";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useHaptic } from "@/hooks/useHaptic";
+import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import { STOCK_TYPE_LABELS } from "@/constants";
 
 export interface AccountStats {
   amount_krw: number;

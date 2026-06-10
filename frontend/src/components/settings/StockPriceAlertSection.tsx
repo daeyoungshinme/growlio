@@ -6,13 +6,13 @@ import {
   reactivateStockPriceAlert,
   deleteStockPriceAlert,
   type StockPriceAlert,
-} from "../../api/alerts";
-import type { StockSuggestion } from "../../api/assets";
-import { useStockSearch } from "../../hooks/useStockSearch";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { invalidateStockPriceAlertData } from "../../utils/queryInvalidation";
+} from "@/api/alerts";
+import type { StockSuggestion } from "@/api/assets";
+import { useStockSearch } from "@/hooks/useStockSearch";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { invalidateStockPriceAlertData } from "@/utils/queryInvalidation";
 import { SectionCard, inputClass, labelClass } from "./shared";
 
 const DeleteIcon = () => (

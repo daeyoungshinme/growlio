@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import type { StockSuggestion } from "../../api/assets";
-import { convertUsdToKrw, fmtKrwShort } from "../../utils/format";
-import { isOverseasMarket, POSITION_MARKETS } from "../../constants/markets";
-import PriceCell from "../common/PriceCell";
-import { SuggestionDropdown } from "../common/SuggestionDropdown";
-import { pnlColor } from "../../utils/colors";
-import type { Position } from "../../hooks/usePositionsEditor";
+import type { StockSuggestion } from "@/api/assets";
+import { convertUsdToKrw, fmtKrwShort } from "@/utils/format";
+import { isOverseasMarket, POSITION_MARKETS } from "@/constants/markets";
+import PriceCell from "@/components/common/PriceCell";
+import { SuggestionDropdown } from "@/components/common/SuggestionDropdown";
+import { pnlColor } from "@/utils/colors";
+import type { Position } from "@/hooks/usePositionsEditor";
 
 export type { Position };
 
@@ -158,13 +158,13 @@ export function PositionsTable({
       {/* ── 모바일 카드 뷰 (sm 미만) ── */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {readonly ? (
-          liveRows.map((row, i) => <ReadonlyMobileCard key={i} row={row} />)
+          liveRows.map((row, i) => <ReadonlyMobileCard key={row._rowKey ?? String(i)} row={row} />)
         ) : (
           liveRows.map((row, i) => {
             const overseas = isOverseasMarket(row.market);
             const priceLoading = priceLoadingRows.has(i);
             return (
-              <div key={i} className="py-3 space-y-2">
+              <div key={row._rowKey ?? String(i)} className="py-3 space-y-2">
                 <div className="relative">
                   <input
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
@@ -209,7 +209,7 @@ export function PositionsTable({
                       {POSITION_MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </div>
-                  <button onClick={() => removeRow(i)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg">
+                  <button onClick={() => removeRow(i)} className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg">
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -311,13 +311,13 @@ export function PositionsTable({
           </thead>
           <tbody>
             {readonly ? (
-              liveRows.map((row, i) => <ReadonlyDesktopRow key={i} row={row} />)
+              liveRows.map((row, i) => <ReadonlyDesktopRow key={row._rowKey ?? String(i)} row={row} />)
             ) : (
               liveRows.map((row, i) => {
                 const overseas = isOverseasMarket(row.market);
                 const priceLoading = priceLoadingRows.has(i);
                 return (
-                  <tr key={i} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 align-top">
+                  <tr key={row._rowKey ?? String(i)} className="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 align-top">
                     <td className="py-2 pr-3">
                       <div className="relative">
                         <input

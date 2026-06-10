@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
-import TransactionHistoryTab from "../components/assets/TransactionHistoryTab";
-import { renderWithProviders } from "../test/renderWithProviders";
-import type { AssetAccount } from "../api/assets";
+import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import type { AssetAccount } from "@/api/assets";
 
 vi.mock("../api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),

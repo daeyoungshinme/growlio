@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
-import HeroSummaryCard from "../components/dashboard/HeroSummaryCard";
-import { renderWithProviders } from "../test/renderWithProviders";
-import type { DashboardData } from "../api/dashboard";
+import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import type { DashboardData } from "@/api/dashboard";
 
 vi.mock("../components/dashboard/AssetAllocationChart", () => ({
   default: () => <div data-testid="mock-allocation-chart" />,

@@ -1,20 +1,20 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
-import { INPUT_SM } from "../../constants/inputStyles";
-import Modal from "../common/Modal";
+import { INPUT_SM } from "@/constants/inputStyles";
+import Modal from "@/components/common/Modal";
 import {
   fetchRebalancingAlert,
   upsertRebalancingAlert,
   deleteRebalancingAlert,
   type ScheduleType,
-} from "../../api/alerts";
-import { fetchAccounts } from "../../api/assets";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { STALE_TIME } from "../../constants/queryConfig";
-import { invalidateRebalancingAlertData } from "../../utils/queryInvalidation";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
+} from "@/api/alerts";
+import { fetchAccounts } from "@/api/assets";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
 
 interface Props {
   portfolioId: string;
@@ -74,8 +74,8 @@ const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL"
 
 const inputClass = `w-full ${INPUT_SM}`;
 
-import type { RebalancingAlert } from "../../api/alerts";
-import type { AssetAccount } from "../../api/assets";
+import type { RebalancingAlert } from "@/api/alerts";
+import type { AssetAccount } from "@/api/assets";
 import type { QueryClient } from "@tanstack/react-query";
 
 export default function RebalancingAlertModal({ portfolioId, portfolioName, onClose }: Props) {

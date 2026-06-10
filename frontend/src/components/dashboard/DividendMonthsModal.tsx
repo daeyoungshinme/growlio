@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { MONTH_LABELS } from "../../utils/dividendUtils";
+import { MONTH_LABELS } from "@/utils/dividendUtils";
 
 interface Props {
   ticker: string;
@@ -38,7 +38,7 @@ export default function DividendMonthsModal({
             <p className="font-semibold text-gray-900 dark:text-gray-50">{name}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500">{ticker} · {market}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={16} />
           </button>
         </div>

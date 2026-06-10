@@ -1,4 +1,5 @@
 """통합 포트폴리오 CRUD API (백테스팅·리밸런싱 공용)."""
+import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -12,12 +13,14 @@ from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.user import User
+from app.redis_client import get_redis
 from app.schemas.portfolio import (
     PortfolioCreate,
     PortfolioReorderRequest,
     PortfolioResponse,
     PortfolioUpdate,
 )
+from app.utils.cache_keys import TTL_PORTFOLIO_LIST, invalidate_user_caches, portfolio_list_key
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -60,6 +63,15 @@ async def list_portfolios(
     db: AsyncSession = Depends(get_db),
 ):
     """저장된 포트폴리오 목록."""
+    redis = await get_redis()
+    cache_key = portfolio_list_key(current_user.id)
+    try:
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass
+
     rows = await db.execute(
         _with_relations(
             select(Portfolio)
@@ -67,7 +79,15 @@ async def list_portfolios(
             .order_by(Portfolio.sort_order, Portfolio.created_at)
         )
     )
-    return rows.scalars().all()
+    portfolios = rows.scalars().all()
+    result = [PortfolioResponse.model_validate(p).model_dump(mode="json") for p in portfolios]
+
+    try:
+        await redis.setex(cache_key, TTL_PORTFOLIO_LIST, json.dumps(result))
+    except Exception:
+        pass
+
+    return result
 
 
 @router.post("", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
@@ -103,6 +123,9 @@ async def create_portfolio(
             db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
 
     await db.commit()
+
+    redis = await get_redis()
+    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
 
     result = await db.execute(
         _with_relations(select(Portfolio).where(Portfolio.id == portfolio.id))
@@ -162,6 +185,9 @@ async def update_portfolio(
 
     await db.commit()
 
+    redis = await get_redis()
+    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+
     result2 = await db.execute(
         _with_relations(select(Portfolio).where(Portfolio.id == portfolio_id))
     )
@@ -191,6 +217,9 @@ async def delete_portfolio(
     await db.delete(portfolio)
     await db.commit()
 
+    redis = await get_redis()
+    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+
 
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
 @limiter.limit("30/minute")
@@ -216,3 +245,6 @@ async def reorder_portfolios(
         .values(sort_order=sort_case)
     )
     await db.commit()
+
+    redis = await get_redis()
+    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))

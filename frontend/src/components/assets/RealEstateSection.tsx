@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { X, Pencil, Trash2 } from "lucide-react";
-import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "../../api/assets";
-import { fmtKrw } from "../../utils/format";
-import { INPUT_SM } from "../../constants/inputStyles";
-import { REAL_ESTATE_ASSET_TYPE } from "../../constants/assets";
+import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "@/api/assets";
+import { fmtKrw } from "@/utils/format";
+import { INPUT_SM } from "@/constants/inputStyles";
+import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 
 const PROPERTY_TYPE_OPTIONS = ["아파트", "오피스텔", "상가", "토지", "단독주택", "기타"];
 
@@ -57,7 +57,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 추가</h2>
-          <button onClick={onClose} aria-label="닫기" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={18} />
           </button>
         </div>
@@ -186,7 +186,7 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 수정</h2>
-          <button onClick={onClose} aria-label="닫기" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={18} />
           </button>
         </div>

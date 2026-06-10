@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { X, CheckCircle, XCircle } from "lucide-react";
-import type { AssetAccountCreate } from "../../api/assets";
-import { INPUT_SM } from "../../constants/inputStyles";
-import { verifyKisCredentials } from "../../api/assets";
-import { useCurrencyInput } from "../../hooks/useCurrencyInput";
-import { useForm } from "../../hooks/useForm";
-import { extractErrorMessage } from "../../utils/error";
-import { convertUsdToKrw, fmtKrw } from "../../utils/format";
+import type { AssetAccountCreate } from "@/api/assets";
+import { INPUT_SM } from "@/constants/inputStyles";
+import { verifyKisCredentials } from "@/api/assets";
+import { useCurrencyInput } from "@/hooks/useCurrencyInput";
+import { useForm } from "@/hooks/useForm";
+import { extractErrorMessage } from "@/utils/error";
+import { convertUsdToKrw, fmtKrw } from "@/utils/format";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -97,8 +97,8 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">증권사 계좌 등록</h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X size={18} />
+          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">주식 계좌를 등록하면 포트폴리오에서 조회할 수 있습니다</p>

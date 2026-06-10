@@ -24,19 +24,19 @@ import {
   fetchPortfolios,
   reorderPortfolios,
   updatePortfolio,
-} from "../../api/portfolios";
-import { fetchAccounts } from "../../api/assets";
+} from "@/api/portfolios";
+import { fetchAccounts } from "@/api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import { AnalysisPanel } from "./AnalysisPanel";
-import ErrorBoundary from "../ErrorBoundary";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { invalidatePortfolioData } from "../../utils/queryInvalidation";
-import { QUERY_KEYS } from "../../constants/queryKeys";
-import { fetchRebalancingAlerts } from "../../api/alerts";
-import ConfirmModal from "../common/ConfirmModal";
+import ErrorBoundary from "@/components/ErrorBoundary";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { fetchRebalancingAlerts } from "@/api/alerts";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import RebalancingAlertModal from "./RebalancingAlertModal";
-import { STALE_TIME } from "../../constants/queryConfig";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 function SortablePortfolioItem({
   id,

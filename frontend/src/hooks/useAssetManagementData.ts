@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { fetchAccounts, type AssetAccount } from "../api/assets";
-import { fetchPortfolioOverview } from "../api/portfolios";
-import { fetchTransactions } from "../api/transactions";
+import { fetchAccounts, type AssetAccount } from "@/api/assets";
+import { fetchPortfolioOverview } from "@/api/portfolios";
+import { fetchTransactions } from "@/api/transactions";
 import { useExchangeRate } from "./useExchangeRate";
-import { QUERY_KEYS } from "../constants/queryKeys";
-import type { ASSET_MANAGEMENT_TABS } from "../constants/tabs";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import type { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 
 type Tab = typeof ASSET_MANAGEMENT_TABS[number];
 

@@ -1,14 +1,14 @@
 import { lazy, Suspense, useMemo, useState } from "react";
-import { useThemeStore } from "../../stores/themeStore";
-import { fmtKrwShort } from "../../utils/format";
-import SkeletonCard from "../common/SkeletonCard";
+import { useThemeStore } from "@/stores/themeStore";
+import { fmtKrwShort } from "@/utils/format";
+import SkeletonCard from "@/components/common/SkeletonCard";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
 import MonthlyTickerDetail from "./MonthlyTickerDetail";
-import type { DividendByTicker, DividendYield } from "../../types";
-import { MONTH_LABELS, dividendFreqInfo, weightBarColor, yieldBadgeClass } from "../../utils/dividendUtils";
-import EmptyState from "../common/EmptyState";
+import type { DividendByTicker, DividendYield } from "@/types";
+import { MONTH_LABELS, dividendFreqInfo, weightBarColor, yieldBadgeClass } from "@/utils/dividendUtils";
+import EmptyState from "@/components/common/EmptyState";
 
 interface DividendSummary {
   annual_received: number;

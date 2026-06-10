@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useDashboardData } from "../hooks/useDashboardData";
+import { useDashboardData } from "@/hooks/useDashboardData";
 
 vi.mock("../api/dashboard", () => ({
   fetchDashboard: vi.fn(),

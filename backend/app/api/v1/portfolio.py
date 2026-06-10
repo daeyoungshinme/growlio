@@ -17,6 +17,7 @@ from app.models.asset import AssetAccount
 from app.models.user import User
 from app.redis_client import get_redis
 from app.services.credential_service import get_kis_user_credentials
+from app.schemas.portfolio import PortfolioSummaryResponse
 from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -48,7 +49,7 @@ async def portfolio_overview(
     return await build_portfolio_overview(current_user.id, db, redis=redis, lite=lite)
 
 
-@router.get("/summary")
+@router.get("/summary", response_model=PortfolioSummaryResponse)
 @limiter.limit("5/minute")
 async def portfolio_summary(
     request: Request,

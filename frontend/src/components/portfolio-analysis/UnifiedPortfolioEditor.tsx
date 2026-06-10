@@ -1,16 +1,16 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import { AssetAccount, type StockSuggestion } from "../../api/assets";
-import { Portfolio, PortfolioItem } from "../../api/portfolios";
-import { PORTFOLIO_WEIGHT_TOLERANCE } from "../../constants/validation";
+import { AssetAccount, type StockSuggestion } from "@/api/assets";
+import { Portfolio, PortfolioItem } from "@/api/portfolios";
+import { PORTFOLIO_WEIGHT_TOLERANCE } from "@/constants/validation";
 import {
   BASE_TYPE_STOCK_ONLY,
   BASE_TYPE_TOTAL_ASSETS,
   CASH_TICKER,
   KR_PROPERTY_MARKET,
   REAL_ESTATE_ASSET_TYPE,
-} from "../../constants/assets";
-import { useStockSearch } from "../../hooks/useStockSearch";
+} from "@/constants/assets";
+import { useStockSearch } from "@/hooks/useStockSearch";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
 
@@ -119,7 +119,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
           <h2 className="font-semibold text-gray-800 dark:text-gray-50">
             {initial ? "포트폴리오 수정" : "새 포트폴리오 만들기"}
           </h2>
-          <button onClick={onClose} aria-label="닫기" className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-lg transition-colors">
             <X size={18} />
           </button>
         </div>

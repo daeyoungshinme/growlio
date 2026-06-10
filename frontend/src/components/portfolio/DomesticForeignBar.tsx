@@ -1,4 +1,4 @@
-import { fmtKrwShort } from "../../utils/format";
+import { fmtKrwShort } from "@/utils/format";
 
 interface Item {
   name: string;

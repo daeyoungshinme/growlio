@@ -1,7 +1,7 @@
 import { LineChart, LogOut, PieChart, Settings, Home, Wallet, TrendingUp, Moon, Sun } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useThemeStore } from "../../stores/themeStore";
-import { useLogout } from "../../hooks/useLogout";
+import { useThemeStore } from "@/stores/themeStore";
+import { useLogout } from "@/hooks/useLogout";
 
 const nav = [
   { to: "/dashboard", icon: Home, label: "대시보드" },

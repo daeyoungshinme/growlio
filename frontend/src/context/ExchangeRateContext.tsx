@@ -1,17 +1,37 @@
 import { createContext, useContext } from "react";
-import { useExchangeRate } from "../hooks/useExchangeRate";
+import { useQuery } from "@tanstack/react-query";
+import { fetchExchangeRate } from "@/api/assets";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 
-const ExchangeRateContext = createContext<number | null>(null);
+export interface ExchangeRateContextValue {
+  rate: number | null;
+  isLoading: boolean;
+  error: Error | null;
+}
+
+const ExchangeRateContext = createContext<ExchangeRateContextValue>({
+  rate: null,
+  isLoading: false,
+  error: null,
+});
 
 export function ExchangeRateProvider({ children }: { children: React.ReactNode }) {
-  const usdRate = useExchangeRate();
+  const { data, isLoading, error } = useQuery({
+    queryKey: QUERY_KEYS.exchangeRate,
+    queryFn: fetchExchangeRate,
+    staleTime: STALE_TIME.EXCHANGE_RATE,
+  });
+
   return (
-    <ExchangeRateContext.Provider value={usdRate}>
+    <ExchangeRateContext.Provider
+      value={{ rate: data?.usd_krw ?? null, isLoading, error: error as Error | null }}
+    >
       {children}
     </ExchangeRateContext.Provider>
   );
 }
 
-export function useExchangeRateContext(): number | null {
+export function useExchangeRateContext(): ExchangeRateContextValue {
   return useContext(ExchangeRateContext);
 }

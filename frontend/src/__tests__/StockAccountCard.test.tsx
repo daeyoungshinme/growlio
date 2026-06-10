@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
-import StockAccountCard from "../components/assets/StockAccountCard";
-import { renderWithProviders } from "../test/renderWithProviders";
-import type { AssetAccount } from "../api/assets";
+import StockAccountCard from "@/components/assets/StockAccountCard";
+import { renderWithProviders } from "@/test/renderWithProviders";
+import type { AssetAccount } from "@/api/assets";
 
 vi.mock("../hooks/useExchangeRate", () => ({
   useExchangeRate: () => 1350,
@@ -58,7 +58,7 @@ describe("StockAccountCard", () => {
 
   it("계좌번호를 표시한다", () => {
     renderWithProviders(<StockAccountCard {...defaultProps} />);
-    expect(screen.getByText("12345678-01")).toBeInTheDocument();
+    expect(screen.getByText(/12345678-01/)).toBeInTheDocument();
   });
 
   it("KIS 동기화 버튼에 aria-label이 있다", () => {

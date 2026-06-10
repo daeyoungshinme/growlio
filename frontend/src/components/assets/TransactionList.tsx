@@ -1,7 +1,7 @@
 import { Pencil, Trash2 } from "lucide-react";
-import { Transaction, TransactionCreate } from "../../api/transactions";
-import { fmtKrw } from "../../utils/format";
-import { TX_LABELS, TX_COLORS } from "../../constants/transaction";
+import { Transaction, TransactionCreate } from "@/api/transactions";
+import { fmtKrw } from "@/utils/format";
+import { TX_LABELS, TX_COLORS } from "@/constants/transaction";
 
 interface TransactionListProps {
   txList: Transaction[] | undefined;

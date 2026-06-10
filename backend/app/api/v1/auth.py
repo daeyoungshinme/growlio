@@ -21,7 +21,7 @@ async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.post("/sync-profile", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/sync-profile", response_model=UserResponse, status_code=status.HTTP_200_OK)
 @limiter.limit("10/minute")
 async def sync_profile(
     request: Request,

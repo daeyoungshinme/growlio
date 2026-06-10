@@ -1,11 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useReducer } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AssetAccount } from "../api/assets";
-import { extractErrorMessage } from "../utils/error";
-import { invalidateSyncData } from "../utils/queryInvalidation";
+import { AssetAccount } from "@/api/assets";
+import { extractErrorMessage } from "@/utils/error";
+import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { triggerHaptic } from "./useHaptic";
-import { OVERSEAS_MARKET_SET, isOverseasMarket } from "../constants/markets";
-import { CASH_TICKER, KR_PROPERTY_MARKET } from "../constants/assets";
+import { OVERSEAS_MARKET_SET, isOverseasMarket } from "@/constants/markets";
+import { CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 import {
   ExecutionOrderItem,
   ExecutionResult,
@@ -13,7 +13,7 @@ import {
   RebalancingAnalysis,
   RebalancingItem,
   executeRebalancing,
-} from "../api/rebalancing";
+} from "@/api/rebalancing";
 import { useRebalancingBalances } from "./useRebalancingBalances";
 import { useRebalancingPrices } from "./useRebalancingPrices";
 

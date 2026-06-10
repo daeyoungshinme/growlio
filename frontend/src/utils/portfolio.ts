@@ -1,4 +1,4 @@
-import type { PortfolioPosition, AggregatedPosition } from "../types";
+import type { PortfolioPosition, AggregatedPosition } from "@/types";
 
 export interface AggregatedPositionWithSubs extends AggregatedPosition {
   sub_positions: PortfolioPosition[];

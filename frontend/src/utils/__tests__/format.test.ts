@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { convertUsdToKrw, formatUsdAsKrw, fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "../format";
+import { convertUsdToKrw, formatUsdAsKrw, fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
 
 describe("fmtKrw", () => {
   it("억원 단위 변환", () => {

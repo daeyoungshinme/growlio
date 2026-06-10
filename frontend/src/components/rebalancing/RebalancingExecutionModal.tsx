@@ -1,8 +1,8 @@
-import { AssetAccount } from "../../api/assets";
-import { ExecutionResult, RebalancingAnalysis } from "../../api/rebalancing";
+import { AssetAccount } from "@/api/assets";
+import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { RebalancingResultSection } from "./RebalancingResultSection";
 import { RebalancingConfirmStep } from "./RebalancingConfirmStep";
-import { RebalancingExecutionContext, useRebalancingExecution } from "../../hooks/useRebalancingExecution";
+import { RebalancingExecutionContext, useRebalancingExecution } from "@/hooks/useRebalancingExecution";
 
 interface Props {
   portfolioId: string;

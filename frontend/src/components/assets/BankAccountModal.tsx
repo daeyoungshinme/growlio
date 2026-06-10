@@ -1,9 +1,9 @@
 import { X } from "lucide-react";
-import type { AssetAccount, AssetAccountCreate } from "../../api/assets";
-import { useCurrencyInput } from "../../hooks/useCurrencyInput";
-import { useForm } from "../../hooks/useForm";
-import { fmtKrw } from "../../utils/format";
-import { INPUT_SM, TEXTAREA_SM } from "../../constants/inputStyles";
+import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
+import { useCurrencyInput } from "@/hooks/useCurrencyInput";
+import { useForm } from "@/hooks/useForm";
+import { fmtKrw } from "@/utils/format";
+import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 
 interface Props {
   initialAccount?: AssetAccount;
@@ -51,8 +51,8 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
             {isEdit ? "은행계좌 수정" : "은행계좌 추가"}
           </h2>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
-            <X size={18} />
+          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { supabase } from "../lib/supabase";
-import { api } from "../api/client";
+import { supabase } from "@/lib/supabase";
+import { api } from "@/api/client";
 
 interface AuthState {
   isAuthenticated: boolean;

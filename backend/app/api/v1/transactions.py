@@ -15,7 +15,7 @@ from app.models.asset import Transaction
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
-from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches
+from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches, monthly_trend_key
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -133,6 +133,7 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
         redis,
         dashboard_summary_key(user_id),
         dividend_summary_key(user_id),
+        monthly_trend_key(user_id),
     )
 
 

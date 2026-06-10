@@ -1,15 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, RefreshCw, X } from "lucide-react";
-import { api } from "../../api/client";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { usePositionsEditor } from "../../hooks/usePositionsEditor";
-import { extractErrorMessage } from "../../utils/error";
-import { fmtKrwShort } from "../../utils/format";
-import { pnlColor } from "../../utils/colors";
-import Modal from "../common/Modal";
+import { api } from "@/api/client";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { usePositionsEditor } from "@/hooks/usePositionsEditor";
+import { extractErrorMessage } from "@/utils/error";
+import { fmtKrwShort } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
+import Modal from "@/components/common/Modal";
 import { PositionsTable } from "./PositionsTable";
-import type { Position } from "../../hooks/usePositionsEditor";
-import { useState } from "react";
+import type { Position } from "@/hooks/usePositionsEditor";
 
 interface Summary {
   total_invested: number;

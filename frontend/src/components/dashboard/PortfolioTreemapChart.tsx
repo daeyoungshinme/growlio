@@ -1,9 +1,9 @@
 import { memo } from "react";
 import { ResponsiveContainer, Tooltip as RechartsTooltip, Treemap } from "recharts";
-import { useThemeStore } from "../../stores/themeStore";
-import { fmtKrw } from "../../utils/format";
-import TreemapCell from "../common/TreemapCell";
-import { chartTooltipStyle } from "../../utils/chart";
+import { useThemeStore } from "@/stores/themeStore";
+import { fmtKrw } from "@/utils/format";
+import TreemapCell from "@/components/common/TreemapCell";
+import { chartTooltipStyle } from "@/utils/chart";
 
 interface ChartItem {
   name: string;

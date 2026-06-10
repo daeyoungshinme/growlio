@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { OverseasPositionDetail } from "../api/tax";
+import { OverseasPositionDetail } from "@/api/tax";
 
 export const TAX_DEDUCTION = 2_500_000;
 export const TAX_RATE = 0.22;

@@ -1,5 +1,5 @@
 import { useContext, useEffect } from "react";
-import { RefreshContext } from "../components/layout/AppLayout";
+import { RefreshContext } from "@/components/layout/AppLayout";
 
 /**
  * AppLayout의 pull-to-refresh에 현재 페이지 새로고침 콜백을 등록한다.

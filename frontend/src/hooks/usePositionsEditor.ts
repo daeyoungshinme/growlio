@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { fetchStockPrice } from "../api/assets";
-import type { StockSuggestion } from "../api/assets";
+import { fetchStockPrice } from "@/api/assets";
+import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "./useStockSearch";
-import { extractErrorMessage } from "../utils/error";
-import { toast } from "../utils/toast";
-import { isOverseasMarket } from "../constants/markets";
+import { extractErrorMessage } from "@/utils/error";
+import { toast } from "@/utils/toast";
+import { isOverseasMarket } from "@/constants/markets";
 
 export interface Position {
   ticker: string;
@@ -20,6 +20,7 @@ export interface Position {
   value_amount?: number;
   pnl?: number;
   pnl_pct?: number;
+  _rowKey?: string; // 리스트 렌더링용 안정적 키 (백엔드 응답에는 없음)
 }
 
 export function usePositionsEditor(initialRows: Position[], usdRate: number | null) {
@@ -35,7 +36,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   const addRow = () =>
     setRows((prev) => [
       ...prev,
-      { ticker: "", name: "", market: "KOSPI", qty: 0, avg_price: 0, avg_price_usd: null, usd_rate: null, current_price: null, current_price_usd: null },
+      { ticker: "", name: "", market: "KOSPI", qty: 0, avg_price: 0, avg_price_usd: null, usd_rate: null, current_price: null, current_price_usd: null, _rowKey: crypto.randomUUID() },
     ]);
 
   const removeRow = (i: number) => {
@@ -112,6 +113,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
         isOverseasMarket(p.market) && p.current_price && p.usd_rate
           ? +(p.current_price / p.usd_rate).toFixed(4)
           : (p.current_price_usd ?? null),
+      _rowKey: p._rowKey ?? `${p.ticker}-${p.market}`,
     }));
 
   return {

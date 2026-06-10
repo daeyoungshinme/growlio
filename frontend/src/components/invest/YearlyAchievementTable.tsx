@@ -1,6 +1,6 @@
-import type { YearlyAchievement } from "../../api/invest";
-import { fmtKrw } from "../../utils/format";
-import EmptyState from "../common/EmptyState";
+import type { YearlyAchievement } from "@/api/invest";
+import { fmtKrw } from "@/utils/format";
+import EmptyState from "@/components/common/EmptyState";
 
 function pctColor(pct: number) {
   if (pct >= 100) return "text-red-500";

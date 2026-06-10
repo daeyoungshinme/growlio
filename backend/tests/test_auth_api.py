@@ -106,13 +106,13 @@ class TestSyncProfile:
                     json={"display_name": "새유저"},
                     headers={"Authorization": "Bearer faketoken"},
                 )
-            assert resp.status_code == 201
+            assert resp.status_code == 200
         finally:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)
 
     def test_sync_profile_idempotent(self):
-        """이미 존재하는 유저 JWT로 요청하면 기존 유저를 반환한다 (201 또는 200)."""
+        """이미 존재하는 유저 JWT로 요청하면 기존 유저를 반환한다 (200)."""
         from app.main import app
         from app.database import get_db
         from app.api.deps import get_token_payload
@@ -136,7 +136,7 @@ class TestSyncProfile:
                     json={"display_name": None},
                     headers={"Authorization": "Bearer faketoken"},
                 )
-            assert resp.status_code in (200, 201)
+            assert resp.status_code == 200
         finally:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)

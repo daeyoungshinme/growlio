@@ -1,18 +1,18 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../api/client";
+import { api } from "@/api/client";
 import {
   fetchExchangeRateAlerts,
   createExchangeRateAlert,
   reactivateExchangeRateAlert,
   deleteExchangeRateAlert,
   type ExchangeRateAlert,
-} from "../../api/alerts";
-import { useExchangeRate } from "../../hooks/useExchangeRate";
-import { invalidateAlertData } from "../../utils/queryInvalidation";
-import { toast } from "../../utils/toast";
-import { extractErrorMessage } from "../../utils/error";
-import { QUERY_KEYS } from "../../constants/queryKeys";
+} from "@/api/alerts";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { invalidateAlertData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { SectionCard, inputClass, labelClass } from "./shared";
 
 interface Props {
