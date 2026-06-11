@@ -32,6 +32,8 @@ from app.services.asset_service import sync_account as _sync_account_service
 from app.services.credential_service import encrypt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
+    TTL_ACCOUNT_DETAIL,
+    account_detail_key,
     dashboard_summary_key,
     dividend_summary_key,
     dividend_ticker_summary_key,
@@ -200,8 +202,23 @@ async def get_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    import contextlib
+    import json
+
+    from redis.exceptions import RedisError
+
+    redis = await get_redis()
+    cache_key = account_detail_key(current_user.id, account_id)
+    with contextlib.suppress(RedisError):
+        cached = await redis.get(cache_key)
+        if cached:
+            return json.loads(cached)
+
     account = await _get_owned_account(account_id, current_user.id, db)
-    return _account_response(account)
+    response = _account_response(account)
+    with contextlib.suppress(RedisError):
+        await redis.setex(cache_key, TTL_ACCOUNT_DETAIL, response.model_dump_json())
+    return response
 
 
 @router.put("/{account_id}", response_model=AssetAccountResponse)
@@ -286,6 +303,14 @@ async def update_account(
         if pos_list:
             await sync_snapshot_positions(db, snapshot_id=new_snap.id, account_id=account.id, positions=pos_list)
         await db.commit()
+
+    import contextlib
+
+    from redis.exceptions import RedisError
+
+    _redis = await get_redis()
+    with contextlib.suppress(RedisError):
+        await _redis.delete(account_detail_key(account.user_id, account.id))
     return _account_response(account)
 
 
@@ -331,6 +356,10 @@ async def _delete_account_credentials(
     token_model,
     redis_key: str,
 ) -> None:
+    import contextlib
+
+    from redis.exceptions import RedisError
+
     account = await _get_owned_account(account_id, user_id, db)
     setattr(account, app_key_attr, None)
     setattr(account, app_secret_attr, None)
@@ -339,6 +368,8 @@ async def _delete_account_credentials(
 
     redis = await get_redis()
     await redis.delete(redis_key)
+    with contextlib.suppress(RedisError):
+        await redis.delete(account_detail_key(user_id, account_id))
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -347,9 +378,16 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    import contextlib
+
+    from redis.exceptions import RedisError
+
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
     await db.commit()
+    _redis = await get_redis()
+    with contextlib.suppress(RedisError):
+        await _redis.delete(account_detail_key(current_user.id, account_id))
 
 
 @router.post("/{account_id}/sync")

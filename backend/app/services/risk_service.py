@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 
 logger = structlog.get_logger()
 
@@ -24,15 +25,6 @@ _RISK_CACHE_TTL = 3600  # 1시간
 _KOSPI_SYMBOL = "^KS11"
 _SP500_SYMBOL = "^GSPC"
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
-
-
-def _to_yf_symbol(ticker: str, market: str) -> str:
-    m = market.upper()
-    if m in ("KOSPI", "KRX"):
-        return f"{ticker.zfill(6)}.KS"
-    if m == "KOSDAQ":
-        return f"{ticker.zfill(6)}.KQ"
-    return ticker
 
 
 def _sync_fetch_risk_data(

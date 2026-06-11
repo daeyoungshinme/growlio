@@ -18,13 +18,18 @@ logger = structlog.get_logger()
 _yfinance_sem = asyncio.Semaphore(5)
 
 
-def _to_yahoo_symbol(ticker: str, market: str) -> str:
+def to_yf_symbol(ticker: str, market: str) -> str:
+    """Yahoo Finance 심볼 변환 (KOSPI/KRX → .KS, KOSDAQ → .KQ, 해외 그대로)."""
     m = market.upper()
     if m in ("KOSPI", "KRX"):
         return f"{ticker.zfill(6)}.KS"
     if m == "KOSDAQ":
         return f"{ticker.zfill(6)}.KQ"
     return ticker
+
+
+# 내부 별칭 (기존 코드 호환)
+_to_yahoo_symbol = to_yf_symbol
 
 
 def _sync_usdkrw() -> float:

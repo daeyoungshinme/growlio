@@ -6,7 +6,6 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
-import InsightsPanel from "@/components/dashboard/InsightsPanel";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -139,11 +138,6 @@ export default function DashboardPage() {
           </ErrorBoundary>
         </div>
       </div>
-
-      {/* Row 3: 포트폴리오 진단 인사이트 */}
-      <ErrorBoundary variant="section">
-        <InsightsPanel />
-      </ErrorBoundary>
 
       {/* Row 4: 자산 추이 */}
       <ErrorBoundary variant="section">

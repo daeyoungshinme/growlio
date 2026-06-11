@@ -46,13 +46,11 @@ export default function PortfolioPage() {
   useRegisterRefresh(handleRefresh);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = TABS.includes(searchParams.get("tab") as Tab)
-    ? (searchParams.get("tab") as Tab)
-    : "종목 현황";
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const urlTab = searchParams.get("tab") as Tab;
+  const tab: Tab = TABS.includes(urlTab) ? urlTab : "종목 현황";
+  const portfolioId = searchParams.get("portfolioId") ?? undefined;
 
   const handleTabChange = useCallback((next: Tab) => {
-    setTab(next);
     setSearchParams({ tab: next }, { replace: true });
   }, [setSearchParams]);
   const [syncingAll, setSyncingAll] = useState(false);
@@ -261,7 +259,7 @@ export default function PortfolioPage() {
 
       {tab === "포트폴리오 분석" && (
         <ErrorBoundary variant="section">
-          <PortfolioAnalysisTab />
+          <PortfolioAnalysisTab portfolioId={portfolioId} />
         </ErrorBoundary>
       )}
 

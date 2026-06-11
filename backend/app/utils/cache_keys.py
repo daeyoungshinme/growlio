@@ -23,6 +23,8 @@ TTL_HAS_OVERSEAS_FALSE = 900     # 해외 없음 15분 (신규 매수 시 빠른
 TTL_DIVIDEND_SUMMARY = 3600      # 배당 집계 1시간
 TTL_PORTFOLIO_OVERVIEW = 900     # 포트폴리오 overview 15분
 TTL_PORTFOLIO_LIST = 300         # 포트폴리오 목록 5분
+TTL_ACCOUNT_DETAIL = 300         # 계좌 상세 5분
+TTL_EXCHANGE_RATE_ALERTS = 300   # 환율 알림 목록 5분
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -100,6 +102,14 @@ def portfolio_overview_lite_key(user_id: uuid.UUID) -> str:
 
 def portfolio_list_key(user_id: uuid.UUID) -> str:
     return f"portfolio_list:{user_id}"
+
+
+def account_detail_key(user_id: uuid.UUID, account_id: uuid.UUID) -> str:
+    return f"account_detail:{user_id}:{account_id}"
+
+
+def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
+    return f"alerts:exchange_rate:{user_id}"
 
 
 async def invalidate_user_caches(redis: Any, *keys: str) -> None:

@@ -1,12 +1,15 @@
 """목표환율 / 리밸런싱 알림 CRUD API."""
 from __future__ import annotations
 
+import contextlib
+import json
 import uuid
 from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +19,8 @@ from app.limiter import limiter
 from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User
+from app.redis_client import get_redis
+from app.utils.cache_keys import TTL_EXCHANGE_RATE_ALERTS, exchange_rate_alerts_key
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -61,6 +66,14 @@ async def list_exchange_rate_alerts(
     db: AsyncSession = Depends(get_db),
 ):
     """내 목표환율 알림 목록 조회 (활성 + 발동 이력)."""
+    if skip == 0 and limit == 50:
+        redis = await get_redis()
+        cache_key = exchange_rate_alerts_key(current_user.id)
+        with contextlib.suppress(RedisError):
+            cached = await redis.get(cache_key)
+            if isinstance(cached, (str, bytes, bytearray)):
+                return json.loads(cached)
+
     result = await db.execute(
         select(ExchangeRateAlert)
         .where(ExchangeRateAlert.user_id == current_user.id)
@@ -68,8 +81,16 @@ async def list_exchange_rate_alerts(
         .offset(skip)
         .limit(limit)
     )
-    alerts = result.scalars().all()
-    return [AlertResponse.model_validate(a) for a in alerts]
+    alerts_list = [AlertResponse.model_validate(a) for a in result.scalars().all()]
+
+    if skip == 0 and limit == 50:
+        with contextlib.suppress(RedisError):
+            await redis.setex(
+                cache_key,
+                TTL_EXCHANGE_RATE_ALERTS,
+                json.dumps([a.model_dump(mode="json") for a in alerts_list]),
+            )
+    return alerts_list
 
 
 @router.post("/exchange-rate", response_model=AlertResponse, status_code=status.HTTP_201_CREATED)
@@ -90,6 +111,9 @@ async def create_exchange_rate_alert(
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
+    _redis = await get_redis()
+    with contextlib.suppress(RedisError):
+        await _redis.delete(exchange_rate_alerts_key(current_user.id))
     return AlertResponse.model_validate(alert)
 
 
@@ -112,6 +136,9 @@ async def reactivate_exchange_rate_alert(
     alert.trigger_count = 0
     await db.commit()
     await db.refresh(alert)
+    _redis = await get_redis()
+    with contextlib.suppress(RedisError):
+        await _redis.delete(exchange_rate_alerts_key(current_user.id))
     return AlertResponse.model_validate(alert)
 
 
@@ -132,6 +159,9 @@ async def delete_exchange_rate_alert(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
     await db.delete(alert)
     await db.commit()
+    _redis = await get_redis()
+    with contextlib.suppress(RedisError):
+        await _redis.delete(exchange_rate_alerts_key(current_user.id))
 
 
 # ── 리밸런싱 알림 ────────────────────────────────────────────────────────────

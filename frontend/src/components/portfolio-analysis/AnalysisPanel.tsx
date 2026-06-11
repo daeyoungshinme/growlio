@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
@@ -22,11 +22,12 @@ interface Props {
   portfolios: Portfolio[];
   activeAccounts: AssetAccount[];
   onOpenAlertModal: (portfolioId: string) => void;
+  autoAnalyzeId?: string;
 }
 
 type AnalysisMode = "rebalancing" | "backtest";
 
-export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal }: Props) {
+export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal, autoAnalyzeId }: Props) {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
   const [analysis, setAnalysis] = useState<RebalancingAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -77,6 +78,24 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       setAnalyzing(false);
     }
   }
+
+  const autoAnalyzedRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!autoAnalyzeId) return;
+    if (autoAnalyzedRef.current === autoAnalyzeId) return;
+    if (!selectedIds.has(autoAnalyzeId) || selectedIds.size !== 1) return;
+    autoAnalyzedRef.current = autoAnalyzeId;
+    setAnalysisMode("rebalancing");
+    setBacktestResult(null);
+    setAnalyzing(true);
+    setAnalysisError(null);
+    setAnalysis(null);
+    analyzePortfolio(autoAnalyzeId)
+      .then((result) => setAnalysis(result))
+      .catch((err) => setAnalysisError(extractErrorMessage(err, "분석 중 오류가 발생했습니다.")))
+      .finally(() => setAnalyzing(false));
+  }, [autoAnalyzeId, selectedIds]);
 
   function handleSwitchToBacktest() {
     setAnalysisMode("backtest");

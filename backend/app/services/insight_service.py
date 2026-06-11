@@ -231,8 +231,8 @@ async def _check_rebalancing_opportunity(
                 severity=InsightSeverity.ALERT,
                 title="리밸런싱 필요",
                 detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다. 리밸런싱이 필요합니다.",
-                action_label="리밸런싱 실행",
-                action_url="/portfolio?tab=analysis",
+                action_label="리밸런싱 분석",
+                action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
                 metric_value=round(max_drift, 1),
             ))
         elif max_drift >= 5:
@@ -242,7 +242,7 @@ async def _check_rebalancing_opportunity(
                 title="리밸런싱 권장",
                 detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다.",
                 action_label="리밸런싱 분석",
-                action_url="/portfolio?tab=analysis",
+                action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
                 metric_value=round(max_drift, 1),
             ))
 

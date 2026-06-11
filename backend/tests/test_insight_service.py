@@ -129,7 +129,7 @@ class TestCheckTaxLossHarvest:
         from app.services.insight_service import _check_tax_loss_harvest
 
         positions = [
-            {"ticker": "AAPL", "unrealized_pnl_krw": 2_000_000, "qty": 5},
+            {"ticker": "AAPL", "unrealized_pnl_krw": 3_000_000, "qty": 5},
             {"ticker": "TSLA", "unrealized_pnl_krw": -1_500_000, "qty": 3},
         ]
         with patch("app.services.insight_service.get_overseas_positions_detail",

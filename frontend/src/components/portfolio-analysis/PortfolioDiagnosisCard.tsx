@@ -36,8 +36,7 @@ function InsightRow({ insight }: { insight: Insight }) {
 
   const handleAction = () => {
     if (!insight.action_url) return;
-    const [path] = insight.action_url.split("?");
-    navigate(path);
+    navigate(insight.action_url);
   };
 
   const severityDot: Record<string, string> = {

@@ -28,6 +28,7 @@ from app.schemas.backtest import (
     PortfolioMetrics,
     SeriesData,
 )
+from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 
 logger = structlog.get_logger()
 
@@ -36,17 +37,6 @@ DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 # 백테스팅에서 제외되는 특수 항목 (가격 데이터 없음)
 _BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE"}
 _BACKTEST_SKIP_MARKETS = {"KR_PROPERTY"}
-
-
-# ── Yahoo Finance 심볼 변환 (price_service와 동일 로직) ───────
-
-def _to_yf_symbol(ticker: str, market: str) -> str:
-    m = market.upper()
-    if m in ("KOSPI", "KRX"):
-        return f"{ticker.zfill(6)}.KS"
-    if m == "KOSDAQ":
-        return f"{ticker.zfill(6)}.KQ"
-    return ticker
 
 
 # ── yfinance 히스토리컬 다운로드 (동기) ──────────────────────

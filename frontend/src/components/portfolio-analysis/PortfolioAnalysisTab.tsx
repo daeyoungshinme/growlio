@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -61,7 +61,7 @@ function SortablePortfolioItem({
   );
 }
 
-export default function PortfolioAnalysisTab() {
+export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: string }) {
   const qc = useQueryClient();
 
   const { data: portfoliosRaw, isLoading } = useQuery({
@@ -92,6 +92,12 @@ export default function PortfolioAnalysisTab() {
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!portfolioId || portfolios.length === 0) return;
+    if (!portfolios.some((p) => p.id === portfolioId)) return;
+    setSelectedIds(new Set([portfolioId]));
+  }, [portfolioId, portfolios]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
 
@@ -472,6 +478,7 @@ export default function PortfolioAnalysisTab() {
           portfolios={sortedPortfolios}
           activeAccounts={activeAccounts}
           onOpenAlertModal={setAlertModalPortfolioId}
+          autoAnalyzeId={portfolioId}
         />
       </ErrorBoundary>
       </div>
