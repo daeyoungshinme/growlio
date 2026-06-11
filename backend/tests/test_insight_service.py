@@ -77,7 +77,9 @@ class TestCheckRebalancingOpportunity:
         portfolio = SimpleNamespace(
             id=uuid.uuid4(),
             name="테스트",
+            base_type="STOCK_ONLY",
             items=[SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=100.0)],
+            account_ids=None,
         )
         exec_result = MagicMock()
         exec_result.scalars.return_value.all.return_value = [portfolio]

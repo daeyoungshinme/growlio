@@ -6,6 +6,76 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.enums import AssetType, DataSource, TransactionType
+from app.models.asset import VALID_MARKETS
+
+
+class ManualPosition(BaseModel):
+    """수동 종목 입력 스키마."""
+    ticker: str
+    name: str
+    market: str = "KOSPI"
+    qty: float
+    avg_price: float
+    avg_price_usd: float | None = None
+    usd_rate: float | None = None
+    current_price: float | None = None
+
+    @field_validator("name")
+    @classmethod
+    def name_not_empty(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("종목명은 빈 값일 수 없습니다")
+        if len(stripped) > 200:
+            raise ValueError("종목명은 200자 이하여야 합니다")
+        return stripped
+
+    @field_validator("ticker")
+    @classmethod
+    def ticker_not_empty(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("티커는 빈 값일 수 없습니다")
+        if len(stripped) > 20:
+            raise ValueError("티커는 20자 이하여야 합니다")
+        return stripped.upper()
+
+    @field_validator("qty")
+    @classmethod
+    def qty_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("수량은 0보다 커야 합니다")
+        if v > 1_000_000:
+            raise ValueError("수량은 1,000,000 이하여야 합니다")
+        return v
+
+    @field_validator("avg_price")
+    @classmethod
+    def avg_price_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("평균단가는 0보다 커야 합니다")
+        return v
+
+    @field_validator("avg_price_usd")
+    @classmethod
+    def avg_price_usd_positive(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("달러 평균단가는 0보다 커야 합니다")
+        return v
+
+    @field_validator("usd_rate")
+    @classmethod
+    def usd_rate_range(cls, v: float | None) -> float | None:
+        if v is not None and not (0 < v < 10000):
+            raise ValueError("환율은 0 초과 10,000 미만이어야 합니다")
+        return v
+
+    @field_validator("market")
+    @classmethod
+    def market_valid(cls, v: str) -> str:
+        if v not in VALID_MARKETS:
+            raise ValueError(f"유효하지 않은 시장: {v}. 허용값: {sorted(VALID_MARKETS)}")
+        return v
 
 
 class PositionItem(BaseModel):
@@ -147,6 +217,7 @@ class AssetAccountResponse(BaseModel):
     created_at: datetime
     has_own_kis_credentials: bool = False     # KIS 계좌별 API 키 보유 여부
     has_own_kiwoom_credentials: bool = False  # 키움 계좌별 API 키 보유 여부
+    target_portfolio_id: UUID | None = None
 
     model_config = {"from_attributes": True}
 

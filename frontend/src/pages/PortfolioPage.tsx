@@ -21,6 +21,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
 import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
+import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimizationCard";
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -249,6 +250,12 @@ export default function PortfolioPage() {
             dividendByTicker={dividendByTicker}
             totalInvestedKrw={data?.total_invested_krw}
           />
+        </ErrorBoundary>
+      )}
+
+      {tab === "세금 추정" && (
+        <ErrorBoundary variant="section">
+          <TaxOptimizationCard />
         </ErrorBoundary>
       )}
 

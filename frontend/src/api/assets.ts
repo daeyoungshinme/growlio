@@ -30,6 +30,7 @@ export interface AssetAccount {
   created_at: string;
   has_own_kis_credentials: boolean;
   has_own_kiwoom_credentials: boolean;
+  target_portfolio_id?: string | null;
 }
 
 export interface AssetAccountCreate {
@@ -68,6 +69,20 @@ export const deleteAccount = (id: string) =>
 
 export const syncAccount = (id: string) =>
   api.post(`/assets/${id}/sync`).then((r) => r.data);
+
+export const setAccountTargetPortfolio = (accountId: string, portfolioId: string | null) =>
+  api.patch<AssetAccount>(`/assets/${accountId}/target-portfolio`, { target_portfolio_id: portfolioId }).then((r) => r.data);
+
+export const batchSetTargetPortfolio = (
+  portfolioId: string | null,
+  accountIds: string[],
+): Promise<AssetAccount[]> =>
+  api
+    .patch<AssetAccount[]>("/assets/batch-target-portfolio", {
+      portfolio_id: portfolioId,
+      account_ids: accountIds,
+    })
+    .then((r) => r.data);
 
 export const verifyKisCredentials = (data: { kis_app_key: string; kis_app_secret: string; is_mock: boolean }) =>
   api.post<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data).then((r) => r.data);

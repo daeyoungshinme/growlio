@@ -95,8 +95,20 @@ def _is_bypass(exc: BaseException) -> bool:
 
 
 # ── 서비스별 사전 설정 인스턴스 ──────────────────────────────────────────────────
-kis_circuit = CircuitBreaker("KIS", fail_max=5, reset_timeout=60.0)
-kiwoom_circuit = CircuitBreaker("Kiwoom", fail_max=5, reset_timeout=60.0)
-yahoo_circuit = CircuitBreaker("YahooFinance", fail_max=3, reset_timeout=120.0)
-dart_circuit = CircuitBreaker("DART", fail_max=5, reset_timeout=120.0)
-openbanking_circuit = CircuitBreaker("OpenBanking", fail_max=3, reset_timeout=90.0)
+# 임계값은 config.py의 cb_* 필드로 조정 가능
+def _cfg():
+    from app.config import settings
+    return settings
+
+
+def _make(name: str, fail_max: int, reset_timeout: float) -> CircuitBreaker:
+    return CircuitBreaker(name, fail_max=fail_max, reset_timeout=reset_timeout)
+
+
+kis_circuit = _make("KIS", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
+kiwoom_circuit = _make("Kiwoom", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
+yahoo_circuit = _make("YahooFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
+dart_circuit = _make("DART", _cfg().cb_default_fail_max, _cfg().cb_ext_reset_timeout)
+openbanking_circuit = _make("OpenBanking", _cfg().cb_ext_fail_max, 90.0)
+naver_circuit = _make("NaverFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
+fdr_circuit = _make("FinanceDataReader", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)

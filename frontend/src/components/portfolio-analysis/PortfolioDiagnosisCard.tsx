@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { useInsights } from "@/hooks/useInsights";
 import type { Insight, InsightType } from "@/api/insights";
 
@@ -73,6 +75,7 @@ interface Props {
 }
 
 export default function PortfolioDiagnosisCard({ portfolioName }: Props) {
+  const [isOpen, setIsOpen] = useState(false);
   const { data: allInsights, isLoading } = useInsights();
 
   if (isLoading) {
@@ -97,10 +100,32 @@ export default function PortfolioDiagnosisCard({ portfolioName }: Props) {
 
   if (insights.length === 0) {
     return (
-      <div className="card flex flex-col items-center justify-center py-12 text-center">
-        <div className="text-3xl mb-3">✅</div>
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">포트폴리오 이상 없음</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">현재 발견된 문제가 없습니다</p>
+      <div className="card">
+        <button
+          onClick={() => setIsOpen((v) => !v)}
+          className="w-full flex items-center justify-between cursor-pointer"
+        >
+          <div>
+            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">포트폴리오 진단 결과</h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              {portfolioName ? `'${portfolioName}' 기준` : "전체 자산 기준"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500">✅ 이상 없음</span>
+            <ChevronDown
+              size={16}
+              className={`text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+            />
+          </div>
+        </button>
+        {isOpen && (
+          <div className="mt-5 flex flex-col items-center justify-center py-8 text-center">
+            <div className="text-3xl mb-3">✅</div>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">포트폴리오 이상 없음</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">현재 발견된 문제가 없습니다</p>
+          </div>
+        )}
       </div>
     );
   }
@@ -109,15 +134,18 @@ export default function PortfolioDiagnosisCard({ portfolioName }: Props) {
   const warnCount = insights.filter((i) => i.severity === "WARNING").length;
 
   return (
-    <div className="card space-y-5">
-      <div className="flex items-center justify-between">
+    <div className="card">
+      <button
+        onClick={() => setIsOpen((v) => !v)}
+        className="w-full flex items-center justify-between cursor-pointer"
+      >
         <div>
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">포트폴리오 진단 결과</h3>
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             {portfolioName ? `'${portfolioName}' 기준` : "전체 자산 기준"}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
           {alertCount > 0 && (
             <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5">
               위험 {alertCount}
@@ -128,28 +156,36 @@ export default function PortfolioDiagnosisCard({ portfolioName }: Props) {
               주의 {warnCount}
             </span>
           )}
-        </div>
-      </div>
-
-      {concentrationPct !== null && (
-        <div className="space-y-2">
-          <DiagnosticGauge
-            label="자산 집중도"
-            value={concentrationPct}
-            max={100}
-            color={concentrationPct >= 40 ? "#EF4444" : concentrationPct >= 30 ? "#F59E0B" : "#22C55E"}
+          <ChevronDown
+            size={16}
+            className={`text-gray-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </div>
-      )}
+      </button>
 
-      <div>
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-2">발견된 이슈 ({insights.length}개)</p>
-        <div>
-          {insights.map((insight, idx) => (
-            <InsightRow key={`${insight.type}-${idx}`} insight={insight} />
-          ))}
+      {isOpen && (
+        <div className="mt-5 space-y-5">
+          {concentrationPct !== null && (
+            <div className="space-y-2">
+              <DiagnosticGauge
+                label="자산 집중도"
+                value={concentrationPct}
+                max={100}
+                color={concentrationPct >= 40 ? "#EF4444" : concentrationPct >= 30 ? "#F59E0B" : "#22C55E"}
+              />
+            </div>
+          )}
+
+          <div>
+            <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-2">발견된 이슈 ({insights.length}개)</p>
+            <div>
+              {insights.map((insight, idx) => (
+                <InsightRow key={`${insight.type}-${idx}`} insight={insight} />
+              ))}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

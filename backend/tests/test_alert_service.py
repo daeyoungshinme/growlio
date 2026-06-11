@@ -21,34 +21,34 @@ class TestShouldFireToday:
         )
 
     def test_daily_always_fires(self):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today
 
         alert = self._make_alert("DAILY")
-        assert _should_fire_today(alert) is True
+        assert should_fire_today(alert) is True
 
     def test_weekly_fires_on_correct_day(self):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
 
         # today의 요일을 구해 schedule_day_of_week로 설정
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         alert = self._make_alert("WEEKLY", schedule_day_of_week=today.weekday())
-        assert _should_fire_today(alert) is True
+        assert should_fire_today(alert) is True
 
     def test_weekly_does_not_fire_on_wrong_day(self):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         wrong_day = (today.weekday() + 1) % 7
         alert = self._make_alert("WEEKLY", schedule_day_of_week=wrong_day)
-        result = _should_fire_today(alert)
+        result = should_fire_today(alert)
         # 오늘 요일 != wrong_day이면 False여야 함
         if today.weekday() != wrong_day:
             assert result is False
 
     def test_quarterly_fires_first_time(self):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
         import calendar
 
@@ -61,10 +61,10 @@ class TestShouldFireToday:
             schedule_day_of_month=target_day,
             last_triggered_at=None,  # 최초 발송
         )
-        assert _should_fire_today(alert) is True
+        assert should_fire_today(alert) is True
 
     def test_quarterly_does_not_fire_before_cooldown(self):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
         import calendar
 
@@ -79,7 +79,7 @@ class TestShouldFireToday:
             schedule_day_of_month=target_day,
             last_triggered_at=recent_trigger,
         )
-        result = _should_fire_today(alert)
+        result = should_fire_today(alert)
         # 30일은 80일 쿨다운 미만이므로 False
         if today.day == target_day:
             assert result is False
@@ -89,24 +89,24 @@ class TestShouldFireToday:
 
 class TestAlreadyFiredToday:
     def test_returns_false_when_never_triggered(self):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today
 
         alert = SimpleNamespace(last_triggered_at=None)
-        assert _already_fired_today(alert) is False
+        assert already_fired_today(alert) is False
 
     def test_returns_true_when_fired_today(self):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today
 
         now = datetime.now(tz=UTC)
         alert = SimpleNamespace(last_triggered_at=now)
-        assert _already_fired_today(alert) is True
+        assert already_fired_today(alert) is True
 
     def test_returns_false_when_fired_yesterday(self):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today
 
         yesterday = datetime.now(tz=UTC) - timedelta(days=1)
         alert = SimpleNamespace(last_triggered_at=yesterday)
-        assert _already_fired_today(alert) is False
+        assert already_fired_today(alert) is False
 
 
 # ── check_and_trigger_alerts (환율) ─────────────────────────
@@ -355,9 +355,9 @@ async def test_save_alert_history_adds_to_session(mock_db):
     """_save_alert_history가 AlertHistory 객체를 session에 추가한다."""
     user_id = uuid.uuid4()
 
-    from app.services.alert_service import _save_alert_history
+    from app.services.alert_repository import save_alert_history
 
-    await _save_alert_history(mock_db, user_id, "EXCHANGE_RATE", "환율 알림: 1290원")
+    await save_alert_history(mock_db, user_id, "EXCHANGE_RATE", "환율 알림: 1290원")
 
     mock_db.add.assert_called_once()
     added_obj = mock_db.add.call_args[0][0]

@@ -1,32 +1,27 @@
 """목표환율 / 리밸런싱 알림 체크 서비스."""
 from __future__ import annotations
 
-import calendar
 import uuid
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
+from app.models.alert import ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
+from app.services.alert_calculator import (
+    already_fired_today,
+    should_fire_today,
+    should_trigger_exchange_rate,
+    should_trigger_stock_price,
+)
+from app.services.alert_repository import save_alert_history
 from app.utils.currency import fetch_usd_krw
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
-
-_MULTI_TRIGGER_COOLDOWN = timedelta(hours=1)
-
-
-async def _save_alert_history(
-    db: AsyncSession,
-    user_id: uuid.UUID,
-    alert_type: str,
-    message: str,
-) -> None:
-    db.add(AlertHistory(user_id=user_id, alert_type=alert_type, message=message))
 
 
 async def check_and_trigger_alerts(db: AsyncSession) -> None:
@@ -52,21 +47,11 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
 
     triggered_count = 0
     for alert, user_email, notification_email, fcm_token in rows:
-        email = notification_email or user_email
-        target = float(alert.target_rate)
-        should_trigger = (
-            (alert.direction == "BELOW" and current_rate <= target)
-            or (alert.direction == "ABOVE" and current_rate >= target)
-        )
-        if not should_trigger:
+        if not should_trigger_exchange_rate(alert, current_rate):
             continue
 
-        # 다회 발동 알림: 쿨다운 체크 (마지막 발동 후 1시간 이내면 건너뜀)
-        if alert.max_trigger_count > 1 and alert.triggered_at:
-            elapsed = datetime.now(tz=UTC) - alert.triggered_at
-            if elapsed < _MULTI_TRIGGER_COOLDOWN:
-                continue
-
+        email = notification_email or user_email
+        target = float(alert.target_rate)
         try:
             await send_exchange_rate_alert(
                 to_email=email,
@@ -90,7 +75,7 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
-        await _save_alert_history(
+        await save_alert_history(
             db,
             alert.user_id,
             "EXCHANGE_RATE",
@@ -102,56 +87,6 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         await db.commit()
         alert_trigger_count.labels(alert_type="exchange_rate").inc(triggered_count)
         logger.info("exchange_rate_alerts_triggered", count=triggered_count, current_rate=current_rate)
-
-
-_KST = timezone(timedelta(hours=9))
-
-# QUARTERLY/SEMIANNUAL/ANNUAL: 쿨다운(일) 경과 후 지정 날짜에 발송
-_SCHEDULE_MIN_DAYS: dict[str, int] = {
-    "QUARTERLY": 80,
-    "SEMIANNUAL": 170,
-    "ANNUAL": 350,
-}
-
-
-def _should_fire_today(alert: RebalancingAlert) -> bool:
-    """오늘이 해당 알림의 발송일인지 확인."""
-    today = datetime.now(tz=_KST).date()
-    schedule = alert.schedule_type or "DAILY"
-
-    if schedule == "DAILY":
-        return True
-
-    if schedule == "WEEKLY":
-        target_dow = alert.schedule_day_of_week if alert.schedule_day_of_week is not None else 0
-        return today.weekday() == target_dow
-
-    if schedule == "MONTHLY":
-        target_day = alert.schedule_day_of_month or 1
-        last_day = calendar.monthrange(today.year, today.month)[1]
-        return today.day == min(target_day, last_day)
-
-    if schedule in _SCHEDULE_MIN_DAYS:
-        target_day = alert.schedule_day_of_month or 1
-        last_day = calendar.monthrange(today.year, today.month)[1]
-        if today.day != min(target_day, last_day):
-            return False
-        if not alert.last_triggered_at:
-            return True  # 최초 발송
-        min_days = _SCHEDULE_MIN_DAYS[schedule]
-        elapsed_days = (today - alert.last_triggered_at.astimezone(_KST).date()).days
-        return elapsed_days >= min_days
-
-    return False
-
-
-def _already_fired_today(alert: RebalancingAlert) -> bool:
-    """오늘 이미 발송됐는지 확인 (중복 방지)."""
-    if not alert.last_triggered_at:
-        return False
-    today = datetime.now(tz=_KST).date()
-    fired_date = alert.last_triggered_at.astimezone(_KST).date()
-    return fired_date == today
 
 
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
@@ -171,15 +106,11 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
     triggered_count = 0
     for alert, portfolio, user_email, notification_email in rows:
-        # 1. 오늘 발송일인지 확인
-        if not _should_fire_today(alert):
+        if not should_fire_today(alert):
+            continue
+        if already_fired_today(alert):
             continue
 
-        # 2. 오늘 이미 발송했으면 건너뜀
-        if _already_fired_today(alert):
-            continue
-
-        # 3. 포트폴리오 분석
         saved_ids = getattr(portfolio, "account_ids", None)
         effective_account_ids: list[uuid.UUID] | None = (
             [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
@@ -202,7 +133,6 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         threshold = float(alert.threshold_pct)
         drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
 
-        # 4. 발송 여부 결정
         only_when_drift = getattr(alert, "only_when_drift", True)
         if only_when_drift:
             if not drifting:
@@ -217,7 +147,6 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         email = notification_email or user_email
 
         if mode == "AUTO" and alert.account_id and drifting:
-            # 5a. AUTO 모드: 자동 주문 실행
             from app.redis_client import get_redis
             from app.schemas.rebalancing import ExecutionOrderItem
             from app.services.rebalancing_execution_service import execute_rebalancing
@@ -264,7 +193,6 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                     logger.error("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
                     continue
         else:
-            # 5b. NOTIFY 모드: 이메일 알림만
             try:
                 await send_rebalancing_alert(
                     to_email=email,
@@ -280,7 +208,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                 continue
 
         drift_desc = f"{len(drifting)}개 종목 드리프트" if drifting else "정기 보고"
-        await _save_alert_history(
+        await save_alert_history(
             db,
             alert.user_id,
             "REBALANCING",
@@ -314,7 +242,6 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
     if not rows:
         return
 
-    # ticker별 그룹화 후 배치 조회 (user_id는 첫 번째 유저 기준)
     sample_user_id = rows[0][0].user_id
     unique_tickers = list({(a.ticker, a.market) for a, _, _, _ in rows})
     price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, redis)
@@ -324,21 +251,11 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
         price = price_map.get(alert.ticker)
         if not price:
             continue
-
-        target = float(alert.target_price)
-        should_trigger = (
-            (alert.direction == "BELOW" and price <= target)
-            or (alert.direction == "ABOVE" and price >= target)
-        )
-        if not should_trigger:
+        if not should_trigger_stock_price(alert, price):
             continue
 
-        if alert.max_trigger_count > 1 and alert.triggered_at:
-            elapsed = datetime.now(tz=UTC) - alert.triggered_at
-            if elapsed < _MULTI_TRIGGER_COOLDOWN:
-                continue
-
         email = notification_email or user_email
+        target = float(alert.target_price)
         try:
             await send_stock_price_alert(
                 to_email=email,
@@ -364,7 +281,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
         alert.triggered_at = datetime.now(tz=UTC)
         if alert.trigger_count >= alert.max_trigger_count:
             alert.is_active = False
-        await _save_alert_history(
+        await save_alert_history(
             db,
             alert.user_id,
             "STOCK_PRICE",

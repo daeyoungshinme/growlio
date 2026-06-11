@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, Edit2, GripVertical, Loader2, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Bell, Edit2, GripVertical, Loader2, Plus, Target, Trash2 } from "lucide-react";
 import {
   Portfolio,
   PortfolioItem,
@@ -25,13 +25,14 @@ import {
   reorderPortfolios,
   updatePortfolio,
 } from "@/api/portfolios";
-import { fetchAccounts } from "@/api/assets";
+import { fetchAccounts, batchSetTargetPortfolio } from "@/api/assets";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import { AnalysisPanel } from "./AnalysisPanel";
+import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -158,6 +159,56 @@ export default function PortfolioAnalysisTab() {
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 삭제에 실패했습니다"), "error"),
   });
 
+  const batchTargetMut = useMutation({
+    mutationFn: ({ portfolioId, accountIds }: { portfolioId: string | null; accountIds: string[] }) =>
+      batchSetTargetPortfolio(portfolioId, accountIds),
+    onSuccess: (_, { portfolioId, accountIds }) => {
+      invalidateAccountData(qc);
+      if (portfolioId === null) {
+        toast("목표 포트폴리오 지정이 해제되었습니다");
+      } else {
+        const pName = sortedPortfolios.find((p) => p.id === portfolioId)?.name ?? "";
+        toast(`${pName}가 ${accountIds.length}개 계좌의 목표로 지정되었습니다`);
+      }
+    },
+    onError: (e) => toast(extractErrorMessage(e, "목표 포트폴리오 설정에 실패했습니다"), "error"),
+  });
+
+  function getPortfolioTargetState(p: Portfolio): "full" | "partial" | "none" {
+    const linkedIds = p.account_ids?.length ? p.account_ids : stockAccounts.map((a) => a.id);
+    const relevant = stockAccounts.filter((a) => linkedIds.includes(a.id));
+    if (relevant.length === 0) return "none";
+    const assigned = relevant.filter((a) => a.target_portfolio_id === p.id).length;
+    if (assigned === 0) return "none";
+    return assigned === relevant.length ? "full" : "partial";
+  }
+
+  function handleToggleTarget(e: React.MouseEvent, p: Portfolio) {
+    e.stopPropagation();
+    const linkedIds = p.account_ids?.length ? p.account_ids : stockAccounts.map((a) => a.id);
+    const relevant = stockAccounts.filter((a) => linkedIds.includes(a.id));
+    if (relevant.length === 0) return;
+    const currentState = getPortfolioTargetState(p);
+    if (currentState === "full") {
+      batchTargetMut.mutate({ portfolioId: null, accountIds: relevant.map((a) => a.id) });
+      return;
+    }
+    const conflicting = relevant.filter(
+      (a) => a.target_portfolio_id !== null && a.target_portfolio_id !== p.id
+    );
+    if (conflicting.length > 0) {
+      const conflictNames = conflicting
+        .map((a) => {
+          const targetPName = sortedPortfolios.find((po) => po.id === a.target_portfolio_id)?.name ?? "다른 포트폴리오";
+          return `${a.name}(→${targetPName})`;
+        })
+        .join(", ");
+      toast(`다음 계좌가 이미 다른 포트폴리오를 목표로 지정하고 있습니다: ${conflictNames}`, "error");
+      return;
+    }
+    batchTargetMut.mutate({ portfolioId: p.id, accountIds: relevant.map((a) => a.id) });
+  }
+
   const toggleSelect = (id: string) =>
     setSelectedIds((prev) => {
       const next = new Set(prev);
@@ -180,6 +231,8 @@ export default function PortfolioAnalysisTab() {
     .map((p) => p.name)
     .join(", ");
 
+  const unassignedAccounts = stockAccounts.filter((a) => !a.target_portfolio_id);
+
   // 포트폴리오에 지정된 계좌 이름 헬퍼
   function getAccountLabel(p: Portfolio): string {
     if (!p.account_ids?.length) return "모든 주식 계좌";
@@ -190,7 +243,17 @@ export default function PortfolioAnalysisTab() {
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+    <div className="space-y-5">
+      {/* ── 전체 자산 진단 ───────────────────────────────────────────── */}
+      <ErrorBoundary variant="section">
+        <PortfolioDiagnosisCard />
+      </ErrorBoundary>
+
+      {/* ── 구분선 ─────────────────────────────────────────────────── */}
+      <hr className="border-gray-200 dark:border-gray-700" />
+
+      {/* ── 포트폴리오 목록 + 분석 패널 ─────────────────────────────── */}
+      <div className="flex flex-col md:flex-row gap-4 md:gap-6">
       {/* ── 포트폴리오 목록 (모바일: 상단 전체폭, 데스크톱: 좌측 고정) ── */}
       <div className="w-full md:w-72 lg:w-80 md:flex-shrink-0 space-y-3">
         <div className="flex items-center justify-between">
@@ -202,6 +265,28 @@ export default function PortfolioAnalysisTab() {
             <Plus size={13} /> 새로 만들기
           </button>
         </div>
+
+        {unassignedAccounts.length > 0 && sortedPortfolios.length > 0 && (
+          <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-400">목표 미지정 계좌</p>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {unassignedAccounts.map((a) => (
+                <span
+                  key={a.id}
+                  className="text-xs px-1.5 py-0.5 rounded-md bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-700 text-amber-700 dark:text-amber-400"
+                >
+                  {a.name}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-amber-600/70 dark:text-amber-500/70 mt-1.5">
+              포트폴리오 카드에서 목표 지정 버튼을 클릭해 지정하세요.
+            </p>
+          </div>
+        )}
 
         {isLoading ? (
           <div className="flex justify-center py-8">
@@ -232,13 +317,19 @@ export default function PortfolioAnalysisTab() {
         ) : (
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
             <SortableContext items={sortedPortfolios.map((p) => p.id)} strategy={verticalListSortingStrategy}>
-              {sortedPortfolios.map((p) => (
+              {sortedPortfolios.map((p) => {
+                const tState = getPortfolioTargetState(p);
+                return (
                 <SortablePortfolioItem key={p.id} id={p.id}>
                   {({ dragHandleListeners }) => (
                     <div
                       className={`rounded-xl border p-3.5 cursor-pointer transition-colors ${
                         selectedIds.has(p.id)
                           ? "border-blue-400 bg-blue-50 dark:bg-blue-950"
+                          : tState === "full"
+                          ? "border-blue-200 dark:border-blue-700 bg-white dark:bg-gray-900 hover:bg-blue-50/50 dark:hover:bg-blue-950/40"
+                          : tState === "partial"
+                          ? "border-amber-200 dark:border-amber-700 bg-white dark:bg-gray-900 hover:bg-amber-50/50 dark:hover:bg-amber-950/40"
                           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800"
                       }`}
                       onClick={() => toggleSelect(p.id)}
@@ -294,6 +385,15 @@ export default function PortfolioAnalysisTab() {
                               })()}
                             </div>
                             <div className="flex gap-0.5 shrink-0 items-center">
+                              {tState !== "none" && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
+                                  tState === "full"
+                                    ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
+                                    : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400"
+                                }`}>
+                                  {tState === "full" ? "목표" : "일부"}
+                                </span>
+                              )}
                               {alertPortfolioIds.has(p.id) && (
                                 <span
                                   className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
@@ -305,6 +405,22 @@ export default function PortfolioAnalysisTab() {
                                   {alertByPortfolioId[p.id]?.mode === "AUTO" ? "자동" : "알림"}
                                 </span>
                               )}
+                              <button
+                                onClick={(e) => handleToggleTarget(e, p)}
+                                disabled={batchTargetMut.isPending}
+                                aria-label="목표 포트폴리오 지정"
+                                title={tState === "full" ? "목표 지정 해제" : "이 포트폴리오를 목표로 지정"}
+                                className={`flex items-center gap-0.5 px-1.5 py-1 rounded-lg transition-colors text-xs ${
+                                  tState === "full"
+                                    ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                    : tState === "partial"
+                                    ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    : "text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
+                                }`}
+                              >
+                                <Target size={12} />
+                                {tState === "none" && <span>목표 지정</span>}
+                              </button>
                               <button
                                 onClick={(e) => { e.stopPropagation(); setEditingPortfolio(p); setEditorOpen(true); }}
                                 aria-label="포트폴리오 수정"
@@ -341,7 +457,8 @@ export default function PortfolioAnalysisTab() {
                     </div>
                   )}
                 </SortablePortfolioItem>
-              ))}
+                );
+              })}
             </SortableContext>
           </DndContext>
         )}
@@ -357,6 +474,8 @@ export default function PortfolioAnalysisTab() {
           onOpenAlertModal={setAlertModalPortfolioId}
         />
       </ErrorBoundary>
+      </div>
+
       {/* 포트폴리오 에디터 모달 */}
       {editorOpen && (
         <UnifiedPortfolioEditor

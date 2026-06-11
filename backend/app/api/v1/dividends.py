@@ -1,6 +1,7 @@
 """배당금 현황 API."""
 
 import redis.asyncio as aioredis
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +25,7 @@ from app.services.dividend_service import (
 )
 
 router = APIRouter(prefix="/dividends", tags=["dividends"])
+logger = structlog.get_logger()
 
 
 @router.get("/summary")
@@ -161,8 +163,8 @@ async def drip_simulation(
     try:
         from app.services.asset_aggregator import get_dashboard_summary
         dashboard_data = await get_dashboard_summary(current_user.id, db, redis)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("drip_dashboard_summary_failed", user_id=str(current_user.id), error=str(e))
 
     initial_value = float(dashboard_data.get("total_assets_krw") or 0)
     monthly_contribution = float(

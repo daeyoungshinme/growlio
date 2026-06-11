@@ -34,7 +34,10 @@ export function invalidateTransactionData(qc: QueryClient) {
 
 /** 포트폴리오/백테스트/리밸런싱 CUD 후 */
 export function invalidatePortfolioData(qc: QueryClient) {
-  return qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
+  ]);
 }
 
 /** DCA 목표 변경 후 — dca-analysis + settings + dashboard */

@@ -27,41 +27,41 @@ def _make_alert(schedule_type="DAILY", schedule_day_of_week=None,
 
 class TestShouldFireToday:
     def test_daily_always_true(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         alert = _make_alert(schedule_type="DAILY")
         assert _should_fire_today(alert) is True
 
     def test_none_schedule_defaults_to_daily(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         alert = _make_alert(schedule_type=None)
         assert _should_fire_today(alert) is True
 
     def test_unknown_schedule_returns_false(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         alert = _make_alert(schedule_type="UNKNOWN_SCHEDULE")
         assert _should_fire_today(alert) is False
 
     def test_weekly_matches_today_dow(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today_dow = datetime.now(tz=_KST).date().weekday()
         alert = _make_alert(schedule_type="WEEKLY", schedule_day_of_week=today_dow)
         assert _should_fire_today(alert) is True
 
     def test_weekly_mismatches_today_dow(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today_dow = datetime.now(tz=_KST).date().weekday()
         mismatch_dow = (today_dow + 3) % 7
         alert = _make_alert(schedule_type="WEEKLY", schedule_day_of_week=mismatch_dow)
         assert _should_fire_today(alert) is False
 
     def test_monthly_matches_today_day(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=today.day)
         assert _should_fire_today(alert) is True
 
     def test_monthly_mismatches_today_day(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         mismatch_day = (today.day % 28) + 1  # never today
         if mismatch_day == today.day:
@@ -72,7 +72,7 @@ class TestShouldFireToday:
         assert result is (mismatch_day == today.day)
 
     def test_monthly_defaults_to_day_1(self, override_settings):
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=None)
         expected = today.day == 1
@@ -80,7 +80,7 @@ class TestShouldFireToday:
 
     def test_quarterly_first_trigger(self, override_settings):
         """최초 발송(last_triggered_at=None)이면 True."""
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(
             schedule_type="QUARTERLY",
@@ -93,7 +93,7 @@ class TestShouldFireToday:
 
     def test_quarterly_within_cooldown_returns_false(self, override_settings):
         """80일 쿨다운 이전에는 False."""
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         last_triggered = datetime.now(tz=_KST) - timedelta(days=30)
         alert = _make_alert(
@@ -105,7 +105,7 @@ class TestShouldFireToday:
 
     def test_quarterly_after_cooldown_returns_true(self, override_settings):
         """80일 이상 경과 후 True."""
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         last_triggered = datetime.now(tz=_KST) - timedelta(days=90)
         alert = _make_alert(
@@ -117,7 +117,7 @@ class TestShouldFireToday:
 
     def test_quarterly_day_mismatch_returns_false(self, override_settings):
         """발송일이 오늘과 다르면 False."""
-        from app.services.alert_service import _should_fire_today
+        from app.services.alert_calculator import should_fire_today as _should_fire_today
         today = datetime.now(tz=_KST).date()
         mismatch_day = (today.day % 28) + 1
         if mismatch_day == today.day:
@@ -134,17 +134,17 @@ class TestShouldFireToday:
 
 class TestAlreadyFiredToday:
     def test_no_last_triggered_returns_false(self, override_settings):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today as _already_fired_today
         alert = SimpleNamespace(last_triggered_at=None)
         assert _already_fired_today(alert) is False
 
     def test_fired_today_returns_true(self, override_settings):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today as _already_fired_today
         alert = SimpleNamespace(last_triggered_at=datetime.now(tz=_KST))
         assert _already_fired_today(alert) is True
 
     def test_fired_yesterday_returns_false(self, override_settings):
-        from app.services.alert_service import _already_fired_today
+        from app.services.alert_calculator import already_fired_today as _already_fired_today
         yesterday = datetime.now(tz=_KST) - timedelta(days=1)
         alert = SimpleNamespace(last_triggered_at=yesterday)
         assert _already_fired_today(alert) is False

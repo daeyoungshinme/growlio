@@ -34,6 +34,7 @@ from app.utils.cache_keys import (
     dividend_info_key,
     dividend_months_key,
 )
+from app.utils.circuit_breaker import fdr_circuit, naver_circuit
 
 logger = structlog.get_logger()
 
@@ -105,7 +106,13 @@ async def fetch_ticker_dividend_info(
         # 0순위: Naver Finance (국내 종목 전용, 인증 불필요)
         if is_korean:
             fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-            naver_info = await loop.run_in_executor(None, partial(fn, ticker))
+            try:
+                naver_info = await naver_circuit.call(
+                    loop.run_in_executor, None, partial(fn, ticker)
+                )
+            except Exception as _naver_exc:
+                logger.warning("naver_dividend_circuit_skipped", ticker=ticker, error=str(_naver_exc))
+                naver_info = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
             if naver_info["dps"] > 0 and dps == 0.0:
                 dps = naver_info["dps"]
             if naver_info["dividend_yield"] > 0 and yield_decimal == 0.0:
@@ -158,7 +165,13 @@ async def fetch_ticker_dividend_info(
 
             # 3.5순위: FinanceDataReader ETF (국내 ETF — pykrx 실패 시 fallback)
             if is_korean and is_etf and (dps == 0.0 or yield_decimal == 0.0):
-                fdr = await loop.run_in_executor(None, partial(sync_fdr_etf_dividend_info, ticker))
+                try:
+                    fdr = await fdr_circuit.call(
+                        loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)
+                    )
+                except Exception as _fdr_exc:
+                    logger.warning("fdr_dividend_circuit_skipped", ticker=ticker, error=str(_fdr_exc))
+                    fdr = {"dps": 0, "dividend_yield": 0}
                 if fdr["dps"] > 0 and dps == 0.0:
                     dps = fdr["dps"]
                 if fdr["dividend_yield"] > 0 and yield_decimal == 0.0:

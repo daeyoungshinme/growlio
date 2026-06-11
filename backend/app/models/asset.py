@@ -77,6 +77,9 @@ class AssetAccount(Base):
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    target_portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="asset_accounts")  # type: ignore[name-defined]
     snapshots: Mapped[list["AssetSnapshot"]] = relationship(back_populates="account")
@@ -328,4 +331,5 @@ class Position(Base):
             "account_id",
             postgresql_where=text("snapshot_id IS NULL"),
         ),
+        Index("idx_positions_account_ticker", "account_id", "ticker"),
     )

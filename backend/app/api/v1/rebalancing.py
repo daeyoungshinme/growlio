@@ -379,7 +379,8 @@ async def _fetch_broker_balance(
             orderable = await get_orderable_cash(
                 app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
             )
-        except Exception:
+        except Exception as e:
+            logger.warning("orderable_cash_fetch_failed", account_id=str(account.id), error=str(e))
             orderable = None
         positions: list[KisBalancePosition] = [
             KisBalancePosition(

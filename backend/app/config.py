@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     kiwoom_semaphore_limit: int = 5
     kiwoom_default_retries: int = 3
 
+    # Circuit breaker 공통 임계값
+    cb_default_fail_max: int = 5        # 실패 횟수 임계값 (기본)
+    cb_default_reset_timeout: float = 60.0  # 복구 대기(초) (기본)
+    cb_ext_fail_max: int = 3            # 외부 API (Naver, FDR, Yahoo) 실패 임계값
+    cb_ext_reset_timeout: float = 120.0 # 외부 API 복구 대기(초)
+
     # DB 커넥션 풀 설정
     database_pool_size: int = 10
     database_max_overflow: int = 5
@@ -66,9 +72,6 @@ class Settings(BaseSettings):
 
     # FCM 푸시 알림 — 서비스 계정 JSON 전체 문자열 (비어 있으면 푸시 비활성화)
     firebase_credentials_json: str = ""
-
-    # AI 분석 — Google Gemini API 키 (비어 있으면 AI 분석 비활성화)
-    google_api_key: str = ""
 
     @property
     def allowed_origins_list(self) -> list[str]:

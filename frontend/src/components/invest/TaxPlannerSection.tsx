@@ -1,8 +1,11 @@
-import { Info, TrendingUp, TrendingDown, Lightbulb, Calculator } from "lucide-react";
-import { OverseasPositionDetail } from "@/api/tax";
-import { fmtKrw, fmtPct } from "@/utils/format";
+import { Info, TrendingUp, TrendingDown, Lightbulb } from "lucide-react";
+import type { OverseasPositionDetail } from "@/api/tax";
+import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
-import { useTaxSimulation, posKey, TAX_DEDUCTION, TAX_RATE } from "@/hooks/useTaxSimulation";
+import { useTaxSimulation, TAX_DEDUCTION } from "@/hooks/useTaxSimulation";
+import { TaxPositionTable } from "./TaxPositionTable";
+import { TaxSimulationCard } from "./TaxSimulationCard";
+import { TaxRecommendationList } from "./TaxRecommendationList";
 
 interface Props {
   positions: OverseasPositionDetail[];
@@ -10,24 +13,14 @@ interface Props {
 
 export default function TaxPlannerSection({ positions }: Props) {
   const {
-    alreadyRealizedInput,
-    setAlreadyRealizedInput,
-    sellQtyMap,
-    alreadyRealized,
-    profitPositions,
-    lossPositions,
-    totalLoss,
-    remainingDeduction,
-    maxTaxFreeProfit,
-    currentTax,
-    deductionUsedPct,
-    totalSimPnl,
-    hasAnyQtyInput,
-    simTotalRealized,
-    simTax,
-    simTaxDiff,
-    recommendations,
-    handleQtyChange,
+    alreadyRealizedInput, setAlreadyRealizedInput,
+    sellQtyMap, alreadyRealized,
+    profitPositions, lossPositions,
+    totalLoss, remainingDeduction, maxTaxFreeProfit,
+    currentTax, deductionUsedPct,
+    totalSimPnl, hasAnyQtyInput,
+    simTotalRealized, simTax, simTaxDiff,
+    recommendations, handleQtyChange,
   } = useTaxSimulation(positions);
 
   if (positions.length === 0) {
@@ -48,7 +41,6 @@ export default function TaxPlannerSection({ positions }: Props) {
 
       {/* 올해 이미 실현한 손익 입력 + 공제 현황 */}
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4 space-y-3">
-        {/* 배당금 안내 */}
         <div className="flex items-start gap-2 p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
           <Info size={13} className="text-blue-500 mt-0.5 shrink-0" />
           <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
@@ -66,7 +58,6 @@ export default function TaxPlannerSection({ positions }: Props) {
           </p>
         </div>
 
-        {/* 실현 손익 입력 — 모바일에서 wrap 허용 */}
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs font-medium text-gray-600 dark:text-gray-400 shrink-0">
             올해 실현 손익 (원)
@@ -86,7 +77,6 @@ export default function TaxPlannerSection({ positions }: Props) {
           )}
         </div>
 
-        {/* 공제 현황 */}
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-gray-500 dark:text-gray-400">공제 사용 현황</span>
@@ -97,11 +87,7 @@ export default function TaxPlannerSection({ positions }: Props) {
           <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all ${
-                deductionUsedPct >= 100
-                  ? "bg-red-400"
-                  : deductionUsedPct >= 70
-                  ? "bg-amber-400"
-                  : "bg-emerald-400"
+                deductionUsedPct >= 100 ? "bg-red-400" : deductionUsedPct >= 70 ? "bg-amber-400" : "bg-emerald-400"
               }`}
               style={{ width: `${deductionUsedPct}%` }}
             />
@@ -127,7 +113,6 @@ export default function TaxPlannerSection({ positions }: Props) {
         </div>
       </div>
 
-      {/* 수익 종목 */}
       {profitPositions.length > 0 && (
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -136,134 +121,18 @@ export default function TaxPlannerSection({ positions }: Props) {
             <span className="hidden sm:inline ml-1 text-xs text-gray-400 dark:text-gray-500">— 매도 수량을 입력해 세금을 계산하세요</span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{profitPositions.length}종목</span>
           </div>
-
-          {/* 모바일: 카드 레이아웃 */}
-          <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
-            {profitPositions.map((pos) => {
-              const qty = sellQtyMap[posKey(pos)] ?? 0;
-              const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
-              const rowSimPnl = pnlPs * qty;
-              const isWithinBudget = pos.unrealized_pnl_krw <= maxTaxFreeProfit;
-              return (
-                <div key={posKey(pos)} className="px-4 py-2 space-y-1.5">
-                  {/* 행1: ticker + 회사명 | 수익률 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1 min-w-0">
-                      <span className="font-medium text-sm text-gray-800 dark:text-gray-200">{pos.ticker}</span>
-                      <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
-                      {isWithinBudget && (
-                        <span className="px-1 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
-                          무세 실현 가능
-                        </span>
-                      )}
-                      <span className="text-gray-400 dark:text-gray-500 text-xs truncate">· {pos.name}</span>
-                    </div>
-                    <span className={`text-sm font-medium shrink-0 ${pnlColor(pos.unrealized_pnl_pct)}`}>
-                      {fmtPct(pos.unrealized_pnl_pct)}
-                    </span>
-                  </div>
-                  {/* 행2: PnL | 매도 수량 입력 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-sm font-medium ${pnlColor(pos.unrealized_pnl_krw)}`}>
-                      {fmtKrw(pos.unrealized_pnl_krw)}
-                      {qty > 0 && (
-                        <span className={`ml-1.5 text-xs ${pnlColor(rowSimPnl)}`}>
-                          ({qty}주: {fmtKrw(rowSimPnl)})
-                        </span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={Math.floor(pos.qty)}
-                        step={1}
-                        value={qty === 0 ? "" : qty}
-                        onChange={(e) => handleQtyChange(pos, e.target.value)}
-                        placeholder="0"
-                        className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
-                      />
-                      <span className="text-xs text-gray-400 dark:text-gray-500">/ {Math.floor(pos.qty)}주</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* 데스크탑: 테이블 레이아웃 */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-2 py-2 sm:px-4 text-left font-medium">종목</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">미실현 수익</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">수익률</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">매도 수량</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                {profitPositions.map((pos) => {
-                  const qty = sellQtyMap[posKey(pos)] ?? 0;
-                  const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
-                  const rowSimPnl = pnlPs * qty;
-                  const isWithinBudget = pos.unrealized_pnl_krw <= maxTaxFreeProfit;
-                  return (
-                    <tr key={posKey(pos)} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="px-2 py-2.5 sm:px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-gray-800 dark:text-gray-200">{pos.ticker}</span>
-                          <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
-                          {isWithinBudget && (
-                            <span className="ml-1 px-1.5 py-0.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded text-xs font-medium">
-                              무세 실현 가능
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-gray-400 dark:text-gray-500 mt-0.5">{pos.name}</div>
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <span className={`font-medium ${pnlColor(pos.unrealized_pnl_krw)}`}>
-                          {fmtKrw(pos.unrealized_pnl_krw)}
-                        </span>
-                        {qty > 0 && (
-                          <div className={`text-xs ${pnlColor(rowSimPnl)}`}>
-                            {qty}주: {fmtKrw(rowSimPnl)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <span className={pnlColor(pos.unrealized_pnl_pct)}>
-                          {fmtPct(pos.unrealized_pnl_pct)}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            min={0}
-                            max={Math.floor(pos.qty)}
-                            step={1}
-                            value={qty === 0 ? "" : qty}
-                            onChange={(e) => handleQtyChange(pos, e.target.value)}
-                            placeholder="0"
-                            className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
-                          />
-                          <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                            / {Math.floor(pos.qty)}주
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <TaxPositionTable
+            kind="profit"
+            positions={profitPositions}
+            sellQtyMap={sellQtyMap}
+            maxTaxFreeProfit={maxTaxFreeProfit}
+            totalLoss={totalLoss}
+            hasAnyQtyInput={hasAnyQtyInput}
+            handleQtyChange={handleQtyChange}
+          />
         </div>
       )}
 
-      {/* 손실 종목 */}
       {lossPositions.length > 0 && (
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 dark:border-gray-800">
@@ -274,234 +143,31 @@ export default function TaxPlannerSection({ positions }: Props) {
             </span>
             <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{lossPositions.length}종목</span>
           </div>
-
-          {/* 모바일: 카드 레이아웃 */}
-          <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-800">
-            {lossPositions.map((pos) => {
-              const qty = sellQtyMap[posKey(pos)] ?? 0;
-              const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
-              const rowSimPnl = pnlPs * qty;
-              const taxSaved = Math.round(Math.abs(rowSimPnl) * TAX_RATE);
-              return (
-                <div key={posKey(pos)} className="px-4 py-2 space-y-1.5">
-                  {/* 행1: ticker + 회사명 | 손실률 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1 min-w-0">
-                      <span className="font-medium text-sm text-gray-800 dark:text-gray-200">{pos.ticker}</span>
-                      <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
-                      <span className="text-gray-400 dark:text-gray-500 text-xs truncate">· {pos.name}</span>
-                    </div>
-                    <span className={`text-sm font-medium shrink-0 ${pnlColor(pos.unrealized_pnl_pct)}`}>
-                      {fmtPct(pos.unrealized_pnl_pct)}
-                    </span>
-                  </div>
-                  {/* 행2: PnL | 매도 수량 입력 */}
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-sm font-medium ${pnlColor(pos.unrealized_pnl_krw)}`}>
-                      {fmtKrw(pos.unrealized_pnl_krw)}
-                      {qty > 0 && (
-                        <span className={`ml-1.5 text-xs ${pnlColor(rowSimPnl)}`}>
-                          ({qty}주: {fmtKrw(rowSimPnl)})
-                        </span>
-                      )}
-                    </span>
-                    <div className="shrink-0 text-right">
-                      <div className="flex items-center gap-1 justify-end">
-                        <input
-                          type="number"
-                          min={0}
-                          max={Math.floor(pos.qty)}
-                          step={1}
-                          value={qty === 0 ? "" : qty}
-                          onChange={(e) => handleQtyChange(pos, e.target.value)}
-                          placeholder="0"
-                          className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
-                        />
-                        <span className="text-xs text-gray-400 dark:text-gray-500">/ {Math.floor(pos.qty)}주</span>
-                      </div>
-                      {qty > 0 && (
-                        <div className="text-xs text-blue-500 dark:text-blue-400 font-medium mt-0.5">
-                          최대 {fmtKrw(taxSaved)} 절세
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {totalLoss < 0 && !hasAnyQtyInput && (
-              <div className="px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20">
-                <p className="text-xs text-blue-600 dark:text-blue-400">
-                  전량 매도 시 {fmtKrw(Math.abs(totalLoss))} 손실 통산 →{" "}
-                  수익 종목에서 추가로 {fmtKrw(Math.abs(totalLoss))}까지 세금 없이 실현 가능
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* 데스크탑: 테이블 레이아웃 */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-gray-400 dark:text-gray-500 border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-2 py-2 sm:px-4 text-left font-medium">종목</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">미실현 손실</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">손실률</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">매도 수량</th>
-                  <th className="px-2 py-2 sm:px-4 text-right font-medium">통산 절세 효과</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                {lossPositions.map((pos) => {
-                  const qty = sellQtyMap[posKey(pos)] ?? 0;
-                  const pnlPs = pos.qty > 0 ? pos.unrealized_pnl_krw / pos.qty : 0;
-                  const rowSimPnl = pnlPs * qty;
-                  const taxSaved = Math.round(Math.abs(rowSimPnl) * TAX_RATE);
-                  return (
-                    <tr key={posKey(pos)} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="px-2 py-2.5 sm:px-4">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium text-gray-800 dark:text-gray-200">{pos.ticker}</span>
-                          <span className="text-gray-400 dark:text-gray-500 text-xs">{pos.market}</span>
-                        </div>
-                        <div className="text-gray-400 dark:text-gray-500 mt-0.5">{pos.name}</div>
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <span className={`font-medium ${pnlColor(pos.unrealized_pnl_krw)}`}>
-                          {fmtKrw(pos.unrealized_pnl_krw)}
-                        </span>
-                        {qty > 0 && (
-                          <div className={`text-xs ${pnlColor(rowSimPnl)}`}>
-                            {qty}주: {fmtKrw(rowSimPnl)}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <span className={pnlColor(pos.unrealized_pnl_pct)}>
-                          {fmtPct(pos.unrealized_pnl_pct)}
-                        </span>
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <input
-                            type="number"
-                            min={0}
-                            max={Math.floor(pos.qty)}
-                            step={1}
-                            value={qty === 0 ? "" : qty}
-                            onChange={(e) => handleQtyChange(pos, e.target.value)}
-                            placeholder="0"
-                            className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded px-1.5 py-1 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-400"
-                          />
-                          <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">
-                            / {Math.floor(pos.qty)}주
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-2.5 sm:px-4 text-right">
-                        {qty === 0 ? (
-                          <span className="text-gray-300 dark:text-gray-600">—</span>
-                        ) : (
-                          <span className="text-blue-500 dark:text-blue-400 font-medium">
-                            최대 {fmtKrw(taxSaved)} 절세
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              {totalLoss < 0 && !hasAnyQtyInput && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={5} className="px-4 py-2.5 bg-blue-50 dark:bg-blue-900/20">
-                      <p className="text-xs text-blue-600 dark:text-blue-400">
-                        전량 매도 시 {fmtKrw(Math.abs(totalLoss))} 손실 통산 →{" "}
-                        수익 종목에서 추가로 {fmtKrw(Math.abs(totalLoss))}까지 세금 없이 실현 가능
-                      </p>
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
+          <TaxPositionTable
+            kind="loss"
+            positions={lossPositions}
+            sellQtyMap={sellQtyMap}
+            maxTaxFreeProfit={maxTaxFreeProfit}
+            totalLoss={totalLoss}
+            hasAnyQtyInput={hasAnyQtyInput}
+            handleQtyChange={handleQtyChange}
+          />
         </div>
       )}
 
-      {/* 시뮬레이션 합계 카드 (수량 입력 시 표시) */}
       {hasAnyQtyInput && (
-        <div className={`rounded-xl border p-3 sm:p-4 space-y-3 ${
-          simTax === 0
-            ? "border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-900/20"
-            : "border-orange-200 dark:border-orange-800/50 bg-orange-50 dark:bg-orange-900/20"
-        }`}>
-          <div className="flex items-center gap-2">
-            <Calculator size={13} className={simTax === 0 ? "text-emerald-500" : "text-orange-500"} />
-            <span className={`text-xs font-semibold ${simTax === 0 ? "text-emerald-700 dark:text-emerald-400" : "text-orange-700 dark:text-orange-400"}`}>
-              매도 시뮬레이션 합계
-            </span>
-          </div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:gap-x-6 sm:gap-y-1.5 text-xs">
-            <span className="text-gray-500 dark:text-gray-400">선택 종목 실현 손익</span>
-            <span className={`text-right font-medium ${pnlColor(totalSimPnl)}`}>{fmtKrw(totalSimPnl)}</span>
-            {alreadyRealized !== 0 && (
-              <>
-                <span className="text-gray-500 dark:text-gray-400">기존 실현 손익</span>
-                <span className={`text-right font-medium ${pnlColor(alreadyRealized)}`}>{fmtKrw(alreadyRealized)}</span>
-              </>
-            )}
-            <span className="text-gray-500 dark:text-gray-400">통산 실현 손익</span>
-            <span className={`text-right font-medium ${pnlColor(simTotalRealized)}`}>{fmtKrw(simTotalRealized)}</span>
-            <span className="text-gray-500 dark:text-gray-400">250만원 공제</span>
-            <span className="text-right text-gray-600 dark:text-gray-300">−{fmtKrw(Math.min(TAX_DEDUCTION, Math.max(0, simTotalRealized)))}</span>
-            <span className={`font-semibold ${simTax === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}`}>
-              예상 납부 세금
-            </span>
-            <span className={`text-right font-bold text-base ${simTax === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-orange-600 dark:text-orange-400"}`}>
-              {fmtKrw(simTax)}
-            </span>
-            {simTaxDiff !== 0 && currentTax > 0 && (
-              <>
-                <span className="text-gray-400 dark:text-gray-500">기존 대비 세금 변화</span>
-                <span className={`text-right font-medium ${pnlColor(-simTaxDiff)}`}>
-                  {simTaxDiff > 0 ? "+" : ""}{fmtKrw(simTaxDiff)}
-                </span>
-              </>
-            )}
-          </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            * 미실현 손익 기준 추정치. 22% 세율(지방소득세 포함). 실제 매도가는 다를 수 있습니다.
-          </p>
-        </div>
+        <TaxSimulationCard
+          totalSimPnl={totalSimPnl}
+          alreadyRealized={alreadyRealized}
+          simTotalRealized={simTotalRealized}
+          simTax={simTax}
+          simTaxDiff={simTaxDiff}
+          currentTax={currentTax}
+        />
       )}
 
-      {/* 절세 추천 (수량 미입력 시에만 표시) */}
       {!hasAnyQtyInput && recommendations.length > 0 && (
-        <div className="rounded-xl border border-amber-200 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/20 p-4 space-y-2">
-          <div className="flex items-center gap-2">
-            <Lightbulb size={13} className="text-amber-500 shrink-0" />
-            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-              절세 추천 — 세금 없이 실현 가능한 종목
-            </span>
-          </div>
-          <ul className="space-y-1.5">
-            {recommendations.map(({ pos, label, taxSaved }) => (
-              <li key={`rec-${posKey(pos)}`} className="flex flex-wrap items-start justify-between gap-y-1 text-xs">
-                <span className="flex-1 min-w-0 text-gray-700 dark:text-gray-300">
-                  <span className="font-medium">{pos.ticker}</span>{" "}
-                  <span className="text-gray-500 dark:text-gray-400">{label}</span>
-                  {" → "}수익 {fmtKrw(pos.unrealized_pnl_krw)} 실현
-                </span>
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium ml-2 shrink-0">
-                  세금 절감 {fmtKrw(taxSaved)}
-                </span>
-              </li>
-            ))}
-          </ul>
-          <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-            * 수익 종목 테이블에서 매도 수량을 직접 입력하면 자세한 시뮬레이션을 확인할 수 있습니다.
-          </p>
-        </div>
+        <TaxRecommendationList recommendations={recommendations} />
       )}
 
       {profitPositions.length === 0 && lossPositions.length === 0 && (

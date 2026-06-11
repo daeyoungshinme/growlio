@@ -175,9 +175,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 > 수동 `invalidateQueries` 호출 금지 — `src/utils/queryInvalidation.ts`의 유틸 함수 사용 (하단 참고).
 
-> **⚠️ 예외 — stock-price-alerts:** `queryInvalidation.ts` 유틸 미존재. CUD 후 직접 호출 필수:
-> `qc.invalidateQueries({ queryKey: QUERY_KEYS.stockPriceAlerts })`
-
 **포맷팅 유틸리티 (`src/utils/format.ts`)**
 - 모든 포맷 함수는 `src/utils/format.ts`에서 import. 로컬 재정의 금지.
   ```ts

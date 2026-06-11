@@ -1,17 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { X } from "lucide-react";
-import { useState } from "react";
 import Modal from "@/components/common/Modal";
 import { api } from "@/api/client";
-import { useExchangeRate } from "@/hooks/useExchangeRate";
-import { useForm } from "@/hooks/useForm";
-import { useStockSearch } from "@/hooks/useStockSearch";
 import {
   createTransaction,
   deleteTransaction,
   fetchTransactions,
   Transaction,
-  TransactionCreate,
   updateTransaction,
 } from "@/api/transactions";
 import { convertUsdToKrw, fmtKrw } from "@/utils/format";
@@ -22,6 +17,7 @@ import { TransactionList } from "./TransactionList";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { transactionSchema } from "@/schemas/transaction";
+import { useTransactionFormState } from "@/hooks/useTransactionFormState";
 
 interface Props {
   accountId: string;
@@ -31,34 +27,22 @@ interface Props {
   onClose: () => void;
 }
 
-const today = new Date().toISOString().slice(0, 10);
-
-const EMPTY_FORM: TransactionCreate = {
-  account_id: "",
-  transaction_type: "DEPOSIT",
-  amount: 0,
-  transaction_date: today,
-  ticker: "",
-  notes: "",
-};
-
 export default function TransactionModal({ accountId, accountName, depositKrw = 0, onDepositUpdate, onClose }: Props) {
   const qc = useQueryClient();
-  const { form, set, setForm } = useForm<TransactionCreate>({ ...EMPTY_FORM, account_id: accountId });
-
-  const [formError, setFormError] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
-  const [amountUsd, setAmountUsd] = useState<number>(0);
-  const usdRate = useExchangeRate();
-  const [tickerDirect, setTickerDirect] = useState(false);
-  const [tickerQuery, setTickerQuery] = useState("");
-  const { suggestions: tickerSuggestions, isSearching: tickerSearchLoading, search: runTickerSearch, clearSuggestions: clearTickerSuggestions } = useStockSearch();
-  const [showTickerSuggestions, setShowTickerSuggestions] = useState(false);
-  const [editingTx, setEditingTx] = useState<Transaction | null>(null);
-  const [depositPrompt, setDepositPrompt] = useState<{
-    amount: number;
-    txType: "DEPOSIT" | "WITHDRAWAL" | "DIVIDEND";
-  } | null>(null);
+  const {
+    form, set, formError, setFormError,
+    currency, amountUsd, usdRate,
+    tickerDirect, setTickerDirect,
+    tickerQuery,
+    tickerSuggestions, tickerSearchLoading,
+    showTickerSuggestions, setShowTickerSuggestions,
+    clearTickerSuggestions,
+    editingTx, setEditingTx,
+    depositPrompt, setDepositPrompt,
+    resetForm, startEdit, triggerDepositPrompt,
+    handleCurrencySwitch, handleUsdAmountChange,
+    handleTxTypeChange, handleTickerQueryChange,
+  } = useTransactionFormState(accountId);
 
   const { data: txList, isLoading } = useQuery<Transaction[]>({
     queryKey: QUERY_KEYS.transactions(accountId),
@@ -78,46 +62,24 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
 
   const invalidate = () => invalidateTransactionData(qc);
 
-  const resetForm = () => {
-    setForm({ ...EMPTY_FORM, account_id: accountId });
-    setFormError(null);
-    setCurrency("KRW"); setAmountUsd(0);
-    setTickerDirect(false); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false);
-  };
-
-  const VALID_TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const;
-  type TxType = (typeof VALID_TX_TYPES)[number];
-  const isValidTxType = (val: unknown): val is TxType =>
-    VALID_TX_TYPES.includes(val as TxType);
-
-  const triggerDepositPrompt = (amt: number, txType: string) => {
-    if (amt > 0 && onDepositUpdate && isValidTxType(txType)) {
-      setDepositPrompt({ amount: amt, txType });
-    }
-  };
-
   const createMut = useMutation({
     mutationFn: createTransaction,
     onSuccess: (_, vars) => {
       invalidate();
-      const amt = vars.amount ?? 0;
-      const txType = vars.transaction_type;
       resetForm();
-      triggerDepositPrompt(amt, txType);
+      triggerDepositPrompt(vars.amount ?? 0, vars.transaction_type);
     },
     onError: () => toast("내역 저장에 실패했습니다"),
   });
 
   const updateMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<TransactionCreate> }) =>
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateTransaction>[1] }) =>
       updateTransaction(id, data),
     onSuccess: (_, vars) => {
       invalidate();
-      const amt = vars.data?.amount ?? 0;
-      const txType = vars.data?.transaction_type ?? "";
       setEditingTx(null);
       resetForm();
-      triggerDepositPrompt(amt, txType);
+      triggerDepositPrompt((vars.data?.amount as number) ?? 0, (vars.data?.transaction_type as string) ?? "");
     },
     onError: () => toast("내역 수정에 실패했습니다"),
   });
@@ -127,22 +89,6 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
     onSuccess: invalidate,
     onError: () => toast("내역 삭제에 실패했습니다"),
   });
-
-  const startEdit = (tx: Transaction) => {
-    setEditingTx(tx);
-    setForm({
-      account_id: accountId,
-      transaction_type: tx.transaction_type,
-      amount: tx.amount,
-      transaction_date: tx.transaction_date,
-      ticker: tx.ticker ?? "",
-      notes: tx.notes ?? "",
-    });
-    setTickerDirect(!!tx.ticker);
-    setTickerQuery(tx.ticker ?? "");
-    setCurrency("KRW"); setAmountUsd(0);
-    clearTickerSuggestions(); setShowTickerSuggestions(false);
-  };
 
   const handleSubmit = () => {
     const result = transactionSchema.safeParse({
@@ -163,7 +109,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
       notes: form.notes || undefined,
     };
     if (editingTx) {
-      updateMut.mutate({ id: editingTx.id, data: payload });
+      updateMut.mutate({ id: editingTx.id, data: payload as Parameters<typeof updateTransaction>[1] });
     } else {
       createMut.mutate(payload);
     }
@@ -189,11 +135,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
             {(["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const).map((t) => (
               <button
                 key={t}
-                onClick={() => {
-                  set("transaction_type", t);
-                  setCurrency("KRW"); setAmountUsd(0);
-                  setTickerDirect(false); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false);
-                }}
+                onClick={() => handleTxTypeChange(t)}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
                   form.transaction_type === t
                     ? "bg-blue-600 text-white border-blue-600"
@@ -216,15 +158,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                       <button
                         key={c}
                         type="button"
-                        onClick={() => {
-                          if (c === currency) return;
-                          if (c === "USD") {
-                            setAmountUsd(usdRate && form.amount ? parseFloat((form.amount / usdRate).toFixed(2)) : 0);
-                          } else {
-                            setAmountUsd(0);
-                          }
-                          setCurrency(c);
-                        }}
+                        onClick={() => handleCurrencySwitch(c)}
                         className={`px-1.5 py-0.5 rounded transition-colors ${
                           currency === c
                             ? "bg-blue-600 text-white"
@@ -245,11 +179,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                       type="number"
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       value={amountUsd || ""}
-                      onChange={(e) => {
-                        const usd = parseFloat(e.target.value) || 0;
-                        setAmountUsd(usd);
-                        set("amount", convertUsdToKrw(usd, usdRate));
-                      }}
+                      onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
                       placeholder="0.00"
                       step="0.01"
                       min={0}
@@ -313,13 +243,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                   <div className="relative w-full">
                     <input
                       value={tickerQuery}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setTickerQuery(v); set("ticker", v);
-                        setShowTickerSuggestions(true);
-                        if (!v.trim()) { clearTickerSuggestions(); return; }
-                        runTickerSearch(v);
-                      }}
+                      onChange={(e) => handleTickerQueryChange(e.target.value)}
                       onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowTickerSuggestions(false), 150)}
                       placeholder="종목명 또는 코드 검색"
@@ -334,8 +258,10 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                           <li key={s.ticker}
                             className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2"
                             onMouseDown={() => {
-                              setTickerQuery(s.name); set("ticker", s.name);
-                              clearTickerSuggestions(); setShowTickerSuggestions(false);
+                              handleTickerQueryChange(s.name);
+                              set("ticker", s.name);
+                              clearTickerSuggestions();
+                              setShowTickerSuggestions(false);
                             }}>
                             <span className="font-medium text-blue-700 dark:text-blue-400">{s.ticker}</span>
                             <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
@@ -347,7 +273,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                   </div>
                   {accountPositions.length > 0 && (
                     <button type="button"
-                      onClick={() => { setTickerDirect(false); set("ticker", ""); setTickerQuery(""); clearTickerSuggestions(); setShowTickerSuggestions(false); }}
+                      onClick={() => { setTickerDirect(false); set("ticker", ""); handleTickerQueryChange(""); }}
                       className="shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap">
                       ← 목록
                     </button>
@@ -373,7 +299,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                     {accountPositions.map((p) => (
                       <tr key={p.ticker}
                         className="border-t border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                        onClick={() => { set("ticker", p.name); setTickerDirect(false); setTickerQuery(""); }}>
+                        onClick={() => { set("ticker", p.name); setTickerDirect(false); handleTickerQueryChange(""); }}>
                         <td className="py-1 text-gray-700 dark:text-gray-300">{p.name}</td>
                         <td className="py-1 text-right text-gray-500 dark:text-gray-400">{p.qty?.toLocaleString() ?? "—"}</td>
                       </tr>

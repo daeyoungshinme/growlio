@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, ChevronDown, ChevronUp, ClipboardList, Loader2, RefreshCw } from "lucide-react";
-import { useInsights } from "@/hooks/useInsights";
+import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
 import { analyzePortfolio, RebalancingAnalysis } from "@/api/rebalancing";
 import { fetchRebalancingAlerts } from "@/api/alerts";
@@ -11,7 +10,6 @@ import type { AssetAccount } from "@/api/assets";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
-import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -26,7 +24,7 @@ interface Props {
   onOpenAlertModal: (portfolioId: string) => void;
 }
 
-type AnalysisMode = "rebalancing" | "backtest" | "diagnosis";
+type AnalysisMode = "rebalancing" | "backtest";
 
 export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal }: Props) {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
@@ -34,9 +32,6 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
-  const [diagnosisExpanded, setDiagnosisExpanded] = useState(false);
-  const { data: insights } = useInsights();
-  const urgentInsights = (insights ?? []).filter((ins) => ins.severity === "ALERT" || ins.severity === "WARNING");
   const [startDate, setStartDate] = useState(BACKTEST_DEFAULT_START_DATE);
   const [endDate, setEndDate] = useState(BACKTEST_DEFAULT_END_DATE);
   const [activePreset, setActivePreset] = useState<number | null>(5);
@@ -124,17 +119,6 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           백테스팅
         </button>
 
-        <button
-          onClick={() => setAnalysisMode("diagnosis")}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-            analysisMode === "diagnosis"
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
-          }`}
-        >
-          <ClipboardList size={14} /> 포트폴리오 진단
-        </button>
-
         {selectedIds.size > 0 && (
           <span className="w-full md:w-auto text-xs text-gray-400 dark:text-gray-500">
             {selectedNames}
@@ -142,34 +126,6 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           </span>
         )}
       </div>
-
-      {/* 인사이트 배너 — ALERT/WARNING 있을 때 자동 표시 */}
-      {urgentInsights.length > 0 && analysisMode !== "diagnosis" && (
-        <div className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
-          urgentInsights.some((i) => i.severity === "ALERT")
-            ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
-            : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30"
-        }`}>
-          <button
-            className="w-full flex items-center justify-between gap-2 text-left"
-            onClick={() => setDiagnosisExpanded((v) => !v)}
-          >
-            <span className={`font-medium ${
-              urgentInsights.some((i) => i.severity === "ALERT")
-                ? "text-red-700 dark:text-red-400"
-                : "text-yellow-700 dark:text-yellow-400"
-            }`}>
-              ⚠️ 포트폴리오 진단 — {urgentInsights.length}개 항목 확인 필요
-            </span>
-            {diagnosisExpanded ? <ChevronUp size={13} className="text-gray-400 shrink-0" /> : <ChevronDown size={13} className="text-gray-400 shrink-0" />}
-          </button>
-          {diagnosisExpanded && (
-            <div className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
-              <PortfolioDiagnosisCard />
-            </div>
-          )}
-        </div>
-      )}
 
       {/* 백테스팅 설정 패널 */}
       {analysisMode === "backtest" && (
@@ -346,18 +302,11 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         </div>
       )}
 
-      {/* 포트폴리오 진단 */}
-      {analysisMode === "diagnosis" && (
-        <PortfolioDiagnosisCard
-          portfolioName={selectedIds.size === 1 ? selectedNames : undefined}
-        />
-      )}
-
       {/* Empty state */}
       {!analysisMode && (
         <div className="flex flex-col items-center justify-center h-64 text-center text-gray-400 dark:text-gray-500">
           <div className="text-4xl mb-3">📊</div>
-          <div className="text-sm font-medium mb-1">포트폴리오를 선택하고 분석하세요</div>
+          <div className="text-sm font-medium mb-1">포트폴리오를 1개 선택하세요</div>
           <div className="text-xs">좌측에서 포트폴리오를 선택한 후 리밸런싱 분석 또는 백테스팅을 실행하세요</div>
         </div>
       )}

@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import json
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,7 @@ from app.services.dart_service import fetch_disclosures_for_tickers
 from app.utils.cache_keys import TTL_DART, dart_disclosures_key
 
 router = APIRouter(prefix="/dart", tags=["dart"])
+logger = structlog.get_logger()
 
 _DOMESTIC_MARKETS = frozenset({"KOSPI", "KOSDAQ"})
 
@@ -55,8 +57,8 @@ async def get_disclosures(
         cached = await redis.get(cache_key)
         if cached:
             return json.loads(cached)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("dart_cache_read_failed", error=str(e))
 
     result = await db.execute(
         select(Position.ticker)

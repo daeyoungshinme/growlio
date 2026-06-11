@@ -13,9 +13,11 @@ import structlog
 from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.tax_service import (
+    _OVERSEAS_GAIN_DEDUCTION,
     _OVERSEAS_TAX_RATE,
     get_overseas_positions_detail,
 )
@@ -175,27 +177,42 @@ async def _check_rebalancing_opportunity(
     from app.services.portfolio_service import build_portfolio_overview
 
     result = await db.execute(
-        select(Portfolio).where(Portfolio.user_id == user_id)
+        select(Portfolio)
+        .where(Portfolio.user_id == user_id)
+        .options(
+            selectinload(Portfolio.items),
+            selectinload(Portfolio.linked_accounts),
+        )
     )
     portfolios = result.scalars().all()
     if not portfolios:
         return []
 
-    try:
-        overview = await build_portfolio_overview(user_id, db)
-    except Exception:
-        return []
-
+    insights: list[Insight] = []
     for pf in portfolios:
-        items = pf.items or []
+        items = pf.items
         if not items:
             continue
 
-        all_positions = overview.get("all_positions", [])
-        total_stock = float(overview.get("total_stock_krw", 0) or 0)
-        if total_stock <= 0:
+        # 포트폴리오별 계좌 필터 적용 (None이면 전체 계좌)
+        raw_ids = pf.account_ids
+        account_ids = [uuid.UUID(aid) for aid in raw_ids] if raw_ids else None
+
+        try:
+            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids)
+        except Exception:
             continue
 
+        # base_type에 따라 드리프트 분모 결정
+        if pf.base_type == "TOTAL_ASSETS":
+            base_krw = float(overview.get("total_assets_krw") or 0)
+        else:  # STOCK_ONLY (기본값)
+            base_krw = float(overview.get("total_stock_krw") or 0)
+
+        if base_krw <= 0:
+            continue
+
+        all_positions = overview.get("all_positions", [])
         pos_map: dict[tuple[str, str], float] = {}
         for p in all_positions:
             key = (p.get("ticker", ""), p.get("market", ""))
@@ -203,16 +220,13 @@ async def _check_rebalancing_opportunity(
 
         max_drift = 0.0
         for item in items:
-            ticker = item.get("ticker", "") if isinstance(item, dict) else item.ticker
-            market = item.get("market", "") if isinstance(item, dict) else item.market
-            target_w = float(item.get("weight", 0) if isinstance(item, dict) else item.weight)
-            cur_val = pos_map.get((ticker, market), 0.0)
-            cur_w = (cur_val / total_stock * 100) if total_stock > 0 else 0.0
-            drift = abs(target_w - cur_w)
-            max_drift = max(max_drift, drift)
+            target_w = float(item.weight)
+            cur_val = pos_map.get((item.ticker, item.market), 0.0)
+            cur_w = cur_val / base_krw * 100
+            max_drift = max(max_drift, abs(target_w - cur_w))
 
         if max_drift >= 10:
-            return [Insight(
+            insights.append(Insight(
                 type=InsightType.REBALANCING_OPPORTUNITY,
                 severity=InsightSeverity.ALERT,
                 title="리밸런싱 필요",
@@ -220,9 +234,9 @@ async def _check_rebalancing_opportunity(
                 action_label="리밸런싱 실행",
                 action_url="/portfolio?tab=analysis",
                 metric_value=round(max_drift, 1),
-            )]
+            ))
         elif max_drift >= 5:
-            return [Insight(
+            insights.append(Insight(
                 type=InsightType.REBALANCING_OPPORTUNITY,
                 severity=InsightSeverity.WARNING,
                 title="리밸런싱 권장",
@@ -230,9 +244,11 @@ async def _check_rebalancing_opportunity(
                 action_label="리밸런싱 분석",
                 action_url="/portfolio?tab=analysis",
                 metric_value=round(max_drift, 1),
-            )]
+            ))
 
-    return []
+    # ALERT 우선, 없으면 WARNING 1개
+    alerts = [i for i in insights if i.severity == InsightSeverity.ALERT]
+    return alerts[:1] or insights[:1]
 
 
 # ---------------------------------------------------------------------------
@@ -254,8 +270,16 @@ async def _check_tax_loss_harvest(
     if not loss_positions or total_gain <= 0:
         return []
 
+    # 연 250만원 기본 공제 적용 — 공제 후 과세 이익이 없으면 절세 불필요
+    taxable_gain = max(0.0, total_gain - _OVERSEAS_GAIN_DEDUCTION)
+    if taxable_gain <= 0:
+        return []
+
+    # 절세액 큰 순(손실 큰 순)으로 정렬
+    loss_positions.sort(key=lambda p: p["unrealized_pnl_krw"])
+
     total_loss = sum(abs(p["unrealized_pnl_krw"]) for p in loss_positions)
-    offsettable = min(total_loss, total_gain)
+    offsettable = min(total_loss, taxable_gain)
     tax_saved = offsettable * _OVERSEAS_TAX_RATE
 
     if tax_saved < 50_000:
@@ -273,7 +297,7 @@ async def _check_tax_loss_harvest(
             "세금 상세 페이지에서 확인하세요."
         ),
         action_label="세금 계획 보기",
-        action_url="/invest?tab=tax",
+        action_url="/portfolio?tab=analysis",
         metric_value=round(tax_saved, 0),
     )]
 

@@ -1,13 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
-import {
-  createAccount,
-  updateAccount,
-  deleteAccount,
-  syncAccount,
-} from "@/api/assets";
-import { extractErrorMessage } from "@/utils/error";
 import StockPositionsModal from "@/components/assets/StockPositionsModal";
 import TransactionModal from "@/components/assets/TransactionModal";
 import BankAccountModal from "@/components/assets/BankAccountModal";
@@ -24,12 +17,12 @@ import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import EmptyState from "@/components/common/EmptyState";
-import { invalidateAccountData, invalidateSyncData } from "@/utils/queryInvalidation";
+import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { toast } from "@/utils/toast";
 import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 import { useAssetModals } from "@/hooks/useAssetModals";
+import { useAccountMutations } from "@/hooks/useAccountMutations";
 import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
 
@@ -39,9 +32,6 @@ type Tab = typeof TABS[number];
 
 export default function AssetManagementPage() {
   const [tab, setTab] = useState<Tab>("은행계좌");
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
-  const [syncingStockIds, setSyncingStockIds] = useState<Set<string>>(new Set());
 
   const {
     showBankModal, setShowBankModal,
@@ -62,120 +52,28 @@ export default function AssetManagementPage() {
   useRegisterRefresh(handleRefresh);
   const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);
 
-  const invalidateAll = useCallback(() => invalidateAccountData(queryClient), [queryClient]);
-
-  const createMutation = useMutation({
-    mutationFn: createAccount,
-    onSuccess: async (data) => {
-      invalidateAll();
-      setShowBankModal(false);
-      setShowStockModal(false);
-      if (data.data_source === "KIS_API" || data.data_source === "KIWOOM_API") {
-        setSyncingStockIds((prev) => new Set(prev).add(data.id));
-        try {
-          await syncAccount(data.id);
-          invalidateAll();
-          toast("계좌가 추가되었습니다", "success");
-        } catch {
-          toast("초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.");
-        } finally {
-          setSyncingStockIds((prev) => {
-            const next = new Set(prev);
-            next.delete(data.id);
-            return next;
-          });
-        }
-      } else {
-        toast("계좌가 추가되었습니다", "success");
-      }
-    },
-    onError: (e) => toast(extractErrorMessage(e, "계좌 추가에 실패했습니다"), "error"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteAccount,
-    onSuccess: () => {
-      invalidateAll();
-      setDeletingId(null);
-      toast("계좌가 삭제되었습니다", "success");
-    },
-    onError: (e) => toast(extractErrorMessage(e, "계좌 삭제에 실패했습니다"), "error"),
+  const {
+    createMutation, deleteMutation,
+    updateBankMutation, updateDepositMutation, updateNameMutation, updateRealEstateMutation,
+    handleSyncBank, handleSyncKisAccount,
+    deletingId, setDeletingId, syncingBankId, syncingStockIds,
+  } = useAccountMutations({
+    onBankModalClose: () => setShowBankModal(false),
+    onStockModalClose: () => setShowStockModal(false),
+    onEditBankClose: () => setEditingBankAccount(null),
+    onEditRealEstateClose: () => setEditingRealEstate(null),
   });
 
   const handleDelete = useCallback((id: string) => {
     setConfirmDeleteId(id);
-  }, []);
+  }, [setConfirmDeleteId]);
 
   const handleConfirmDelete = useCallback(() => {
     if (!confirmDeleteId) return;
     setDeletingId(confirmDeleteId);
     deleteMutation.mutate(confirmDeleteId);
     setConfirmDeleteId(null);
-  }, [confirmDeleteId, deleteMutation]);
-
-  const updateBankMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
-      updateAccount(id, data),
-    onSuccess: () => { invalidateAll(); setEditingBankAccount(null); toast("저장되었습니다", "success"); },
-    onError: (e) => toast(extractErrorMessage(e, "계좌 수정에 실패했습니다"), "error"),
-  });
-
-  const updateDepositMutation = useMutation({
-    mutationFn: ({ id, deposit_krw, deposit_usd }: { id: string; deposit_krw: number; deposit_usd?: number }) =>
-      updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
-    onSuccess: () => { invalidateAll(); toast("예수금이 업데이트되었습니다", "success"); },
-    onError: (e) => toast(extractErrorMessage(e, "예수금 수정에 실패했습니다"), "error"),
-  });
-
-  const updateNameMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateAccount(id, { name }),
-    onSuccess: () => { invalidateAll(); toast("계좌명이 저장되었습니다", "success"); },
-    onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
-  });
-
-  const updateRealEstateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
-      updateAccount(id, data),
-    onSuccess: () => {
-      invalidateAll();
-      setEditingRealEstate(null);
-      toast("저장되었습니다", "success");
-    },
-    onError: (e) => toast(extractErrorMessage(e, "부동산 정보 수정에 실패했습니다"), "error"),
-  });
-
-  const handleSyncBank = useCallback(async (id: string) => {
-    setSyncingBankId(id);
-    try {
-      await syncAccount(id);
-      invalidateAll();
-      toast("동기화 완료", "success");
-    } catch {
-      toast("동기화에 실패했습니다");
-    } finally {
-      setSyncingBankId(null);
-    }
-  }, [invalidateAll]);
-
-  const handleSyncKisAccount = useCallback(async (id: string) => {
-    const acc = accounts.find((a) => a.id === id);
-    setSyncingStockIds((prev) => new Set(prev).add(id));
-    try {
-      await syncAccount(id);
-      await invalidateSyncData(queryClient);
-      toast("동기화 완료", "success");
-    } catch {
-      const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
-      toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);
-    } finally {
-      setSyncingStockIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, [accounts, queryClient]);
+  }, [confirmDeleteId, deleteMutation, setDeletingId, setConfirmDeleteId]);
 
   const bankAccounts = accounts.filter((a) => BANK_TYPES.includes(a.asset_type));
   const stockAccounts = accounts.filter((a) => STOCK_TYPES.includes(a.asset_type));
@@ -317,7 +215,7 @@ export default function AssetManagementPage() {
                   onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
                   onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
                   onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
-                  onSync={handleSyncKisAccount}
+                  onSync={(id) => handleSyncKisAccount(id, accounts)}
                   isSyncing={syncingStockIds.has(account.id)}
                   isDeleting={deletingId === account.id && deleteMutation.isPending} />
               ))}

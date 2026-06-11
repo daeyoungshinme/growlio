@@ -124,6 +124,14 @@ async def create_portfolio(
     if body.account_ids:
         for aid in body.account_ids:
             db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
+        await db.execute(
+            update(AssetAccount)
+            .where(
+                AssetAccount.id.in_(body.account_ids),
+                AssetAccount.target_portfolio_id.is_(None),
+            )
+            .values(target_portfolio_id=portfolio.id)
+        )
 
     await db.commit()
 
@@ -180,11 +188,35 @@ async def update_portfolio(
             ))
 
     if body.account_ids is not None:
+        old_ids = {str(la.account_id) for la in portfolio.linked_accounts}
+        new_ids = {str(aid) for aid in body.account_ids}
+        added = new_ids - old_ids
+        removed = old_ids - new_ids
+
         await db.execute(
             delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id)
         )
         for aid in body.account_ids:
             db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
+
+        if added:
+            await db.execute(
+                update(AssetAccount)
+                .where(
+                    AssetAccount.id.in_([uuid.UUID(aid) for aid in added]),
+                    AssetAccount.target_portfolio_id.is_(None),
+                )
+                .values(target_portfolio_id=portfolio.id)
+            )
+        if removed:
+            await db.execute(
+                update(AssetAccount)
+                .where(
+                    AssetAccount.id.in_([uuid.UUID(aid) for aid in removed]),
+                    AssetAccount.target_portfolio_id == portfolio.id,
+                )
+                .values(target_portfolio_id=None)
+            )
 
     await db.commit()
 

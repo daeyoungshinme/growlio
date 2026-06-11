@@ -63,18 +63,20 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: dashboardPattern,
-            handler: "StaleWhileRevalidate",
+            handler: "NetworkFirst",
             options: {
               cacheName: "api-dashboard",
-              expiration: { maxAgeSeconds: 86400, maxEntries: 5 },
+              networkTimeoutSeconds: 10,
+              expiration: { maxAgeSeconds: 300, maxEntries: 5 },
             },
           },
           {
             urlPattern: portfolioOverviewPattern,
-            handler: "StaleWhileRevalidate",
+            handler: "NetworkFirst",
             options: {
               cacheName: "api-portfolio",
-              expiration: { maxAgeSeconds: 86400, maxEntries: 5 },
+              networkTimeoutSeconds: 10,
+              expiration: { maxAgeSeconds: 300, maxEntries: 5 },
             },
           },
           {

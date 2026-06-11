@@ -1,12 +1,10 @@
 import { lazy, Suspense } from "react";
-import { AlertTriangle, ChevronDown, ChevronUp, Settings2 } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
-import { useTaxPlanner } from "@/hooks/useTaxPlanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
-import TaxPlannerSection from "@/components/invest/TaxPlannerSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
@@ -34,18 +32,6 @@ export default function InvestPlanPage() {
     openEdit,
     saveSettings,
   } = useGoalSettings();
-
-  const {
-    currentYear,
-    taxYear,
-    setTaxYear,
-    showTax,
-    setShowTax,
-    taxData,
-    taxLoading,
-    positionsData,
-    posLoading,
-  } = useTaxPlanner();
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
@@ -151,99 +137,6 @@ export default function InvestPlanPage() {
           </div>
         </ErrorBoundary>
       )}
-
-      {/* 세금 추정 섹션 */}
-      <div className="card-overflow">
-        <button
-          onClick={() => setShowTax((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-base font-semibold text-gray-800 dark:text-gray-200">세금 추정</span>
-            <span className="text-xs text-gray-400 dark:text-gray-500">배당세·해외 양도세 예상 납부액</span>
-          </div>
-          {showTax ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-        </button>
-        {showTax && (
-          <div className="px-4 pb-4 space-y-4 border-t border-gray-100 dark:border-gray-800">
-            <div className="flex items-center gap-3 pt-4">
-              <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>
-              <select
-                value={taxYear}
-                onChange={(e) => setTaxYear(Number(e.target.value))}
-                className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
-                  <option key={y} value={y}>{y}년</option>
-                ))}
-              </select>
-            </div>
-
-            {taxLoading && (
-              <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>
-            )}
-
-            {taxData && !taxLoading && (
-              <div className="space-y-4">
-                {(taxData.domestic_large_holder_warning || taxData.comprehensive_tax_warning) && (
-                  <div className="space-y-2">
-                    {taxData.domestic_large_holder_warning && (
-                      <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
-                        <AlertTriangle size={14} className="text-orange-500 mt-0.5 shrink-0" />
-                        <p className="text-xs text-orange-700 dark:text-orange-400">
-                          국내 주식 보유액이 10억원 이상입니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다.
-                        </p>
-                      </div>
-                    )}
-                    {taxData.comprehensive_tax_warning && (
-                      <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                        <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
-                        <p className="text-xs text-red-700 dark:text-red-400">
-                          금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수 있습니다.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
-                  <div className="flex-1 min-w-0 px-3 py-2.5">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">배당소득세</p>
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
-                      {fmtKrw(taxData.dividend_tax_krw)}
-                    </p>
-                    <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                      배당수령 {fmtKrw(taxData.dividend_income_krw)} × {taxData.rates.dividend_tax_rate_pct}%
-                    </p>
-                  </div>
-                  <div className="flex-1 min-w-0 px-3 py-2.5">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">해외 양도세</p>
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
-                      {fmtKrw(taxData.overseas_tax_estimated_krw)}
-                    </p>
-                    <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                      미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} ({taxData.rates.overseas_tax_rate_pct}%)
-                    </p>
-                  </div>
-                  <div className="flex-1 min-w-0 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20">
-                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">예상 납부</p>
-                    <p className="text-base font-bold text-blue-700 dark:text-blue-300 mt-0.5 truncate">
-                      {fmtKrw(taxData.total_estimated_tax_krw)}
-                    </p>
-                    <p className="hidden sm:block text-xs text-blue-500 dark:text-blue-500 mt-0.5">{taxYear}년 기준</p>
-                  </div>
-                </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">{taxData.note}</p>
-              </div>
-            )}
-            {showTax && !posLoading && positionsData && (
-              <ErrorBoundary variant="section">
-                <TaxPlannerSection positions={positionsData} />
-              </ErrorBoundary>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* 설정 편집 모달 */}
       {editing && (

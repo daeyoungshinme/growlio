@@ -48,8 +48,6 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=6.1.0",
     # FCM 푸시 알림 (선택적 — FIREBASE_CREDENTIALS_JSON 환경변수 설정 시 활성화)
     "firebase-admin>=6.5.0",
-    # AI 분석 (선택적 — GOOGLE_API_KEY 환경변수 설정 시 활성화)
-    "google-genai>=1.16.0,<2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -74,7 +72,7 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-addopts = "--tb=short --cov=app --cov-fail-under=50 --cov-report=term-missing"
+addopts = "--tb=short --cov=app --cov-fail-under=65 --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["app"]

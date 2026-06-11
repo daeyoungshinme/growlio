@@ -28,7 +28,10 @@ async def redis_lock(
         yield bool(acquired)
     finally:
         if acquired:
-            current = await redis.get(key)
-            if current == lock_value:
-                await redis.delete(key)
-                logger.debug("redis_lock_released", key=key)
+            try:
+                current = await redis.get(key)
+                if current == lock_value:
+                    await redis.delete(key)
+                    logger.debug("redis_lock_released", key=key)
+            except Exception as e:
+                logger.warning("redis_lock_release_failed", key=key, error=str(e))

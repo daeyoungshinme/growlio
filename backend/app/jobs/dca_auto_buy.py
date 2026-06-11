@@ -18,6 +18,7 @@ from app.models.user import UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 from app.services.price_service import fetch_prices_batch
+from app.utils.redis_lock import redis_lock
 
 logger = structlog.get_logger()
 
@@ -27,6 +28,14 @@ async def run_dca_auto_execution() -> None:
     today = date.today()
     redis = await get_redis()
 
+    async with redis_lock(redis, "dca_auto_execution_lock", ttl=3600) as acquired:
+        if not acquired:
+            logger.info("dca_auto_execution_skipped_lock_held")
+            return
+        await _run_dca_auto_execution(today, redis)
+
+
+async def _run_dca_auto_execution(today: date, redis) -> None:
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(UserSettings).where(

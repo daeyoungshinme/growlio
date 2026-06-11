@@ -3,12 +3,8 @@ name: E2E Tests (Playwright)
 on:
   push:
     branches: [main]
-    paths:
-      - "frontend/**"
   pull_request:
     branches: [main]
-    paths:
-      - "frontend/**"
 
 jobs:
   e2e:
