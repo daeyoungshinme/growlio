@@ -92,6 +92,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
     mutationFn: createTransaction,
     onSuccess: (_, vars) => {
       invalidateTransactionData(qc);
+      toast("추가되었습니다", "success");
       onSuccess(vars.account_id as string ?? "", vars.amount ?? 0, vars.transaction_type);
     },
     onError: (e) => toast(extractErrorMessage(e, "내역 저장에 실패했습니다"), "error"),
@@ -102,6 +103,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
       updateTransaction(id, data),
     onSuccess: (_, vars) => {
       invalidateTransactionData(qc);
+      toast("수정되었습니다", "success");
       onSuccess(vars.data?.account_id as string ?? "", vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
     },
     onError: (e) => toast(extractErrorMessage(e, "내역 수정에 실패했습니다"), "error"),
@@ -183,7 +185,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               <div>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-sm text-gray-400 shrink-0">$</span>
-                  <input type="number"
+                  <input type="number" inputMode="decimal"
                     value={amountUsd || ""}
                     onChange={(e) => {
                       const usd = parseFloat(e.target.value) || 0;
@@ -202,7 +204,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                 )}
               </div>
             ) : (
-              <input type="number" required min={1} value={form.amount || ""}
+              <input type="number" inputMode="decimal" required min={1} value={form.amount || ""}
                 onChange={(e) => setField("amount", Number(e.target.value))}
                 placeholder="예: 500000" className={`${inputCls} mt-1`} />
             )}
@@ -284,6 +286,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
           <label className={labelCls}>거래 수수료 (선택)</label>
           <input
             type="number"
+            inputMode="numeric"
             min={0}
             step={1}
             value={form.fee ?? ""}

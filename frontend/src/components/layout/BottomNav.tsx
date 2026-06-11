@@ -5,7 +5,7 @@ const nav = [
   { to: "/dashboard", icon: Home, label: "대시보드" },
   { to: "/portfolio", icon: PieChart, label: "포트폴리오" },
   { to: "/asset-management", icon: Wallet, label: "자산관리" },
-  { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
+  { to: "/invest-plan", icon: TrendingUp, label: "투자계획" },
   { to: "/settings", icon: Settings, label: "설정" },
 ];
 

@@ -27,7 +27,7 @@ export default function DashboardPage() {
     await qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
   }, [qc]);
   useRegisterRefresh(handleRefresh);
-  const { data, isLoading, error, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate } = useDashboardData();
+  const { data, isLoading, error, dataUpdatedAt, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate } = useDashboardData();
 
   const overallDividendYield = useMemo(() => {
     const estimated = data?.estimated_annual_dividends;
@@ -95,6 +95,7 @@ export default function DashboardPage() {
           data={data}
           dcaData={dcaData}
           exchangeRate={exchangeRate}
+          dataUpdatedAt={dataUpdatedAt}
         />
       </ErrorBoundary>
 

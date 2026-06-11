@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Bell, ClipboardList, Loader2, RefreshCw } from "lucide-react";
-import { BacktestResult, CorrelationResult, runBacktest, runCorrelation } from "@/api/backtest";
+import { Bell, ChevronDown, ChevronUp, ClipboardList, Loader2, RefreshCw } from "lucide-react";
+import { useInsights } from "@/hooks/useInsights";
+import { BacktestResult, runBacktest } from "@/api/backtest";
 import { analyzePortfolio, RebalancingAnalysis } from "@/api/rebalancing";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
@@ -9,7 +10,6 @@ import type { AssetAccount } from "@/api/assets";
 
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
-import CorrelationHeatmap from "@/components/backtest/CorrelationHeatmap";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import { toast } from "@/utils/toast";
@@ -34,8 +34,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
-  const [correlationResult, setCorrelationResult] = useState<CorrelationResult | null>(null);
-  const [correlationLoading, setCorrelationLoading] = useState(false);
+  const [diagnosisExpanded, setDiagnosisExpanded] = useState(false);
+  const { data: insights } = useInsights();
+  const urgentInsights = (insights ?? []).filter((ins) => ins.severity === "ALERT" || ins.severity === "WARNING");
   const [startDate, setStartDate] = useState(BACKTEST_DEFAULT_START_DATE);
   const [endDate, setEndDate] = useState(BACKTEST_DEFAULT_END_DATE);
   const [activePreset, setActivePreset] = useState<number | null>(5);
@@ -86,7 +87,6 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
     setAnalysisMode("backtest");
     setAnalysis(null);
     setAnalysisError(null);
-    setCorrelationResult(null);
   }
 
   const canRunBacktest = startDate < endDate && (selectedIds.size > 0 || includeSpy || includeReal);
@@ -142,6 +142,34 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           </span>
         )}
       </div>
+
+      {/* 인사이트 배너 — ALERT/WARNING 있을 때 자동 표시 */}
+      {urgentInsights.length > 0 && analysisMode !== "diagnosis" && (
+        <div className={`rounded-xl border px-3 py-2 text-xs transition-colors ${
+          urgentInsights.some((i) => i.severity === "ALERT")
+            ? "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30"
+            : "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/30"
+        }`}>
+          <button
+            className="w-full flex items-center justify-between gap-2 text-left"
+            onClick={() => setDiagnosisExpanded((v) => !v)}
+          >
+            <span className={`font-medium ${
+              urgentInsights.some((i) => i.severity === "ALERT")
+                ? "text-red-700 dark:text-red-400"
+                : "text-yellow-700 dark:text-yellow-400"
+            }`}>
+              ⚠️ 포트폴리오 진단 — {urgentInsights.length}개 항목 확인 필요
+            </span>
+            {diagnosisExpanded ? <ChevronUp size={13} className="text-gray-400 shrink-0" /> : <ChevronDown size={13} className="text-gray-400 shrink-0" />}
+          </button>
+          {diagnosisExpanded && (
+            <div className="mt-2 border-t border-gray-200 dark:border-gray-700 pt-2">
+              <PortfolioDiagnosisCard />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 백테스팅 설정 패널 */}
       {analysisMode === "backtest" && (
@@ -227,7 +255,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             </div>
             <div className="flex justify-end">
               <button
-                onClick={() => { setBacktestResult(null); setCorrelationResult(null); runMut.mutate(); }}
+                onClick={() => { setBacktestResult(null); runMut.mutate(); }}
                 disabled={!canRunBacktest || runMut.isPending}
                 aria-busy={runMut.isPending}
                 className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
@@ -309,36 +337,6 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
             <BacktestMetricsTable metrics={backtestResult.metrics} />
-          </div>
-          <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-            {correlationResult ? (
-              <CorrelationHeatmap result={correlationResult} />
-            ) : (
-              <div className="flex justify-center">
-                <button
-                  onClick={async () => {
-                    if (!selectedIds.size) return;
-                    setCorrelationLoading(true);
-                    try {
-                      const res = await runCorrelation({
-                        portfolio_ids: Array.from(selectedIds),
-                        start_date: startDate,
-                        end_date: endDate,
-                      });
-                      setCorrelationResult(res);
-                    } catch {
-                      toast("상관관계 분석에 실패했습니다");
-                    } finally {
-                      setCorrelationLoading(false);
-                    }
-                  }}
-                  disabled={correlationLoading || !selectedIds.size}
-                  className="flex items-center gap-2 px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
-                >
-                  {correlationLoading ? <><Loader2 size={12} className="animate-spin" /> 분석 중...</> : "📊 종목 간 상관관계 분석"}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}

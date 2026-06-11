@@ -92,6 +92,7 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
               <label className={labelClass}>월 매수 금액 (원)</label>
               <input
                 type="number"
+                inputMode="decimal"
                 className={inputClass}
                 value={dcaForm.amount}
                 onChange={(e) => setDcaForm((f) => ({ ...f, amount: e.target.value }))}

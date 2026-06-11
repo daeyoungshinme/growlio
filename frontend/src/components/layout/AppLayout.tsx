@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
+import OfflineBanner from "@/components/common/OfflineBanner";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -71,6 +72,7 @@ export default function AppLayout() {
               </button>
             </div>
           )}
+          <OfflineBanner />
           {/* Pull-to-Refresh 인디케이터 */}
           {(isPulling || isRefreshing) && (
             <div

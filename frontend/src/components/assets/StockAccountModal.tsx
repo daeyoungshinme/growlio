@@ -93,8 +93,8 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">증권사 계좌 등록</h2>
           <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
@@ -135,7 +135,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">원화 예수금</label>
                 <div className="relative mt-0.5">
-                  <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <input type="number" inputMode="decimal" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={depositKrw ?? ""} onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))} placeholder="0" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
                 </div>
@@ -144,7 +144,7 @@ export default function StockAccountModal({ onClose, onSubmit, isLoading }: Prop
                 <label className="text-xs text-gray-500 dark:text-gray-400">외화 예수금 (USD)</label>
                 <div className="relative mt-0.5">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
-                  <input type="number" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <input type="number" inputMode="decimal" className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={depositUsd ?? ""} onChange={(e) => setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))} placeholder="0" />
                 </div>
                 {(depositUsd ?? 0) > 0 && (

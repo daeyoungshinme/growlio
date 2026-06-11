@@ -122,6 +122,7 @@ export function StockPriceAlertSection() {
             <label className={labelClass}>목표가 (원)</label>
             <input
               type="number"
+              inputMode="decimal"
               className={inputClass}
               value={form.target_price}
               onChange={(e) => setForm((f) => ({ ...f, target_price: e.target.value }))}
@@ -144,6 +145,7 @@ export function StockPriceAlertSection() {
             <label className={labelClass}>알림 횟수</label>
             <input
               type="number"
+              inputMode="numeric"
               className={inputClass}
               value={form.max_trigger_count}
               onChange={(e) => setForm((f) => ({ ...f, max_trigger_count: e.target.value }))}

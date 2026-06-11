@@ -216,7 +216,7 @@ export function PositionsTable({
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">보유수량</p>
-                    <input type="number"
+                    <input type="number" inputMode="numeric"
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                       value={row.qty || ""} onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
                       min={0} placeholder="0" />
@@ -227,7 +227,7 @@ export function PositionsTable({
                       <div>
                         <div className="flex items-center gap-1">
                           <span className="text-sm text-gray-400 shrink-0">$</span>
-                          <input type="number"
+                          <input type="number" inputMode="decimal"
                             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                             value={row.avg_price_usd ?? ""} onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
                             placeholder="0.00" min={0} step="0.01" />
@@ -239,7 +239,7 @@ export function PositionsTable({
                         )}
                       </div>
                     ) : (
-                      <input type="number"
+                      <input type="number" inputMode="decimal"
                         className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                         value={row.avg_price || ""} onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
                         min={0} placeholder="0" />
@@ -251,7 +251,7 @@ export function PositionsTable({
                   {overseas ? (
                     <div className="relative">
                       <span className="absolute left-3 top-2 text-sm text-gray-400 dark:text-gray-500 pointer-events-none">$</span>
-                      <input type="number"
+                      <input type="number" inputMode="decimal"
                         className={`w-full border border-gray-300 dark:border-gray-600 rounded-lg pl-6 pr-3 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 transition-opacity ${priceLoading ? "opacity-50" : ""}`}
                         value={rows[i].current_price_usd ?? ""}
                         onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
@@ -265,7 +265,7 @@ export function PositionsTable({
                     </div>
                   ) : (
                     <div className="relative">
-                      <input type="number"
+                      <input type="number" inputMode="decimal"
                         className={`w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 transition-opacity ${priceLoading ? "opacity-50" : ""}`}
                         value={rows[i].current_price ?? ""}
                         onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
@@ -355,7 +355,7 @@ export function PositionsTable({
                       </div>
                     </td>
                     <td className="py-2 pr-3">
-                      <input type="number"
+                      <input type="number" inputMode="numeric"
                         className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                         value={row.qty || ""} onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
                         min={0} placeholder="0" />
@@ -365,7 +365,7 @@ export function PositionsTable({
                         <div>
                           <div className="flex items-center gap-1">
                             <span className="text-xs text-gray-400 shrink-0">$</span>
-                            <input type="number"
+                            <input type="number" inputMode="decimal"
                               className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                               value={row.avg_price_usd ?? ""} onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
                               placeholder="0.00" min={0} step="0.01" />
@@ -377,7 +377,7 @@ export function PositionsTable({
                           )}
                         </div>
                       ) : (
-                        <input type="number"
+                        <input type="number" inputMode="decimal"
                           className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                           value={row.avg_price || ""} onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
                           min={0} placeholder="0" />
@@ -390,7 +390,7 @@ export function PositionsTable({
                       {overseas ? (
                         <div className="relative">
                           <span className="absolute left-2 top-2 text-xs text-gray-400 dark:text-gray-500 pointer-events-none">$</span>
-                          <input type="number"
+                          <input type="number" inputMode="decimal"
                             className="w-full border border-gray-300 dark:border-gray-600 rounded pl-5 pr-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                             value={priceLoading ? "" : (rows[i].current_price_usd ?? "")}
                             onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
@@ -404,7 +404,7 @@ export function PositionsTable({
                         </div>
                       ) : (
                         <div className="relative">
-                          <input type="number"
+                          <input type="number" inputMode="decimal"
                             className="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 text-xs text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
                             value={priceLoading ? "" : (rows[i].current_price ?? "")}
                             onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}

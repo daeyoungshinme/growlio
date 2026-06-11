@@ -75,6 +75,7 @@ export default function AssetManagementPage() {
         try {
           await syncAccount(data.id);
           invalidateAll();
+          toast("계좌가 추가되었습니다", "success");
         } catch {
           toast("초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.");
         } finally {
@@ -84,6 +85,8 @@ export default function AssetManagementPage() {
             return next;
           });
         }
+      } else {
+        toast("계좌가 추가되었습니다", "success");
       }
     },
     onError: (e) => toast(extractErrorMessage(e, "계좌 추가에 실패했습니다"), "error"),
@@ -94,6 +97,7 @@ export default function AssetManagementPage() {
     onSuccess: () => {
       invalidateAll();
       setDeletingId(null);
+      toast("계좌가 삭제되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "계좌 삭제에 실패했습니다"), "error"),
   });
@@ -112,21 +116,21 @@ export default function AssetManagementPage() {
   const updateBankMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
-    onSuccess: () => { invalidateAll(); setEditingBankAccount(null); },
+    onSuccess: () => { invalidateAll(); setEditingBankAccount(null); toast("저장되었습니다", "success"); },
     onError: (e) => toast(extractErrorMessage(e, "계좌 수정에 실패했습니다"), "error"),
   });
 
   const updateDepositMutation = useMutation({
     mutationFn: ({ id, deposit_krw, deposit_usd }: { id: string; deposit_krw: number; deposit_usd?: number }) =>
       updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
-    onSuccess: () => invalidateAll(),
+    onSuccess: () => { invalidateAll(); toast("예수금이 업데이트되었습니다", "success"); },
     onError: (e) => toast(extractErrorMessage(e, "예수금 수정에 실패했습니다"), "error"),
   });
 
   const updateNameMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       updateAccount(id, { name }),
-    onSuccess: () => invalidateAll(),
+    onSuccess: () => { invalidateAll(); toast("계좌명이 저장되었습니다", "success"); },
     onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
   });
 
@@ -136,6 +140,7 @@ export default function AssetManagementPage() {
     onSuccess: () => {
       invalidateAll();
       setEditingRealEstate(null);
+      toast("저장되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "부동산 정보 수정에 실패했습니다"), "error"),
   });
@@ -145,6 +150,9 @@ export default function AssetManagementPage() {
     try {
       await syncAccount(id);
       invalidateAll();
+      toast("동기화 완료", "success");
+    } catch {
+      toast("동기화에 실패했습니다");
     } finally {
       setSyncingBankId(null);
     }
@@ -156,7 +164,7 @@ export default function AssetManagementPage() {
     try {
       await syncAccount(id);
       await invalidateSyncData(queryClient);
-      toast("동기화 완료");
+      toast("동기화 완료", "success");
     } catch {
       const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
       toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);

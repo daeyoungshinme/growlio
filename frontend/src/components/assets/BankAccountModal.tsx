@@ -45,8 +45,8 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
             {isEdit ? "은행계좌 수정" : "은행계좌 추가"}
@@ -87,6 +87,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               <span className="text-sm text-gray-500 dark:text-gray-400 w-8 shrink-0">₩</span>
               <input
                 type="number"
+                inputMode="decimal"
                 value={depositKrw ?? ""}
                 onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))}
                 placeholder="0"
@@ -98,6 +99,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               <span className="text-sm text-gray-500 dark:text-gray-400 w-8 shrink-0">$</span>
               <input
                 type="number"
+                inputMode="decimal"
                 value={depositUsd ?? ""}
                 onChange={(e) => setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))}
                 placeholder="0"

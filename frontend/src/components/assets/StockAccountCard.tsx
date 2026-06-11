@@ -159,7 +159,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               <div className="mt-0.5 space-y-1">
                 <div className="flex items-center gap-1">
                   <input
-                    type="number" autoFocus min={0}
+                    type="number" inputMode="decimal" autoFocus min={0}
                     value={editKrwValue}
                     onChange={(e) => setEditKrwValue(e.target.value)}
                     onKeyDown={(e) => {
@@ -174,7 +174,7 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-gray-400 shrink-0">$</span>
                   <input
-                    type="number" min={0} step="0.01"
+                    type="number" inputMode="decimal" min={0} step="0.01"
                     value={editUsdValue}
                     onChange={(e) => setEditUsdValue(e.target.value)}
                     onKeyDown={(e) => {

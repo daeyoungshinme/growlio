@@ -12,10 +12,19 @@ interface Props {
   data: DashboardData;
   dcaData: DCAAnalysisData | undefined;
   exchangeRate: number | null;
+  dataUpdatedAt?: number;
 }
 
-export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Props) {
+export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, dataUpdatedAt }: Props) {
   const currentYear = new Date().getFullYear();
+
+  const updatedLabel = useMemo(() => {
+    if (!dataUpdatedAt) return null;
+    const mins = Math.floor((Date.now() - dataUpdatedAt) / 60_000);
+    if (mins < 1) return "방금 업데이트";
+    if (mins < 60) return `${mins}분 전 업데이트`;
+    return `${Math.floor(mins / 60)}시간 전 업데이트`;
+  }, [dataUpdatedAt]);
 
   const allocationChartData = useMemo(() => {
     const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
@@ -78,6 +87,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate }: Pr
               <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
                 {Math.floor(data.total_assets_krw).toLocaleString()}원
               </p>
+              {updatedLabel && (
+                <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">{updatedLabel}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <div>

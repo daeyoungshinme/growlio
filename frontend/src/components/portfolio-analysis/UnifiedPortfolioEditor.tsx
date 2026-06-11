@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, Wand2, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount, type StockSuggestion } from "@/api/assets";
 import { Portfolio, PortfolioItem } from "@/api/portfolios";
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "@/constants/validation";
@@ -11,6 +12,9 @@ import {
   REAL_ESTATE_ASSET_TYPE,
 } from "@/constants/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import type { PortfolioOverview } from "@/types";
+import { toast } from "@/utils/toast";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
 
@@ -25,6 +29,7 @@ interface Props {
 const EMPTY_ITEM: PortfolioItem = { ticker: "", name: "", market: "KOSPI", weight: 0 };
 
 export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave, onClose, saving }: Props) {
+  const qc = useQueryClient();
   const [name, setName] = useState(initial?.name ?? "");
   const [baseType, setBaseType] = useState(initial?.base_type ?? BASE_TYPE_STOCK_ONLY);
   const [items, setItems] = useState<PortfolioItem[]>(
@@ -76,6 +81,40 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   function addRealEstate() {
     if (items.some((i) => i.market === KR_PROPERTY_MARKET)) return;
     setItems((prev) => [...prev, { ticker: REAL_ESTATE_ASSET_TYPE, name: "부동산", market: KR_PROPERTY_MARKET, weight: 0 }]);
+  }
+
+  function fillFromHoldings() {
+    const hasData = items.some((i) => i.ticker && i.name);
+    if (hasData && !confirm("입력된 종목을 현재 보유 비중으로 교체하시겠습니까?")) return;
+
+    const overview = qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview);
+    if (!overview?.all_positions.length) {
+      toast("보유 종목 데이터가 없습니다. 계좌 동기화 후 다시 시도해주세요.", "error");
+      return;
+    }
+
+    const grouped = new Map<string, { ticker: string; name: string; market: string; totalValue: number }>();
+    for (const p of overview.all_positions) {
+      if (!p.ticker || p.value_krw <= 0) continue;
+      const key = `${p.ticker}-${p.market}`;
+      const existing = grouped.get(key);
+      if (existing) existing.totalValue += p.value_krw;
+      else grouped.set(key, { ticker: p.ticker, name: p.name, market: p.market, totalValue: p.value_krw });
+    }
+
+    const entries = [...grouped.values()].sort((a, b) => b.totalValue - a.totalValue);
+    if (!entries.length) { toast("보유 종목이 없습니다.", "error"); return; }
+
+    const totalValue = entries.reduce((s, e) => s + e.totalValue, 0);
+    const newItems: PortfolioItem[] = entries.map((e) => ({
+      ticker: e.ticker, name: e.name, market: e.market,
+      weight: Math.round((e.totalValue / totalValue) * 1000) / 10,
+    }));
+    // 반올림 오차 보정: 마지막 항목에 나머지 비중 합산
+    const diff = Math.round((100 - newItems.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
+    if (newItems.length > 0 && diff !== 0) newItems[newItems.length - 1].weight += diff;
+
+    setItems(newItems);
   }
 
   function handleTickerInput(idx: number, value: string) {
@@ -164,9 +203,19 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700 dark:text-gray-300">종목 및 비중</label>
-              <span className={`text-xs font-medium ${weightOk ? "text-green-600" : "text-orange-500"}`}>
-                합계 {totalWeight.toFixed(1)}% {weightOk ? "✓" : "(100% 필요)"}
-              </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={fillFromHoldings}
+                  className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors"
+                  title="현재 보유 종목을 현재 비중으로 자동 채웁니다"
+                >
+                  <Wand2 size={12} /> 현재 보유 종목으로 채우기
+                </button>
+                <span className={`text-xs font-medium ${weightOk ? "text-green-600" : "text-orange-500"}`}>
+                  합계 {totalWeight.toFixed(1)}% {weightOk ? "✓" : "(100% 필요)"}
+                </span>
+              </div>
             </div>
 
             <div className="space-y-2">

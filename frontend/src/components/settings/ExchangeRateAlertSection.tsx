@@ -144,6 +144,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
           <label className={labelClass}>목표환율 (원)</label>
           <input
             type="number"
+            inputMode="decimal"
             className={inputClass}
             value={alertForm.target_rate}
             onChange={(e) => setAlertForm((f) => ({ ...f, target_rate: e.target.value }))}
@@ -166,6 +167,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
           <label className={labelClass}>알림 횟수</label>
           <input
             type="number"
+            inputMode="numeric"
             className={inputClass}
             value={alertForm.max_trigger_count}
             onChange={(e) => setAlertForm((f) => ({ ...f, max_trigger_count: e.target.value }))}

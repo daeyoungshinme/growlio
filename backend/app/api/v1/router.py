@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 
 from app.api.v1 import (
-    ai_analysis,
     alerts,
     assets,
     auth,
@@ -41,5 +40,4 @@ router.include_router(rebalancing.router)
 router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(dart.router)
-router.include_router(ai_analysis.router)
 router.include_router(ws_prices.router)

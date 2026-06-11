@@ -53,8 +53,8 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
   const inputCls = `w-full ${INPUT_SM}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 추가</h2>
           <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
@@ -89,18 +89,18 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현재 시세 (원) *</label>
-              <input type="number" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
+              <input type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
                 placeholder="예: 800000000" className={inputCls} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입가 (원)</label>
-              <input type="number" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+              <input type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                 placeholder="예: 600000000" className={inputCls} />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담보대출 잔액 (원)</label>
-            <input type="number" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
+            <input type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
               placeholder="0" className={inputCls} />
           </div>
           <div className="flex items-center gap-2">
@@ -182,8 +182,8 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
   const inputCls = `w-full ${INPUT_SM}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 수정</h2>
           <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
@@ -218,18 +218,18 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현재 시세 (원) *</label>
-              <input type="number" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
+              <input type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
                 className={inputCls} />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입가 (원)</label>
-              <input type="number" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+              <input type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                 className={inputCls} />
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담보대출 잔액 (원)</label>
-            <input type="number" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
+            <input type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
               className={inputCls} />
           </div>
           <div className="flex items-center gap-2">

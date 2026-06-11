@@ -208,13 +208,25 @@ export default function PortfolioAnalysisTab() {
             <Loader2 size={20} className="animate-spin text-gray-400 dark:text-gray-500" />
           </div>
         ) : sortedPortfolios.length === 0 ? (
-          <div className="text-center py-10 text-sm text-gray-400 dark:text-gray-500">
-            <div className="mb-2">포트폴리오가 없습니다.</div>
+          <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-5 text-center space-y-4">
+            <div className="text-2xl">🎯</div>
+            <div>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">목표 포트폴리오를 만들어 보세요</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">종목과 목표 비중을 설정하면 현재 보유 현황과 비교해 리밸런싱 가이드를 제공합니다.</p>
+            </div>
+            <div className="flex flex-col gap-1.5 text-left">
+              {(["① 종목·비중 입력", "② 리밸런싱 분석 확인", "③ 이메일 알림 설정"] as const).map((step) => (
+                <div key={step} className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-300 dark:bg-blue-700 flex-shrink-0" />
+                  {step}
+                </div>
+              ))}
+            </div>
             <button
               onClick={() => { setEditingPortfolio(null); setEditorOpen(true); }}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
+              className="w-full py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              + 새로 만들기
+              첫 번째 포트폴리오 만들기
             </button>
           </div>
         ) : (

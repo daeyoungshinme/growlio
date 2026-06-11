@@ -370,23 +370,19 @@ export default function RebalancingTable({
             <div className="grid grid-cols-2 gap-3">
               <div
                 className="bg-gray-700 rounded-xl p-3 text-center"
-                title="HHI (허핀달-허쉬만 지수): 포트폴리오 집중도. 낮을수록 분산"
+                title="집중도 지수(HHI): 낮을수록 종목이 고르게 분산된 포트폴리오입니다"
               >
-                <div className="text-xs text-gray-400 mb-1">현재 집중도 (HHI)</div>
-                <div className={`text-sm font-semibold ${curLabel.cls}`}>
-                  {currentHHI.toFixed(0)}
-                </div>
-                <div className={`text-xs mt-0.5 ${curLabel.cls}`}>{curLabel.text}</div>
+                <div className="text-xs text-gray-400 mb-1">현재 집중도</div>
+                <div className={`text-sm font-semibold ${curLabel.cls}`}>{curLabel.text}</div>
+                <div className="text-xs text-gray-500 mt-0.5">HHI {currentHHI.toFixed(0)}</div>
               </div>
               <div
                 className="bg-gray-700 rounded-xl p-3 text-center"
-                title="리밸런싱 후 목표 HHI"
+                title="리밸런싱 후 목표 집중도"
               >
-                <div className="text-xs text-gray-400 mb-1">목표 집중도 (HHI)</div>
-                <div className={`text-sm font-semibold ${tgtLabel.cls}`}>
-                  {targetHHI.toFixed(0)}
-                </div>
-                <div className={`text-xs mt-0.5 ${tgtLabel.cls}`}>{tgtLabel.text}</div>
+                <div className="text-xs text-gray-400 mb-1">목표 집중도</div>
+                <div className={`text-sm font-semibold ${tgtLabel.cls}`}>{tgtLabel.text}</div>
+                <div className="text-xs text-gray-500 mt-0.5">HHI {targetHHI.toFixed(0)}</div>
               </div>
             </div>
             {estFee > 0 && (

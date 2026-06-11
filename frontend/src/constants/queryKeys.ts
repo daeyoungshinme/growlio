@@ -29,5 +29,4 @@ export const QUERY_KEYS = {
   dripSimulation: ["drip-simulation"] as const,
   monthlyOptimization: ["monthly-optimization"] as const,
   portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
-  aiAnalysis: ["ai-analysis"] as const,
 } as const;

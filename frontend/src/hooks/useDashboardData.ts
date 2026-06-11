@@ -8,7 +8,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 
 export function useDashboardData() {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
     staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 백엔드 Redis TTL(5분)과 동기화
@@ -38,5 +38,5 @@ export function useDashboardData() {
 
   const exchangeRate = useExchangeRate();
 
-  return { data, isLoading, error, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate };
+  return { data, isLoading, error, dataUpdatedAt, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate };
 }
