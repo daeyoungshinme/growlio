@@ -12,7 +12,7 @@ vi.mock("@/utils/toast", () => ({
 }));
 
 vi.mock("@/utils/error", () => ({
-  extractErrorMessage: vi.fn((e, fallback) => fallback),
+  extractErrorMessage: vi.fn((_e, fallback) => fallback),
 }));
 
 const makePos = (overrides: Partial<Position> = {}): Position => ({

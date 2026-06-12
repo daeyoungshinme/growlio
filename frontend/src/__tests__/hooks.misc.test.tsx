@@ -5,6 +5,7 @@ import React from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useLogout } from "@/hooks/useLogout";
+import type { AuthState } from "@/stores/authStore";
 
 vi.mock("@/api/assets", () => ({
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
@@ -138,8 +139,8 @@ describe("useLogout", () => {
   it("logout 실행 시 authStore.logout을 호출한다", async () => {
     const { useAuthStore } = await import("@/stores/authStore");
     const logoutFn = vi.fn().mockResolvedValue(undefined);
-    vi.mocked(useAuthStore).mockImplementation((selector: (s: { logout: () => Promise<void> }) => unknown) => {
-      const state = { logout: logoutFn };
+    vi.mocked(useAuthStore).mockImplementation((selector: (s: AuthState) => unknown) => {
+      const state = { logout: logoutFn } as unknown as AuthState;
       return typeof selector === "function" ? selector(state) : state;
     });
 

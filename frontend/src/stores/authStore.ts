@@ -3,7 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { api } from "@/api/client";
 import { getHttpStatus } from "@/utils/error";
 
-interface AuthState {
+export interface AuthState {
   isAuthenticated: boolean;
   isAuthChecking: boolean;
   userId: string | null;

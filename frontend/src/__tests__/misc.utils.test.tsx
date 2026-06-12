@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import Tooltip from "@/components/common/Tooltip";
 import { SideBadge, StatusBadge } from "@/components/rebalancing/RebalancingBadges";
