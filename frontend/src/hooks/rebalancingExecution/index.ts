@@ -176,12 +176,14 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     const map: Record<string, ReturnType<typeof getSellRows>> = {};
     for (const acc of kisAccounts) map[acc.id] = getSellRows(acc.id);
     return map;
+  // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
   }, [actionableItems, liveBalances, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
     for (const acc of kisAccounts) map[acc.id] = getBuyRows(acc.id);
     return map;
+  // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
   }, [actionableItems, liveBalances, buyAccounts, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
@@ -261,7 +263,7 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
   useEffect(() => {
     loadAllLiveBalances();
     loadAllPrices();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // 마운트 시 1회만 실행 — loadAll* 함수를 dep에 추가하면 렌더마다 재조회됨. eslint-disable-line react-hooks/exhaustive-deps
 
   const orders = buildOrders();
   const hasRealAccount = orders.some((o) => {

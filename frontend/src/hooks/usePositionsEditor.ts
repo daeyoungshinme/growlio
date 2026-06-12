@@ -5,6 +5,7 @@ import { useStockSearch } from "./useStockSearch";
 import { extractErrorMessage } from "@/utils/error";
 import { toast } from "@/utils/toast";
 import { isOverseasMarket } from "@/constants/markets";
+import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 
 export interface Position {
   ticker: string;
@@ -71,7 +72,7 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   };
 
   const handleNameBlur = (i: number) => {
-    setTimeout(() => { if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); } }, 150);
+    setTimeout(() => { if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); } }, SEARCH_DROPDOWN_HIDE_DELAY);
   };
 
   const handleSelectSuggestion = (i: number, s: StockSuggestion) => {

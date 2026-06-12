@@ -120,7 +120,6 @@ export function useRealtimePrice({
         RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
       reconnectAttemptRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => {
-        // eslint-disable-next-line react-hooks/immutability
         void connect();
       }, delay);
     };
@@ -141,6 +140,7 @@ export function useRealtimePrice({
       wsRef.current?.close();
       wsRef.current = null;
     };
+    // connect는 sendSubscribe에 의존 — 전체 dep 추가 시 tickers 변경마다 재연결 루프 발생.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, connect]);
 

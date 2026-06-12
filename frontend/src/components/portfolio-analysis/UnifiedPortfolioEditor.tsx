@@ -13,6 +13,7 @@ import {
 } from "@/constants/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { FOCUS_SETTLE_DELAY } from "@/constants/timers";
 import type { PortfolioOverview } from "@/types";
 import { toast } from "@/utils/toast";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
@@ -135,7 +136,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
     updateItem(idx, { ticker: "", name: "" });
     setEditingRows((prev) => new Set(prev).add(idx));
     clearSuggestions();
-    setTimeout(() => searchInputRefs.current.get(idx)?.focus(), 0);
+    setTimeout(() => searchInputRefs.current.get(idx)?.focus(), FOCUS_SETTLE_DELAY);
   }
 
   function handleSubmit() {

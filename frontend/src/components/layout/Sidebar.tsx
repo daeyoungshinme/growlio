@@ -1,4 +1,4 @@
-import { LineChart, LogOut, PieChart, Settings, Home, Wallet, TrendingUp, Moon, Sun } from "lucide-react";
+import { BarChart2, LineChart, LogOut, PieChart, Settings, Home, Wallet, TrendingUp, Moon, Sun } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
@@ -8,6 +8,7 @@ const nav = [
   { to: "/portfolio", icon: PieChart, label: "포트폴리오" },
   { to: "/asset-management", icon: Wallet, label: "자산관리" },
   { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
+  { to: "/market", icon: BarChart2, label: "시장" },
   { to: "/settings", icon: Settings, label: "설정" },
 ];
 

@@ -315,3 +315,44 @@ class TestBuildPortfolioOverviewWithAccounts:
         pos = result["all_positions"][0]
         assert "weight_in_stock" in pos
         assert pos["weight_in_stock"] >= 0
+
+    @pytest.mark.asyncio
+    async def test_with_account_ids_filter_applies_where(self, override_settings):
+        """account_ids 전달 시 쿼리에 필터 추가 (line 170)."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        db.execute = AsyncMock(return_value=_exec_result([]))
+
+        result = await build_portfolio_overview(uuid.uuid4(), db, account_ids=[acc_id])
+
+        assert result["total_assets_krw"] == 0
+
+    @pytest.mark.asyncio
+    async def test_current_positions_added_to_cur_pos_map(self, override_settings):
+        """현재 보유 포지션(snapshot_id=None) 있을 때 cur_pos_map 채움 (line 199)."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        snap_id = uuid.uuid4()
+
+        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIS")
+        snapshot = _make_snapshot(snap_id, acc_id)
+        snap_pos = _make_position(snap_id, acc_id)
+
+        cur_pos = SimpleNamespace(
+            snapshot_id=None,
+            account_id=acc_id,
+            ticker="000660", name="SK하이닉스",
+            market="KOSPI", qty=5, avg_price=100_000,
+            current_price=120_000, value_krw=600_000, currency="KRW",
+        )
+
+        db.execute = AsyncMock(side_effect=[
+            _exec_result([account]),
+            _exec_result([snapshot]),
+            _exec_result([snap_pos]),
+            _exec_result([cur_pos]),
+        ])
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        assert result["total_assets_krw"] > 0

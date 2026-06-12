@@ -47,6 +47,9 @@ class Settings(BaseSettings):
 
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
+    fred_api_key: str = ""  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
+    fmp_api_key: str = ""   # financialmodelingprep.com — 증시 캘린더 (무료 API 키)
+
     open_banking_client_id: str = ""
     open_banking_client_secret: str = ""
     open_banking_redirect_uri: str = "http://localhost:8000/api/v1/open-banking/callback"

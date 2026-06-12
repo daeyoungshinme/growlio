@@ -22,6 +22,7 @@ from app.services.dividend_aggregator import get_dividend_summary
 from app.utils.cache_keys import (
     TTL_DASHBOARD_SUMMARY,
     TTL_MONTHLY_TREND,
+    RedisType,
     dashboard_summary_key,
     monthly_trend_key,
 )
@@ -98,7 +99,7 @@ async def _fetch_position_maps(
 async def _build_asset_totals(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Any = None,
+    redis: RedisType = None,
 ) -> tuple[float, float, float, dict[str, float]]:
     """최신 스냅샷 기준 총자산·투자금·주식평가액·유형별 금액을 집계한다.
     Returns: (total_assets_krw, total_invested, stock_value, by_type)
@@ -196,7 +197,7 @@ async def _get_scalar_init_data(
     return first_snap, net_deposits
 
 
-async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis=None) -> dict[str, Any]:
+async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
     if redis:
         cached = await redis.get(dashboard_summary_key(user_id))
@@ -277,7 +278,7 @@ def _calc_returns(
     return annualized, cumulative
 
 
-async def _get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis=None) -> list[dict]:
+async def _get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> list[dict]:
     cache_key = monthly_trend_key(user_id)
     if redis:
         with contextlib.suppress(RedisError):

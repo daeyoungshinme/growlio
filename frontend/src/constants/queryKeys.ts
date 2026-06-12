@@ -29,4 +29,9 @@ export const QUERY_KEYS = {
   dripSimulation: ["drip-simulation"] as const,
   monthlyOptimization: ["monthly-optimization"] as const,
   portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
+  economicIndicators: ["economic-indicators"] as const,
+  economicIndicatorCalendar: ["economic-indicator-calendar"] as const,
+  economicIndicatorHistory: (code: string, months: number) =>
+    ["economic-indicator-history", code, months] as const,
+  economicIndicatorSubscriptions: ["economic-indicator-subscriptions"] as const,
 } as const;

@@ -31,6 +31,91 @@ _SEARCH_RESULTS = [
 _USD_KRW_CACHED = 1350.0
 
 
+class TestSearchNaverUnit:
+    @pytest.mark.asyncio
+    async def test_search_naver_returns_results(self, override_settings):
+        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from app.api.v1.stocks import _search_naver
+        mock_resp = MM()
+        mock_resp.json.return_value = {
+            "items": [{"code": "005930", "name": "삼성전자", "typeCode": "KOSPI"}]
+        }
+        mock_resp.raise_for_status = MM()
+        with p("httpx.AsyncClient") as mock_client_cls:
+            mock_ctx = MM()
+            mock_ctx.__aenter__ = AM(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AM(return_value=None)
+            mock_ctx.get = AM(return_value=mock_resp)
+            mock_client_cls.return_value = mock_ctx
+            result = await _search_naver("삼성전자", 5)
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_search_naver_http_error_returns_empty(self, override_settings):
+        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from app.api.v1.stocks import _search_naver
+        with p("httpx.AsyncClient") as mock_client_cls:
+            mock_ctx = MM()
+            mock_ctx.__aenter__ = AM(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AM(return_value=None)
+            mock_ctx.get = AM(side_effect=Exception("connection error"))
+            mock_client_cls.return_value = mock_ctx
+            result = await _search_naver("삼성전자", 5)
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_search_naver_limit_enforced(self, override_settings):
+        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from app.api.v1.stocks import _search_naver
+        many_items = [{"code": f"00593{i}", "name": f"종목{i}", "typeCode": "KOSPI"} for i in range(10)]
+        mock_resp = MM()
+        mock_resp.json.return_value = {"items": many_items}
+        mock_resp.raise_for_status = MM()
+        with p("httpx.AsyncClient") as mock_client_cls:
+            mock_ctx = MM()
+            mock_ctx.__aenter__ = AM(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AM(return_value=None)
+            mock_ctx.get = AM(return_value=mock_resp)
+            mock_client_cls.return_value = mock_ctx
+            result = await _search_naver("종목", 3)
+        assert len(result) <= 3
+
+
+class TestSearchYahooUnit:
+    @pytest.mark.asyncio
+    async def test_search_yahoo_returns_results(self, override_settings):
+        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from app.api.v1.stocks import _search_yahoo
+        mock_resp = MM()
+        mock_resp.json.return_value = {
+            "quotes": [{"symbol": "AAPL", "shortname": "Apple Inc.", "quoteType": "EQUITY", "exchange": "NMS"}]
+        }
+        mock_resp.raise_for_status = MM()
+        with p("httpx.AsyncClient") as mock_client_cls:
+            mock_ctx = MM()
+            mock_ctx.__aenter__ = AM(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AM(return_value=None)
+            mock_ctx.get = AM(return_value=mock_resp)
+            mock_client_cls.return_value = mock_ctx
+            result = await _search_yahoo("AAPL", 5)
+        assert isinstance(result, list)
+        assert len(result) > 0
+
+    @pytest.mark.asyncio
+    async def test_search_yahoo_http_error_returns_empty(self, override_settings):
+        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from app.api.v1.stocks import _search_yahoo
+        with p("httpx.AsyncClient") as mock_client_cls:
+            mock_ctx = MM()
+            mock_ctx.__aenter__ = AM(return_value=mock_ctx)
+            mock_ctx.__aexit__ = AM(return_value=None)
+            mock_ctx.get = AM(side_effect=Exception("timeout"))
+            mock_client_cls.return_value = mock_ctx
+            result = await _search_yahoo("AAPL", 5)
+        assert result == []
+
+
 class TestStockSearch:
     def test_search_returns_200(self, override_settings):
         from app.main import app

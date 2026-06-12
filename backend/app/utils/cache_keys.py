@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+
+from redis.asyncio import Redis as AioRedis
+
+RedisType = AioRedis | None
 
 # ---------------------------------------------------------------------------
 # TTL 상수 (초)
@@ -25,6 +28,9 @@ TTL_PORTFOLIO_OVERVIEW = 900     # 포트폴리오 overview 15분
 TTL_PORTFOLIO_LIST = 300         # 포트폴리오 목록 5분
 TTL_ACCOUNT_DETAIL = 300         # 계좌 상세 5분
 TTL_EXCHANGE_RATE_ALERTS = 300   # 환율 알림 목록 5분
+TTL_INDICATOR_LATEST = 3600      # 경제지표 최신값 1시간
+TTL_INDICATOR_HISTORY = 21600    # 경제지표 시계열 6시간
+TTL_INDICATOR_CALENDAR = 86400   # 경제지표 발표 일정 24시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -112,8 +118,22 @@ def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
     return f"alerts:exchange_rate:{user_id}"
 
 
-async def invalidate_user_caches(redis: Any, *keys: str) -> None:
+def economic_indicator_latest_key(code: str) -> str:
+    return f"economic:latest:{code}"
+
+
+def economic_indicator_history_key(code: str, months: int) -> str:
+    return f"economic:history:{code}:{months}"
+
+
+def economic_indicator_calendar_key() -> str:
+    return "economic:calendar:upcoming"
+
+
+async def invalidate_user_caches(redis: RedisType, *keys: str) -> None:
     """주어진 캐시 키들을 RedisError 무시하며 일괄 삭제한다."""
+    if redis is None:
+        return
     import contextlib
 
     from redis.exceptions import RedisError

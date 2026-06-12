@@ -57,23 +57,23 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 별칭 *</label>
-            <input type="text" required value={form.name}
+            <label htmlFor="bank-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 별칭 *</label>
+            <input id="bank-name" type="text" required value={form.name}
               onChange={(e) => set("name", e.target.value)}
               placeholder="예: 국민은행 주계좌"
               className={`w-full ${INPUT_SM}`} />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">은행명</label>
-            <input type="text" value={form.institution}
+            <label htmlFor="bank-institution" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">은행명</label>
+            <input id="bank-institution" type="text" value={form.institution}
               onChange={(e) => set("institution", e.target.value)}
               placeholder="예: 국민은행"
               className={`w-full ${INPUT_SM}`} />
           </div>
           {!isEdit && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 종류</label>
-              <select value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)}
+              <label htmlFor="bank-asset-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">계좌 종류</label>
+              <select id="bank-asset-type" value={form.asset_type} onChange={(e) => set("asset_type", e.target.value)}
                 className={`w-full ${INPUT_SM}`}>
                 <option value="BANK_ACCOUNT">입출금</option>
                 <option value="DEPOSIT">예·적금</option>
@@ -122,8 +122,8 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             )}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">메모</label>
-            <textarea value={form.notes} onChange={(e) => set("notes", e.target.value)}
+            <label htmlFor="bank-notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">메모</label>
+            <textarea id="bank-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)}
               placeholder="선택 입력" rows={2}
               className={`w-full ${TEXTAREA_SM}`} />
           </div>

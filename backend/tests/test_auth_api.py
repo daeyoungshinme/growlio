@@ -111,6 +111,27 @@ class TestSyncProfile:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)
 
+    def test_sync_profile_invalid_payload_returns_401(self):
+        """sub 또는 email 없는 페이로드로 요청하면 401을 반환한다 (line 36)."""
+        from app.main import app
+        from app.database import get_db
+        from app.api.deps import get_token_payload
+
+        async def override_payload():
+            return {"sub": None, "email": None}
+
+        app.dependency_overrides[get_token_payload] = override_payload
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.post(
+                    "/api/v1/auth/sync-profile",
+                    json={"display_name": "테스트"},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+            assert resp.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_token_payload, None)
+
     def test_sync_profile_idempotent(self):
         """이미 존재하는 유저 JWT로 요청하면 기존 유저를 반환한다 (200)."""
         from app.main import app

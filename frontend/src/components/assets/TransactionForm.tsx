@@ -16,6 +16,7 @@ import { toast } from "@/utils/toast";
 import { TX_LABELS } from "@/constants/transaction";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
+import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { extractErrorMessage } from "@/utils/error";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -150,8 +151,8 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className={labelCls}>계좌 선택</label>
-            <select value={form.account_id}
+            <label htmlFor="txform-account" className={labelCls}>계좌 선택</label>
+            <select id="txform-account" value={form.account_id}
               onChange={(e) => { setField("account_id", e.target.value); setField("ticker", ""); resetTicker(); }}
               className={inputCls}>
               <option value="">계좌 미지정</option>
@@ -159,8 +160,8 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
             </select>
           </div>
           <div>
-            <label className={labelCls}>날짜 *</label>
-            <input type="date" required value={form.transaction_date}
+            <label htmlFor="txform-date" className={labelCls}>날짜 *</label>
+            <input id="txform-date" type="date" required value={form.transaction_date}
               onChange={(e) => setField("transaction_date", e.target.value)}
               className={inputCls} />
           </div>
@@ -236,7 +237,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                         runTickerSearch(v);
                       }}
                       onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowTickerSuggestions(false), 150)}
+                      onBlur={() => setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
                       placeholder="종목명 또는 코드 검색"
                       className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -277,14 +278,15 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         </div>
         {form.transaction_type === "DIVIDEND" && (
           <div>
-            <label className={labelCls}>메모 (선택)</label>
-            <input value={form.notes || ""} onChange={(e) => setField("notes", e.target.value)}
+            <label htmlFor="txform-notes" className={labelCls}>메모 (선택)</label>
+            <input id="txform-notes" value={form.notes || ""} onChange={(e) => setField("notes", e.target.value)}
               placeholder="메모 입력" className={`${inputCls} mt-1`} />
           </div>
         )}
         <div>
-          <label className={labelCls}>거래 수수료 (선택)</label>
+          <label htmlFor="txform-fee" className={labelCls}>거래 수수료 (선택)</label>
           <input
+            id="txform-fee"
             type="number"
             inputMode="numeric"
             min={0}

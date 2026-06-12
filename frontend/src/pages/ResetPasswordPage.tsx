@@ -4,6 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
 
 export default function ResetPasswordPage() {
@@ -29,7 +30,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (success) {
-      const timer = setTimeout(() => navigate("/login"), 3000);
+      const timer = setTimeout(() => navigate("/login"), REDIRECT_DELAY_MS);
       return () => clearTimeout(timer);
     }
   }, [success, navigate]);
@@ -106,8 +107,9 @@ export default function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">새 비밀번호</label>
+              <label htmlFor="reset-new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">새 비밀번호</label>
               <input
+                id="reset-new-password"
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -117,8 +119,9 @@ export default function ResetPasswordPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호 확인</label>
+              <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호 확인</label>
               <input
+                id="reset-confirm-password"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

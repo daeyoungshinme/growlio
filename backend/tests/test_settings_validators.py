@@ -3,6 +3,28 @@ import pytest
 from pydantic import ValidationError
 
 
+class TestValidatePortfolioWeightsOptional:
+    def test_none_input_returns_none(self):
+        from app.schemas._validators import validate_portfolio_weights_optional
+        result = validate_portfolio_weights_optional(None)
+        assert result is None
+
+    def test_valid_items_delegates_to_validate_weights(self):
+        from types import SimpleNamespace
+        from app.schemas._validators import validate_portfolio_weights_optional
+        items = [SimpleNamespace(weight=60.0), SimpleNamespace(weight=40.0)]
+        result = validate_portfolio_weights_optional(items)
+        assert result is items
+
+    def test_invalid_items_raises(self):
+        import pytest
+        from types import SimpleNamespace
+        from app.schemas._validators import validate_portfolio_weights_optional
+        items = [SimpleNamespace(weight=50.0)]  # sum != 100
+        with pytest.raises(ValueError):
+            validate_portfolio_weights_optional(items)
+
+
 class TestGoalUpdate:
     def test_negative_goal_amount_raises(self):
         from app.api.v1.settings import GoalUpdate

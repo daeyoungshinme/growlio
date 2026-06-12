@@ -4,7 +4,6 @@ export interface PortfolioRiskMetrics {
   var_95_pct: number;
   var_99_pct: number;
   annualized_volatility_pct: number;
-  beta_kospi: number;
   beta_sp500: number;
   diversification_score: number;
   top_holding_weight_pct: number;

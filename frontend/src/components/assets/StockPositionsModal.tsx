@@ -56,6 +56,7 @@ export default function StockPositionsModal({
     }).catch((e) => {
       setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
     }).finally(() => setLoading(false));
+  // editor.setRows/enrichRows는 렌더마다 새 참조 → dep 포함 시 무한 루프. accountId/readonly 변경 시만 재조회.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, readonly]);
 

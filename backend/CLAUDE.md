@@ -223,7 +223,7 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 - `HTTPException(status_code=..., detail="한국어 메시지")` — 사용자 노출 메시지는 한국어.
 
 **yfinance 비동기 호출**
-- yfinance는 동기 라이브러리. `asyncio.get_event_loop().run_in_executor(None, fn)` 패턴으로 실행.
+- yfinance는 동기 라이브러리. `asyncio.get_running_loop().run_in_executor(None, fn)` 패턴으로 실행.
 - 동시 호출은 `asyncio.Semaphore(5)` 제한.
 
 **Pydantic v2 스타일**

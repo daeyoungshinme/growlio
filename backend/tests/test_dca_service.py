@@ -382,3 +382,31 @@ class TestGetDcaAnalysisConfigured:
         # goal_annual_return_pct=0.0 is falsy → is_configured=False (no projection)
         assert result["is_configured"] is False
         assert result["projection_months"] == []
+
+    @pytest.mark.asyncio
+    async def test_configured_with_historical_actuals_no_current_month(
+        self, mock_db, override_settings
+    ):
+        """이번 달 스냅샷 없고 과거 월 데이터 있을 때 최근 월 값 사용 (lines 78-79)."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=7.0,
+            goal_amount=50_000_000.0,
+            goal_start_date=datetime(2020, 1, 1),
+            goal_initial_amount=10_000_000,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        past_row = SimpleNamespace(month="2024-01", total=12_000_000.0)
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = [past_row]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        assert result["is_configured"] is True
+        assert isinstance(result["goal_timeline"], dict)

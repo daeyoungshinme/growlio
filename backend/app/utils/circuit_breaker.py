@@ -5,7 +5,10 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.config import Settings
 
 import structlog
 
@@ -96,7 +99,7 @@ def _is_bypass(exc: BaseException) -> bool:
 
 # ── 서비스별 사전 설정 인스턴스 ──────────────────────────────────────────────────
 # 임계값은 config.py의 cb_* 필드로 조정 가능
-def _cfg():
+def _cfg() -> "Settings":
     from app.config import settings
     return settings
 

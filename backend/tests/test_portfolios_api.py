@@ -1,4 +1,5 @@
 """포트폴리오 CRUD API 테스트 (GET/POST/PUT/DELETE /api/v1/portfolios)."""
+import json
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -79,6 +80,73 @@ def _setup_app(user, db):
     app.dependency_overrides[get_current_user] = override_auth
     app.dependency_overrides[get_db] = override_db
     return app
+
+
+def _make_full_portfolio(user_id, portfolio_id=None):
+    from datetime import datetime, timezone
+    _id = portfolio_id or uuid.uuid4()
+    return SimpleNamespace(
+        id=_id,
+        user_id=user_id,
+        name="테스트 포트폴리오",
+        items=[],
+        linked_accounts=[],
+        account_ids=None,
+        base_type="STOCK_ONLY",
+        sort_order=0,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+
+
+class TestUpdatePortfolio:
+    def test_update_returns_404_when_not_found(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        result_mock = MagicMock()
+        result_mock.scalar_one_or_none.return_value = None
+        db.execute = AsyncMock(return_value=result_mock)
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(f"/api/v1/portfolios/{uuid.uuid4()}", json={"name": "새 이름"})
+            assert resp.status_code == 404
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_update_portfolio_name_returns_200(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = _make_full_portfolio(user_id=user.id)
+
+        async def multi_execute(*args, **kwargs):
+            r = MagicMock()
+            r.scalar_one_or_none.return_value = portfolio
+            r.scalar_one.return_value = portfolio
+            return r
+
+        db.execute = AsyncMock(side_effect=multi_execute)
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/portfolios/{portfolio.id}",
+                    json={"name": "업데이트된 이름"},
+                )
+            assert resp.status_code == 200
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
 
 
 class TestListPortfolios:
@@ -258,3 +326,255 @@ class TestReorderPortfolios:
             from app.database import get_db
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+
+def _cleanup(app):
+    from app.api.deps import get_current_user
+    from app.database import get_db
+    app.dependency_overrides.pop(get_current_user, None)
+    app.dependency_overrides.pop(get_db, None)
+
+
+class TestCreatePortfolioExtended:
+    """create_portfolio 핵심 경로 커버 (lines 105-144, 37-48)."""
+
+    def test_create_with_valid_items_success(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = _make_full_portfolio(user_id=user.id)
+
+        result = MagicMock()
+        result.scalar_one.return_value = portfolio
+        db.execute = AsyncMock(return_value=result)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/portfolios",
+                    json={
+                        "name": "테스트 포트폴리오",
+                        "items": [
+                            {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "weight": 100.0},
+                        ],
+                    },
+                )
+            assert resp.status_code in (200, 201)
+        finally:
+            _cleanup(app)
+
+    def test_create_with_account_ids_links_accounts(self, override_settings):
+        """_validate_account_ids 통과 + 계좌 연동 로직 (lines 37-48, 124-134)."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = _make_full_portfolio(user_id=user.id)
+        account_id = uuid.uuid4()
+
+        result = MagicMock()
+        result.scalar_one.return_value = portfolio
+        result.all.return_value = [(account_id,)]
+        db.execute = AsyncMock(return_value=result)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    "/api/v1/portfolios",
+                    json={
+                        "name": "계좌 연동 포트폴리오",
+                        "items": [
+                            {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "weight": 100.0},
+                        ],
+                        "account_ids": [str(account_id)],
+                    },
+                )
+            assert resp.status_code in (200, 201)
+        finally:
+            _cleanup(app)
+
+    def test_create_with_invalid_account_ids_returns_400(self, override_settings):
+        """_validate_account_ids에서 소유하지 않은 계좌 감지 시 400 (lines 44-48)."""
+        user = _make_user()
+        db = _make_mock_db()
+
+        result = MagicMock()
+        result.all.return_value = []
+        db.execute = AsyncMock(return_value=result)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.post(
+                    "/api/v1/portfolios",
+                    json={
+                        "name": "포트폴리오",
+                        "items": [
+                            {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "weight": 100.0},
+                        ],
+                        "account_ids": [str(uuid.uuid4())],
+                    },
+                )
+            assert resp.status_code == 400
+        finally:
+            _cleanup(app)
+
+
+class TestListPortfoliosExtended:
+    def test_returns_cached_data_on_cache_hit(self, override_settings):
+        """Redis 캐시 히트 시 DB 조회 없이 반환 (lines 74-76)."""
+        user = _make_user()
+        db = _make_mock_db()
+
+        cached = json.dumps([{
+            "id": str(uuid.uuid4()), "name": "캐시 포트폴리오",
+            "items": [], "base_type": "STOCK_ONLY", "sort_order": 0,
+            "account_ids": None,
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+        }])
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(get=AsyncMock(return_value=cached))),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get("/api/v1/portfolios")
+            assert resp.status_code == 200
+            assert len(resp.json()) == 1
+        finally:
+            _cleanup(app)
+
+    def test_cache_read_exception_falls_through(self, override_settings):
+        """Redis 캐시 읽기 실패 시 DB 조회로 폴백 (lines 75-76)."""
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(
+                          get=AsyncMock(side_effect=Exception("redis error")),
+                          setex=AsyncMock(),
+                      )),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get("/api/v1/portfolios")
+            assert resp.status_code == 200
+        finally:
+            _cleanup(app)
+
+    def test_cache_write_exception_still_returns_data(self, override_settings):
+        """Redis 캐시 쓰기 실패 시도 데이터 반환 (lines 90-91)."""
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(
+                          get=AsyncMock(return_value=None),
+                          setex=AsyncMock(side_effect=Exception("redis write error")),
+                      )),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get("/api/v1/portfolios")
+            assert resp.status_code == 200
+        finally:
+            _cleanup(app)
+
+
+class TestUpdatePortfolioExtended:
+    """update_portfolio 추가 경로 커버 (lines 172, 176, 179-181, 191-212)."""
+
+    def _make_result(self, portfolio, account_id=None):
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = portfolio
+        result.scalar_one.return_value = portfolio
+        if account_id:
+            result.all.return_value = [(account_id,)]
+        return result
+
+    def test_update_portfolio_items(self, override_settings):
+        """body.items 업데이트 경로 (lines 179-181)."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = _make_full_portfolio(user_id=user.id)
+        db.execute = AsyncMock(return_value=self._make_result(portfolio))
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/portfolios/{portfolio.id}",
+                    json={"items": [{"ticker": "000660", "name": "SK하이닉스", "market": "KOSPI", "weight": 100.0}]},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup(app)
+
+    def test_update_portfolio_base_type(self, override_settings):
+        """body.base_type 업데이트 경로 (line 176)."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = _make_full_portfolio(user_id=user.id)
+        db.execute = AsyncMock(return_value=self._make_result(portfolio))
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/portfolios/{portfolio.id}",
+                    json={"base_type": "TOTAL_ASSETS"},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup(app)
+
+    def test_update_portfolio_account_ids_change(self, override_settings):
+        """account_ids 변경 시 추가/제거 로직 (lines 172, 191-212)."""
+        user = _make_user()
+        db = _make_mock_db()
+        old_account_id = uuid.uuid4()
+        new_account_id = uuid.uuid4()
+        portfolio = _make_full_portfolio(user_id=user.id)
+        portfolio.linked_accounts = [SimpleNamespace(account_id=old_account_id)]
+
+        result = self._make_result(portfolio, account_id=new_account_id)
+        db.execute = AsyncMock(return_value=result)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/portfolios/{portfolio.id}",
+                    json={"account_ids": [str(new_account_id)]},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup(app)

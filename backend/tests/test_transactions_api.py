@@ -222,6 +222,22 @@ class TestGetTransaction:
         finally:
             _cleanup_app()
 
+    def test_returns_200_when_found(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        tx = _make_tx(user_id=user.id)
+        db.scalar = AsyncMock(return_value=tx)
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(
+                    f"/api/v1/transactions/{tx.id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup_app()
+
 
 class TestUpdateTransaction:
     def test_returns_404_for_nonexistent(self, override_settings):
@@ -237,6 +253,72 @@ class TestUpdateTransaction:
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code == 404
+        finally:
+            _cleanup_app()
+
+    def test_update_returns_200_when_found(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        tx = _make_tx(user_id=user.id)
+        db.scalar = AsyncMock(return_value=tx)
+        db.refresh = AsyncMock()
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/transactions/{tx.id}",
+                    json={"amount": 2000000},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup_app()
+
+    def test_update_all_fields(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        tx = _make_tx(user_id=user.id)
+        db.scalar = AsyncMock(return_value=tx)
+        db.refresh = AsyncMock()
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(delete=AsyncMock())),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/transactions/{tx.id}",
+                    json={
+                        "transaction_type": "WITHDRAWAL",
+                        "amount": 500000,
+                        "transaction_date": "2026-02-01",
+                        "ticker": "005930",
+                        "notes": "업데이트된 메모",
+                        "fee": 500,
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+        finally:
+            _cleanup_app()
+
+    def test_filters_by_account_id(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        account_id = uuid.uuid4()
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(
+                    f"/api/v1/transactions?account_id={account_id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
         finally:
             _cleanup_app()
 

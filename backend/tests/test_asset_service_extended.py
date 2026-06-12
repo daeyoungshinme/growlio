@@ -125,6 +125,34 @@ class TestSyncAccount:
         assert account.deposit_krw == 1_000_000.0
 
     @pytest.mark.asyncio
+    async def test_sync_account_updates_deposit_usd_from_foreign(self, mock_db, override_settings):
+        """deposit_foreign 있으면 account.deposit_usd에 반영 (line 99)."""
+        from app.services.asset_service import sync_account
+        from app.providers.base import BalanceResult
+
+        account = _make_account("MANUAL")
+
+        balance = BalanceResult(
+            total_value_krw=5_000_000.0,
+            deposit_foreign=500.0,
+            positions=[],
+        )
+
+        mock_provider = AsyncMock()
+        mock_provider.sync = AsyncMock(return_value=balance)
+        fake_snapshot = SimpleNamespace(id=uuid.uuid4())
+
+        with (
+            patch("app.services.asset_service.get_provider", return_value=mock_provider),
+            patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
+            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()),
+            patch("app.services.asset_service.broker_sync_duration"),
+        ):
+            await sync_account(account, mock_db, redis=MagicMock())
+
+        assert account.deposit_usd == 500.0
+
+    @pytest.mark.asyncio
     async def test_sync_account_with_positions_deletes_old_positions(
         self, mock_db, override_settings
     ):

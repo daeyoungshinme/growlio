@@ -8,6 +8,7 @@ from app.api.v1 import (
     dart,
     dashboard,
     dividends,
+    economic_indicators,
     insights,
     invest,
     open_banking,
@@ -41,3 +42,4 @@ router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(dart.router)
 router.include_router(ws_prices.router)
+router.include_router(economic_indicators.router)

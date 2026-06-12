@@ -60,3 +60,72 @@ def test_ciphertext_is_hex_string():
 
     ciphertext = encrypt("test-value")
     assert all(c in "0123456789abcdef" for c in ciphertext.lower())
+
+
+class TestGetKisUserCredentials:
+    """get_kis_user_credentials 함수 커버 (lines 71-94)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_no_account(self):
+        """KIS 계좌 없으면 None 반환."""
+        from unittest.mock import AsyncMock
+        from app.services.credential_service import get_kis_user_credentials
+        import uuid
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=None)
+        result = await get_kis_user_credentials(uuid.uuid4(), db)
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_credentials_on_success(self):
+        """계좌 있고 토큰 발급 성공 시 자격증명 반환 (lines 71-91)."""
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from app.services.credential_service import encrypt, get_kis_user_credentials
+        import uuid
+
+        raw_key = "test-app-key"
+        raw_secret = "test-app-secret"
+        account = SimpleNamespace(
+            id=uuid.uuid4(),
+            kis_app_key=encrypt(raw_key),
+            kis_app_secret=encrypt(raw_secret),
+            is_mock_mode=False,
+        )
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=account)
+
+        with patch("app.kis.auth.get_access_token", AsyncMock(return_value="fake-token")):
+            with patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())):
+                result = await get_kis_user_credentials(uuid.uuid4(), db)
+
+        assert result is not None
+        assert result["app_key"] == raw_key
+        assert result["access_token"] == "fake-token"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_on_token_error(self):
+        """토큰 발급 실패 시 None 반환 및 경고 로그 (lines 92-94)."""
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from app.services.credential_service import encrypt, get_kis_user_credentials
+        import uuid
+
+        account = SimpleNamespace(
+            id=uuid.uuid4(),
+            kis_app_key=encrypt("key"),
+            kis_app_secret=encrypt("secret"),
+            is_mock_mode=False,
+        )
+
+        db = AsyncMock()
+        db.scalar = AsyncMock(return_value=account)
+
+        with patch("app.kis.auth.get_access_token",
+                   AsyncMock(side_effect=Exception("token error"))):
+            with patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())):
+                result = await get_kis_user_credentials(uuid.uuid4(), db)
+
+        assert result is None

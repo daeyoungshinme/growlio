@@ -511,4 +511,60 @@ async def send_password_reset_email(to_email: str, reset_link: str) -> None:
         logger.info("password_reset_email_sent", to=to_email)
     except Exception as e:
         logger.error("password_reset_email_failed", to=to_email, error=str(e))
+
+
+async def send_indicator_alert_email(
+    to_email: str,
+    indicators: list[dict],
+) -> None:
+    """경제지표 발표 알림 이메일 발송."""
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return
+
+    subject = f"[Growlio] 경제지표 발표 알림 — {indicators[0]['name']} 외 {len(indicators) - 1}개" if len(indicators) > 1 else f"[Growlio] 경제지표 발표 알림 — {indicators[0]['name']}"
+
+    rows_html = ""
+    for ind in indicators:
+        latest = ind.get("latest_value")
+        previous = ind.get("previous_value")
+        change_pct = ind.get("change_pct")
+        unit = ind.get("unit", "")
+        date_str = ind.get("latest_date", "")
+
+        change_str = ""
+        if change_pct is not None:
+            arrow = "▲" if change_pct >= 0 else "▼"
+            color = "#dc2626" if change_pct >= 0 else "#2563eb"
+            change_str = f' <span style="color:{color};">{arrow}{abs(change_pct):.2f}%</span>'
+
+        rows_html += f"""
+        <tr>
+          <td style="padding:10px 8px; background:#f8fafc; font-weight:600; border-bottom:1px solid #e2e8f0;">{ind.get('name', '')}</td>
+          <td style="padding:10px 8px; border-bottom:1px solid #e2e8f0;">
+            <strong>{latest} {unit}</strong>{change_str}
+            <br><span style="font-size:12px;color:#94a3b8;">전월 {previous} {unit} | {date_str}</span>
+          </td>
+        </tr>"""
+
+    html = f"""
+    <div style="font-family: sans-serif; max-width: 520px; margin: 0 auto;">
+      <h2 style="color: #1d4ed8; margin-bottom: 4px;">📊 경제지표 발표 알림</h2>
+      <p style="color: #64748b; font-size: 14px; margin-top: 0;">구독하신 경제지표의 최신 발표값을 안내드립니다.</p>
+      <table style="width:100%; border-collapse:collapse; margin-top:16px;">
+        {rows_html}
+      </table>
+      <p style="margin-top:20px; color:#94a3b8; font-size:12px;">
+        Growlio 앱에서 상세 추이 차트를 확인하실 수 있습니다.<br>
+        알림 설정은 앱 > 시장 > 구독 관리에서 변경하세요.
+      </p>
+    </div>
+    """
+
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("indicator_alert_email_sent", to=to_email, count=len(indicators))
+    except Exception as e:
+        logger.error("indicator_alert_email_failed", to=to_email, error=str(e))
+        raise
         raise

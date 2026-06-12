@@ -241,3 +241,30 @@ class TestExecuteRebalancing:
         assert call_count == 2
         assert results[0].fail_count == 1
         assert results[0].success_count == 1
+
+
+class TestRebalancingSchemaValidators:
+    """schemas/rebalancing.py 검증자 커버리지 (lines 81, 92-94)."""
+
+    def test_execution_order_item_limit_with_no_price_raises(self):
+        """order_type=LIMIT이고 limit_price 없으면 ValidationError (line 81)."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError, match="지정가 주문"):
+            ExecutionOrderItem(
+                ticker="005930", name="삼성전자", market="KOSPI",
+                side="BUY", quantity=10, order_type="LIMIT", limit_price=None,
+            )
+
+    def test_execution_request_empty_orders_raises(self):
+        """orders 빈 리스트로 ExecutionRequest 생성 시 ValidationError (lines 92-93)."""
+        from pydantic import ValidationError
+        from app.schemas.rebalancing import ExecutionRequest
+        with pytest.raises(ValidationError, match="최소 1개"):
+            ExecutionRequest(orders=[])
+
+    def test_execution_request_valid_orders_accepted(self):
+        """유효한 orders로 ExecutionRequest 생성 성공 (line 94)."""
+        from app.schemas.rebalancing import ExecutionRequest
+        order = _make_order()
+        req = ExecutionRequest(orders=[order])
+        assert len(req.orders) == 1

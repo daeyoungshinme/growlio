@@ -16,6 +16,7 @@ import { TX_LABELS } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { transactionSchema } from "@/schemas/transaction";
 import { useTransactionFormState } from "@/hooks/useTransactionFormState";
 
@@ -205,9 +206,10 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
             {/* 날짜 */}
             <div className="min-w-0">
               <div className="flex items-center h-5">
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-400">날짜 *</label>
+                <label htmlFor="tx-date" className="text-xs font-medium text-gray-600 dark:text-gray-400">날짜 *</label>
               </div>
               <input
+                id="tx-date"
                 type="date"
                 className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={form.transaction_date}
@@ -245,7 +247,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                       value={tickerQuery}
                       onChange={(e) => handleTickerQueryChange(e.target.value)}
                       onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
-                      onBlur={() => setTimeout(() => setShowTickerSuggestions(false), 150)}
+                      onBlur={() => setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
                       placeholder="종목명 또는 코드 검색"
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -312,8 +314,9 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
 
           {/* 메모 */}
           <div>
-            <label className="text-xs font-medium text-gray-600 dark:text-gray-400">메모 (선택)</label>
+            <label htmlFor="tx-notes" className="text-xs font-medium text-gray-600 dark:text-gray-400">메모 (선택)</label>
             <input
+              id="tx-notes"
               className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={form.notes || ""}
               onChange={(e) => set("notes", e.target.value)}

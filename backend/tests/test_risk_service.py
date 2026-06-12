@@ -166,15 +166,15 @@ class TestGetPortfolioRiskMetrics:
         mock_db.execute = AsyncMock(side_effect=[snap_result, pos_result])
 
         returns = [0.01 * (i % 5 - 2) for i in range(300)]
-        returns_map = {"AAPL": returns, "^KS11": returns, "^GSPC": returns}
+        returns_map = {"AAPL": returns, "^GSPC": returns}
 
-        with patch("app.services.risk_service.asyncio.get_event_loop") as mock_loop:
+        with patch("app.services.risk_service.asyncio.get_running_loop") as mock_loop:
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=returns_map)
             result = await get_portfolio_risk_metrics(uuid.uuid4(), mock_db)
 
         assert result["position_count"] == 1
         assert "var_95_pct" in result
-        assert "beta_kospi" in result
+        assert "beta_sp500" in result
 
 
 # ── get_currency_exposure ────────────────────────────────────
@@ -273,7 +273,7 @@ class TestSyncFetchRiskData:
         from app.services.risk_service import _sync_fetch_risk_data
 
         with patch("yfinance.download", side_effect=Exception("network error")):
-            result = _sync_fetch_risk_data(["AAPL"], ["^KS11"])
+            result = _sync_fetch_risk_data(["AAPL"], ["^GSPC"])
 
         assert result == {}
 
@@ -282,7 +282,7 @@ class TestSyncFetchRiskData:
         from app.services.risk_service import _sync_fetch_risk_data
 
         with patch("yfinance.download", return_value=pd.DataFrame()):
-            result = _sync_fetch_risk_data(["AAPL"], ["^KS11"])
+            result = _sync_fetch_risk_data(["AAPL"], ["^GSPC"])
 
         assert result == {}
 

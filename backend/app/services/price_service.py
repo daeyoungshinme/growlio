@@ -15,7 +15,6 @@ import json
 import uuid
 from functools import partial
 
-import redis.asyncio as aioredis
 import structlog
 from redis.exceptions import RedisError
 from sqlalchemy import select
@@ -32,6 +31,7 @@ from app.services.yahoo_price import (
 from app.utils.cache_keys import (
     TTL_PRICE_CURRENT,
     TTL_PRICE_RETURN,
+    RedisType,
     current_price_key,
     price_return_key,
 )
@@ -47,7 +47,7 @@ async def fetch_current_price(
     ticker: str,
     market: str,
     db: AsyncSession,
-    redis: aioredis.Redis | None = None,
+    redis: RedisType = None,
 ) -> float | None:
     """단일 종목 현재가 조회.
     Redis 15분 캐시 → Yahoo Finance → KIS 순으로 시도한다.
@@ -88,7 +88,7 @@ async def fetch_prices_batch(
     user_id: uuid.UUID,
     tickers: list[tuple[str, str]],
     db: AsyncSession,
-    redis=None,
+    redis: RedisType = None,
 ) -> dict[str, float]:
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
@@ -129,7 +129,7 @@ async def fetch_prices_batch(
 
 async def get_historical_returns(
     tickers: list[tuple[str, str]],
-    redis=None,
+    redis: RedisType = None,
     years: int = 10,
 ) -> dict[tuple[str, str], dict]:
     """각 종목의 최근 N년 누적/연환산 수익률을 반환한다."""
@@ -185,7 +185,7 @@ async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAcc
     )
 
 
-async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db, redis) -> float | None:
+async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType) -> float | None:
     try:
         price = await _price_via_kis(account, ticker, market, db, redis)
         if price:
@@ -195,7 +195,7 @@ async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db, r
     return None
 
 
-async def _price_via_kis(account: AssetAccount, ticker: str, market: str, db, redis) -> float | None:
+async def _price_via_kis(account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType) -> float | None:
     from app.kis.auth import get_access_token
 
     app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]

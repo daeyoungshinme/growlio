@@ -690,8 +690,8 @@ async def test_send_test_email_exception_raised(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_password_reset_exception_raised(monkeypatch):
-    """send_password_reset_email 예외 시 re-raise."""
+async def test_send_password_reset_exception_silenced(monkeypatch):
+    """send_password_reset_email은 예외 발생 시 re-raise 없이 조용히 실패한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -699,7 +699,7 @@ async def test_send_password_reset_exception_raised(monkeypatch):
     import app.services.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_password_reset_email(
-                "user@example.com", "https://growlio.app/reset?token=abc"
-            )
+        # 예외가 propagate되지 않아야 함
+        await em.send_password_reset_email(
+            "user@example.com", "https://growlio.app/reset?token=abc"
+        )

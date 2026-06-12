@@ -7,8 +7,6 @@ import json
 import uuid
 from dataclasses import asdict, dataclass
 from enum import StrEnum
-from typing import Any
-
 import structlog
 from redis.exceptions import RedisError
 from sqlalchemy import select
@@ -21,6 +19,7 @@ from app.services.tax_service import (
     _OVERSEAS_TAX_RATE,
     get_overseas_positions_detail,
 )
+from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
 
@@ -65,7 +64,7 @@ class Insight:
 async def generate_insights(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Any = None,
+    redis: RedisType = None,
     force_refresh: bool = False,
 ) -> list[dict]:
     """모든 체커를 병렬 실행하고 인사이트 목록을 반환한다 (Redis 1h 캐시)."""
@@ -110,7 +109,7 @@ async def generate_insights(
 async def get_insights_summary(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Any = None,
+    redis: RedisType = None,
 ) -> dict[str, int]:
     """심각도별 인사이트 개수 (대시보드 뱃지용)."""
     insights = await generate_insights(user_id, db, redis)
@@ -306,6 +305,8 @@ async def _check_tax_loss_harvest(
 # 캐시 무효화 헬퍼
 # ---------------------------------------------------------------------------
 
-async def invalidate_insights_cache(user_id: uuid.UUID, redis: Any) -> None:
+async def invalidate_insights_cache(user_id: uuid.UUID, redis: RedisType) -> None:
+    if redis is None:
+        return
     with contextlib.suppress(RedisError):
         await redis.delete(insights_key(user_id))

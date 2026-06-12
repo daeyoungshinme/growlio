@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import json
 from functools import partial
-from typing import Any
 
 import structlog
+from redis.asyncio import Redis as AioRedis
 
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
 from app.services.dart_service import fetch_dart_dividend
@@ -42,7 +42,7 @@ logger = structlog.get_logger()
 async def fetch_ticker_dividend_info(
     ticker: str,
     market: str,
-    redis: Any,
+    redis: AioRedis,
     sem: asyncio.Semaphore,
     kis_creds: dict | None,
     dart_key: str,

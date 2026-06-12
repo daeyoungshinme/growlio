@@ -7,8 +7,6 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
-
 import structlog
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,6 +22,7 @@ from app.providers.manual_provider import ManualProvider
 from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
+    RedisType,
     alloc_history_key,
     dashboard_summary_key,
     dividend_summary_key,
@@ -71,13 +70,13 @@ def get_provider(account: AssetAccount) -> BrokerProvider:
     reraise=True,
 )
 async def _retry_provider_sync(
-    provider: BrokerProvider, account: AssetAccount, db: AsyncSession, redis: Any
+    provider: BrokerProvider, account: AssetAccount, db: AsyncSession, redis: RedisType
 ) -> BalanceResult:
     """ProviderNetworkError에 한해 지수 백오프(2s→4s→8s, 최대 30s) 재시도."""
     return await provider.sync(account, db, redis)
 
 
-async def sync_account(account: AssetAccount, db: AsyncSession, redis: Any) -> AssetSnapshot:
+async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType) -> AssetSnapshot:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
     SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.

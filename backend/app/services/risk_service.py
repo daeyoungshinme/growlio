@@ -9,8 +9,6 @@ import asyncio
 import json
 import math
 import uuid
-from typing import Any
-
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,11 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
 
 _RISK_CACHE_TTL = 3600  # 1시간
-_KOSPI_SYMBOL = "^KS11"
 _SP500_SYMBOL = "^GSPC"
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 
@@ -145,7 +143,7 @@ def _calc_diversification_score(
 async def get_portfolio_risk_metrics(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Any = None,
+    redis: RedisType = None,
     portfolio_id: str | None = None,
 ) -> dict:
     cache_key = f"risk:{user_id}:{portfolio_id or 'all'}"
@@ -192,9 +190,9 @@ async def get_portfolio_risk_metrics(
     yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
     weights = [p["value_krw"] / total_value for p in positions]
 
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     returns_map = await loop.run_in_executor(
-        None, _sync_fetch_risk_data, yf_symbols, [_KOSPI_SYMBOL, _SP500_SYMBOL]
+        None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL]
     )
 
     # 포트폴리오 가중 수익률 시계열 구성
@@ -223,7 +221,6 @@ async def get_portfolio_risk_metrics(
     else:
         volatility_pct = 0.0
 
-    beta_kospi = _calc_beta(portfolio_rets, returns_map.get(_KOSPI_SYMBOL, []))
     beta_sp500 = _calc_beta(portfolio_rets, returns_map.get(_SP500_SYMBOL, []))
 
     diversification_score = _calc_diversification_score(
@@ -239,7 +236,6 @@ async def get_portfolio_risk_metrics(
         "var_95_pct": round(var_95, 2),
         "var_99_pct": round(var_99, 2),
         "annualized_volatility_pct": round(volatility_pct, 2),
-        "beta_kospi": round(beta_kospi, 3),
         "beta_sp500": round(beta_sp500, 3),
         "diversification_score": diversification_score,
         "top_holding_weight_pct": round(top_weight_pct, 2),
@@ -262,7 +258,6 @@ def _empty_risk_result() -> dict:
         "var_95_pct": 0.0,
         "var_99_pct": 0.0,
         "annualized_volatility_pct": 0.0,
-        "beta_kospi": 1.0,
         "beta_sp500": 1.0,
         "diversification_score": 0,
         "top_holding_weight_pct": 0.0,
