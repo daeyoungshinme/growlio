@@ -29,7 +29,9 @@ router = APIRouter(prefix="/backtest", tags=["backtest"])
 
 
 @router.get("/portfolios", response_model=list[BacktestPortfolioResponse])
+@limiter.limit("30/minute")
 async def list_portfolios(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -43,7 +45,9 @@ async def list_portfolios(
 
 
 @router.post("/portfolios", response_model=BacktestPortfolioResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("30/minute")
 async def create_portfolio(
+    request: Request,
     body: BacktestPortfolioCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -61,7 +65,9 @@ async def create_portfolio(
 
 
 @router.put("/portfolios/{portfolio_id}", response_model=BacktestPortfolioResponse)
+@limiter.limit("30/minute")
 async def update_portfolio(
+    request: Request,
     portfolio_id: uuid.UUID,
     body: BacktestPortfolioUpdate,
     current_user: User = Depends(get_current_user),
@@ -88,7 +94,9 @@ async def update_portfolio(
 
 
 @router.delete("/portfolios/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("30/minute")
 async def delete_portfolio(
+    request: Request,
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

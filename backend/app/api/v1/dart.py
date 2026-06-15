@@ -6,6 +6,7 @@ import contextlib
 import json
 
 import structlog
+from redis.exceptions import RedisError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +46,7 @@ async def get_disclosures(
         )
     try:
         api_key = decrypt(settings_row.dart_api_key)
-    except Exception:
+    except (ValueError, AttributeError):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="DART API 키 복호화에 실패했습니다. 키를 다시 설정해주세요.",
@@ -57,7 +58,7 @@ async def get_disclosures(
         cached = await redis.get(cache_key)
         if cached:
             return json.loads(cached)
-    except Exception as e:
+    except (RedisError, json.JSONDecodeError) as e:
         logger.warning("dart_cache_read_failed", error=str(e))
 
     result = await db.execute(
@@ -78,7 +79,7 @@ async def get_disclosures(
 
     items = await fetch_disclosures_for_tickers(tickers, api_key, days=days)
 
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(RedisError):
         await redis.set(cache_key, json.dumps(items, ensure_ascii=False), ex=TTL_DART)
 
     return items
