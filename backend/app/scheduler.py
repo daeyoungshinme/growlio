@@ -41,8 +41,21 @@ def init_scheduler() -> None:
     )
     scheduler.add_job(
         run_rebalancing_alert_check,
-        CronTrigger(hour=18, minute=30, timezone="Asia/Seoul"),
+        CronTrigger(hour=8, minute=30, timezone="Asia/Seoul"),
         id="rebalancing_alert_check_daily",
+        replace_existing=True,
+    )
+    from app.jobs.deposit_monitor import run_deposit_monitor
+    scheduler.add_job(
+        run_deposit_monitor,
+        CronTrigger(hour=15, minute=35, timezone="Asia/Seoul"),
+        id="deposit_monitor_intraday",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_deposit_monitor,
+        CronTrigger(hour=18, minute=5, timezone="Asia/Seoul"),
+        id="deposit_monitor_daily",
         replace_existing=True,
     )
     from app.jobs.dca_auto_buy import run_dca_auto_execution

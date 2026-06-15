@@ -135,6 +135,9 @@ describe("api/alerts — rebalancing alerts", () => {
       account_id: null,
       order_type: "MARKET",
       market_condition_mode: "DISABLED",
+      deposit_trigger_enabled: false,
+      deposit_trigger_account_id: null,
+      deposit_trigger_min_amount_krw: null,
     });
     expect(api.put).toHaveBeenCalledWith("/alerts/rebalancing/port-1", expect.objectContaining({
       portfolio_id: "port-1",

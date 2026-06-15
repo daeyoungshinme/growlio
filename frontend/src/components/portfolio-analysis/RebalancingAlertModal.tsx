@@ -55,16 +55,16 @@ function buildDescription(
 ): string {
   const when =
     scheduleType === "DAILY"
-      ? "매일 18:30에"
+      ? "매일 08:30에"
       : scheduleType === "WEEKLY"
-        ? `매주 ${DAYS_KO[dayOfWeek]}요일 18:30에`
+        ? `매주 ${DAYS_KO[dayOfWeek]}요일 08:30에`
         : scheduleType === "MONTHLY"
-          ? `매월 ${dayOfMonth}일 18:30에`
+          ? `매월 ${dayOfMonth}일 08:30에`
           : scheduleType === "QUARTERLY"
-            ? `매 3개월 ${dayOfMonth}일 18:30에`
+            ? `매 3개월 ${dayOfMonth}일 08:30에`
             : scheduleType === "SEMIANNUAL"
-              ? `매 6개월 ${dayOfMonth}일 18:30에`
-              : `매년 ${dayOfMonth}일 18:30에`;
+              ? `매 6개월 ${dayOfMonth}일 08:30에`
+              : `매년 ${dayOfMonth}일 08:30에`;
 
   const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
 
@@ -161,6 +161,17 @@ function AlertFormBody({
   const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
     alert?.market_condition_mode ?? "DISABLED",
   );
+  const [depositTriggerEnabled, setDepositTriggerEnabled] = useState(
+    alert?.deposit_trigger_enabled ?? false,
+  );
+  const [depositTriggerAccountId, setDepositTriggerAccountId] = useState<string>(
+    alert?.deposit_trigger_account_id ?? "",
+  );
+  const [depositTriggerMinAmount, setDepositTriggerMinAmount] = useState<number>(
+    alert?.deposit_trigger_min_amount_krw ?? 100_000,
+  );
+
+  const kisAccounts = brokerAccounts.filter((a) => a.asset_type === "STOCK_KIS");
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -175,6 +186,10 @@ function AlertFormBody({
         account_id: mode === "AUTO" && accountId ? accountId : null,
         order_type: orderType,
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
+        deposit_trigger_enabled: depositTriggerEnabled,
+        deposit_trigger_account_id:
+          depositTriggerEnabled && depositTriggerAccountId ? depositTriggerAccountId : null,
+        deposit_trigger_min_amount_krw: depositTriggerEnabled ? depositTriggerMinAmount : null,
       }),
     onSuccess: () => {
       invalidateRebalancingAlertData(qc, portfolioId);
@@ -488,6 +503,97 @@ function AlertFormBody({
                 </div>
               </div>
             )}
+
+            {/* ── 예수금 입금 감지 ── */}
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    예수금 입금 감지
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    입금 확인 시 위 설정(알림/자동실행)으로 비중 배분 매수
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={depositTriggerEnabled}
+                  onClick={() => setDepositTriggerEnabled((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                    depositTriggerEnabled
+                      ? "bg-blue-600"
+                      : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      depositTriggerEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {depositTriggerEnabled && (
+                <div className="space-y-3 mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      감시 계좌 (KIS)
+                    </label>
+                    <select
+                      className={inputClass}
+                      value={depositTriggerAccountId}
+                      onChange={(e) => setDepositTriggerAccountId(e.target.value)}
+                    >
+                      <option value="">계좌 선택</option>
+                      {kisAccounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                          {a.deposit_krw != null
+                            ? ` — 예수금 ${a.deposit_krw.toLocaleString("ko-KR")}원`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                    {kisAccounts.length === 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      최소 감지 금액 (KRW)
+                    </label>
+                    <input
+                      type="number"
+                      min={10_000}
+                      step={10_000}
+                      value={depositTriggerMinAmount}
+                      onChange={(e) => setDepositTriggerMinAmount(Number(e.target.value))}
+                      className={inputClass}
+                      placeholder="예: 100000"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      이 금액 이상 입금 시에만 동작 (최소 10,000원)
+                    </p>
+                  </div>
+
+                  {alert?.last_deposit_checked_at && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400">
+                      마지막 확인:{" "}
+                      {new Date(alert.last_deposit_checked_at).toLocaleString("ko-KR")}
+                      {alert.last_known_deposit_krw != null && (
+                        <span className="block">
+                          기준 예수금:{" "}
+                          {alert.last_known_deposit_krw.toLocaleString("ko-KR")}원
+                        </span>
+                      )}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* ── 설명 텍스트 ── */}
             <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">

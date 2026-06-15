@@ -194,6 +194,73 @@ async def send_rebalancing_alert(
         raise
 
 
+async def send_deposit_trigger_alert(
+    to_email: str,
+    portfolio_name: str,
+    deposit_increment: float,
+    items: list[dict],
+) -> None:
+    """예수금 입금 감지 알림 이메일 발송.
+
+    items: [{"ticker", "name", "weight_pct", "alloc_amount"}]
+    """
+    if not settings.smtp_host or not settings.smtp_user:
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return
+
+    subject = f"[Growlio] 예수금 +{deposit_increment:,.0f}원 입금 — {portfolio_name} 비중 매수 추천"
+
+    rows_html = ""
+    for item in items:
+        alloc = float(item.get("alloc_amount", 0))
+        weight = float(item.get("weight_pct", 0))
+        rows_html += (
+            f"<tr>"
+            f"<td style='padding:8px;border-bottom:1px solid #e2e8f0;'>"
+            f"{item.get('name', '')} ({item.get('ticker', '')})</td>"
+            f"<td style='padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;'>"
+            f"{weight:.1f}%</td>"
+            f"<td style='padding:8px;border-bottom:1px solid #e2e8f0;text-align:right;"
+            f"font-weight:bold;color:#1d4ed8;'>{alloc:,.0f}원</td>"
+            f"</tr>"
+        )
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;">
+      <h2 style="color:#1d4ed8;">예수금 입금 감지</h2>
+      <p style="color:#374151;margin-top:8px;">
+        계좌에 <strong style="color:#16a34a;">+{deposit_increment:,.0f}원</strong>이
+        입금되었습니다.<br>
+        포트폴리오 <strong>{portfolio_name}</strong> 비중에 따른 매수 추천 내역입니다.
+      </p>
+      <table style="width:100%;border-collapse:collapse;margin-top:16px;font-size:13px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="padding:8px;text-align:left;">종목</th>
+            <th style="padding:8px;text-align:right;">비중</th>
+            <th style="padding:8px;text-align:right;">배분 금액</th>
+          </tr>
+        </thead>
+        <tbody>{rows_html}</tbody>
+      </table>
+      <p style="margin-top:20px;color:#64748b;font-size:13px;">
+        Growlio 앱에서 직접 매수를 실행하거나,
+        자동 실행 설정을 활성화하면 다음 입금 시 자동으로 매수됩니다.
+      </p>
+    </div>
+    """
+
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info(
+            "deposit_trigger_alert_email_sent",
+            to=to_email, portfolio=portfolio_name, increment=deposit_increment,
+        )
+    except Exception as exc:
+        logger.error("deposit_trigger_alert_email_failed", to=to_email, error=str(exc))
+        raise
+
+
 async def send_stock_price_alert(
     to_email: str,
     ticker: str,

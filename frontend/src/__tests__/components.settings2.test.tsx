@@ -404,6 +404,11 @@ describe("RebalancingTable", () => {
       last_triggered_at: null,
       created_at: "2024-01-01",
       updated_at: "2024-01-01",
+      deposit_trigger_enabled: false,
+      deposit_trigger_account_id: null,
+      deposit_trigger_min_amount_krw: null,
+      last_known_deposit_krw: null,
+      last_deposit_checked_at: null,
     };
     renderWithProviders(
       <RebalancingTable

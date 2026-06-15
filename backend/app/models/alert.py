@@ -73,6 +73,16 @@ class RebalancingAlert(Base):
         String(10), nullable=False, default="DISABLED"
     )
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # ── 예수금 입금 감지 트리거 ──────────────────────────────────────
+    deposit_trigger_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    deposit_trigger_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="SET NULL"), nullable=True
+    )
+    deposit_trigger_min_amount_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    last_known_deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    last_deposit_checked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

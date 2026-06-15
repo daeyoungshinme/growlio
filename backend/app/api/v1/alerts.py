@@ -18,6 +18,7 @@ from app.api.v1._account_deps import get_owned_or_404
 from app.database import get_db
 from app.limiter import limiter
 from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
+from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
@@ -164,6 +165,10 @@ class RebalancingAlertCreate(BaseModel):
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
+    # 예수금 입금 감지 트리거
+    deposit_trigger_enabled: bool = False
+    deposit_trigger_account_id: uuid.UUID | None = None
+    deposit_trigger_min_amount_krw: int | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -186,6 +191,13 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("날짜는 1~28 사이여야 합니다")
         return v
 
+    @field_validator("deposit_trigger_min_amount_krw")
+    @classmethod
+    def validate_min_amount(cls, v: int | None) -> int | None:
+        if v is not None and v < 10_000:
+            raise ValueError("최소 감지 금액은 10,000원 이상이어야 합니다")
+        return v
+
 
 class RebalancingAlertResponse(BaseModel):
     model_config = {"from_attributes": True}
@@ -206,6 +218,11 @@ class RebalancingAlertResponse(BaseModel):
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    deposit_trigger_enabled: bool
+    deposit_trigger_account_id: uuid.UUID | None
+    deposit_trigger_min_amount_krw: int | None
+    last_known_deposit_krw: float | None
+    last_deposit_checked_at: datetime | None
 
 
 @router.get("/rebalancing", response_model=list[RebalancingAlertResponse])
@@ -270,6 +287,9 @@ async def upsert_rebalancing_alert(
         alert.order_type = body.order_type
         alert.market_condition_mode = body.market_condition_mode
         alert.is_active = True
+        alert.deposit_trigger_enabled = body.deposit_trigger_enabled
+        alert.deposit_trigger_account_id = body.deposit_trigger_account_id
+        alert.deposit_trigger_min_amount_krw = body.deposit_trigger_min_amount_krw
     else:
         alert = RebalancingAlert(
             user_id=current_user.id,
@@ -285,8 +305,22 @@ async def upsert_rebalancing_alert(
             order_type=body.order_type,
             market_condition_mode=body.market_condition_mode,
             is_active=True,
+            deposit_trigger_enabled=body.deposit_trigger_enabled,
+            deposit_trigger_account_id=body.deposit_trigger_account_id,
+            deposit_trigger_min_amount_krw=body.deposit_trigger_min_amount_krw,
         )
         db.add(alert)
+
+    # 예수금 입금 감지 활성화 시 기준 예수금 초기화 (첫 발동 즉시 트리거 방지)
+    if body.deposit_trigger_enabled and body.deposit_trigger_account_id:
+        trigger_account = await db.scalar(
+            select(AssetAccount).where(
+                AssetAccount.id == body.deposit_trigger_account_id,
+                AssetAccount.user_id == current_user.id,
+            )
+        )
+        if trigger_account and trigger_account.deposit_krw is not None:
+            alert.last_known_deposit_krw = trigger_account.deposit_krw
 
     await db.commit()
     await db.refresh(alert)
