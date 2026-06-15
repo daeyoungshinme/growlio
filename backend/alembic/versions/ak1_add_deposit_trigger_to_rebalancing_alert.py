@@ -11,6 +11,11 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
+revision = "ak1_add_deposit_trigger_to_rebalancing_alert"
+down_revision = "aj1_drop_duplicate_asset_account_indexes"
+branch_labels = None
+depends_on = None
+
 
 def upgrade() -> None:
     op.add_column(
