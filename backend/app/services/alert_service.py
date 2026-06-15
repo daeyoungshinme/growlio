@@ -91,9 +91,20 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
 
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
+    from app.redis_client import get_redis
     from app.services.email_service import send_rebalancing_alert
+    from app.services.market_signal_service import get_market_signal
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing_service import analyze_rebalancing
+
+    # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
+    try:
+        _redis = await get_redis()
+        _market_signal = await get_market_signal(_redis)
+        composite_level: str = _market_signal.get("composite_level", "GREEN")
+    except Exception as _exc:
+        logger.warning("market_signal_fetch_failed_in_alert_check", error=str(_exc))
+        composite_level = "GREEN"  # 조회 실패 시 안전 방향으로 실행 허용
 
     result = await db.execute(
         select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email)
@@ -145,6 +156,23 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
         mode = getattr(alert, "mode", "NOTIFY")
         email = notification_email or user_email
+
+        # 시장 신호 기반 자동 실행 게이트
+        if mode == "AUTO":
+            market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+            _blocked = (
+                market_mode == "CAUTIOUS" and composite_level == "RED"
+            ) or (
+                market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
+            )
+            if _blocked:
+                logger.info(
+                    "rebalancing_auto_skipped_market_signal",
+                    alert_id=str(alert.id),
+                    composite_level=composite_level,
+                    market_condition_mode=market_mode,
+                )
+                mode = "NOTIFY"
 
         if mode == "AUTO" and alert.account_id and drifting:
             from app.redis_client import get_redis
@@ -212,7 +240,10 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             db,
             alert.user_id,
             "REBALANCING",
-            f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type})",
+            (
+                f"리밸런싱 알림: {portfolio.name} — {drift_desc}"
+                f" ({alert.schedule_type}) [시장신호: {composite_level}]"
+            ),
         )
         alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1

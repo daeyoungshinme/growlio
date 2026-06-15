@@ -33,7 +33,7 @@ export function EditableDesktopPositionRow({
             </div>
           )}
           {searchLoading && suggestIdx === i && (
-            <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-gray-400" /></span>
+            <span className="absolute right-2 top-2"><Loader2 size={14} className="animate-spin text-gray-400" /></span>
           )}
           {suggestIdx === i && suggestions.length > 0 && (
             <div className="absolute top-full left-0 mt-1 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-52 overflow-y-auto">
@@ -93,7 +93,7 @@ export function EditableDesktopPositionRow({
               value={priceLoading ? "" : (rawRow.current_price_usd ?? "")}
               onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
               placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} step="0.01" disabled={priceLoading} />
-            {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
+            {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
             {convertUsdToKrw(rawRow.current_price_usd, usdRate) > 0 && (
               <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
                 ≈ ₩{convertUsdToKrw(rawRow.current_price_usd, usdRate).toLocaleString()}
@@ -107,7 +107,7 @@ export function EditableDesktopPositionRow({
               value={priceLoading ? "" : (rawRow.current_price ?? "")}
               onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
               placeholder={priceLoading ? "조회중..." : "자동조회"} min={0} disabled={priceLoading} />
-            {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={12} className="animate-spin text-blue-400" /></span>}
+            {priceLoading && <span className="absolute right-2 top-2"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
           </div>
         )}
       </td>
@@ -118,8 +118,8 @@ export function EditableDesktopPositionRow({
         <PnlCell val={row.pnl ?? 0} pct={row.pnl_pct ?? 0} />
       </td>
       <td className="py-2">
-        <button onClick={() => removeRow(i)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded">
-          <Trash2 size={14} />
+        <button onClick={() => removeRow(i)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded">
+          <Trash2 size={16} />
         </button>
       </td>
     </tr>

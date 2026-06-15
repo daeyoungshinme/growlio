@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 
 export interface ExchangeRateAlert {
   id: string;
@@ -12,26 +12,29 @@ export interface ExchangeRateAlert {
 }
 
 export const fetchExchangeRateAlerts = () =>
-  api.get<ExchangeRateAlert[]>("/alerts/exchange-rate").then((r) => r.data);
+  apiGet<ExchangeRateAlert[]>("/alerts/exchange-rate");
 
 export const createExchangeRateAlert = (
   target_rate: number,
   direction: "BELOW" | "ABOVE",
   max_trigger_count: number = 1,
 ) =>
-  api
-    .post<ExchangeRateAlert>("/alerts/exchange-rate", { target_rate, direction, max_trigger_count })
-    .then((r) => r.data);
+  apiPost<ExchangeRateAlert>("/alerts/exchange-rate", {
+    target_rate,
+    direction,
+    max_trigger_count,
+  });
 
 export const reactivateExchangeRateAlert = (id: string) =>
-  api.patch<ExchangeRateAlert>(`/alerts/exchange-rate/${id}/reactivate`).then((r) => r.data);
+  apiPatch<ExchangeRateAlert>(`/alerts/exchange-rate/${id}/reactivate`);
 
 export const deleteExchangeRateAlert = (id: string) =>
-  api.delete(`/alerts/exchange-rate/${id}`).then((r) => r.data);
+  apiDelete(`/alerts/exchange-rate/${id}`);
 
 // ── 리밸런싱 알림 ──────────────────────────────────────────────────────────
 
 export type ScheduleType = "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL";
+export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT";
 
 export interface RebalancingAlert {
   id: string;
@@ -46,6 +49,7 @@ export interface RebalancingAlert {
   strategy: "FULL" | "BUY_ONLY";
   account_id: string | null;
   order_type: "MARKET" | "LIMIT";
+  market_condition_mode: MarketConditionMode;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -62,27 +66,26 @@ export interface RebalancingAlertUpsert {
   strategy: "FULL" | "BUY_ONLY";
   account_id: string | null;
   order_type: "MARKET" | "LIMIT";
+  market_condition_mode: MarketConditionMode;
 }
 
 export const fetchRebalancingAlerts = () =>
-  api.get<RebalancingAlert[]>("/alerts/rebalancing").then((r) => r.data);
+  apiGet<RebalancingAlert[]>("/alerts/rebalancing");
 
 export const fetchRebalancingAlert = (portfolioId: string) =>
-  api.get<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`).then((r) => r.data);
+  apiGet<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`);
 
 export const upsertRebalancingAlert = (
   portfolioId: string,
   body: Omit<RebalancingAlertUpsert, "portfolio_id">,
 ) =>
-  api
-    .put<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`, {
-      portfolio_id: portfolioId,
-      ...body,
-    })
-    .then((r) => r.data);
+  apiPut<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`, {
+    portfolio_id: portfolioId,
+    ...body,
+  });
 
 export const deleteRebalancingAlert = (portfolioId: string) =>
-  api.delete(`/alerts/rebalancing/${portfolioId}`);
+  apiDelete(`/alerts/rebalancing/${portfolioId}`);
 
 // ── 주가 목표 알림 ──────────────────────────────────────────────────────────
 
@@ -101,7 +104,7 @@ export interface StockPriceAlert {
 }
 
 export const fetchStockPriceAlerts = () =>
-  api.get<StockPriceAlert[]>("/alerts/stock-price").then((r) => r.data);
+  apiGet<StockPriceAlert[]>("/alerts/stock-price");
 
 export const createStockPriceAlert = (body: {
   ticker: string;
@@ -110,13 +113,13 @@ export const createStockPriceAlert = (body: {
   target_price: number;
   direction: "BELOW" | "ABOVE";
   max_trigger_count?: number;
-}) => api.post<StockPriceAlert>("/alerts/stock-price", body).then((r) => r.data);
+}) => apiPost<StockPriceAlert>("/alerts/stock-price", body);
 
 export const reactivateStockPriceAlert = (id: string) =>
-  api.patch<StockPriceAlert>(`/alerts/stock-price/${id}/reactivate`).then((r) => r.data);
+  apiPatch<StockPriceAlert>(`/alerts/stock-price/${id}/reactivate`);
 
 export const deleteStockPriceAlert = (id: string) =>
-  api.delete(`/alerts/stock-price/${id}`).then((r) => r.data);
+  apiDelete(`/alerts/stock-price/${id}`);
 
 export interface AlertHistoryItem {
   id: string;
@@ -126,4 +129,4 @@ export interface AlertHistoryItem {
 }
 
 export const fetchAlertHistory = (params?: { skip?: number; limit?: number }) =>
-  api.get<AlertHistoryItem[]>("/alerts/history", { params }).then((r) => r.data);
+  apiGet<AlertHistoryItem[]>("/alerts/history", { params });

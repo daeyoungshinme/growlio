@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -92,11 +92,15 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const analysisSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!portfolioId || portfolios.length === 0) return;
     if (!portfolios.some((p) => p.id === portfolioId)) return;
     setSelectedIds(new Set([portfolioId]));
+    setTimeout(() => {
+      analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
   }, [portfolioId, portfolios]);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
@@ -471,16 +475,18 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
       </div>
 
       {/* ── 우측: 분석 패널 ──────────────────────────────────────── */}
-      <ErrorBoundary variant="section">
-        <AnalysisPanel
-          selectedIds={selectedIds}
-          selectedNames={selectedNames}
-          portfolios={sortedPortfolios}
-          activeAccounts={activeAccounts}
-          onOpenAlertModal={setAlertModalPortfolioId}
-          autoAnalyzeId={portfolioId}
-        />
-      </ErrorBoundary>
+      <div ref={analysisSectionRef}>
+        <ErrorBoundary variant="section">
+          <AnalysisPanel
+            selectedIds={selectedIds}
+            selectedNames={selectedNames}
+            portfolios={sortedPortfolios}
+            activeAccounts={activeAccounts}
+            onOpenAlertModal={setAlertModalPortfolioId}
+            autoAnalyzeId={portfolioId}
+          />
+        </ErrorBoundary>
+      </div>
       </div>
 
       {/* 포트폴리오 에디터 모달 */}

@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet, apiPost } from "./client";
 
 export interface DRIPYearlyPoint {
   year: number;
@@ -30,8 +30,10 @@ export interface MonthlyOptimizationItem {
   current_monthly_total_krw: number;
 }
 
-export const fetchDRIPSimulation = (params: { n_years?: number; annual_dividend_yield_pct?: number }) =>
-  api.post<DRIPSimulationResult>("/dividends/drip-simulation", params).then((r) => r.data);
+export const fetchDRIPSimulation = (params: {
+  n_years?: number;
+  annual_dividend_yield_pct?: number;
+}) => apiPost<DRIPSimulationResult>("/dividends/drip-simulation", params);
 
 export const fetchMonthlyOptimization = () =>
-  api.get<MonthlyOptimizationItem[]>("/dividends/monthly-optimization").then((r) => r.data);
+  apiGet<MonthlyOptimizationItem[]>("/dividends/monthly-optimization");

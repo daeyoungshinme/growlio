@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet } from "./client";
 
 export interface PortfolioRiskMetrics {
   var_95_pct: number;
@@ -22,9 +22,9 @@ export interface CurrencyExposure {
 }
 
 export const fetchPortfolioRisk = (portfolioId?: string) =>
-  api
-    .get<PortfolioRiskMetrics>(portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk")
-    .then((r) => r.data);
+  apiGet<PortfolioRiskMetrics>(
+    portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk",
+  );
 
 export const fetchCurrencyExposure = () =>
-  api.get<CurrencyExposure>("/portfolio/currency-exposure").then((r) => r.data);
+  apiGet<CurrencyExposure>("/portfolio/currency-exposure");

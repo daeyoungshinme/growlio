@@ -31,6 +31,7 @@ TTL_EXCHANGE_RATE_ALERTS = 300   # 환율 알림 목록 5분
 TTL_INDICATOR_LATEST = 3600      # 경제지표 최신값 1시간
 TTL_INDICATOR_HISTORY = 21600    # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400   # 경제지표 발표 일정 24시간
+TTL_MARKET_SIGNAL = 3600         # 복합 시장 신호 1시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -90,7 +91,7 @@ def ob_state_key(state: str) -> str:
     return f"ob_state:{state}"
 
 
-def has_overseas_key(account_id: int) -> str:
+def has_overseas_key(account_id: uuid.UUID) -> str:
     return f"has_overseas:{account_id}"
 
 
@@ -130,6 +131,10 @@ def economic_indicator_calendar_key() -> str:
     return "economic:calendar:upcoming"
 
 
+def market_signal_latest_key() -> str:
+    return "market:signal:latest"
+
+
 async def invalidate_user_caches(redis: RedisType, *keys: str) -> None:
     """주어진 캐시 키들을 RedisError 무시하며 일괄 삭제한다."""
     if redis is None:
@@ -140,3 +145,8 @@ async def invalidate_user_caches(redis: RedisType, *keys: str) -> None:
 
     with contextlib.suppress(RedisError):
         await redis.delete(*keys)
+
+
+async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+    """환율 알림 목록 캐시를 삭제한다."""
+    await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))

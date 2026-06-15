@@ -43,7 +43,8 @@ function AllocationHistoryChart() {
   const { data, isLoading } = useQuery({
     queryKey: QUERY_KEYS.allocationHistory(12),
     queryFn: () => fetchAllocationHistory(12),
-    staleTime: STALE_TIME.EXCHANGE_RATE,
+    staleTime: STALE_TIME.LONG,  // 1시간 — 백엔드 Redis TTL 1일에 맞게 조정
+    gcTime: STALE_TIME.LONG,
   });
 
   const { chartData, allTypes } = useMemo(() => {

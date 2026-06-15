@@ -47,8 +47,8 @@ export default function IndicatorHistoryChart({ data, name, unit, isDark }: Prop
 
   return (
     <div>
-      <ResponsiveContainer width="100%" height={200}>
-        <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
           <XAxis
             dataKey="date"
             tickFormatter={formatXDate}
@@ -63,7 +63,7 @@ export default function IndicatorHistoryChart({ data, name, unit, isDark }: Prop
             tick={{ fontSize: 11, fill: "#9CA3AF" }}
             axisLine={false}
             tickLine={false}
-            width={52}
+            width={44}
           />
           <Tooltip
             labelFormatter={(label: string) => {

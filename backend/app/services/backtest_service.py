@@ -34,6 +34,8 @@ logger = structlog.get_logger()
 
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 
+_TRADING_DAYS_PER_YEAR = 252  # 연간 거래일 수 (연율화 계산 기준)
+
 # 백테스팅에서 제외되는 특수 항목 (가격 데이터 없음)
 _BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE"}
 _BACKTEST_SKIP_MARKETS = {"KR_PROPERTY"}
@@ -97,7 +99,7 @@ def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
         )
 
     total_return = (values[-1] / 100.0 - 1) * 100
-    years = len(values) / 252  # 거래일 기준
+    years = len(values) / _TRADING_DAYS_PER_YEAR
     cagr = ((values[-1] / 100.0) ** (1 / years) - 1) * 100 if years > 0 else 0
 
     # MDD
@@ -127,10 +129,10 @@ def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
     std_r = math.sqrt(variance) if variance > 0 else 0
 
     # Sharpe (무위험이율 = 0 가정, 연율화)
-    sharpe = (mean_r / std_r * math.sqrt(252)) if std_r > 0 else 0
+    sharpe = (mean_r / std_r * math.sqrt(_TRADING_DAYS_PER_YEAR)) if std_r > 0 else 0
 
     # Volatility (연율화 표준편차, %)
-    volatility_pct = std_r * math.sqrt(252) * 100
+    volatility_pct = std_r * math.sqrt(_TRADING_DAYS_PER_YEAR) * 100
 
     # Sortino (하방 편차 기준)
     downside_rets = [r for r in daily_rets if r < 0]
@@ -138,7 +140,7 @@ def _compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
         ds_mean = sum(downside_rets) / len(downside_rets)
         ds_var = sum((r - ds_mean) ** 2 for r in downside_rets) / (len(downside_rets) - 1)
         ds_std = math.sqrt(ds_var) if ds_var > 0 else 0
-        sortino = (mean_r / ds_std * math.sqrt(252)) if ds_std > 0 else 0
+        sortino = (mean_r / ds_std * math.sqrt(_TRADING_DAYS_PER_YEAR)) if ds_std > 0 else 0
     else:
         sortino = 0.0
 

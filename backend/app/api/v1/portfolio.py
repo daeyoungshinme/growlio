@@ -155,4 +155,5 @@ async def portfolio_currency_exposure(
     db: AsyncSession = Depends(get_db),
 ):
     """KRW/USD/기타 통화 비중 분석."""
-    return await get_currency_exposure(current_user.id, db)
+    redis = await get_redis()
+    return await get_currency_exposure(current_user.id, db, redis)

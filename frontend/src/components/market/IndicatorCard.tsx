@@ -42,7 +42,7 @@ export default function IndicatorCard({
   return (
     <button
       onClick={onSelect}
-      className={`w-full text-left rounded-2xl border p-4 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 ${
+      className={`w-full text-left rounded-2xl border p-3 sm:p-4 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 ${
         isSelected
           ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 shadow-sm"
           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-gray-300 dark:hover:border-gray-600"
@@ -52,8 +52,8 @@ export default function IndicatorCard({
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div className="min-w-0">
-          <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{dateStr}</p>
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mt-0.5 leading-tight">
+          <p className="text-xs text-gray-400 dark:text-gray-500">{dateStr}</p>
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 mt-0.5 leading-tight line-clamp-2">
             {name}
           </p>
         </div>
@@ -65,7 +65,7 @@ export default function IndicatorCard({
           disabled={isPending}
           aria-label={subscribed ? "구독 해제" : "구독"}
           title={subscribed ? "알림 구독 해제" : "발표 시 알림 받기"}
-          className={`shrink-0 p-1.5 rounded-lg transition-colors ${
+          className={`shrink-0 p-2.5 rounded-xl transition-colors ${
             subscribed
               ? "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/30"
               : "text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30"
@@ -75,31 +75,33 @@ export default function IndicatorCard({
         </button>
       </div>
 
-      <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">{formattedValue}</p>
+      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50 tabular-nums">{formattedValue}</p>
 
-      <div className="mt-2 flex items-center gap-1.5">
-        {isUp && (
-          <>
-            <TrendingUp size={14} className="text-red-500 shrink-0" />
-            <span className="text-xs font-medium text-red-500">+{changeAbs?.toFixed(2)}%</span>
-          </>
-        )}
-        {isDown && (
-          <>
-            <TrendingDown size={14} className="text-blue-500 shrink-0" />
-            <span className="text-xs font-medium text-blue-500">-{changeAbs?.toFixed(2)}%</span>
-          </>
-        )}
-        {!isUp && !isDown && change_pct !== null && (
-          <>
-            <Minus size={14} className="text-gray-400 shrink-0" />
-            <span className="text-xs text-gray-400">변동 없음</span>
-          </>
-        )}
+      <div className="mt-2 space-y-1">
+        <div className="flex items-center gap-1.5">
+          {isUp && (
+            <>
+              <TrendingUp size={14} className="text-red-500 shrink-0" />
+              <span className="text-xs font-medium text-red-500">+{changeAbs?.toFixed(2)}%</span>
+            </>
+          )}
+          {isDown && (
+            <>
+              <TrendingDown size={14} className="text-blue-500 shrink-0" />
+              <span className="text-xs font-medium text-blue-500">-{changeAbs?.toFixed(2)}%</span>
+            </>
+          )}
+          {!isUp && !isDown && change_pct !== null && (
+            <>
+              <Minus size={14} className="text-gray-400 shrink-0" />
+              <span className="text-xs text-gray-400">변동 없음</span>
+            </>
+          )}
+        </div>
         {formattedPrev && (
-          <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             전월 {formattedPrev}
-          </span>
+          </p>
         )}
       </div>
     </button>

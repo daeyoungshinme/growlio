@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet } from "./client";
 
 export interface DCAProjectionPoint {
   month: string;
@@ -42,4 +42,4 @@ export interface DCAAnalysisData {
 }
 
 export const fetchDCAAnalysis = () =>
-  api.get<DCAAnalysisData>("/invest/dca-analysis").then((r) => r.data);
+  apiGet<DCAAnalysisData>("/invest/dca-analysis");

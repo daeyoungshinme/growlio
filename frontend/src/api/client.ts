@@ -95,3 +95,20 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+type ApiConfig = Parameters<typeof api.get>[1];
+
+export const apiGet = <T>(url: string, config?: ApiConfig) =>
+  api.get<T>(url, config).then((r) => r.data);
+
+export const apiPost = <T>(url: string, data?: unknown, config?: ApiConfig) =>
+  api.post<T>(url, data, config).then((r) => r.data);
+
+export const apiPut = <T>(url: string, data?: unknown, config?: ApiConfig) =>
+  api.put<T>(url, data, config).then((r) => r.data);
+
+export const apiPatch = <T>(url: string, data?: unknown, config?: ApiConfig) =>
+  api.patch<T>(url, data, config).then((r) => r.data);
+
+export const apiDelete = <T = unknown>(url: string, config?: ApiConfig) =>
+  api.delete<T>(url, config).then((r) => r.data);

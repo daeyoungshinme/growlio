@@ -52,3 +52,9 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: METRICS_TOKEN
+        sync: false
+      - key: FRED_API_KEY
+        sync: false
+      - key: FMP_API_KEY
+        sync: false

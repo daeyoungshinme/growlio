@@ -39,6 +39,7 @@ export default function AssetManagementPage() {
     showRealEstateModal, setShowRealEstateModal,
     editingRealEstate, setEditingRealEstate,
     editingBankAccount, setEditingBankAccount,
+    editingStockAccount, setEditingStockAccount,
     confirmDeleteId, setConfirmDeleteId,
     positionsAccount, setPositionsAccount,
     txAccount, setTxAccount,
@@ -54,7 +55,7 @@ export default function AssetManagementPage() {
 
   const {
     createMutation, deleteMutation,
-    updateBankMutation, updateDepositMutation, updateNameMutation, updateRealEstateMutation,
+    updateBankMutation, updateStockMutation, updateDepositMutation, updateNameMutation, updateRealEstateMutation,
     handleSyncBank, handleSyncKisAccount,
     deletingId, setDeletingId, syncingBankId, syncingStockIds,
   } = useAccountMutations({
@@ -62,6 +63,7 @@ export default function AssetManagementPage() {
     onStockModalClose: () => setShowStockModal(false),
     onEditBankClose: () => setEditingBankAccount(null),
     onEditRealEstateClose: () => setEditingRealEstate(null),
+    onEditStockClose: () => setEditingStockAccount(null),
   });
 
   const handleDelete = useCallback((id: string) => {
@@ -213,6 +215,7 @@ export default function AssetManagementPage() {
                   onDelete={handleDelete}
                   onManagePositions={setPositionsAccount}
                   onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
+                  onEdit={setEditingStockAccount}
                   onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
                   onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                   onSync={(id) => handleSyncKisAccount(id, accounts)}
@@ -240,6 +243,13 @@ export default function AssetManagementPage() {
         <StockAccountModal onClose={() => setShowStockModal(false)}
           onSubmit={(data) => createMutation.mutate(data)}
           isLoading={createMutation.isPending} />
+      )}
+      {editingStockAccount && (
+        <StockAccountModal
+          initialAccount={editingStockAccount}
+          onClose={() => setEditingStockAccount(null)}
+          onSubmit={(data) => updateStockMutation.mutate({ id: editingStockAccount.id, data })}
+          isLoading={updateStockMutation.isPending} />
       )}
       {showRealEstateModal && (
         <RealEstateAccountModal onClose={() => setShowRealEstateModal(false)}

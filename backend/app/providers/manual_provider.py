@@ -2,23 +2,29 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from typing import Any
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
 from app.exceptions import BadRequestError
+from app.models.asset import Position as DBPosition
 from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.base import Position as ProviderPosition
 from app.utils.currency import fetch_usd_krw
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models.asset import AssetAccount
 
 
 class ManualProvider(BrokerProvider):
     PROVIDER_ID = "MANUAL"
     PROVIDER_NAME = "수동 입력"
 
-    async def sync(self, account: Any, db: Any, redis: Any) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
         from app.kis.constants import OVERSEAS_MARKETS
-        from app.models.asset import Position as DBPosition
 
         # 현재 포지션을 positions 테이블에서 로드
         pos_result = await db.execute(
@@ -87,7 +93,7 @@ class ManualProvider(BrokerProvider):
         )
 
 
-def _db_to_provider_position(p: Any) -> ProviderPosition:
+def _db_to_provider_position(p: DBPosition) -> ProviderPosition:
     return ProviderPosition(
         ticker=p.ticker,
         name=p.name or "",

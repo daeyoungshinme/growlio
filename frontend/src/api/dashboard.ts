@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPut } from "./client";
 
 export interface DashboardAllocationItem {
   type: string;
@@ -38,7 +38,7 @@ export interface DashboardData {
 }
 
 export const fetchDashboard = () =>
-  api.get<DashboardData>("/dashboard").then((r) => r.data);
+  apiGet<DashboardData>("/dashboard");
 
 export interface TickerDividendItem {
   ticker: string | null;
@@ -57,10 +57,13 @@ export interface TickerDividendItem {
 }
 
 export const fetchDividendByTicker = () =>
-  api.get<TickerDividendItem[]>("/dividends/by-ticker").then((r) => r.data);
+  apiGet<TickerDividendItem[]>("/dividends/by-ticker");
 
-export const updateTickerDividendMonths = (ticker: string, market: string, dividend_months: number[]) =>
-  api.put(`/dividends/ticker-settings/${ticker}`, { market, dividend_months }).then((r) => r.data);
+export const updateTickerDividendMonths = (
+  ticker: string,
+  market: string,
+  dividend_months: number[],
+) => apiPut(`/dividends/ticker-settings/${ticker}`, { market, dividend_months });
 
 export const deleteTickerDividendMonths = (ticker: string, market: string) =>
-  api.delete(`/dividends/ticker-settings/${ticker}`, { params: { market } }).then((r) => r.data);
+  apiDelete(`/dividends/ticker-settings/${ticker}`, { params: { market } });

@@ -9,12 +9,11 @@ import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
-import LoginPage from "./pages/LoginPage";
-import RegisterPage from "./pages/RegisterPage";
-import FindAccountPage from "./pages/FindAccountPage";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
-
+const LoginPage = lazy(() => import("./pages/LoginPage"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage"));
+const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
 const AssetManagementPage = lazy(() => import("./pages/AssetManagementPage"));
@@ -69,11 +68,11 @@ export default function App() {
     <Toaster />
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/find-account" element={<FindAccountPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
+        <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
+        <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
+        <Route path="/forgot-password" element={<LazyRoute Component={ForgotPasswordPage} />} />
+        <Route path="/reset-password" element={<LazyRoute Component={ResetPasswordPage} />} />
         <Route
           path="/"
           element={

@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 export interface HoldingItem {
   ticker: string;
@@ -45,21 +45,21 @@ export interface BacktestResult {
 }
 
 export const fetchBacktestPortfolios = () =>
-  api.get<BacktestPortfolioConfig[]>("/backtest/portfolios").then((r) => r.data);
+  apiGet<BacktestPortfolioConfig[]>("/backtest/portfolios");
 
 export const createBacktestPortfolio = (body: { name: string; holdings: HoldingItem[] }) =>
-  api.post<BacktestPortfolioConfig>("/backtest/portfolios", body).then((r) => r.data);
+  apiPost<BacktestPortfolioConfig>("/backtest/portfolios", body);
 
 export const updateBacktestPortfolio = (
   id: string,
-  body: { name?: string; holdings?: HoldingItem[] }
-) => api.put<BacktestPortfolioConfig>(`/backtest/portfolios/${id}`, body).then((r) => r.data);
+  body: { name?: string; holdings?: HoldingItem[] },
+) => apiPut<BacktestPortfolioConfig>(`/backtest/portfolios/${id}`, body);
 
 export const deleteBacktestPortfolio = (id: string) =>
-  api.delete(`/backtest/portfolios/${id}`);
+  apiDelete(`/backtest/portfolios/${id}`);
 
 export const runBacktest = (req: BacktestRunRequest) =>
-  api.post<BacktestResult>("/backtest/run", req).then((r) => r.data);
+  apiPost<BacktestResult>("/backtest/run", req);
 
 export interface CorrelationRequest {
   portfolio_ids: string[];
@@ -73,4 +73,4 @@ export interface CorrelationResult {
 }
 
 export const runCorrelation = (req: CorrelationRequest) =>
-  api.post<CorrelationResult>("/backtest/correlation", req).then((r) => r.data);
+  apiPost<CorrelationResult>("/backtest/correlation", req);

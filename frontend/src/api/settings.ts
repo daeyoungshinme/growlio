@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet, apiPut } from "./client";
 
 export interface SettingsData {
   has_kis: boolean;
@@ -30,10 +30,10 @@ export interface AutoDcaPayload {
 }
 
 export const fetchSettings = (): Promise<SettingsData> =>
-  api.get<SettingsData>("/settings").then((r) => r.data);
+  apiGet<SettingsData>("/settings");
 
 export const updateAutoDca = (payload: AutoDcaPayload) =>
-  api.put("/settings/auto-dca", payload).then((r) => r.data);
+  apiPut("/settings/auto-dca", payload);
 
 export const registerPushToken = (fcm_token: string | null) =>
-  api.put("/settings/push-token", { fcm_token }).then((r) => r.data);
+  apiPut("/settings/push-token", { fcm_token });

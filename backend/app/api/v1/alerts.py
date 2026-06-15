@@ -14,13 +14,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.api.v1._account_deps import get_owned_or_404
 from app.database import get_db
 from app.limiter import limiter
 from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
-from app.utils.cache_keys import TTL_EXCHANGE_RATE_ALERTS, exchange_rate_alerts_key
+from app.utils.cache_keys import (
+    TTL_EXCHANGE_RATE_ALERTS,
+    exchange_rate_alerts_key,
+    invalidate_exchange_rate_alert_caches,
+)
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 
@@ -111,9 +116,7 @@ async def create_exchange_rate_alert(
     db.add(alert)
     await db.commit()
     await db.refresh(alert)
-    _redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await _redis.delete(exchange_rate_alerts_key(current_user.id))
+    await invalidate_exchange_rate_alert_caches(await get_redis(), current_user.id)
     return AlertResponse.model_validate(alert)
 
 
@@ -124,21 +127,12 @@ async def reactivate_exchange_rate_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """비활성 알림을 재활성화하고 발동 횟수를 초기화한다."""
-    alert = await db.scalar(
-        select(ExchangeRateAlert).where(
-            ExchangeRateAlert.id == alert_id,
-            ExchangeRateAlert.user_id == current_user.id,
-        )
-    )
-    if not alert:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    alert = await get_owned_or_404(db, ExchangeRateAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
     alert.is_active = True
     alert.trigger_count = 0
     await db.commit()
     await db.refresh(alert)
-    _redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await _redis.delete(exchange_rate_alerts_key(current_user.id))
+    await invalidate_exchange_rate_alert_caches(await get_redis(), current_user.id)
     return AlertResponse.model_validate(alert)
 
 
@@ -149,19 +143,10 @@ async def delete_exchange_rate_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """목표환율 알림 삭제."""
-    alert = await db.scalar(
-        select(ExchangeRateAlert).where(
-            ExchangeRateAlert.id == alert_id,
-            ExchangeRateAlert.user_id == current_user.id,
-        )
-    )
-    if not alert:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    alert = await get_owned_or_404(db, ExchangeRateAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
     await db.delete(alert)
     await db.commit()
-    _redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await _redis.delete(exchange_rate_alerts_key(current_user.id))
+    await invalidate_exchange_rate_alert_caches(await get_redis(), current_user.id)
 
 
 # ── 리밸런싱 알림 ────────────────────────────────────────────────────────────
@@ -178,6 +163,7 @@ class RebalancingAlertCreate(BaseModel):
     strategy: Literal["FULL", "BUY_ONLY"] = "BUY_ONLY"
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
+    market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
 
     @field_validator("threshold_pct")
     @classmethod
@@ -216,6 +202,7 @@ class RebalancingAlertResponse(BaseModel):
     strategy: str
     account_id: uuid.UUID | None
     order_type: str
+    market_condition_mode: str
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -263,14 +250,7 @@ async def upsert_rebalancing_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """포트폴리오 리밸런싱 알림 생성 또는 수정 (upsert)."""
-    portfolio = await db.scalar(
-        select(Portfolio).where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+    await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
 
     alert = await db.scalar(
         select(RebalancingAlert).where(
@@ -288,6 +268,7 @@ async def upsert_rebalancing_alert(
         alert.strategy = body.strategy
         alert.account_id = body.account_id
         alert.order_type = body.order_type
+        alert.market_condition_mode = body.market_condition_mode
         alert.is_active = True
     else:
         alert = RebalancingAlert(
@@ -302,6 +283,7 @@ async def upsert_rebalancing_alert(
             strategy=body.strategy,
             account_id=body.account_id,
             order_type=body.order_type,
+            market_condition_mode=body.market_condition_mode,
             is_active=True,
         )
         db.add(alert)
@@ -421,14 +403,7 @@ async def reactivate_stock_price_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """주가 알림 재활성화."""
-    alert = await db.scalar(
-        select(StockPriceAlert).where(
-            StockPriceAlert.id == alert_id,
-            StockPriceAlert.user_id == current_user.id,
-        )
-    )
-    if not alert:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    alert = await get_owned_or_404(db, StockPriceAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
     alert.is_active = True
     alert.trigger_count = 0
     await db.commit()
@@ -443,14 +418,7 @@ async def delete_stock_price_alert(
     db: AsyncSession = Depends(get_db),
 ):
     """주가 알림 삭제."""
-    alert = await db.scalar(
-        select(StockPriceAlert).where(
-            StockPriceAlert.id == alert_id,
-            StockPriceAlert.user_id == current_user.id,
-        )
-    )
-    if not alert:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림을 찾을 수 없습니다")
+    alert = await get_owned_or_404(db, StockPriceAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
     await db.delete(alert)
     await db.commit()
 

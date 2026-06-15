@@ -6,6 +6,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useLogout } from "@/hooks/useLogout";
 import type { AuthState } from "@/stores/authStore";
+import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 
 vi.mock("@/api/assets", () => ({
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
@@ -27,7 +28,9 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <ExchangeRateProvider>{children}</ExchangeRateProvider>
+    </QueryClientProvider>
   );
 }
 

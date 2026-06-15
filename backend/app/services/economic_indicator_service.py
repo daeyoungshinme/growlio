@@ -72,6 +72,24 @@ INDICATORS: dict[str, dict[str, str]] = {
         "frequency": "monthly",
         "description": "생산자물가지수 (기준: 1982=100)",
     },
+    "VIX": {
+        "name": "VIX 공포지수",
+        "name_en": "VIX Volatility Index",
+        "source": "fred",
+        "series": "VIXCLS",
+        "unit": "지수",
+        "frequency": "daily",
+        "description": "CBOE 변동성 지수 — 시장 불안 심리 측정 (20 이상: 주의, 30 이상: 공포)",
+    },
+    "T10Y2Y": {
+        "name": "장단기 금리차 (10Y-2Y)",
+        "name_en": "10Y-2Y Treasury Yield Spread",
+        "source": "fred",
+        "series": "T10Y2Y",
+        "unit": "%",
+        "frequency": "daily",
+        "description": "10년물-2년물 미국 국채 스프레드 — 역전(-) 시 경기침체 선행지표",
+    },
 }
 
 FRED_BASE = "https://api.stlouisfed.org/fred"

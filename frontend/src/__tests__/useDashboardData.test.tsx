@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 
 vi.mock("../api/dashboard", () => ({
   fetchDashboard: vi.fn(),
@@ -43,7 +45,9 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <ExchangeRateProvider>{children}</ExchangeRateProvider>
+    </QueryClientProvider>
   );
 }
 

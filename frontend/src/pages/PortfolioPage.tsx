@@ -20,8 +20,8 @@ import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
-import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
-import TaxOptimizationCard from "@/components/portfolio-analysis/TaxOptimizationCard";
+const PortfolioAnalysisTab = lazy(() => import("../components/portfolio-analysis/PortfolioAnalysisTab"));
+const TaxOptimizationCard = lazy(() => import("../components/portfolio-analysis/TaxOptimizationCard"));
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -66,7 +66,6 @@ export default function PortfolioPage() {
   const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
-    enabled: !isLoading,
     staleTime: STALE_TIME.LONG,
   });
 
@@ -86,6 +85,11 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     if (isLoading || !data) return;
+    qc.prefetchQuery({
+      queryKey: QUERY_KEYS.dividendPositions,
+      queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
+      staleTime: STALE_TIME.LONG,
+    });
     qc.prefetchQuery({
       queryKey: QUERY_KEYS.dividendSummary,
       queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
@@ -253,13 +257,17 @@ export default function PortfolioPage() {
 
       {tab === "세금 추정" && (
         <ErrorBoundary variant="section">
-          <TaxOptimizationCard />
+          <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+            <TaxOptimizationCard />
+          </Suspense>
         </ErrorBoundary>
       )}
 
       {tab === "포트폴리오 분석" && (
         <ErrorBoundary variant="section">
-          <PortfolioAnalysisTab portfolioId={portfolioId} />
+          <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+            <PortfolioAnalysisTab portfolioId={portfolioId} />
+          </Suspense>
         </ErrorBoundary>
       )}
 

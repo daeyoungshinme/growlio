@@ -92,8 +92,6 @@ class AssetAccount(Base):
     )
 
     __table_args__ = (
-        Index("idx_asset_accounts_user_id", "user_id"),
-        Index("idx_asset_accounts_user", "user_id"),
         Index("idx_asset_accounts_user_active", "user_id", "is_active"),
         Index("idx_asset_accounts_user_active_include", "user_id", "is_active", "include_in_total"),
         Index("idx_asset_accounts_user_active_type", "user_id", "is_active", "asset_type"),

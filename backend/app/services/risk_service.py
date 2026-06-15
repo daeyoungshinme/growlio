@@ -23,6 +23,7 @@ logger = structlog.get_logger()
 _RISK_CACHE_TTL = 3600  # 1시간
 _SP500_SYMBOL = "^GSPC"
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
+_MIN_RETURN_POINTS_FOR_CORRELATION = 20  # 상관계수 계산에 필요한 최소 수익률 데이터 포인트
 
 
 def _sync_fetch_risk_data(
@@ -116,7 +117,7 @@ def _calc_diversification_score(
             r1 = returns_map.get(s1, [])
             r2 = returns_map.get(s2, [])
             k = min(len(r1), len(r2))
-            if k < 20:
+            if k < _MIN_RETURN_POINTS_FOR_CORRELATION:
                 continue
             r1 = r1[:k]
             r2 = r2[:k]
@@ -154,7 +155,7 @@ async def get_portfolio_risk_metrics(
             if cached:
                 return json.loads(cached)
         except Exception:
-            pass
+            pass  # Redis 오류 무시 — DB에서 재계산
 
     # 최신 스냅샷 포지션 조회
     subq = latest_snapshot_subquery(user_id=user_id)
@@ -166,13 +167,14 @@ async def get_portfolio_risk_metrics(
     )
     rows = result.all()
 
-    # 포지션 집계 (ticker+market 기준)
+    # 포지션 집계 (ticker+market 기준) — 배치 조회로 N+1 방지
+    snap_ids = [snap.id for snap, _ in rows]
     pos_map: dict[str, dict] = {}
-    for snap, _ in rows:
-        snap_positions = await db.execute(
-            select(Position).where(Position.snapshot_id == snap.id)
+    if snap_ids:
+        all_pos_result = await db.execute(
+            select(Position).where(Position.snapshot_id.in_(snap_ids))
         )
-        for pos in snap_positions.scalars().all():
+        for pos in all_pos_result.scalars().all():
             key = f"{pos.ticker}-{pos.market}"
             if key not in pos_map:
                 pos_map[key] = {"ticker": pos.ticker, "market": pos.market, "value_krw": 0.0}
@@ -248,7 +250,7 @@ async def get_portfolio_risk_metrics(
         try:
             await redis.setex(cache_key, _RISK_CACHE_TTL, json.dumps(result_data))
         except Exception:
-            pass
+            pass  # Redis 오류 무시 — DB에서 재계산
 
     return result_data
 
@@ -270,8 +272,19 @@ def _empty_risk_result() -> dict:
 async def get_currency_exposure(
     user_id: uuid.UUID,
     db: AsyncSession,
+    redis: RedisType = None,
 ) -> dict:
     """국내/해외/통화 비중 분석."""
+    cache_key = f"currency_exposure:{user_id}"
+
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass  # Redis 오류 무시 — DB에서 재계산
+
     subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
@@ -285,11 +298,13 @@ async def get_currency_exposure(
     usd_total = 0.0
     other_total = 0.0
 
-    for snap, _ in rows:
-        snap_positions = await db.execute(
-            select(Position).where(Position.snapshot_id == snap.id)
+    # 배치 조회로 N+1 방지
+    snap_ids = [snap.id for snap, _ in rows]
+    if snap_ids:
+        all_pos_result = await db.execute(
+            select(Position).where(Position.snapshot_id.in_(snap_ids))
         )
-        for pos in snap_positions.scalars().all():
+        for pos in all_pos_result.scalars().all():
             val = float(pos.value_krw or 0)
             currency = (pos.currency or "KRW").upper()
             if currency == "KRW":
@@ -303,7 +318,7 @@ async def get_currency_exposure(
     if grand_total <= 0:
         return {"krw_pct": 0, "usd_pct": 0, "other_pct": 0, "krw_value": 0, "usd_value": 0, "other_value": 0}
 
-    return {
+    data = {
         "krw_value": round(krw_total, 0),
         "usd_value": round(usd_total, 0),
         "other_value": round(other_total, 0),
@@ -311,3 +326,11 @@ async def get_currency_exposure(
         "usd_pct": round(usd_total / grand_total * 100, 2),
         "other_pct": round(other_total / grand_total * 100, 2),
     }
+
+    if redis:
+        try:
+            await redis.setex(cache_key, _RISK_CACHE_TTL, json.dumps(data))
+        except Exception:
+            pass  # Redis 오류 무시 — DB에서 재계산
+
+    return data

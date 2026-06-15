@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 
 export interface RealEstateDetails {
   address?: string;
@@ -56,39 +56,44 @@ export interface AssetAccountCreate {
 }
 
 export const fetchAccounts = () =>
-  api.get<AssetAccount[]>("/assets").then((r) => r.data);
+  apiGet<AssetAccount[]>("/assets");
 
 export const createAccount = (data: AssetAccountCreate) =>
-  api.post<AssetAccount>("/assets", data).then((r) => r.data);
+  apiPost<AssetAccount>("/assets", data);
 
-export const updateAccount = (id: string, data: Partial<AssetAccountCreate & { is_active: boolean; deposit_krw: number; real_estate_details: RealEstateDetails }>) =>
-  api.put<AssetAccount>(`/assets/${id}`, data).then((r) => r.data);
+export const updateAccount = (
+  id: string,
+  data: Partial<AssetAccountCreate & { is_active: boolean; deposit_krw: number; real_estate_details: RealEstateDetails }>,
+) => apiPut<AssetAccount>(`/assets/${id}`, data);
 
 export const deleteAccount = (id: string) =>
-  api.delete(`/assets/${id}`);
+  apiDelete(`/assets/${id}`);
 
 export const syncAccount = (id: string) =>
-  api.post(`/assets/${id}/sync`).then((r) => r.data);
+  apiPost(`/assets/${id}/sync`);
 
 export const setAccountTargetPortfolio = (accountId: string, portfolioId: string | null) =>
-  api.patch<AssetAccount>(`/assets/${accountId}/target-portfolio`, { target_portfolio_id: portfolioId }).then((r) => r.data);
+  apiPatch<AssetAccount>(`/assets/${accountId}/target-portfolio`, {
+    target_portfolio_id: portfolioId,
+  });
 
 export const batchSetTargetPortfolio = (
   portfolioId: string | null,
   accountIds: string[],
 ): Promise<AssetAccount[]> =>
-  api
-    .patch<AssetAccount[]>("/assets/batch-target-portfolio", {
-      portfolio_id: portfolioId,
-      account_ids: accountIds,
-    })
-    .then((r) => r.data);
+  apiPatch<AssetAccount[]>("/assets/batch-target-portfolio", {
+    portfolio_id: portfolioId,
+    account_ids: accountIds,
+  });
 
-export const verifyKisCredentials = (data: { kis_app_key: string; kis_app_secret: string; is_mock: boolean }) =>
-  api.post<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data).then((r) => r.data);
+export const verifyKisCredentials = (data: {
+  kis_app_key: string;
+  kis_app_secret: string;
+  is_mock: boolean;
+}) => apiPost<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data);
 
 export const fetchSnapshots = (start?: string, end?: string) =>
-  api.get("/assets/snapshots/range", { params: { start_date: start, end_date: end } }).then((r) => r.data);
+  apiGet("/assets/snapshots/range", { params: { start_date: start, end_date: end } });
 
 export interface StockSuggestion {
   ticker: string;
@@ -98,10 +103,10 @@ export interface StockSuggestion {
 }
 
 export const searchStocks = (q: string, signal?: AbortSignal): Promise<StockSuggestion[]> =>
-  api.get<StockSuggestion[]>("/stocks/search", { params: { q }, signal }).then((r) => r.data);
+  apiGet<StockSuggestion[]>("/stocks/search", { params: { q }, signal });
 
 export const fetchExchangeRate = (): Promise<{ usd_krw: number }> =>
-  api.get<{ usd_krw: number }>("/stocks/exchange-rate").then((r) => r.data);
+  apiGet<{ usd_krw: number }>("/stocks/exchange-rate");
 
 export interface StockPrice {
   price_krw: number | null;
@@ -110,4 +115,4 @@ export interface StockPrice {
 }
 
 export const fetchStockPrice = (ticker: string, market: string): Promise<StockPrice> =>
-  api.get<StockPrice>("/stocks/price", { params: { ticker, market } }).then((r) => r.data);
+  apiGet<StockPrice>("/stocks/price", { params: { ticker, market } });

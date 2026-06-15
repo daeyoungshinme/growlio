@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPost } from "./client";
 
 export interface IndicatorLatest {
   code: string;
@@ -34,21 +34,19 @@ export interface HistoryPoint {
 }
 
 export const fetchIndicators = () =>
-  api.get<IndicatorLatest[]>("/economic-indicators").then((r) => r.data);
+  apiGet<IndicatorLatest[]>("/economic-indicators");
 
 export const fetchIndicatorCalendar = () =>
-  api.get<EconomicCalendarEvent[]>("/economic-indicators/calendar").then((r) => r.data);
+  apiGet<EconomicCalendarEvent[]>("/economic-indicators/calendar");
 
 export const fetchIndicatorHistory = (code: string, months = 24) =>
-  api
-    .get<HistoryPoint[]>(`/economic-indicators/${code}/history`, { params: { months } })
-    .then((r) => r.data);
+  apiGet<HistoryPoint[]>(`/economic-indicators/${code}/history`, { params: { months } });
 
 export const fetchIndicatorSubscriptions = () =>
-  api.get<string[]>("/economic-indicators/subscriptions").then((r) => r.data);
+  apiGet<string[]>("/economic-indicators/subscriptions");
 
 export const subscribeIndicator = (code: string) =>
-  api.post(`/economic-indicators/${code}/subscribe`);
+  apiPost(`/economic-indicators/${code}/subscribe`);
 
 export const unsubscribeIndicator = (code: string) =>
-  api.delete(`/economic-indicators/${code}/subscribe`);
+  apiDelete(`/economic-indicators/${code}/subscribe`);

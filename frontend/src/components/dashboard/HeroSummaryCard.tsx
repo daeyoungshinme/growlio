@@ -91,7 +91,7 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
                 <p className="text-xs text-gray-300 dark:text-gray-600 mt-1">{updatedLabel}</p>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
                 <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
@@ -112,7 +112,7 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
           </div>
           {/* 보조 항목: 입금 달성률 · 은퇴 목표 */}
           <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
-            <div className="grid grid-cols-2 gap-2 sm:gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate">입금 달성률</p>
                 <p className={`text-sm font-semibold mt-0.5 ${depositColor}`}>

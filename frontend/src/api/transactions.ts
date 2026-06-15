@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPost, apiPut } from "./client";
 
 export interface Transaction {
   id: string;
@@ -26,13 +26,13 @@ export const fetchTransactions = (params?: {
   account_id?: string;
   year?: number;
   transaction_type?: string;
-}) => api.get<Transaction[]>("/transactions", { params }).then((r) => r.data);
+}) => apiGet<Transaction[]>("/transactions", { params });
 
 export const createTransaction = (data: TransactionCreate) =>
-  api.post<Transaction>("/transactions", data).then((r) => r.data);
+  apiPost<Transaction>("/transactions", data);
 
 export const updateTransaction = (id: string, data: Partial<TransactionCreate>) =>
-  api.put<Transaction>(`/transactions/${id}`, data).then((r) => r.data);
+  apiPut<Transaction>(`/transactions/${id}`, data);
 
 export const deleteTransaction = (id: string) =>
-  api.delete(`/transactions/${id}`);
+  apiDelete(`/transactions/${id}`);

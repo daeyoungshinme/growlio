@@ -18,7 +18,10 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { fetchMarketSignal } from "@/api/marketSignals";
+import MarketSignalBanner from "./MarketSignalBanner";
 
 function applyExecutionResults(analysis: RebalancingAnalysis, results: ExecutionResult[]): RebalancingAnalysis {
   const successMap: Record<string, number> = {};
@@ -71,6 +74,12 @@ export default function RebalancingTab() {
   });
   // fetchAccounts는 is_active=True 필터로 활성 계좌만 반환
   const allAccounts = accounts;
+
+  const { data: marketSignal } = useQuery({
+    queryKey: QUERY_KEYS.marketSignal,
+    queryFn: fetchMarketSignal,
+    staleTime: STALE_TIME.LONG,
+  });
 
   const createMutation = useMutation({
     mutationFn: (body: { name: string; items: PortfolioItem[]; base_type: string }) =>
@@ -275,6 +284,7 @@ export default function RebalancingTab() {
                 <RefreshCw size={12} /> 다시 분석
               </button>
             </div>
+            {marketSignal && <MarketSignalBanner signal={marketSignal} />}
             <RebalancingTable
               analysis={analysis}
               portfolioId={analysis.portfolio_id}

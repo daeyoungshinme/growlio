@@ -34,6 +34,9 @@ logger = structlog.get_logger()
 
 _STOCK_TYPES = {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER}
 
+_XIRR_INITIAL_RATE = 0.1
+_XIRR_MAX_ITERATIONS = 200
+
 
 async def _get_latest_snapshot_rows(
     user_id: uuid.UUID, db: AsyncSession
@@ -74,15 +77,16 @@ async def _fetch_position_maps(
     snap_ids: list, stock_acc_ids: list, db: AsyncSession
 ) -> tuple[dict, dict]:
     """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
-    snap_positions: dict[Any, list] = {}
+    snap_positions: dict[uuid.UUID, list[Position]] = {}
     if snap_ids:
         pos_result = await db.execute(
             select(Position).where(Position.snapshot_id.in_(snap_ids))
         )
         for pos in pos_result.scalars().all():
-            snap_positions.setdefault(pos.snapshot_id, []).append(pos)
+            if pos.snapshot_id is not None:
+                snap_positions.setdefault(pos.snapshot_id, []).append(pos)
 
-    current_positions: dict[Any, list] = {}
+    current_positions: dict[uuid.UUID, list[Position]] = {}
     if stock_acc_ids:
         cur_result = await db.execute(
             select(Position).where(
@@ -204,14 +208,26 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         if cached:
             return json.loads(cached)
 
-    # first_snap_date + net_deposits_ytd를 CTE 단일 쿼리로 묶어 round-trip 절감
-    first_snap_date, net_deposits_ytd = await _get_scalar_init_data(user_id, db)
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
+    # 1단계: 서로 독립적인 쿼리들을 병렬 실행
+    # _get_monthly_trend / get_dividend_summary는 Redis 캐시 히트 시 DB 접근 없음
+    (
+        (first_snap_date, net_deposits_ytd),
+        settings_row,
+        monthly_trend,
+        div_summary,
+    ) = await asyncio.gather(
+        _get_scalar_init_data(user_id, db),
+        db.scalar(select(UserSettings).where(UserSettings.user_id == user_id)),
+        _get_monthly_trend(user_id, db, redis),
+        get_dividend_summary(user_id, db, redis),
+    )
+
+    # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
     total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(
         user_id, db, redis
     )
-    monthly_trend = await _get_monthly_trend(user_id, db, redis)
-    div_summary = await get_dividend_summary(user_id, db, redis)
+
+    # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 
     bank_total = total_assets_krw - stock_value
@@ -332,8 +348,8 @@ def _xirr(cashflows: list[tuple[date, float]]) -> float | None:
     days = [(d - d0).days for d, _ in cashflows]
 
     pairs = list(zip(amounts, days, strict=True))
-    rate = 0.1
-    for _ in range(200):
+    rate = _XIRR_INITIAL_RATE
+    for _ in range(_XIRR_MAX_ITERATIONS):
         try:
             npv = sum(cf / (1 + rate) ** (d / 365.0) for cf, d in pairs)
             dnpv = sum(

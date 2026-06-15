@@ -8,13 +8,16 @@ import {
   upsertRebalancingAlert,
   deleteRebalancingAlert,
   type ScheduleType,
+  type MarketConditionMode,
 } from "@/api/alerts";
 import { fetchAccounts } from "@/api/assets";
+import { fetchMarketSignal } from "@/api/marketSignals";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
+import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 
 interface Props {
   portfolioId: string;
@@ -76,6 +79,7 @@ const inputClass = `w-full ${INPUT_SM}`;
 
 import type { RebalancingAlert } from "@/api/alerts";
 import type { AssetAccount } from "@/api/assets";
+import type { MarketSignalResponse } from "@/api/marketSignals";
 import type { QueryClient } from "@tanstack/react-query";
 
 export default function RebalancingAlertModal({ portfolioId, portfolioName, onClose }: Props) {
@@ -97,6 +101,12 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
     staleTime: STALE_TIME.MEDIUM,
   });
 
+  const { data: marketSignal } = useQuery({
+    queryKey: QUERY_KEYS.marketSignal,
+    queryFn: fetchMarketSignal,
+    staleTime: STALE_TIME.LONG,
+  });
+
   const brokerAccounts = accounts.filter(
     (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
   );
@@ -116,6 +126,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
             portfolioId={portfolioId}
             qc={qc}
             onClose={onClose}
+            marketSignal={marketSignal}
           />
         )}
       </div>
@@ -129,12 +140,14 @@ function AlertFormBody({
   portfolioId,
   qc,
   onClose,
+  marketSignal,
 }: {
   alert: RebalancingAlert | null;
   brokerAccounts: AssetAccount[];
   portfolioId: string;
   qc: QueryClient;
   onClose: () => void;
+  marketSignal?: MarketSignalResponse;
 }) {
   const [scheduleType, setScheduleType] = useState<ScheduleType>(alert?.schedule_type ?? "DAILY");
   const [dayOfWeek, setDayOfWeek] = useState(alert?.schedule_day_of_week ?? 0);
@@ -145,6 +158,9 @@ function AlertFormBody({
   const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">(alert?.strategy ?? "BUY_ONLY");
   const [accountId, setAccountId] = useState<string>(alert?.account_id ?? "");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">(alert?.order_type ?? "MARKET");
+  const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
+    alert?.market_condition_mode ?? "DISABLED",
+  );
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -158,6 +174,7 @@ function AlertFormBody({
         strategy,
         account_id: mode === "AUTO" && accountId ? accountId : null,
         order_type: orderType,
+        market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
       }),
     onSuccess: () => {
       invalidateRebalancingAlertData(qc, portfolioId);
@@ -408,6 +425,66 @@ function AlertFormBody({
                     <option value="MARKET">시장가</option>
                     <option value="LIMIT">지정가</option>
                   </select>
+                </div>
+
+                {/* ── 시장 신호 연동 ── */}
+                <div className="pt-1 border-t border-orange-200/30 dark:border-orange-800/30">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                      시장 신호 연동
+                    </p>
+                    {marketSignal && (
+                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                        현재:
+                        <MarketSignalLevelBadge level={marketSignal.composite_level} size="xs" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    {(
+                      [
+                        {
+                          value: "DISABLED" as MarketConditionMode,
+                          label: "신호 무시",
+                          desc: "시장 상황과 무관하게 자동 실행",
+                        },
+                        {
+                          value: "CAUTIOUS" as MarketConditionMode,
+                          label: "신중",
+                          desc: "고위험(RED) 신호 시 자동 실행 중단",
+                        },
+                        {
+                          value: "STRICT" as MarketConditionMode,
+                          label: "엄격",
+                          desc: "중위험(YELLOW) 이상에서 자동 실행 중단",
+                        },
+                      ] as const
+                    ).map(({ value, label, desc }) => (
+                      <label
+                        key={value}
+                        className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                          marketConditionMode === value
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                            : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="market_condition_mode"
+                          value={value}
+                          checked={marketConditionMode === value}
+                          onChange={() => setMarketConditionMode(value)}
+                          className="mt-0.5 accent-blue-600"
+                        />
+                        <div>
+                          <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                            {label}
+                          </div>
+                          <div className="text-xs text-gray-400 dark:text-gray-500">{desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}

@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet } from "./client";
 
 export interface OverseasPositionDetail {
   ticker: string;
@@ -18,7 +18,7 @@ export interface OverseasPositionDetail {
 }
 
 export const fetchOverseasPositionsTax = () =>
-  api.get<OverseasPositionDetail[]>("/tax/overseas-positions").then((r) => r.data);
+  apiGet<OverseasPositionDetail[]>("/tax/overseas-positions");
 
 export interface TaxSummary {
   year: number;
@@ -39,6 +39,4 @@ export interface TaxSummary {
 }
 
 export const fetchTaxSummary = (year?: number) =>
-  api
-    .get<TaxSummary>("/tax/summary", { params: year ? { year } : undefined })
-    .then((r) => r.data);
+  apiGet<TaxSummary>("/tax/summary", { params: year ? { year } : undefined });

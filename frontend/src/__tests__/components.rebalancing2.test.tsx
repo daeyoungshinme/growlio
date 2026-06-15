@@ -1,0 +1,326 @@
+import { describe, it, expect, vi } from "vitest";
+import { screen, fireEvent } from "@testing-library/react";
+import { render } from "@testing-library/react";
+import { renderWithProviders } from "@/test/renderWithProviders";
+
+// Mock API calls
+vi.mock("@/api/rebalancing", () => ({
+  fetchRebalancingHistory: vi.fn().mockResolvedValue([]),
+  fetchRebalancingExecutionDetail: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/api/marketSignals", () => ({
+  fetchMarketSignal: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/hooks/useRebalancingExecution", () => ({
+  isOverseasMarket: vi.fn((market: string) => ["NASDAQ", "NYSE", "AMEX", "TSX"].includes(market)),
+}));
+
+import { SideBadge, StatusBadge } from "@/components/rebalancing/RebalancingBadges";
+import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import MarketSignalBanner from "@/components/rebalancing/MarketSignalBanner";
+import { PriceCell } from "@/components/rebalancing/RebalancingPriceCell";
+import {
+  DiffCell,
+  WeightDiffBadge,
+  WeightBar,
+  SharesCell,
+  DividendDiffCell,
+  Return10yCell,
+  CagrCard,
+} from "@/components/rebalancing/RebalancingCells";
+import RebalancingHistoryTab from "@/components/rebalancing/RebalancingHistoryTab";
+import type { MarketSignalResponse } from "@/api/marketSignals";
+import type { RebalancingItem } from "@/api/rebalancing";
+
+// ------- SideBadge -------
+describe("SideBadge", () => {
+  it("renders buy badge", () => {
+    render(<SideBadge isBuy={true} />);
+    expect(screen.getByText("매수")).toBeDefined();
+  });
+
+  it("renders sell badge", () => {
+    render(<SideBadge isBuy={false} />);
+    expect(screen.getByText("매도")).toBeDefined();
+  });
+});
+
+// ------- StatusBadge -------
+describe("StatusBadge", () => {
+  it("renders success status", () => {
+    render(<StatusBadge status="SUCCESS" />);
+    expect(screen.getByText("성공")).toBeDefined();
+  });
+
+  it("renders failed status", () => {
+    render(<StatusBadge status="FAILED" />);
+    expect(screen.getByText("실패")).toBeDefined();
+  });
+
+  it("renders skipped status", () => {
+    render(<StatusBadge status="SKIPPED" />);
+    expect(screen.getByText("건너뜀")).toBeDefined();
+  });
+});
+
+// ------- MarketSignalLevelBadge -------
+describe("MarketSignalLevelBadge", () => {
+  it("renders GREEN level", () => {
+    render(<MarketSignalLevelBadge level="GREEN" />);
+    expect(screen.getByText("안전")).toBeDefined();
+  });
+
+  it("renders YELLOW level", () => {
+    render(<MarketSignalLevelBadge level="YELLOW" />);
+    expect(screen.getByText("주의")).toBeDefined();
+  });
+
+  it("renders RED level", () => {
+    render(<MarketSignalLevelBadge level="RED" />);
+    expect(screen.getByText("위험")).toBeDefined();
+  });
+
+  it("renders sm size", () => {
+    const { container } = render(<MarketSignalLevelBadge level="GREEN" size="sm" />);
+    expect(container.firstChild).toBeDefined();
+  });
+});
+
+// ------- MarketSignalBanner -------
+const mockSignal: MarketSignalResponse = {
+  composite_level: "YELLOW",
+  data_freshness: "FRESH",
+  fear_greed_contrarian_buy: false,
+  signals: {
+    vix: { value: 20.5, level: "MEDIUM", date: "2024-01-15" },
+    yield_curve: { value: -0.5, state: "INVERTED" },
+    fear_greed: { value: 45, label: "Fear", classification: "FEAR" },
+  },
+};
+
+describe("MarketSignalBanner", () => {
+  it("renders signal banner", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    expect(screen.getByText("시장 위험 신호")).toBeDefined();
+  });
+
+  it("shows VIX data", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    expect(screen.getByText("VIX")).toBeDefined();
+    expect(screen.getByText("20.5")).toBeDefined();
+  });
+
+  it("shows yield curve data", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    expect(screen.getByText("10Y-2Y")).toBeDefined();
+  });
+
+  it("shows fear greed data", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    expect(screen.getByText("F&G")).toBeDefined();
+  });
+
+  it("collapses on click", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    const toggleBtn = screen.getByLabelText("접기");
+    fireEvent.click(toggleBtn);
+    expect(screen.getByLabelText("펼치기")).toBeDefined();
+  });
+
+  it("shows contrarian buy message when true", () => {
+    const contrarian = { ...mockSignal, fear_greed_contrarian_buy: true, composite_level: "GREEN" as const };
+    render(<MarketSignalBanner signal={contrarian} />);
+    expect(screen.getByText(/역발상 매수 기회/)).toBeDefined();
+  });
+
+  it("shows stale data freshness", () => {
+    const stale = { ...mockSignal, data_freshness: "STALE" as const };
+    render(<MarketSignalBanner signal={stale} />);
+    expect(screen.getByText(/데이터 조회 불가/)).toBeDefined();
+  });
+});
+
+// ------- PriceCell -------
+describe("PriceCell", () => {
+  it("renders loading state", () => {
+    render(
+      <PriceCell
+        ticker="AAPL"
+        market="NASDAQ"
+        priceState="loading"
+        livePricesKrw={{}}
+        livePricesUsd={{}}
+      />
+    );
+    expect(screen.getByText("조회 중")).toBeDefined();
+  });
+
+  it("renders Korean price", () => {
+    render(
+      <PriceCell
+        ticker="005930"
+        market="KOSPI"
+        priceState="loaded"
+        livePricesKrw={{ "005930": 75000 }}
+        livePricesUsd={{}}
+      />
+    );
+    expect(screen.getByText(/75,000/)).toBeDefined();
+  });
+
+  it("renders USD + KRW for overseas", () => {
+    render(
+      <PriceCell
+        ticker="AAPL"
+        market="NASDAQ"
+        priceState="loaded"
+        livePricesKrw={{ AAPL: 170000 }}
+        livePricesUsd={{ AAPL: 125.50 }}
+      />
+    );
+    expect(screen.getByText(/125\.50/)).toBeDefined();
+  });
+
+  it("renders dash when no price", () => {
+    render(
+      <PriceCell
+        ticker="AAPL"
+        market="NASDAQ"
+        priceState="loaded"
+        livePricesKrw={{}}
+        livePricesUsd={{}}
+      />
+    );
+    expect(screen.getByText("—")).toBeDefined();
+  });
+});
+
+// ------- RebalancingCells -------
+describe("DiffCell", () => {
+  it("renders positive diff", () => {
+    const { container } = render(<DiffCell diff={500000} />);
+    // fmtKrw formats to Korean units (만원 etc)
+    expect(container.textContent).toContain("+");
+  });
+
+  it("renders negative diff", () => {
+    const { container } = render(<DiffCell diff={-300000} />);
+    expect(container.textContent?.length).toBeGreaterThan(0);
+  });
+
+  it("renders zero diff", () => {
+    render(<DiffCell diff={0} />);
+    expect(screen.getByText("-")).toBeDefined();
+  });
+});
+
+describe("WeightDiffBadge", () => {
+  it("renders positive weight diff", () => {
+    render(<WeightDiffBadge diff={5.5} />);
+    expect(screen.getByText(/▲.*5\.5%/)).toBeDefined();
+  });
+
+  it("renders negative weight diff", () => {
+    render(<WeightDiffBadge diff={-3.2} />);
+    expect(screen.getByText(/▼.*3\.2%/)).toBeDefined();
+  });
+
+  it("renders zero diff", () => {
+    render(<WeightDiffBadge diff={0.05} />);
+    expect(screen.getByText("±0%")).toBeDefined();
+  });
+});
+
+describe("WeightBar", () => {
+  it("renders weight bar", () => {
+    const { container } = render(<WeightBar current={30} target={40} />);
+    expect(container.querySelector('.rounded-full')).toBeDefined();
+  });
+});
+
+const mockRebalancingItem: RebalancingItem = {
+  ticker: "AAPL",
+  name: "Apple Inc.",
+  market: "NASDAQ",
+  current_weight_pct: 15,
+  target_weight_pct: 20,
+  current_value_krw: 1500000,
+  target_value_krw: 2000000,
+  diff_krw: 500000,
+  shares_to_trade: 3,
+  current_price_krw: 170000,
+  currency: "USD",
+  drift_pct: 5,
+  drift_level: "OVER",
+  estimated_annual_dividend_krw: 50000,
+  target_annual_dividend_krw: 65000,
+  dividend_diff_krw: 15000,
+  cagr_10y_pct: 12.5,
+  return_10y_pct: 224.0,
+  actual_years_10y: 10,
+};
+
+describe("SharesCell", () => {
+  it("renders positive shares to trade", () => {
+    render(<SharesCell item={mockRebalancingItem} />);
+    expect(screen.getByText("+3주")).toBeDefined();
+  });
+
+  it("renders zero shares", () => {
+    render(<SharesCell item={{ ...mockRebalancingItem, shares_to_trade: 0 }} />);
+    expect(screen.getByText("0")).toBeDefined();
+  });
+
+  it("renders null shares", () => {
+    render(<SharesCell item={{ ...mockRebalancingItem, shares_to_trade: null }} />);
+    expect(screen.getByText("-")).toBeDefined();
+  });
+});
+
+describe("DividendDiffCell", () => {
+  it("renders positive diff", () => {
+    render(<DividendDiffCell diff={15000} />);
+    expect(screen.getByText(/\+/)).toBeDefined();
+  });
+
+  it("renders zero diff", () => {
+    render(<DividendDiffCell diff={0} />);
+    expect(screen.getByText("-")).toBeDefined();
+  });
+});
+
+describe("Return10yCell", () => {
+  it("renders return data", () => {
+    render(<Return10yCell item={mockRebalancingItem} />);
+    expect(screen.getByText(/12\.5%/)).toBeDefined();
+  });
+
+  it("renders null cagr", () => {
+    render(<Return10yCell item={{ ...mockRebalancingItem, cagr_10y_pct: null, return_10y_pct: null }} />);
+    expect(screen.getByText("—")).toBeDefined();
+  });
+});
+
+describe("CagrCard", () => {
+  it("renders cagr card", () => {
+    render(<CagrCard label="포트폴리오" cagr={8.5} />);
+    expect(screen.getByText("포트폴리오")).toBeDefined();
+    expect(screen.getByText(/8\.5%/)).toBeDefined();
+  });
+
+  it("renders null cagr as nothing", () => {
+    const { container } = render(<CagrCard label="포트폴리오" cagr={null} />);
+    expect(container.firstChild).toBeNull();
+  });
+});
+
+// ------- RebalancingHistoryTab -------
+describe("RebalancingHistoryTab", () => {
+  it("renders without crash", () => {
+    renderWithProviders(<RebalancingHistoryTab />);
+    // Shows loading or empty state
+    expect(document.body).toBeDefined();
+  });
+});

@@ -61,7 +61,7 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
         role="dialog"
         aria-modal="true"
         aria-labelledby={title != null ? titleId : undefined}
-        className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[90dvh] flex flex-col`}
+        className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[85dvh] flex flex-col overscroll-contain`}
         onClick={(e) => e.stopPropagation()}
       >
         {title != null && (

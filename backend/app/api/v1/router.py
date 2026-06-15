@@ -11,6 +11,7 @@ from app.api.v1 import (
     economic_indicators,
     insights,
     invest,
+    market_signals,
     open_banking,
     portfolio,
     portfolios,
@@ -43,3 +44,4 @@ router.include_router(tax.router)
 router.include_router(dart.router)
 router.include_router(ws_prices.router)
 router.include_router(economic_indicators.router)
+router.include_router(market_signals.router)

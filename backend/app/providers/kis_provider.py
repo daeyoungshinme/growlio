@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING
+import uuid
 
 import httpx
 import structlog
@@ -19,6 +20,12 @@ from app.services.credential_service import decrypt
 from app.utils.cache_keys import TTL_HAS_OVERSEAS_FALSE, TTL_HAS_OVERSEAS_TRUE, has_overseas_key
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models.asset import AssetAccount
+
 logger = structlog.get_logger()
 
 
@@ -26,18 +33,23 @@ class KISProvider(BrokerProvider):
     PROVIDER_ID = "KIS_API"
     PROVIDER_NAME = "한국투자증권 KIS API"
 
-    async def sync(self, account: Any, db: Any, redis: Any) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
         if not account.kis_app_key or not account.kis_app_secret:
             raise ProviderCredentialError(
                 "KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요."
             )
+        if not account.kis_account_no:
+            raise ProviderCredentialError("KIS 계좌번호가 설정되지 않았습니다.")
+        if redis is None:
+            raise ProviderApiError("Redis 연결이 필요합니다.")
+        account_no: str = account.kis_account_no
         app_key = decrypt(account.kis_app_key)
         app_secret = decrypt(account.kis_app_secret)
         is_mock = account.is_mock_mode
         account_id_str = str(account.id)
         user_id_str = str(account.user_id)
 
-        logger.info("kis_sync_start", account_no=account.kis_account_no, is_mock=is_mock)
+        logger.info("kis_sync_start", account_no=account_no, is_mock=is_mock)
 
         try:
             access_token = await get_access_token(
@@ -48,15 +60,15 @@ class KISProvider(BrokerProvider):
                 domestic, overseas = await asyncio.gather(
                     get_domestic_balance(
                         app_key, app_secret, access_token,
-                        account.kis_account_no, is_mock=is_mock,
+                        account_no, is_mock=is_mock,
                     ),
                     _fetch_overseas_cached(
                         app_key, app_secret, access_token,
-                        account.kis_account_no, is_mock, account.id, redis,
+                        account_no, is_mock, account.id, redis,
                     ),
                 )
             except KisTokenExpiredError:
-                logger.warning("kis_token_expired_refreshing", account_no=account.kis_account_no)
+                logger.warning("kis_token_expired_refreshing", account_no=account_no)
                 access_token = await get_access_token(
                     app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
                     user_id=user_id_str, account_id=account_id_str, force_refresh=True,
@@ -64,11 +76,11 @@ class KISProvider(BrokerProvider):
                 domestic, overseas = await asyncio.gather(
                     get_domestic_balance(
                         app_key, app_secret, access_token,
-                        account.kis_account_no, is_mock=is_mock,
+                        account_no, is_mock=is_mock,
                     ),
                     _fetch_overseas_cached(
                         app_key, app_secret, access_token,
-                        account.kis_account_no, is_mock, account.id, redis,
+                        account_no, is_mock, account.id, redis,
                     ),
                 )
         except KisApiError as e:
@@ -139,7 +151,7 @@ _EMPTY_OVERSEAS: dict = {"positions": [], "total_value_usd": 0.0, "deposit_usd":
 
 async def _fetch_overseas_cached(
     app_key: str, app_secret: str, access_token: str,
-    account_no: str, is_mock: bool, account_id: Any, redis: Any,
+    account_no: str, is_mock: bool, account_id: uuid.UUID, redis: aioredis.Redis,
 ) -> dict:
     """해외 잔고 조회 — Redis 캐시로 국내 전용 계좌의 해외 API 호출을 건너뛴다."""
     cached = await redis.get(has_overseas_key(account_id))

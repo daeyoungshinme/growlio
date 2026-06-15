@@ -20,6 +20,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
     institution: initialAccount?.institution ?? "",
     asset_type: initialAccount?.asset_type ?? "BANK_ACCOUNT",
     notes: initialAccount?.notes ?? "",
+    include_in_total: initialAccount?.include_in_total ?? true,
   });
 
   const {
@@ -41,6 +42,7 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
       deposit_usd: depositUsd ?? 0,
       manual_amount: totalKrw > 0 ? totalKrw : undefined,
       notes: form.notes || undefined,
+      include_in_total: form.include_in_total,
     });
   };
 
@@ -126,6 +128,13 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
             <textarea id="bank-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)}
               placeholder="선택 입력" rows={2}
               className={`w-full ${TEXTAREA_SM}`} />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="bank-include-in-total"
+              checked={form.include_in_total}
+              onChange={(e) => set("include_in_total", e.target.checked)}
+              className="w-4 h-4 text-blue-600" />
+            <label htmlFor="bank-include-in-total" className="text-sm text-gray-700 dark:text-gray-300">전체 자산 합계에 포함</label>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" onClick={onClose}

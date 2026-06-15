@@ -3,6 +3,7 @@ import { renderHook, act, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { useTransactionFormState } from "@/hooks/useTransactionFormState";
+import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
 
 vi.mock("@/api/assets", () => ({
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
@@ -18,7 +19,9 @@ function createWrapper() {
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });
   return ({ children }: { children: React.ReactNode }) => (
-    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+    <QueryClientProvider client={qc}>
+      <ExchangeRateProvider>{children}</ExchangeRateProvider>
+    </QueryClientProvider>
   );
 }
 

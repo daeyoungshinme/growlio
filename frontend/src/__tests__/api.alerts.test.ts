@@ -1,8 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/api/client", () => ({
-  api: { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() },
-}));
+vi.mock("@/api/client", () => {
+  const mockApi = {
+    get: vi.fn(),
+    post: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    patch: vi.fn(),
+  };
+  return {
+    api: mockApi,
+    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+  };
+});
 
 import { api } from "@/api/client";
 import {
@@ -120,6 +134,7 @@ describe("api/alerts — rebalancing alerts", () => {
       strategy: "FULL",
       account_id: null,
       order_type: "MARKET",
+      market_condition_mode: "DISABLED",
     });
     expect(api.put).toHaveBeenCalledWith("/alerts/rebalancing/port-1", expect.objectContaining({
       portfolio_id: "port-1",

@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet } from "./client";
 
 export interface DisclosureItem {
   rcept_no: string;
@@ -11,4 +11,4 @@ export interface DisclosureItem {
 }
 
 export const fetchDartDisclosures = (days: number) =>
-  api.get<DisclosureItem[]>("/dart/disclosures", { params: { days } }).then((r) => r.data);
+  apiGet<DisclosureItem[]>("/dart/disclosures", { params: { days } });

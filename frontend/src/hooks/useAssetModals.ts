@@ -19,6 +19,7 @@ export function useAssetModals() {
   const [showRealEstateModal, setShowRealEstateModal] = useState(false);
   const [editingRealEstate, setEditingRealEstate] = useState<AssetAccount | null>(null);
   const [editingBankAccount, setEditingBankAccount] = useState<AssetAccount | null>(null);
+  const [editingStockAccount, setEditingStockAccount] = useState<AssetAccount | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [positionsAccount, setPositionsAccount] = useState<PositionsAccountInfo | null>(null);
   const [txAccount, setTxAccount] = useState<TxAccountInfo | null>(null);
@@ -34,6 +35,8 @@ export function useAssetModals() {
     setEditingRealEstate,
     editingBankAccount,
     setEditingBankAccount,
+    editingStockAccount,
+    setEditingStockAccount,
     confirmDeleteId,
     setConfirmDeleteId,
     positionsAccount,

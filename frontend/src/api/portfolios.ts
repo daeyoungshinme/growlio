@@ -1,11 +1,11 @@
-import { api } from "./client";
+import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 import type { PortfolioOverview } from "@/types";
 
 export const fetchPortfolioOverview = () =>
-  api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
+  apiGet<PortfolioOverview>("/portfolio/overview");
 
 export const fetchPortfolioOverviewLite = () =>
-  api.get<PortfolioOverview>("/portfolio/overview", { params: { lite: true } }).then((r) => r.data);
+  apiGet<PortfolioOverview>("/portfolio/overview", { params: { lite: true } });
 
 export interface AllocationTypeItem {
   asset_type: string;
@@ -21,7 +21,7 @@ export interface AllocationHistoryPoint {
 }
 
 export const fetchAllocationHistory = (months: number) =>
-  api.get<AllocationHistoryPoint[]>("/portfolio/allocation-history", { params: { months } }).then((r) => r.data);
+  apiGet<AllocationHistoryPoint[]>("/portfolio/allocation-history", { params: { months } });
 
 export interface PortfolioItem {
   ticker: string;
@@ -42,22 +42,22 @@ export interface Portfolio {
 }
 
 export const fetchPortfolios = () =>
-  api.get<Portfolio[]>("/portfolios").then((r) => r.data);
+  apiGet<Portfolio[]>("/portfolios");
 
 export const createPortfolio = (body: {
   name: string;
   items: PortfolioItem[];
   base_type?: string;
   account_ids?: string[] | null;
-}) => api.post<Portfolio>("/portfolios", body).then((r) => r.data);
+}) => apiPost<Portfolio>("/portfolios", body);
 
 export const updatePortfolio = (
   id: string,
-  body: { name?: string; items?: PortfolioItem[]; base_type?: string; account_ids?: string[] | null }
-) => api.put<Portfolio>(`/portfolios/${id}`, body).then((r) => r.data);
+  body: { name?: string; items?: PortfolioItem[]; base_type?: string; account_ids?: string[] | null },
+) => apiPut<Portfolio>(`/portfolios/${id}`, body);
 
 export const deletePortfolio = (id: string) =>
-  api.delete(`/portfolios/${id}`);
+  apiDelete(`/portfolios/${id}`);
 
 export const reorderPortfolios = (items: { id: string; sort_order: number }[]) =>
-  api.patch("/portfolios/reorder", { items });
+  apiPatch("/portfolios/reorder", { items });

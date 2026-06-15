@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Trash2 } from "lucide-react";
+import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Settings, Trash2 } from "lucide-react";
 import { type AssetAccount } from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
 import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
+import EditableNameField from "@/components/common/EditableNameField";
 
 export interface AccountStats {
   amount_krw: number;
@@ -21,6 +22,7 @@ interface Props {
   onDelete: (id: string) => void;
   onManagePositions: (account: { id: string; name: string; dataSource: string }) => void;
   onTransactions: (account: { id: string; name: string }) => void;
+  onEdit: (account: AssetAccount) => void;
   onEditDeposit: (id: string, depositKrw: number, depositUsd: number) => void;
   onEditName: (id: string, name: string) => void;
   onSync: (id: string) => void;
@@ -28,27 +30,17 @@ interface Props {
   isDeleting: boolean;
 }
 
-export default function StockAccountCard({ account, stats, onDelete, onManagePositions, onTransactions, onEditDeposit, onEditName, onSync, isSyncing, isDeleting }: Props) {
+export default function StockAccountCard({ account, stats, onDelete, onManagePositions, onTransactions, onEdit, onEditDeposit, onEditName, onSync, isSyncing, isDeleting }: Props) {
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const accountNo = account.kis_account_no ?? account.kiwoom_account_no ?? null;
   const hasStats = stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
-  const [editNameMode, setEditNameMode] = useState(false);
-  const [editNameValue, setEditNameValue] = useState(account.name);
   const [editDepositMode, setEditDepositMode] = useState(false);
   const [editKrwValue, setEditKrwValue] = useState("");
   const [editUsdValue, setEditUsdValue] = useState("");
   const usdRate = useExchangeRate();
   const { impact } = useHaptic();
-
-  const handleSaveName = () => {
-    const trimmed = editNameValue.trim();
-    if (trimmed) {
-      onEditName(account.id, trimmed);
-      setEditNameMode(false);
-    }
-  };
 
   const handleSave = () => {
     onEditDeposit(account.id, Number(editKrwValue) || 0, Number(editUsdValue) || 0);
@@ -66,53 +58,35 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           {/* 줄1: 계좌명 + 편집버튼 */}
-          <div className="flex items-center gap-1.5 min-w-0">
-            {editNameMode ? (
-              <>
-                <input
-                  type="text"
-                  value={editNameValue}
-                  autoFocus
-                  onChange={(e) => setEditNameValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveName();
-                    if (e.key === "Escape") { setEditNameMode(false); setEditNameValue(account.name); }
-                  }}
-                  className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2 py-0.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <button onClick={handleSaveName} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">저장</button>
-                <button onClick={() => { setEditNameMode(false); setEditNameValue(account.name); }} className="text-xs text-gray-400 dark:text-gray-500 hover:underline">취소</button>
-              </>
-            ) : (
-              <>
-                <span className="text-base font-semibold text-gray-900 dark:text-gray-50 truncate" title={account.notes ? `${account.name} — ${account.notes}` : account.name}>{account.name}</span>
-                <button
-                  onClick={() => { setEditNameValue(account.name); setEditNameMode(true); }}
-                  title="계좌명 수정"
-                  aria-label="계좌명 수정"
-                  className="p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0">
-                  <Pencil size={12} />
-                </button>
-              </>
-            )}
-          </div>
+          <EditableNameField
+            name={account.name}
+            onSave={(name) => onEditName(account.id, name)}
+            className="min-w-0"
+            textClassName="text-base font-semibold text-gray-900 dark:text-gray-50 truncate"
+          />
           {/* 줄2: 텍스트 정보(truncate) + 배지(항상 표시) */}
           <div className="flex items-center gap-1.5 mt-1 min-w-0">
             {(account.institution || accountNo) && (
-              <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate min-w-0">
+              <span className="text-xs text-gray-400 dark:text-gray-500 truncate min-w-0">
                 {[account.institution, accountNo].filter(Boolean).join(" · ")}
               </span>
             )}
-            <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[11px] rounded-full shrink-0">{typeLabel}</span>
+            <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">{typeLabel}</span>
             {account.has_own_kis_credentials && (
-              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-[11px] rounded-full shrink-0">API 키</span>
+              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">API 키</span>
             )}
             {account.has_own_kiwoom_credentials && (
-              <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-[11px] rounded-full shrink-0">키움 API 키</span>
+              <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">키움 API 키</span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          <button onClick={() => onEdit(account)}
+            title="계좌 수정"
+            aria-label="계좌 수정"
+            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg transition-colors">
+            <Settings size={16} />
+          </button>
           {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
             <button onClick={() => { impact("light"); onSync(account.id); }} disabled={isSyncing}
               title={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}

@@ -75,7 +75,7 @@ async def ws_prices(websocket: WebSocket) -> None:
                 await websocket.send_text(json.dumps({"type": "pong"}))
 
     except WebSocketDisconnect:
-        pass
+        pass  # 클라이언트 정상 종료 — 추가 처리 불필요
     except Exception as e:
         logger.warning("ws_prices_error", ws_id=ws_id, error=str(e))
     finally:

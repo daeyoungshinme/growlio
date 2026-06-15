@@ -95,7 +95,7 @@ export default function EconomicCalendarList({ events }: Props) {
           <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2 px-1">
             {formatDateHeader(dateStr)}
           </p>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             {dayEvents.map((event, i) => {
               const impactStyle = event.impact ? IMPACT_STYLE[event.impact] : IMPACT_STYLE.Low;
               const flag = COUNTRY_FLAG[event.country] ?? "";
@@ -105,16 +105,16 @@ export default function EconomicCalendarList({ events }: Props) {
               return (
                 <div
                   key={`${event.event}-${i}`}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-colors"
+                  className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/60 border border-transparent hover:border-gray-200 dark:hover:border-gray-700 transition-colors"
                 >
                   {/* 국가 플래그 */}
                   <div className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-white dark:bg-gray-700 shadow-sm text-lg">
                     {flag || <Calendar size={16} className="text-gray-400" />}
                   </div>
 
-                  {/* 이벤트명 + 시간 */}
+                  {/* 이벤트명 + 시간 + 부가정보 */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">
+                    <p className="text-sm font-medium text-gray-800 dark:text-gray-100 line-clamp-2 leading-snug">
                       {event.event}
                     </p>
                     {event.time_kst && (
@@ -122,37 +122,26 @@ export default function EconomicCalendarList({ events }: Props) {
                         {event.time_kst} KST
                       </p>
                     )}
+                    {(showValue || event.impact) && (
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {showValue && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {hasResult ? "실제" : "예측"}{" "}
+                            <span className="font-semibold text-gray-700 dark:text-gray-200">
+                              {formatValue(hasResult ? event.actual : event.estimate, event.currency)}
+                            </span>
+                          </span>
+                        )}
+                        {event.impact && (
+                          <span
+                            className={`text-xs font-medium px-2 py-1 rounded-full ${impactStyle.badge}`}
+                          >
+                            {IMPACT_LABEL[event.impact] ?? event.impact}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {/* 예측/실제값 */}
-                  {showValue && (
-                    <div className="shrink-0 text-right">
-                      {hasResult ? (
-                        <>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">실제</p>
-                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            {formatValue(event.actual, event.currency)}
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">예측</p>
-                          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                            {formatValue(event.estimate, event.currency)}
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* impact 배지 */}
-                  {event.impact && (
-                    <span
-                      className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${impactStyle.badge}`}
-                    >
-                      {IMPACT_LABEL[event.impact] ?? event.impact}
-                    </span>
-                  )}
                 </div>
               );
             })}

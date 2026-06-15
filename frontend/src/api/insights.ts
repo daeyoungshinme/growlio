@@ -1,4 +1,4 @@
-import { api } from "./client";
+import { apiGet } from "./client";
 
 export type InsightSeverity = "INFO" | "WARNING" | "ALERT";
 
@@ -27,7 +27,7 @@ export interface InsightsSummary {
 }
 
 export const fetchInsights = () =>
-  api.get<Insight[]>("/insights").then((r) => r.data);
+  apiGet<Insight[]>("/insights");
 
 export const fetchInsightsSummary = () =>
-  api.get<InsightsSummary>("/insights/summary").then((r) => r.data);
+  apiGet<InsightsSummary>("/insights/summary");

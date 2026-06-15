@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
-import { INPUT_SM } from "@/constants/inputStyles";
+import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 
 const PROPERTY_TYPE_OPTIONS = ["아파트", "오피스텔", "상가", "토지", "단독주택", "기타"];
@@ -63,43 +63,43 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="re-create-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">부동산 이름 *</label>
+            <label htmlFor="re-create-name" className={FORM_LABEL}>부동산 이름 *</label>
             <input id="re-create-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="예: 강남 아파트" className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-create-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종류</label>
+              <label htmlFor="re-create-type" className={FORM_LABEL}>종류</label>
               <select id="re-create-type" value={form.property_type} onChange={(e) => setForm({ ...form, property_type: e.target.value })}
                 className={inputCls}>
                 {PROPERTY_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="re-create-purchase-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입일</label>
+              <label htmlFor="re-create-purchase-date" className={FORM_LABEL}>매입일</label>
               <input id="re-create-purchase-date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
                 className={inputCls} />
             </div>
           </div>
           <div>
-            <label htmlFor="re-create-address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">주소</label>
+            <label htmlFor="re-create-address" className={FORM_LABEL}>주소</label>
             <input id="re-create-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
               placeholder="예: 서울시 강남구 ..." className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-create-market-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현재 시세 (원) *</label>
+              <label htmlFor="re-create-market-value" className={FORM_LABEL}>현재 시세 (원) *</label>
               <input id="re-create-market-value" type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
                 placeholder="예: 800000000" className={inputCls} />
             </div>
             <div>
-              <label htmlFor="re-create-purchase-price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입가 (원)</label>
+              <label htmlFor="re-create-purchase-price" className={FORM_LABEL}>매입가 (원)</label>
               <input id="re-create-purchase-price" type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                 placeholder="예: 600000000" className={inputCls} />
             </div>
           </div>
           <div>
-            <label htmlFor="re-create-mortgage" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담보대출 잔액 (원)</label>
+            <label htmlFor="re-create-mortgage" className={FORM_LABEL}>담보대출 잔액 (원)</label>
             <input id="re-create-mortgage" type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
               placeholder="0" className={inputCls} />
           </div>
@@ -192,43 +192,43 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="re-edit-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">부동산 이름 *</label>
+            <label htmlFor="re-edit-name" className={FORM_LABEL}>부동산 이름 *</label>
             <input id="re-edit-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
               className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-edit-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">종류</label>
+              <label htmlFor="re-edit-type" className={FORM_LABEL}>종류</label>
               <select id="re-edit-type" value={form.property_type} onChange={(e) => setForm({ ...form, property_type: e.target.value })}
                 className={inputCls}>
                 {PROPERTY_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="re-edit-purchase-date" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입일</label>
+              <label htmlFor="re-edit-purchase-date" className={FORM_LABEL}>매입일</label>
               <input id="re-edit-purchase-date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
                 className={inputCls} />
             </div>
           </div>
           <div>
-            <label htmlFor="re-edit-address" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">주소</label>
+            <label htmlFor="re-edit-address" className={FORM_LABEL}>주소</label>
             <input id="re-edit-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
               className={inputCls} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-edit-market-value" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">현재 시세 (원) *</label>
+              <label htmlFor="re-edit-market-value" className={FORM_LABEL}>현재 시세 (원) *</label>
               <input id="re-edit-market-value" type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
                 className={inputCls} />
             </div>
             <div>
-              <label htmlFor="re-edit-purchase-price" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">매입가 (원)</label>
+              <label htmlFor="re-edit-purchase-price" className={FORM_LABEL}>매입가 (원)</label>
               <input id="re-edit-purchase-price" type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                 className={inputCls} />
             </div>
           </div>
           <div>
-            <label htmlFor="re-edit-mortgage" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">담보대출 잔액 (원)</label>
+            <label htmlFor="re-edit-mortgage" className={FORM_LABEL}>담보대출 잔액 (원)</label>
             <input id="re-edit-mortgage" type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
               className={inputCls} />
           </div>

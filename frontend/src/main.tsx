@@ -27,6 +27,9 @@ const queryClient = new QueryClient({
       retry: 1,
       gcTime: 30 * 60 * 1000,
       refetchIntervalInBackground: false,
+      // window focus 시 60초 이내 갱신된 쿼리는 재조회 생략 (thundering herd 방지)
+      refetchOnWindowFocus: (query) =>
+        Date.now() - (query.state.dataUpdatedAt ?? 0) > 60_000,
     },
   },
 });

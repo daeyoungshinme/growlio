@@ -11,6 +11,7 @@ interface Options {
   onStockModalClose: () => void;
   onEditBankClose: () => void;
   onEditRealEstateClose: () => void;
+  onEditStockClose: () => void;
 }
 
 export function useAccountMutations({
@@ -18,6 +19,7 @@ export function useAccountMutations({
   onStockModalClose,
   onEditBankClose,
   onEditRealEstateClose,
+  onEditStockClose,
 }: Options) {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -89,6 +91,17 @@ export function useAccountMutations({
     onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
   });
 
+  const updateStockMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
+      updateAccount(id, data),
+    onSuccess: () => {
+      invalidateAll();
+      onEditStockClose();
+      toast("저장되었습니다", "success");
+    },
+    onError: (e) => toast(extractErrorMessage(e, "계좌 수정에 실패했습니다"), "error"),
+  });
+
   const updateRealEstateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
@@ -136,6 +149,7 @@ export function useAccountMutations({
     createMutation,
     deleteMutation,
     updateBankMutation,
+    updateStockMutation,
     updateDepositMutation,
     updateNameMutation,
     updateRealEstateMutation,

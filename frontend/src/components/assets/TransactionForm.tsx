@@ -245,11 +245,26 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                       <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">검색 중...</span>
                     )}
                     {showTickerSuggestions && tickerSuggestions.length > 0 && (
-                      <ul className="absolute z-20 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-0.5 max-h-48 overflow-y-auto">
+                      <ul
+                        role="listbox"
+                        aria-label="종목 검색 결과"
+                        className="absolute z-20 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-0.5 max-h-48 overflow-y-auto"
+                      >
                         {tickerSuggestions.map((s) => (
-                          <li key={s.ticker}
-                            className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2"
-                            onMouseDown={() => { setTickerQuery(s.name); setField("ticker", s.ticker); clearTickerSuggestions(); setShowTickerSuggestions(false); }}>
+                          <li
+                            key={s.ticker}
+                            role="option"
+                            aria-selected={false}
+                            tabIndex={0}
+                            className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2 focus:bg-blue-50 dark:focus:bg-blue-950 focus:outline-none"
+                            onMouseDown={() => { setTickerQuery(s.name); setField("ticker", s.ticker); clearTickerSuggestions(); setShowTickerSuggestions(false); }}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setTickerQuery(s.name); setField("ticker", s.ticker); clearTickerSuggestions(); setShowTickerSuggestions(false);
+                              }
+                            }}
+                          >
                             <span className="font-medium text-blue-700 dark:text-blue-400">{s.ticker}</span>
                             <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
                             <span className="text-xs text-gray-400 ml-auto">{s.market}</span>

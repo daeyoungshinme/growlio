@@ -6,6 +6,8 @@ import uuid
 from datetime import date, datetime, timezone
 from typing import Any
 
+_DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
+
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -227,8 +229,8 @@ def _build_yearly_achievements(projection_months: list[dict]) -> list[dict[str, 
 
 
 def _calc_months_to_goal(initial_value: float, pmt: float, r: float, goal_amount: float) -> int | None:
-    """현재 계획 기준 목표 달성까지 남은 개월 수. 최대 600개월(50년) 탐색."""
-    for n in range(1, 601):
+    """현재 계획 기준 목표 달성까지 남은 개월 수."""
+    for n in range(1, _DCA_MAX_MONTHS + 1):
         if r == 0:
             fv = initial_value + pmt * n
         else:

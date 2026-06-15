@@ -49,4 +49,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("idx_asset_accounts_user_id", table_name="asset_accounts")
-    # OB 토큰 암호화 해제는 안전하게 수행할 수 없으므로 생략 (토큰을 무효화해야 함)
+    # OB 토큰 암호화 해제는 의도적으로 미구현:
+    # - 복호화하려면 KIS_CRED_ENCRYPTION_KEY가 필요하며, 롤백 환경에서 키가 없을 수 있음
+    # - 암호화된 토큰을 평문으로 되돌리는 것 자체가 보안 위험
+    # - 실제 롤백이 필요한 경우: 해당 유저의 OB 토큰을 NULL로 초기화하고 재인증 유도할 것
+    #   예) UPDATE user_settings SET ob_access_token = NULL, ob_refresh_token = NULL;

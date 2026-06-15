@@ -80,6 +80,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
   }
 
   const autoAnalyzedRef = useRef<string | undefined>(undefined);
+  const selectedIdStr = Array.from(selectedIds).sort().join(",");
 
   useEffect(() => {
     if (!autoAnalyzeId) return;
@@ -95,7 +96,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       .then((result) => setAnalysis(result))
       .catch((err) => setAnalysisError(extractErrorMessage(err, "분석 중 오류가 발생했습니다.")))
       .finally(() => setAnalyzing(false));
-  }, [autoAnalyzeId, selectedIds]);
+    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAnalyzeId, selectedIdStr]);
 
   function handleSwitchToBacktest() {
     setAnalysisMode("backtest");
@@ -266,8 +269,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             analysis={analysis}
             portfolioId={analysis.portfolio_id}
             accounts={(() => {
-              const p = portfolios.find((p) => selectedIds.has(p.id));
-              return p?.account_ids?.length
+              const p = portfolios.find((p) => p.id === analysis.portfolio_id);
+              if (!p) return [];
+              return p.account_ids?.length
                 ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
                 : activeAccounts;
             })()}

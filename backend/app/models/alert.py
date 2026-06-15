@@ -68,6 +68,10 @@ class RebalancingAlert(Base):
     )
     # 주문 유형: MARKET | LIMIT
     order_type: Mapped[str] = mapped_column(String(10), nullable=False, default="MARKET")
+    # 시장 신호 연동 모드: DISABLED | CAUTIOUS(RED 시 건너뜀) | STRICT(YELLOW|RED 시 건너뜀)
+    market_condition_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="DISABLED"
+    )
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

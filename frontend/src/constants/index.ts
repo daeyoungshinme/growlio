@@ -31,6 +31,12 @@ export const DATA_SOURCE_BADGE: Record<string, string> = {
   MANUAL: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 
+export const BANK_TYPE_LABELS: Record<string, string> = {
+  BANK_ACCOUNT: "입출금",
+  DEPOSIT: "예·적금",
+  CASH_OTHER: "현금/기타",
+};
+
 export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"];
 export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"];
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING
 
 import httpx
 import structlog
@@ -12,6 +12,12 @@ from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNe
 from app.providers.base import BalanceResult, BrokerProvider, Position
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
+
+if TYPE_CHECKING:
+    import redis.asyncio as aioredis
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.models.asset import AssetAccount
 
 logger = structlog.get_logger()
 
@@ -22,7 +28,7 @@ class KiwoomProvider(BrokerProvider):
     PROVIDER_ID = "KIWOOM_API"
     PROVIDER_NAME = "키움증권 OpenAPI+"
 
-    async def sync(self, account: Any, db: Any, redis: Any) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
         from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
         from app.kiwoom.balance import get_domestic_balance as kiwoom_get_balance
         from app.kiwoom.client import KiwoomApiError, KiwoomTokenExpiredError
@@ -32,10 +38,11 @@ class KiwoomProvider(BrokerProvider):
         if not account.kiwoom_account_no:
             raise ProviderCredentialError("키움 계좌번호가 설정되지 않았습니다")
 
+        account_no: str = account.kiwoom_account_no
         app_key = decrypt(account.kiwoom_app_key)
         app_secret = decrypt(account.kiwoom_app_secret)
         is_mock = account.is_mock_mode
-        logger.info("kiwoom_sync_start", account_no=account.kiwoom_account_no, is_mock=is_mock)
+        logger.info("kiwoom_sync_start", account_no=account_no, is_mock=is_mock)
 
         async def _do() -> dict:
             token = await kiwoom_get_access_token(
@@ -43,14 +50,14 @@ class KiwoomProvider(BrokerProvider):
                 user_id=str(account.user_id), account_id=str(account.id),
             )
             try:
-                return await kiwoom_get_balance(token, account.kiwoom_account_no, is_mock=is_mock)
+                return await kiwoom_get_balance(token, account_no, is_mock=is_mock)
             except KiwoomTokenExpiredError:
-                logger.warning("kiwoom_token_expired_refreshing", account_no=account.kiwoom_account_no)
+                logger.warning("kiwoom_token_expired_refreshing", account_no=account_no)
                 refreshed = await kiwoom_get_access_token(
                     app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
                     user_id=str(account.user_id), account_id=str(account.id), force_refresh=True,
                 )
-                return await kiwoom_get_balance(refreshed, account.kiwoom_account_no, is_mock=is_mock)
+                return await kiwoom_get_balance(refreshed, account_no, is_mock=is_mock)
 
         try:
             domestic = await asyncio.wait_for(_do(), timeout=_SYNC_TIMEOUT)

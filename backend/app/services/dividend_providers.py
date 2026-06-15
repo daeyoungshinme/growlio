@@ -12,6 +12,19 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 logger = structlog.get_logger()
 
+
+def _zero_div() -> dict:
+    return {"dps": 0.0, "dividend_yield": 0.0}
+
+
+def _zero_div_with_months() -> dict:
+    return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+
+
+def _yield_from_dps(dps: float, price: float) -> float:
+    return round(dps / price, 6) if (dps > 0 and price > 0) else 0.0
+
+
 _NAVER_RETRY = dict(
     retry=retry_if_exception_type(Exception),
     wait=wait_exponential(multiplier=1, min=1, max=8),
@@ -53,7 +66,7 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
         return {"dividend_yield": yld, "dps": dps, "ex_dividend_date": None}
     except Exception as e:
         logger.warning("yahoo_dividend_info_failed", symbol=yahoo_symbol, error=str(e))
-        return {"dividend_yield": 0.0, "dps": 0.0, "ex_dividend_date": None}
+        return {"ex_dividend_date": None, **_zero_div()}
 
 
 def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
@@ -77,19 +90,19 @@ def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
 
         div_df = stock.get_market_dividend_by_date(start, end, ticker)
         if div_df is None or div_df.empty:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         dps_col = next((c for c in ["주당배당금", "DPS"] if c in div_df.columns), None)
         if dps_col is None:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         annual_dps = float(div_df[dps_col][div_df[dps_col] > 0].sum())
         if annual_dps <= 0:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         price_df = stock.get_etf_ohlcv_by_date(end, end, ticker)
         current_price = float(price_df["종가"].iloc[-1]) if not price_df.empty else 0.0
-        yield_decimal = round(annual_dps / current_price, 6) if current_price > 0 else 0.0
+        yield_decimal = _yield_from_dps(annual_dps, current_price)
 
         logger.info(
             "pykrx_etf_dividend_fetched",
@@ -98,7 +111,7 @@ def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
         return {"dps": annual_dps, "dividend_yield": yield_decimal}
     except Exception as e:
         logger.warning("pykrx_etf_dividend_failed", ticker=ticker, error=str(e))
-        return {"dps": 0.0, "dividend_yield": 0.0}
+        return _zero_div()
 
 
 def sync_fdr_etf_dividend_info(ticker: str) -> dict:
@@ -112,11 +125,11 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         etf_list = fdr.StockListing("ETF/KR")
         row = etf_list[etf_list["Symbol"] == ticker]
         if row.empty:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         current_price = float(row["Price"].iloc[0]) if "Price" in row.columns else 0.0
         if current_price == 0.0:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         with contextlib.redirect_stdout(io.StringIO()):
             from pykrx import stock
@@ -125,21 +138,19 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         fund_df = stock.get_market_fundamental_by_ticker(today_str, market="ALL")
 
         if fund_df is None or fund_df.empty or ticker not in fund_df.index:
-            return {"dps": 0.0, "dividend_yield": 0.0}
+            return _zero_div()
 
         row_f = fund_df.loc[ticker]
         dps = float(row_f.get("DPS", 0) or 0)
         div_pct = float(row_f.get("DIV", 0) or 0)
 
-        yield_decimal = round(div_pct / 100, 6) if div_pct > 0 else (
-            round(dps / current_price, 6) if (dps > 0 and current_price > 0) else 0.0
-        )
+        yield_decimal = round(div_pct / 100, 6) if div_pct > 0 else _yield_from_dps(dps, current_price)
 
         logger.info("fdr_etf_dividend_fetched", ticker=ticker, dps=dps, yield_decimal=yield_decimal)
         return {"dps": dps, "dividend_yield": yield_decimal}
     except Exception as exc:
         logger.warning("fdr_etf_dividend_failed", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0}
+        return _zero_div()
 
 
 def sync_naver_etf_dividend_info(ticker: str) -> dict:
@@ -163,7 +174,7 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
         resp = _fetch()
         div = resp.json().get("dividend") or {}
         if not div:
-            return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+            return _zero_div_with_months()
 
         yield_pct = float(div.get("dividendYieldTtm") or 0)
         dps = float(div.get("dividendPerShareTtm") or 0)
@@ -188,13 +199,13 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
             ticker=ticker,
             status=exc.response.status_code if exc.response else None,
         )
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
     except _req_exc.RequestException as exc:
         logger.warning("naver_etf_dividend_network_error", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
     except (ValueError, KeyError, TypeError) as exc:
         logger.warning("naver_etf_dividend_parse_error", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
 
 
 def sync_naver_stock_dividend_info(ticker: str) -> dict:
@@ -219,7 +230,7 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
         detail = resp.json().get("stockItemDetail") or {}
         yield_pct = float(detail.get("dividendYield") or 0)
         if yield_pct <= 0:
-            return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+            return _zero_div_with_months()
         logger.info("naver_stock_dividend_fetched", ticker=ticker, yield_pct=yield_pct)
         return {"dps": 0.0, "dividend_yield": yield_pct / 100.0, "dividend_months": []}
     except _req_exc.HTTPError as exc:
@@ -228,13 +239,13 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
             ticker=ticker,
             status=exc.response.status_code if exc.response else None,
         )
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
     except _req_exc.RequestException as exc:
         logger.warning("naver_stock_dividend_network_error", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
     except (ValueError, KeyError, TypeError) as exc:
         logger.warning("naver_stock_dividend_parse_error", ticker=ticker, error=str(exc))
-        return {"dps": 0.0, "dividend_yield": 0.0, "dividend_months": []}
+        return _zero_div_with_months()
 
 
 def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:

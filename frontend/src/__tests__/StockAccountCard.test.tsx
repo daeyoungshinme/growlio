@@ -38,6 +38,7 @@ const defaultProps = {
   onDelete: vi.fn(),
   onManagePositions: vi.fn(),
   onTransactions: vi.fn(),
+  onEdit: vi.fn(),
   onEditDeposit: vi.fn(),
   onEditName: vi.fn(),
   onSync: vi.fn(),

@@ -178,15 +178,16 @@ async def build_portfolio_overview(
     # 스냅샷 포지션 미리 로드 (snapshot_id → [Position])
     snap_ids = [s.id for s in snap_by_acc.values()]
     acc_ids = [a.id for a in accounts if a.asset_type in STOCK_TYPES]
-    snap_pos_map: dict[Any, list[Position]] = {}
-    cur_pos_map: dict[Any, list[Position]] = {}
+    snap_pos_map: dict[uuid.UUID, list[Position]] = {}
+    cur_pos_map: dict[uuid.UUID, list[Position]] = {}
 
     if snap_ids:
         sp_result = await db.execute(
             select(Position).where(Position.snapshot_id.in_(snap_ids))
         )
         for pos in sp_result.scalars().all():
-            snap_pos_map.setdefault(pos.snapshot_id, []).append(pos)
+            if pos.snapshot_id is not None:
+                snap_pos_map.setdefault(pos.snapshot_id, []).append(pos)
 
     if acc_ids:
         cp_result = await db.execute(

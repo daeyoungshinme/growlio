@@ -8,7 +8,7 @@ import {
   useSubscribeMutation,
 } from "@/hooks/useEconomicIndicators";
 import IndicatorCard from "@/components/market/IndicatorCard";
-import EconomicCalendarList from "@/components/market/EconomicCalendarList";
+import EconomicCalendar from "@/components/market/EconomicCalendar";
 import IndicatorHistoryChart from "@/components/market/IndicatorHistoryChart";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { toast } from "@/utils/toast";
@@ -44,7 +44,7 @@ export default function MarketPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6 pb-24 lg:pb-6 space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-4 sm:py-6 pb-24 lg:pb-6 space-y-4 sm:space-y-6">
       {/* 헤더 */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -55,7 +55,7 @@ export default function MarketPage() {
           onClick={() => refetch()}
           disabled={isFetching}
           aria-label="새로고침"
-          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
+          className="p-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50"
         >
           <RefreshCw size={16} className={isFetching ? "animate-spin" : ""} />
         </button>
@@ -64,7 +64,7 @@ export default function MarketPage() {
       {/* 증시 캘린더 */}
       <section
         aria-label="경제 이벤트 발표 일정"
-        className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5"
+        className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-800 dark:text-gray-200">
@@ -79,7 +79,7 @@ export default function MarketPage() {
             ))}
           </div>
         ) : (
-          <EconomicCalendarList events={calendar} />
+          <EconomicCalendar events={calendar} />
         )}
       </section>
 
@@ -121,7 +121,7 @@ export default function MarketPage() {
       {selectedIndicator && (
         <section
           aria-label={`${selectedIndicator.name} 추이`}
-          className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-5"
+          className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 sm:p-5"
         >
           <div className="flex items-center justify-between mb-4">
             <div>
