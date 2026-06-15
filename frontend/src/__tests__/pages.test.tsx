@@ -314,28 +314,6 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("renders rebalancing automation section", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
-    await waitFor(() => {
-      expect(screen.getByText("리밸런싱 자동화")).toBeDefined();
-    });
-  });
-
-  it("renders invest goal section", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    );
-    await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeDefined();
-    });
-  });
-
   it("DART save button is present", async () => {
     renderWithProviders(
       <MemoryRouter>

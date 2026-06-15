@@ -256,11 +256,63 @@ def _build_ticker_account_map(overview: dict) -> dict[str, list[TickerAccountInf
     return ticker_account_map
 
 
+def _build_implicit_cash_item(
+    result_items: list[RebalancingItem],
+    overview: dict,
+    base_krw: float,
+) -> RebalancingItem | None:
+    """포트폴리오에 CASH 항목이 없을 때 암묵적 예수금 항목을 계산해 반환한다.
+
+    포트폴리오 items 목표 비중 합이 X%이면 100-X%가 목표 예수금 비중.
+    합계가 100%이면 목표 예수금은 0%이고, 실제 예수금은 전량 초과(드리프트).
+    base_krw가 0이거나 실제 예수금이 없으면 None 반환.
+    """
+    has_cash = any(i.ticker == "CASH" for i in result_items)
+    if has_cash or base_krw <= 0:
+        return None
+
+    total_target_pct = sum(i.target_weight_pct for i in result_items)
+    implicit_cash_target_pct = max(0.0, 100.0 - total_target_pct)
+
+    total_assets_krw = float(overview.get("total_assets_krw", 0))
+    total_stock_krw = float(overview.get("total_stock_krw", 0))
+    cash_value = max(0.0, total_assets_krw - total_stock_krw)
+
+    if cash_value <= 0:
+        return None
+
+    cash_current_pct = cash_value / base_krw * 100
+    cash_target_value = base_krw * (implicit_cash_target_pct / 100.0)
+    diff_krw = cash_target_value - cash_value
+
+    return RebalancingItem(
+        ticker="CASH",
+        name="예수금",
+        market="KRW",
+        target_weight_pct=round(implicit_cash_target_pct, 2),
+        current_weight_pct=round(cash_current_pct, 2),
+        weight_diff_pct=round(implicit_cash_target_pct - cash_current_pct, 2),
+        current_value_krw=round(cash_value, 0),
+        target_value_krw=round(cash_target_value, 0),
+        diff_krw=round(diff_krw, 0),
+        shares_to_trade=None,
+        current_price_krw=None,
+        dividend_yield=None,
+        annual_dividend_current_krw=0.0,
+        annual_dividend_target_krw=0.0,
+        annual_dividend_diff_krw=0.0,
+        return_10y_pct=None,
+        cagr_10y_pct=None,
+        actual_years_10y=None,
+    )
+
+
 def analyze_rebalancing(
     portfolio: Portfolio,
     overview: dict,
     dividend_map: dict[tuple[str, str], dict] | None = None,
     returns_map: dict[tuple[str, str], dict] | None = None,
+    include_implicit_cash: bool = False,
 ) -> RebalancingAnalysis:
     """현재 자산(overview)과 목표 포트폴리오를 비교해 리밸런싱 분석 결과를 반환한다."""
     base_krw = float(
@@ -276,6 +328,11 @@ def analyze_rebalancing(
     result_items += _build_untracked_items(
         current_map, target_keys, base_krw, dividend_map, returns_map
     )
+
+    if include_implicit_cash and portfolio.base_type == "TOTAL_ASSETS":
+        cash_item = _build_implicit_cash_item(result_items, overview, base_krw)
+        if cash_item is not None:
+            result_items.append(cash_item)
 
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
     target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(

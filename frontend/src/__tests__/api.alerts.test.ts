@@ -129,7 +129,7 @@ describe("api/alerts — rebalancing alerts", () => {
       schedule_type: "DAILY",
       schedule_day_of_week: null,
       schedule_day_of_month: null,
-      only_when_drift: true,
+      trigger_condition: "DRIFT_ONLY" as const,
       mode: "NOTIFY",
       strategy: "FULL",
       account_id: null,

@@ -57,7 +57,8 @@ class RebalancingAlert(Base):
     schedule_type: Mapped[str] = mapped_column(String(12), nullable=False, default="DAILY")
     schedule_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)
     schedule_day_of_month: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    only_when_drift: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # 발동 조건: DRIFT_ONLY(스케줄 날+드리프트), SCHEDULE_ONLY(스케줄 날 항상), BOTH(스케줄 날 항상+비스케줄 날 드리프트)
+    trigger_condition: Mapped[str] = mapped_column(String(20), nullable=False, default="DRIFT_ONLY")
     # 실행 모드: NOTIFY(이메일 알림만) | AUTO(자동 주문 실행)
     mode: Mapped[str] = mapped_column(String(10), nullable=False, default="NOTIFY")
     # 자동 실행 전략: BUY_ONLY | FULL

@@ -288,23 +288,63 @@ async def _notify_deposit_rebalancing(
     fcm_token: str | None,
     db: AsyncSession,
 ) -> None:
-    """NOTIFY 모드: 이메일 + FCM 푸시 발송."""
-    from app.services.email_service import send_deposit_trigger_alert
-    from app.services.push_service import send_push_to_user
+    """NOTIFY 모드: 드리프트 분석 기반 매수 추천 이메일 + FCM 푸시 발송.
 
-    items = portfolio.items
-    total_weight = sum(float(item.weight) for item in items) if items else 0
+    단순 비중 배분 대신 현재 포트폴리오 상태를 분석하여
+    부족한(underweight) 종목부터 예수금 입금액을 배분한다.
+    """
+    from app.services.email_service import send_deposit_trigger_alert
+    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.push_service import send_push_to_user
+    from app.services.rebalancing_service import analyze_rebalancing
 
     notify_items: list[dict] = []
-    for item in items:
-        weight = float(item.weight) / total_weight if total_weight > 0 else 0
-        alloc_amount = deposit_increment * weight
-        notify_items.append({
-            "ticker": item.ticker,
-            "name": item.name,
-            "weight_pct": float(item.weight),
-            "alloc_amount": alloc_amount,
-        })
+
+    try:
+        saved_ids = getattr(portfolio, "account_ids", None)
+        account_ids = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+        overview = await build_portfolio_overview(alert.user_id, db, account_ids=account_ids)
+        analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+
+        # 부족한(underweight) 종목만 추출: diff_krw < 0이면 현재 < 목표 (매수 필요)
+        # CASH는 매수 대상에서 제외 (예수금이 부족하면 현금 보유를 늘려야 하므로 투자 불필요)
+        underweight = [
+            i for i in analysis.items
+            if i.diff_krw < 0 and i.ticker != "CASH" and i.shares_to_trade is not None
+        ]
+
+        if underweight:
+            # 부족금액 크기 비율로 deposit_increment 배분
+            total_deficit = sum(abs(i.diff_krw) for i in underweight)
+            for item in underweight:
+                alloc_ratio = abs(item.diff_krw) / total_deficit if total_deficit > 0 else 0
+                alloc_amount = deposit_increment * alloc_ratio
+                notify_items.append({
+                    "ticker": item.ticker,
+                    "name": item.name,
+                    "weight_pct": float(item.target_weight_pct),
+                    "alloc_amount": alloc_amount,
+                    "weight_diff_pct": float(item.weight_diff_pct),
+                })
+    except Exception as exc:
+        logger.warning(
+            "deposit_notify_analysis_failed_fallback_to_proportional",
+            alert_id=str(alert.id),
+            error=str(exc),
+        )
+
+    # 분석 실패 또는 underweight 종목 없을 경우 기존 비중 비례 배분으로 폴백
+    if not notify_items:
+        p_items = portfolio.items
+        total_weight = sum(float(pi.weight) for pi in p_items) if p_items else 0
+        for pi in p_items:
+            w = float(pi.weight) / total_weight if total_weight > 0 else 0
+            notify_items.append({
+                "ticker": pi.ticker,
+                "name": pi.name,
+                "weight_pct": float(pi.weight),
+                "alloc_amount": deposit_increment * w,
+            })
 
     await send_deposit_trigger_alert(
         to_email=email,

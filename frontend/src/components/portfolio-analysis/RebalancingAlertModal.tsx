@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { INPUT_SM } from "@/constants/inputStyles";
@@ -9,6 +9,7 @@ import {
   deleteRebalancingAlert,
   type ScheduleType,
   type MarketConditionMode,
+  type TriggerCondition,
 } from "@/api/alerts";
 import { fetchAccounts } from "@/api/assets";
 import { fetchMarketSignal } from "@/api/marketSignals";
@@ -22,6 +23,7 @@ import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBa
 interface Props {
   portfolioId: string;
   portfolioName: string;
+  accountIds?: string[] | null;
   onClose: () => void;
 }
 
@@ -49,7 +51,7 @@ function buildDescription(
   scheduleType: ScheduleType,
   dayOfWeek: number,
   dayOfMonth: number,
-  onlyWhenDrift: boolean,
+  triggerCondition: TriggerCondition,
   threshold: number,
   mode: "NOTIFY" | "AUTO",
 ): string {
@@ -68,9 +70,14 @@ function buildDescription(
 
   const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
 
-  return onlyWhenDrift
-    ? `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`
-    : `${when} 리밸런싱 현황 리포트를 받습니다.`;
+  if (triggerCondition === "DRIFT_ONLY") {
+    return `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`;
+  }
+  if (triggerCondition === "SCHEDULE_ONLY") {
+    return `${when} 리밸런싱 현황 리포트를 받습니다.`;
+  }
+  // BOTH
+  return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
 }
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
@@ -82,7 +89,7 @@ import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import type { QueryClient } from "@tanstack/react-query";
 
-export default function RebalancingAlertModal({ portfolioId, portfolioName, onClose }: Props) {
+export default function RebalancingAlertModal({ portfolioId, portfolioName, accountIds, onClose }: Props) {
   const qc = useQueryClient();
 
   const { data: alert, isLoading } = useQuery({
@@ -124,6 +131,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, onCl
             alert={alert ?? null}
             brokerAccounts={brokerAccounts}
             portfolioId={portfolioId}
+            accountIds={accountIds}
             qc={qc}
             onClose={onClose}
             marketSignal={marketSignal}
@@ -138,6 +146,7 @@ function AlertFormBody({
   alert,
   brokerAccounts,
   portfolioId,
+  accountIds,
   qc,
   onClose,
   marketSignal,
@@ -145,6 +154,7 @@ function AlertFormBody({
   alert: RebalancingAlert | null;
   brokerAccounts: AssetAccount[];
   portfolioId: string;
+  accountIds?: string[] | null;
   qc: QueryClient;
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
@@ -152,7 +162,9 @@ function AlertFormBody({
   const [scheduleType, setScheduleType] = useState<ScheduleType>(alert?.schedule_type ?? "DAILY");
   const [dayOfWeek, setDayOfWeek] = useState(alert?.schedule_day_of_week ?? 0);
   const [dayOfMonth, setDayOfMonth] = useState(alert?.schedule_day_of_month ?? 1);
-  const [onlyWhenDrift, setOnlyWhenDrift] = useState(alert?.only_when_drift ?? true);
+  const [triggerCondition, setTriggerCondition] = useState<TriggerCondition>(
+    alert?.trigger_condition ?? "DRIFT_ONLY",
+  );
   const [threshold, setThreshold] = useState(alert?.threshold_pct ?? 5);
   const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
   const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">(alert?.strategy ?? "BUY_ONLY");
@@ -171,7 +183,17 @@ function AlertFormBody({
     alert?.deposit_trigger_min_amount_krw ?? 100_000,
   );
 
-  const kisAccounts = brokerAccounts.filter((a) => a.asset_type === "STOCK_KIS");
+  const kisAccounts = brokerAccounts.filter(
+    (a) => a.asset_type === "STOCK_KIS" && (accountIds == null || accountIds.includes(a.id)),
+  );
+
+  useEffect(() => {
+    if (depositTriggerAccountId && brokerAccounts.length > 0) {
+      if (!kisAccounts.some((a) => a.id === depositTriggerAccountId)) {
+        setDepositTriggerAccountId("");
+      }
+    }
+  }, [kisAccounts, depositTriggerAccountId, brokerAccounts.length]);
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -180,7 +202,7 @@ function AlertFormBody({
         schedule_type: scheduleType,
         schedule_day_of_week: scheduleType === "WEEKLY" ? dayOfWeek : null,
         schedule_day_of_month: NEEDS_DAY_OF_MONTH.includes(scheduleType) ? dayOfMonth : null,
-        only_when_drift: onlyWhenDrift,
+        trigger_condition: triggerCondition,
         mode,
         strategy,
         account_id: mode === "AUTO" && accountId ? accountId : null,
@@ -285,39 +307,45 @@ function AlertFormBody({
             <div>
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
               <div className="space-y-2">
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={onlyWhenDrift}
-                    onChange={() => setOnlyWhenDrift(true)}
-                    className="mt-0.5 text-blue-600"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    비중 이탈 시에만
-                    <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      이탈 종목이 있을 때만 동작합니다
+                {(
+                  [
+                    {
+                      value: "DRIFT_ONLY" as TriggerCondition,
+                      label: "비중 이탈 시에만",
+                      desc: "이탈 종목이 있을 때만 동작합니다",
+                    },
+                    {
+                      value: "SCHEDULE_ONLY" as TriggerCondition,
+                      label: "주기마다 항상",
+                      desc: "이탈 여부와 관계없이 주기마다 리포트를 받습니다",
+                    },
+                    {
+                      value: "BOTH" as TriggerCondition,
+                      label: "주기마다 + 비중 이탈 시",
+                      desc: "주기 리포트를 받으면서 이탈 감지 시 즉시 추가 알림 (예수금 포함)",
+                    },
+                  ] as const
+                ).map(({ value, label, desc }) => (
+                  <label key={value} className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={triggerCondition === value}
+                      onChange={() => setTriggerCondition(value)}
+                      className="mt-0.5 text-blue-600"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      {label}
+                      <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                        {desc}
+                      </span>
                     </span>
-                  </span>
-                </label>
-                <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!onlyWhenDrift}
-                    onChange={() => setOnlyWhenDrift(false)}
-                    className="mt-0.5 text-blue-600"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    주기마다 항상
-                    <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                      이탈 여부와 관계없이 주기마다 리포트를 받습니다
-                    </span>
-                  </span>
-                </label>
+                  </label>
+                ))}
               </div>
             </div>
 
-            {/* ── 임계값 슬라이더 (이탈 시에만 표시) ── */}
-            {onlyWhenDrift && (
+            {/* ── 임계값 슬라이더 (이탈 감지 포함 조건에서 표시) ── */}
+            {(triggerCondition === "DRIFT_ONLY" || triggerCondition === "BOTH") && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   이탈 임계값
@@ -556,7 +584,9 @@ function AlertFormBody({
                     </select>
                     {kisAccounts.length === 0 && (
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
+                        {accountIds != null
+                          ? "이 포트폴리오에 연결된 KIS 계좌가 없습니다. 포트폴리오 설정에서 KIS 계좌를 연결해주세요."
+                          : "KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요."}
                       </p>
                     )}
                   </div>
@@ -597,7 +627,7 @@ function AlertFormBody({
 
             {/* ── 설명 텍스트 ── */}
             <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-              {buildDescription(scheduleType, dayOfWeek, dayOfMonth, onlyWhenDrift, threshold, mode)}
+              {buildDescription(scheduleType, dayOfWeek, dayOfMonth, triggerCondition, threshold, mode)}
             </p>
 
             {/* ── 현재 설정 표시 ── */}

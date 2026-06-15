@@ -347,6 +347,38 @@ describe("RebalancingAlertModal", () => {
       expect(text.length).toBeGreaterThan(0);
     });
   });
+
+  it("renders with accountIds prop without crash", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          accountIds={["acc-1"]}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    await waitFor(() => {
+      expect(document.body).toBeDefined();
+    });
+  });
+
+  it("renders with accountIds=null (all accounts) without crash", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertModal
+          portfolioId="p1"
+          portfolioName="테스트 포트폴리오"
+          accountIds={null}
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>
+    );
+    await waitFor(() => {
+      expect(document.body).toBeDefined();
+    });
+  });
 });
 
 // =========================================

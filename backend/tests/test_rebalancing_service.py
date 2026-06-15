@@ -417,3 +417,75 @@ class TestTickerAccountMap:
         ])
         result = analyze_rebalancing(portfolio, _make_overview())
         assert result.ticker_account_map == {}
+
+
+# ── include_implicit_cash 테스트 ─────────────────────────────
+
+class TestImplicitCash:
+    """analyze_rebalancing include_implicit_cash=True 동작 검증."""
+
+    def test_implicit_cash_added_when_weights_under_100(self):
+        """포트폴리오 비중 합 <100%이면 암묵적 CASH 항목이 추가된다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 70}],
+            base_type="TOTAL_ASSETS",
+        )
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=500_000)
+        result = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        tickers = [i.ticker for i in result.items]
+        assert "CASH" in tickers
+        cash = next(i for i in result.items if i.ticker == "CASH")
+        # 목표 현금 비중 = 100 - 70 = 30%
+        assert cash.target_weight_pct == 30.0
+        # 현재 현금 = 1M - 500K = 500K → 현재 비중 = 50%
+        assert cash.current_weight_pct == 50.0
+        # diff_krw = 목표 300K - 현재 500K = -200K (현금 초과)
+        assert cash.diff_krw == -200_000
+
+    def test_implicit_cash_not_added_when_cash_already_in_portfolio(self):
+        """포트폴리오에 이미 CASH 항목이 있으면 중복 추가 안 함."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 70},
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 30},
+            ],
+            base_type="TOTAL_ASSETS",
+        )
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=700_000)
+        result = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        cash_items = [i for i in result.items if i.ticker == "CASH"]
+        assert len(cash_items) == 1
+
+    def test_implicit_cash_not_added_when_stock_only_base(self):
+        """base_type=STOCK_ONLY이면 include_implicit_cash=True여도 CASH 추가 안 함."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 70}],
+            base_type="STOCK_ONLY",
+        )
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=700_000)
+        result = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        tickers = [i.ticker for i in result.items]
+        assert "CASH" not in tickers
+
+    def test_implicit_cash_skipped_when_no_actual_cash(self):
+        """실제 예수금이 0이면 CASH 항목이 추가되지 않는다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 70}],
+            base_type="TOTAL_ASSETS",
+        )
+        # total_assets == total_stock → 예수금 0
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        tickers = [i.ticker for i in result.items]
+        assert "CASH" not in tickers
+
+    def test_implicit_cash_false_by_default(self):
+        """기본 호출(include_implicit_cash=False)에는 CASH가 추가되지 않는다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 70}],
+            base_type="TOTAL_ASSETS",
+        )
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=500_000)
+        result = analyze_rebalancing(portfolio, overview)
+        tickers = [i.ticker for i in result.items]
+        assert "CASH" not in tickers

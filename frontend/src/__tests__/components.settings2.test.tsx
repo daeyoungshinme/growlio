@@ -396,7 +396,7 @@ describe("RebalancingTable", () => {
       schedule_type: "DAILY" as const,
       schedule_day_of_week: null,
       schedule_day_of_month: null,
-      only_when_drift: true,
+      trigger_condition: "DRIFT_ONLY" as const,
       strategy: "BUY_ONLY" as const,
       account_id: null,
       order_type: "MARKET" as const,

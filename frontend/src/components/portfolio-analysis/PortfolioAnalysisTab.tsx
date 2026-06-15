@@ -512,6 +512,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
           key={alertModalPortfolioId}
           portfolioId={alertModalPortfolioId}
           portfolioName={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
+          accountIds={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null}
           onClose={() => setAlertModalPortfolioId(null)}
         />
       )}

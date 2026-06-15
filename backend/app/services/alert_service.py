@@ -117,7 +117,11 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
     triggered_count = 0
     for alert, portfolio, user_email, notification_email in rows:
-        if not should_fire_today(alert):
+        trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
+        is_schedule_day = should_fire_today(alert)
+
+        # BOTH: 매일 체크; DRIFT_ONLY/SCHEDULE_ONLY: 스케줄 날만 체크
+        if not is_schedule_day and trigger_condition != "BOTH":
             continue
         if already_fired_today(alert):
             continue
@@ -136,7 +140,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             continue
 
         try:
-            analysis = analyze_rebalancing(portfolio, overview)
+            analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
         except Exception as exc:
             logger.error("rebalancing_alert_analysis_failed", alert_id=str(alert.id), error=str(exc))
             continue
@@ -144,15 +148,27 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         threshold = float(alert.threshold_pct)
         drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
 
-        only_when_drift = getattr(alert, "only_when_drift", True)
-        if only_when_drift:
+        if trigger_condition == "SCHEDULE_ONLY":
+            if not is_schedule_day:
+                continue
+            items_to_show = analysis.items
+            is_scheduled_report = True
+        elif trigger_condition == "DRIFT_ONLY":
             if not drifting:
                 continue
             items_to_show = drifting
             is_scheduled_report = False
-        else:
-            items_to_show = analysis.items
-            is_scheduled_report = True
+        else:  # BOTH
+            if is_schedule_day:
+                # 스케줄 날: 드리프트 무관 전체 리포트
+                items_to_show = analysis.items
+                is_scheduled_report = True
+            elif drifting:
+                # 비스케줄 날: 드리프트 감지 시만 발송
+                items_to_show = drifting
+                is_scheduled_report = False
+            else:
+                continue
 
         mode = getattr(alert, "mode", "NOTIFY")
         email = notification_email or user_email

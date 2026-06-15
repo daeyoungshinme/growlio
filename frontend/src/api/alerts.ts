@@ -35,6 +35,7 @@ export const deleteExchangeRateAlert = (id: string) =>
 
 export type ScheduleType = "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL";
 export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT";
+export type TriggerCondition = "DRIFT_ONLY" | "SCHEDULE_ONLY" | "BOTH";
 
 export interface RebalancingAlert {
   id: string;
@@ -44,7 +45,7 @@ export interface RebalancingAlert {
   schedule_type: ScheduleType;
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;
-  only_when_drift: boolean;
+  trigger_condition: TriggerCondition;
   mode: "NOTIFY" | "AUTO";
   strategy: "FULL" | "BUY_ONLY";
   account_id: string | null;
@@ -66,7 +67,7 @@ export interface RebalancingAlertUpsert {
   schedule_type: ScheduleType;
   schedule_day_of_week: number | null;
   schedule_day_of_month: number | null;
-  only_when_drift: boolean;
+  trigger_condition: TriggerCondition;
   mode: "NOTIFY" | "AUTO";
   strategy: "FULL" | "BUY_ONLY";
   account_id: string | null;

@@ -383,7 +383,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         schedule_day_of_month=None,
         last_triggered_at=None,
         threshold_pct=5.0,
-        only_when_drift=True,
+        trigger_condition="DRIFT_ONLY",
         mode="NOTIFY",
         account_id=None,
         strategy="BUY_ONLY",
@@ -416,7 +416,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
 
 @pytest.mark.asyncio
 async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
-    """드리프트 없을 때 only_when_drift=True이면 이메일 미발송."""
+    """드리프트 없을 때 trigger_condition=DRIFT_ONLY이면 이메일 미발송."""
     user_id = uuid.uuid4()
     portfolio_id = uuid.uuid4()
 
@@ -429,7 +429,7 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
         schedule_day_of_month=None,
         last_triggered_at=None,
         threshold_pct=5.0,
-        only_when_drift=True,
+        trigger_condition="DRIFT_ONLY",
         mode="NOTIFY",
         account_id=None,
     )
@@ -473,7 +473,7 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
         schedule_day_of_month=None,
         last_triggered_at=None,
         threshold_pct=5.0,
-        only_when_drift=True,
+        trigger_condition="DRIFT_ONLY",
         mode="NOTIFY",
         account_id=None,
     )
@@ -495,7 +495,7 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
 
 @pytest.mark.asyncio
 async def test_check_rebalancing_alerts_scheduled_report(mock_db):
-    """only_when_drift=False + scheduled report 이메일 발송."""
+    """trigger_condition=SCHEDULE_ONLY + scheduled report 이메일 발송."""
     user_id = uuid.uuid4()
     portfolio_id = uuid.uuid4()
 
@@ -508,7 +508,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         schedule_day_of_month=None,
         last_triggered_at=None,
         threshold_pct=5.0,
-        only_when_drift=False,
+        trigger_condition="SCHEDULE_ONLY",
         mode="NOTIFY",
         account_id=None,
         strategy="BUY_ONLY",
@@ -610,3 +610,130 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_db.commit.assert_not_called()
+
+
+# ── trigger_condition=BOTH 테스트 ─────────────────────────────
+
+def _make_both_alert(user_id, portfolio_id, schedule_type="DAILY"):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        portfolio_id=portfolio_id,
+        schedule_type=schedule_type,
+        schedule_day_of_week=None,
+        schedule_day_of_month=None,
+        last_triggered_at=None,
+        threshold_pct=5.0,
+        trigger_condition="BOTH",
+        mode="NOTIFY",
+        account_id=None,
+        strategy="BUY_ONLY",
+        order_type="MARKET",
+    )
+
+
+@pytest.mark.asyncio
+async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(mock_db):
+    """BOTH + 스케줄 날(DAILY) → 드리프트 없어도 전체 리포트 발송."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    alert = _make_both_alert(user_id, portfolio_id, schedule_type="DAILY")
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
+                                base_type="STOCK", items=[])
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    mock_db.execute = AsyncMock(return_value=execute_result)
+
+    item = SimpleNamespace(
+        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
+        diff_krw=100_000, shares_to_trade=1.0,
+    )
+    analysis = SimpleNamespace(items=[item])
+    overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+    with (
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+    ):
+        from app.services.alert_service import check_rebalancing_alerts
+        await check_rebalancing_alerts(mock_db)
+
+    mock_email.assert_called_once()
+    call_kwargs = mock_email.call_args.kwargs
+    assert call_kwargs.get("is_scheduled_report") is True
+    mock_db.commit.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
+    """BOTH + 비스케줄 날 + 드리프트 → 드리프트 알림 발송."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    from datetime import timedelta, timezone
+    today_weekday = datetime.now(tz=timezone(timedelta(hours=9))).weekday()
+    wrong_day = (today_weekday + 1) % 7
+
+    alert = _make_both_alert(user_id, portfolio_id, schedule_type="WEEKLY")
+    alert.schedule_day_of_week = wrong_day
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
+                                base_type="STOCK", items=[])
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    mock_db.execute = AsyncMock(return_value=execute_result)
+
+    drifting_item = SimpleNamespace(
+        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0,
+        diff_krw=500_000, shares_to_trade=5.0,
+    )
+    analysis = SimpleNamespace(items=[drifting_item])
+    overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+    with (
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+    ):
+        from app.services.alert_service import check_rebalancing_alerts
+        await check_rebalancing_alerts(mock_db)
+
+    if today_weekday != wrong_day:
+        mock_email.assert_called_once()
+        call_kwargs = mock_email.call_args.kwargs
+        assert call_kwargs.get("is_scheduled_report") is False
+
+
+@pytest.mark.asyncio
+async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db):
+    """BOTH + 비스케줄 날 + 드리프트 없음 → 발송 안 함."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    from datetime import timedelta, timezone
+    today_weekday = datetime.now(tz=timezone(timedelta(hours=9))).weekday()
+    wrong_day = (today_weekday + 1) % 7
+
+    alert = _make_both_alert(user_id, portfolio_id, schedule_type="WEEKLY")
+    alert.schedule_day_of_week = wrong_day
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
+                                base_type="STOCK", items=[])
+    execute_result = MagicMock()
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    mock_db.execute = AsyncMock(return_value=execute_result)
+
+    item = SimpleNamespace(
+        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
+        diff_krw=100_000, shares_to_trade=1.0,
+    )
+    analysis = SimpleNamespace(items=[item])
+    overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+    with (
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+    ):
+        from app.services.alert_service import check_rebalancing_alerts
+        await check_rebalancing_alerts(mock_db)
+
+    if today_weekday != wrong_day:
+        mock_email.assert_not_called()

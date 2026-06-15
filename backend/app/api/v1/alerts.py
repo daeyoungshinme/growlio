@@ -159,7 +159,7 @@ class RebalancingAlertCreate(BaseModel):
     schedule_type: Literal["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"] = "DAILY"
     schedule_day_of_week: int | None = None  # WEEKLY 전용: 0=월...6=일
     schedule_day_of_month: int | None = None  # MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL: 1~28
-    only_when_drift: bool = True
+    trigger_condition: Literal["DRIFT_ONLY", "SCHEDULE_ONLY", "BOTH"] = "DRIFT_ONLY"
     mode: Literal["NOTIFY", "AUTO"] = "NOTIFY"
     strategy: Literal["FULL", "BUY_ONLY"] = "BUY_ONLY"
     account_id: uuid.UUID | None = None
@@ -209,7 +209,7 @@ class RebalancingAlertResponse(BaseModel):
     schedule_type: str
     schedule_day_of_week: int | None
     schedule_day_of_month: int | None
-    only_when_drift: bool
+    trigger_condition: str
     mode: str
     strategy: str
     account_id: uuid.UUID | None
@@ -280,7 +280,7 @@ async def upsert_rebalancing_alert(
         alert.schedule_type = body.schedule_type
         alert.schedule_day_of_week = body.schedule_day_of_week
         alert.schedule_day_of_month = body.schedule_day_of_month
-        alert.only_when_drift = body.only_when_drift
+        alert.trigger_condition = body.trigger_condition
         alert.mode = body.mode
         alert.strategy = body.strategy
         alert.account_id = body.account_id
@@ -298,7 +298,7 @@ async def upsert_rebalancing_alert(
             schedule_type=body.schedule_type,
             schedule_day_of_week=body.schedule_day_of_week,
             schedule_day_of_month=body.schedule_day_of_month,
-            only_when_drift=body.only_when_drift,
+            trigger_condition=body.trigger_condition,
             mode=body.mode,
             strategy=body.strategy,
             account_id=body.account_id,
