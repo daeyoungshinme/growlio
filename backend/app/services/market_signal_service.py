@@ -2,14 +2,19 @@
 from __future__ import annotations
 
 import contextlib
-import json
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx
+import redis.asyncio as aioredis
 import structlog
 
-from app.utils.cache_keys import TTL_MARKET_SIGNAL, market_signal_latest_key
+from app.utils.cache_keys import (
+    TTL_MARKET_SIGNAL,
+    get_cached_json,
+    market_signal_latest_key,
+    set_cached_json,
+)
 from app.utils.circuit_breaker import CircuitBreaker, CircuitOpenError
 
 logger = structlog.get_logger()
@@ -128,7 +133,7 @@ async def fetch_fear_greed_signal() -> dict[str, Any] | None:
         logger.warning("fear_greed_fetch_failed", error=str(exc))
         return None
 
-    with contextlib.suppress(Exception):
+    with contextlib.suppress(ValueError, TypeError):
         value_raw = entry.get("value", "50")
         value = int(value_raw)
         classification_raw = (entry.get("value_classification") or "Neutral").lower()
@@ -227,26 +232,19 @@ def compute_composite_signal(
 # ---------------------------------------------------------------------------
 
 
-async def get_market_signal(redis: Any = None) -> dict[str, Any]:
+async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, Any]:
     """복합 시장 위험 신호를 반환한다. Redis 1시간 캐시."""
     cache_key = market_signal_latest_key()
 
-    if redis is not None:
-        with contextlib.suppress(Exception):
-            cached = await redis.get(cache_key)
-            if cached:
-                data = json.loads(cached)
-                if data.get("data_freshness") != "STALE":
-                    data["data_freshness"] = "CACHED"
-                return data
+    if redis is not None and (data := await get_cached_json(redis, cache_key)) is not None:
+        if isinstance(data, dict) and data.get("data_freshness") != "STALE":
+            data["data_freshness"] = "CACHED"
+        return data
 
     vix, yield_curve, fear_greed = await _fetch_all_signals()
     result = compute_composite_signal(vix, yield_curve, fear_greed)
 
-    if redis is not None:
-        with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_MARKET_SIGNAL, json.dumps(result))
-
+    await set_cached_json(redis, cache_key, result, TTL_MARKET_SIGNAL)
     return result
 
 
@@ -265,7 +263,7 @@ async def _fetch_all_signals() -> tuple[
         return_exceptions=True,
     )
 
-    def _safe(r: Any) -> dict[str, Any] | None:
+    def _safe(r: dict[str, Any] | BaseException | None) -> dict[str, Any] | None:
         if isinstance(r, BaseException):
             logger.warning("market_signal_fetch_error", error=str(r))
             return None

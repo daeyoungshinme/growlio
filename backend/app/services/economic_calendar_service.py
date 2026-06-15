@@ -2,14 +2,18 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 from datetime import date, timedelta
 from typing import Any
 
+import redis.asyncio as aioredis
 import structlog
 
-from app.utils.cache_keys import TTL_INDICATOR_CALENDAR, economic_indicator_calendar_key
+from app.utils.cache_keys import (
+    TTL_INDICATOR_CALENDAR,
+    economic_indicator_calendar_key,
+    get_cached_json,
+    set_cached_json,
+)
 
 from .economic_indicator_service import INDICATORS, _fred_get_release_dates
 
@@ -69,27 +73,19 @@ async def _fetch_fred_calendar_events(days_ahead: int = _DAYS_AHEAD) -> list[dic
     return events
 
 
-async def sync_calendar_to_cache(redis: Any) -> list[dict[str, Any]]:
+async def sync_calendar_to_cache(redis: aioredis.Redis | None) -> list[dict[str, Any]]:
     """FRED에서 캘린더 이벤트를 조회해 Redis에 저장한다."""
     events = await _fetch_fred_calendar_events()
 
     if redis and events:
-        cache_key = economic_indicator_calendar_key()
-        with contextlib.suppress(Exception):
-            payload = json.dumps(events, ensure_ascii=False, allow_nan=False)
-            await redis.setex(cache_key, TTL_INDICATOR_CALENDAR, payload)
+        await set_cached_json(redis, economic_indicator_calendar_key(), events, TTL_INDICATOR_CALENDAR)
         logger.info("fred_calendar_synced", count=len(events))
 
     return events
 
 
-async def get_calendar_events(redis: Any) -> list[dict[str, Any]]:
+async def get_calendar_events(redis: aioredis.Redis | None) -> list[dict[str, Any]]:
     """캘린더 이벤트를 반환한다. Redis 캐시 hit 시 캐시값, miss 시 FRED 직접 조회."""
-    cache_key = economic_indicator_calendar_key()
-    if redis:
-        with contextlib.suppress(Exception):
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
-
+    if (hit := await get_cached_json(redis, economic_indicator_calendar_key())) is not None:
+        return hit
     return await sync_calendar_to_cache(redis)

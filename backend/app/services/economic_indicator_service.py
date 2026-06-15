@@ -1,7 +1,6 @@
 """경제지표 서비스 — FRED(미국) + ECOS 한국은행(한국) API 연동."""
 from __future__ import annotations
 
-import contextlib
 import json
 import math
 from datetime import UTC, date, datetime, timedelta
@@ -18,6 +17,9 @@ from app.utils.cache_keys import (
     TTL_INDICATOR_LATEST,
     economic_indicator_history_key,
     economic_indicator_latest_key,
+    get_cached_json,
+    invalidate_user_caches,
+    set_cached_json,
 )
 
 logger = structlog.get_logger()
@@ -206,11 +208,8 @@ async def fetch_indicator_latest(code: str, redis=None) -> dict[str, Any] | None
         return None
 
     cache_key = economic_indicator_latest_key(code)
-    if redis:
-        with contextlib.suppress(Exception):
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
+    if (hit := await get_cached_json(redis, cache_key)) is not None:
+        return hit
 
     raw = await _fred_get_observations(meta["series"], limit=3)
     points = _parse_fred_obs(raw)
@@ -242,11 +241,7 @@ async def fetch_indicator_latest(code: str, redis=None) -> dict[str, Any] | None
         "change_pct": change_pct,
     }
 
-    if redis:
-        with contextlib.suppress(Exception):
-            payload = json.dumps(result, ensure_ascii=False, allow_nan=False)
-            await redis.setex(cache_key, TTL_INDICATOR_LATEST, payload)
-
+    await set_cached_json(redis, cache_key, result, TTL_INDICATOR_LATEST)
     return result
 
 
@@ -266,11 +261,8 @@ async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> li
         return []
 
     cache_key = economic_indicator_history_key(code, months)
-    if redis:
-        with contextlib.suppress(Exception):
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
+    if (hit := await get_cached_json(redis, cache_key)) is not None:
+        return hit
 
     raw = await _fred_get_observations(meta["series"], limit=months + 3)
     points = _parse_fred_obs(raw)
@@ -278,11 +270,7 @@ async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> li
     # 최근 months개만 반환
     result = points[-months:] if len(points) > months else points
 
-    if redis:
-        with contextlib.suppress(Exception):
-            payload = json.dumps(result, ensure_ascii=False, allow_nan=False)
-            await redis.setex(cache_key, TTL_INDICATOR_HISTORY, payload)
-
+    await set_cached_json(redis, cache_key, result, TTL_INDICATOR_HISTORY)
     return result
 
 
@@ -343,11 +331,7 @@ def _now_utc() -> datetime:
 async def sync_all_to_cache(redis) -> dict[str, dict[str, Any]]:
     """모든 지표 최신값을 FRED/ECOS에서 강제 갱신 후 반환."""
     import asyncio
-    if redis:
-        # 기존 캐시 무효화
-        keys = [economic_indicator_latest_key(c) for c in INDICATORS]
-        with contextlib.suppress(Exception):
-            await redis.delete(*keys)
+    await invalidate_user_caches(redis, *[economic_indicator_latest_key(c) for c in INDICATORS])
 
     results = {}
     tasks = [(code, fetch_indicator_latest(code, redis)) for code in INDICATORS]
