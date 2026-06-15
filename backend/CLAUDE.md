@@ -31,6 +31,9 @@ cd backend && uv run alembic revision --autogenerate -m "description"
 ```bash
 # 현재 마이그레이션 상태 확인
 cd backend && uv run alembic current
+
+# 마이그레이션 히스토리 전체 조회
+cd backend && uv run alembic history --verbose
 ```
 
 ### Tests

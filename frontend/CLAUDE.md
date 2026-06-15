@@ -122,7 +122,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
 
-**테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트만 존재: `format.test.ts`, `error.test.ts`, `colors.test.ts`.
+**테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트: `format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`.
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
 
@@ -232,6 +232,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
   import { isOverseasMarket } from "../constants/markets";
   // isOverseasMarket("NYSE") → true, isOverseasMarket("KOSPI") → false
   ```
+
+**플랫폼 감지 유틸리티 (`src/utils/platform.ts`)**
+- `isNativePlatform()` — Capacitor WebView(네이티브 앱) 여부 감지. Android 빌드에서만 `true` 반환.
+- `getApiBaseUrl()` — 네이티브: `VITE_API_DOMAIN` 기반 절대 URL, 웹: `""` (상대 경로 유지).
+- API 클라이언트나 네이티브 전용 분기 작성 시 인라인 `window.Capacitor` 접근 금지 — 이 함수 사용.
 
 **차트 유틸리티 (`src/utils/chart.ts`)**
 - `chartTooltipStyle(isDark)` — Recharts `<Tooltip>` 다크모드 스타일 반환. 인라인 스타일 객체 중복 작성 금지.
