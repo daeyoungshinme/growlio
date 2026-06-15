@@ -108,7 +108,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -117,9 +117,11 @@ class TestGetTaxSummary:
             "year", "dividend_income_krw", "dividend_tax_krw",
             "overseas_unrealized_gain_krw", "overseas_gain_deduction_krw",
             "overseas_tax_estimated_krw", "domestic_stock_value_krw",
+            "domestic_unrealized_gain_krw",
             "domestic_large_holder_warning", "comprehensive_tax_warning",
             "total_estimated_tax_krw", "total_fees_krw",
-            "harvesting_recommendations", "note", "rates",
+            "harvesting_recommendations", "financial_investment_tax_simulation",
+            "note", "rates",
         ]
         for key in required:
             assert key in result, f"Missing key: {key}"
@@ -133,7 +135,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=dividend_income),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -150,7 +152,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(overseas_unrealized, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(overseas_unrealized, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -167,7 +169,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(1_000_000.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(1_000_000.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -182,7 +184,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 1_000_000_000.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 1_000_000_000.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -197,7 +199,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=20_000_001.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -212,7 +214,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=15_000.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2025, mock_db)
@@ -227,7 +229,7 @@ class TestGetTaxSummary:
         with (
             patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
             patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
-            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0)),
+            patch("app.services.tax_service._calc_stock_unrealized", new_callable=AsyncMock, return_value=(0.0, 0.0, 0.0)),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
             result = await get_tax_summary(user_id, 2024, mock_db)

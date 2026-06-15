@@ -100,6 +100,7 @@ const mockAnalysis: RebalancingAnalysis = {
   },
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockKisAccounts: AssetAccount[] = [
   {
     id: "acc1",
@@ -111,7 +112,7 @@ const mockKisAccounts: AssetAccount[] = [
     deposit_usd: null,
     is_mock_mode: false,
     target_portfolio_id: null,
-  } as AssetAccount,
+  } as unknown as AssetAccount,
 ];
 
 const baseState: ExecutionState = {
@@ -148,7 +149,7 @@ describe("executionReducer", () => {
   it("BALANCES_LOADED — 잔고와 입금을 업데이트한다", () => {
     const action: ExecutionAction = {
       type: "BALANCES_LOADED",
-      balances: { acc1: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price_krw: 70000, current_price_krw: 70000, name: "삼성전자", market: "KRX" }] },
+      balances: { acc1: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price: 70000, current_price: 70000, name: "삼성전자", market: "KRX" }] },
       deposits: { acc1: 1000000 },
       orderables: { acc1: 800000 },
       states: { acc1: "loaded" },
@@ -360,7 +361,9 @@ describe("useRebalancingBalances", () => {
     const { fetchBrokerBalance } = await import("@/api/rebalancing");
     vi.mocked(fetchBrokerBalance).mockResolvedValue({
       account_id: "acc1",
-      positions: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price_krw: 70000, current_price_krw: 70000, name: "삼성전자", market: "KRX" }],
+      account_name: "KIS 계좌",
+      is_mock: false,
+      positions: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price: 70000, current_price: 70000, name: "삼성전자", market: "KRX" }],
       deposit_krw: 1000000,
       orderable_krw: 800000,
       error: null,
@@ -417,6 +420,8 @@ describe("useRebalancingBalances", () => {
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([
       {
         account_id: "acc1",
+        account_name: "KIS 계좌",
+        is_mock: false,
         positions: [],
         deposit_krw: 1000000,
         orderable_krw: 800000,
@@ -443,6 +448,8 @@ describe("useRebalancingBalances", () => {
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([
       {
         account_id: "acc1",
+        account_name: "KIS 계좌",
+        is_mock: false,
         positions: [],
         deposit_krw: 0,
         orderable_krw: null,

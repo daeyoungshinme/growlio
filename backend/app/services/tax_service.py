@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Any
+from typing import Any, TypedDict
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
+from app.services._snapshot_queries import latest_snapshot_subquery
 
 _OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
@@ -19,6 +20,80 @@ _OVERSEAS_GAIN_DEDUCTION = 2_500_000
 _OVERSEAS_TAX_RATE = 0.22
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
 _COMPREHENSIVE_TAX_THRESHOLD = 20_000_000
+
+# 금융투자소득세 상수 (2025년 이후 유예 중)
+_GEUMT_DOMESTIC_DEDUCTION = 50_000_000   # 국내 주식 5천만원 기본공제
+_GEUMT_RATE_STANDARD = 0.20             # 기본세율 20%
+_GEUMT_RATE_EXCESS = 0.25               # 3억 초과분 25%
+_GEUMT_EXCESS_THRESHOLD = 300_000_000   # 누진 구간 기준 3억
+
+
+class _GeuMTRates(TypedDict):
+    standard_pct: float
+    excess_above_300m_pct: float
+
+
+class GeuMTSimulationResult(TypedDict):
+    overseas_gain_krw: float
+    overseas_deduction_krw: int
+    overseas_taxable_krw: float
+    overseas_tax_krw: float
+    domestic_gain_krw: float
+    domestic_deduction_krw: int
+    domestic_taxable_krw: float
+    domestic_tax_krw: float
+    total_tax_krw: float
+    current_overseas_tax_krw: float
+    tax_difference_krw: float
+    note: str
+    rates: _GeuMTRates
+
+
+def _calc_geumt_tax(taxable_gain: float) -> float:
+    """금투세 누진 세율 계산. 3억 이하 20%, 초과분 25%."""
+    if taxable_gain <= 0:
+        return 0.0
+    if taxable_gain <= _GEUMT_EXCESS_THRESHOLD:
+        return taxable_gain * _GEUMT_RATE_STANDARD
+    return (
+        _GEUMT_EXCESS_THRESHOLD * _GEUMT_RATE_STANDARD
+        + (taxable_gain - _GEUMT_EXCESS_THRESHOLD) * _GEUMT_RATE_EXCESS
+    )
+
+
+def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float) -> GeuMTSimulationResult:
+    """금융투자소득세 시뮬레이션 (2025년 이후 유예 중).
+
+    미실현 손익 기준 추정치. 실제 과세는 실현 손익 기준.
+    """
+    overseas_taxable = max(0.0, overseas_gain - _OVERSEAS_GAIN_DEDUCTION)
+    domestic_taxable = max(0.0, domestic_gain - _GEUMT_DOMESTIC_DEDUCTION)
+
+    overseas_tax = _calc_geumt_tax(overseas_taxable)
+    domestic_tax = _calc_geumt_tax(domestic_taxable)
+    total_tax = overseas_tax + domestic_tax
+
+    current_overseas_tax = max(0.0, overseas_gain - _OVERSEAS_GAIN_DEDUCTION) * _OVERSEAS_TAX_RATE
+    tax_difference = total_tax - current_overseas_tax
+
+    return {
+        "overseas_gain_krw": round(overseas_gain, 0),
+        "overseas_deduction_krw": _OVERSEAS_GAIN_DEDUCTION,
+        "overseas_taxable_krw": round(overseas_taxable, 0),
+        "overseas_tax_krw": round(overseas_tax, 0),
+        "domestic_gain_krw": round(domestic_gain, 0),
+        "domestic_deduction_krw": _GEUMT_DOMESTIC_DEDUCTION,
+        "domestic_taxable_krw": round(domestic_taxable, 0),
+        "domestic_tax_krw": round(domestic_tax, 0),
+        "total_tax_krw": round(total_tax, 0),
+        "current_overseas_tax_krw": round(current_overseas_tax, 0),
+        "tax_difference_krw": round(tax_difference, 0),
+        "note": "금투세는 2025년 이후 유예 중입니다. 현재 미실현 손익 기준 추정치입니다.",
+        "rates": {
+            "standard_pct": _GEUMT_RATE_STANDARD * 100,
+            "excess_above_300m_pct": _GEUMT_RATE_EXCESS * 100,
+        },
+    }
 
 
 async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> dict[str, Any]:
@@ -36,7 +111,7 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     )
     dividend_tax = dividend_income * _DIVIDEND_TAX_RATE
 
-    overseas_unrealized, domestic_stock_krw = await _calc_stock_unrealized(user_id, db)
+    overseas_unrealized, domestic_stock_krw, domestic_unrealized = await _calc_stock_unrealized(user_id, db)
     overseas_gain_taxable = max(0.0, overseas_unrealized - _OVERSEAS_GAIN_DEDUCTION)
     overseas_tax_estimated = overseas_gain_taxable * _OVERSEAS_TAX_RATE
 
@@ -47,6 +122,7 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
 
     positions = await get_overseas_positions_detail(user_id, db)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable)
+    geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized)
 
     return {
         "year": year,
@@ -56,11 +132,13 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
         "overseas_gain_deduction_krw": _OVERSEAS_GAIN_DEDUCTION,
         "overseas_tax_estimated_krw": round(overseas_tax_estimated, 0),
         "domestic_stock_value_krw": round(domestic_stock_krw, 0),
+        "domestic_unrealized_gain_krw": round(domestic_unrealized, 0),
         "domestic_large_holder_warning": domestic_large_holder_warning,
         "comprehensive_tax_warning": comprehensive_tax_warning,
         "total_estimated_tax_krw": round(dividend_tax + overseas_tax_estimated, 0),
         "total_fees_krw": round(total_fees, 0),
         "harvesting_recommendations": harvesting,
+        "financial_investment_tax_simulation": geumt_simulation,
         "note": (
             "해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. "
             "실제 납부액은 실현 손익 기준으로 계산됩니다."
@@ -79,15 +157,7 @@ async def get_overseas_positions_detail(
 
     최신 스냅샷 기준. 수익·손실 종목 모두 포함.
     """
-    subq = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .where(AssetSnapshot.user_id == user_id)
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
+    subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -200,20 +270,12 @@ async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession)
 
 async def _calc_stock_unrealized(
     user_id: uuid.UUID, db: AsyncSession
-) -> tuple[float, float]:
-    """최신 스냅샷 기준 해외주식 미실현 손익과 국내주식 평가액 반환.
+) -> tuple[float, float, float]:
+    """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
 
-    Returns: (overseas_unrealized_krw, domestic_stock_value_krw)
+    Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw)
     """
-    subq = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .where(AssetSnapshot.user_id == user_id)
-        .group_by(AssetSnapshot.account_id)
-        .subquery()
-    )
+    subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -233,6 +295,7 @@ async def _calc_stock_unrealized(
     overseas_value = 0.0
     overseas_invested = 0.0
     domestic_value = 0.0
+    domestic_invested = 0.0
 
     for snap, _acc in rows:
         for pos in snap.position_items:
@@ -246,6 +309,8 @@ async def _calc_stock_unrealized(
                 overseas_invested += avg * qty
             elif market in _DOMESTIC_MARKETS:
                 domestic_value += cur * qty
+                domestic_invested += avg * qty
 
     overseas_unrealized = overseas_value - overseas_invested
-    return overseas_unrealized, domestic_value
+    domestic_unrealized = domestic_value - domestic_invested
+    return overseas_unrealized, domestic_value, domestic_unrealized

@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronDown, ChevronUp, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
 import TaxPlannerSection from "@/components/invest/TaxPlannerSection";
+import { GeumtSimulationSection } from "@/components/invest/GeumtSimulationSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { fmtKrw } from "@/utils/format";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -13,6 +14,7 @@ export default function TaxOptimizationCard() {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear);
   const [plannerOpen, setPlannerOpen] = useState(false);
+  const [geumtOpen, setGeumtOpen] = useState(false);
 
   const { data: taxData, isLoading: taxLoading } = useQuery({
     queryKey: QUERY_KEYS.taxSummary(taxYear),
@@ -122,6 +124,23 @@ export default function TaxOptimizationCard() {
                 <TaxPlannerSection positions={positionsData} />
               </ErrorBoundary>
             ) : null
+          )}
+
+          <button
+            onClick={() => setGeumtOpen((v) => !v)}
+            className="w-full flex items-center justify-between py-2 text-xs font-medium text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
+          >
+            <span>금투세 시뮬레이션 — 유예 중 세제 미리 보기</span>
+            {geumtOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {geumtOpen && taxData.financial_investment_tax_simulation && (
+            <ErrorBoundary variant="section">
+              <GeumtSimulationSection
+                sim={taxData.financial_investment_tax_simulation}
+                currentOverseasTax={taxData.overseas_tax_estimated_krw}
+              />
+            </ErrorBoundary>
           )}
         </div>
       )}

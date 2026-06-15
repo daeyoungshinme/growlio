@@ -318,7 +318,9 @@ describe("useGoalSettings", () => {
   });
 
   it("데이터 로드 후 data가 설정된다", async () => {
-    const mockData = {
+    const { fetchDCAAnalysis } = await import("@/api/invest");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mockData: any = {
       settings: {
         monthly_deposit_amount: 500000,
         goal_annual_return_pct: 8,
@@ -331,7 +333,6 @@ describe("useGoalSettings", () => {
       yearly_achievements: [],
       goal_timeline: null,
     };
-    const { fetchDCAAnalysis } = await import("@/api/invest");
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockData);
 
     const { result } = renderHook(() => useGoalSettings(), { wrapper: createWrapper() });
@@ -342,12 +343,13 @@ describe("useGoalSettings", () => {
 
   it("editing 초기값이 false다", async () => {
     const { fetchDCAAnalysis } = await import("@/api/invest");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(fetchDCAAnalysis).mockResolvedValue({
-      settings: null,
+      settings: null as any,
       is_configured: false,
       projection_months: [],
       yearly_achievements: [],
-      goal_timeline: null,
+      goal_timeline: null as any,
     });
 
     const { result } = renderHook(() => useGoalSettings(), { wrapper: createWrapper() });
