@@ -130,7 +130,6 @@ describe("MonthlyAchievementTable", () => {
   });
 
   it("renders monthly data", () => {
-    const today = new Date().toISOString().slice(0, 7);
     const pastData: DCAProjectionPoint[] = [
       { month: "2023-01", projected_krw: 1000000, actual_krw: 950000, achievement_pct: 95, has_data: true },
       { month: "2023-02", projected_krw: 2000000, actual_krw: 2100000, achievement_pct: 105, has_data: true },

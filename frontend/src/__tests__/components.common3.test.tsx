@@ -78,7 +78,7 @@ describe("ErrorBoundary", () => {
   });
 
   it("retry button resets error state (section variant)", () => {
-    const { rerender } = render(
+    render(
       <ErrorBoundary variant="section">
         <BrokenComponent shouldThrow />
       </ErrorBoundary>
@@ -91,11 +91,12 @@ describe("ErrorBoundary", () => {
   });
 
   it("shows ChunkLoadError reload button in section", () => {
-    function ChunkError() {
+    const ChunkError = () => {
       const e = new Error("Loading chunk 1 failed");
       e.name = "ChunkLoadError";
       throw e;
-    }
+      return null; // unreachable — satisfies JSX component return type
+    };
     render(
       <ErrorBoundary variant="section">
         <ChunkError />

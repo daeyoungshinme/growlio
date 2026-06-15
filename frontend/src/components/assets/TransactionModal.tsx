@@ -80,7 +80,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
       invalidate();
       setEditingTx(null);
       resetForm();
-      triggerDepositPrompt((vars.data?.amount as number) ?? 0, (vars.data?.transaction_type as string) ?? "");
+      triggerDepositPrompt(vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
     },
     onError: () => toast("내역 수정에 실패했습니다"),
   });

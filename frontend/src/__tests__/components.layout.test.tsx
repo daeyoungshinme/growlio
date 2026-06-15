@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { MemoryRouter, Route, Routes, Outlet } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 // Mock all heavy hooks/dependencies
 vi.mock("@/hooks/usePullToRefresh", () => ({

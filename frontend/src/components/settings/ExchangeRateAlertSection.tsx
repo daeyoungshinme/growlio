@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import {
   fetchExchangeRateAlerts,
@@ -9,22 +9,17 @@ import {
   type ExchangeRateAlert,
 } from "@/api/alerts";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
+import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { SectionCard, inputClass, labelClass } from "./shared";
+import { SectionCard, DeleteIcon, inputClass, labelClass } from "./shared";
 
 interface Props {
   userEmail?: string;
   onSettingsChange: () => void;
 }
-
-const DeleteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
 
 export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props) {
   const queryClient = useQueryClient();
@@ -38,10 +33,14 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
   const [notificationEmail, setNotificationEmail] = useState(userEmail ?? "");
   const [saving, setSaving] = useState<string | null>(null);
 
-  const { data: alerts = [] } = useQuery<ExchangeRateAlert[]>({
-    queryKey: QUERY_KEYS.exchangeRateAlerts,
-    queryFn: fetchExchangeRateAlerts,
-  });
+  const { items: alerts, reactivateMutation: reactivateAlertMutation, deleteMutation: deleteAlertMutation } =
+    useAlertCrud<ExchangeRateAlert>({
+      queryKey: QUERY_KEYS.exchangeRateAlerts,
+      queryFn: fetchExchangeRateAlerts,
+      reactivateFn: reactivateExchangeRateAlert,
+      deleteFn: deleteExchangeRateAlert,
+      invalidateFn: invalidateAlertData,
+    });
 
   const createAlertMutation = useMutation({
     mutationFn: () =>
@@ -56,20 +55,6 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
       toast("알림이 등록되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "알림 등록에 실패했습니다"), "error"),
-  });
-
-  const reactivateAlertMutation = useMutation({
-    mutationFn: (id: string) => reactivateExchangeRateAlert(id),
-    onSuccess: () => {
-      invalidateAlertData(queryClient);
-      toast("알림이 재활성화되었습니다", "success");
-    },
-    onError: (e) => toast(extractErrorMessage(e, "재활성화에 실패했습니다"), "error"),
-  });
-
-  const deleteAlertMutation = useMutation({
-    mutationFn: (id: string) => deleteExchangeRateAlert(id),
-    onSuccess: () => invalidateAlertData(queryClient),
   });
 
   const saveNotificationEmail = async () => {

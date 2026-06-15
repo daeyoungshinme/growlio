@@ -82,8 +82,8 @@ describe("PortfolioWeightChart", () => {
 
   it("renders with valid items", () => {
     const items = [
-      { ticker: "AAPL", name: "Apple", weight: 40, is_global: false },
-      { ticker: "005930", name: "삼성전자", weight: 30, is_global: false },
+      { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 40 },
+      { ticker: "005930", name: "삼성전자", market: "KOSPI", weight: 30 },
     ];
     renderWithProviders(
       <PortfolioWeightChart items={items} />
@@ -93,7 +93,7 @@ describe("PortfolioWeightChart", () => {
 
   it("shows concentration warning when weight > 50", () => {
     const items = [
-      { ticker: "AAPL", name: "Apple", weight: 60, is_global: false },
+      { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 60 },
     ];
     renderWithProviders(
       <PortfolioWeightChart items={items} />
@@ -107,24 +107,48 @@ const mockAccounts: AssetAccount[] = [
   {
     id: "acc1",
     name: "한국투자 주식계좌",
-    broker: "KIS",
-    account_number: "123-456",
-    account_type: "STOCK",
+    asset_type: "STOCK_KIS",
+    data_source: "KIS_API",
+    institution: null,
+    kis_account_no: "123-456",
+    kiwoom_account_no: null,
     is_mock_mode: false,
     is_active: true,
-    goal_portfolio_id: null,
+    manual_amount: null,
+    manual_currency: "KRW",
+    manual_updated_at: null,
+    deposit_krw: null,
+    deposit_usd: null,
+    real_estate_details: null,
+    include_in_total: true,
+    sort_order: 0,
+    notes: null,
     created_at: "2024-01-01",
+    has_own_kis_credentials: false,
+    has_own_kiwoom_credentials: false,
   },
   {
     id: "acc2",
     name: "키움 모의계좌",
-    broker: "KIWOOM",
-    account_number: "789-012",
-    account_type: "STOCK",
+    asset_type: "STOCK_KIWOOM",
+    data_source: "KIWOOM_API",
+    institution: null,
+    kis_account_no: null,
+    kiwoom_account_no: "789-012",
     is_mock_mode: true,
     is_active: true,
-    goal_portfolio_id: null,
+    manual_amount: null,
+    manual_currency: "KRW",
+    manual_updated_at: null,
+    deposit_krw: null,
+    deposit_usd: null,
+    real_estate_details: null,
+    include_in_total: true,
+    sort_order: 1,
+    notes: null,
     created_at: "2024-01-01",
+    has_own_kis_credentials: false,
+    has_own_kiwoom_credentials: false,
   },
 ];
 
@@ -203,11 +227,13 @@ describe("PortfolioAccountSelector", () => {
 const mockAnalysis: RebalancingAnalysis = {
   portfolio_id: "p1",
   portfolio_name: "포트폴리오 A",
-  total_value_krw: 10000000,
-  total_cash_krw: 0,
-  target_weighted_cagr_10y_pct: 8.5,
-  target_portfolio_annual_dividend: 300000,
+  base_type: "STOCK_ONLY",
   base_value_krw: 10000000,
+  analyzed_at: "2024-01-01",
+  current_portfolio_annual_dividend: 0,
+  target_portfolio_annual_dividend: 300000,
+  target_weighted_cagr_10y_pct: 8.5,
+  ticker_account_map: {},
   items: [
     {
       ticker: "AAPL",
@@ -215,22 +241,18 @@ const mockAnalysis: RebalancingAnalysis = {
       market: "NASDAQ",
       current_weight_pct: 20,
       target_weight_pct: 25,
+      weight_diff_pct: 5,
       current_value_krw: 2000000,
       target_value_krw: 2500000,
       diff_krw: 500000,
       shares_to_trade: 3,
       current_price_krw: 170000,
-      currency: "USD",
-      drift_pct: 5,
-      drift_level: "OVER",
-      estimated_annual_dividend_krw: 50000,
-      target_annual_dividend_krw: 65000,
-      dividend_diff_krw: 15000,
       cagr_10y_pct: 12.5,
       return_10y_pct: 224.0,
       actual_years_10y: 10,
     },
   ],
+  untracked_holdings: [],
 };
 
 describe("PortfolioComparisonPanel", () => {

@@ -2,7 +2,7 @@
  * Tests for settings components, RebalancingTable, ResetPasswordPage, and other uncovered components.
  */
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 
@@ -113,15 +113,25 @@ import type { AssetAccount } from "@/api/assets";
 const mockAccount: AssetAccount = {
   id: "acc1",
   name: "한국투자",
-  broker: "KIS",
-  account_number: "123",
-  account_type: "STOCK",
   asset_type: "STOCK_KIS",
+  data_source: "KIS_API",
+  institution: null,
+  kis_account_no: "123",
+  kiwoom_account_no: null,
   is_mock_mode: false,
   is_active: true,
-  goal_portfolio_id: null,
+  manual_amount: null,
+  manual_currency: "KRW",
+  manual_updated_at: null,
+  deposit_krw: null,
+  deposit_usd: null,
+  real_estate_details: null,
+  include_in_total: true,
+  sort_order: 0,
+  notes: null,
   created_at: "2024-01-01",
-  data_source: "KIS_API",
+  has_own_kis_credentials: false,
+  has_own_kiwoom_credentials: false,
 };
 
 const mockItem: RebalancingItem = {
@@ -130,21 +140,15 @@ const mockItem: RebalancingItem = {
   market: "NASDAQ",
   current_weight_pct: 20,
   target_weight_pct: 25,
+  weight_diff_pct: 5,
   current_value_krw: 2000000,
   target_value_krw: 2500000,
   diff_krw: 500000,
   shares_to_trade: 3,
   current_price_krw: 170000,
-  currency: "USD",
-  drift_pct: 5,
-  drift_level: "OVER",
-  estimated_annual_dividend_krw: 50000,
-  target_annual_dividend_krw: 65000,
-  dividend_diff_krw: 15000,
   cagr_10y_pct: 12.5,
   return_10y_pct: 224.0,
   actual_years_10y: 10,
-  weight_diff_pct: 5,
   annual_dividend_current_krw: 100000,
   annual_dividend_target_krw: 150000,
   annual_dividend_diff_krw: 50000,
@@ -154,13 +158,15 @@ const mockItem: RebalancingItem = {
 const mockAnalysis: RebalancingAnalysis = {
   portfolio_id: "p1",
   portfolio_name: "테스트 포트폴리오",
-  total_value_krw: 10000000,
-  total_cash_krw: 0,
-  target_weighted_cagr_10y_pct: 8.5,
-  target_portfolio_annual_dividend: 300000,
+  base_type: "VALUE",
   base_value_krw: 10000000,
+  analyzed_at: "2024-01-01",
+  current_portfolio_annual_dividend: 0,
+  target_portfolio_annual_dividend: 300000,
+  target_weighted_cagr_10y_pct: 8.5,
   items: [mockItem],
   untracked_holdings: [],
+  ticker_account_map: {},
 };
 
 // =========================================
@@ -397,8 +403,17 @@ describe("RebalancingTable", () => {
       mode: "AUTO" as const,
       threshold_pct: 5,
       is_active: true,
-      auto_execute: false,
+      schedule_type: "DAILY" as const,
+      schedule_day_of_week: null,
+      schedule_day_of_month: null,
+      only_when_drift: true,
+      strategy: "BUY_ONLY" as const,
+      account_id: null,
+      order_type: "MARKET" as const,
+      market_condition_mode: "DISABLED" as const,
+      last_triggered_at: null,
       created_at: "2024-01-01",
+      updated_at: "2024-01-01",
     };
     renderWithProviders(
       <RebalancingTable

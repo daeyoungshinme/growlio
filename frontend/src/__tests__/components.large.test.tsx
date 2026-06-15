@@ -7,7 +7,7 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 import type { AssetAccount } from "@/api/assets";
-import type { PortfolioPosition, AggregatedPosition } from "@/types";
+import type { PortfolioPosition } from "@/types";
 
 // ---- Recharts mock ----
 vi.mock("recharts", () => ({
@@ -208,18 +208,25 @@ import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnaly
 const mockStockAccount: AssetAccount = {
   id: "acc1",
   name: "한국투자 주식",
-  broker: "KIS",
-  account_number: "123-456",
-  account_type: "STOCK",
   asset_type: "STOCK_KIS",
+  data_source: "KIS_API",
+  institution: null,
+  kis_account_no: "123456789",
+  kiwoom_account_no: null,
   is_mock_mode: false,
   is_active: true,
-  goal_portfolio_id: null,
+  manual_amount: null,
+  manual_currency: "KRW",
+  manual_updated_at: null,
   deposit_krw: 1000000,
   deposit_usd: 500,
+  real_estate_details: null,
+  include_in_total: true,
+  sort_order: 0,
+  notes: null,
   created_at: "2024-01-01",
-  data_source: "KIS_API",
-  kis_account_no: "123456789",
+  has_own_kis_credentials: false,
+  has_own_kiwoom_credentials: false,
 };
 
 const mockStats: AccountStats = {
@@ -491,16 +498,13 @@ describe("AnalysisPanel", () => {
   const mockPortfolio = {
     id: "p1",
     name: "테스트 포트폴리오",
-    items: [
-      {
-        ticker: "AAPL",
-        name: "Apple",
-        market: "NASDAQ",
-        target_weight_pct: 50,
-        is_global: true,
-      },
-    ],
+    base_type: "STOCK_ONLY",
+    sort_order: 0,
     created_at: "2024-01-01",
+    updated_at: "2024-01-01",
+    items: [
+      { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 50 },
+    ],
   };
 
   it("renders without crash", async () => {

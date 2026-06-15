@@ -94,7 +94,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
     onSuccess: (_, vars) => {
       invalidateTransactionData(qc);
       toast("추가되었습니다", "success");
-      onSuccess(vars.account_id as string ?? "", vars.amount ?? 0, vars.transaction_type);
+      onSuccess(vars.account_id ?? "", vars.amount ?? 0, vars.transaction_type);
     },
     onError: (e) => toast(extractErrorMessage(e, "내역 저장에 실패했습니다"), "error"),
   });
@@ -105,7 +105,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
     onSuccess: (_, vars) => {
       invalidateTransactionData(qc);
       toast("수정되었습니다", "success");
-      onSuccess(vars.data?.account_id as string ?? "", vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
+      onSuccess(vars.data?.account_id ?? "", vars.data?.amount ?? 0, vars.data?.transaction_type ?? "");
     },
     onError: (e) => toast(extractErrorMessage(e, "내역 수정에 실패했습니다"), "error"),
   });

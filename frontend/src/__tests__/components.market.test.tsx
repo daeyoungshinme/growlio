@@ -69,13 +69,18 @@ describe("EconomicCalendarList", () => {
 
 // ------- IndicatorCard -------
 const mockIndicator: IndicatorLatest = {
-  series_id: "UNRATE",
+  code: "UNRATE",
   name: "실업률",
+  name_en: "Unemployment Rate",
   unit: "%",
+  frequency: "Monthly",
+  description: "미국 실업률",
   latest_value: 3.7,
-  previous_value: 3.8,
-  change_pct: -2.63,
   latest_date: "2024-01-15",
+  previous_value: 3.8,
+  previous_date: "2023-12-15",
+  change: -0.1,
+  change_pct: -2.63,
 };
 
 describe("IndicatorCard", () => {

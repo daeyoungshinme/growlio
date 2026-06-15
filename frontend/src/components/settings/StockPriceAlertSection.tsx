@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   fetchStockPriceAlerts,
   createStockPriceAlert,
@@ -9,17 +9,12 @@ import {
 } from "@/api/alerts";
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
+import { useAlertCrud } from "@/hooks/useAlertCrud";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateStockPriceAlertData } from "@/utils/queryInvalidation";
-import { SectionCard, inputClass, labelClass } from "./shared";
-
-const DeleteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-  </svg>
-);
+import { SectionCard, DeleteIcon, inputClass, labelClass } from "./shared";
 
 export function StockPriceAlertSection() {
   const qc = useQueryClient();
@@ -32,9 +27,12 @@ export function StockPriceAlertSection() {
   const { suggestions, isSearching, search: runSearch, clearSuggestions } = useStockSearch();
   const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
 
-  const { data: stockAlerts = [] } = useQuery<StockPriceAlert[]>({
+  const { items: stockAlerts, reactivateMutation, deleteMutation } = useAlertCrud<StockPriceAlert>({
     queryKey: QUERY_KEYS.stockPriceAlerts,
     queryFn: fetchStockPriceAlerts,
+    reactivateFn: reactivateStockPriceAlert,
+    deleteFn: deleteStockPriceAlert,
+    invalidateFn: invalidateStockPriceAlertData,
   });
 
   const createMutation = useMutation({
@@ -57,16 +55,6 @@ export function StockPriceAlertSection() {
       toast("주가 알림이 등록되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "알림 등록에 실패했습니다"), "error"),
-  });
-
-  const reactivateMutation = useMutation({
-    mutationFn: (id: string) => reactivateStockPriceAlert(id),
-    onSuccess: () => { invalidateStockPriceAlertData(qc); toast("알림이 재활성화되었습니다", "success"); },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => deleteStockPriceAlert(id),
-    onSuccess: () => invalidateStockPriceAlertData(qc),
   });
 
   const handleSearch = (value: string) => {

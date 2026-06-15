@@ -144,7 +144,7 @@ describe("useExchangeRate", () => {
 
   it("shows toast on error", async () => {
     const { useExchangeRateContext } = await import("@/context/ExchangeRateContext");
-    vi.mocked(useExchangeRateContext).mockReturnValueOnce({ rate: null, error: new Error("Network error") });
+    vi.mocked(useExchangeRateContext).mockReturnValueOnce({ rate: null, isLoading: false, error: new Error("Network error") });
     const { useExchangeRate } = await import("@/hooks/useExchangeRate");
     const wrapper = createWrapper();
     const { result } = renderHook(() => useExchangeRate(), { wrapper });
