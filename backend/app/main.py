@@ -1,7 +1,6 @@
 import re
 import time
 import uuid
-from collections.abc import Callable
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -9,7 +8,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
@@ -81,8 +80,6 @@ app = FastAPI(
     docs_url="/docs" if settings.app_env == "development" else None,
 )
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
-
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # slowapi handler signature
 
@@ -135,15 +132,6 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-@app.middleware("http")
-async def protect_metrics_endpoint(request: Request, call_next: Callable) -> Response:
-    if request.url.path == "/metrics" and settings.metrics_token:
-        auth = request.headers.get("Authorization", "")
-        if auth != f"Bearer {settings.metrics_token}":
-            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
-    return await call_next(request)
-
-
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -183,3 +171,12 @@ async def health():
     if db_ok and redis_ok:
         return {"status": "ok"}
     return JSONResponse(status_code=503, content={"status": "unavailable"})
+
+
+@app.get("/metrics", include_in_schema=False)
+async def metrics_endpoint(request: Request) -> Response:
+    if settings.metrics_token:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {settings.metrics_token}":
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

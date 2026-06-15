@@ -45,7 +45,7 @@ dependencies = [
     # Error tracking
     "sentry-sdk[fastapi]>=2.0.0",
     # Metrics
-    "prometheus-fastapi-instrumentator>=6.1.0",
+    "prometheus-client>=0.20.0",
     # FCM 푸시 알림 (선택적 — FIREBASE_CREDENTIALS_JSON 환경변수 설정 시 활성화)
     "firebase-admin>=6.5.0,<7.0.0",
 ]
