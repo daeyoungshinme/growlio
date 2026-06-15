@@ -11,23 +11,6 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 import type { PortfolioMetrics, SeriesData } from "@/api/backtest";
 
-// ---- Recharts mock ----
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Area: () => <div />,
-  Bar: () => <div />,
-  Line: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
-  Legend: () => <div />,
-  ReferenceLine: () => <div />,
-}));
-
 // ---- API mocks ----
 vi.mock("@/api/client", () => ({
   api: {

@@ -92,9 +92,9 @@ describe("useAuthStore", () => {
     const { supabase } = await import("@/lib/supabase");
     const { api } = await import("@/api/client");
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
-      data: { user: { id: "user-1", email: "test@example.com" }, session: {} as never },
+      data: { user: { id: "user-1", email: "test@example.com" }, session: null },
       error: null,
-    } as never);
+    } as any);
     vi.mocked(api.post).mockResolvedValue({});
 
     const { useAuthStore } = await import("@/stores/authStore");
@@ -109,7 +109,7 @@ describe("useAuthStore", () => {
     vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
       data: { user: null, session: null },
       error: { message: "Invalid credentials" },
-    } as never);
+    } as any);
 
     const { useAuthStore } = await import("@/stores/authStore");
     await expect(
@@ -133,7 +133,7 @@ describe("useAuthStore", () => {
     const { supabase } = await import("@/lib/supabase");
     vi.mocked(supabase.auth.getSession).mockResolvedValue({
       data: { session: null },
-    } as never);
+    } as any);
 
     const { useAuthStore } = await import("@/stores/authStore");
     await useAuthStore.getState().checkAuth();
@@ -148,7 +148,7 @@ describe("useAuthStore", () => {
       data: {
         session: { user: { id: "user-1", email: "test@example.com" } },
       },
-    } as never);
+    } as any);
     vi.mocked(api.get).mockResolvedValue({
       data: { needs_password_reset: false },
     });
@@ -181,7 +181,7 @@ describe("useAuthStore", () => {
     vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
       data: null,
       error: new Error("Email not found"),
-    } as never);
+    } as any);
 
     const { useAuthStore } = await import("@/stores/authStore");
     await expect(useAuthStore.getState().forgotPassword("unknown@example.com")).rejects.toThrow();

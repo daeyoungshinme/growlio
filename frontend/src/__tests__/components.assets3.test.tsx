@@ -3,6 +3,7 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 import type { Transaction } from "@/api/transactions";
+import type { PortfolioOverview } from "@/types";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350 })),
@@ -99,7 +100,7 @@ describe("StockAccountSummaryCard", () => {
       total_stock_krw: 10000000,
       unrealized_pnl_krw: 500000,
       stock_return_pct: 5.0,
-    } as never;
+    } as unknown as PortfolioOverview;
 
     renderWithProviders(
       <StockAccountSummaryCard
@@ -134,7 +135,7 @@ describe("StockAccountSummaryCard", () => {
       total_stock_krw: 9000000,
       unrealized_pnl_krw: -500000,
       stock_return_pct: -5.0,
-    } as never;
+    } as unknown as PortfolioOverview;
 
     renderWithProviders(
       <StockAccountSummaryCard

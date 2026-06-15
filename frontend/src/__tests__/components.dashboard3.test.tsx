@@ -3,22 +3,6 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 
-// Mock recharts
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Legend: () => <div />,
-  Tooltip: () => <div />,
-  Treemap: () => <div />,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => <div />,
-  Cell: () => <div />,
-}));
-
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: () => ({ isDark: false, toggle: vi.fn() }),
 }));

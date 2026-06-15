@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import React from "react";
+import type { AssetAccount } from "@/api/assets";
 // renderWithProviders is not used here - using createWrapper instead
 
 function createWrapper(options?: { path?: string }) {
@@ -201,7 +202,7 @@ describe("useAssetModals", () => {
   it("can set editing real estate", async () => {
     const { useAssetModals } = await import("@/hooks/useAssetModals");
     const { result } = renderHook(() => useAssetModals());
-    const mockAccount = { id: "re1", name: "아파트" } as never;
+    const mockAccount = { id: "re1", name: "아파트" } as unknown as AssetAccount;
     act(() => {
       result.current.setEditingRealEstate(mockAccount);
     });

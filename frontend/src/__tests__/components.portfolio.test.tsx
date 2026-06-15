@@ -3,24 +3,6 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DividendByTicker } from "@/types";
 
-// Mock recharts
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
-  Area: () => <div />,
-  Cell: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
-  Treemap: () => <div />,
-  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Pie: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Legend: () => <div />,
-}));
-
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: () => ({ isDark: false, toggle: vi.fn() }),
 }));

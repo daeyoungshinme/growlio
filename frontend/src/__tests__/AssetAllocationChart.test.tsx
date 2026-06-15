@@ -3,15 +3,6 @@ import { screen } from "@testing-library/react";
 import AssetAllocationChart from "@/components/dashboard/AssetAllocationChart";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
-vi.mock("recharts", () => ({
-  PieChart: ({ children }: { children: React.ReactNode }) => <div data-testid="pie-chart">{children}</div>,
-  Pie: ({ data }: { data: unknown[] }) => <div data-testid="pie" data-count={data?.length} />,
-  Cell: () => null,
-  Tooltip: () => null,
-  Legend: () => null,
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-}));
-
 vi.mock("../stores/themeStore", () => ({
   useThemeStore: () => false,
 }));

@@ -4,21 +4,6 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DCAProjectionPoint, GoalTimeline, YearlyAchievement } from "@/api/invest";
 import type { OverseasPositionDetail } from "@/api/tax";
 
-// Mock recharts
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => <div />,
-  Bar: () => <div />,
-  Cell: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
-  Legend: () => <div />,
-}));
-
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: () => ({ isDark: false, toggle: vi.fn() }),
 }));

@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
+import type { DashboardData } from "../api/dashboard";
+import type { PortfolioOverview } from "@/types";
+import type { DCAAnalysisData } from "../api/invest";
 
 vi.mock("../api/dashboard", () => ({
   fetchDashboard: vi.fn(),
@@ -58,10 +61,10 @@ describe("useDashboardData", () => {
     const { fetchPortfolioOverview, fetchPortfolioOverviewLite } = await import("../api/portfolios");
     const { fetchDCAAnalysis } = await import("../api/invest");
     const { fetchAccounts, fetchExchangeRate } = await import("../api/assets");
-    vi.mocked(fetchDashboard).mockResolvedValue(mockDashboardData as never);
-    vi.mocked(fetchPortfolioOverview).mockResolvedValue(mockOverview as never);
-    vi.mocked(fetchPortfolioOverviewLite).mockResolvedValue(mockOverview as never);
-    vi.mocked(fetchDCAAnalysis).mockResolvedValue(null as never);
+    vi.mocked(fetchDashboard).mockResolvedValue(mockDashboardData as unknown as DashboardData);
+    vi.mocked(fetchPortfolioOverview).mockResolvedValue(mockOverview as unknown as PortfolioOverview);
+    vi.mocked(fetchPortfolioOverviewLite).mockResolvedValue(mockOverview as unknown as PortfolioOverview);
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(null as unknown as DCAAnalysisData);
     vi.mocked(fetchAccounts).mockResolvedValue([]);
     vi.mocked(fetchExchangeRate).mockResolvedValue({ usd_krw: 1350 });
   });

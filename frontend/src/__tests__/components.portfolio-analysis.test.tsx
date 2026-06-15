@@ -5,20 +5,6 @@ import { MemoryRouter } from "react-router-dom";
 import type { AssetAccount } from "@/api/assets";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Pie: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Cell: () => <div />,
-  Tooltip: () => <div />,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Legend: () => <div />,
-}));
-
 vi.mock("@/hooks/useInsights", () => ({
   useInsights: vi.fn(() => ({ data: [], isLoading: false })),
 }));

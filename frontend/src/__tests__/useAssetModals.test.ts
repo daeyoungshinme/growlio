@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useAssetModals } from "@/hooks/useAssetModals";
+import type { AssetAccount } from "@/api/assets";
 
 describe("useAssetModals", () => {
   it("초기 상태: 모든 모달이 닫혀 있고 선택 항목이 없다", () => {
@@ -37,7 +38,7 @@ describe("useAssetModals", () => {
 
   it("setEditingRealEstate가 부동산 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    const mockAccount = { id: "acc-1", name: "내 아파트" } as never;
+    const mockAccount = { id: "acc-1", name: "내 아파트" } as unknown as AssetAccount;
     act(() => { result.current.setEditingRealEstate(mockAccount); });
     expect(result.current.editingRealEstate).toEqual(mockAccount);
     act(() => { result.current.setEditingRealEstate(null); });
@@ -46,7 +47,7 @@ describe("useAssetModals", () => {
 
   it("setEditingBankAccount가 은행 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    const mockAccount = { id: "acc-2", name: "국민은행" } as never;
+    const mockAccount = { id: "acc-2", name: "국민은행" } as unknown as AssetAccount;
     act(() => { result.current.setEditingBankAccount(mockAccount); });
     expect(result.current.editingBankAccount).toEqual(mockAccount);
   });

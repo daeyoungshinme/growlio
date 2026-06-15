@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
+import type { SettingsData } from "@/api/settings";
 
 // ---- API mocks ----
 vi.mock("@/api/client", () => ({
@@ -88,17 +89,6 @@ vi.mock("@/lib/supabase", () => ({
       getSession: vi.fn().mockResolvedValue({ data: { session: null } }),
     },
   },
-}));
-
-// ---- Recharts mock ----
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Bar: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
 }));
 
 // ---- Imports ----
@@ -274,7 +264,7 @@ describe("DCASettingsSection", () => {
       auto_dca_account_id: "acc1",
       has_dart: false,
       has_open_banking: false,
-    } as never;
+    } as unknown as SettingsData;
 
     renderWithProviders(
       <DCASettingsSection current={current} onSettingsChange={vi.fn()} />

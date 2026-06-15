@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
+import type { AssetAccount } from "@/api/assets";
 import StatCard from "@/components/common/StatCard";
 import PriceCell from "@/components/common/PriceCell";
 import BankAccountCard from "@/components/assets/BankAccountCard";
@@ -93,39 +94,39 @@ describe("BankAccountCard", () => {
   };
 
   it("계좌명과 기관명을 표시한다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     expect(screen.getByText("국민은행 입출금")).toBeInTheDocument();
     expect(screen.getByText("국민은행")).toBeInTheDocument();
   });
 
   it("asset_type 레이블을 올바르게 표시한다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     expect(screen.getByText("입출금")).toBeInTheDocument();
   });
 
   it("DEPOSIT 타입이면 예·적금 레이블을 표시한다", () => {
     renderWithProviders(
-      <BankAccountCard account={makeAccount({ asset_type: "DEPOSIT" }) as never} {...defaultProps} />
+      <BankAccountCard account={makeAccount({ asset_type: "DEPOSIT" }) as unknown as AssetAccount} {...defaultProps} />
     );
     expect(screen.getByText("예·적금")).toBeInTheDocument();
   });
 
   it("notes가 있으면 표시한다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     expect(screen.getByText("비상금 통장")).toBeInTheDocument();
   });
 
   it("삭제 버튼 클릭 시 onDelete를 호출한다", () => {
     const onDelete = vi.fn();
     renderWithProviders(
-      <BankAccountCard account={makeAccount() as never} {...defaultProps} onDelete={onDelete} />
+      <BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} onDelete={onDelete} />
     );
     fireEvent.click(screen.getByLabelText("계좌 삭제"));
     expect(onDelete).toHaveBeenCalledWith("acc-1");
   });
 
   it("MANUAL 데이터소스이면 금액 수정 버튼이 나온다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     expect(screen.getByLabelText("금액 수정")).toBeInTheDocument();
   });
 
@@ -140,7 +141,7 @@ describe("BankAccountCard", () => {
   });
 
   it("계좌명 수정 버튼 클릭 시 편집 모드로 전환된다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
     expect(screen.getByRole("textbox")).toBeInTheDocument();
     expect(screen.getByText("저장")).toBeInTheDocument();
@@ -150,7 +151,7 @@ describe("BankAccountCard", () => {
   it("계좌명 저장 시 onEditName을 호출한다", () => {
     const onEditName = vi.fn();
     renderWithProviders(
-      <BankAccountCard account={makeAccount() as never} {...defaultProps} onEditName={onEditName} />
+      <BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} onEditName={onEditName} />
     );
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
     const input = screen.getByRole("textbox");
@@ -160,7 +161,7 @@ describe("BankAccountCard", () => {
   });
 
   it("취소 버튼 클릭 시 편집 모드를 벗어난다", () => {
-    renderWithProviders(<BankAccountCard account={makeAccount() as never} {...defaultProps} />);
+    renderWithProviders(<BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />);
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
     fireEvent.click(screen.getByText("취소"));
     expect(screen.queryByRole("textbox")).toBeNull();

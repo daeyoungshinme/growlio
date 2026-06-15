@@ -3,17 +3,6 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { EconomicCalendarEvent, IndicatorLatest } from "@/api/economicIndicators";
 
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => <div />,
-  XAxis: () => <div />,
-  YAxis: () => <div />,
-  CartesianGrid: () => <div />,
-  Tooltip: () => <div />,
-  ReferenceLine: () => <div />,
-}));
-
 import EconomicCalendar from "@/components/market/EconomicCalendar";
 import EconomicCalendarList from "@/components/market/EconomicCalendarList";
 import IndicatorCard from "@/components/market/IndicatorCard";

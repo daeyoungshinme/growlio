@@ -9,20 +9,6 @@ import { MemoryRouter } from "react-router-dom";
 import type { AssetAccount } from "@/api/assets";
 import type { PortfolioPosition } from "@/types";
 
-// ---- Recharts mock ----
-vi.mock("recharts", () => ({
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="recharts-container">{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  LineChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Area: () => <div />, Bar: () => <div />, Line: () => <div />,
-  Pie: () => <div />, Cell: () => <div />,
-  XAxis: () => <div />, YAxis: () => <div />,
-  CartesianGrid: () => <div />, Tooltip: () => <div />,
-  Legend: () => <div />, Treemap: () => <div />, ReferenceLine: () => <div />,
-}));
-
 // ---- Store mocks ----
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: (selector: (s: { isDark: boolean; toggle: () => void }) => unknown) => {
