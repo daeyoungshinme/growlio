@@ -19,6 +19,8 @@ def override_settings(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")
+    from app.config import settings as _settings
+    monkeypatch.setattr(_settings, "app_env", "test")
 
 
 @pytest.fixture(autouse=True)

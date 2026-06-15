@@ -35,16 +35,16 @@ from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 class TestCacheKeyBuilders:
     def test_current_price_key(self, override_settings):
-        assert current_price_key("AAPL", "NASDAQ") == "price:current:AAPL:NASDAQ"
+        assert current_price_key("AAPL", "NASDAQ") == "test:price:current:AAPL:NASDAQ"
 
     def test_price_return_key(self, override_settings):
-        assert price_return_key(3, "AAPL", "NASDAQ") == "return:3y:AAPL:NASDAQ"
+        assert price_return_key(3, "AAPL", "NASDAQ") == "test:return:3y:AAPL:NASDAQ"
 
     def test_monthly_trend_key(self, override_settings):
         uid = uuid.uuid4()
         key = monthly_trend_key(uid)
         assert str(uid) in key
-        assert key.startswith("monthly_trend:")
+        assert key.startswith("test:monthly_trend:")
 
     def test_dividend_ticker_summary_key(self, override_settings):
         uid = uuid.uuid4()
