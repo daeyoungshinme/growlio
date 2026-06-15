@@ -29,7 +29,7 @@ async def get_owned_or_404(
     return obj
 
 
-async def get_owned_account(account_id: UUID, user_id, db: AsyncSession) -> AssetAccount:
+async def get_owned_account(account_id: UUID, user_id: UUID, db: AsyncSession) -> AssetAccount:
     account = await db.scalar(
         select(AssetAccount).where(
             AssetAccount.id == account_id,

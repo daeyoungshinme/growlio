@@ -37,7 +37,7 @@ from app.services.dividend_providers import (
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.dividend_service import get_ticker_dividend_summary
+from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing_service import analyze_rebalancing

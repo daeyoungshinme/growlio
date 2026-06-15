@@ -92,7 +92,7 @@ class TestDividendMonthPrediction:
 
     def test_known_schedule_produces_months(self):
         """하드코딩된 종목 배당월 목록이 정수 리스트인지 확인."""
-        from app.services.dividend_service import KNOWN_DIVIDEND_SCHEDULES
+        from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES
 
         for key, months in KNOWN_DIVIDEND_SCHEDULES.items():
             assert isinstance(months, list)

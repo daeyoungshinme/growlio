@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAccountPositions } from "@/hooks/useAccountPositions";
 import type { AssetAccount } from "@/api/assets";
 import {
   createTransaction,
@@ -14,7 +14,6 @@ import { useStockSearch } from "@/hooks/useStockSearch";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS } from "@/constants/transaction";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { extractErrorMessage } from "@/utils/error";
@@ -67,20 +66,10 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   } = useStockSearch();
   const [showTickerSuggestions, setShowTickerSuggestions] = useState(false);
 
-  const { data: positionsData } = useQuery<{
-    positions: Array<{ ticker: string; name: string; qty: number }>;
-  }>({
-    queryKey: ["account-positions", form.account_id],
-    queryFn: () =>
-      api
-        .get<{ positions: Array<{ ticker: string; name: string; qty: number }> }>(
-          `/assets/${form.account_id}/positions`
-        )
-        .then((r) => r.data),
-    enabled: !!form.account_id && form.transaction_type === "DIVIDEND",
-    staleTime: STALE_TIME.MEDIUM,
-  });
-  const accountPositions = positionsData?.positions ?? [];
+  const accountPositions = useAccountPositions(
+    form.account_id ?? "",
+    form.transaction_type === "DIVIDEND",
+  );
 
   const resetTicker = () => {
     setTickerDirect(false);

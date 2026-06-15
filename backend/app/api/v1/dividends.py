@@ -16,7 +16,7 @@ from app.services.dividend.drip_service import (
     simulate_drip,
 )
 from app.services.dividend_aggregator import get_dividend_summary
-from app.services.dividend_service import (
+from app.services.dividend.orchestrator import (
     delete_ticker_settings,
     get_position_dividend_yields,
     get_ticker_dividend_summary,

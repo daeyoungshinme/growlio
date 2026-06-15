@@ -89,7 +89,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             result = await sync_account(account, mock_db, redis=MagicMock())
@@ -117,7 +117,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, redis=MagicMock())
@@ -145,7 +145,7 @@ class TestSyncAccount:
         with (
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
-            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, redis=MagicMock())
@@ -184,7 +184,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.get_provider", return_value=mock_provider),
             patch("app.services.asset_service._upsert_snapshot", new=AsyncMock(return_value=fake_snapshot)),
             patch("app.services.asset_service.sync_snapshot_positions", new=AsyncMock()),
-            patch("app.services.asset_service.invalidate_user_caches", new=AsyncMock()),
+            patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
             await sync_account(account, mock_db, redis=MagicMock())

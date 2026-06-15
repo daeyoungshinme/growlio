@@ -186,3 +186,22 @@ async def invalidate_user_caches(redis: RedisType, *keys: str) -> None:
 async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.UUID) -> None:
     """환율 알림 목록 캐시를 삭제한다."""
     await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))
+
+
+async def invalidate_account_caches(
+    redis: RedisType, user_id: uuid.UUID, year: int | None = None
+) -> None:
+    """계좌 싱크 완료 후 관련 캐시 일괄 무효화."""
+    from datetime import date as _date
+
+    _year = year if year is not None else _date.today().year
+    await invalidate_user_caches(
+        redis,
+        monthly_trend_key(user_id),
+        dashboard_summary_key(user_id),
+        portfolio_overview_key(user_id),
+        portfolio_overview_lite_key(user_id),
+        alloc_history_key(user_id, 12),
+        dividend_summary_key(user_id),
+        dividend_ticker_summary_key(user_id, _year),
+    )

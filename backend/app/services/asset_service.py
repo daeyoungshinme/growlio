@@ -23,14 +23,7 @@ from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
     RedisType,
-    alloc_history_key,
-    dashboard_summary_key,
-    dividend_summary_key,
-    dividend_ticker_summary_key,
-    invalidate_user_caches,
-    monthly_trend_key,
-    portfolio_overview_key,
-    portfolio_overview_lite_key,
+    invalidate_account_caches,
 )
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit
 from app.utils.metrics import broker_sync_duration
@@ -141,16 +134,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    await invalidate_user_caches(
-        redis,
-        monthly_trend_key(account.user_id),
-        dashboard_summary_key(account.user_id),
-        portfolio_overview_key(account.user_id),
-        portfolio_overview_lite_key(account.user_id),
-        alloc_history_key(account.user_id, 12),
-        dividend_summary_key(account.user_id),
-        dividend_ticker_summary_key(account.user_id, date.today().year),
-    )
+    await invalidate_account_caches(redis, account.user_id)
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         _time.monotonic() - _sync_start

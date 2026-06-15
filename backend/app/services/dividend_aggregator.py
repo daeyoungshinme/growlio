@@ -13,7 +13,7 @@ from redis.exceptions import RedisError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.services.dividend_service import get_ticker_dividend_summary
+from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key
 
 logger = structlog.get_logger()
@@ -21,9 +21,12 @@ logger = structlog.get_logger()
 
 async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redis | None = None) -> dict:
     if redis:
-        cached = await redis.get(dividend_summary_key(user_id))
-        if cached:
-            return json.loads(cached)
+        try:
+            cached = await redis.get(dividend_summary_key(user_id))
+            if cached:
+                return json.loads(cached)
+        except RedisError:
+            logger.warning("dividend_cache_read_error", user_id=str(user_id))
 
     current_year = date.today().year
 

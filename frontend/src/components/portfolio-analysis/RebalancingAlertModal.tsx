@@ -1,23 +1,11 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
+import { type ScheduleType, type TriggerCondition, type MarketConditionMode } from "@/api/alerts";
 import {
-  fetchRebalancingAlert,
-  upsertRebalancingAlert,
-  deleteRebalancingAlert,
-  type ScheduleType,
-  type MarketConditionMode,
-  type TriggerCondition,
-} from "@/api/alerts";
-import { fetchAccounts } from "@/api/assets";
-import { fetchMarketSignal } from "@/api/marketSignals";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
-import { toast } from "@/utils/toast";
-import { extractErrorMessage, getHttpStatus } from "@/utils/error";
+  useRebalancingAlertQueries,
+  useRebalancingAlertFormState,
+} from "@/hooks/useRebalancingAlertForm";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 
 interface Props {
@@ -76,47 +64,15 @@ function buildDescription(
   if (triggerCondition === "SCHEDULE_ONLY") {
     return `${when} 리밸런싱 현황 리포트를 받습니다.`;
   }
-  // BOTH
   return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
 }
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
-
 const inputClass = `w-full ${INPUT_SM}`;
 
-import type { RebalancingAlert } from "@/api/alerts";
-import type { AssetAccount } from "@/api/assets";
-import type { MarketSignalResponse } from "@/api/marketSignals";
-import type { QueryClient } from "@tanstack/react-query";
-
 export default function RebalancingAlertModal({ portfolioId, portfolioName, accountIds, onClose }: Props) {
-  const qc = useQueryClient();
-
-  const { data: alert, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlert(portfolioId),
-    queryFn: () => fetchRebalancingAlert(portfolioId),
-    staleTime: STALE_TIME.MEDIUM,
-    retry: (failureCount, error: unknown) => {
-      const status = getHttpStatus(error);
-      return status === 404 ? false : failureCount < 2;
-    },
-  });
-
-  const { data: accounts = [] } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
-  });
-
-  const { data: marketSignal } = useQuery({
-    queryKey: QUERY_KEYS.marketSignal,
-    queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.LONG,
-  });
-
-  const brokerAccounts = accounts.filter(
-    (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
-  );
+  const { alert, isLoading, brokerAccounts, kisAccounts, marketSignal } =
+    useRebalancingAlertQueries({ portfolioId, accountIds });
 
   return (
     <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
@@ -128,11 +84,11 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, acco
         ) : (
           <AlertFormBody
             key={alert?.id ?? "new"}
-            alert={alert ?? null}
+            alert={alert}
             brokerAccounts={brokerAccounts}
+            kisAccounts={kisAccounts}
             portfolioId={portfolioId}
             accountIds={accountIds}
-            qc={qc}
             onClose={onClose}
             marketSignal={marketSignal}
           />
@@ -142,537 +98,410 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, acco
   );
 }
 
+import type { RebalancingAlert } from "@/api/alerts";
+import type { AssetAccount } from "@/api/assets";
+import type { MarketSignalResponse } from "@/api/marketSignals";
+
 function AlertFormBody({
   alert,
   brokerAccounts,
+  kisAccounts,
   portfolioId,
   accountIds,
-  qc,
   onClose,
   marketSignal,
 }: {
   alert: RebalancingAlert | null;
   brokerAccounts: AssetAccount[];
+  kisAccounts: AssetAccount[];
   portfolioId: string;
   accountIds?: string[] | null;
-  qc: QueryClient;
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
 }) {
-  const [scheduleType, setScheduleType] = useState<ScheduleType>(alert?.schedule_type ?? "DAILY");
-  const [dayOfWeek, setDayOfWeek] = useState(alert?.schedule_day_of_week ?? 0);
-  const [dayOfMonth, setDayOfMonth] = useState(alert?.schedule_day_of_month ?? 1);
-  const [triggerCondition, setTriggerCondition] = useState<TriggerCondition>(
-    alert?.trigger_condition ?? "DRIFT_ONLY",
-  );
-  const [threshold, setThreshold] = useState(alert?.threshold_pct ?? 5);
-  const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
-  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">(alert?.strategy ?? "BUY_ONLY");
-  const [accountId, setAccountId] = useState<string>(alert?.account_id ?? "");
-  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">(alert?.order_type ?? "MARKET");
-  const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
-    alert?.market_condition_mode ?? "DISABLED",
-  );
-  const [depositTriggerEnabled, setDepositTriggerEnabled] = useState(
-    alert?.deposit_trigger_enabled ?? false,
-  );
-  const [depositTriggerAccountId, setDepositTriggerAccountId] = useState<string>(
-    alert?.deposit_trigger_account_id ?? "",
-  );
-  const [depositTriggerMinAmount, setDepositTriggerMinAmount] = useState<number>(
-    alert?.deposit_trigger_min_amount_krw ?? 100_000,
-  );
-
-  const kisAccounts = brokerAccounts.filter(
-    (a) => a.asset_type === "STOCK_KIS" && (accountIds == null || accountIds.includes(a.id)),
-  );
-
-  useEffect(() => {
-    if (depositTriggerAccountId && brokerAccounts.length > 0) {
-      if (!kisAccounts.some((a) => a.id === depositTriggerAccountId)) {
-        setDepositTriggerAccountId("");
-      }
-    }
-  }, [kisAccounts, depositTriggerAccountId, brokerAccounts.length]);
-
-  const upsertMut = useMutation({
-    mutationFn: () =>
-      upsertRebalancingAlert(portfolioId, {
-        threshold_pct: threshold,
-        schedule_type: scheduleType,
-        schedule_day_of_week: scheduleType === "WEEKLY" ? dayOfWeek : null,
-        schedule_day_of_month: NEEDS_DAY_OF_MONTH.includes(scheduleType) ? dayOfMonth : null,
-        trigger_condition: triggerCondition,
-        mode,
-        strategy,
-        account_id: mode === "AUTO" && accountId ? accountId : null,
-        order_type: orderType,
-        market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
-        deposit_trigger_enabled: depositTriggerEnabled,
-        deposit_trigger_account_id:
-          depositTriggerEnabled && depositTriggerAccountId ? depositTriggerAccountId : null,
-        deposit_trigger_min_amount_krw: depositTriggerEnabled ? depositTriggerMinAmount : null,
-      }),
-    onSuccess: () => {
-      invalidateRebalancingAlertData(qc, portfolioId);
-      toast("설정이 저장되었습니다", "success");
-      onClose();
-    },
-    onError: (e) => toast(extractErrorMessage(e, "설정 저장에 실패했습니다")),
+  const form = useRebalancingAlertFormState({
+    alert,
+    portfolioId,
+    accountIds,
+    kisAccounts,
+    onClose,
   });
 
-  const deleteMut = useMutation({
-    mutationFn: () => deleteRebalancingAlert(portfolioId),
-    onSuccess: () => {
-      invalidateRebalancingAlertData(qc, portfolioId);
-      toast("설정이 해제되었습니다", "success");
-      onClose();
-    },
-    onError: (e) => toast(extractErrorMessage(e, "설정 해제에 실패했습니다")),
-  });
-
-  const isPending = upsertMut.isPending || deleteMut.isPending;
   const hasAlert = !!alert;
 
   return (
     <>
       {/* ── 알림 주기 ── */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
-              <div className="flex flex-wrap gap-1.5">
-                {SCHEDULE_OPTIONS.map(({ value, label }) => (
-                  <button
-                    key={value}
-                    onClick={() => setScheduleType(value)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      scheduleType === value
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
+        <div className="flex flex-wrap gap-1.5">
+          {SCHEDULE_OPTIONS.map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => form.setScheduleType(value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                form.scheduleType === value
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {/* ── 요일 선택 (WEEKLY) ── */}
-            {scheduleType === "WEEKLY" && (
+      {/* ── 요일 선택 (WEEKLY) ── */}
+      {form.scheduleType === "WEEKLY" && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">요일</p>
+          <div className="flex gap-1">
+            {DAYS_KO.map((day, idx) => (
+              <button
+                key={idx}
+                onClick={() => form.setDayOfWeek(idx)}
+                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  form.dayOfWeek === idx
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 기준 날짜 선택 ── */}
+      {NEEDS_DAY_OF_MONTH.includes(form.scheduleType) && (
+        <div>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">기준 날짜</p>
+          <div className="flex items-center gap-2">
+            <select
+              value={form.dayOfMonth}
+              onChange={(e) => form.setDayOfMonth(Number(e.target.value))}
+              className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d}일
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {SCHEDULE_LABEL[form.scheduleType]}마다 이 날짜에 실행
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── 알림 조건 ── */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
+        <div className="space-y-2">
+          {(
+            [
+              { value: "DRIFT_ONLY" as TriggerCondition, label: "비중 이탈 시에만", desc: "이탈 종목이 있을 때만 동작합니다" },
+              { value: "SCHEDULE_ONLY" as TriggerCondition, label: "주기마다 항상", desc: "이탈 여부와 관계없이 주기마다 리포트를 받습니다" },
+              { value: "BOTH" as TriggerCondition, label: "주기마다 + 비중 이탈 시", desc: "주기 리포트를 받으면서 이탈 감지 시 즉시 추가 알림 (예수금 포함)" },
+            ] as const
+          ).map(({ value, label, desc }) => (
+            <label key={value} className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                type="radio"
+                checked={form.triggerCondition === value}
+                onChange={() => form.setTriggerCondition(value)}
+                className="mt-0.5 text-blue-600"
+              />
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                {label}
+                <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">{desc}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 임계값 슬라이더 ── */}
+      {(form.triggerCondition === "DRIFT_ONLY" || form.triggerCondition === "BOTH") && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">이탈 임계값</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="range"
+              min={1}
+              max={20}
+              step={0.5}
+              value={form.threshold}
+              onChange={(e) => form.setThreshold(parseFloat(e.target.value))}
+              className="flex-1"
+            />
+            <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 w-14 text-right">
+              ±{form.threshold.toFixed(1)}%
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── 실행 모드 ── */}
+      <div>
+        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 모드</p>
+        <div className="grid grid-cols-2 gap-2">
+          {(["NOTIFY", "AUTO"] as const).map((m) => (
+            <label
+              key={m}
+              className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                form.mode === m
+                  ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                  : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+              }`}
+            >
+              <input
+                type="radio"
+                name="mode"
+                value={m}
+                checked={form.mode === m}
+                onChange={() => form.setMode(m)}
+                className="mt-0.5 accent-blue-600"
+              />
               <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">요일</p>
-                <div className="flex gap-1">
-                  {DAYS_KO.map((day, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setDayOfWeek(idx)}
-                      className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                        dayOfWeek === idx
-                          ? "bg-blue-600 text-white"
-                          : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                  {m === "NOTIFY" ? "알림만 (권장)" : "자동 실행"}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {m === "NOTIFY" ? "이메일로 알림 수신" : "조건 충족 시 주문 자동 실행"}
                 </div>
               </div>
-            )}
+            </label>
+          ))}
+        </div>
+      </div>
 
-            {/* ── 기준 날짜 선택 (MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL) ── */}
-            {NEEDS_DAY_OF_MONTH.includes(scheduleType) && (
-              <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  기준 날짜
-                </p>
-                <div className="flex items-center gap-2">
-                  <select
-                    value={dayOfMonth}
-                    onChange={(e) => setDayOfMonth(Number(e.target.value))}
-                    className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                      <option key={d} value={d}>
-                        {d}일
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {SCHEDULE_LABEL[scheduleType]}마다 이 날짜에 실행
-                  </span>
-                </div>
-              </div>
-            )}
+      {/* ── 자동 실행 옵션 ── */}
+      {form.mode === "AUTO" && (
+        <div className="space-y-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
+          <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+            ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다.
+          </p>
 
-            {/* ── 알림 조건 ── */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
-              <div className="space-y-2">
-                {(
-                  [
-                    {
-                      value: "DRIFT_ONLY" as TriggerCondition,
-                      label: "비중 이탈 시에만",
-                      desc: "이탈 종목이 있을 때만 동작합니다",
-                    },
-                    {
-                      value: "SCHEDULE_ONLY" as TriggerCondition,
-                      label: "주기마다 항상",
-                      desc: "이탈 여부와 관계없이 주기마다 리포트를 받습니다",
-                    },
-                    {
-                      value: "BOTH" as TriggerCondition,
-                      label: "주기마다 + 비중 이탈 시",
-                      desc: "주기 리포트를 받으면서 이탈 감지 시 즉시 추가 알림 (예수금 포함)",
-                    },
-                  ] as const
-                ).map(({ value, label, desc }) => (
-                  <label key={value} className="flex items-start gap-2.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      checked={triggerCondition === value}
-                      onChange={() => setTriggerCondition(value)}
-                      className="mt-0.5 text-blue-600"
-                    />
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {label}
-                      <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                        {desc}
-                      </span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">실행 계좌 (KIS/키움)</label>
+            <select className={inputClass} value={form.accountId} onChange={(e) => form.setAccountId(e.target.value)}>
+              <option value="">계좌 선택</option>
+              {brokerAccounts.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </div>
 
-            {/* ── 임계값 슬라이더 (이탈 감지 포함 조건에서 표시) ── */}
-            {(triggerCondition === "DRIFT_ONLY" || triggerCondition === "BOTH") && (
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  이탈 임계값
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    step={0.5}
-                    value={threshold}
-                    onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                    className="flex-1"
-                  />
-                  <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 w-14 text-right">
-                    ±{threshold.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* ── 실행 모드 ── */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 모드</p>
-              <div className="grid grid-cols-2 gap-2">
-                {(["NOTIFY", "AUTO"] as const).map((m) => (
-                  <label
-                    key={m}
-                    className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      mode === m
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                        : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="mode"
-                      value={m}
-                      checked={mode === m}
-                      onChange={() => setMode(m)}
-                      className="mt-0.5 accent-blue-600"
-                    />
-                    <div>
-                      <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                        {m === "NOTIFY" ? "알림만 (권장)" : "자동 실행"}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {m === "NOTIFY" ? "이메일로 알림 수신" : "조건 충족 시 주문 자동 실행"}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* ── 자동 실행 옵션 (AUTO 모드) ── */}
-            {mode === "AUTO" && (
-              <div className="space-y-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
-                <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                  ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다.
-                </p>
-
+          <div className="grid grid-cols-2 gap-2">
+            {(["BUY_ONLY", "FULL"] as const).map((s) => (
+              <label
+                key={s}
+                className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                  form.strategy === s
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                    : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="strategy"
+                  value={s}
+                  checked={form.strategy === s}
+                  onChange={() => form.setStrategy(s)}
+                  className="mt-0.5 accent-blue-600"
+                />
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    실행 계좌 (KIS/키움)
-                  </label>
-                  <select
-                    className={inputClass}
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                  >
-                    <option value="">계좌 선택</option>
-                    {brokerAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  {(["BUY_ONLY", "FULL"] as const).map((s) => (
-                    <label
-                      key={s}
-                      className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
-                        strategy === s
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                          : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="strategy"
-                        value={s}
-                        checked={strategy === s}
-                        onChange={() => setStrategy(s)}
-                        className="mt-0.5 accent-blue-600"
-                      />
-                      <div>
-                        <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                          {s === "BUY_ONLY" ? "매수만 (권장)" : "매도+매수"}
-                        </div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          {s === "BUY_ONLY" ? "세금 절감" : "완전 리밸런싱"}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    주문 유형
-                  </label>
-                  <select
-                    className={inputClass}
-                    value={orderType}
-                    onChange={(e) => setOrderType(e.target.value as "MARKET" | "LIMIT")}
-                  >
-                    <option value="MARKET">시장가</option>
-                    <option value="LIMIT">지정가</option>
-                  </select>
-                </div>
-
-                {/* ── 시장 신호 연동 ── */}
-                <div className="pt-1 border-t border-orange-200/30 dark:border-orange-800/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                      시장 신호 연동
-                    </p>
-                    {marketSignal && (
-                      <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                        현재:
-                        <MarketSignalLevelBadge level={marketSignal.composite_level} size="xs" />
-                      </div>
-                    )}
+                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                    {s === "BUY_ONLY" ? "매수만 (권장)" : "매도+매수"}
                   </div>
-                  <div className="space-y-1.5">
-                    {(
-                      [
-                        {
-                          value: "DISABLED" as MarketConditionMode,
-                          label: "신호 무시",
-                          desc: "시장 상황과 무관하게 자동 실행",
-                        },
-                        {
-                          value: "CAUTIOUS" as MarketConditionMode,
-                          label: "신중",
-                          desc: "고위험(RED) 신호 시 자동 실행 중단",
-                        },
-                        {
-                          value: "STRICT" as MarketConditionMode,
-                          label: "엄격",
-                          desc: "중위험(YELLOW) 이상에서 자동 실행 중단",
-                        },
-                      ] as const
-                    ).map(({ value, label, desc }) => (
-                      <label
-                        key={value}
-                        className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                          marketConditionMode === value
-                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                            : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="market_condition_mode"
-                          value={value}
-                          checked={marketConditionMode === value}
-                          onChange={() => setMarketConditionMode(value)}
-                          className="mt-0.5 accent-blue-600"
-                        />
-                        <div>
-                          <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                            {label}
-                          </div>
-                          <div className="text-xs text-gray-400 dark:text-gray-500">{desc}</div>
-                        </div>
-                      </label>
-                    ))}
+                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {s === "BUY_ONLY" ? "세금 절감" : "완전 리밸런싱"}
                   </div>
                 </div>
-              </div>
-            )}
+              </label>
+            ))}
+          </div>
 
-            {/* ── 예수금 입금 감지 ── */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    예수금 입금 감지
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    입금 확인 시 위 설정(알림/자동실행)으로 비중 배분 매수
-                  </p>
+          <div>
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">주문 유형</label>
+            <select
+              className={inputClass}
+              value={form.orderType}
+              onChange={(e) => form.setOrderType(e.target.value as "MARKET" | "LIMIT")}
+            >
+              <option value="MARKET">시장가</option>
+              <option value="LIMIT">지정가</option>
+            </select>
+          </div>
+
+          {/* ── 시장 신호 연동 ── */}
+          <div className="pt-1 border-t border-orange-200/30 dark:border-orange-800/30">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-gray-700 dark:text-gray-300">시장 신호 연동</p>
+              {marketSignal && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                  현재: <MarketSignalLevelBadge level={marketSignal.composite_level} size="xs" />
                 </div>
-                <button
-                  role="switch"
-                  aria-checked={depositTriggerEnabled}
-                  onClick={() => setDepositTriggerEnabled((v) => !v)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                    depositTriggerEnabled
-                      ? "bg-blue-600"
-                      : "bg-gray-300 dark:bg-gray-600"
+              )}
+            </div>
+            <div className="space-y-1.5">
+              {(
+                [
+                  { value: "DISABLED" as MarketConditionMode, label: "신호 무시", desc: "시장 상황과 무관하게 자동 실행" },
+                  { value: "CAUTIOUS" as MarketConditionMode, label: "신중", desc: "고위험(RED) 신호 시 자동 실행 중단" },
+                  { value: "STRICT" as MarketConditionMode, label: "엄격", desc: "중위험(YELLOW) 이상에서 자동 실행 중단" },
+                ] as const
+              ).map(({ value, label, desc }) => (
+                <label
+                  key={value}
+                  className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                    form.marketConditionMode === value
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                      : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
                   }`}
                 >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      depositTriggerEnabled ? "translate-x-6" : "translate-x-1"
-                    }`}
+                  <input
+                    type="radio"
+                    name="market_condition_mode"
+                    value={value}
+                    checked={form.marketConditionMode === value}
+                    onChange={() => form.setMarketConditionMode(value)}
+                    className="mt-0.5 accent-blue-600"
                   />
-                </button>
-              </div>
-
-              {depositTriggerEnabled && (
-                <div className="space-y-3 mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      감시 계좌 (KIS)
-                    </label>
-                    <select
-                      className={inputClass}
-                      value={depositTriggerAccountId}
-                      onChange={(e) => setDepositTriggerAccountId(e.target.value)}
-                    >
-                      <option value="">계좌 선택</option>
-                      {kisAccounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.name}
-                          {a.deposit_krw != null
-                            ? ` — 예수금 ${a.deposit_krw.toLocaleString("ko-KR")}원`
-                            : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {kisAccounts.length === 0 && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        {accountIds != null
-                          ? "이 포트폴리오에 연결된 KIS 계좌가 없습니다. 포트폴리오 설정에서 KIS 계좌를 연결해주세요."
-                          : "KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요."}
-                      </p>
-                    )}
+                    <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{label}</div>
+                    <div className="text-xs text-gray-400 dark:text-gray-500">{desc}</div>
                   </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      최소 감지 금액 (KRW)
-                    </label>
-                    <input
-                      type="number"
-                      min={10_000}
-                      step={10_000}
-                      value={depositTriggerMinAmount}
-                      onChange={(e) => setDepositTriggerMinAmount(Number(e.target.value))}
-                      className={inputClass}
-                      placeholder="예: 100000"
-                    />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      이 금액 이상 입금 시에만 동작 (최소 10,000원)
-                    </p>
-                  </div>
+      {/* ── 예수금 입금 감지 ── */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between mb-1">
+          <div>
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">예수금 입금 감지</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              입금 확인 시 위 설정(알림/자동실행)으로 비중 배분 매수
+            </p>
+          </div>
+          <button
+            role="switch"
+            aria-checked={form.depositTriggerEnabled}
+            onClick={() => form.setDepositTriggerEnabled((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+              form.depositTriggerEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                form.depositTriggerEnabled ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </button>
+        </div>
 
-                  {alert?.last_deposit_checked_at && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      마지막 확인:{" "}
-                      {new Date(alert.last_deposit_checked_at).toLocaleString("ko-KR")}
-                      {alert.last_known_deposit_krw != null && (
-                        <span className="block">
-                          기준 예수금:{" "}
-                          {alert.last_known_deposit_krw.toLocaleString("ko-KR")}원
-                        </span>
-                      )}
-                    </p>
-                  )}
-                </div>
+        {form.depositTriggerEnabled && (
+          <div className="space-y-3 mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">감시 계좌 (KIS)</label>
+              <select
+                className={inputClass}
+                value={form.depositTriggerAccountId}
+                onChange={(e) => form.setDepositTriggerAccountId(e.target.value)}
+              >
+                <option value="">계좌 선택</option>
+                {kisAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                    {a.deposit_krw != null ? ` — 예수금 ${a.deposit_krw.toLocaleString("ko-KR")}원` : ""}
+                  </option>
+                ))}
+              </select>
+              {kisAccounts.length === 0 && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  {accountIds != null
+                    ? "이 포트폴리오에 연결된 KIS 계좌가 없습니다. 포트폴리오 설정에서 KIS 계좌를 연결해주세요."
+                    : "KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요."}
+                </p>
               )}
             </div>
 
-            {/* ── 설명 텍스트 ── */}
-            <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-              {buildDescription(scheduleType, dayOfWeek, dayOfMonth, triggerCondition, threshold, mode)}
-            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">최소 감지 금액 (KRW)</label>
+              <input
+                type="number"
+                min={10_000}
+                step={10_000}
+                value={form.depositTriggerMinAmount}
+                onChange={(e) => form.setDepositTriggerMinAmount(Number(e.target.value))}
+                className={inputClass}
+                placeholder="예: 100000"
+              />
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                이 금액 이상 입금 시에만 동작 (최소 10,000원)
+              </p>
+            </div>
 
-            {/* ── 현재 설정 표시 ── */}
-            {hasAlert && (
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
-                현재 설정이 활성화되어 있습니다.
-                {alert.last_triggered_at && (
-                  <span className="block mt-0.5 text-blue-500">
-                    마지막 실행:{" "}
-                    {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
+            {alert?.last_deposit_checked_at && (
+              <p className="text-xs text-blue-600 dark:text-blue-400">
+                마지막 확인: {new Date(alert.last_deposit_checked_at).toLocaleString("ko-KR")}
+                {alert.last_known_deposit_krw != null && (
+                  <span className="block">
+                    기준 예수금: {alert.last_known_deposit_krw.toLocaleString("ko-KR")}원
                   </span>
                 )}
-              </div>
+              </p>
             )}
+          </div>
+        )}
+      </div>
 
-            {/* ── 버튼 ── */}
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={() => upsertMut.mutate()}
-                disabled={isPending}
-                aria-busy={upsertMut.isPending}
-                className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                {upsertMut.isPending ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Bell size={14} />
-                )}
-                {hasAlert ? "설정 업데이트" : "자동화 설정"}
-              </button>
-              {hasAlert && (
-                <button
-                  onClick={() => deleteMut.mutate()}
-                  disabled={isPending}
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
-                >
-                  {deleteMut.isPending ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <BellOff size={14} />
-                  )}
-                  설정 해제
-                </button>
-              )}
-    </div>
+      {/* ── 설명 텍스트 ── */}
+      <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+        {buildDescription(form.scheduleType, form.dayOfWeek, form.dayOfMonth, form.triggerCondition, form.threshold, form.mode)}
+      </p>
+
+      {/* ── 현재 설정 표시 ── */}
+      {hasAlert && (
+        <div className="rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 p-3 text-xs text-blue-700 dark:text-blue-300">
+          현재 설정이 활성화되어 있습니다.
+          {alert.last_triggered_at && (
+            <span className="block mt-0.5 text-blue-500">
+              마지막 실행: {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── 버튼 ── */}
+      <div className="flex gap-3 pt-1">
+        <button
+          onClick={() => form.upsertMut.mutate()}
+          disabled={form.isPending}
+          aria-busy={form.upsertMut.isPending}
+          className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {form.upsertMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+          {hasAlert ? "설정 업데이트" : "자동화 설정"}
+        </button>
+        {hasAlert && (
+          <button
+            onClick={() => form.deleteMut.mutate()}
+            disabled={form.isPending}
+            className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+          >
+            {form.deleteMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <BellOff size={14} />}
+            설정 해제
+          </button>
+        )}
+      </div>
     </>
   );
 }

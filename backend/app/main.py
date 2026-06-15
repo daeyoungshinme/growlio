@@ -64,6 +64,9 @@ async def lifespan(app: FastAPI):
         logger.error("redis_startup_failed", error=str(e))
         raise RuntimeError(f"Redis에 연결할 수 없습니다: {e}") from e
 
+    if settings.app_env == "production" and not settings.metrics_token:
+        logger.warning("metrics_token_unset", message="/metrics 엔드포인트가 차단됩니다. METRICS_TOKEN을 설정하세요.")
+
     init_scheduler()
     logger.info("app_started", env=settings.app_env)
     yield
@@ -110,6 +113,15 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https://static.toss.im https://ssl.pstatic.net; "
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co; "
+        "object-src 'none'; "
+        "frame-ancestors 'none';"
+    )
     if settings.app_env == "production":
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
@@ -179,4 +191,7 @@ async def metrics_endpoint(request: Request) -> Response:
         auth = request.headers.get("Authorization", "")
         if auth != f"Bearer {settings.metrics_token}":
             return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    elif settings.app_env == "production":
+        # 프로덕션에서 metrics_token 미설정 시 항상 차단
+        return JSONResponse(status_code=403, content={"detail": "Forbidden"})
     return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

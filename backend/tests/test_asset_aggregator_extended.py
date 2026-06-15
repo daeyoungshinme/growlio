@@ -391,15 +391,15 @@ class TestGetDashboardSummary:
 class TestBuildAssetTotals:
     @pytest.mark.asyncio
     async def test_empty_rows_returns_zeros(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _build_asset_totals
+        from app.services.composition_calculator import build_asset_totals
 
         with (
-            patch("app.services.asset_aggregator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.asset_aggregator._get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
-            patch("app.services.asset_aggregator._get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator._fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
+            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
+            patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
+            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
-            total, invested, stock, by_type = await _build_asset_totals(uuid.uuid4(), mock_db)
+            total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == 0.0
         assert invested == 0.0
@@ -408,7 +408,7 @@ class TestBuildAssetTotals:
 
     @pytest.mark.asyncio
     async def test_bank_account_row_added_to_total(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _build_asset_totals
+        from app.services.composition_calculator import build_asset_totals
 
         snap = SimpleNamespace(id=uuid.uuid4(), amount_krw=5_000_000.0, invested_amount=None)
         acc = SimpleNamespace(
@@ -417,19 +417,19 @@ class TestBuildAssetTotals:
         )
 
         with (
-            patch("app.services.asset_aggregator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.asset_aggregator._get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
-            patch("app.services.asset_aggregator._get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator._fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
+            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
+            patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
+            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
-            total, invested, stock, by_type = await _build_asset_totals(uuid.uuid4(), mock_db)
+            total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == pytest.approx(5_000_000.0)
         assert by_type.get("BANK_ACCOUNT") == pytest.approx(5_000_000.0)
 
     @pytest.mark.asyncio
     async def test_excluded_account_not_in_total(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _build_asset_totals
+        from app.services.composition_calculator import build_asset_totals
 
         snap = SimpleNamespace(id=uuid.uuid4(), amount_krw=5_000_000.0, invested_amount=None)
         acc = SimpleNamespace(
@@ -439,18 +439,18 @@ class TestBuildAssetTotals:
         )
 
         with (
-            patch("app.services.asset_aggregator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.asset_aggregator._get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
-            patch("app.services.asset_aggregator._get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator._fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
+            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
+            patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
+            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
-            total, _, _, _ = await _build_asset_totals(uuid.uuid4(), mock_db)
+            total, _, _, _ = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == 0.0
 
     @pytest.mark.asyncio
     async def test_no_snap_account_manual_amount_added(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _build_asset_totals
+        from app.services.composition_calculator import build_asset_totals
 
         acc = SimpleNamespace(
             id=uuid.uuid4(), asset_type="CASH_OTHER",
@@ -460,12 +460,12 @@ class TestBuildAssetTotals:
         )
 
         with (
-            patch("app.services.asset_aggregator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.asset_aggregator._get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
-            patch("app.services.asset_aggregator._get_no_snap_accounts", new=AsyncMock(return_value=[acc])),
-            patch("app.services.asset_aggregator._fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
+            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
+            patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[acc])),
+            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
-            total, _, _, by_type = await _build_asset_totals(uuid.uuid4(), mock_db)
+            total, _, _, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == pytest.approx(3_000_000.0)
 
