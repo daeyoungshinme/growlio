@@ -9,7 +9,7 @@ from alembic import op
 from sqlalchemy import text
 
 revision = "aa2_add_snapshots_user_date_index"
-down_revision = "z2_positions_normalization"
+down_revision = "ak1_add_deposit_trigger_to_rebalancing_alert"
 branch_labels = None
 depends_on = None
 
