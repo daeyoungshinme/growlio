@@ -102,3 +102,11 @@ growlio/
 - `avg_price` 및 모든 금액 컬럼은 **항상 KRW** — 해외 종목은 프론트에서 USD × 환율 변환 후 전송
 - **월별 추이 쿼리**: `is_active = TRUE` 필터 필수 — 누락 시 비활성 계좌 스냅샷이 합산되어 금액 수배 부풀림
 - **스냅샷 기준**: 월말 스냅샷 개념 없음 — 해당 월 마지막 sync일 값이 월별 대표값으로 사용됨
+
+---
+
+## 자주 막히는 문제
+
+- `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
+- alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
+- pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인

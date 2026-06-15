@@ -124,6 +124,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트: `format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`.
 
+> 테스트 대상: 순수 유틸 함수 (`utils/`, `constants/`) — React 컴포넌트·React Query 훅은 테스트하지 않음. 새 유틸 추가 시 동일 디렉토리에 `*.test.ts` 작성.
+
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
 
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
