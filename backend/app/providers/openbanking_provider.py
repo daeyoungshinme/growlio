@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import secrets
 from datetime import date
-from typing import Any
 
+import redis.asyncio as aioredis
 import structlog
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.exceptions import ProviderCredentialError
+from app.models.asset import AssetAccount
 from app.providers.base import BalanceResult, BrokerProvider
 
 logger = structlog.get_logger()
@@ -18,7 +20,7 @@ class OpenBankingProvider(BrokerProvider):
     PROVIDER_ID = "OPEN_BANKING"
     PROVIDER_NAME = "금융결제원 오픈뱅킹"
 
-    async def sync(self, account: Any, db: Any, redis: Any) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
         from app.models.user import UserSettings
         from app.providers.openbanking import ensure_ob_token_fresh, get_account_balance
 

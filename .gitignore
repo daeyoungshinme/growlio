@@ -29,9 +29,11 @@ backend/htmlcov/
 backend/coverage.xml
 
 # ── Node.js ────────────────────────────────────────
+node_modules/
 frontend/node_modules/
 frontend/dist/
 frontend/coverage/
+frontend/tsc_output.txt
 *.tsbuildinfo
 # 백엔드 OpenAPI에서 자동 생성 (npm run generate:api-types)
 frontend/src/types/api.generated.ts

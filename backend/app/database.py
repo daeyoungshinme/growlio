@@ -16,6 +16,7 @@ _engine_kwargs: dict = {
     "max_overflow": settings.database_max_overflow,
     "pool_timeout": settings.database_pool_timeout,
     "pool_pre_ping": True,
+    "pool_recycle": 280,  # PostgreSQL 방화벽 300초 idle timeout 대비
 }
 # Supabase 또는 프로덕션 환경에서는 SSL 필수
 if settings.app_env == "production" or settings.supabase_project_url:

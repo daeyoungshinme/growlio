@@ -102,8 +102,7 @@ async def open_banking_callback(
     await db.commit()
 
     # 프론트엔드로 리다이렉트 (연결 성공 페이지)
-    frontend_origin = settings.allowed_origins_list[0]
-    return RedirectResponse(url=f"{frontend_origin}/settings?ob_connected=1")
+    return RedirectResponse(url=f"{settings.frontend_url}/settings?ob_connected=1")
 
 
 @router.get("/accounts")
