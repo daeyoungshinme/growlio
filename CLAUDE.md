@@ -13,6 +13,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, Node 18+, [uv](https://docs.astral.sh/uv/) 필수.
 
+> Android 빌드 시 추가 필요: JDK 17+, Android Studio (SDK 포함).
+
 > **pre-commit hooks** 설정됨 — commit 시 ruff, mypy, eslint, trailing-whitespace 자동 실행. 실패 시 commit 블록.
 
 ## First-time Setup (순서 중요)
@@ -22,8 +24,7 @@ Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, N
 docker compose up -d db redis
 
 # 2. 의존성 설치
-cd backend && uv venv  # 최초 1회: 가상환경 생성
-make install-backend   # pip install
+make install-backend   # backend uv venv + pip install (최초 1회)
 make install-frontend  # npm install
 
 # 3. 환경 변수 설정

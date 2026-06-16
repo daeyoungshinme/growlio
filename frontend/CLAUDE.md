@@ -257,6 +257,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
+> **새 invalidation 함수 추가 시:** 이 파일에 `invalidate<Domain>Data(queryClient)` 형태로 추가하고, 관련 mutation의 `onSuccess`에서 호출. 컴포넌트·훅 내부에서 직접 `queryClient.invalidateQueries()` 호출 금지.
+
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 - `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
 - `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (1분)

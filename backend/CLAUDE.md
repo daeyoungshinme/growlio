@@ -170,6 +170,8 @@ jobs/                         # APScheduler 정기 작업
   ├── rebalancing_alert.py    # 매일 18:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
   ├── stock_price_alert.py    # 주가 알림 정기 작업
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
+
+> **새 job 추가:** `jobs/` 에 파일 생성 후 `app/main.py` lifespan의 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
 ```
 
 **자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
