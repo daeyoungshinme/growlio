@@ -9,7 +9,6 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import UTC, datetime
-from decimal import Decimal
 
 import structlog
 from sqlalchemy import select
@@ -184,7 +183,7 @@ async def _update_deposit_baseline(
 ) -> None:
     fresh = await db.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert_id))
     if fresh:
-        fresh.last_known_deposit_krw = Decimal(str(current_deposit))
+        fresh.last_known_deposit_krw = current_deposit
         fresh.last_deposit_checked_at = datetime.now(UTC)
 
 

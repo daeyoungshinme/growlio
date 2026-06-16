@@ -262,7 +262,8 @@ describe("MarketPage", () => {
   });
 
   it("shows error toast when subscribe fails", async () => {
-    mockSubscribeFn.mockRejectedValue(new Error("subscribe failed"));
+    // Error with empty message forces extractErrorMessage to use the fallback string
+    mockSubscribeFn.mockRejectedValue(new Error());
     setupMocks();
     renderPage();
     const subscribeBtn = screen.getAllByRole("button", { name: "subscribe" })[0];

@@ -24,6 +24,7 @@ from app.limiter import limiter
 from app.providers.http_client import close_http_client
 from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
+from app.utils.metrics import http_request_duration
 
 logger = structlog.get_logger()
 
@@ -127,12 +128,20 @@ async def add_security_headers(request: Request, call_next):
     return response
 
 
+def _path_prefix(path: str) -> str:
+    """'/api/v1/dashboard/summary' → '/api/v1/dashboard'"""
+    parts = path.rstrip("/").split("/")
+    return "/".join(parts[:4]) if len(parts) >= 4 else path
+
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     start = time.monotonic()
     response = await call_next(request)
-    duration_ms = round((time.monotonic() - start) * 1000)
+    elapsed = time.monotonic() - start
+    duration_ms = round(elapsed * 1000)
     request_id = getattr(request.state, "request_id", "-")
+    status_class = f"{response.status_code // 100}xx"
     logger.info(
         "http_request",
         method=request.method,
@@ -141,6 +150,11 @@ async def log_requests(request: Request, call_next):
         duration_ms=duration_ms,
         request_id=request_id,
     )
+    http_request_duration.labels(
+        method=request.method,
+        path_prefix=_path_prefix(request.url.path),
+        status_class=status_class,
+    ).observe(elapsed)
     return response
 
 
