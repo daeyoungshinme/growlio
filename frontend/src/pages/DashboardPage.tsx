@@ -9,7 +9,6 @@ import DividendSection from "@/components/dashboard/DividendSection";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
@@ -40,21 +39,7 @@ export default function DashboardPage() {
     [data]
   );
 
-  if (isLoading) return (
-    <div className="space-y-6">
-      <div className="card">
-        <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
-          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <SkeletonCard rows={4} height="h-5" />
-        <SkeletonCard rows={4} height="h-5" />
-      </div>
-      <SkeletonCard rows={3} height="h-4" />
-    </div>
-  );
-  if (error || !data) return (
+  if (!isLoading && (error || !data)) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
       <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
       <button
@@ -95,6 +80,7 @@ export default function DashboardPage() {
           dcaData={dcaData}
           exchangeRate={exchangeRate}
           dataUpdatedAt={dataUpdatedAt}
+          isLoading={isLoading}
         />
       </ErrorBoundary>
 
@@ -130,8 +116,8 @@ export default function DashboardPage() {
           </div>
           <ErrorBoundary variant="section">
             <DividendSection
-              annualReceived={data.annual_dividends_received ?? null}
-              estimatedAnnual={data.estimated_annual_dividends ?? null}
+              annualReceived={data?.annual_dividends_received ?? null}
+              estimatedAnnual={data?.estimated_annual_dividends ?? null}
               estimatedMonthly={estimatedMonthly}
               overallDividendYield={overallDividendYield}
               isLoading={isLoading}

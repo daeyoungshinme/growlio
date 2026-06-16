@@ -41,7 +41,7 @@ const persister = createSyncStoragePersister({
   throttleTime: 2000,
 });
 
-const PERSIST_QUERY_KEYS = new Set(["dashboard", "portfolio-overview", "accounts"]);
+const PERSIST_QUERY_KEYS = new Set(["dashboard", "portfolio-overview", "accounts", "dca-analysis"]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

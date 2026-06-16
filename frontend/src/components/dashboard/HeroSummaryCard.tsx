@@ -3,19 +3,21 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
+import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
 
 const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
 
 interface Props {
-  data: DashboardData;
+  data: DashboardData | undefined;
   dcaData: DCAAnalysisData | undefined;
   exchangeRate: number | null;
   dataUpdatedAt?: number;
+  isLoading?: boolean;
 }
 
-export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, dataUpdatedAt }: Props) {
+export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, dataUpdatedAt, isLoading }: Props) {
   const currentYear = new Date().getFullYear();
 
   const updatedLabel = useMemo(() => {
@@ -27,6 +29,7 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
   }, [dataUpdatedAt]);
 
   const allocationChartData = useMemo(() => {
+    if (!data) return [];
     const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
     const stockItems = data.asset_allocation.filter((item) => item.type.startsWith("STOCK_"));
     const cashItems = data.asset_allocation.filter((item) => CASH_TYPES.has(item.type));
@@ -53,15 +56,15 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
       });
     }
     return result;
-  }, [data.asset_allocation]);
+  }, [data]);
 
   const depositColor =
-    data.deposit_achievement_pct != null && data.deposit_achievement_pct >= 100
+    data?.deposit_achievement_pct != null && data.deposit_achievement_pct >= 100
       ? "text-green-600"
       : "text-blue-600 dark:text-blue-400";
 
   const timeline = dcaData?.goal_timeline;
-  const currentProgressPct = timeline?.current_progress_pct ?? data.goal_achievement_pct;
+  const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
   const progressColor =
     currentProgressPct == null
       ? "text-gray-400 dark:text-gray-500"
@@ -71,7 +74,17 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
       ? "text-orange-500"
       : "text-gray-600 dark:text-gray-300";
 
-  const goalAmountDisplay = dcaData?.settings.goal_amount ?? data.goal_amount;
+  const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
+
+  if (isLoading || !data) {
+    return (
+      <div className="card">
+        <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
+          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="card flex flex-col gap-3 lg:gap-4">

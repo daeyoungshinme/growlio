@@ -1,4 +1,4 @@
-import { lazy, LazyExoticComponent, Suspense, useEffect } from "react";
+import { lazy, LazyExoticComponent, Suspense, useCallback, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
@@ -6,13 +6,18 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import PageLoader from "./components/common/PageLoader";
 import TopLoadingBar from "./components/common/TopLoadingBar";
 import Toaster from "./components/Toaster";
-import { useAuthStore } from "./stores/authStore";
+import { useAuthStore, AUTH_ME_CACHE_KEY } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWidget } from "./hooks/useWidget";
 import { usePortfolioTabFetching } from "./hooks/usePortfolioTabFetching";
 import BiometricGuard from "./components/common/BiometricGuard";
+import { fetchDashboard } from "./api/dashboard";
+import { fetchAccounts, fetchExchangeRate } from "./api/assets";
+import { fetchPortfolioOverviewLite } from "./api/portfolios";
+import { fetchDCAAnalysis } from "./api/invest";
+import { QUERY_KEYS } from "./constants/queryKeys";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
@@ -95,14 +100,24 @@ export default function App() {
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
+  const prefetchDashboardData = useCallback(() => {
+    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
+    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
+    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
+    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
+    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+  }, [queryClient]);
+
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    // 세션이 감지되는 순간(localStorage, 네트워크 전) prefetch를 /auth/me와 병렬 실행
+    checkAuth(prefetchDashboardData);
+  }, [checkAuth, prefetchDashboardData]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
       queryClient.clear();
       window.localStorage.removeItem(PERSIST_CACHE_KEY);
+      window.localStorage.removeItem(AUTH_ME_CACHE_KEY);
       logout();
     };
     window.addEventListener("growlio:session-expired", handleSessionExpired);

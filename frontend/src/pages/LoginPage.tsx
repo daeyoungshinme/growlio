@@ -5,8 +5,9 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { fetchDashboard } from "@/api/dashboard";
-import { fetchAccounts } from "@/api/assets";
+import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
 import { fetchPortfolioOverviewLite } from "@/api/portfolios";
+import { fetchDCAAnalysis } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
 export default function LoginPage() {
@@ -29,6 +30,8 @@ export default function LoginPage() {
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
+      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
+      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
       navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");

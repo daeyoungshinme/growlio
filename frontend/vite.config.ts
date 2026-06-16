@@ -9,7 +9,7 @@ const apiBase = `^https://${apiDomain.replace(/\./g, "\\.")}`;
 const apiPattern = new RegExp(`${apiBase}/.*`);
 const dashboardPattern = new RegExp(`${apiBase}/api/v1/dashboard(\\?.*)?$`);
 const portfolioOverviewPattern = new RegExp(`${apiBase}/api/v1/portfolio/overview(\\?.*)?$`);
-const accountsPattern = new RegExp(`${apiBase}/api/v1/accounts(\\?.*)?$`);
+const accountsPattern = new RegExp(`${apiBase}/api/v1/assets(\\?.*)?$`);
 
 export default defineConfig({
   build: {
@@ -64,28 +64,25 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: dashboardPattern,
-            handler: "NetworkFirst",
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "api-dashboard",
-              networkTimeoutSeconds: 10,
               expiration: { maxAgeSeconds: 300, maxEntries: 5 },
             },
           },
           {
             urlPattern: portfolioOverviewPattern,
-            handler: "NetworkFirst",
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "api-portfolio",
-              networkTimeoutSeconds: 10,
               expiration: { maxAgeSeconds: 300, maxEntries: 5 },
             },
           },
           {
             urlPattern: accountsPattern,
-            handler: "NetworkFirst",
+            handler: "StaleWhileRevalidate",
             options: {
               cacheName: "api-accounts",
-              networkTimeoutSeconds: 10,
               expiration: { maxAgeSeconds: 300, maxEntries: 5 },
             },
           },
