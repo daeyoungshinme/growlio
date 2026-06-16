@@ -3,16 +3,20 @@ import { isNativePlatform } from "@/utils/platform";
 import { useHaptic } from "./useHaptic";
 
 const STORAGE_KEY = "growlio_biometric_enabled";
-const SESSION_KEY = "growlio_biometric_verified";
+export const BIOMETRIC_SESSION_KEY = "growlio_biometric_verified";
+const AVAILABLE_CACHE_KEY = "growlio_biometric_available";
 
 export function useBiometric() {
   const { impact } = useHaptic();
 
   // 이번 세션에서 이미 인증했는지 (앱 재시작 시 초기화됨)
   const [isVerified, setIsVerified] = useState(
-    () => sessionStorage.getItem(SESSION_KEY) === "1",
+    () => sessionStorage.getItem(BIOMETRIC_SESSION_KEY) === "1",
   );
-  const [isAvailable, setIsAvailable] = useState(false);
+  // 이전 체크 결과를 localStorage에서 즉시 읽어 초기값으로 사용 (비동기 체크 전 flash 방지)
+  const [isAvailable, setIsAvailable] = useState(
+    () => localStorage.getItem(AVAILABLE_CACHE_KEY) === "1",
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -28,6 +32,7 @@ export function useBiometric() {
       try {
         const { NativeBiometric } = await import("capacitor-native-biometric");
         const result = await NativeBiometric.isAvailable();
+        localStorage.setItem(AVAILABLE_CACHE_KEY, result.isAvailable ? "1" : "0");
         setIsAvailable(result.isAvailable);
       } catch {
         setIsAvailable(false);
@@ -48,7 +53,7 @@ export function useBiometric() {
         description: "저장된 자산 정보를 확인하려면 인증이 필요합니다",
         maxAttempts: 3,
       });
-      sessionStorage.setItem(SESSION_KEY, "1");
+      sessionStorage.setItem(BIOMETRIC_SESSION_KEY, "1");
       setIsVerified(true);
       impact("success");
     } catch (e: unknown) {
@@ -65,7 +70,7 @@ export function useBiometric() {
       localStorage.setItem(STORAGE_KEY, "1");
     } else {
       localStorage.removeItem(STORAGE_KEY);
-      sessionStorage.setItem(SESSION_KEY, "1");
+      sessionStorage.setItem(BIOMETRIC_SESSION_KEY, "1");
       setIsVerified(true);
     }
   }, []);

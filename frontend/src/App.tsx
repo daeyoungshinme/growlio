@@ -106,6 +106,7 @@ export default function App() {
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+    import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);
 
   useEffect(() => {
