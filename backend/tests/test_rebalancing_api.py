@@ -169,3 +169,47 @@ class TestBrokerBalance:
             from app.database import get_db
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+    def test_returns_502_on_kis_api_error(self, override_settings):
+        """KisApiError 발생 시 HTTP 502를 반환한다."""
+        from types import SimpleNamespace
+        from app.kis.client import KisApiError
+
+        user = _make_user()
+        db = _make_mock_db()
+        account = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            name="테스트 KIS",
+            asset_type="STOCK_KIS",
+            is_mock_mode=False,
+            kis_account_no="12345678-01",
+            kis_app_key="encrypted_key",
+            kis_app_secret="encrypted_secret",
+        )
+        db.scalar = AsyncMock(return_value=account)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch("app.api.v1.rebalancing.get_redis", new_callable=AsyncMock,
+                      return_value=AsyncMock(get=AsyncMock(return_value=None))),
+                patch("app.api.v1.rebalancing.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
+                patch(
+                    "app.api.v1.rebalancing._fetch_broker_balance",
+                    new_callable=AsyncMock,
+                    side_effect=KisApiError("1", "호출 후처리(MCI전송) 오류 입니다."),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/rebalancing/broker-balance/{account.id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 502
+            assert "KIS API" in resp.json()["detail"]
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)

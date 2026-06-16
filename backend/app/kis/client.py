@@ -38,6 +38,9 @@ def _check_kis_api_error(data: dict[str, Any], path: str) -> None:
         raise KisApiError(rt_cd, msg)
 
 
+_TRANSIENT_RT_CD = {"1"}  # MCI전송 오류 등 KIS 서버 일시 장애
+
+
 async def kis_request(
     method: str,
     path: str,
@@ -50,19 +53,27 @@ async def kis_request(
 ) -> dict[str, Any]:
     """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함."""
     await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
-    return await broker_request(
-        method,
-        path,
-        base_url=KIS_MOCK_BASE_URL if is_mock else KIS_REAL_BASE_URL,
-        headers=headers,
-        params=params,
-        json=json,
-        retries=retries,
-        ssl_verify=not is_mock,
-        semaphore=_semaphore,
-        post_request_delay=0.0,
-        log_prefix="kis",
-        check_token_expired=_check_kis_token_expired,
-        check_api_error=_check_kis_api_error,
-        token_expired_exc=KisTokenExpiredError,
-    )
+    for attempt in range(2):
+        try:
+            return await broker_request(
+                method,
+                path,
+                base_url=KIS_MOCK_BASE_URL if is_mock else KIS_REAL_BASE_URL,
+                headers=headers,
+                params=params,
+                json=json,
+                retries=retries,
+                ssl_verify=not is_mock,
+                semaphore=_semaphore,
+                post_request_delay=0.0,
+                log_prefix="kis",
+                check_token_expired=_check_kis_token_expired,
+                check_api_error=_check_kis_api_error,
+                token_expired_exc=KisTokenExpiredError,
+            )
+        except KisApiError as e:
+            if e.rt_cd not in _TRANSIENT_RT_CD or attempt >= 1:
+                raise
+            logger.warning("kis_transient_error_retry", rt_cd=e.rt_cd, msg=e.msg, path=path, attempt=attempt)
+            await asyncio.sleep(1.0)
+    raise KisApiError("?", "재시도 초과")  # 도달 불가

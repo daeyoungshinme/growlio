@@ -20,6 +20,7 @@ from app.api.v1.router import router
 from app.config import settings
 from app.database import get_db
 from app.exceptions import AppError
+from app.kis.client import KisApiError
 from app.limiter import limiter
 from app.providers.http_client import close_http_client
 from app.redis_client import close_redis, get_redis
@@ -161,6 +162,20 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(KisApiError)
+async def kis_api_error_handler(request: Request, exc: KisApiError) -> JSONResponse:
+    logger.warning(
+        "kis_api_error_unhandled",
+        path=str(request.url.path),
+        rt_cd=exc.rt_cd,
+        msg=exc.msg,
+    )
+    return JSONResponse(
+        status_code=502,
+        content={"detail": f"KIS API 오류가 발생했습니다 (코드: {exc.rt_cd}). 잠시 후 다시 시도해주세요."},
+    )
 
 
 @app.exception_handler(Exception)

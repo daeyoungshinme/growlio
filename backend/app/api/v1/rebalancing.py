@@ -14,6 +14,7 @@ from app.config import settings
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_orderable_cash
+from app.kis.client import KisApiError
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
@@ -460,6 +461,11 @@ async def get_broker_account_balance(
         return await _fetch_broker_balance(account, db, redis, usd_rate)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except KisApiError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"KIS API 응답 오류 (코드: {e.rt_cd}). 잠시 후 다시 시도해주세요.",
+        ) from e
 
 
 @router.get("/broker-balance-all", response_model=list[KisBalanceResponse])

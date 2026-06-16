@@ -170,13 +170,52 @@ def _compute_frontier(
 # Public API
 # ---------------------------------------------------------------------------
 
-async def get_efficient_frontier(
+def _compute_portfolio_position(
+    symbols: list[str],
+    weights: list[float],
+    returns_map: dict[str, list[float]],
+) -> dict | None:
+    """주어진 tickers·weights로 포트폴리오의 (risk, return) 위치를 계산한다."""
+    import numpy as np
+
+    valid_pairs = [
+        (s, w)
+        for s, w in zip(symbols, weights, strict=False)
+        if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
+    ]
+    if not valid_pairs:
+        return None
+
+    valid_syms, valid_weights = zip(*valid_pairs, strict=False)
+    w_arr = np.array(valid_weights, dtype=float)
+    total = w_arr.sum()
+    if total <= 0:
+        return None
+    w_arr /= total
+
+    min_len = min(len(returns_map[s]) for s in valid_syms)
+    rets = np.array([returns_map[s][:min_len] for s in valid_syms])
+    mean_annual = rets.mean(axis=1) * 252
+    if len(valid_syms) > 1:
+        cov_annual = np.cov(rets) * 252
+    else:
+        cov_annual = np.array([[float(np.var(rets[0])) * 252]])
+
+    cur_ret = float(w_arr @ mean_annual) * 100
+    cur_vol = float(np.sqrt(w_arr @ cov_annual @ w_arr)) * 100
+    if not (math.isfinite(cur_vol) and math.isfinite(cur_ret)):
+        return None
+    return {"risk": round(cur_vol, 2), "return": round(cur_ret, 2)}
+
+
+async def get_efficient_frontier(  # noqa: C901
     user_id: uuid.UUID,
     db: AsyncSession,
     redis: RedisType = None,
+    compare_portfolio_id: str | None = None,
 ) -> dict:
-    """효율적 프론티어 데이터 반환."""
-    cache_key = f"efficient_frontier:{user_id}"
+    """효율적 프론티어 데이터 반환. compare_portfolio_id 지정 시 목표 포트폴리오 위치도 포함."""
+    cache_key = f"efficient_frontier:{user_id}:{compare_portfolio_id or ''}"
 
     if redis:
         try:
@@ -216,23 +255,51 @@ async def get_efficient_frontier(
         return {
             "frontier": [],
             "current": None,
+            "target": None,
             "assets": [],
             "note": f"효율적 프론티어는 {_MIN_POSITIONS}종목 이상 필요합니다",
         }
 
     total_value = sum(p["value_krw"] for p in pos_map.values())
     if total_value <= 0:
-        return {"frontier": [], "current": None, "assets": [], "note": "포지션 데이터 없음"}
+        return {
+            "frontier": [], "current": None, "target": None,
+            "assets": [], "note": "포지션 데이터 없음",
+        }
 
     positions = list(pos_map.values())
     yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
     weights = [p["value_krw"] / total_value for p in positions]
 
+    # 비교 포트폴리오 종목 추가 (유니버스 확장)
+    compare_symbols: list[str] = []
+    compare_weights: list[float] = []
+    if compare_portfolio_id:
+        from app.models.portfolio import Portfolio
+        portfolio = await db.get(Portfolio, compare_portfolio_id)
+        if portfolio and portfolio.items:
+            total_w = sum(float(item.weight) for item in portfolio.items)
+            for item in portfolio.items:
+                sym = _to_yf_symbol(item.ticker, item.market)
+                compare_symbols.append(sym)
+                compare_weights.append(float(item.weight) / total_w if total_w > 0 else 0.0)
+
+    # returns 취득: 현재 + 비교 포트폴리오 합집합
+    all_symbols = list(dict.fromkeys(yf_symbols + compare_symbols))  # 중복 제거, 순서 유지
+
     loop = asyncio.get_running_loop()
-    returns_map = await loop.run_in_executor(None, _sync_fetch_returns, yf_symbols)
+    returns_map = await loop.run_in_executor(None, _sync_fetch_returns, all_symbols)
     result_data = await loop.run_in_executor(
         None, _compute_frontier, yf_symbols, weights, returns_map
     )
+
+    # 비교 포트폴리오 위치 계산
+    target_pos = None
+    if compare_symbols and compare_weights:
+        target_pos = await loop.run_in_executor(
+            None, _compute_portfolio_position, compare_symbols, compare_weights, returns_map
+        )
+    result_data["target"] = target_pos
 
     if redis:
         with contextlib.suppress(Exception):

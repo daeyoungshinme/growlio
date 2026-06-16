@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  Legend,
   PolarAngleAxis,
   PolarGrid,
   Radar,
@@ -7,7 +8,7 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import { fetchFactorAnalysis } from "@/api/risk";
+import { fetchFactorAnalysis, fetchPortfolioFactorAnalysis } from "@/api/risk";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useThemeStore } from "@/stores/themeStore";
@@ -20,12 +21,26 @@ const FACTOR_LABELS: Record<string, string> = {
   momentum: "모멘텀",
 };
 
-export default function FactorExposureChart() {
+const FACTOR_KEYS = ["value", "growth", "size", "momentum"] as const;
+
+interface Props {
+  selectedPortfolioId?: string;
+}
+
+export default function FactorExposureChart({ selectedPortfolioId }: Props) {
   const { isDark } = useThemeStore();
+
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.factorAnalysis,
     queryFn: fetchFactorAnalysis,
     staleTime: STALE_TIME.LONG,
+  });
+
+  const { data: targetData, isLoading: targetLoading } = useQuery({
+    queryKey: QUERY_KEYS.portfolioFactorAnalysis(selectedPortfolioId!),
+    queryFn: () => fetchPortfolioFactorAnalysis(selectedPortfolioId!),
+    staleTime: STALE_TIME.LONG,
+    enabled: !!selectedPortfolioId,
   });
 
   if (isLoading) {
@@ -53,13 +68,15 @@ export default function FactorExposureChart() {
     );
   }
 
-  const radarData = Object.entries(data.portfolio_factors).map(([key, value]) => ({
-    factor: FACTOR_LABELS[key] ?? key,
-    score: value,
+  const radarData = FACTOR_KEYS.map((key) => ({
+    factor: FACTOR_LABELS[key],
+    current: data.portfolio_factors[key],
+    target: targetData?.portfolio_factors[key] ?? null,
     fullMark: 100,
   }));
 
   const { contentStyle, labelStyle } = chartTooltipStyle(isDark);
+  const hasTarget = !!selectedPortfolioId && !!targetData;
 
   return (
     <div className="card space-y-3">
@@ -67,10 +84,11 @@ export default function FactorExposureChart() {
         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">팩터 노출도</h3>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
           Fama-French 기반 · {data.position_count}종목
+          {hasTarget && targetLoading && " · 목표 로딩 중..."}
         </p>
       </div>
 
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={hasTarget ? 240 : 220}>
         <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
           <PolarGrid stroke={isDark ? "#374151" : "#E5E7EB"} />
           <PolarAngleAxis
@@ -78,28 +96,79 @@ export default function FactorExposureChart() {
             tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
           />
           <Radar
-            name="포트폴리오"
-            dataKey="score"
+            name="현재 포트폴리오"
+            dataKey="current"
             stroke="#3B82F6"
             fill="#3B82F6"
             fillOpacity={0.25}
             dot={{ r: 3, fill: "#3B82F6" }}
           />
+          {hasTarget && (
+            <Radar
+              name={targetData?.portfolio_name ?? "목표 포트폴리오"}
+              dataKey="target"
+              stroke="#F59E0B"
+              fill="#F59E0B"
+              fillOpacity={0.15}
+              dot={{ r: 3, fill: "#F59E0B" }}
+            />
+          )}
           <Tooltip
             contentStyle={contentStyle}
             labelStyle={labelStyle}
-            formatter={(v: number) => [`${v.toFixed(1)} / 100`, "점수"]}
+            formatter={(v: number, name: string) => [`${v.toFixed(1)} / 100`, name]}
           />
+          {hasTarget && (
+            <Legend
+              wrapperStyle={{ fontSize: 11, color: isDark ? "#9CA3AF" : "#6B7280" }}
+            />
+          )}
         </RadarChart>
       </ResponsiveContainer>
 
-      {/* 팩터 설명 */}
-      <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
-        <span><span className="font-medium text-gray-700 dark:text-gray-300">가치</span> — 낮은 P/E·P/B</span>
-        <span><span className="font-medium text-gray-700 dark:text-gray-300">성장</span> — 높은 P/E·P/B</span>
-        <span><span className="font-medium text-gray-700 dark:text-gray-300">소형주</span> — 낮은 시가총액</span>
-        <span><span className="font-medium text-gray-700 dark:text-gray-300">모멘텀</span> — 12-1M 수익률</span>
-      </div>
+      {/* 팩터 델타 뱃지 (목표 포트폴리오 선택 시) */}
+      {hasTarget && targetData && (
+        <div className="grid grid-cols-2 gap-2">
+          {FACTOR_KEYS.map((key) => {
+            const delta = targetData.portfolio_factors[key] - data.portfolio_factors[key];
+            const isUp = delta > 1;
+            const isDown = delta < -1;
+            return (
+              <div
+                key={key}
+                className="flex items-center justify-between rounded-lg bg-gray-50 dark:bg-gray-700/50 px-2.5 py-1.5 text-xs"
+              >
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {FACTOR_LABELS[key]}
+                </span>
+                <span
+                  className={
+                    isUp
+                      ? "font-semibold text-amber-600 dark:text-amber-400"
+                      : isDown
+                      ? "font-semibold text-blue-500"
+                      : "text-gray-400 dark:text-gray-500"
+                  }
+                >
+                  {isUp ? "+" : ""}
+                  {delta.toFixed(1)}
+                  {isUp ? " ↑" : isDown ? " ↓" : " →"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 팩터 설명 (목표 비선택 시) */}
+      {!hasTarget && (
+        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span><span className="font-medium text-gray-700 dark:text-gray-300">가치</span> — 낮은 P/E·P/B</span>
+          <span><span className="font-medium text-gray-700 dark:text-gray-300">성장</span> — 높은 P/E·P/B</span>
+          <span><span className="font-medium text-gray-700 dark:text-gray-300">소형주</span> — 낮은 시가총액</span>
+          <span><span className="font-medium text-gray-700 dark:text-gray-300">모멘텀</span> — 12-1M 수익률</span>
+        </div>
+      )}
 
       {/* 상위 종목 팩터 테이블 */}
       {data.holdings.length > 0 && (

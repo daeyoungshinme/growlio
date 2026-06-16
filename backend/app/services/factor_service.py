@@ -169,6 +169,60 @@ def _portfolio_factors(holdings: list[dict]) -> dict:
 # Public API
 # ---------------------------------------------------------------------------
 
+async def get_factor_analysis_for_portfolio(
+    portfolio_id: str,
+    db: AsyncSession,
+    redis: RedisType = None,
+) -> dict:
+    """저장된 포트폴리오(Portfolio.items)의 팩터 노출도 분석 반환."""
+    from app.models.portfolio import Portfolio
+
+    cache_key = f"factor_analysis:portfolio:{portfolio_id}"
+
+    if redis:
+        try:
+            cached = await redis.get(cache_key)
+            if cached:
+                return json.loads(cached)
+        except Exception:
+            pass
+
+    portfolio = await db.get(Portfolio, portfolio_id)
+    if not portfolio or not portfolio.items:
+        return _empty_factor_result()
+
+    positions = [
+        {"ticker": item.ticker, "market": item.market, "name": item.name}
+        for item in portfolio.items
+    ]
+    weights = [float(item.weight) / 100.0 for item in portfolio.items]
+
+    total_weight = sum(weights)
+    if total_weight <= 0:
+        return _empty_factor_result()
+    weights = [w / total_weight for w in weights]
+
+    yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
+
+    loop = asyncio.get_running_loop()
+    factor_data = await loop.run_in_executor(None, _sync_fetch_factor_data, yf_symbols)
+
+    holdings = _build_holdings(positions, yf_symbols, weights, factor_data)
+    result_data: dict = {
+        "holdings": holdings,
+        "portfolio_factors": _portfolio_factors(holdings),
+        "position_count": len(positions),
+        "portfolio_name": portfolio.name,
+        "note": "yfinance 기반 팩터 점수 (0-100, 높을수록 해당 팩터 노출도 높음)",
+    }
+
+    if redis:
+        with contextlib.suppress(Exception):
+            await redis.setex(cache_key, _FACTOR_CACHE_TTL, json.dumps(result_data))
+
+    return result_data
+
+
 async def get_factor_analysis(
     user_id: uuid.UUID,
     db: AsyncSession,

@@ -27,6 +27,7 @@ export interface FactorAnalysis {
     momentum: number;
   };
   position_count: number;
+  portfolio_name?: string;
   note: string;
 }
 
@@ -48,6 +49,7 @@ export interface FrontierAsset {
 export interface EfficientFrontier {
   frontier: FrontierPoint[];
   current: FrontierPoint | null;
+  target: FrontierPoint | null;
   assets: FrontierAsset[];
   note: string;
 }
@@ -77,6 +79,52 @@ export interface CurrencyExposure {
   other_pct: number;
 }
 
+// ---------------------------------------------------------------------------
+// 리밸런싱 전략
+// ---------------------------------------------------------------------------
+
+export interface FactorChange {
+  current: number;
+  target: number;
+  delta: number;
+}
+
+export interface FrontierChanges {
+  current_risk: number | null;
+  current_return: number | null;
+  target_risk: number | null;
+  target_return: number | null;
+  risk_change: number | null;
+  return_change: number | null;
+  sharpe_improvement: boolean | null;
+  current_sharpe: number | null;
+  target_sharpe: number | null;
+}
+
+export interface TradeRecommendation {
+  action: string;
+  ticker: string;
+  market: string;
+  name: string;
+  current_weight: number;
+  target_weight: number;
+  reason: string;
+}
+
+export interface RebalancingStrategy {
+  portfolio_id: string;
+  portfolio_name: string;
+  factor_changes: Record<string, FactorChange>;
+  frontier_changes: FrontierChanges;
+  trade_recommendations: TradeRecommendation[];
+  overall_direction: string;
+  summary: string;
+}
+
+// ---------------------------------------------------------------------------
+// API 함수
+// ---------------------------------------------------------------------------
+
 export const fetchPortfolioRisk = (portfolioId?: string) =>
   apiGet<PortfolioRiskMetrics>(
     portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk",
@@ -88,5 +136,15 @@ export const fetchCurrencyExposure = () =>
 export const fetchFactorAnalysis = () =>
   apiGet<FactorAnalysis>("/portfolio/factor-analysis");
 
-export const fetchEfficientFrontier = () =>
-  apiGet<EfficientFrontier>("/portfolio/efficient-frontier");
+export const fetchPortfolioFactorAnalysis = (portfolioId: string) =>
+  apiGet<FactorAnalysis>(`/portfolio/factor-analysis/${portfolioId}`);
+
+export const fetchEfficientFrontier = (comparePortfolioId?: string) =>
+  apiGet<EfficientFrontier>(
+    comparePortfolioId
+      ? `/portfolio/efficient-frontier?compare_portfolio_id=${comparePortfolioId}`
+      : "/portfolio/efficient-frontier",
+  );
+
+export const fetchRebalancingStrategy = (portfolioId: string) =>
+  apiGet<RebalancingStrategy>(`/portfolio/rebalancing-strategy?portfolio_id=${portfolioId}`);

@@ -151,6 +151,11 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     .map((p) => p.name)
     .join(", ");
 
+  const singleSelectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined;
+  const singleSelectedName = singleSelectedId
+    ? sortedPortfolios.find((p) => p.id === singleSelectedId)?.name
+    : undefined;
+
   return (
     <div className="space-y-5">
       <ErrorBoundary variant="section">
@@ -160,12 +165,20 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
       <hr className="border-gray-200 dark:border-gray-700" />
 
       {/* ── 팩터 분석 + 효율적 프론티어 ─────────────────────────────── */}
+      {singleSelectedId && (
+        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+          비교 중: <span className="font-semibold">{singleSelectedName}</span>
+        </p>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <ErrorBoundary variant="section">
-          <FactorExposureChart />
+          <FactorExposureChart selectedPortfolioId={singleSelectedId} />
         </ErrorBoundary>
         <ErrorBoundary variant="section">
-          <EfficientFrontierChart />
+          <EfficientFrontierChart
+            comparePortfolioId={singleSelectedId}
+            comparePortfolioName={singleSelectedName}
+          />
         </ErrorBoundary>
       </div>
 

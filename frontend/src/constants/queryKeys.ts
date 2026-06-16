@@ -36,5 +36,8 @@ export const QUERY_KEYS = {
   economicIndicatorSubscriptions: ["economic-indicator-subscriptions"] as const,
   marketSignal: ["market-signal"] as const,
   factorAnalysis: ["factor-analysis"] as const,
-  efficientFrontier: ["efficient-frontier"] as const,
+  portfolioFactorAnalysis: (portfolioId: string) => ["factor-analysis", portfolioId] as const,
+  efficientFrontier: (comparePortfolioId?: string) =>
+    ["efficient-frontier", comparePortfolioId ?? null] as const,
+  rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
 } as const;

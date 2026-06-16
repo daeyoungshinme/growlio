@@ -18,9 +18,10 @@ from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.portfolio import PortfolioSummaryResponse
 from app.services.credential_service import get_kis_user_credentials
-from app.services.factor_service import get_factor_analysis
+from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
 from app.services.portfolio_optimizer import get_efficient_frontier
 from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
+from app.services.rebalancing_strategy_service import get_rebalancing_strategy
 from app.services.risk_service import (
     get_currency_exposure,
     get_portfolio_risk_metrics,
@@ -161,16 +162,46 @@ async def portfolio_factor_analysis(
     return await get_factor_analysis(current_user.id, db, redis)
 
 
+@router.get("/factor-analysis/{portfolio_id}")
+@limiter.limit("5/minute")
+async def portfolio_factor_analysis_by_id(
+    request: Request,
+    portfolio_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """저장된 포트폴리오의 팩터 분석 — 비교 목적."""
+    redis = await get_redis()
+    return await get_factor_analysis_for_portfolio(portfolio_id, db, redis)
+
+
 @router.get("/efficient-frontier")
 @limiter.limit("3/minute")
 async def portfolio_efficient_frontier(
     request: Request,
+    compare_portfolio_id: str | None = Query(None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """효율적 프론티어 — Mean-Variance Optimization (scipy SLSQP)."""
+    """효율적 프론티어 — Mean-Variance Optimization (scipy SLSQP). compare_portfolio_id 지정 시 목표 포트폴리오 위치도 반환."""
     redis = await get_redis()
-    return await get_efficient_frontier(current_user.id, db, redis)
+    return await get_efficient_frontier(current_user.id, db, redis, compare_portfolio_id=compare_portfolio_id)
+
+
+@router.get("/rebalancing-strategy")
+@limiter.limit("3/minute")
+async def portfolio_rebalancing_strategy(
+    request: Request,
+    portfolio_id: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """팩터·프론티어 분석 기반 리밸런싱 전략 제시."""
+    redis = await get_redis()
+    result = await get_rebalancing_strategy(current_user.id, portfolio_id, db, redis)
+    if "error" in result:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["error"])
+    return result
 
 
 @router.get("/currency-exposure")

@@ -10,6 +10,7 @@ import type { AssetAccount } from "@/api/assets";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
+import RebalancingStrategyCard from "@/components/portfolio-analysis/RebalancingStrategyCard";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -25,7 +26,7 @@ interface Props {
   autoAnalyzeId?: string;
 }
 
-type AnalysisMode = "rebalancing" | "backtest";
+type AnalysisMode = "rebalancing" | "backtest" | "strategy";
 
 export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal, autoAnalyzeId }: Props) {
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
@@ -139,6 +140,19 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           }`}
         >
           백테스팅
+        </button>
+
+        <button
+          onClick={() => setAnalysisMode("strategy")}
+          disabled={!canRebalance}
+          title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
+          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
+            analysisMode === "strategy"
+              ? "bg-amber-500 text-white hover:bg-amber-600"
+              : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+          }`}
+        >
+          전략 분석
         </button>
 
         {selectedIds.size > 0 && (
@@ -324,6 +338,14 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           해당 기간의 가격 데이터가 없습니다. 기간을 조정해보세요.
         </div>
       )}
+
+      {/* 전략 분석 결과 */}
+      {analysisMode === "strategy" && (() => {
+        const [id] = Array.from(selectedIds);
+        const portfolio = portfolios.find((p) => p.id === id);
+        if (!id || !portfolio) return null;
+        return <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />;
+      })()}
 
       {/* Empty state */}
       {!analysisMode && (
