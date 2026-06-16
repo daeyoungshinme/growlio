@@ -36,6 +36,7 @@ ASSET_TYPE_LABELS: dict[str, str] = {
 }
 
 STOCK_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_OTHER})
+DOMESTIC_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "KRX"})
 
 
 async def _fetch_latest_snapshots(
@@ -271,6 +272,8 @@ async def build_portfolio_overview(
     ]
 
     stock_alloc_source = lite_stock_items if lite else all_positions
+    domestic_stock_krw = sum(p["value_krw"] for p in stock_alloc_source if p.get("market") in DOMESTIC_MARKETS)
+    foreign_stock_krw = sum(p["value_krw"] for p in stock_alloc_source if p.get("market") not in DOMESTIC_MARKETS)
     overview = {
         "total_assets_krw": total_assets_krw,
         "total_stock_krw": stock_total_krw,
@@ -278,6 +281,8 @@ async def build_portfolio_overview(
         "total_invested_krw": total_invested_krw,
         "unrealized_pnl_krw": unrealized_pnl_krw,
         "stock_return_pct": round(stock_return_pct, 2),
+        "domestic_stock_krw": domestic_stock_krw,
+        "foreign_stock_krw": foreign_stock_krw,
         "asset_type_allocation": asset_type_allocation,
         "stock_allocation": _build_stock_allocation(stock_alloc_source, stock_total_krw),
         "all_positions": all_positions,
@@ -301,6 +306,8 @@ def _empty_overview() -> dict[str, Any]:
         "total_invested_krw": 0,
         "unrealized_pnl_krw": 0,
         "stock_return_pct": 0,
+        "domestic_stock_krw": 0,
+        "foreign_stock_krw": 0,
         "asset_type_allocation": [],
         "stock_allocation": [],
         "all_positions": [],

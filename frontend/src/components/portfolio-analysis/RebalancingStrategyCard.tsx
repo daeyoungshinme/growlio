@@ -33,7 +33,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.rebalancingStrategy(portfolioId),
     queryFn: () => fetchRebalancingStrategy(portfolioId),
-    staleTime: STALE_TIME.MEDIUM,
+    staleTime: STALE_TIME.LONG,
   });
 
   if (isLoading) {

@@ -26,57 +26,90 @@ logger = structlog.get_logger()
 _FACTOR_CACHE_TTL = 3600  # 1시간
 
 
+def _safe_float(v: object) -> float | None:
+    try:
+        f = float(v)  # type: ignore[arg-type]
+        return f if math.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
 def _sync_fetch_factor_data(symbols: list[str]) -> dict[str, dict]:
-    """yfinance .info에서 P/E, P/B, 시가총액, 12-1M 모멘텀 수집. 동기 함수."""
+    """yfinance .info에서 P/E, P/B, 시가총액, 12-1M 모멘텀 수집.
+
+    - 역사 데이터(모멘텀): yf.download() 단일 배치 호출
+    - .info(P/E·P/B·시가총액): ThreadPoolExecutor(max_workers=5) 병렬 조회
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from datetime import date, timedelta
 
+    import pandas as pd
     import yfinance as yf
 
+    # Step 1: 역사 데이터 일괄 다운로드 (모멘텀 계산용)
+    end_date = date.today() - timedelta(days=21)
+    start_date = end_date - timedelta(days=335)
+    momentum_map: dict[str, float | None] = {sym: None for sym in symbols}
+    try:
+        raw_hist = yf.download(
+            symbols,
+            start=start_date.isoformat(),
+            end=end_date.isoformat(),
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+        close: pd.DataFrame | None
+        if raw_hist is not None and not raw_hist.empty:
+            if isinstance(raw_hist.columns, pd.MultiIndex):
+                close = raw_hist.get("Close")
+            else:
+                close = raw_hist if isinstance(raw_hist, pd.DataFrame) else raw_hist.to_frame(name=symbols[0])
+        else:
+            close = None
+
+        if close is not None:
+            for sym in symbols:
+                try:
+                    col = sym if sym in close.columns else None
+                    if col is None:
+                        continue
+                    series = close[col].dropna()
+                    if len(series) >= 2:
+                        raw_mom = float(series.iloc[-1] / series.iloc[0] - 1) * 100
+                        momentum_map[sym] = round(raw_mom, 2) if math.isfinite(raw_mom) else None
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning("factor_history_batch_failed", error=str(e))
+
+    # Step 2: .info 병렬 조회 (P/E, P/B, 시가총액)
+    def _fetch_one_info(sym: str) -> tuple[str, dict]:
+        try:
+            return sym, yf.Ticker(sym).info or {}
+        except Exception:
+            return sym, {}
+
+    info_map: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_fetch_one_info, sym): sym for sym in symbols}
+        for future in as_completed(futures):
+            try:
+                sym, info = future.result()
+                info_map[sym] = info
+            except Exception as e:
+                logger.warning("factor_info_fetch_failed", error=str(e))
+
+    # Step 3: 결과 조합
     result: dict[str, dict] = {}
     for sym in symbols:
-        try:
-            ticker = yf.Ticker(sym)
-            info = ticker.info or {}
-
-            pe_ratio = info.get("trailingPE") or info.get("forwardPE")
-            pb_ratio = info.get("priceToBook")
-            market_cap = info.get("marketCap")
-
-            # 12-1M 모멘텀: 12개월 전 → 1개월 전 구간 수익률
-            end_date = date.today() - timedelta(days=21)
-            start_date = end_date - timedelta(days=335)
-            hist = ticker.history(
-                start=start_date.isoformat(),
-                end=end_date.isoformat(),
-                auto_adjust=True,
-            )
-            momentum: float | None = None
-            if not hist.empty and len(hist) >= 2:
-                raw_mom = float(hist["Close"].iloc[-1] / hist["Close"].iloc[0] - 1) * 100
-                if math.isfinite(raw_mom):
-                    momentum = round(raw_mom, 2)
-
-            def _safe_float(v: object) -> float | None:
-                try:
-                    f = float(v)  # type: ignore[arg-type]
-                    return f if math.isfinite(f) else None
-                except (TypeError, ValueError):
-                    return None
-
-            result[sym] = {
-                "pe_ratio": _safe_float(pe_ratio),
-                "pb_ratio": _safe_float(pb_ratio),
-                "market_cap": _safe_float(market_cap),
-                "momentum_pct": momentum,
-            }
-        except Exception as e:
-            logger.warning("factor_fetch_failed", symbol=sym, error=str(e))
-            result[sym] = {
-                "pe_ratio": None,
-                "pb_ratio": None,
-                "market_cap": None,
-                "momentum_pct": None,
-            }
+        info = info_map.get(sym, {})
+        result[sym] = {
+            "pe_ratio": _safe_float(info.get("trailingPE") or info.get("forwardPE")),
+            "pb_ratio": _safe_float(info.get("priceToBook")),
+            "market_cap": _safe_float(info.get("marketCap")),
+            "momentum_pct": momentum_map.get(sym),
+        }
     return result
 
 

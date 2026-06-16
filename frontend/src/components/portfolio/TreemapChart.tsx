@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ResponsiveContainer, Treemap, Tooltip } from "recharts";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
@@ -18,7 +19,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-export default function TreemapChart({ data, title, isLoading }: Props) {
+function TreemapChart({ data, title, isLoading }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   return (
     <div className="card">
@@ -47,3 +48,5 @@ export default function TreemapChart({ data, title, isLoading }: Props) {
     </div>
   );
 }
+
+export default memo(TreemapChart);

@@ -44,7 +44,7 @@ def _sync_fetch_returns(symbols: list[str]) -> dict[str, list[float]]:
             end=end.isoformat(),
             auto_adjust=True,
             progress=False,
-            threads=False,
+            threads=True,
         )
     except Exception as e:
         logger.warning("optimizer_yf_download_failed", error=str(e))

@@ -67,6 +67,8 @@ export interface PortfolioOverview {
   total_invested_krw: number;
   unrealized_pnl_krw: number;
   stock_return_pct: number;
+  domestic_stock_krw?: number;
+  foreign_stock_krw?: number;
   asset_type_allocation: AllocationItem[];
   stock_allocation: AllocationItem[];
   all_positions: PortfolioPosition[];

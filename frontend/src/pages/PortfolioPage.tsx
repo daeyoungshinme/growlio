@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
 import { api } from "@/api/client";
 import { syncAccount } from "@/api/assets";
@@ -15,8 +15,8 @@ import { pnlColor } from "@/utils/colors";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import { DOMESTIC_MARKETS } from "@/constants";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
+import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
@@ -55,18 +55,20 @@ export default function PortfolioPage() {
   }, [setSearchParams]);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const [chartsOpen, setChartsOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
     queryFn: fetchOverview,
     staleTime: STALE_TIME.EXCHANGE_RATE,
-    refetchInterval: REFETCH_INTERVAL.PORTFOLIO,
+    refetchInterval: isNativePlatform() ? false : REFETCH_INTERVAL.PORTFOLIO,
   });
 
   const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
     staleTime: STALE_TIME.LONG,
+    enabled: !isLoading && !!data,
   });
 
   const { data: divSummary } = useQuery({
@@ -85,11 +87,6 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     if (isLoading || !data) return;
-    qc.prefetchQuery({
-      queryKey: QUERY_KEYS.dividendPositions,
-      queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
-      staleTime: STALE_TIME.LONG,
-    });
     qc.prefetchQuery({
       queryKey: QUERY_KEYS.dividendSummary,
       queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
@@ -139,12 +136,8 @@ export default function PortfolioPage() {
 
   const marketChartData = useMemo(() => {
     if (!data) return [];
-    let domestic = 0;
-    let foreign = 0;
-    for (const p of data.all_positions) {
-      if (DOMESTIC_MARKETS.includes(p.market)) domestic += p.value_krw;
-      else foreign += p.value_krw;
-    }
+    const domestic = data.domestic_stock_krw ?? 0;
+    const foreign = data.foreign_stock_krw ?? 0;
     const total = domestic + foreign;
     if (total === 0) return [];
     const items = [];
@@ -222,10 +215,6 @@ export default function PortfolioPage() {
 
       {tab === "종목 현황" && (
         <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-            <DomesticForeignBar items={marketChartData} />
-            <TreemapChart data={stockChartData} title="종목별 비중" />
-          </Suspense>
           {(() => {
             const dividendMap = Object.fromEntries(
               dividendData.map((d) => [`${d.ticker}-${d.market}`, d])
@@ -240,6 +229,19 @@ export default function PortfolioPage() {
               />
             );
           })()}
+          <button
+            onClick={() => setChartsOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
+          >
+            {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            비중 차트 {chartsOpen ? "접기" : "펼치기"}
+          </button>
+          {chartsOpen && (
+            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+              <DomesticForeignBar items={marketChartData} />
+              <TreemapChart data={stockChartData} title="종목별 비중" />
+            </Suspense>
+          )}
         </ErrorBoundary>
       )}
 

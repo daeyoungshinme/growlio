@@ -54,6 +54,9 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
       <div className="card space-y-3">
         <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
         <div className="h-60 bg-gray-100 dark:bg-gray-700 rounded-xl animate-pulse" />
+        <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
+          처음 조회 시 15–30초 소요될 수 있습니다
+        </p>
       </div>
     );
   }
