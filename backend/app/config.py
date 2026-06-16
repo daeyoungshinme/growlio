@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     cb_ext_fail_max: int = 3            # 외부 API (Naver, FDR, Yahoo) 실패 임계값
     cb_ext_reset_timeout: float = 120.0 # 외부 API 복구 대기(초)
 
+    migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
+
     # DB 커넥션 풀 설정
     database_pool_size: int = 10
     database_max_overflow: int = 5

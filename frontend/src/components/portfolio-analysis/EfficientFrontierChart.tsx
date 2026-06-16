@@ -110,6 +110,7 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
         </p>
       </div>
 
+      <div className="min-h-[200px]">
       <ResponsiveContainer width="100%" height={260}>
         <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
           <CartesianGrid stroke={gridColor} strokeDasharray="3 3" />
@@ -167,6 +168,7 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
           )}
         </ScatterChart>
       </ResponsiveContainer>
+      </div>
 
       {/* 범례 */}
       <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">

@@ -88,6 +88,7 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
         </p>
       </div>
 
+      <div className="min-h-[200px]">
       <ResponsiveContainer width="100%" height={hasTarget ? 240 : 220}>
         <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
           <PolarGrid stroke={isDark ? "#374151" : "#E5E7EB"} />
@@ -125,6 +126,7 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
           )}
         </RadarChart>
       </ResponsiveContainer>
+      </div>
 
       {/* 팩터 델타 뱃지 (목표 포트폴리오 선택 시) */}
       {hasTarget && targetData && (

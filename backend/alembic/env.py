@@ -10,7 +10,8 @@ from app.database import Base
 import app.models  # noqa: F401 — ensure all models are imported for metadata
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url.replace('%', '%%'))
+_migration_url = (settings.migration_database_url or settings.database_url).replace('%', '%%')
+config.set_main_option("sqlalchemy.url", _migration_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -34,7 +35,8 @@ def do_run_migrations(connection):
 async def run_async_migrations() -> None:
     extra: dict = {}
     if settings.supabase_project_url or settings.app_env == "production":
-        extra["connect_args"] = {"ssl": "require"}
+        # statement_cache_size=0: Transaction Pooler(port 6543)는 prepared statement 캐시 비호환
+        extra["connect_args"] = {"ssl": "require", "server_settings": {"statement_cache_size": "0"}}
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

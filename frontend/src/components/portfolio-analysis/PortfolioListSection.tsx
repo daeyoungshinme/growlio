@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -12,11 +13,12 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertCircle, Bell, Edit2, GripVertical, Loader2, Plus, Target, Trash2 } from "lucide-react";
+import { AlertCircle, Bell, Edit2, GripVertical, Loader2, Plus, RefreshCw, Target, Trash2 } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
 import { toast } from "@/utils/toast";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
 function SortablePortfolioItem({
   id,
@@ -54,6 +56,7 @@ interface PortfolioListSectionProps {
   onOpenAlertModal: (portfolioId: string) => void;
   onConfirmDelete: (portfolioId: string) => void;
   onBatchSetTarget: (portfolioId: string | null, accountIds: string[]) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 export default function PortfolioListSection({
@@ -70,7 +73,15 @@ export default function PortfolioListSection({
   onOpenAlertModal,
   onConfirmDelete,
   onBatchSetTarget,
+  onRefresh,
 }: PortfolioListSectionProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { isPulling, pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: onRefresh ?? (() => Promise.resolve()),
+    containerRef,
+    disabled: !onRefresh,
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
@@ -122,7 +133,21 @@ export default function PortfolioListSection({
   }
 
   return (
-    <div className="w-full md:w-72 lg:w-80 md:flex-shrink-0 space-y-3">
+    <div ref={containerRef} className="w-full md:w-72 lg:w-80 md:flex-shrink-0 space-y-3 overflow-y-auto">
+      {/* 당겨서 새로고침 인디케이터 */}
+      {(isPulling || isRefreshing) && (
+        <div
+          className="flex items-center justify-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 transition-all"
+          style={{ height: isPulling ? `${pullDistance}px` : undefined }}
+        >
+          <RefreshCw
+            size={14}
+            className={isRefreshing ? "animate-spin" : ""}
+            style={isPulling && !isRefreshing ? { transform: `rotate(${pullDistance * 3}deg)` } : undefined}
+          />
+          {isRefreshing ? "새로고침 중..." : "놓아서 새로고침"}
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
         <button

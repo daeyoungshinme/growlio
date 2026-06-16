@@ -14,6 +14,7 @@ import uuid
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
@@ -187,7 +188,11 @@ async def get_factor_analysis_for_portfolio(
         except Exception:
             pass
 
-    portfolio = await db.get(Portfolio, portfolio_id)
+    portfolio = await db.scalar(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(Portfolio.id == portfolio_id)
+    )
     if not portfolio or not portfolio.items:
         return _empty_factor_result()
 

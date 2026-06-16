@@ -1,6 +1,7 @@
 """리밸런싱 전략 서비스 — 팩터 노출도 + 효율적 프론티어를 종합해 전략 방향을 제시한다."""
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import json
 import uuid
@@ -8,6 +9,7 @@ import uuid
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
@@ -17,7 +19,7 @@ from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
 
-_STRATEGY_CACHE_TTL = 1800  # 30분
+_STRATEGY_CACHE_TTL = 3600  # 팩터·프론티어(1h)와 TTL 일치 — 전략은 두 캐시의 함수이므로 먼저 만료될 필요 없음
 _RISK_FREE_RATE = 3.0       # Sharpe 계산 기준 무위험 수익률 (%)
 
 _FACTOR_LABELS: dict[str, str] = {
@@ -185,13 +187,21 @@ async def get_rebalancing_strategy(
         except Exception:
             pass
 
-    portfolio = await db.get(Portfolio, portfolio_id)
+    portfolio = await db.scalar(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(Portfolio.id == portfolio_id)
+    )
     if not portfolio:
         return {"error": "포트폴리오를 찾을 수 없습니다"}
 
-    # 1. 팩터 분석 (현재 실계좌 + 목표 포트폴리오)
-    current_factors_data = await get_factor_analysis(user_id, db, redis)
-    target_factors_data = await get_factor_analysis_for_portfolio(portfolio_id, db, redis)
+    # 1+2. 팩터·프론티어 병렬 조회 — 세 호출이 서로 독립적이므로 asyncio.gather로 동시 실행.
+    # 캐시 히트(TTL=1h) 시 DB 접근 없이 Redis에서 즉시 반환되어 AsyncSession 경합 없음.
+    current_factors_data, target_factors_data, frontier_data = await asyncio.gather(
+        get_factor_analysis(user_id, db, redis),
+        get_factor_analysis_for_portfolio(portfolio_id, db, redis),
+        get_efficient_frontier(user_id, db, redis, compare_portfolio_id=portfolio_id),
+    )
 
     current_pf = current_factors_data.get("portfolio_factors", {})
     target_pf = target_factors_data.get("portfolio_factors", {})
@@ -205,11 +215,6 @@ async def get_rebalancing_strategy(
             "target": round(tgt_val, 1),
             "delta": round(tgt_val - cur_val, 1),
         }
-
-    # 2. 효율적 프론티어 + 두 포트폴리오 위치
-    frontier_data = await get_efficient_frontier(
-        user_id, db, redis, compare_portfolio_id=portfolio_id
-    )
     cur_pos = frontier_data.get("current")
     tgt_pos = frontier_data.get("target")
 

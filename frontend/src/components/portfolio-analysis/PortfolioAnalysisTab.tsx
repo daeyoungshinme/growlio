@@ -205,6 +205,9 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
           onOpenAlertModal={setAlertModalPortfolioId}
           onConfirmDelete={setConfirmDeleteId}
           onBatchSetTarget={(pid, accountIds) => batchTargetMut.mutate({ portfolioId: pid, accountIds })}
+          onRefresh={async () => {
+            await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
+          }}
         />
 
         <div ref={analysisSectionRef}>

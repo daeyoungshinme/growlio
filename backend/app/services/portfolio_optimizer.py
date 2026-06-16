@@ -14,6 +14,7 @@ import uuid
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
@@ -276,7 +277,11 @@ async def get_efficient_frontier(  # noqa: C901
     compare_weights: list[float] = []
     if compare_portfolio_id:
         from app.models.portfolio import Portfolio
-        portfolio = await db.get(Portfolio, compare_portfolio_id)
+        portfolio = await db.get(
+            Portfolio,
+            compare_portfolio_id,
+            options=[selectinload(Portfolio.items)],
+        )
         if portfolio and portfolio.items:
             total_w = sum(float(item.weight) for item in portfolio.items)
             for item in portfolio.items:

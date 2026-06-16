@@ -11,6 +11,7 @@ import { useThemeStore } from "./stores/themeStore";
 import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWidget } from "./hooks/useWidget";
+import { usePortfolioTabFetching } from "./hooks/usePortfolioTabFetching";
 import BiometricGuard from "./components/common/BiometricGuard";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
@@ -43,10 +44,11 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
 
 function AppRoutes() {
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
+  const isPortfolioLoading = usePortfolioTabFetching();
 
   return (
     <>
-      <TopLoadingBar isVisible={isAuthChecking} />
+      <TopLoadingBar isVisible={isAuthChecking || isPortfolioLoading} />
       <Routes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />

@@ -296,7 +296,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             const portfolioIdStr = analysis.portfolio_id.toString();
             const existingAlert = alertByPortfolioId[portfolioIdStr];
             return (
-              <div className="hidden sm:flex items-center justify-between mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
                 {existingAlert ? (
                   <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
                     <Bell size={12} />
@@ -309,7 +309,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
                 )}
                 <button
                   onClick={() => onOpenAlertModal(portfolioIdStr)}
-                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap ml-3"
+                  className="self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3"
                 >
                   {existingAlert ? "설정 변경" : "자동화 설정"}
                 </button>

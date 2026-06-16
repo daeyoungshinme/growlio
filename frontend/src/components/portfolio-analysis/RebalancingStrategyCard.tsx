@@ -174,7 +174,9 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400">
             종목별 조정 방향
           </p>
-          <div className="overflow-x-auto">
+
+          {/* 데스크탑: 테이블 */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-700">
@@ -182,7 +184,7 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
                   <th className="text-center py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">방향</th>
                   <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">현재</th>
                   <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">목표</th>
-                  <th className="text-left py-1.5 pl-2 font-medium text-gray-400 dark:text-gray-500 hidden sm:table-cell">사유</th>
+                  <th className="text-left py-1.5 pl-2 font-medium text-gray-400 dark:text-gray-500">사유</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,13 +209,53 @@ export default function RebalancingStrategyCard({ portfolioId, portfolioName }: 
                     <td className="py-1.5 px-1 text-right font-medium text-gray-700 dark:text-gray-300">
                       {rec.target_weight.toFixed(1)}%
                     </td>
-                    <td className="py-1.5 pl-2 text-gray-400 dark:text-gray-500 hidden sm:table-cell max-w-[120px] truncate">
+                    <td className="py-1.5 pl-2 text-gray-400 dark:text-gray-500 max-w-[120px] truncate">
                       {rec.reason}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* 모바일: 카드형 목록 */}
+          <div className="sm:hidden space-y-2">
+            {trade_recommendations.map((rec, i) => {
+              const weightChange = rec.target_weight - rec.current_weight;
+              return (
+                <div
+                  key={i}
+                  className="flex flex-col gap-1 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="font-medium text-sm text-gray-800 dark:text-gray-200">{rec.ticker}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 truncate">{rec.name.slice(0, 10)}</span>
+                    </div>
+                    <span
+                      className={`shrink-0 inline-block px-1.5 py-0.5 rounded text-xs font-medium ${
+                        ACTION_COLORS[rec.action] ?? "text-gray-500 bg-gray-100 dark:bg-gray-700"
+                      }`}
+                    >
+                      {rec.action}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <span className="text-gray-500 dark:text-gray-400">{rec.current_weight.toFixed(1)}%</span>
+                    <span className="text-gray-300 dark:text-gray-600">→</span>
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{rec.target_weight.toFixed(1)}%</span>
+                    <span
+                      className={`font-medium ${
+                        weightChange > 0 ? "text-red-500" : weightChange < 0 ? "text-blue-500" : "text-gray-400"
+                      }`}
+                    >
+                      ({weightChange > 0 ? "+" : ""}{weightChange.toFixed(1)}%p)
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{rec.reason}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
