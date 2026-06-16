@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Sun, Moon, LogOut, Bell } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
+import { useBiometric } from "@/hooks/useBiometric";
+import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { type SettingsData } from "@/api/settings";
@@ -73,6 +75,7 @@ const labelClass = LABEL_MD;
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
   const logout = useLogout();
+  const { isAvailable, isEnabled, setEnabled } = useBiometric();
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);
@@ -197,6 +200,19 @@ export default function SettingsPage() {
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
             {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
           </button>
+          {isNativePlatform() && isAvailable && (
+            <button
+              onClick={() => setEnabled(!isEnabled)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              aria-pressed={isEnabled}
+            >
+              <Fingerprint size={18} className={isEnabled ? "text-blue-500" : undefined} />
+              생체 인증
+              <span className={`ml-auto text-xs font-medium ${isEnabled ? "text-blue-500" : "text-gray-400"}`}>
+                {isEnabled ? "켜짐" : "꺼짐"}
+              </span>
+            </button>
+          )}
           <button
             onClick={logout}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"

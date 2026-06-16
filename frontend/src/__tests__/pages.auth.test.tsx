@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { render } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import FindAccountPage from "@/pages/FindAccountPage";
@@ -17,6 +18,10 @@ const mockLogin = vi.fn();
 const mockForgotPassword = vi.fn();
 const mockFindAccount = vi.fn();
 
+vi.mock("@/api/dashboard", () => ({ fetchDashboard: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/api/assets", () => ({ fetchAccounts: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/api/portfolios", () => ({ fetchPortfolioOverviewLite: vi.fn().mockResolvedValue({}) }));
+
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn((selector) => {
     const state = {
@@ -29,7 +34,12 @@ vi.mock("@/stores/authStore", () => ({
 }));
 
 function renderWithRouter(ui: React.ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </QueryClientProvider>
+  );
 }
 
 describe("LoginPage", () => {

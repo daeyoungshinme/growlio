@@ -14,7 +14,7 @@ vi.mock("@/context/ExchangeRateContext", () => ({
   ExchangeRateProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock("@/hooks/useOnlineStatus", () => ({
-  useOnlineStatus: vi.fn(() => true),
+  useOnlineStatus: vi.fn(() => ({ online: true, lastOnlineAt: null })),
 }));
 vi.mock("@/hooks/useLogout", () => ({
   useLogout: () => vi.fn(),

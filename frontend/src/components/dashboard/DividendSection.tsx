@@ -1,14 +1,28 @@
 import { memo } from "react";
 import { fmtKrwShort } from "@/utils/format";
+import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 
 interface Props {
   annualReceived: number | null;
   estimatedAnnual: number | null;
   estimatedMonthly: number | null;
   overallDividendYield?: number | null;
+  isLoading?: boolean;
 }
 
-export default memo(function DividendSection({ annualReceived, estimatedAnnual, estimatedMonthly, overallDividendYield }: Props) {
+export default memo(function DividendSection({ annualReceived, estimatedAnnual, estimatedMonthly, overallDividendYield, isLoading }: Props) {
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="px-2 py-3 sm:px-4 text-center">
+            <SkeletonStatBox />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
       <div className="px-2 py-3 sm:px-4 text-center min-w-0">

@@ -134,6 +134,7 @@ export default function DashboardPage() {
               estimatedAnnual={data.estimated_annual_dividends ?? null}
               estimatedMonthly={estimatedMonthly}
               overallDividendYield={overallDividendYield}
+              isLoading={isLoading}
             />
           </ErrorBoundary>
         </div>

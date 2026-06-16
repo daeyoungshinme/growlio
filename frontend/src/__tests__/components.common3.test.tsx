@@ -10,7 +10,7 @@ vi.mock("@sentry/react", () => ({
 
 // Mock useOnlineStatus
 vi.mock("@/hooks/useOnlineStatus", () => ({
-  useOnlineStatus: vi.fn(() => true),
+  useOnlineStatus: vi.fn(() => ({ online: true, lastOnlineAt: null })),
 }));
 
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -150,13 +150,13 @@ describe("Toaster", () => {
 // ------- OfflineBanner -------
 describe("OfflineBanner", () => {
   it("renders nothing when online", () => {
-    vi.mocked(useOnlineStatus).mockReturnValue(true);
+    vi.mocked(useOnlineStatus).mockReturnValue({ online: true, lastOnlineAt: null });
     const { container } = renderWithProviders(<OfflineBanner />);
     expect(container.firstChild).toBeNull();
   });
 
   it("renders banner when offline", () => {
-    vi.mocked(useOnlineStatus).mockReturnValue(false);
+    vi.mocked(useOnlineStatus).mockReturnValue({ online: false, lastOnlineAt: new Date() });
     renderWithProviders(<OfflineBanner />);
     expect(screen.getByRole("alert")).toBeDefined();
     expect(screen.getByText(/오프라인 상태입니다/)).toBeDefined();

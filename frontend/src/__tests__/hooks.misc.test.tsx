@@ -37,23 +37,24 @@ function createWrapper() {
 describe("useOnlineStatus", () => {
   it("초기 상태는 navigator.onLine 값이다", () => {
     const { result } = renderHook(() => useOnlineStatus());
-    expect(result.current).toBe(navigator.onLine);
+    expect(result.current.online).toBe(navigator.onLine);
   });
 
-  it("online 이벤트 발생 시 true가 된다", () => {
+  it("online 이벤트 발생 시 online이 true가 된다", () => {
     const { result } = renderHook(() => useOnlineStatus());
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
-    expect(result.current).toBe(true);
+    expect(result.current.online).toBe(true);
+    expect(result.current.lastOnlineAt).toBeInstanceOf(Date);
   });
 
-  it("offline 이벤트 발생 시 false가 된다", () => {
+  it("offline 이벤트 발생 시 online이 false가 된다", () => {
     const { result } = renderHook(() => useOnlineStatus());
     act(() => {
       window.dispatchEvent(new Event("offline"));
     });
-    expect(result.current).toBe(false);
+    expect(result.current.online).toBe(false);
   });
 
   it("언마운트 시 이벤트 리스너가 제거된다", () => {

@@ -20,12 +20,13 @@ export function useWidget() {
   useEffect(() => {
     if (!native || !data) return;
 
+    const snapshot = data;
     async function sync() {
       try {
         const { WidgetPlugin } = await import("@/plugins/WidgetPlugin");
         await WidgetPlugin.update({
-          totalAssets: fmtKrwShort(data.total_assets_krw),
-          stockReturn: fmtPct(data.stock_return_pct),
+          totalAssets: fmtKrwShort(snapshot.total_assets_krw),
+          stockReturn: fmtPct(snapshot.stock_return_pct),
         });
       } catch {
         // 위젯 미설치 또는 플러그인 미사용 환경에서는 무시

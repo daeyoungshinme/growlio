@@ -65,7 +65,7 @@ export default function RebalancingAlertModal({ portfolioId, portfolioName, acco
 
   return (
     <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
-      <div className="p-6 space-y-5">
+      <div className="flex-1 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <div className="flex justify-center py-4">
             <Loader2 size={20} className="animate-spin text-gray-400" />
@@ -120,6 +120,7 @@ function AlertFormBody({
 
   return (
     <>
+      <div className="p-6 space-y-5 pb-2">
       {/* ── 알림 주기 ── */}
       <div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
@@ -144,12 +145,12 @@ function AlertFormBody({
       {form.scheduleType === "WEEKLY" && (
         <div>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">요일</p>
-          <div className="flex gap-1">
+          <div className="grid grid-cols-7 gap-1">
             {DAYS_KO.map((day, idx) => (
               <button
                 key={idx}
                 onClick={() => form.setDayOfWeek(idx)}
-                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   form.dayOfWeek === idx
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -259,7 +260,7 @@ function AlertFormBody({
 
       {/* ── 자동 실행 옵션 ── */}
       {form.mode === "AUTO" && (
-        <div className="space-y-3 p-3 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
+        <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
           <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
             ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다.
           </p>
@@ -274,7 +275,7 @@ function AlertFormBody({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             {STRATEGY_OPTIONS.map(({ value: s, label, desc }) => (
               <label
                 key={s}
@@ -376,8 +377,9 @@ function AlertFormBody({
           </button>
         </div>
 
-        {form.depositTriggerEnabled && (
-          <div className="space-y-3 mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
+        <div className={`grid transition-all duration-200 ${form.depositTriggerEnabled ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr]"}`}>
+          <div className="overflow-hidden">
+          <div className="space-y-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">감시 계좌 (KIS)</label>
               <select
@@ -429,7 +431,8 @@ function AlertFormBody({
               </p>
             )}
           </div>
-        )}
+          </div>{/* end overflow-hidden */}
+        </div>{/* end grid animation wrapper */}
       </div>
 
       {/* ── 설명 텍스트 ── */}
@@ -449,8 +452,10 @@ function AlertFormBody({
         </div>
       )}
 
+      </div>{/* end p-6 form fields */}
+
       {/* ── 버튼 ── */}
-      <div className="flex gap-3 pt-1">
+      <div className="sticky bottom-0 bg-white dark:bg-gray-900 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">
         <button
           onClick={() => form.upsertMut.mutate()}
           disabled={form.isPending}

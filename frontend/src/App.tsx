@@ -1,15 +1,17 @@
 import { lazy, LazyExoticComponent, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useNavigation } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PageLoader from "./components/common/PageLoader";
+import TopLoadingBar from "./components/common/TopLoadingBar";
 import Toaster from "./components/Toaster";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWidget } from "./hooks/useWidget";
+import BiometricGuard from "./components/common/BiometricGuard";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
@@ -36,6 +38,47 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
         <Component />
       </Suspense>
     </ErrorBoundary>
+  );
+}
+
+function AppRoutes() {
+  const { state: navState } = useNavigation();
+  const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
+
+  return (
+    <>
+      <TopLoadingBar isVisible={isAuthChecking || navState === "loading"} />
+      <Routes>
+        <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
+        <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
+        <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
+        <Route path="/forgot-password" element={<LazyRoute Component={ForgotPasswordPage} />} />
+        <Route path="/reset-password" element={<LazyRoute Component={ResetPasswordPage} />} />
+        <Route
+          path="/"
+          element={
+            <PrivateRoute>
+              <BiometricGuard>
+                <AppLayout />
+              </BiometricGuard>
+            </PrivateRoute>
+          }
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<LazyRoute Component={DashboardPage} />} />
+          <Route path="portfolio" element={<LazyRoute Component={PortfolioPage} />} />
+          <Route path="asset-management" element={<LazyRoute Component={AssetManagementPage} />} />
+          <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
+          <Route path="market" element={<LazyRoute Component={MarketPage} />} />
+          <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
+          {/* 구 URL 리다이렉트 */}
+          <Route path="assets" element={<Navigate to="/portfolio" replace />} />
+          <Route path="trend" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </>
   );
 }
 
@@ -67,37 +110,10 @@ export default function App() {
 
   return (
     <>
-    <Toaster />
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
-        <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
-        <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
-        <Route path="/forgot-password" element={<LazyRoute Component={ForgotPasswordPage} />} />
-        <Route path="/reset-password" element={<LazyRoute Component={ResetPasswordPage} />} />
-        <Route
-          path="/"
-          element={
-            <PrivateRoute>
-              <AppLayout />
-            </PrivateRoute>
-          }
-        >
-          <Route index element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<LazyRoute Component={DashboardPage} />} />
-          <Route path="portfolio" element={<LazyRoute Component={PortfolioPage} />} />
-          <Route path="asset-management" element={<LazyRoute Component={AssetManagementPage} />} />
-          <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
-          <Route path="market" element={<LazyRoute Component={MarketPage} />} />
-          <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
-          {/* 구 URL 리다이렉트 */}
-          <Route path="assets" element={<Navigate to="/portfolio" replace />} />
-          <Route path="trend" element={<Navigate to="/dashboard" replace />} />
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+      <Toaster />
+      <BrowserRouter>
+        <AppRoutes />
+      </BrowserRouter>
     </>
   );
 }

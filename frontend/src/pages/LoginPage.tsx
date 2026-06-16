@@ -1,8 +1,13 @@
 import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { fetchDashboard } from "@/api/dashboard";
+import { fetchAccounts } from "@/api/assets";
+import { fetchPortfolioOverviewLite } from "@/api/portfolios";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -11,6 +16,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,6 +24,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
+      // 로그인 직후 대시보드 데이터를 백그라운드에서 미리 가져온다.
+      // await 없이 실행하므로 navigate와 병렬 진행 — 청크 로드 완료 시점에 캐시가 채워짐.
+      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
+      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
+      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
       navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");

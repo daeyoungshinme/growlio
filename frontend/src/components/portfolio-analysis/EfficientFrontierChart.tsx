@@ -15,11 +15,6 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 
-interface TooltipPayload {
-  name: string;
-  value: number;
-}
-
 function CustomTooltip({
   active,
   payload,

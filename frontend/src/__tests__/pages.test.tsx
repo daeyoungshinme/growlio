@@ -144,7 +144,7 @@ vi.mock("@/hooks/useLogout", () => ({
 }));
 
 vi.mock("@/hooks/useOnlineStatus", () => ({
-  useOnlineStatus: vi.fn(() => true),
+  useOnlineStatus: vi.fn(() => ({ online: true, lastOnlineAt: null })),
 }));
 
 vi.mock("@/hooks/usePushNotifications", () => ({

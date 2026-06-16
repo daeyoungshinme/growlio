@@ -283,23 +283,23 @@ describe("useLogout (via hooks.queries)", () => {
 describe("useOnlineStatus (via hooks.queries)", () => {
   it("navigator.onLine 초기 상태를 반환한다", () => {
     const { result } = renderHook(() => useOnlineStatus());
-    expect(typeof result.current).toBe("boolean");
+    expect(typeof result.current.online).toBe("boolean");
   });
 
-  it("online 이벤트 발생 시 true가 된다", () => {
+  it("online 이벤트 발생 시 online이 true가 된다", () => {
     const { result } = renderHook(() => useOnlineStatus());
     act(() => {
       window.dispatchEvent(new Event("online"));
     });
-    expect(result.current).toBe(true);
+    expect(result.current.online).toBe(true);
   });
 
-  it("offline 이벤트 발생 시 false가 된다", () => {
+  it("offline 이벤트 발생 시 online이 false가 된다", () => {
     const { result } = renderHook(() => useOnlineStatus());
     act(() => {
       window.dispatchEvent(new Event("offline"));
     });
-    expect(result.current).toBe(false);
+    expect(result.current.online).toBe(false);
   });
 });
 
