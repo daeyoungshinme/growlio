@@ -1,5 +1,5 @@
 import { lazy, LazyExoticComponent, Suspense, useEffect } from "react";
-import { BrowserRouter, Navigate, Route, Routes, useNavigation } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import AppLayout from "./components/layout/AppLayout";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -42,12 +42,11 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
 }
 
 function AppRoutes() {
-  const { state: navState } = useNavigation();
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
 
   return (
     <>
-      <TopLoadingBar isVisible={isAuthChecking || navState === "loading"} />
+      <TopLoadingBar isVisible={isAuthChecking} />
       <Routes>
         <Route path="/login" element={<LazyRoute Component={LoginPage} />} />
         <Route path="/register" element={<LazyRoute Component={RegisterPage} />} />
