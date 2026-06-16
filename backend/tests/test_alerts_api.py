@@ -116,7 +116,7 @@ class TestExchangeRateAlerts:
 
         from unittest.mock import patch
         with TestClient(app, raise_server_exceptions=False) as client:
-            with patch("app.api.v1.alerts.ExchangeRateAlert") as MockAlert:
+            with patch("app.api.v1.exchange_rate_alerts.ExchangeRateAlert") as MockAlert:
                 instance = MagicMock()
                 instance.id = alert_orm.id
                 instance.user_id = user.id
@@ -416,7 +416,7 @@ class TestStockPriceAlertExtended:
         }
         from unittest.mock import patch
         with TestClient(app, raise_server_exceptions=False) as client:
-            with patch("app.api.v1.alerts.StockPriceAlert") as MockAlert:
+            with patch("app.api.v1.stock_price_alerts.StockPriceAlert") as MockAlert:
                 MockAlert.return_value = alert_orm
                 resp = client.post("/api/v1/alerts/stock-price", json=payload)
         assert resp.status_code in (200, 201)

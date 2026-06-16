@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { X, CheckCircle, XCircle, Lock } from "lucide-react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import { verifyKisCredentials } from "@/api/assets";
@@ -133,6 +134,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const typeLabel = STOCK_TYPE_LABELS[initialAccount?.asset_type ?? ""] ?? initialAccount?.asset_type;
 
   return (
+    <ErrorBoundary variant="section">
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-1">
@@ -391,5 +393,6 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

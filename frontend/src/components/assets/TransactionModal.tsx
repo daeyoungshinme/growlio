@@ -12,7 +12,7 @@ import {
 import { convertUsdToKrw, fmtKrw } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { TX_LABELS } from "@/constants/transaction";
+import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
 import { TransactionList } from "./TransactionList";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -133,7 +133,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
         <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700 space-y-3 shrink-0">
           {/* 유형 */}
           <div className="flex gap-2">
-            {(["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const).map((t) => (
+            {TX_TYPES.map((t) => (
               <button
                 key={t}
                 onClick={() => handleTxTypeChange(t)}
@@ -155,7 +155,7 @@ export default function TransactionModal({ accountId, accountName, depositKrw = 
                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400">금액 *</label>
                 {form.transaction_type === "DIVIDEND" && (
                   <div className="flex gap-0.5 text-xs">
-                    {(["KRW", "USD"] as const).map((c) => (
+                    {CURRENCY_TYPES.map((c) => (
                       <button
                         key={c}
                         type="button"

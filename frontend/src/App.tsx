@@ -9,6 +9,7 @@ import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
+import { useWidget } from "./hooks/useWidget";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
@@ -44,6 +45,7 @@ export default function App() {
   const logout = useAuthStore((s) => s.logout);
   const queryClient = useQueryClient();
   usePushNotifications();
+  useWidget();
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", isDark);

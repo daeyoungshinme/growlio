@@ -1,12 +1,22 @@
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
-import { type ScheduleType, type TriggerCondition, type MarketConditionMode } from "@/api/alerts";
+import { type ScheduleType, type TriggerCondition } from "@/api/alerts";
 import {
   useRebalancingAlertQueries,
   useRebalancingAlertFormState,
 } from "@/hooks/useRebalancingAlertForm";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import {
+  SCHEDULE_OPTIONS,
+  DAYS_KO,
+  SCHEDULE_LABEL,
+  NEEDS_DAY_OF_MONTH,
+  TRIGGER_CONDITION_OPTIONS,
+  MODE_OPTIONS,
+  STRATEGY_OPTIONS,
+  MARKET_CONDITION_OPTIONS,
+} from "@/constants/rebalancingConfig";
 
 interface Props {
   portfolioId: string;
@@ -14,26 +24,6 @@ interface Props {
   accountIds?: string[] | null;
   onClose: () => void;
 }
-
-const SCHEDULE_OPTIONS: { value: ScheduleType; label: string }[] = [
-  { value: "DAILY", label: "매일" },
-  { value: "WEEKLY", label: "매주" },
-  { value: "MONTHLY", label: "매월" },
-  { value: "QUARTERLY", label: "3개월" },
-  { value: "SEMIANNUAL", label: "6개월" },
-  { value: "ANNUAL", label: "1년" },
-];
-
-const DAYS_KO = ["월", "화", "수", "목", "금", "토", "일"];
-
-const SCHEDULE_LABEL: Record<ScheduleType, string> = {
-  DAILY: "매일",
-  WEEKLY: "매주",
-  MONTHLY: "매월",
-  QUARTERLY: "매 3개월",
-  SEMIANNUAL: "매 6개월",
-  ANNUAL: "매년",
-};
 
 function buildDescription(
   scheduleType: ScheduleType,
@@ -67,7 +57,6 @@ function buildDescription(
   return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
 }
 
-const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 const inputClass = `w-full ${INPUT_SM}`;
 
 export default function RebalancingAlertModal({ portfolioId, portfolioName, accountIds, onClose }: Props) {
@@ -200,13 +189,7 @@ function AlertFormBody({
       <div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
         <div className="space-y-2">
-          {(
-            [
-              { value: "DRIFT_ONLY" as TriggerCondition, label: "비중 이탈 시에만", desc: "이탈 종목이 있을 때만 동작합니다" },
-              { value: "SCHEDULE_ONLY" as TriggerCondition, label: "주기마다 항상", desc: "이탈 여부와 관계없이 주기마다 리포트를 받습니다" },
-              { value: "BOTH" as TriggerCondition, label: "주기마다 + 비중 이탈 시", desc: "주기 리포트를 받으면서 이탈 감지 시 즉시 추가 알림 (예수금 포함)" },
-            ] as const
-          ).map(({ value, label, desc }) => (
+          {TRIGGER_CONDITION_OPTIONS.map(({ value, label, desc }) => (
             <label key={value} className="flex items-start gap-2.5 cursor-pointer">
               <input
                 type="radio"
@@ -248,7 +231,7 @@ function AlertFormBody({
       <div>
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 모드</p>
         <div className="grid grid-cols-2 gap-2">
-          {(["NOTIFY", "AUTO"] as const).map((m) => (
+          {MODE_OPTIONS.map(({ value: m, label, desc }) => (
             <label
               key={m}
               className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
@@ -266,12 +249,8 @@ function AlertFormBody({
                 className="mt-0.5 accent-blue-600"
               />
               <div>
-                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                  {m === "NOTIFY" ? "알림만 (권장)" : "자동 실행"}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {m === "NOTIFY" ? "이메일로 알림 수신" : "조건 충족 시 주문 자동 실행"}
-                </div>
+                <div className="text-sm font-medium text-gray-800 dark:text-gray-200">{label}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{desc}</div>
               </div>
             </label>
           ))}
@@ -296,7 +275,7 @@ function AlertFormBody({
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            {(["BUY_ONLY", "FULL"] as const).map((s) => (
+            {STRATEGY_OPTIONS.map(({ value: s, label, desc }) => (
               <label
                 key={s}
                 className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
@@ -314,12 +293,8 @@ function AlertFormBody({
                   className="mt-0.5 accent-blue-600"
                 />
                 <div>
-                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                    {s === "BUY_ONLY" ? "매수만 (권장)" : "매도+매수"}
-                  </div>
-                  <div className="text-xs text-gray-400 dark:text-gray-500">
-                    {s === "BUY_ONLY" ? "세금 절감" : "완전 리밸런싱"}
-                  </div>
+                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200">{label}</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500">{desc}</div>
                 </div>
               </label>
             ))}
@@ -348,13 +323,7 @@ function AlertFormBody({
               )}
             </div>
             <div className="space-y-1.5">
-              {(
-                [
-                  { value: "DISABLED" as MarketConditionMode, label: "신호 무시", desc: "시장 상황과 무관하게 자동 실행" },
-                  { value: "CAUTIOUS" as MarketConditionMode, label: "신중", desc: "고위험(RED) 신호 시 자동 실행 중단" },
-                  { value: "STRICT" as MarketConditionMode, label: "엄격", desc: "중위험(YELLOW) 이상에서 자동 실행 중단" },
-                ] as const
-              ).map(({ value, label, desc }) => (
+              {MARKET_CONDITION_OPTIONS.map(({ value, label, desc }) => (
                 <label
                   key={value}
                   className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${

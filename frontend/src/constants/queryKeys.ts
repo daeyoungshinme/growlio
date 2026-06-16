@@ -35,4 +35,6 @@ export const QUERY_KEYS = {
     ["economic-indicator-history", code, months] as const,
   economicIndicatorSubscriptions: ["economic-indicator-subscriptions"] as const,
   marketSignal: ["market-signal"] as const,
+  factorAnalysis: ["factor-analysis"] as const,
+  efficientFrontier: ["efficient-frontier"] as const,
 } as const;

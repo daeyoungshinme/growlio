@@ -4,4 +4,6 @@
     <string name="title_activity_main">Growlio</string>
     <string name="package_name">com.growlio.app</string>
     <string name="custom_url_scheme">com.growlio.app</string>
+    <string name="widget_name">Growlio 위젯</string>
+    <string name="widget_description">총 자산 및 수익률 표시</string>
 </resources>

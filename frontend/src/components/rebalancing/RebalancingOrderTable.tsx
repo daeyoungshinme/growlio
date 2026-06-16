@@ -1,4 +1,5 @@
 import React from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { SideBadge } from "./RebalancingBadges";
@@ -48,7 +49,7 @@ export function RebalancingOrderTable({
   getBuyTotalInfo,
 }: RebalancingOrderTableProps) {
   return (
-    <>
+    <ErrorBoundary variant="section">
       {/* 모바일 카드 뷰 */}
       <div className="md:hidden divide-y divide-gray-700/30">
         {sellRows.length > 0 && (
@@ -405,6 +406,6 @@ export function RebalancingOrderTable({
           </tbody>
         </table>
       </div>
-    </>
+    </ErrorBoundary>
   );
 }

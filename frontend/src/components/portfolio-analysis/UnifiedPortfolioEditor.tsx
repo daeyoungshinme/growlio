@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { Plus, Trash2, Wand2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { AssetAccount, type StockSuggestion } from "@/api/assets";
@@ -152,6 +153,7 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
   }, [clearSuggestions]);
 
   return (
+    <ErrorBoundary variant="section">
     <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0">
       <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col">
         {/* 헤더 */}
@@ -360,5 +362,6 @@ export default function UnifiedPortfolioEditor({ initial, accounts = [], onSave,
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

@@ -13,7 +13,7 @@ import { useForm } from "@/hooks/useForm";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
-import { TX_LABELS } from "@/constants/transaction";
+import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { extractErrorMessage } from "@/utils/error";
@@ -126,7 +126,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
         className={`bg-white dark:bg-gray-900 rounded-2xl border p-5 space-y-4 ${editingTx ? "border-amber-200 dark:border-amber-800" : "border-blue-200 dark:border-blue-800"}`}
       >
         <div className="flex gap-2">
-          {(["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const).map((t) => (
+          {TX_TYPES.map((t) => (
             <button key={t} type="button"
               onClick={() => { setField("transaction_type", t); setCurrency("KRW"); setAmountUsd(0); resetTicker(); }}
               className={`flex-1 py-3 text-sm font-medium rounded-lg border transition-colors ${
@@ -161,7 +161,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               <label className={labelCls}>금액 *</label>
               {form.transaction_type === "DIVIDEND" && (
                 <div className="flex gap-0.5 text-xs">
-                  {(["KRW", "USD"] as const).map((c) => (
+                  {CURRENCY_TYPES.map((c) => (
                     <button key={c} type="button"
                       onClick={() => { setCurrency(c); setAmountUsd(0); }}
                       className={`px-2.5 py-1.5 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}>

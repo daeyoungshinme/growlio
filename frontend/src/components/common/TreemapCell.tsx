@@ -1,14 +1,26 @@
 import { PIE_COLORS } from "@/utils/colors";
 
-export default function TreemapCell(props: Record<string, unknown>) {
-  const x = (props.x as number) ?? 0;
-  const y = (props.y as number) ?? 0;
-  const width = (props.width as number) ?? 0;
-  const height = (props.height as number) ?? 0;
-  const name = (props.name as string) ?? "";
-  const pct = (props.pct as number) ?? 0;
-  const ticker = (props.ticker as string) ?? "";
-  const index = (props.index as number) ?? 0;
+interface TreemapCellProps {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  name?: string;
+  pct?: number;
+  ticker?: string;
+  index?: number;
+}
+
+export default function TreemapCell({
+  x = 0,
+  y = 0,
+  width = 0,
+  height = 0,
+  name = "",
+  pct = 0,
+  ticker = "",
+  index = 0,
+}: TreemapCellProps) {
   const color = PIE_COLORS[index % PIE_COLORS.length];
 
   return (

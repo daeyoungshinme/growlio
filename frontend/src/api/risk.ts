@@ -1,5 +1,61 @@
 import { apiGet } from "./client";
 
+// ---------------------------------------------------------------------------
+// 팩터 분석
+// ---------------------------------------------------------------------------
+
+export interface FactorHolding {
+  ticker: string;
+  name: string;
+  weight_pct: number;
+  pe_ratio: number | null;
+  pb_ratio: number | null;
+  market_cap: number | null;
+  momentum_pct: number | null;
+  value_score: number;
+  growth_score: number;
+  size_score: number;
+  momentum_score: number;
+}
+
+export interface FactorAnalysis {
+  holdings: FactorHolding[];
+  portfolio_factors: {
+    value: number;
+    growth: number;
+    size: number;
+    momentum: number;
+  };
+  position_count: number;
+  note: string;
+}
+
+// ---------------------------------------------------------------------------
+// 효율적 프론티어
+// ---------------------------------------------------------------------------
+
+export interface FrontierPoint {
+  risk: number;
+  return: number;
+}
+
+export interface FrontierAsset {
+  symbol: string;
+  expected_return_pct: number;
+  volatility_pct: number;
+}
+
+export interface EfficientFrontier {
+  frontier: FrontierPoint[];
+  current: FrontierPoint | null;
+  assets: FrontierAsset[];
+  note: string;
+}
+
+// ---------------------------------------------------------------------------
+// 위험 지표 (기존)
+// ---------------------------------------------------------------------------
+
 export interface PortfolioRiskMetrics {
   var_95_pct: number;
   var_99_pct: number;
@@ -28,3 +84,9 @@ export const fetchPortfolioRisk = (portfolioId?: string) =>
 
 export const fetchCurrencyExposure = () =>
   apiGet<CurrencyExposure>("/portfolio/currency-exposure");
+
+export const fetchFactorAnalysis = () =>
+  apiGet<FactorAnalysis>("/portfolio/factor-analysis");
+
+export const fetchEfficientFrontier = () =>
+  apiGet<EfficientFrontier>("/portfolio/efficient-frontier");
