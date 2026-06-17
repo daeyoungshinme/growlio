@@ -19,8 +19,12 @@ const mockForgotPassword = vi.fn();
 const mockFindAccount = vi.fn();
 
 vi.mock("@/api/dashboard", () => ({ fetchDashboard: vi.fn().mockResolvedValue({}) }));
-vi.mock("@/api/assets", () => ({ fetchAccounts: vi.fn().mockResolvedValue([]) }));
+vi.mock("@/api/assets", () => ({
+  fetchAccounts: vi.fn().mockResolvedValue([]),
+  fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
+}));
 vi.mock("@/api/portfolios", () => ({ fetchPortfolioOverviewLite: vi.fn().mockResolvedValue({}) }));
+vi.mock("@/api/invest", () => ({ fetchDCAAnalysis: vi.fn().mockResolvedValue({}) }));
 
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn((selector) => {

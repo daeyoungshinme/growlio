@@ -33,11 +33,16 @@ function BrokenComponent({ shouldThrow }: { shouldThrow: boolean }) {
 }
 
 describe("ErrorBoundary", () => {
+  let suppressWindowError: (e: ErrorEvent) => void;
+
   beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation(() => {});
+    suppressWindowError = (e: ErrorEvent) => e.preventDefault();
+    window.addEventListener("error", suppressWindowError);
   });
   afterEach(() => {
     vi.restoreAllMocks();
+    window.removeEventListener("error", suppressWindowError);
   });
 
   it("renders children when no error", () => {
