@@ -46,7 +46,9 @@ repos:
     rev: v4.6.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^frontend/android/
       - id: end-of-file-fixer
+        exclude: ^frontend/android/
       - id: check-merge-conflict
       - id: check-yaml
       - id: check-json
