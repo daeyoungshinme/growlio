@@ -28,7 +28,8 @@ repos:
       - id: eslint
         name: ESLint (frontend)
         language: system
-        entry: bash -c 'if [ -x frontend/node_modules/.bin/eslint ]; then cd frontend && ./node_modules/.bin/eslint src --fix; else echo "SKIP: frontend/node_modules 없음 — npm install 실행 필요" && exit 0; fi'
+        entry: >-
+          bash -c 'if [ -x frontend/node_modules/.bin/eslint ]; then cd frontend && ./node_modules/.bin/eslint src --fix; else echo "SKIP: frontend/node_modules 없음 — npm install 실행 필요" && exit 0; fi'
         files: ^frontend/src/
         pass_filenames: false
 
