@@ -6,6 +6,7 @@ Create Date: 2026-06-09
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "af1_add_fcm_token"

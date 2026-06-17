@@ -8,8 +8,12 @@ from __future__ import annotations
 import math
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 
 import structlog
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 logger = structlog.get_logger()
 

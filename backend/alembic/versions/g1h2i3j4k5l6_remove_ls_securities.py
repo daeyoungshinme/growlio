@@ -7,15 +7,18 @@ Revises: f9a8b7c6d5e4
 Create Date: 2026-05-21 00:00:00.000000
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "g1h2i3j4k5l6"
-down_revision: Union[str, None] = "f9a8b7c6d5e4"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "f9a8b7c6d5e4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -39,4 +42,7 @@ def downgrade() -> None:
     op.add_column("asset_accounts", sa.Column("ls_account_no", sa.String(20), nullable=True))
     op.add_column("user_settings", sa.Column("ls_app_key", sa.String(512), nullable=True))
     op.add_column("user_settings", sa.Column("ls_app_secret", sa.String(512), nullable=True))
-    op.add_column("user_settings", sa.Column("ls_is_mock", sa.Boolean(), nullable=False, server_default="true"))
+    op.add_column(
+        "user_settings",
+        sa.Column("ls_is_mock", sa.Boolean(), nullable=False, server_default="true"),
+    )

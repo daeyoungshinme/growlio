@@ -8,8 +8,9 @@ Create Date: 2026-06-15
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "ak1_add_deposit_trigger_to_rebalancing_alert"
 down_revision = "aj1_drop_duplicate_asset_account_indexes"

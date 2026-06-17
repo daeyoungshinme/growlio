@@ -5,8 +5,9 @@ Revises: n1_ob_fintech_unique
 Create Date: 2026-05-28
 """
 
-from alembic import op
 from sqlalchemy import text
+
+from alembic import op
 
 revision = "o1_security_improvements"
 down_revision = "n1_ob_fintech_unique"
@@ -41,6 +42,7 @@ def upgrade() -> None:
     except Exception as e:
         # KIS_CRED_ENCRYPTION_KEY 미설정 환경(테스트 DB)에서는 기존 토큰이 없으므로 무시
         import structlog
+
         structlog.get_logger().warning("ob_token_encryption_skipped", error=str(e))
 
     # 2. asset_accounts.user_id 인덱스 추가 — 계좌 목록 조회 성능 개선

@@ -5,9 +5,10 @@ Revises: 003
 Create Date: 2026-05-02 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "004"
 down_revision = "003"
@@ -31,7 +32,12 @@ def upgrade() -> None:
         sa.Column("transaction_date", sa.Date(), nullable=False),
         sa.Column("ticker", sa.String(20), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["account_id"], ["asset_accounts.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),

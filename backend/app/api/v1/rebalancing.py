@@ -2,6 +2,7 @@
 import asyncio
 import uuid
 from functools import partial
+from typing import cast
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -31,6 +32,7 @@ from app.schemas.rebalancing import (
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
 )
+from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services.credential_service import decrypt
 from app.services.dividend_constants import is_korean_etf
 from app.services.dividend_providers import (
@@ -148,7 +150,12 @@ async def analyze_portfolio(
     all_return_tickers = list(set(target_tickers) | set(current_tickers))
     returns_map = await get_historical_returns(all_return_tickers, redis=redis)
 
-    return analyze_rebalancing(portfolio, overview, dividend_map, returns_map)
+    return analyze_rebalancing(
+        portfolio,
+        overview,
+        cast(dict[tuple[str, str], DividendMapEntry], dividend_map),
+        cast(dict[tuple[str, str], ReturnsMapEntry], returns_map),
+    )
 
 
 @router.post("/portfolios/{portfolio_id}/execute", response_model=list[ExecutionResult])

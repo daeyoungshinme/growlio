@@ -5,16 +5,19 @@ Revises: f9a8b7c6d5e4
 Create Date: 2026-05-21 10:00:00.000000
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "a2b3c4d5e6f7"
-down_revision: Union[str, None] = "f9a8b7c6d5e4"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "f9a8b7c6d5e4"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -5,14 +5,16 @@ Revises: 18bc774cd76e
 Create Date: 2026-05-24
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 from alembic import op
 
 revision: str = "i1j2k3l4m5n6"
-down_revision: Union[str, None] = "18bc774cd76e"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "18bc774cd76e"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

@@ -78,6 +78,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   useEffect(() => {
     if (!portfolioId || portfolios.length === 0) return;
     if (!portfolios.some((p) => p.id === portfolioId)) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSelectedIds(new Set([portfolioId]));
     setTimeout(() => {
       analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });

@@ -8,8 +8,9 @@ Create Date: 2026-06-11
 from __future__ import annotations
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
+
+from alembic import op
 
 revision = "ah1_account_target_portfolio"
 down_revision = "ag1_position_ticker_idx"

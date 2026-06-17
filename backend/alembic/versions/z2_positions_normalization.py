@@ -13,8 +13,9 @@ from __future__ import annotations
 import uuid
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+from alembic import op
 
 revision = "z2_positions_normalization"
 down_revision = "z1_rebalancing_results"
@@ -27,10 +28,18 @@ def upgrade() -> None:
     op.create_table(
         "positions",
         sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("account_id", UUID(as_uuid=True),
-                  sa.ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("snapshot_id", UUID(as_uuid=True),
-                  sa.ForeignKey("asset_snapshots.id", ondelete="CASCADE"), nullable=True),
+        sa.Column(
+            "account_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("asset_accounts.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "snapshot_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("asset_snapshots.id", ondelete="CASCADE"),
+            nullable=True,
+        ),
         sa.Column("ticker", sa.String(20), nullable=False),
         sa.Column("name", sa.String(200), nullable=False, server_default=""),
         sa.Column("market", sa.String(20), nullable=False),
@@ -54,7 +63,9 @@ def upgrade() -> None:
     # 2. asset_accounts.manual_positions JSONB → positions (snapshot_id IS NULL)
     conn = op.get_bind()
     accounts = conn.execute(
-        sa.text("SELECT id, manual_positions FROM asset_accounts WHERE manual_positions IS NOT NULL")
+        sa.text(
+            "SELECT id, manual_positions FROM asset_accounts WHERE manual_positions IS NOT NULL"
+        )
     ).fetchall()
 
     for row in accounts:
@@ -65,10 +76,12 @@ def upgrade() -> None:
                 continue
             conn.execute(
                 sa.text(
-                    "INSERT INTO positions (id, account_id, snapshot_id, ticker, name, market, qty, avg_price, "
+                    "INSERT INTO positions "
+                    "(id, account_id, snapshot_id, ticker, name, market, qty, avg_price, "
                     " avg_price_usd, current_price, value_krw, currency, usd_rate) "
-                    "VALUES (gen_random_uuid(), :acc_id, NULL, :ticker, :name, :market, :qty, :avg_price, "
-                    " :avg_price_usd, :current_price, :value_krw, :currency, :usd_rate)"
+                    "VALUES "
+                    "(gen_random_uuid(), :acc_id, NULL, :ticker, :name, :market, :qty, "
+                    ":avg_price, :avg_price_usd, :current_price, :value_krw, :currency, :usd_rate)"
                 ),
                 {
                     "acc_id": acc_id,
@@ -78,7 +91,9 @@ def upgrade() -> None:
                     "qty": float(p.get("qty", 0)),
                     "avg_price": float(p.get("avg_price", 0)),
                     "avg_price_usd": float(p["avg_price_usd"]) if p.get("avg_price_usd") else None,
-                    "current_price": float(p.get("current_price")) if p.get("current_price") else None,
+                    "current_price": float(p.get("current_price"))
+                    if p.get("current_price")
+                    else None,
                     "value_krw": float(p.get("value_krw")) if p.get("value_krw") else None,
                     "currency": p.get("currency", "KRW"),
                     "usd_rate": float(p["usd_rate"]) if p.get("usd_rate") else None,
@@ -107,10 +122,12 @@ def upgrade() -> None:
                 continue
             conn.execute(
                 sa.text(
-                    "INSERT INTO positions (id, account_id, snapshot_id, ticker, name, market, qty, avg_price, "
+                    "INSERT INTO positions "
+                    "(id, account_id, snapshot_id, ticker, name, market, qty, avg_price, "
                     " avg_price_usd, current_price, value_krw, currency, usd_rate) "
-                    "VALUES (gen_random_uuid(), :acc_id, :snap_id, :ticker, :name, :market, :qty, :avg_price, "
-                    " :avg_price_usd, :current_price, :value_krw, :currency, :usd_rate)"
+                    "VALUES "
+                    "(gen_random_uuid(), :acc_id, :snap_id, :ticker, :name, :market, :qty, "
+                    ":avg_price, :avg_price_usd, :current_price, :value_krw, :currency, :usd_rate)"
                 ),
                 {
                     "acc_id": acc_id,
@@ -121,7 +138,9 @@ def upgrade() -> None:
                     "qty": float(p.get("qty", 0)),
                     "avg_price": float(p.get("avg_price", 0)),
                     "avg_price_usd": float(p["avg_price_usd"]) if p.get("avg_price_usd") else None,
-                    "current_price": float(p.get("current_price")) if p.get("current_price") else None,
+                    "current_price": float(p.get("current_price"))
+                    if p.get("current_price")
+                    else None,
                     "value_krw": float(p.get("value_krw") or p.get("value_usd", 0) or 0) or None,
                     "currency": p.get("currency", "KRW"),
                     "usd_rate": float(p["usd_rate"]) if p.get("usd_rate") else None,
@@ -140,6 +159,7 @@ def downgrade() -> None:
 
     # 2. 역마이그레이션: positions → JSONB
     import json
+
     conn = op.get_bind()
 
     # account 현재 포지션 (snapshot_id IS NULL)
@@ -152,11 +172,18 @@ def downgrade() -> None:
             {"aid": acc_id},
         ).fetchall()
         pos_list = [
-            {"ticker": r.ticker, "name": r.name, "market": r.market, "qty": float(r.qty),
-             "avg_price": float(r.avg_price), "avg_price_usd": float(r.avg_price_usd) if r.avg_price_usd else None,
-             "current_price": float(r.current_price) if r.current_price else None,
-             "value_krw": float(r.value_krw) if r.value_krw else None,
-             "currency": r.currency, "usd_rate": float(r.usd_rate) if r.usd_rate else None}
+            {
+                "ticker": r.ticker,
+                "name": r.name,
+                "market": r.market,
+                "qty": float(r.qty),
+                "avg_price": float(r.avg_price),
+                "avg_price_usd": float(r.avg_price_usd) if r.avg_price_usd else None,
+                "current_price": float(r.current_price) if r.current_price else None,
+                "value_krw": float(r.value_krw) if r.value_krw else None,
+                "currency": r.currency,
+                "usd_rate": float(r.usd_rate) if r.usd_rate else None,
+            }
             for r in rows
         ]
         conn.execute(
@@ -174,9 +201,16 @@ def downgrade() -> None:
             {"sid": snap_id},
         ).fetchall()
         pos_list = [
-            {"ticker": r.ticker, "name": r.name, "market": r.market, "qty": float(r.qty),
-             "avg_price": float(r.avg_price), "current_price": float(r.current_price) if r.current_price else None,
-             "value_krw": float(r.value_krw) if r.value_krw else None, "currency": r.currency}
+            {
+                "ticker": r.ticker,
+                "name": r.name,
+                "market": r.market,
+                "qty": float(r.qty),
+                "avg_price": float(r.avg_price),
+                "current_price": float(r.current_price) if r.current_price else None,
+                "value_krw": float(r.value_krw) if r.value_krw else None,
+                "currency": r.currency,
+            }
             for r in rows
         ]
         conn.execute(

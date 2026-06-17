@@ -13,25 +13,29 @@ export default function TopLoadingBar({ isVisible }: Props) {
     if (completeTimer.current) clearTimeout(completeTimer.current);
 
     if (isVisible) {
-      setOpacity(1);
       // 0% → 즉시 시작, 다음 frame에서 85%로 느리게 진행
-      setWidth(0);
       const raf = requestAnimationFrame(() => {
-        setWidth(85);
+        setOpacity(1);
+        setWidth(0);
+        requestAnimationFrame(() => {
+          setWidth(85);
+        });
       });
       return () => cancelAnimationFrame(raf);
     } else {
       // 완료: 100%로 즉시 채운 뒤 fade out
-      setWidth(100);
-      completeTimer.current = setTimeout(() => {
-        setOpacity(0);
-        completeTimer.current = setTimeout(() => setWidth(0), 300);
-      }, 150);
+      const raf = requestAnimationFrame(() => {
+        setWidth(100);
+        completeTimer.current = setTimeout(() => {
+          setOpacity(0);
+          completeTimer.current = setTimeout(() => setWidth(0), 300);
+        }, 150);
+      });
+      return () => {
+        cancelAnimationFrame(raf);
+        if (completeTimer.current) clearTimeout(completeTimer.current);
+      };
     }
-
-    return () => {
-      if (completeTimer.current) clearTimeout(completeTimer.current);
-    };
   }, [isVisible]);
 
   if (opacity === 0 && width === 0) return null;

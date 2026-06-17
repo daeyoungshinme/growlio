@@ -5,8 +5,9 @@ Revises: r1_add_rebalancing_alerts
 Create Date: 2026-05-31
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "s1_alert_schedule"
 down_revision = "r1_add_rebalancing_alerts"

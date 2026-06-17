@@ -5,16 +5,19 @@ Revises: i1j2k3l4m5n6
 Create Date: 2026-05-24
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 revision: str = "j1k2l3m4n5o6"
-down_revision: Union[str, None] = "i1j2k3l4m5n6"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "i1j2k3l4m5n6"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:

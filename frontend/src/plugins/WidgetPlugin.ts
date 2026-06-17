@@ -9,6 +9,7 @@ export interface WidgetPlugin {
   update(options: WidgetUpdateOptions): Promise<void>;
 }
 
+// eslint-disable-next-line no-redeclare
 export const WidgetPlugin = registerPlugin<WidgetPlugin>("Widget", {
   web: {
     update: async () => {

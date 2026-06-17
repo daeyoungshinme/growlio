@@ -8,26 +8,43 @@ rebalancing_alerts 테이블에 실행 설정(mode/strategy/account_id/order_typ
 user_settings에서 auto_rebalance_* 컬럼 제거.
 기존 활성 자동 리밸런싱 데이터를 rebalancing_alerts로 이전.
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "x1_merge_rebalancing_and_auto"
-down_revision: Union[str, None] = "eabe85f7281c"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "eabe85f7281c"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     # rebalancing_alerts 테이블에 4개 컬럼 추가
-    op.add_column("rebalancing_alerts", sa.Column("mode", sa.String(10), nullable=False, server_default="NOTIFY"))
-    op.add_column("rebalancing_alerts", sa.Column("strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"))
     op.add_column(
         "rebalancing_alerts",
-        sa.Column("account_id", sa.UUID(), sa.ForeignKey("asset_accounts.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("mode", sa.String(10), nullable=False, server_default="NOTIFY"),
     )
-    op.add_column("rebalancing_alerts", sa.Column("order_type", sa.String(10), nullable=False, server_default="MARKET"))
+    op.add_column(
+        "rebalancing_alerts",
+        sa.Column("strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"),
+    )
+    op.add_column(
+        "rebalancing_alerts",
+        sa.Column(
+            "account_id",
+            sa.UUID(),
+            sa.ForeignKey("asset_accounts.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+    )
+    op.add_column(
+        "rebalancing_alerts",
+        sa.Column("order_type", sa.String(10), nullable=False, server_default="MARKET"),
+    )
 
     # 기존 auto_rebalance_* 데이터 → rebalancing_alerts 이전
     op.execute(
@@ -78,15 +95,47 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # user_settings 컬럼 복원
-    op.add_column("user_settings", sa.Column("auto_rebalance_enabled", sa.Boolean(), nullable=False, server_default="false"))
-    op.add_column("user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True))
+    op.add_column(
+        "user_settings",
+        sa.Column("auto_rebalance_enabled", sa.Boolean(), nullable=False, server_default="false"),
+    )
+    op.add_column(
+        "user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True)
+    )
     op.add_column("user_settings", sa.Column("auto_rebalance_account_id", sa.UUID(), nullable=True))
-    op.add_column("user_settings", sa.Column("auto_rebalance_threshold_pct", sa.Numeric(precision=5, scale=2), nullable=False, server_default="5.0"))
-    op.add_column("user_settings", sa.Column("auto_rebalance_strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"))
-    op.add_column("user_settings", sa.Column("auto_rebalance_mode", sa.String(20), nullable=False, server_default="NOTIFY"))
-    op.add_column("user_settings", sa.Column("auto_rebalance_order_type", sa.String(20), nullable=False, server_default="MARKET"))
-    op.add_column("user_settings", sa.Column("auto_rebalance_last_executed_at", sa.DateTime(timezone=True), nullable=True))
-    op.add_column("user_settings", sa.Column("auto_rebalance_last_checked_at", sa.DateTime(timezone=True), nullable=True))
+    op.add_column(
+        "user_settings",
+        sa.Column(
+            "auto_rebalance_threshold_pct",
+            sa.Numeric(precision=5, scale=2),
+            nullable=False,
+            server_default="5.0",
+        ),
+    )
+    op.add_column(
+        "user_settings",
+        sa.Column(
+            "auto_rebalance_strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"
+        ),
+    )
+    op.add_column(
+        "user_settings",
+        sa.Column("auto_rebalance_mode", sa.String(20), nullable=False, server_default="NOTIFY"),
+    )
+    op.add_column(
+        "user_settings",
+        sa.Column(
+            "auto_rebalance_order_type", sa.String(20), nullable=False, server_default="MARKET"
+        ),
+    )
+    op.add_column(
+        "user_settings",
+        sa.Column("auto_rebalance_last_executed_at", sa.DateTime(timezone=True), nullable=True),
+    )
+    op.add_column(
+        "user_settings",
+        sa.Column("auto_rebalance_last_checked_at", sa.DateTime(timezone=True), nullable=True),
+    )
 
     # rebalancing_alerts 컬럼 제거
     op.drop_column("rebalancing_alerts", "order_type")

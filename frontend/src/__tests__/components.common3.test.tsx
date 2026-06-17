@@ -95,7 +95,6 @@ describe("ErrorBoundary", () => {
       const e = new Error("Loading chunk 1 failed");
       e.name = "ChunkLoadError";
       throw e;
-      return null; // unreachable — satisfies JSX component return type
     };
     render(
       <ErrorBoundary variant="section">

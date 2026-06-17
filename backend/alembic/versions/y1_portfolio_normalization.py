@@ -13,8 +13,9 @@ from __future__ import annotations
 import uuid
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+from alembic import op
 
 revision = "y1_portfolio_normalization"
 down_revision = "x1_merge_rebalancing_and_auto"
@@ -27,7 +28,12 @@ def upgrade() -> None:
     op.create_table(
         "portfolio_items",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column("portfolio_id", UUID(as_uuid=True), sa.ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "portfolio_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("portfolios.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("ticker", sa.String(20), nullable=False),
         sa.Column("name", sa.String(200), nullable=False, server_default=""),
         sa.Column("market", sa.String(20), nullable=False),
@@ -39,17 +45,25 @@ def upgrade() -> None:
     # 2. portfolio_accounts 테이블 생성
     op.create_table(
         "portfolio_accounts",
-        sa.Column("portfolio_id", UUID(as_uuid=True), sa.ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("account_id", UUID(as_uuid=True), sa.ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "portfolio_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("portfolios.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "account_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("asset_accounts.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("portfolio_id", "account_id"),
     )
 
     # 3. 기존 JSONB 데이터 마이그레이션
     conn = op.get_bind()
 
-    portfolios = conn.execute(
-        sa.text("SELECT id, items, account_ids FROM portfolios")
-    ).fetchall()
+    portfolios = conn.execute(sa.text("SELECT id, items, account_ids FROM portfolios")).fetchall()
 
     for row in portfolios:
         pid = row[0]
@@ -59,8 +73,10 @@ def upgrade() -> None:
         for idx, item in enumerate(items_json):
             conn.execute(
                 sa.text(
-                    "INSERT INTO portfolio_items (id, portfolio_id, ticker, name, market, weight, sort_order) "
-                    "VALUES (gen_random_uuid(), :pid, :ticker, :name, :market, :weight, :sort_order)"
+                    "INSERT INTO portfolio_items "
+                    "(id, portfolio_id, ticker, name, market, weight, sort_order) "
+                    "VALUES "
+                    "(gen_random_uuid(), :pid, :ticker, :name, :market, :weight, :sort_order)"
                 ),
                 {
                     "pid": pid,
@@ -114,8 +130,7 @@ def downgrade() -> None:
             {"pid": pid},
         ).fetchall()
         items_list = [
-            {"ticker": r[0], "name": r[1], "market": r[2], "weight": float(r[3])}
-            for r in items
+            {"ticker": r[0], "name": r[1], "market": r[2], "weight": float(r[3])} for r in items
         ]
 
         accounts = conn.execute(
@@ -125,6 +140,7 @@ def downgrade() -> None:
         account_ids_list = [str(r[0]) for r in accounts]
 
         import json
+
         conn.execute(
             sa.text(
                 "UPDATE portfolios SET items = :items::jsonb, account_ids = :aids::jsonb "

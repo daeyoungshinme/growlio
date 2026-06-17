@@ -5,32 +5,45 @@ Revises: e8a93587d968
 Create Date: 2026-05-19 10:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+from typing import Union
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = 'f9a8b7c6d5e4'
-down_revision: Union[str, None] = '33a12f46ad9a'
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+from alembic import op
+
+revision: str = "f9a8b7c6d5e4"
+down_revision: str | None = "33a12f46ad9a"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
     op.create_table(
-        'portfolios',
-        sa.Column('id', sa.UUID(), nullable=False),
-        sa.Column('user_id', sa.UUID(), nullable=False),
-        sa.Column('name', sa.String(length=100), nullable=False),
-        sa.Column('items', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-        sa.Column('base_type', sa.String(length=20), nullable=False, server_default='STOCK_ONLY'),
-        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.PrimaryKeyConstraint('id'),
+        "portfolios",
+        sa.Column("id", sa.UUID(), nullable=False),
+        sa.Column("user_id", sa.UUID(), nullable=False),
+        sa.Column("name", sa.String(length=100), nullable=False),
+        sa.Column("items", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+        sa.Column("base_type", sa.String(length=20), nullable=False, server_default="STOCK_ONLY"),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+        sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index('idx_portfolios_user', 'portfolios', ['user_id'], unique=False)
+    op.create_index("idx_portfolios_user", "portfolios", ["user_id"], unique=False)
 
     # backtest_portfolios 데이터 이관
     # holdings: [{ticker, market, weight}] → items: [{ticker, name, market, weight}]
@@ -71,5 +84,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index('idx_portfolios_user', table_name='portfolios')
-    op.drop_table('portfolios')
+    op.drop_index("idx_portfolios_user", table_name="portfolios")
+    op.drop_table("portfolios")

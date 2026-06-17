@@ -102,6 +102,7 @@ export function useRebalancingAlertFormState({
   useEffect(() => {
     if (depositTriggerAccountId && kisAccounts.length > 0) {
       if (!kisAccounts.some((a) => a.id === depositTriggerAccountId)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDepositTriggerAccountId("");
       }
     }

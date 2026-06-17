@@ -1,16 +1,16 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
+import app.models  # noqa: F401 — ensure all models are imported for metadata
+from alembic import context
 from app.config import settings
 from app.database import Base
-import app.models  # noqa: F401 — ensure all models are imported for metadata
 
 config = context.config
-_migration_url = (settings.migration_database_url or settings.database_url).replace('%', '%%')
+_migration_url = (settings.migration_database_url or settings.database_url).replace("%", "%%")
 config.set_main_option("sqlalchemy.url", _migration_url)
 
 if config.config_file_name is not None:

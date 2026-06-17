@@ -6,6 +6,7 @@ Create Date: 2026-06-09
 """
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "ae1_add_monthly_report_enabled"

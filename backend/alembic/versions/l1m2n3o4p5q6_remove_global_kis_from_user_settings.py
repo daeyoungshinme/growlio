@@ -8,15 +8,18 @@ Revises: 6eafeed60ba3
 Create Date: 2026-05-25
 
 """
-from typing import Sequence, Union
+
+from collections.abc import Sequence
+from typing import Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "l1m2n3o4p5q6"
-down_revision: Union[str, None] = "6eafeed60ba3"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "6eafeed60ba3"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -27,7 +30,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.add_column("user_settings", sa.Column("kis_is_mock", sa.Boolean(), nullable=False, server_default="true"))
+    op.add_column(
+        "user_settings",
+        sa.Column("kis_is_mock", sa.Boolean(), nullable=False, server_default="true"),
+    )
     op.add_column("user_settings", sa.Column("kis_account_no", sa.String(20), nullable=True))
     op.add_column("user_settings", sa.Column("kis_app_secret", sa.String(512), nullable=True))
     op.add_column("user_settings", sa.Column("kis_app_key", sa.String(512), nullable=True))

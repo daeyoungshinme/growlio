@@ -12,8 +12,9 @@ from __future__ import annotations
 import uuid
 
 import sqlalchemy as sa
-from alembic import op
 from sqlalchemy.dialects.postgresql import JSONB, UUID
+
+from alembic import op
 
 revision = "z1_rebalancing_results"
 down_revision = "y1_portfolio_normalization"
@@ -26,8 +27,12 @@ def upgrade() -> None:
     op.create_table(
         "rebalancing_execution_results",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        sa.Column("execution_id", UUID(as_uuid=True),
-                  sa.ForeignKey("rebalancing_executions.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "execution_id",
+            UUID(as_uuid=True),
+            sa.ForeignKey("rebalancing_executions.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("account_id", sa.String(50), nullable=True),
         sa.Column("account_name", sa.String(200), nullable=True),
         sa.Column("is_mock", sa.Boolean, nullable=False, server_default="false"),
@@ -61,15 +66,16 @@ def upgrade() -> None:
             account_id = exec_result.get("account_id", "")
             account_name = exec_result.get("account_name", "")
             is_mock = exec_result.get("is_mock", False)
-            executed_at = exec_result.get("executed_at", "")
-
             for order in exec_result.get("orders", []):
                 conn.execute(
                     sa.text(
                         "INSERT INTO rebalancing_execution_results "
-                        "(id, execution_id, account_id, account_name, is_mock, action, ticker, name, market, "
+                        "(id, execution_id, account_id, account_name, is_mock, "
+                        "action, ticker, name, market, "
                         " quantity, status, order_no, error_message, order_type) "
-                        "VALUES (gen_random_uuid(), :eid, :aid, :aname, :is_mock, :action, :ticker, :name, "
+                        "VALUES "
+                        "(gen_random_uuid(), :eid, :aid, :aname, :is_mock, "
+                        ":action, :ticker, :name, "
                         " :market, :qty, :status, :order_no, :error_msg, :order_type)"
                     ),
                     {
@@ -118,16 +124,30 @@ def downgrade() -> None:
             acc_id = r[0] or ""
             by_account[acc_id]["account_name"] = r[1] or ""
             by_account[acc_id]["is_mock"] = r[2]
-            by_account[acc_id]["orders"].append({
-                "side": r[3], "ticker": r[4], "name": r[5], "market": r[6],
-                "quantity": r[7], "status": r[8], "order_no": r[9],
-                "error_msg": r[10], "order_type": r[11],
-            })
+            by_account[acc_id]["orders"].append(
+                {
+                    "side": r[3],
+                    "ticker": r[4],
+                    "name": r[5],
+                    "market": r[6],
+                    "quantity": r[7],
+                    "status": r[8],
+                    "order_no": r[9],
+                    "error_msg": r[10],
+                    "order_type": r[11],
+                }
+            )
 
         results_list = [
-            {"account_id": aid, "account_name": data["account_name"], "is_mock": data["is_mock"],
-             "orders": data["orders"], "success_count": sum(1 for o in data["orders"] if o["status"] == "SUCCESS"),
-             "fail_count": sum(1 for o in data["orders"] if o["status"] == "FAILED"), "executed_at": ""}
+            {
+                "account_id": aid,
+                "account_name": data["account_name"],
+                "is_mock": data["is_mock"],
+                "orders": data["orders"],
+                "success_count": sum(1 for o in data["orders"] if o["status"] == "SUCCESS"),
+                "fail_count": sum(1 for o in data["orders"] if o["status"] == "FAILED"),
+                "executed_at": "",
+            }
             for aid, data in by_account.items()
         ]
         if results_list:

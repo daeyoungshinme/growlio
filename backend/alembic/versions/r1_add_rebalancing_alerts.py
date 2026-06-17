@@ -5,8 +5,9 @@ Revises: q1_add_performance_indexes
 Create Date: 2026-05-31
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "r1_add_rebalancing_alerts"
 down_revision = "q1_add_performance_indexes"
@@ -23,8 +24,18 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("threshold_pct", sa.Numeric(5, 2), nullable=False),
         sa.Column("last_triggered_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["portfolio_id"], ["portfolios.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),

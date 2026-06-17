@@ -5,8 +5,9 @@ Revises: 001
 Create Date: 2025-01-01 00:00:00.000000
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "002"
 down_revision = "001"
@@ -18,7 +19,10 @@ def upgrade() -> None:
     # user_settings: LS증권 자격증명 + 오픈뱅킹 추가 필드
     op.add_column("user_settings", sa.Column("ls_app_key", sa.String(512), nullable=True))
     op.add_column("user_settings", sa.Column("ls_app_secret", sa.String(512), nullable=True))
-    op.add_column("user_settings", sa.Column("ls_is_mock", sa.Boolean(), nullable=False, server_default="true"))
+    op.add_column(
+        "user_settings",
+        sa.Column("ls_is_mock", sa.Boolean(), nullable=False, server_default="true"),
+    )
     op.add_column("user_settings", sa.Column("ob_refresh_token", sa.Text(), nullable=True))
     op.add_column("user_settings", sa.Column("ob_user_seq_no", sa.String(20), nullable=True))
 

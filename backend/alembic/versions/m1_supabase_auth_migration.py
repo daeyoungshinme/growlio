@@ -7,8 +7,9 @@ Create Date: 2026-05-25
 NOTE: Supabase DB에만 실행. 로컬 Docker DB에는 실행하지 말 것.
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "m1_supabase_auth"
 down_revision = "l1m2n3o4p5q6"

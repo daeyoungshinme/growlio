@@ -5,9 +5,11 @@ Revises: al1_merge_deposit_trigger_and_snapshot_index
 Create Date: 2026-06-15
 
 """
+
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision = "am1_add_trigger_condition_to_rebalancing_alert"

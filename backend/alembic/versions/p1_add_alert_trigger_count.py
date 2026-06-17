@@ -5,8 +5,9 @@ Revises: o1_security_improvements
 Create Date: 2026-05-29
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "p1_add_alert_trigger_count"
 down_revision = "o1_security_improvements"

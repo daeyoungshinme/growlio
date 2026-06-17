@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { isNativePlatform } from "@/utils/platform";
 
@@ -55,6 +55,7 @@ export function useRealtimePrice({
   const mountedRef = useRef(true);
   // 이전 tickers 내용 추적 — 배열 참조만 바뀐 경우 재구독 방지
   const tickersKeyRef = useRef<string>("");
+  const connectRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     enabledRef.current = enabled;
@@ -120,7 +121,7 @@ export function useRealtimePrice({
         RECONNECT_DELAYS[Math.min(reconnectAttemptRef.current, RECONNECT_DELAYS.length - 1)];
       reconnectAttemptRef.current += 1;
       reconnectTimerRef.current = setTimeout(() => {
-        void connect();
+        void connectRef.current?.();
       }, delay);
     };
 
@@ -128,6 +129,10 @@ export function useRealtimePrice({
       ws.close();
     };
   }, [sendSubscribe]);
+
+  useLayoutEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   // 연결 수명주기 관리
   useEffect(() => {
