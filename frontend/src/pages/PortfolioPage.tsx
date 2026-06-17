@@ -55,7 +55,7 @@ export default function PortfolioPage() {
   }, [setSearchParams]);
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
-  const [chartsOpen, setChartsOpen] = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(true);
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
@@ -215,6 +215,19 @@ export default function PortfolioPage() {
 
       {tab === "종목 현황" && (
         <ErrorBoundary variant="section">
+          {chartsOpen && (
+            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+              <DomesticForeignBar items={marketChartData} />
+              <TreemapChart data={stockChartData} title="종목별 비중" />
+            </Suspense>
+          )}
+          <button
+            onClick={() => setChartsOpen((v) => !v)}
+            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
+          >
+            {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            비중 차트 {chartsOpen ? "접기" : "펼치기"}
+          </button>
           {(() => {
             const dividendMap = Object.fromEntries(
               dividendData.map((d) => [`${d.ticker}-${d.market}`, d])
@@ -229,19 +242,6 @@ export default function PortfolioPage() {
               />
             );
           })()}
-          <button
-            onClick={() => setChartsOpen((v) => !v)}
-            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
-          >
-            {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            비중 차트 {chartsOpen ? "접기" : "펼치기"}
-          </button>
-          {chartsOpen && (
-            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-              <DomesticForeignBar items={marketChartData} />
-              <TreemapChart data={stockChartData} title="종목별 비중" />
-            </Suspense>
-          )}
         </ErrorBoundary>
       )}
 
