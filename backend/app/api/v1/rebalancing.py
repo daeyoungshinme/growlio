@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from functools import partial
-from typing import cast
+from typing import Literal, cast
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -224,7 +224,7 @@ async def quick_execute_rebalancing(
 
     account_id = alert_row.account_id
     strategy = alert_row.strategy or "BUY_ONLY"
-    order_type = alert_row.order_type or "MARKET"
+    order_type = cast(Literal["MARKET", "LIMIT"], alert_row.order_type or "MARKET")
 
     # 포트폴리오 분석
     from app.services.portfolio_service import build_portfolio_overview

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, TypeAlias
 
 from redis.asyncio import Redis as AioRedis
 
-RedisType = AioRedis | None
+RedisType: TypeAlias = AioRedis | None
 
 
 def _env_prefix() -> str:

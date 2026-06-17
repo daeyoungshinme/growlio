@@ -134,6 +134,7 @@ export default defineConfig({
         "src/hooks/useWidget.ts",
         "src/hooks/useSwipeNavigation.ts",
         "src/hooks/useRegisterRefresh.ts",
+        "src/hooks/rebalancingExecution/types.ts",
       ],
       thresholds: {
         lines: 60,

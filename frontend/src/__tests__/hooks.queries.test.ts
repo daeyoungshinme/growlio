@@ -354,7 +354,7 @@ describe("useGoalSettings", () => {
 
   it("editing 초기값이 false다", async () => {
     const { fetchDCAAnalysis } = await import("@/api/invest");
-     
+
     vi.mocked(fetchDCAAnalysis).mockResolvedValue({
       settings: null as any,
       is_configured: false,

@@ -1,6 +1,7 @@
 """백테스팅 Pydantic 스키마."""
 
 import uuid
+from collections.abc import Sequence
 from datetime import date, datetime
 
 from pydantic import BaseModel, ValidationInfo, field_validator
@@ -66,7 +67,7 @@ class BacktestRunRequest(BaseModel):
 
 class SeriesData(BaseModel):
     name: str
-    values: list[float | None]  # 기준 100으로 정규화. None = 해당 날짜 데이터 없음 (앞부분 패딩)
+    values: Sequence[float | None]  # 기준 100으로 정규화. None = 해당 날짜 데이터 없음 (앞부분 패딩)
 
 
 class PortfolioMetrics(BaseModel):

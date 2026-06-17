@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useIsFetching } from "@tanstack/react-query";
 import React from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useLogout } from "@/hooks/useLogout";
+import { useMainPageFetching } from "@/hooks/usePortfolioTabFetching";
 import type { AuthState } from "@/stores/authStore";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
+
+vi.mock("@tanstack/react-query", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@tanstack/react-query")>();
+  return { ...actual, useIsFetching: vi.fn().mockReturnValue(0) };
+});
 
 vi.mock("@/api/assets", () => ({
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
@@ -127,6 +133,26 @@ describe("useCurrencyInput", () => {
       result.current.setDepositUsd(200);
     });
     expect(result.current.depositUsd).toBe(200);
+  });
+});
+
+describe("useMainPageFetching", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fetch 중인 쿼리가 없으면 false를 반환한다", () => {
+    vi.mocked(useIsFetching).mockReturnValue(0);
+    const { result } = renderHook(() => useMainPageFetching(), {
+      wrapper: createWrapper(),
+    });
+    expect(result.current).toBe(false);
+  });
+
+  it("fetch 중인 쿼리가 있으면 true를 반환한다", () => {
+    vi.mocked(useIsFetching).mockReturnValue(1);
+    const { result } = renderHook(() => useMainPageFetching(), {
+      wrapper: createWrapper(),
+    });
+    expect(result.current).toBe(true);
   });
 });
 

@@ -127,7 +127,6 @@ const mockAnalysis: RebalancingAnalysis = {
   },
 };
 
- 
 const mockKisAccounts: AssetAccount[] = [
   {
     id: "acc1",

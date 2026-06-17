@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Literal, cast
 
 import structlog
 from sqlalchemy import select
@@ -187,7 +188,7 @@ async def _execute_auto_rebalancing(
     from app.services.rebalancing_execution_service import execute_rebalancing
 
     strategy = getattr(alert, "strategy", "BUY_ONLY")
-    order_type = getattr(alert, "order_type", "MARKET")
+    order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
 
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
