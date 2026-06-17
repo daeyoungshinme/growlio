@@ -1,5 +1,4 @@
-import React, { memo, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { memo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -12,13 +11,11 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
-import { fetchAllocationHistory } from "@/api/portfolios";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { chartTooltipStyle } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
+import { useAllocationHistory } from "@/hooks/useAllocationHistory";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -40,45 +37,7 @@ function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
-  const { data, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.allocationHistory(12),
-    queryFn: () => fetchAllocationHistory(12),
-    staleTime: STALE_TIME.LONG,  // 1시간 — 백엔드 Redis TTL 1일에 맞게 조정
-    gcTime: STALE_TIME.LONG,
-  });
-
-  const { chartData, allTypes } = useMemo(() => {
-    if (!data || data.length === 0) return { chartData: [], allTypes: [] as string[] };
-
-    const typeSet = new Set<string>();
-    data.forEach((point) => point.allocations.forEach((a) => typeSet.add(a.asset_type)));
-    const types = Array.from(typeSet);
-
-    const points = data.map((point) => {
-      const entry: Record<string, unknown> = {
-        month: point.month.slice(2, 7).replace("-", "."),
-      };
-      const byType = Object.fromEntries(point.allocations.map((a) => [a.asset_type, a.amount_krw]));
-      types.forEach((t) => {
-        entry[t] = byType[t] ?? 0;
-      });
-      return entry;
-    });
-
-    return { chartData: points, allTypes: types };
-  }, [data]);
-
-  const labelMap = useMemo(() => {
-    if (!data || data.length === 0) return {} as Record<string, string>;
-    const map: Record<string, string> = {};
-    data.forEach((point) => point.allocations.forEach((a) => { map[a.asset_type] = a.label; }));
-    return map;
-  }, [data]);
-
-  const reversedMonthly = useMemo(() => {
-    if (!data || data.length === 0) return [];
-    return [...data].reverse();
-  }, [data]);
+  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } = useAllocationHistory(12);
 
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
 

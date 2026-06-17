@@ -15,22 +15,51 @@ _OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
 _DOMESTIC_STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
 
-_DIVIDEND_TAX_RATE = 0.154
-_OVERSEAS_GAIN_DEDUCTION = 2_500_000
-_OVERSEAS_TAX_RATE = 0.22
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
 _COMPREHENSIVE_TAX_THRESHOLD = 20_000_000
-
-# 금융투자소득세 상수 (2025년 이후 유예 중)
-_GEUMT_DOMESTIC_DEDUCTION = 50_000_000   # 국내 주식 5천만원 기본공제
-_GEUMT_RATE_STANDARD = 0.20             # 기본세율 20%
-_GEUMT_RATE_EXCESS = 0.25               # 3억 초과분 25%
-_GEUMT_EXCESS_THRESHOLD = 300_000_000   # 누진 구간 기준 3억
+_GEUMT_EXCESS_THRESHOLD = 300_000_000  # 금투세 누진 구간 기준 3억
 
 
 class _GeuMTRates(TypedDict):
     standard_pct: float
     excess_above_300m_pct: float
+
+
+class _TaxRates(TypedDict):
+    dividend: float           # 배당소득세율
+    overseas_gain: float      # 해외 양도세율
+    overseas_deduction: int   # 해외 양도소득 공제 (원)
+    geumt_domestic_deduction: int  # 금투세 국내 공제 (원)
+    geumt_standard: float     # 금투세 기본세율
+    geumt_excess: float       # 금투세 3억 초과 세율
+
+
+_TAX_RATES: dict[int, _TaxRates] = {
+    2025: _TaxRates(
+        dividend=0.154,
+        overseas_gain=0.22,
+        overseas_deduction=2_500_000,
+        geumt_domestic_deduction=50_000_000,
+        geumt_standard=0.20,
+        geumt_excess=0.25,
+    ),
+    2026: _TaxRates(
+        dividend=0.154,
+        overseas_gain=0.22,
+        overseas_deduction=2_500_000,
+        geumt_domestic_deduction=50_000_000,
+        geumt_standard=0.20,
+        geumt_excess=0.25,
+    ),
+}
+
+
+def _get_rates(year: int) -> _TaxRates:
+    """연도별 세율 반환. 해당 연도가 없으면 가장 가까운 연도 사용."""
+    if year in _TAX_RATES:
+        return _TAX_RATES[year]
+    closest = min(_TAX_RATES.keys(), key=lambda y: abs(y - year))
+    return _TAX_RATES[closest]
 
 
 class GeuMTSimulationResult(TypedDict):
@@ -49,40 +78,42 @@ class GeuMTSimulationResult(TypedDict):
     rates: _GeuMTRates
 
 
-def _calc_geumt_tax(taxable_gain: float) -> float:
-    """금투세 누진 세율 계산. 3억 이하 20%, 초과분 25%."""
+def _calc_geumt_tax(taxable_gain: float, rates: _TaxRates) -> float:
+    """금투세 누진 세율 계산. 3억 이하 기본세율, 초과분 높은세율."""
     if taxable_gain <= 0:
         return 0.0
     if taxable_gain <= _GEUMT_EXCESS_THRESHOLD:
-        return taxable_gain * _GEUMT_RATE_STANDARD
+        return taxable_gain * rates["geumt_standard"]
     return (
-        _GEUMT_EXCESS_THRESHOLD * _GEUMT_RATE_STANDARD
-        + (taxable_gain - _GEUMT_EXCESS_THRESHOLD) * _GEUMT_RATE_EXCESS
+        _GEUMT_EXCESS_THRESHOLD * rates["geumt_standard"]
+        + (taxable_gain - _GEUMT_EXCESS_THRESHOLD) * rates["geumt_excess"]
     )
 
 
-def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float) -> GeuMTSimulationResult:
+def _simulate_geumt_tax(
+    overseas_gain: float, domestic_gain: float, rates: _TaxRates
+) -> GeuMTSimulationResult:
     """금융투자소득세 시뮬레이션 (2025년 이후 유예 중).
 
     미실현 손익 기준 추정치. 실제 과세는 실현 손익 기준.
     """
-    overseas_taxable = max(0.0, overseas_gain - _OVERSEAS_GAIN_DEDUCTION)
-    domestic_taxable = max(0.0, domestic_gain - _GEUMT_DOMESTIC_DEDUCTION)
+    overseas_taxable = max(0.0, overseas_gain - rates["overseas_deduction"])
+    domestic_taxable = max(0.0, domestic_gain - rates["geumt_domestic_deduction"])
 
-    overseas_tax = _calc_geumt_tax(overseas_taxable)
-    domestic_tax = _calc_geumt_tax(domestic_taxable)
+    overseas_tax = _calc_geumt_tax(overseas_taxable, rates)
+    domestic_tax = _calc_geumt_tax(domestic_taxable, rates)
     total_tax = overseas_tax + domestic_tax
 
-    current_overseas_tax = max(0.0, overseas_gain - _OVERSEAS_GAIN_DEDUCTION) * _OVERSEAS_TAX_RATE
+    current_overseas_tax = max(0.0, overseas_gain - rates["overseas_deduction"]) * rates["overseas_gain"]
     tax_difference = total_tax - current_overseas_tax
 
     return {
         "overseas_gain_krw": round(overseas_gain, 0),
-        "overseas_deduction_krw": _OVERSEAS_GAIN_DEDUCTION,
+        "overseas_deduction_krw": rates["overseas_deduction"],
         "overseas_taxable_krw": round(overseas_taxable, 0),
         "overseas_tax_krw": round(overseas_tax, 0),
         "domestic_gain_krw": round(domestic_gain, 0),
-        "domestic_deduction_krw": _GEUMT_DOMESTIC_DEDUCTION,
+        "domestic_deduction_krw": rates["geumt_domestic_deduction"],
         "domestic_taxable_krw": round(domestic_taxable, 0),
         "domestic_tax_krw": round(domestic_tax, 0),
         "total_tax_krw": round(total_tax, 0),
@@ -90,8 +121,8 @@ def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float) -> GeuMTSimu
         "tax_difference_krw": round(tax_difference, 0),
         "note": "금투세는 2025년 이후 유예 중입니다. 현재 미실현 손익 기준 추정치입니다.",
         "rates": {
-            "standard_pct": _GEUMT_RATE_STANDARD * 100,
-            "excess_above_300m_pct": _GEUMT_RATE_EXCESS * 100,
+            "standard_pct": rates["geumt_standard"] * 100,
+            "excess_above_300m_pct": rates["geumt_excess"] * 100,
         },
     }
 
@@ -105,15 +136,16 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     - 금융소득 종합과세 경계(2000만원) 경고
     - 연간 거래 수수료 합계 (fee 컬럼)
     """
+    rates = _get_rates(year)
     dividend_income, total_fees = await asyncio.gather(
         _calc_dividend_income(user_id, year, db),
         _calc_total_fees(user_id, year, db),
     )
-    dividend_tax = dividend_income * _DIVIDEND_TAX_RATE
+    dividend_tax = dividend_income * rates["dividend"]
 
     overseas_unrealized, domestic_stock_krw, domestic_unrealized = await _calc_stock_unrealized(user_id, db)
-    overseas_gain_taxable = max(0.0, overseas_unrealized - _OVERSEAS_GAIN_DEDUCTION)
-    overseas_tax_estimated = overseas_gain_taxable * _OVERSEAS_TAX_RATE
+    overseas_gain_taxable = max(0.0, overseas_unrealized - rates["overseas_deduction"])
+    overseas_tax_estimated = overseas_gain_taxable * rates["overseas_gain"]
 
     domestic_large_holder_warning = domestic_stock_krw >= _DOMESTIC_LARGE_HOLDER_THRESHOLD
 
@@ -121,15 +153,15 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
 
     positions = await get_overseas_positions_detail(user_id, db)
-    harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable)
-    geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized)
+    harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
+    geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
 
     return {
         "year": year,
         "dividend_income_krw": round(dividend_income, 0),
         "dividend_tax_krw": round(dividend_tax, 0),
         "overseas_unrealized_gain_krw": round(overseas_unrealized, 0),
-        "overseas_gain_deduction_krw": _OVERSEAS_GAIN_DEDUCTION,
+        "overseas_gain_deduction_krw": rates["overseas_deduction"],
         "overseas_tax_estimated_krw": round(overseas_tax_estimated, 0),
         "domestic_stock_value_krw": round(domestic_stock_krw, 0),
         "domestic_unrealized_gain_krw": round(domestic_unrealized, 0),
@@ -144,8 +176,8 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
             "실제 납부액은 실현 손익 기준으로 계산됩니다."
         ),
         "rates": {
-            "dividend_tax_rate_pct": _DIVIDEND_TAX_RATE * 100,
-            "overseas_tax_rate_pct": _OVERSEAS_TAX_RATE * 100,
+            "dividend_tax_rate_pct": rates["dividend"] * 100,
+            "overseas_tax_rate_pct": rates["overseas_gain"] * 100,
         },
     }
 
@@ -208,7 +240,7 @@ async def get_overseas_positions_detail(
 
 
 def _build_harvesting_recommendations(
-    positions: list[dict], current_taxable_gain: float
+    positions: list[dict], current_taxable_gain: float, rates: _TaxRates
 ) -> list[dict]:
     """손실 수확(Tax-Loss Harvesting) 추천 목록.
 
@@ -225,7 +257,7 @@ def _build_harvesting_recommendations(
     for pos in loss_positions:
         loss = abs(pos["unrealized_pnl_krw"])
         offset = min(loss, remaining_gain)
-        tax_saved = round(offset * _OVERSEAS_TAX_RATE, 0)
+        tax_saved = round(offset * rates["overseas_gain"], 0)
         recommendations.append(
             {
                 "ticker": pos["ticker"],

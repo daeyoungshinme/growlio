@@ -19,8 +19,15 @@ from starlette.responses import Response
 from app.api.v1.router import router
 from app.config import settings
 from app.database import get_db
-from app.exceptions import AppError
+from app.exceptions import (
+    AppError,
+    ProviderApiError,
+    ProviderCredentialError,
+    ProviderNetworkError,
+    ProviderTokenError,
+)
 from app.kis.client import KisApiError
+from app.utils.circuit_breaker import CircuitOpenError
 from app.limiter import limiter
 from app.providers.http_client import close_http_client
 from app.redis_client import close_redis, get_redis
@@ -162,6 +169,31 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+@app.exception_handler(ProviderCredentialError)
+async def provider_credential_error_handler(request: Request, exc: ProviderCredentialError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ProviderTokenError)
+async def provider_token_error_handler(request: Request, exc: ProviderTokenError) -> JSONResponse:
+    return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.exception_handler(ProviderApiError)
+async def provider_api_error_handler(request: Request, exc: ProviderApiError) -> JSONResponse:
+    return JSONResponse(status_code=exc.http_status, content={"detail": exc.detail})
+
+
+@app.exception_handler(ProviderNetworkError)
+async def provider_network_error_handler(request: Request, exc: ProviderNetworkError) -> JSONResponse:
+    return JSONResponse(status_code=504, content={"detail": str(exc)})
+
+
+@app.exception_handler(CircuitOpenError)
+async def circuit_open_error_handler(request: Request, exc: CircuitOpenError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 
 @app.exception_handler(KisApiError)

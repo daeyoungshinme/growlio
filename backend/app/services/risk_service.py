@@ -15,12 +15,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.market_data_fetcher import fetch_yf_daily_returns
+from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import RedisType, TTL_RISK_ANALYSIS
 
 logger = structlog.get_logger()
-
-_RISK_CACHE_TTL = 3600  # 1시간
 _SP500_SYMBOL = "^GSPC"
 DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 _MIN_RETURN_POINTS_FOR_CORRELATION = 20  # 상관계수 계산에 필요한 최소 수익률 데이터 포인트
@@ -31,45 +31,7 @@ def _sync_fetch_risk_data(
     extra_symbols: list[str],
 ) -> dict[str, list[float]]:
     """1년치 일별 수익률(소수, e.g. 0.01=1%) 반환. 동기 함수."""
-    import yfinance as yf
-    from datetime import date, timedelta
-
-    end = date.today()
-    start = end - timedelta(days=365)
-    all_syms = list(set(symbols + extra_symbols))
-    if not all_syms:
-        return {}
-    try:
-        raw = yf.download(
-            all_syms,
-            start=start.isoformat(),
-            end=end.isoformat(),
-            auto_adjust=True,
-            progress=False,
-            threads=False,
-        )
-    except Exception as e:
-        logger.warning("risk_yf_download_failed", error=str(e))
-        return {}
-
-    import pandas as pd
-
-    close = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
-    if close is None or close.empty:
-        return {}
-    if not isinstance(close, pd.DataFrame):
-        close = close.to_frame(name=all_syms[0])
-
-    result: dict[str, list[float]] = {}
-    for sym in all_syms:
-        if sym not in close.columns:
-            continue
-        series = close[sym].dropna()
-        if len(series) < 2:
-            continue
-        returns = series.pct_change().dropna().tolist()
-        result[sym] = [float(r) for r in returns if math.isfinite(r)]
-    return result
+    return fetch_yf_daily_returns(symbols, extra_symbols=extra_symbols)
 
 
 def _calc_var(returns: list[float], confidence: float) -> float:
@@ -158,27 +120,7 @@ async def get_portfolio_risk_metrics(
             pass  # Redis 오류 무시 — DB에서 재계산
 
     # 최신 스냅샷 포지션 조회
-    subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
-    )
-    rows = result.all()
-
-    # 포지션 집계 (ticker+market 기준) — 배치 조회로 N+1 방지
-    snap_ids = [snap.id for snap, _ in rows]
-    pos_map: dict[str, dict] = {}
-    if snap_ids:
-        all_pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
-        for pos in all_pos_result.scalars().all():
-            key = f"{pos.ticker}-{pos.market}"
-            if key not in pos_map:
-                pos_map[key] = {"ticker": pos.ticker, "market": pos.market, "value_krw": 0.0}
-            pos_map[key]["value_krw"] += float(pos.value_krw or 0)
+    pos_map = await query_latest_position_map(user_id, db)
 
     if not pos_map:
         return _empty_risk_result()
@@ -248,7 +190,7 @@ async def get_portfolio_risk_metrics(
 
     if redis:
         try:
-            await redis.setex(cache_key, _RISK_CACHE_TTL, json.dumps(result_data))
+            await redis.setex(cache_key, TTL_RISK_ANALYSIS, json.dumps(result_data))
         except Exception:
             pass  # Redis 오류 무시 — DB에서 재계산
 
@@ -329,7 +271,7 @@ async def get_currency_exposure(
 
     if redis:
         try:
-            await redis.setex(cache_key, _RISK_CACHE_TTL, json.dumps(data))
+            await redis.setex(cache_key, TTL_RISK_ANALYSIS, json.dumps(data))
         except Exception:
             pass  # Redis 오류 무시 — DB에서 재계산
 

@@ -70,6 +70,8 @@ export function SuggestionDropdown({ rowIndex, suggestions, anchorEl, onSelect }
 
   return createPortal(
     <div
+      role="listbox"
+      aria-label="종목 검색 결과"
       style={{
         position: "fixed",
         zIndex: 9999,
@@ -84,6 +86,8 @@ export function SuggestionDropdown({ rowIndex, suggestions, anchorEl, onSelect }
       {suggestions.map((s, si) => (
         <button
           key={si}
+          role="option"
+          aria-selected={false}
           className="w-full flex items-center justify-between px-3 py-2.5 text-sm hover:bg-blue-50 dark:hover:bg-blue-950 text-left"
           onMouseDown={(e) => {
             e.preventDefault();

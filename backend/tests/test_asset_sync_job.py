@@ -1,20 +1,7 @@
 """asset_sync Job 테스트."""
-import uuid
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-
-def _make_account(account_id=None, user_id=None, name="테스트 계좌", source="KIS_API"):
-    return SimpleNamespace(
-        id=account_id or uuid.uuid4(),
-        user_id=user_id or uuid.uuid4(),
-        name=name,
-        asset_type="STOCK_KIS",
-        data_source=source,
-        is_active=True,
-    )
 
 
 class TestRunDailyAssetSync:
@@ -39,9 +26,9 @@ class TestRunDailyAssetSync:
         mock_sync.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_sync_calls_sync_for_each_account(self):
+    async def test_sync_calls_sync_for_each_account(self, make_account):
         """계좌가 있으면 각 계좌에 대해 sync_account 호출."""
-        accounts = [_make_account(), _make_account()]
+        accounts = [make_account(), make_account()]
         mock_session = AsyncMock()
         execute_result = MagicMock()
         execute_result.scalars.return_value.all.return_value = accounts
@@ -60,9 +47,9 @@ class TestRunDailyAssetSync:
         assert mock_sync.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_sync_continues_when_one_account_fails(self):
+    async def test_sync_continues_when_one_account_fails(self, make_account):
         """한 계좌 실패해도 나머지 계좌는 계속 시도한다."""
-        accounts = [_make_account(name="계좌A"), _make_account(name="계좌B")]
+        accounts = [make_account(name="계좌A"), make_account(name="계좌B")]
         mock_session = AsyncMock()
         execute_result = MagicMock()
         execute_result.scalars.return_value.all.return_value = accounts
@@ -91,9 +78,9 @@ class TestRunDailyAssetSync:
 
 class TestRunIntradayAssetSync:
     @pytest.mark.asyncio
-    async def test_intraday_only_syncs_stock_accounts(self):
+    async def test_intraday_only_syncs_stock_accounts(self, make_account):
         """intraday sync는 KIS/Kiwoom 주식 계좌만 동기화한다."""
-        accounts = [_make_account(source="KIS_API"), _make_account(source="KIWOOM_API")]
+        accounts = [make_account(data_source="KIS_API"), make_account(data_source="KIWOOM_API")]
         mock_session = AsyncMock()
         execute_result = MagicMock()
         execute_result.scalars.return_value.all.return_value = accounts

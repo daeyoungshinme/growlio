@@ -12,12 +12,6 @@ from app.api.deps import get_current_user
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.database import get_db
-from app.exceptions import (
-    ProviderApiError,
-    ProviderCredentialError,
-    ProviderNetworkError,
-    ProviderTokenError,
-)
 from app.limiter import limiter
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.user import User
@@ -28,7 +22,12 @@ from app.schemas.asset import (
     AssetAccountUpdate,
     AssetSnapshotResponse,
 )
-from app.services.asset_service import sync_account as _sync_account_service
+from app.services.asset_service import (
+    sync_account as _sync_account_service,
+    list_accounts as _list_accounts,
+    list_snapshots_in_range as _list_snapshots_in_range,
+    list_accounts_by_ids as _list_accounts_by_ids,
+)
 from app.services.credential_service import encrypt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
@@ -40,7 +39,6 @@ from app.utils.cache_keys import (
     portfolio_overview_key,
     portfolio_overview_lite_key,
 )
-from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.currency import fetch_usd_krw
 from app.utils.redis_lock import redis_lock
 
@@ -73,14 +71,8 @@ async def list_accounts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(AssetAccount)
-        .where(AssetAccount.user_id == current_user.id, AssetAccount.is_active == True)  # noqa: E712
-        .order_by(AssetAccount.sort_order, AssetAccount.created_at)
-        .offset(skip)
-        .limit(limit)
-    )
-    return [_account_response(a) for a in result.scalars().all()]
+    accounts = await _list_accounts(current_user.id, db, skip=skip, limit=limit)
+    return [_account_response(a) for a in accounts]
 
 
 class KisCredentialVerifyRequest(BaseModel):
@@ -138,9 +130,14 @@ async def create_account(
     _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
 
     if req.data_source == "KIS_API":
+        if not req.kis_app_key or not req.kis_app_secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="KIS API 자격증명(App Key, App Secret)을 모두 입력하세요.",
+            )
         req_data = req.model_dump(exclude=_exclude_creds)
-        req_data["kis_app_key"] = encrypt(req.kis_app_key)    # type: ignore[arg-type]
-        req_data["kis_app_secret"] = encrypt(req.kis_app_secret)  # type: ignore[arg-type]
+        req_data["kis_app_key"] = encrypt(req.kis_app_key)
+        req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
         account = AssetAccount(user_id=current_user.id, **req_data)
     elif req.data_source == "KIWOOM_API":
         if not req.kiwoom_account_no or not req.kiwoom_app_key or not req.kiwoom_app_secret:
@@ -186,14 +183,11 @@ async def get_snapshots(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_date는 end_date보다 이전이어야 합니다")
     limit = min(limit, _MAX_SNAPSHOTS_LIMIT)
-    query = select(AssetSnapshot).where(AssetSnapshot.user_id == current_user.id)
-    if start_date:
-        query = query.where(AssetSnapshot.snapshot_date >= start_date)
-    if end_date:
-        query = query.where(AssetSnapshot.snapshot_date <= end_date)
-    query = query.order_by(AssetSnapshot.snapshot_date.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
+    return await _list_snapshots_in_range(
+        current_user.id, db,
+        start_date=start_date, end_date=end_date,
+        skip=skip, limit=limit,
+    )
 
 
 @router.get("/{account_id}", response_model=AssetAccountResponse)
@@ -413,19 +407,11 @@ async def sync_account(
 
 
 async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
-    """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출."""
-    try:
-        snapshot = await _sync_account_service(account, db, redis)
-    except ProviderCredentialError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except ProviderTokenError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except ProviderApiError as e:
-        raise HTTPException(status_code=e.http_status, detail=e.detail) from e
-    except ProviderNetworkError as e:
-        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(e)) from e
-    except CircuitOpenError as e:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+    """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출.
+
+    SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
+    """
+    snapshot = await _sync_account_service(account, db, redis)
 
     await redis.delete(
         dividend_ticker_summary_key(current_user.id, date.today().year),
@@ -453,13 +439,7 @@ async def batch_set_target_portfolio(
     """여러 계좌의 목표 포트폴리오를 일괄 지정하거나 해제한다."""
     if not body.account_ids:
         return []
-    result = await db.execute(
-        select(AssetAccount).where(
-            AssetAccount.id.in_(body.account_ids),
-            AssetAccount.user_id == current_user.id,
-        )
-    )
-    accounts = result.scalars().all()
+    accounts = await _list_accounts_by_ids(body.account_ids, current_user.id, db)
     if len(accounts) != len(body.account_ids):
         raise HTTPException(status_code=403, detail="접근 권한이 없는 계좌가 포함되어 있습니다")
     for account in accounts:
@@ -484,14 +464,7 @@ async def set_target_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌의 목표 포트폴리오를 지정하거나 해제한다."""
-    account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.id == account_id,
-            AssetAccount.user_id == current_user.id,
-        )
-    )
-    if not account:
-        raise HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다")
+    account = await _get_owned_account(account_id, current_user.id, db)
     account.target_portfolio_id = body.target_portfolio_id
     await db.commit()
     await db.refresh(account)

@@ -15,8 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.tax_service import (
-    _OVERSEAS_GAIN_DEDUCTION,
-    _OVERSEAS_TAX_RATE,
+    _get_rates,
     get_overseas_positions_detail,
 )
 from app.utils.cache_keys import RedisType
@@ -269,8 +268,11 @@ async def _check_tax_loss_harvest(
     if not loss_positions or total_gain <= 0:
         return []
 
+    from datetime import date
+    rates = _get_rates(date.today().year)
+
     # 연 250만원 기본 공제 적용 — 공제 후 과세 이익이 없으면 절세 불필요
-    taxable_gain = max(0.0, total_gain - _OVERSEAS_GAIN_DEDUCTION)
+    taxable_gain = max(0.0, total_gain - rates["overseas_deduction"])
     if taxable_gain <= 0:
         return []
 
@@ -279,7 +281,7 @@ async def _check_tax_loss_harvest(
 
     total_loss = sum(abs(p["unrealized_pnl_krw"]) for p in loss_positions)
     offsettable = min(total_loss, taxable_gain)
-    tax_saved = offsettable * _OVERSEAS_TAX_RATE
+    tax_saved = offsettable * rates["overseas_gain"]
 
     if tax_saved < 50_000:
         return []

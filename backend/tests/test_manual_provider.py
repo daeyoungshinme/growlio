@@ -1,7 +1,6 @@
 """providers/manual_provider.py 단위 테스트."""
 from __future__ import annotations
 
-import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -10,22 +9,8 @@ import pytest
 from app.providers.manual_provider import ManualProvider, _db_to_provider_position
 
 
-def _make_account(**kwargs):
-    defaults = dict(
-        id=uuid.uuid4(),
-        user_id=uuid.uuid4(),
-        asset_type="STOCK_OTHER",
-        manual_amount=None,
-        deposit_krw=None,
-        deposit_usd=None,
-        real_estate_details=None,
-        manual_updated_at=None,
-    )
-    defaults.update(kwargs)
-    return SimpleNamespace(**defaults)
-
-
 def _make_db_position(**kwargs):
+    import uuid
     defaults = dict(
         id=uuid.uuid4(),
         account_id=uuid.uuid4(),
@@ -88,8 +73,8 @@ class TestDbToProviderPosition:
 
 class TestManualProviderSync:
     @pytest.mark.asyncio
-    async def test_sync_with_no_positions_uses_manual_amount(self, override_settings):
-        account = _make_account(manual_amount=5_000_000.0, asset_type="STOCK_OTHER")
+    async def test_sync_with_no_positions_uses_manual_amount(self, override_settings, make_account):
+        account = make_account(manual_amount=5_000_000.0, asset_type="STOCK_OTHER")
         db = _make_mock_db(positions=[])
         redis = AsyncMock()
 
@@ -101,8 +86,8 @@ class TestManualProviderSync:
         assert result.positions == []
 
     @pytest.mark.asyncio
-    async def test_sync_with_positions_calculates_value(self, override_settings):
-        account = _make_account(manual_amount=None, asset_type="STOCK_OTHER")
+    async def test_sync_with_positions_calculates_value(self, override_settings, make_account):
+        account = make_account(asset_type="STOCK_OTHER")
         pos = _make_db_position(qty=10.0, avg_price=70000.0, current_price=75000.0)
         db = _make_mock_db(positions=[pos])
         redis = AsyncMock()
@@ -122,9 +107,9 @@ class TestManualProviderSync:
         assert result.total_value_krw == pytest.approx(750000.0)
 
     @pytest.mark.asyncio
-    async def test_sync_raises_when_no_amount_and_no_positions(self, override_settings):
+    async def test_sync_raises_when_no_amount_and_no_positions(self, override_settings, make_account):
         from app.exceptions import BadRequestError
-        account = _make_account(manual_amount=0.0, asset_type="STOCK_OTHER")
+        account = make_account(manual_amount=0.0, asset_type="STOCK_OTHER")
         db = _make_mock_db(positions=[])
         redis = AsyncMock()
 
@@ -134,8 +119,8 @@ class TestManualProviderSync:
                 await provider.sync(account, db, redis)
 
     @pytest.mark.asyncio
-    async def test_sync_real_estate_subtracts_mortgage(self, override_settings):
-        account = _make_account(
+    async def test_sync_real_estate_subtracts_mortgage(self, override_settings, make_account):
+        account = make_account(
             asset_type="REAL_ESTATE",
             manual_amount=500_000_000.0,
             real_estate_details={"mortgage_balance_krw": 100_000_000},
@@ -150,9 +135,9 @@ class TestManualProviderSync:
         assert result.total_value_krw == pytest.approx(400_000_000.0)
 
     @pytest.mark.asyncio
-    async def test_sync_fetches_prices_when_positions_and_redis(self, override_settings):
+    async def test_sync_fetches_prices_when_positions_and_redis(self, override_settings, make_account):
         """redis 비-None + 포지션 있을 때 가격 조회 경로 (lines 33-54)."""
-        account = _make_account(asset_type="STOCK_OTHER", deposit_krw=None, deposit_usd=None)
+        account = make_account(asset_type="STOCK_OTHER")
         pos = _make_db_position(
             ticker="005930", market="KOSPI", qty=10.0, avg_price=70000.0, current_price=70000.0
         )
@@ -169,9 +154,9 @@ class TestManualProviderSync:
         assert result.total_value_krw == pytest.approx(750000.0)
 
     @pytest.mark.asyncio
-    async def test_sync_overseas_position_applies_usd_rate(self, override_settings):
+    async def test_sync_overseas_position_applies_usd_rate(self, override_settings, make_account):
         """해외 종목 USD 환율 적용 경로 (lines 40-48 — has_overseas branch)."""
-        account = _make_account(asset_type="STOCK_OTHER", deposit_krw=None, deposit_usd=None)
+        account = make_account(asset_type="STOCK_OTHER")
         pos = _make_db_position(
             ticker="AAPL", market="NASDAQ", qty=5.0, avg_price=200000.0, current_price=200000.0
         )
@@ -187,10 +172,10 @@ class TestManualProviderSync:
         assert pos.current_price == pytest.approx(210.0 * 1350.0)
 
     @pytest.mark.asyncio
-    async def test_real_estate_raises_when_gross_is_zero(self, override_settings):
+    async def test_real_estate_raises_when_gross_is_zero(self, override_settings, make_account):
         """부동산 시세 0 설정 시 BadRequestError (line 71)."""
         from app.exceptions import BadRequestError
-        account = _make_account(
+        account = make_account(
             asset_type="REAL_ESTATE",
             manual_amount=0.0,
             real_estate_details={},
@@ -204,13 +189,11 @@ class TestManualProviderSync:
                 await provider.sync(account, db, redis)
 
     @pytest.mark.asyncio
-    async def test_sync_with_deposit_krw_only(self, override_settings):
+    async def test_sync_with_deposit_krw_only(self, override_settings, make_account):
         """포지션 없고 deposit_krw만 있을 때 경로 (lines 73-74)."""
-        account = _make_account(
+        account = make_account(
             asset_type="STOCK_OTHER",
-            manual_amount=None,
             deposit_krw=1_000_000.0,
-            deposit_usd=None,
         )
         db = _make_mock_db(positions=[])
         redis = AsyncMock()
@@ -222,9 +205,9 @@ class TestManualProviderSync:
         assert result.total_value_krw == pytest.approx(1_000_000.0)
 
     @pytest.mark.asyncio
-    async def test_sync_price_not_in_map_uses_fallback(self, override_settings):
+    async def test_sync_price_not_in_map_uses_fallback(self, override_settings, make_account):
         """가격 맵에 없는 종목은 기존 current_price 유지 (line 50 — else branch)."""
-        account = _make_account(asset_type="STOCK_OTHER", deposit_krw=None, deposit_usd=None)
+        account = make_account(asset_type="STOCK_OTHER")
         pos = _make_db_position(
             ticker="UNKNOWN", market="KOSPI", qty=10.0, avg_price=50000.0, current_price=50000.0
         )

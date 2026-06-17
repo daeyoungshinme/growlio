@@ -7,6 +7,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from app.services.tax_service import _get_rates
+
+_RATES_2025 = _get_rates(2025)
+
 
 def _make_position(
     ticker="AAPL",
@@ -187,32 +191,32 @@ class TestCalcStockUnrealized:
 class TestCalcGeumtTax:
     def test_zero_gain_returns_zero(self):
         from app.services.tax_service import _calc_geumt_tax
-        assert _calc_geumt_tax(0.0) == 0.0
+        assert _calc_geumt_tax(0.0, _RATES_2025) == 0.0
 
     def test_negative_gain_returns_zero(self):
         from app.services.tax_service import _calc_geumt_tax
-        assert _calc_geumt_tax(-1_000_000.0) == 0.0
+        assert _calc_geumt_tax(-1_000_000.0, _RATES_2025) == 0.0
 
     def test_below_300m_applies_standard_rate(self):
         from app.services.tax_service import _calc_geumt_tax
         # 1억 * 20% = 2천만
-        assert _calc_geumt_tax(100_000_000.0) == pytest.approx(20_000_000.0)
+        assert _calc_geumt_tax(100_000_000.0, _RATES_2025) == pytest.approx(20_000_000.0)
 
     def test_exactly_300m_applies_standard_rate(self):
         from app.services.tax_service import _calc_geumt_tax
         # 3억 * 20% = 6천만
-        assert _calc_geumt_tax(300_000_000.0) == pytest.approx(60_000_000.0)
+        assert _calc_geumt_tax(300_000_000.0, _RATES_2025) == pytest.approx(60_000_000.0)
 
     def test_above_300m_applies_excess_rate(self):
         from app.services.tax_service import _calc_geumt_tax
         # 3억 * 20% + 1억 * 25% = 6천만 + 2천5백만 = 8천5백만
-        assert _calc_geumt_tax(400_000_000.0) == pytest.approx(85_000_000.0)
+        assert _calc_geumt_tax(400_000_000.0, _RATES_2025) == pytest.approx(85_000_000.0)
 
 
 class TestSimulateGeumtTax:
     def test_no_gain_returns_zero_tax(self):
         from app.services.tax_service import _simulate_geumt_tax
-        result = _simulate_geumt_tax(0.0, 0.0)
+        result = _simulate_geumt_tax(0.0, 0.0, _RATES_2025)
         assert result["total_tax_krw"] == 0.0
         assert result["overseas_tax_krw"] == 0.0
         assert result["domestic_tax_krw"] == 0.0
@@ -220,40 +224,40 @@ class TestSimulateGeumtTax:
     def test_overseas_below_deduction_no_tax(self):
         from app.services.tax_service import _simulate_geumt_tax
         # 200만 < 250만 공제
-        result = _simulate_geumt_tax(2_000_000.0, 0.0)
+        result = _simulate_geumt_tax(2_000_000.0, 0.0, _RATES_2025)
         assert result["overseas_tax_krw"] == 0.0
         assert result["overseas_taxable_krw"] == 0.0
 
     def test_overseas_above_deduction_applies_tax(self):
         from app.services.tax_service import _simulate_geumt_tax
         # 1250만 - 250만 = 1000만 * 20% = 200만
-        result = _simulate_geumt_tax(12_500_000.0, 0.0)
+        result = _simulate_geumt_tax(12_500_000.0, 0.0, _RATES_2025)
         assert result["overseas_taxable_krw"] == pytest.approx(10_000_000.0)
         assert result["overseas_tax_krw"] == pytest.approx(2_000_000.0)
 
     def test_domestic_below_deduction_no_tax(self):
         from app.services.tax_service import _simulate_geumt_tax
         # 3천만 < 5천만 공제
-        result = _simulate_geumt_tax(0.0, 30_000_000.0)
+        result = _simulate_geumt_tax(0.0, 30_000_000.0, _RATES_2025)
         assert result["domestic_tax_krw"] == 0.0
         assert result["domestic_taxable_krw"] == 0.0
 
     def test_domestic_above_deduction_applies_tax(self):
         from app.services.tax_service import _simulate_geumt_tax
         # 1억 - 5천만 = 5천만 * 20% = 1천만
-        result = _simulate_geumt_tax(0.0, 100_000_000.0)
+        result = _simulate_geumt_tax(0.0, 100_000_000.0, _RATES_2025)
         assert result["domestic_taxable_krw"] == pytest.approx(50_000_000.0)
         assert result["domestic_tax_krw"] == pytest.approx(10_000_000.0)
 
     def test_tax_difference_vs_current_regime(self):
         from app.services.tax_service import _simulate_geumt_tax
         # 해외 1000만: 현행 (1000만-250만)*22%=165만, 금투세 (1000만-250만)*20%=150만 → 차이 -15만
-        result = _simulate_geumt_tax(10_000_000.0, 0.0)
+        result = _simulate_geumt_tax(10_000_000.0, 0.0, _RATES_2025)
         assert result["tax_difference_krw"] == pytest.approx(-150_000.0, rel=1e-3)
 
     def test_simulation_contains_required_keys(self):
         from app.services.tax_service import _simulate_geumt_tax
-        result = _simulate_geumt_tax(5_000_000.0, 60_000_000.0)
+        result = _simulate_geumt_tax(5_000_000.0, 60_000_000.0, _RATES_2025)
         required = {
             "overseas_gain_krw", "overseas_deduction_krw", "overseas_taxable_krw", "overseas_tax_krw",
             "domestic_gain_krw", "domestic_deduction_krw", "domestic_taxable_krw", "domestic_tax_krw",

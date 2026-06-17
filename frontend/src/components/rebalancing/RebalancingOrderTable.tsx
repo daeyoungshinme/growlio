@@ -13,6 +13,26 @@ export type { PriceCellProps } from "./RebalancingPriceCell";
 export { PriceCell } from "./RebalancingPriceCell";
 export { RebalancingPriceInput } from "./RebalancingPriceInput";
 
+function getNativePrice(
+  ticker: string,
+  market: string,
+  livePricesKrw: Record<string, number>,
+  livePricesUsd: Record<string, number>,
+): number | undefined {
+  return isOverseasMarket(market) ? livePricesUsd[ticker] : livePricesKrw[ticker];
+}
+
+function getLimitEstKrw(
+  nativeLimitPrice: number,
+  qty: number,
+  market: string,
+  globalUsdRate: number | null,
+): number {
+  return isOverseasMarket(market) && globalUsdRate != null
+    ? nativeLimitPrice * globalUsdRate * qty
+    : nativeLimitPrice * qty;
+}
+
 export interface RebalancingOrderTableProps {
   accId: string;
   sellRows: { item: RebalancingItem; currentQty: number; suggestedQty: number }[];
@@ -50,6 +70,11 @@ export function RebalancingOrderTable({
 }: RebalancingOrderTableProps) {
   return (
     <ErrorBoundary variant="section">
+      {priceState === "error" && (
+        <div role="alert" className="mx-3 mb-2 px-3 py-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg">
+          현재가 조회 실패 — 지정가를 직접 입력하거나 잠시 후 다시 시도하세요.
+        </div>
+      )}
       {/* 모바일 카드 뷰 */}
       <div className="md:hidden divide-y divide-gray-700/30">
         {sellRows.length > 0 && (
@@ -58,14 +83,10 @@ export function RebalancingOrderTable({
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
               const key = `sell_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
-              const overseas = isOverseasMarket(item.market);
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = overseas ? livePricesUsd[item.ticker] : livePricesKrw[item.ticker];
+              const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw =
-                overseas && globalUsdRate != null
-                  ? nativeLimitPrice * globalUsdRate * qty
-                  : nativeLimitPrice * qty;
+              const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
                 <RebalancingMobileCard
                   key={key}
@@ -104,14 +125,10 @@ export function RebalancingOrderTable({
               const { allocated, needed } = isMultiAccount
                 ? getBuyTotalInfo(item.ticker)
                 : { allocated: 0, needed: 0 };
-              const overseas = isOverseasMarket(item.market);
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = overseas ? livePricesUsd[item.ticker] : livePricesKrw[item.ticker];
+              const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
-              const estKrw =
-                overseas && globalUsdRate != null
-                  ? nativeLimitPrice * globalUsdRate * qty
-                  : nativeLimitPrice * qty;
+              const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
                 <RebalancingMobileCard
                   key={key}
@@ -168,15 +185,15 @@ export function RebalancingOrderTable({
           </colgroup>
           <thead>
             <tr className="text-[11px] text-gray-500 border-b border-gray-700/50">
-              <th />
-              <th className="px-3 py-2 text-left font-normal">종목</th>
-              <th className="px-3 py-2 text-center font-normal">구분</th>
-              <th className="px-2 py-2 text-right font-normal">현재가</th>
-              <th className="px-3 py-2 text-right font-normal">수량</th>
+              <th scope="col" />
+              <th scope="col" className="px-3 py-2 text-left font-normal">종목</th>
+              <th scope="col" className="px-3 py-2 text-center font-normal">구분</th>
+              <th scope="col" className="px-2 py-2 text-right font-normal">현재가</th>
+              <th scope="col" className="px-3 py-2 text-right font-normal">수량</th>
               {orderType === "LIMIT" && (
-                <th className="px-2 py-2 text-right font-normal">지정가</th>
+                <th scope="col" className="px-2 py-2 text-right font-normal">지정가</th>
               )}
-              <th />
+              <th scope="col" />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700/30">
@@ -195,10 +212,7 @@ export function RebalancingOrderTable({
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const overseas = isOverseasMarket(item.market);
-                  const currentNativePrice = overseas
-                    ? livePricesUsd[item.ticker]
-                    : livePricesKrw[item.ticker];
+                  const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
                   return (
                     <tr
                       key={key}
@@ -290,10 +304,7 @@ export function RebalancingOrderTable({
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const overseas = isOverseasMarket(item.market);
-                  const currentNativePrice = overseas
-                    ? livePricesUsd[item.ticker]
-                    : livePricesKrw[item.ticker];
+                  const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
                   const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
                   const isOnlyAccount = !isMultiAccount;
                   const { allocated, needed } = isMultiAccount

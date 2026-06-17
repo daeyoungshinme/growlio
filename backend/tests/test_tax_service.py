@@ -13,8 +13,11 @@ from app.services.tax_service import (
     _build_harvesting_recommendations,
     _calc_dividend_income,
     _calc_total_fees,
+    _get_rates,
     get_tax_summary,
 )
+
+_RATES_2025 = _get_rates(2025)
 
 
 # ── _build_harvesting_recommendations ────────────────────────
@@ -26,8 +29,8 @@ class TestBuildHarvestingRecommendations:
         """과세 대상 이익이 없으면 빈 리스트."""
         positions = [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ",
                       "unrealized_pnl_krw": -500_000, "qty": 5}]
-        assert _build_harvesting_recommendations(positions, 0.0) == []
-        assert _build_harvesting_recommendations(positions, -100_000) == []
+        assert _build_harvesting_recommendations(positions, 0.0, _RATES_2025) == []
+        assert _build_harvesting_recommendations(positions, -100_000, _RATES_2025) == []
 
     def test_loss_positions_only_selected(self, override_settings):
         """손실 포지션만 추천 목록에 포함된다."""
@@ -37,7 +40,7 @@ class TestBuildHarvestingRecommendations:
             {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
              "unrealized_pnl_krw": -400_000, "qty": 2},
         ]
-        result = _build_harvesting_recommendations(positions, 500_000)
+        result = _build_harvesting_recommendations(positions, 500_000, _RATES_2025)
         tickers = [r["ticker"] for r in result]
         assert "TSLA" in tickers
         assert "AAPL" not in tickers
@@ -48,7 +51,7 @@ class TestBuildHarvestingRecommendations:
             {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
              "unrealized_pnl_krw": -1_000_000, "qty": 5},
         ]
-        result = _build_harvesting_recommendations(positions, 500_000)
+        result = _build_harvesting_recommendations(positions, 500_000, _RATES_2025)
         assert len(result) == 1
         # offset = min(1_000_000, 500_000) = 500_000; tax_saved = 500_000 * 0.22 = 110_000
         assert result[0]["tax_saved_krw"] == 110_000.0
@@ -62,7 +65,7 @@ class TestBuildHarvestingRecommendations:
              "unrealized_pnl_krw": -1_000_000, "qty": 5},
         ]
         # gain=1_500_000 → A(-2M)로 완전 상쇄되므로 B 추천 불필요
-        result = _build_harvesting_recommendations(positions, 1_500_000)
+        result = _build_harvesting_recommendations(positions, 1_500_000, _RATES_2025)
         assert len(result) == 1
         assert result[0]["ticker"] == "A"
 
@@ -74,7 +77,7 @@ class TestBuildHarvestingRecommendations:
             {"ticker": "Y", "name": "Y", "market": "NYSE",
              "unrealized_pnl_krw": -800_000, "qty": 4},
         ]
-        result = _build_harvesting_recommendations(positions, 2_000_000)
+        result = _build_harvesting_recommendations(positions, 2_000_000, _RATES_2025)
         assert result[0]["ticker"] == "Y"
         assert result[1]["ticker"] == "X"
 
@@ -84,7 +87,7 @@ class TestBuildHarvestingRecommendations:
             {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
              "unrealized_pnl_krw": -500_000, "qty": 2},
         ]
-        result = _build_harvesting_recommendations(positions, 1_000_000)
+        result = _build_harvesting_recommendations(positions, 1_000_000, _RATES_2025)
         assert len(result) == 1
         rec = result[0]
         assert "ticker" in rec

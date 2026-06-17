@@ -6,19 +6,20 @@ from datetime import UTC, datetime
 
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import RebalancingAnalysis, RebalancingItem, TickerAccountInfo
+from app.schemas.service_dtypes import DividendMapEntry, PositionMapEntry, ReturnsMapEntry
 
 
-def _build_current_map(overview: dict) -> dict[tuple[str, str], dict]:
+def _build_current_map(overview: dict) -> dict[tuple[str, str], PositionMapEntry]:
     """overview의 all_positions에서 (ticker, market) → 현재 보유 현황 맵을 구성한다."""
-    current_map: dict[tuple[str, str], dict] = {}
+    current_map: dict[tuple[str, str], PositionMapEntry] = {}
     for p in overview.get("all_positions", []):
         key = (p["ticker"], p["market"])
         if key not in current_map:
-            current_map[key] = {
-                "value_krw": 0.0,
-                "current_price": p.get("current_price"),
-                "name": p.get("name", ""),
-            }
+            current_map[key] = PositionMapEntry(
+                value_krw=0.0,
+                current_price=p.get("current_price"),
+                name=p.get("name", ""),
+            )
         current_map[key]["value_krw"] += float(p.get("value_krw", 0))
     return current_map
 
@@ -26,7 +27,7 @@ def _build_current_map(overview: dict) -> dict[tuple[str, str], dict]:
 def _div_info(
     ticker: str,
     market: str,
-    dividend_map: dict[tuple[str, str], dict] | None,
+    dividend_map: dict[tuple[str, str], DividendMapEntry] | None,
 ) -> tuple[float | None, float]:
     """배당 수익률과 연간 배당 추정액(KRW)을 반환한다."""
     if not dividend_map:
@@ -45,9 +46,9 @@ def _build_target_items(
     portfolio: Portfolio,
     base_krw: float,
     overview: dict,
-    current_map: dict[tuple[str, str], dict],
-    dividend_map: dict[tuple[str, str], dict] | None,
-    returns_map: dict[tuple[str, str], dict] | None,
+    current_map: dict[tuple[str, str], PositionMapEntry],
+    dividend_map: dict[tuple[str, str], DividendMapEntry] | None,
+    returns_map: dict[tuple[str, str], ReturnsMapEntry] | None,
 ) -> tuple[list[RebalancingItem], set[tuple[str, str]]]:
     """목표 포트폴리오 항목별 RebalancingItem 리스트와 대상 키 집합을 반환한다."""
     result_items: list[RebalancingItem] = []
@@ -134,11 +135,11 @@ def _build_target_items(
 
 
 def _build_untracked_items(
-    current_map: dict[tuple[str, str], dict],
+    current_map: dict[tuple[str, str], PositionMapEntry],
     target_keys: set[tuple[str, str]],
     base_krw: float,
-    dividend_map: dict[tuple[str, str], dict] | None,
-    returns_map: dict[tuple[str, str], dict] | None,
+    dividend_map: dict[tuple[str, str], DividendMapEntry] | None,
+    returns_map: dict[tuple[str, str], ReturnsMapEntry] | None,
 ) -> list[RebalancingItem]:
     """목표 포트폴리오에 없는 보유 종목을 target=0 매도 아이템으로 반환한다."""
     items: list[RebalancingItem] = []
@@ -184,8 +185,8 @@ def _build_untracked_items(
 
 def _calc_portfolio_cagrs(
     result_items: list[RebalancingItem],
-    current_map: dict[tuple[str, str], dict],
-    returns_map: dict[tuple[str, str], dict] | None,
+    current_map: dict[tuple[str, str], PositionMapEntry],
+    returns_map: dict[tuple[str, str], ReturnsMapEntry] | None,
 ) -> tuple[float | None, float | None]:
     """목표 포트폴리오와 현재 보유 포트폴리오의 가중 CAGR을 계산한다."""
     items_with_return = [
@@ -198,18 +199,20 @@ def _calc_portfolio_cagrs(
         target_w_sum = sum(i.target_weight_pct for i in items_with_return)
         if target_w_sum > 0:
             target_weighted_cagr = round(
-                sum(i.target_weight_pct * i.cagr_10y_pct for i in items_with_return)  # type: ignore[operator, misc]
+                sum(i.target_weight_pct * (i.cagr_10y_pct or 0.0) for i in items_with_return)
                 / target_w_sum,
                 2,
             )
 
     current_weighted_cagr: float | None = None
     if returns_map:
-        holdings = [
-            (data["value_krw"], returns_map[(t, m)]["cagr_pct"])
-            for (t, m), data in current_map.items()
-            if returns_map.get((t, m)) and returns_map[(t, m)].get("cagr_pct") is not None
-        ]
+        holdings: list[tuple[float, float]] = []
+        for (t, m), data in current_map.items():
+            ret = returns_map.get((t, m))
+            if ret is not None:
+                cagr = ret.get("cagr_pct")
+                if cagr is not None:
+                    holdings.append((data["value_krw"], cagr))
         if holdings:
             total_val = sum(v for v, _ in holdings)
             if total_val > 0:
@@ -310,8 +313,8 @@ def _build_implicit_cash_item(
 def analyze_rebalancing(
     portfolio: Portfolio,
     overview: dict,
-    dividend_map: dict[tuple[str, str], dict] | None = None,
-    returns_map: dict[tuple[str, str], dict] | None = None,
+    dividend_map: dict[tuple[str, str], DividendMapEntry] | None = None,
+    returns_map: dict[tuple[str, str], ReturnsMapEntry] | None = None,
     include_implicit_cash: bool = False,
 ) -> RebalancingAnalysis:
     """현재 자산(overview)과 목표 포트폴리오를 비교해 리밸런싱 분석 결과를 반환한다."""

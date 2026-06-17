@@ -16,14 +16,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services._snapshot_queries import latest_snapshot_subquery
+from app.schemas.service_dtypes import FactorData
+from app.services.market_data_fetcher import fetch_yf_close_series, fetch_yf_info
+from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import RedisType, TTL_FACTOR_ANALYSIS
 
 logger = structlog.get_logger()
-
-_FACTOR_CACHE_TTL = 3600  # 1시간
 
 
 def _safe_float(v: object) -> float | None:
@@ -34,74 +33,26 @@ def _safe_float(v: object) -> float | None:
         return None
 
 
-def _sync_fetch_factor_data(symbols: list[str]) -> dict[str, dict]:
-    """yfinance .info에서 P/E, P/B, 시가총액, 12-1M 모멘텀 수집.
-
-    - 역사 데이터(모멘텀): yf.download() 단일 배치 호출
-    - .info(P/E·P/B·시가총액): ThreadPoolExecutor(max_workers=5) 병렬 조회
-    """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+def _sync_fetch_factor_data(symbols: list[str]) -> dict[str, FactorData]:
+    """yfinance .info에서 P/E, P/B, 시가총액, 12-1M 모멘텀 수집."""
     from datetime import date, timedelta
 
-    import pandas as pd
-    import yfinance as yf
-
-    # Step 1: 역사 데이터 일괄 다운로드 (모멘텀 계산용)
+    # Step 1: 역사 데이터 일괄 다운로드 (모멘텀 계산용, 12-1M = 최근 21일 제외 335일)
     end_date = date.today() - timedelta(days=21)
     start_date = end_date - timedelta(days=335)
-    momentum_map: dict[str, float | None] = {sym: None for sym in symbols}
-    try:
-        raw_hist = yf.download(
-            symbols,
-            start=start_date.isoformat(),
-            end=end_date.isoformat(),
-            auto_adjust=True,
-            progress=False,
-            threads=True,
-        )
-        close: pd.DataFrame | None
-        if raw_hist is not None and not raw_hist.empty:
-            if isinstance(raw_hist.columns, pd.MultiIndex):
-                close = raw_hist.get("Close")
-            else:
-                close = raw_hist if isinstance(raw_hist, pd.DataFrame) else raw_hist.to_frame(name=symbols[0])
-        else:
-            close = None
+    close_series = fetch_yf_close_series(symbols, start_date, end_date)
 
-        if close is not None:
-            for sym in symbols:
-                try:
-                    col = sym if sym in close.columns else None
-                    if col is None:
-                        continue
-                    series = close[col].dropna()
-                    if len(series) >= 2:
-                        raw_mom = float(series.iloc[-1] / series.iloc[0] - 1) * 100
-                        momentum_map[sym] = round(raw_mom, 2) if math.isfinite(raw_mom) else None
-                except Exception:
-                    pass
-    except Exception as e:
-        logger.warning("factor_history_batch_failed", error=str(e))
+    momentum_map: dict[str, float | None] = {sym: None for sym in symbols}
+    for sym, series in close_series.items():
+        if len(series) >= 2:
+            raw_mom = float(series.iloc[-1] / series.iloc[0] - 1) * 100
+            momentum_map[sym] = round(raw_mom, 2) if math.isfinite(raw_mom) else None
 
     # Step 2: .info 병렬 조회 (P/E, P/B, 시가총액)
-    def _fetch_one_info(sym: str) -> tuple[str, dict]:
-        try:
-            return sym, yf.Ticker(sym).info or {}
-        except Exception:
-            return sym, {}
-
-    info_map: dict[str, dict] = {}
-    with ThreadPoolExecutor(max_workers=5) as pool:
-        futures = {pool.submit(_fetch_one_info, sym): sym for sym in symbols}
-        for future in as_completed(futures):
-            try:
-                sym, info = future.result()
-                info_map[sym] = info
-            except Exception as e:
-                logger.warning("factor_info_fetch_failed", error=str(e))
+    info_map = fetch_yf_info(symbols)
 
     # Step 3: 결과 조합
-    result: dict[str, dict] = {}
+    result: dict[str, FactorData] = {}
     for sym in symbols:
         info = info_map.get(sym, {})
         result[sym] = {
@@ -160,7 +111,7 @@ def _build_holdings(
     positions: list[dict],
     yf_symbols: list[str],
     weights: list[float],
-    factor_data: dict[str, dict],
+    factor_data: dict[str, FactorData],
 ) -> list[dict]:
     """종목별 팩터 점수를 계산해 holdings 목록을 반환한다."""
     holdings = []
@@ -218,8 +169,8 @@ async def get_factor_analysis_for_portfolio(
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("factor_cache_read_error", cache_key=cache_key, error=str(e))
 
     portfolio = await db.scalar(
         select(Portfolio)
@@ -256,7 +207,7 @@ async def get_factor_analysis_for_portfolio(
 
     if redis:
         with contextlib.suppress(Exception):
-            await redis.setex(cache_key, _FACTOR_CACHE_TTL, json.dumps(result_data))
+            await redis.setex(cache_key, TTL_FACTOR_ANALYSIS, json.dumps(result_data))
 
     return result_data
 
@@ -274,39 +225,10 @@ async def get_factor_analysis(
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("factor_cache_read_error", cache_key=cache_key, error=str(e))
 
-    # 최신 스냅샷 포지션 조회 (risk_service와 동일 패턴)
-    subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .join(
-            subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
-        )
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
-    )
-    rows = result.all()
-
-    snap_ids = [snap.id for snap, _ in rows]
-    pos_map: dict[str, dict] = {}
-    if snap_ids:
-        all_pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
-        for pos in all_pos_result.scalars().all():
-            key = f"{pos.ticker}-{pos.market}"
-            if key not in pos_map:
-                pos_map[key] = {
-                    "ticker": pos.ticker,
-                    "market": pos.market,
-                    "name": pos.name,
-                    "value_krw": 0.0,
-                }
-            pos_map[key]["value_krw"] += float(pos.value_krw or 0)
+    pos_map = await query_latest_position_map(user_id, db, include_name=True)
 
     if not pos_map:
         return _empty_factor_result()
@@ -332,7 +254,7 @@ async def get_factor_analysis(
 
     if redis:
         with contextlib.suppress(Exception):
-            await redis.setex(cache_key, _FACTOR_CACHE_TTL, json.dumps(result_data))
+            await redis.setex(cache_key, TTL_FACTOR_ANALYSIS, json.dumps(result_data))
 
     return result_data
 

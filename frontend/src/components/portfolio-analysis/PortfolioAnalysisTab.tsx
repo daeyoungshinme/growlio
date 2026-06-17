@@ -17,8 +17,6 @@ import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import { AnalysisPanel } from "./AnalysisPanel";
 import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import PortfolioListSection from "./PortfolioListSection";
-import FactorExposureChart from "./FactorExposureChart";
-import EfficientFrontierChart from "./EfficientFrontierChart";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import RebalancingAlertModal from "./RebalancingAlertModal";
@@ -76,14 +74,6 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
 
   const analysisSectionRef = useRef<HTMLDivElement>(null);
-
-  const [analysisVisible, setAnalysisVisible] = useState(false);
-
-  // 캐시에 데이터가 이미 있으면 즉시 차트 표시
-  const hasCachedFactor = !!qc.getQueryData(QUERY_KEYS.factorAnalysis);
-  useEffect(() => {
-    if (hasCachedFactor) setAnalysisVisible(true);
-  }, [hasCachedFactor]);
 
   useEffect(() => {
     if (!portfolioId || portfolios.length === 0) return;
@@ -159,48 +149,11 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     .map((p) => p.name)
     .join(", ");
 
-  const singleSelectedId = selectedIds.size === 1 ? Array.from(selectedIds)[0] : undefined;
-  const singleSelectedName = singleSelectedId
-    ? sortedPortfolios.find((p) => p.id === singleSelectedId)?.name
-    : undefined;
-
   return (
     <div className="space-y-5">
       <ErrorBoundary variant="section">
         <PortfolioDiagnosisCard />
       </ErrorBoundary>
-
-      <hr className="border-gray-200 dark:border-gray-700" />
-
-      {/* ── 팩터 분석 + 효율적 프론티어 ─────────────────────────────── */}
-      {singleSelectedId && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
-          비교 중: <span className="font-semibold">{singleSelectedName}</span>
-        </p>
-      )}
-      {analysisVisible ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <ErrorBoundary variant="section">
-            <FactorExposureChart selectedPortfolioId={singleSelectedId} />
-          </ErrorBoundary>
-          <ErrorBoundary variant="section">
-            <EfficientFrontierChart
-              comparePortfolioId={singleSelectedId}
-              comparePortfolioName={singleSelectedName}
-            />
-          </ErrorBoundary>
-        </div>
-      ) : (
-        <button
-          onClick={() => setAnalysisVisible(true)}
-          className="w-full py-4 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          팩터·프론티어 분석 불러오기
-          <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            처음 조회 시 15–30초 소요될 수 있습니다
-          </span>
-        </button>
-      )}
 
       <hr className="border-gray-200 dark:border-gray-700" />
 

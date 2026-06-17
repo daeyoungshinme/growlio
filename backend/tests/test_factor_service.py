@@ -12,11 +12,13 @@ from app.services.factor_service import (
     _build_holdings,
     _empty_factor_result,
     _portfolio_factors,
+    _safe_float,
     _score_growth,
     _score_momentum,
     _score_size,
     _score_value,
     get_factor_analysis,
+    get_factor_analysis_for_portfolio,
 )
 
 
@@ -148,6 +150,31 @@ class TestPortfolioFactors:
         assert abs(factors["growth"] - (20.0 * 0.6 + 80.0 * 0.4)) < 0.2
 
 
+# ── _safe_float ────────────────────────────────────────────
+
+class TestSafeFloat:
+    def test_normal_float(self, override_settings):
+        assert _safe_float(3.14) == pytest.approx(3.14)
+
+    def test_integer_input(self, override_settings):
+        assert _safe_float(42) == pytest.approx(42.0)
+
+    def test_string_number(self, override_settings):
+        assert _safe_float("12.5") == pytest.approx(12.5)
+
+    def test_none_returns_none(self, override_settings):
+        assert _safe_float(None) is None
+
+    def test_invalid_string_returns_none(self, override_settings):
+        assert _safe_float("not_a_number") is None
+
+    def test_infinity_returns_none(self, override_settings):
+        assert _safe_float(float("inf")) is None
+
+    def test_nan_returns_none(self, override_settings):
+        assert _safe_float(float("nan")) is None
+
+
 # ── 빈 결과 ────────────────────────────────────────────────
 
 class TestEmptyFactorResult:
@@ -156,6 +183,122 @@ class TestEmptyFactorResult:
         assert result["holdings"] == []
         assert result["position_count"] == 0
         assert "value" in result["portfolio_factors"]
+
+
+# ── get_factor_analysis_for_portfolio (DB mock) ────────────
+
+class TestGetFactorAnalysisForPortfolio:
+    @pytest.mark.asyncio
+    async def test_portfolio_not_found_returns_empty(self, mock_db, override_settings):
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+
+        assert result["position_count"] == 0
+        assert result["holdings"] == []
+
+    @pytest.mark.asyncio
+    async def test_portfolio_with_no_items_returns_empty(self, mock_db, override_settings):
+        portfolio = MagicMock()
+        portfolio.items = []
+        mock_db.scalar = AsyncMock(return_value=portfolio)
+
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+
+        assert result["position_count"] == 0
+
+    @pytest.mark.asyncio
+    async def test_portfolio_with_items_calls_executor(self, mock_db, override_settings):
+        item = SimpleNamespace(ticker="005930", market="KOSPI", name="삼성전자", weight=100)
+        portfolio = MagicMock()
+        portfolio.items = [item]
+        portfolio.name = "테스트포트폴리오"
+        mock_db.scalar = AsyncMock(return_value=portfolio)
+
+        factor_data = {
+            "005930.KS": {"pe_ratio": 12.0, "pb_ratio": 1.2, "market_cap": 3e11, "momentum_pct": 5.0}
+        }
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_executor = AsyncMock(return_value=factor_data)
+            mock_loop.return_value.run_in_executor = mock_executor
+
+            result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+
+        assert result["position_count"] == 1
+        assert len(result["holdings"]) == 1
+        assert result["holdings"][0]["ticker"] == "005930"
+        assert result["portfolio_name"] == "테스트포트폴리오"
+
+    @pytest.mark.asyncio
+    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+        cached = {
+            "holdings": [],
+            "portfolio_factors": {"value": 55.0, "growth": 45.0, "size": 50.0, "momentum": 60.0},
+            "position_count": 2,
+            "note": "cached",
+        }
+        redis = AsyncMock()
+        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
+
+        assert result["position_count"] == 2
+        mock_db.scalar.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
+        redis = AsyncMock()
+        redis.get = AsyncMock(side_effect=Exception("redis unavailable"))
+
+        item = SimpleNamespace(ticker="005930", market="KOSPI", name="삼성전자", weight=100)
+        portfolio = MagicMock()
+        portfolio.items = [item]
+        portfolio.name = "테스트"
+        mock_db.scalar = AsyncMock(return_value=portfolio)
+
+        factor_data = {"005930.KS": {"pe_ratio": 10.0, "pb_ratio": 1.0, "market_cap": 1e11, "momentum_pct": 3.0}}
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_executor = AsyncMock(return_value=factor_data)
+            mock_loop.return_value.run_in_executor = mock_executor
+
+            result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
+
+        assert result["position_count"] == 1
+
+    @pytest.mark.asyncio
+    async def test_redis_cache_written_on_success(self, mock_db, override_settings):
+        item = SimpleNamespace(ticker="035420", market="KOSPI", name="NAVER", weight=100)
+        portfolio = MagicMock()
+        portfolio.items = [item]
+        portfolio.name = "포트폴리오"
+        mock_db.scalar = AsyncMock(return_value=portfolio)
+
+        redis = AsyncMock()
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        factor_data = {
+            "035420.KS": {"pe_ratio": 30.0, "pb_ratio": 3.0, "market_cap": 1e11, "momentum_pct": 10.0}
+        }
+        with patch("asyncio.get_running_loop") as mock_loop:
+            mock_executor = AsyncMock(return_value=factor_data)
+            mock_loop.return_value.run_in_executor = mock_executor
+
+            await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
+
+        redis.setex.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_zero_total_weight_returns_empty(self, mock_db, override_settings):
+        item = SimpleNamespace(ticker="005930", market="KOSPI", name="삼성전자", weight=0)
+        portfolio = MagicMock()
+        portfolio.items = [item]
+        portfolio.name = "포트폴리오"
+        mock_db.scalar = AsyncMock(return_value=portfolio)
+
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db)
+
+        assert result["position_count"] == 0
 
 
 # ── get_factor_analysis (DB mock) ─────────────────────────

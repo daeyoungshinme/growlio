@@ -25,8 +25,8 @@ vi.mock("../components/dashboard/DisclosureFeedCard", () => ({
   default: () => <div data-testid="disclosure-feed">DisclosureFeedCard</div>,
 }));
 vi.mock("@/components/dashboard/HeroSummaryCard", () => ({
-  default: ({ data }: { data: { total_asset_krw: number } }) => (
-    <div data-testid="hero-summary">{data.total_asset_krw}</div>
+  default: ({ data }: { data?: { total_asset_krw?: number } }) => (
+    <div data-testid="hero-summary">{data?.total_asset_krw ?? ""}</div>
   ),
 }));
 vi.mock("@/components/dashboard/PortfolioSummaryCard", () => ({
@@ -80,7 +80,7 @@ describe("DashboardPage", () => {
     vi.clearAllMocks();
   });
 
-  it("로딩 중일 때 스켈레톤을 렌더링한다", () => {
+  it("로딩 중일 때 스켈레톤을 렌더링한다", async () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -94,7 +94,9 @@ describe("DashboardPage", () => {
       exchangeRate: null,
     });
     renderDashboard();
-    expect(screen.getAllByTestId("skeleton-stat-box").length).toBeGreaterThan(0);
+    await waitFor(() => {
+      expect(screen.getAllByTestId("skeleton-stat-box").length).toBeGreaterThan(0);
+    });
   });
 
   it("에러 상태일 때 에러 메시지와 재시도 버튼을 표시한다", () => {

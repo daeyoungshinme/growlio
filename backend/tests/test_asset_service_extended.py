@@ -8,60 +8,44 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-def _make_account(data_source="KIS_API", user_id=None):
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        user_id=user_id or uuid.uuid4(),
-        name="테스트",
-        asset_type="STOCK_KIS",
-        data_source=data_source,
-        is_active=True,
-        is_mock_mode=True,
-        deposit_krw=None,
-        deposit_usd=None,
-        kis_app_key=None,
-        kis_app_secret=None,
-    )
-
-
 class TestGetProvider:
-    def test_kis_api_returns_kis_provider(self, override_settings):
+    def test_kis_api_returns_kis_provider(self, override_settings, make_account):
         from app.services.asset_service import get_provider
         from app.providers.kis_provider import KISProvider
 
-        account = _make_account("KIS_API")
+        account = make_account(data_source="KIS_API")
         provider = get_provider(account)
         assert isinstance(provider, KISProvider)
 
-    def test_kiwoom_api_returns_kiwoom_provider(self, override_settings):
+    def test_kiwoom_api_returns_kiwoom_provider(self, override_settings, make_account):
         from app.services.asset_service import get_provider
         from app.providers.kiwoom_provider import KiwoomProvider
 
-        account = _make_account("KIWOOM_API")
+        account = make_account(data_source="KIWOOM_API")
         provider = get_provider(account)
         assert isinstance(provider, KiwoomProvider)
 
-    def test_manual_returns_manual_provider(self, override_settings):
+    def test_manual_returns_manual_provider(self, override_settings, make_account):
         from app.services.asset_service import get_provider
         from app.providers.manual_provider import ManualProvider
 
-        account = _make_account("MANUAL")
+        account = make_account(data_source="MANUAL")
         provider = get_provider(account)
         assert isinstance(provider, ManualProvider)
 
-    def test_open_banking_returns_ob_provider(self, override_settings):
+    def test_open_banking_returns_ob_provider(self, override_settings, make_account):
         from app.services.asset_service import get_provider
         from app.providers.openbanking_provider import OpenBankingProvider
 
-        account = _make_account("OPEN_BANKING")
+        account = make_account(data_source="OPEN_BANKING")
         provider = get_provider(account)
         assert isinstance(provider, OpenBankingProvider)
 
-    def test_unknown_raises_credential_error(self, override_settings):
+    def test_unknown_raises_credential_error(self, override_settings, make_account):
         from app.services.asset_service import get_provider
         from app.exceptions import ProviderCredentialError
 
-        account = _make_account("UNKNOWN_SOURCE")
+        account = make_account(data_source="UNKNOWN_SOURCE")
         with pytest.raises(ProviderCredentialError):
             get_provider(account)
 
@@ -69,12 +53,12 @@ class TestGetProvider:
 class TestSyncAccount:
     @pytest.mark.asyncio
     async def test_sync_account_calls_provider_and_returns_snapshot(
-        self, mock_db, override_settings
+        self, mock_db, override_settings, make_account
     ):
         from app.services.asset_service import sync_account
         from app.providers.base import BalanceResult
 
-        account = _make_account("MANUAL")
+        account = make_account(data_source="MANUAL")
 
         balance = BalanceResult(
             total_value_krw=10_000_000.0,
@@ -98,11 +82,11 @@ class TestSyncAccount:
         mock_provider.sync.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_sync_account_updates_deposit_krw(self, mock_db, override_settings):
+    async def test_sync_account_updates_deposit_krw(self, mock_db, override_settings, make_account):
         from app.services.asset_service import sync_account
         from app.providers.base import BalanceResult
 
-        account = _make_account("MANUAL")
+        account = make_account(data_source="MANUAL")
 
         balance = BalanceResult(
             total_value_krw=5_000_000.0,
@@ -125,12 +109,12 @@ class TestSyncAccount:
         assert account.deposit_krw == 1_000_000.0
 
     @pytest.mark.asyncio
-    async def test_sync_account_updates_deposit_usd_from_foreign(self, mock_db, override_settings):
+    async def test_sync_account_updates_deposit_usd_from_foreign(self, mock_db, override_settings, make_account):
         """deposit_foreign 있으면 account.deposit_usd에 반영 (line 99)."""
         from app.services.asset_service import sync_account
         from app.providers.base import BalanceResult
 
-        account = _make_account("MANUAL")
+        account = make_account(data_source="MANUAL")
 
         balance = BalanceResult(
             total_value_krw=5_000_000.0,
@@ -154,12 +138,12 @@ class TestSyncAccount:
 
     @pytest.mark.asyncio
     async def test_sync_account_with_positions_deletes_old_positions(
-        self, mock_db, override_settings
+        self, mock_db, override_settings, make_account
     ):
         from app.services.asset_service import sync_account
         from app.providers.base import BalanceResult, Position
 
-        account = _make_account("MANUAL")
+        account = make_account(data_source="MANUAL")
 
         pos = Position(
             ticker="AAPL",

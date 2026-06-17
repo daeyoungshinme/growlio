@@ -52,9 +52,17 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
             "is_configured": False,
         }
 
-    start_date: date = start_dt.date() if isinstance(start_dt, datetime) else start_dt  # type: ignore[assignment]
+    assert pmt is not None
+    assert annual_return_pct is not None
+    assert goal_amount is not None
+    assert start_dt is not None
+
+    if isinstance(start_dt, datetime):
+        start_date: date = start_dt.date()
+    else:
+        start_date = start_dt
     today = datetime.now(timezone.utc).date()
-    r = annual_return_pct / 12 / 100  # type: ignore[operator]  # is_configured 가드 통과 후 non-None 보장
+    r = annual_return_pct / 12 / 100
 
     if manual_initial is not None:
         initial_value = manual_initial
@@ -63,14 +71,14 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
     monthly_actuals = await _get_monthly_actual_values(user_id, start_date, db)
 
     # goal_start_date부터 오늘까지 + 향후 미래 예측 (총 목표 달성까지)
-    months_to_goal = _calc_months_to_goal(initial_value, pmt, r, goal_amount)  # type: ignore[arg-type]
+    months_to_goal = _calc_months_to_goal(initial_value, pmt, r, goal_amount)
     total_months = max(
         _elapsed_months(start_date, today) + 1,
         months_to_goal if months_to_goal else _elapsed_months(start_date, today) + 1,
     )
 
     projection_months = _build_projection_curve(
-        initial_value, pmt, r, start_date, total_months, monthly_actuals  # type: ignore[arg-type]
+        initial_value, pmt, r, start_date, total_months, monthly_actuals
     )
     yearly_achievements = _build_yearly_achievements(projection_months)
 
@@ -81,7 +89,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
         current_actual = monthly_actuals[latest_key]
 
     goal_timeline = _calc_goal_timeline(
-        initial_value, pmt, r, goal_amount, current_actual or 0.0, start_date, months_to_goal  # type: ignore[arg-type]
+        initial_value, pmt, r, goal_amount, current_actual or 0.0, start_date, months_to_goal
     )
 
     return {

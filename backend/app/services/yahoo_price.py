@@ -29,9 +29,6 @@ def to_yf_symbol(ticker: str, market: str) -> str:
 
 
 # 내부 별칭 (기존 코드 호환)
-_to_yahoo_symbol = to_yf_symbol
-
-
 def _sync_usdkrw() -> float:
     """동기 함수 — run_in_executor로 호출. 실패 시 0.0 반환."""
     import yfinance as yf
@@ -49,7 +46,7 @@ def _sync_usdkrw() -> float:
 def _sync_yahoo_price(ticker: str, market: str) -> float | None:
     """동기 함수 — run_in_executor로 호출."""
     import yfinance as yf
-    sym = _to_yahoo_symbol(ticker, market)
+    sym = to_yf_symbol(ticker, market)
     try:
         hist = yf.Ticker(sym).history(period="5d")
         if not hist.empty:
@@ -66,7 +63,7 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
     if not items:
         return {}
 
-    sym_map = {_to_yahoo_symbol(t, m): t for t, m in items}
+    sym_map = {to_yf_symbol(t, m): t for t, m in items}
     symbols = list(sym_map.keys())
 
     for attempt in range(3):
@@ -93,8 +90,8 @@ def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
                         val = float(col.iloc[-1])
                         if val > 0:
                             result[orig] = val
-                except (KeyError, IndexError, ValueError):
-                    pass
+                except (KeyError, IndexError, ValueError) as e:
+                    logger.debug("yahoo_price_parse_skip", sym=sym, error=str(e))
             return result
         except Exception as e:
             logger.warning("yahoo_batch_failed", attempt=attempt + 1, error=str(e))
@@ -109,7 +106,7 @@ def _sync_calc_return(ticker: str, market: str, years: int = 10) -> dict | None:
 
     import yfinance as yf
 
-    sym = _to_yahoo_symbol(ticker, market)
+    sym = to_yf_symbol(ticker, market)
     end = date.today()
     try:
         start = end.replace(year=end.year - years)

@@ -6,9 +6,12 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import date
+from typing import Sequence
+
 import structlog
-from sqlalchemy import delete as sql_delete
+from sqlalchemy import delete as sql_delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -146,3 +149,55 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
         total_krw=balance.total_value_krw,
     )
     return snapshot
+
+
+# ---------------------------------------------------------------------------
+# 조회 헬퍼 — API 레이어에서 직접 쿼리하지 않도록 서비스 레이어에서 제공
+# ---------------------------------------------------------------------------
+
+async def list_accounts(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 200,
+) -> Sequence[AssetAccount]:
+    result = await db.execute(
+        select(AssetAccount)
+        .where(AssetAccount.user_id == user_id, AssetAccount.is_active == True)  # noqa: E712
+        .order_by(AssetAccount.sort_order, AssetAccount.created_at)
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()
+
+
+async def list_snapshots_in_range(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    skip: int = 0,
+    limit: int = 365,
+) -> Sequence[AssetSnapshot]:
+    query = select(AssetSnapshot).where(AssetSnapshot.user_id == user_id)
+    if start_date:
+        query = query.where(AssetSnapshot.snapshot_date >= start_date)
+    if end_date:
+        query = query.where(AssetSnapshot.snapshot_date <= end_date)
+    query = query.order_by(AssetSnapshot.snapshot_date.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+async def list_accounts_by_ids(
+    account_ids: list[uuid.UUID],
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> Sequence[AssetAccount]:
+    result = await db.execute(
+        select(AssetAccount).where(
+            AssetAccount.id.in_(account_ids),
+            AssetAccount.user_id == user_id,
+        )
+    )
+    return result.scalars().all()

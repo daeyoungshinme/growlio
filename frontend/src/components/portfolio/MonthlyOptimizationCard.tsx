@@ -1,18 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
 import { TrendingUp } from "lucide-react";
-import { fetchMonthlyOptimization } from "@/api/dividends";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { fmtKrw } from "@/utils/format";
+import { useOptimizationSuggestions } from "@/hooks/useOptimizationSuggestions";
 
 const MONTH_KO = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
 export default function MonthlyOptimizationCard() {
-  const { data: suggestions, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.monthlyOptimization,
-    queryFn: fetchMonthlyOptimization,
-    staleTime: STALE_TIME.LONG,
-  });
+  const { suggestions, isLoading } = useOptimizationSuggestions();
 
   if (isLoading) {
     return (

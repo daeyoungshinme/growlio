@@ -1,27 +1,13 @@
-import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { fetchDRIPSimulation } from "@/api/dividends";
 import { fmtKrwShort, fmtPct } from "@/utils/format";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
-
-const YEARS_OPTIONS = [5, 10, 20, 30] as const;
-type YearsOption = (typeof YEARS_OPTIONS)[number];
+import { useDRIPSimulation, DRIP_YEARS_OPTIONS } from "@/hooks/useDRIPSimulation";
 
 export default function DRIPSimulationChart() {
   const isDark = useThemeStore((s) => s.isDark);
-  const [nYears, setNYears] = useState<YearsOption>(10);
-
-  const { data, mutate, isPending } = useMutation({
-    mutationFn: (years: number) => fetchDRIPSimulation({ n_years: years }),
-  });
-
-  const handleRun = (y: YearsOption) => {
-    setNYears(y);
-    mutate(y);
-  };
+  const { data, nYears, isPending, handleRun } = useDRIPSimulation();
 
   const tooltipStyle = chartTooltipStyle(isDark);
 
@@ -38,7 +24,7 @@ export default function DRIPSimulationChart() {
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">시뮬레이션 기간</span>
         <div className="flex gap-1">
-          {YEARS_OPTIONS.map((y) => (
+          {DRIP_YEARS_OPTIONS.map((y) => (
             <button
               key={y}
               onClick={() => handleRun(y)}

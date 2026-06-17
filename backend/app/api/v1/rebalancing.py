@@ -42,7 +42,7 @@ from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing_service import analyze_rebalancing
-from app.services.yahoo_price import _to_yahoo_symbol
+from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])

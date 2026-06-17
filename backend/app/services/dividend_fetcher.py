@@ -27,7 +27,7 @@ from app.services.dividend_providers import (
     sync_pykrx_etf_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.yahoo_price import _to_yahoo_symbol
+from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.cache_keys import (
     TTL_DIVIDEND_INFO,
     TTL_DIVIDEND_MONTHS,

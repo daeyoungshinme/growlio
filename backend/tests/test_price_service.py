@@ -2,7 +2,7 @@
 
 import pytest
 
-from app.services.yahoo_price import _to_yahoo_symbol
+from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
 
 # ── Yahoo 심볼 변환 테스트 ──────────────────────────────────

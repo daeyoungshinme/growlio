@@ -78,26 +78,72 @@ def make_user_id() -> uuid.UUID:
 
 @pytest.fixture
 def make_account(make_user_id):
-    """AssetAccount 유사 객체 (DB 불필요)."""
+    """AssetAccount 유사 객체 팩토리 (DB 불필요).
+
+    Usage: account = make_account()  or  make_account(data_source="MANUAL", asset_type="BANK_ACCOUNT")
+    """
     from types import SimpleNamespace
-    return SimpleNamespace(
-        id=uuid.uuid4(),
-        user_id=make_user_id,
+
+    def _factory(
+        *,
+        user_id=None,
+        account_id=None,
         name="테스트 계좌",
         asset_type="STOCK_KIS",
         data_source="KIS_API",
         is_active=True,
         is_mock_mode=True,
+        include_in_total=True,
+        institution=None,
+        sort_order=0,
         kis_account_no="12345678-01",
         kis_app_key=None,
         kis_app_secret=None,
+        kiwoom_app_key=None,
+        kiwoom_app_secret=None,
+        kiwoom_account_no=None,
         ob_fintech_use_no=None,
         manual_amount=None,
         manual_positions=None,
         manual_currency="KRW",
         deposit_krw=None,
         deposit_usd=None,
-    )
+        real_estate_details=None,
+        **kwargs,
+    ) -> SimpleNamespace:
+        return SimpleNamespace(
+            id=account_id or uuid.uuid4(),
+            user_id=user_id or make_user_id,
+            name=name,
+            asset_type=asset_type,
+            data_source=data_source,
+            is_active=is_active,
+            is_mock_mode=is_mock_mode,
+            include_in_total=include_in_total,
+            institution=institution,
+            sort_order=sort_order,
+            kis_account_no=kis_account_no,
+            kis_app_key=kis_app_key,
+            kis_app_secret=kis_app_secret,
+            kiwoom_app_key=kiwoom_app_key,
+            kiwoom_app_secret=kiwoom_app_secret,
+            kiwoom_account_no=kiwoom_account_no,
+            ob_fintech_use_no=ob_fintech_use_no,
+            manual_amount=manual_amount,
+            manual_positions=manual_positions,
+            manual_currency=manual_currency,
+            deposit_krw=deposit_krw,
+            deposit_usd=deposit_usd,
+            real_estate_details=real_estate_details,
+            goal_portfolio_id=None,
+            notes=None,
+            manual_updated_at=None,
+            created_at=datetime.now(timezone.utc),
+            updated_at=datetime.now(timezone.utc),
+            **kwargs,
+        )
+
+    return _factory
 
 
 @pytest.fixture

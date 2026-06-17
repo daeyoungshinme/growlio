@@ -343,3 +343,20 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
         await db.commit()
         alert_trigger_count.labels(alert_type="stock_price").inc(triggered_count)
         logger.info("stock_price_alerts_triggered", count=triggered_count)
+
+
+async def list_alert_history(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    skip: int = 0,
+    limit: int = 50,
+):
+    from app.models.alert import AlertHistory
+    result = await db.execute(
+        select(AlertHistory)
+        .where(AlertHistory.user_id == user_id)
+        .order_by(AlertHistory.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    return result.scalars().all()

@@ -11,15 +11,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
+from app.services.position_aggregator import query_latest_position_map
 from app.services.portfolio_optimizer import get_efficient_frontier
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import RedisType, TTL_REBALANCING_STRATEGY
 
 logger = structlog.get_logger()
-
-_STRATEGY_CACHE_TTL = 3600  # 팩터·프론티어(1h)와 TTL 일치 — 전략은 두 캐시의 함수이므로 먼저 만료될 필요 없음
 _RISK_FREE_RATE = 3.0       # Sharpe 계산 기준 무위험 수익률 (%)
 
 _FACTOR_LABELS: dict[str, str] = {
@@ -184,8 +181,8 @@ async def get_rebalancing_strategy(
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("strategy_cache_read_error", cache_key=cache_key, error=str(e))
 
     portfolio = await db.scalar(
         select(Portfolio)
@@ -256,34 +253,7 @@ async def get_rebalancing_strategy(
         }
 
     # 3. 현재 포지션 map 조회 (거래 추천용)
-    subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .join(
-            subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
-        )
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
-    )
-    rows = result.all()
-    snap_ids = [snap.id for snap, _ in rows]
-    current_pos_map: dict[str, dict] = {}
-    if snap_ids:
-        pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
-        for pos in pos_result.scalars().all():
-            key = f"{pos.ticker}-{pos.market}"
-            if key not in current_pos_map:
-                current_pos_map[key] = {
-                    "ticker": pos.ticker,
-                    "market": pos.market,
-                    "name": pos.name or pos.ticker,
-                    "value_krw": 0.0,
-                }
-            current_pos_map[key]["value_krw"] += float(pos.value_krw or 0)
+    current_pos_map = await query_latest_position_map(user_id, db, include_name=True)
 
     # 4. 거래 추천
     trade_recommendations = _build_trade_recommendations(
@@ -308,6 +278,6 @@ async def get_rebalancing_strategy(
 
     if redis:
         with contextlib.suppress(Exception):
-            await redis.setex(cache_key, _STRATEGY_CACHE_TTL, json.dumps(result_data))
+            await redis.setex(cache_key, TTL_REBALANCING_STRATEGY, json.dumps(result_data))
 
     return result_data

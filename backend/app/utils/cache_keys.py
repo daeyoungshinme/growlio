@@ -39,6 +39,10 @@ TTL_INDICATOR_LATEST = 3600      # 경제지표 최신값 1시간
 TTL_INDICATOR_HISTORY = 21600    # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400   # 경제지표 발표 일정 24시간
 TTL_MARKET_SIGNAL = 3600         # 복합 시장 신호 1시간
+TTL_FACTOR_ANALYSIS = 3600       # 팩터 분석 1시간
+TTL_PORTFOLIO_OPTIMIZER = 3600   # 포트폴리오 최적화 1시간
+TTL_RISK_ANALYSIS = 3600         # 위험 분석 1시간
+TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키

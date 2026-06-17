@@ -96,29 +96,23 @@ class TestManualProvider:
         from app.exceptions import BadRequestError
         from app.providers.manual_provider import ManualProvider
 
-        make_account.manual_amount = 0
-        make_account.asset_type = "CASH_OTHER"
-        make_account.deposit_krw = None
-        make_account.deposit_usd = None
+        account = make_account(manual_amount=0, asset_type="CASH_OTHER")
         # mock_db.execute returns [] by default (no positions)
 
         provider = ManualProvider()
         with pytest.raises(BadRequestError, match="수동 금액이 설정되지 않았습니다"):
-            await provider.sync(make_account, mock_db, redis=None)
+            await provider.sync(account, mock_db, redis=None)
 
     @pytest.mark.asyncio
     async def test_uses_manual_amount_when_no_positions(self, mock_db, make_account):
         """포지션 없으면 manual_amount로 BalanceResult 반환."""
         from app.providers.manual_provider import ManualProvider
 
-        make_account.manual_amount = 10_000_000.0
-        make_account.asset_type = "CASH_OTHER"
-        make_account.deposit_krw = None
-        make_account.deposit_usd = None
+        account = make_account(manual_amount=10_000_000.0, asset_type="CASH_OTHER")
         # mock_db.execute returns [] by default (no positions)
 
         provider = ManualProvider()
-        balance = await provider.sync(make_account, mock_db, redis=None)
+        balance = await provider.sync(account, mock_db, redis=None)
 
         assert balance.total_value_krw == 10_000_000.0
 
@@ -133,13 +127,10 @@ class TestManualProvider:
         execute_result.scalars.return_value.all.return_value = [mock_pos]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        make_account.manual_amount = None
-        make_account.asset_type = "STOCK_OTHER"
-        make_account.deposit_krw = None
-        make_account.deposit_usd = None
+        account = make_account(asset_type="STOCK_OTHER")
 
         provider = ManualProvider()
-        balance = await provider.sync(make_account, mock_db, redis=None)
+        balance = await provider.sync(account, mock_db, redis=None)
 
         assert balance.total_value_krw == 800_000.0  # 80000 * 10
         assert balance.invested_krw == 700_000.0      # 70000 * 10
@@ -156,9 +147,7 @@ class TestKISProvider:
         """KISProvider.sync() 호출 후 BalanceResult에 보유종목이 담긴다."""
         from app.providers.kis_provider import KISProvider
 
-        make_account.kis_app_key = "encrypted_key"
-        make_account.kis_app_secret = "encrypted_secret"
-        make_account.is_mock_mode = True
+        account = make_account(kis_app_key="encrypted_key", kis_app_secret="encrypted_secret")
 
         domestic_result = {
             "positions": [
@@ -192,7 +181,7 @@ class TestKISProvider:
             redis = AsyncMock()
             redis.get = AsyncMock(return_value=None)
             provider = KISProvider()
-            balance = await provider.sync(make_account, mock_db, redis)
+            balance = await provider.sync(account, mock_db, redis)
 
         # 국내 + 해외 포지션 2개
         assert len(balance.positions) == 2

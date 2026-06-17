@@ -27,7 +27,9 @@ function SortTh({
 }) {
   return (
     <th
+      scope="col"
       onClick={() => onSort(k)}
+      aria-sort={sort === k ? "descending" : "none"}
       className={`py-2.5 px-4 text-right text-xs font-medium cursor-pointer select-none uppercase ${
         sort === k
           ? "text-blue-600 dark:text-blue-400"
@@ -37,6 +39,43 @@ function SortTh({
       {label}
       {sort === k ? " ↓" : ""}
     </th>
+  );
+}
+
+interface MobileCardProps {
+  agg: ReturnType<typeof groupPositionsByTicker>[number];
+  divData: DividendYield | undefined;
+  divLoading: boolean;
+  divError: boolean;
+}
+
+function StockHoldingMobileCard({ agg, divData, divLoading, divError }: MobileCardProps) {
+  return (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
+          <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
+            {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
+        <span>{agg.total_qty.toLocaleString()}주</span>
+        <span>·</span>
+        <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
+        {!divLoading && !divError && divData && divData.investment_yield > 0 && (
+          <>
+            <span>·</span>
+            <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -95,7 +134,6 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
               {mobileVirtualizer.getVirtualItems().map((virtualItem) => {
                 const agg = sorted[virtualItem.index];
                 const key = `${agg.ticker}-${agg.market}`;
-                const divData = dividendMap[key];
                 return (
                   <div
                     key={key}
@@ -108,29 +146,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                     }}
                     className="px-4 py-3 border-b border-gray-100 dark:border-gray-700"
                   >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
-                        <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
-                          {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
-                      <span>{agg.total_qty.toLocaleString()}주</span>
-                      <span>·</span>
-                      <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
-                      {!divLoading && !divError && divData?.investment_yield > 0 && (
-                        <>
-                          <span>·</span>
-                          <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
-                        </>
-                      )}
-                    </div>
+                    <StockHoldingMobileCard agg={agg} divData={dividendMap[key]} divLoading={divLoading} divError={divError} />
                   </div>
                 );
               })}
@@ -138,32 +154,9 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
           ) : (
             sorted.map((agg) => {
               const key = `${agg.ticker}-${agg.market}`;
-              const divData = dividendMap[key];
               return (
                 <div key={key} className="px-4 py-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{agg.name}</p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{agg.ticker} · {agg.market}</p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-semibold text-gray-900 dark:text-gray-50 text-sm">{fmtKrwShort(agg.total_value_krw)}원</p>
-                      <p className={`text-xs font-medium ${pnlColor(agg.total_pnl)}`}>
-                        {agg.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(agg.total_pnl)}원 ({agg.pnl_pct >= 0 ? "+" : ""}{agg.pnl_pct.toFixed(2)}%)
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
-                    <span>{agg.total_qty.toLocaleString()}주</span>
-                    <span>·</span>
-                    <span className="text-indigo-500 dark:text-indigo-400">비중 {agg.weight_in_stock.toFixed(1)}%</span>
-                    {!divLoading && !divError && divData?.investment_yield > 0 && (
-                      <>
-                        <span>·</span>
-                        <span className="text-green-600 dark:text-green-500">배당 {divData.investment_yield.toFixed(2)}%</span>
-                      </>
-                    )}
-                  </div>
+                  <StockHoldingMobileCard agg={agg} divData={dividendMap[key]} divLoading={divLoading} divError={divError} />
                 </div>
               );
             })
@@ -175,15 +168,15 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
               <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                <th className="py-2.5 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase sticky left-0 z-20 bg-gray-50 dark:bg-gray-800">종목</th>
-                <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">수량</th>
-                <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">평단가</th>
-                <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">현재가</th>
+                <th scope="col" className="py-2.5 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase sticky left-0 z-20 bg-gray-50 dark:bg-gray-800">종목</th>
+                <th scope="col" className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">수량</th>
+                <th scope="col" className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">평단가</th>
+                <th scope="col" className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">현재가</th>
                 <SortTh k="total_value_krw" label="평가금액" className="min-w-[120px]" sort={sort} onSort={setSort} />
                 <SortTh k="pnl_pct" label="수익" sort={sort} onSort={setSort} />
                 <SortTh k="weight_in_stock" label="비중" sort={sort} onSort={setSort} />
-                <th className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase min-w-[130px]">투자배당율</th>
-                <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase w-20">배당월</th>
+                <th scope="col" className="py-2.5 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase min-w-[130px]">투자배당율</th>
+                <th scope="col" className="py-2.5 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase w-20">배당월</th>
               </tr>
             </thead>
             <tbody>

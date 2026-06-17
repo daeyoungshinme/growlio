@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
-import { analyzePortfolio, RebalancingAnalysis } from "@/api/rebalancing";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
@@ -11,11 +10,16 @@ import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import RebalancingStrategyCard from "@/components/portfolio-analysis/RebalancingStrategyCard";
+import FactorExposureChart from "@/components/portfolio-analysis/FactorExposureChart";
+import EfficientFrontierChart from "@/components/portfolio-analysis/EfficientFrontierChart";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
+import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
+import { useAnalysisState } from "@/hooks/useAnalysisState";
+import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 
 interface Props {
   selectedIds: Set<string>;
@@ -26,20 +30,16 @@ interface Props {
   autoAnalyzeId?: string;
 }
 
-type AnalysisMode = "rebalancing" | "backtest" | "strategy";
-
 export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal, autoAnalyzeId }: Props) {
-  const [analysisMode, setAnalysisMode] = useState<AnalysisMode | null>(null);
-  const [analysis, setAnalysis] = useState<RebalancingAnalysis | null>(null);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const selectedIdStr = Array.from(selectedIds).sort().join(",");
+  const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } = useAnalysisState({ autoAnalyzeId, selectedIdStr });
+  const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } = useBacktestDateRange();
+
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
-  const [startDate, setStartDate] = useState(BACKTEST_DEFAULT_START_DATE);
-  const [endDate, setEndDate] = useState(BACKTEST_DEFAULT_END_DATE);
-  const [activePreset, setActivePreset] = useState<number | null>(5);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
+
   const { data: rebalancingAlertsRaw } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlerts,
     queryFn: fetchRebalancingAlerts,
@@ -62,49 +62,10 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
     onError: (e) => toast(extractErrorMessage(e, "백테스트 실행에 실패했습니다"), "error"),
   });
 
-  async function handleRebalancingAnalysis() {
+  function handleRebalancingAnalysis() {
     const [id] = Array.from(selectedIds);
     if (!id) return;
-    setAnalysisMode("rebalancing");
-    setBacktestResult(null);
-    setAnalyzing(true);
-    setAnalysisError(null);
-    setAnalysis(null);
-    try {
-      const result = await analyzePortfolio(id);
-      setAnalysis(result);
-    } catch (err) {
-      setAnalysisError(extractErrorMessage(err, "분석 중 오류가 발생했습니다."));
-    } finally {
-      setAnalyzing(false);
-    }
-  }
-
-  const autoAnalyzedRef = useRef<string | undefined>(undefined);
-  const selectedIdStr = Array.from(selectedIds).sort().join(",");
-
-  useEffect(() => {
-    if (!autoAnalyzeId) return;
-    if (autoAnalyzedRef.current === autoAnalyzeId) return;
-    if (!selectedIds.has(autoAnalyzeId) || selectedIds.size !== 1) return;
-    autoAnalyzedRef.current = autoAnalyzeId;
-    setAnalysisMode("rebalancing");
-    setBacktestResult(null);
-    setAnalyzing(true);
-    setAnalysisError(null);
-    setAnalysis(null);
-    analyzePortfolio(autoAnalyzeId)
-      .then((result) => setAnalysis(result))
-      .catch((err) => setAnalysisError(extractErrorMessage(err, "분석 중 오류가 발생했습니다.")))
-      .finally(() => setAnalyzing(false));
-    // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoAnalyzeId, selectedIdStr]);
-
-  function handleSwitchToBacktest() {
-    setAnalysisMode("backtest");
-    setAnalysis(null);
-    setAnalysisError(null);
+    triggerRebalancingAnalysis(id);
   }
 
   const canRunBacktest = startDate < endDate && (selectedIds.size > 0 || includeSpy || includeReal);
@@ -119,12 +80,12 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           disabled={!canRebalance || analyzing}
           title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
-            analysisMode === "rebalancing"
+            mode === "rebalancing"
               ? "bg-blue-600 text-white hover:bg-blue-700"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
         >
-          {analyzing && analysisMode === "rebalancing" ? (
+          {analyzing && mode === "rebalancing" ? (
             <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
           ) : (
             <><RefreshCw size={14} /> 리밸런싱 분석</>
@@ -132,9 +93,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         </button>
 
         <button
-          onClick={handleSwitchToBacktest}
+          onClick={() => setMode("backtest")}
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-            analysisMode === "backtest"
+            mode === "backtest"
               ? "bg-blue-600 text-white hover:bg-blue-700"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
@@ -143,11 +104,11 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         </button>
 
         <button
-          onClick={() => setAnalysisMode("strategy")}
+          onClick={() => setMode("strategy")}
           disabled={!canRebalance}
           title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
           className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
-            analysisMode === "strategy"
+            mode === "strategy"
               ? "bg-amber-500 text-white hover:bg-amber-600"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
           }`}
@@ -164,41 +125,26 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       </div>
 
       {/* 백테스팅 설정 패널 */}
-      {analysisMode === "backtest" && (
+      {mode === "backtest" && (
         <div className="card">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">기간</span>
-              {([1, 3, 5, 10] as const).map((y) => {
-                const isActive = activePreset === y;
-                return (
-                  <button
-                    key={y}
-                    onClick={() => {
-                      const end = BACKTEST_DEFAULT_END_DATE;
-                      const start = `${new Date().getFullYear() - y}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
-                      setStartDate(start);
-                      setEndDate(end);
-                      setActivePreset(y);
-                    }}
-                    className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
-                      isActive
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                    }`}
-                  >
-                    {y}년
-                  </button>
-                );
-              })}
+              {([1, 3, 5, 10] as const).map((y) => (
+                <button
+                  key={y}
+                  onClick={() => setPreset(y)}
+                  className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
+                    activePreset === y
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  }`}
+                >
+                  {y}년
+                </button>
+              ))}
               <button
-                onClick={() => {
-                  const end = BACKTEST_DEFAULT_END_DATE;
-                  const start = `${new Date().getFullYear() - 30}-01-01`;
-                  setStartDate(start);
-                  setEndDate(end);
-                  setActivePreset(30);
-                }}
+                onClick={() => setPreset(30)}
                 className={`px-2.5 py-1 text-xs rounded-lg font-medium transition-colors ${
                   activePreset === 30
                     ? "bg-blue-600 text-white"
@@ -215,7 +161,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
                   type="date"
                   value={startDate}
                   max={endDate}
-                  onChange={(e) => { setStartDate(e.target.value); setActivePreset(null); }}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -226,7 +172,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
                   value={endDate}
                   min={startDate}
                   max={BACKTEST_DEFAULT_END_DATE}
-                  onChange={(e) => { setEndDate(e.target.value); setActivePreset(null); }}
+                  onChange={(e) => setEndDate(e.target.value)}
                   className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -265,7 +211,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       )}
 
       {/* 리밸런싱 결과 */}
-      {analysisMode === "rebalancing" && analysis && (
+      {mode === "rebalancing" && analysis && (
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
@@ -318,14 +264,14 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           })()}
         </div>
       )}
-      {analysisMode === "rebalancing" && analysisError && (
+      {mode === "rebalancing" && error && (
         <div className="flex items-center justify-center h-48 text-sm text-red-500">
-          {analysisError}
+          {error}
         </div>
       )}
 
       {/* 백테스팅 결과 */}
-      {analysisMode === "backtest" && backtestResult && backtestResult.dates.length > 0 && (
+      {mode === "backtest" && backtestResult && backtestResult.dates.length > 0 && (
         <div className="card space-y-6">
           <BacktestResultChart dates={backtestResult.dates} series={backtestResult.series} />
           <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
@@ -333,22 +279,34 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           </div>
         </div>
       )}
-      {analysisMode === "backtest" && backtestResult && backtestResult.dates.length === 0 && (
+      {mode === "backtest" && backtestResult && backtestResult.dates.length === 0 && (
         <div className="card text-center text-sm text-gray-400 dark:text-gray-600 py-8">
           해당 기간의 가격 데이터가 없습니다. 기간을 조정해보세요.
         </div>
       )}
 
       {/* 전략 분석 결과 */}
-      {analysisMode === "strategy" && (() => {
+      {mode === "strategy" && (() => {
         const [id] = Array.from(selectedIds);
         const portfolio = portfolios.find((p) => p.id === id);
         if (!id || !portfolio) return null;
-        return <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />;
+        return (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ErrorBoundary variant="section">
+                <FactorExposureChart selectedPortfolioId={id} />
+              </ErrorBoundary>
+              <ErrorBoundary variant="section">
+                <EfficientFrontierChart comparePortfolioId={id} comparePortfolioName={portfolio.name} />
+              </ErrorBoundary>
+            </div>
+            <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
+          </div>
+        );
       })()}
 
       {/* Empty state */}
-      {!analysisMode && (
+      {!mode && (
         <div className="flex flex-col items-center justify-center h-64 text-center text-gray-400 dark:text-gray-500">
           <div className="text-4xl mb-3">📊</div>
           <div className="text-sm font-medium mb-1">포트폴리오를 1개 선택하세요</div>

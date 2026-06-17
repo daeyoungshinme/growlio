@@ -1,11 +1,7 @@
 import { memo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
-import { fetchDartDisclosures } from "@/api/dart";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { getHttpStatus } from "@/utils/error";
+import { useDartDisclosures } from "@/hooks/useDartDisclosures";
 
 const DAYS_OPTIONS = [
   { label: "7일", value: 7 },
@@ -20,16 +16,7 @@ function formatDate(rcept_dt: string): string {
 
 function DisclosureFeedCard() {
   const [days, setDays] = useState(30);
-
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: QUERY_KEYS.dartDisclosures(days),
-    queryFn: () => fetchDartDisclosures(days),
-    staleTime: STALE_TIME.LONG,
-    retry: false,
-  });
-
-  const isDartKeyMissing =
-    isError && getHttpStatus(error) === 422;
+  const { data, isLoading, isDartKeyMissing } = useDartDisclosures(days);
 
   return (
     <div className="card">
