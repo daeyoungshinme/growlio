@@ -10,7 +10,7 @@ from __future__ import annotations
 from alembic import op
 
 revision = "aj1_drop_duplicate_asset_account_indexes"
-down_revision = "ai1_add_market_condition_mode"
+down_revision = "ai2_expand_alembic_version_col"
 branch_labels = None
 depends_on = None
 
