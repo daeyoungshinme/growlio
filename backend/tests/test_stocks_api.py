@@ -175,8 +175,9 @@ class TestExchangeRate:
 
     async def test_returns_200_with_yfinance_fallback(self, override_settings):
         """캐시 미스 시 yfinance 폴백."""
+        from httpx import ASGITransport, AsyncClient
+
         from app.main import app
-        from httpx import AsyncClient, ASGITransport
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
