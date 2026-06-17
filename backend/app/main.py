@@ -1,8 +1,9 @@
 import re
 import time
 import uuid
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
-from typing import Awaitable, cast
+from typing import cast
 
 import sentry_sdk
 import structlog
