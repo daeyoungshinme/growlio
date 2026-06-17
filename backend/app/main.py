@@ -2,6 +2,7 @@ import re
 import time
 import uuid
 from contextlib import asynccontextmanager
+from typing import Awaitable, cast
 
 import sentry_sdk
 import structlog
@@ -67,7 +68,7 @@ async def lifespan(app: FastAPI):
     # Redis 연결 확인 — 실패 시 즉시 종료
     try:
         redis = await get_redis()
-        await redis.ping()  # type: ignore[misc]  # redis-py stub returns bool|Awaitable[bool]
+        await cast(Awaitable[bool], redis.ping())
         logger.info("redis_connected")
     except Exception as e:
         logger.error("redis_startup_failed", error=str(e))

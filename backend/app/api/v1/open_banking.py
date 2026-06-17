@@ -63,7 +63,7 @@ async def open_banking_callback(
 
     # state에 바인딩된 user_id가 실제로 DB에 존재하는지 검증
     try:
-        uid = uuid.UUID(user_id)
+        uid = uuid.UUID(user_id.decode() if isinstance(user_id, bytes) else user_id)
     except ValueError:
         logger.warning("ob_callback_invalid_user_id", user_id=user_id)
         raise HTTPException(
