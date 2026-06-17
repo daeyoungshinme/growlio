@@ -77,7 +77,8 @@ packages = ["app"]
 asyncio_mode = "auto"
 addopts = "--tb=short --cov=app --cov-report=term-missing"
 timeout = 30
-timeout_method = "thread"
+timeout_method = "signal"
+asyncio_default_fixture_loop_scope = "function"
 
 [tool.coverage.run]
 source = ["app"]

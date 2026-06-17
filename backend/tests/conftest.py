@@ -231,6 +231,15 @@ def _mock_redis_singleton():
     _rc.redis_client = old
 
 
+@pytest.fixture(autouse=True)
+def _mock_scheduler(monkeypatch):
+    """APScheduler를 no-op으로 패치 — CI에서 백그라운드 잡 실행 방지."""
+    import app.scheduler as sched
+
+    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
+    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
+
+
 @pytest.fixture
 def mock_redis_for_app():
     """FastAPI app lifespan의 Redis 연결을 무력화하는 패치 컨텍스트."""
