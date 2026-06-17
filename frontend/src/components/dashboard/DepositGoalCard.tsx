@@ -23,11 +23,15 @@ export default function DepositGoalCard({ goal, achievementPct, netDeposits }: P
     <div className="space-y-3">
       <div className="flex items-end justify-between">
         <div>
-          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{clampedPct.toFixed(1)}%</span>
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {clampedPct.toFixed(1)}%
+          </span>
           <span className="text-sm text-gray-400 dark:text-gray-500 ml-2">달성</span>
         </div>
         <div className="text-right text-sm text-gray-500 dark:text-gray-400">
-          <span className="font-medium text-gray-800 dark:text-gray-200">{netDeposits != null ? fmtKrw(netDeposits) : "—"}</span>
+          <span className="font-medium text-gray-800 dark:text-gray-200">
+            {netDeposits != null ? fmtKrw(netDeposits) : "—"}
+          </span>
           <span className="text-gray-400 dark:text-gray-500"> / {fmtKrw(goal)}</span>
         </div>
       </div>
@@ -42,7 +46,11 @@ export default function DepositGoalCard({ goal, achievementPct, netDeposits }: P
 
       <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
         <span>올해 순입금액</span>
-        <span>목표까지 <span className="font-medium text-gray-600 dark:text-gray-300">{fmtKrw(remaining)}</span> 남음</span>
+        <span>
+          목표까지{" "}
+          <span className="font-medium text-gray-600 dark:text-gray-300">{fmtKrw(remaining)}</span>{" "}
+          남음
+        </span>
       </div>
     </div>
   );

@@ -104,9 +104,7 @@ async def put_ticker_setting(
     db: AsyncSession = Depends(get_db),
 ):
     """배당월 수동 override 저장."""
-    return await upsert_ticker_settings(
-        current_user.id, ticker, body.market, body.dividend_months, db
-    )
+    return await upsert_ticker_settings(current_user.id, ticker, body.market, body.dividend_months, db)
 
 
 @router.delete("/ticker-settings/{ticker}")
@@ -119,15 +117,14 @@ async def del_ticker_setting(
     """배당월 override 삭제 (자동 감지로 복구)."""
     deleted = await delete_ticker_settings(current_user.id, ticker, market, db)
     if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다")
     return {"deleted": True}
 
 
 # ---------------------------------------------------------------------------
 # DRIP 시뮬레이션
 # ---------------------------------------------------------------------------
+
 
 class DRIPSimulationRequest(BaseModel):
     n_years: int = 10
@@ -155,13 +152,12 @@ async def drip_simulation(
 
     from app.models.user import UserSettings
 
-    settings_row = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == current_user.id)
-    )
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
     div_summary = await get_dividend_summary(current_user.id, db, redis)
     dashboard_data = {}
     try:
         from app.services.asset_aggregator import get_dashboard_summary
+
         dashboard_data = await get_dashboard_summary(current_user.id, db, redis)
     except Exception as e:
         logger.warning("drip_dashboard_summary_failed", user_id=str(current_user.id), error=str(e))
@@ -195,6 +191,7 @@ async def drip_simulation(
 # ---------------------------------------------------------------------------
 # 월별 균등화 제안
 # ---------------------------------------------------------------------------
+
 
 @router.get("/monthly-optimization")
 @limiter.limit("10/minute")

@@ -30,8 +30,12 @@ function CustomTooltip({
   return (
     <div style={contentStyle} className="rounded-lg px-3 py-2 text-xs space-y-0.5">
       {d.label && <p className="font-medium">{d.label}</p>}
-      <p>리스크: <span className="font-medium">{d.risk.toFixed(2)}%</span></p>
-      <p>기대수익: <span className="font-medium">{d.return.toFixed(2)}%</span></p>
+      <p>
+        리스크: <span className="font-medium">{d.risk.toFixed(2)}%</span>
+      </p>
+      <p>
+        기대수익: <span className="font-medium">{d.return.toFixed(2)}%</span>
+      </p>
     </div>
   );
 }
@@ -41,7 +45,10 @@ interface Props {
   comparePortfolioName?: string;
 }
 
-export default function EfficientFrontierChart({ comparePortfolioId, comparePortfolioName }: Props) {
+export default function EfficientFrontierChart({
+  comparePortfolioId,
+  comparePortfolioName,
+}: Props) {
   const { isDark } = useThemeStore();
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.efficientFrontier(comparePortfolioId),
@@ -114,63 +121,70 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
       </div>
 
       <div className="min-h-[200px]">
-      <ResponsiveContainer width="100%" height={260}>
-        <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
-          <CartesianGrid stroke={gridColor} strokeDasharray="3 3" />
-          <XAxis
-            type="number"
-            dataKey="risk"
-            name="리스크"
-            domain={[riskMin, riskMax]}
-            tick={{ fontSize: 10, fill: axisColor }}
-            tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-          >
-            <Label value="연율화 변동성 (%)" offset={-10} position="insideBottom" fontSize={10} fill={axisColor} />
-          </XAxis>
-          <YAxis
-            type="number"
-            dataKey="return"
-            name="기대수익"
-            domain={[retMin, retMax]}
-            tick={{ fontSize: 10, fill: axisColor }}
-            tickFormatter={(v: number) => `${v.toFixed(0)}%`}
-          >
-            <Label value="연율화 기대수익률 (%)" angle={-90} position="insideLeft" fontSize={10} fill={axisColor} />
-          </YAxis>
-          <Tooltip content={<CustomTooltip isDark={isDark} />} />
+        <ResponsiveContainer width="100%" height={260}>
+          <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+            <CartesianGrid stroke={gridColor} strokeDasharray="3 3" />
+            <XAxis
+              type="number"
+              dataKey="risk"
+              name="리스크"
+              domain={[riskMin, riskMax]}
+              tick={{ fontSize: 10, fill: axisColor }}
+              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+            >
+              <Label
+                value="연율화 변동성 (%)"
+                offset={-10}
+                position="insideBottom"
+                fontSize={10}
+                fill={axisColor}
+              />
+            </XAxis>
+            <YAxis
+              type="number"
+              dataKey="return"
+              name="기대수익"
+              domain={[retMin, retMax]}
+              tick={{ fontSize: 10, fill: axisColor }}
+              tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+            >
+              <Label
+                value="연율화 기대수익률 (%)"
+                angle={-90}
+                position="insideLeft"
+                fontSize={10}
+                fill={axisColor}
+              />
+            </YAxis>
+            <Tooltip content={<CustomTooltip isDark={isDark} />} />
 
-          {/* 효율적 프론티어 라인 */}
-          <Scatter
-            name="효율적 프론티어"
-            data={frontierData}
-            fill="#3B82F6"
-            opacity={0.6}
-            line={{ stroke: "#3B82F6", strokeWidth: 2 }}
-            lineType="joint"
-            shape="circle"
-          />
-
-          {/* 현재 포트폴리오 */}
-          {currentData.length > 0 && (
+            {/* 효율적 프론티어 라인 */}
             <Scatter
-              name="현재 포트폴리오"
-              data={currentData}
-              fill="#EF4444"
-              shape="star"
+              name="효율적 프론티어"
+              data={frontierData}
+              fill="#3B82F6"
+              opacity={0.6}
+              line={{ stroke: "#3B82F6", strokeWidth: 2 }}
+              lineType="joint"
+              shape="circle"
             />
-          )}
 
-          {/* 목표 포트폴리오 */}
-          {targetData.length > 0 && (
-            <Scatter
-              name={comparePortfolioName ?? "목표 포트폴리오"}
-              data={targetData}
-              fill="#F59E0B"
-              shape="diamond"
-            />
-          )}
-        </ScatterChart>
-      </ResponsiveContainer>
+            {/* 현재 포트폴리오 */}
+            {currentData.length > 0 && (
+              <Scatter name="현재 포트폴리오" data={currentData} fill="#EF4444" shape="star" />
+            )}
+
+            {/* 목표 포트폴리오 */}
+            {targetData.length > 0 && (
+              <Scatter
+                name={comparePortfolioName ?? "목표 포트폴리오"}
+                data={targetData}
+                fill="#F59E0B"
+                shape="diamond"
+              />
+            )}
+          </ScatterChart>
+        </ResponsiveContainer>
       </div>
 
       {/* 범례 */}
@@ -195,10 +209,14 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
 
       {/* 두 포트폴리오 지표 비교 */}
       {data.current && (
-        <div className={`grid gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3 text-xs ${data.target ? "grid-cols-2" : "grid-cols-2"}`}>
+        <div
+          className={`grid gap-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 p-3 text-xs ${data.target ? "grid-cols-2" : "grid-cols-2"}`}
+        >
           <div className="space-y-1.5">
             {data.target && (
-              <p className="font-medium text-gray-500 dark:text-gray-400 text-xs">현재 포트폴리오</p>
+              <p className="font-medium text-gray-500 dark:text-gray-400 text-xs">
+                현재 포트폴리오
+              </p>
             )}
             <div>
               <p className="text-gray-400 dark:text-gray-500">변동성</p>
@@ -208,7 +226,9 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
             </div>
             <div>
               <p className="text-gray-400 dark:text-gray-500">기대수익</p>
-              <p className={`font-semibold ${data.current.return >= 0 ? "text-red-500" : "text-blue-500"}`}>
+              <p
+                className={`font-semibold ${data.current.return >= 0 ? "text-red-500" : "text-blue-500"}`}
+              >
                 {data.current.return >= 0 ? "+" : ""}
                 {data.current.return.toFixed(2)}%
               </p>
@@ -223,18 +243,26 @@ export default function EfficientFrontierChart({ comparePortfolioId, comparePort
                 <p className="text-gray-400 dark:text-gray-500">변동성</p>
                 <p className="font-semibold text-gray-700 dark:text-gray-300">
                   {data.target.risk.toFixed(2)}%
-                  <span className={`ml-1 text-xs ${data.target.risk < data.current.risk ? "text-red-500" : "text-blue-500"}`}>
-                    ({data.target.risk < data.current.risk ? "" : "+"}{(data.target.risk - data.current.risk).toFixed(2)}%p)
+                  <span
+                    className={`ml-1 text-xs ${data.target.risk < data.current.risk ? "text-red-500" : "text-blue-500"}`}
+                  >
+                    ({data.target.risk < data.current.risk ? "" : "+"}
+                    {(data.target.risk - data.current.risk).toFixed(2)}%p)
                   </span>
                 </p>
               </div>
               <div>
                 <p className="text-gray-400 dark:text-gray-500">기대수익</p>
-                <p className={`font-semibold ${data.target.return >= 0 ? "text-red-500" : "text-blue-500"}`}>
+                <p
+                  className={`font-semibold ${data.target.return >= 0 ? "text-red-500" : "text-blue-500"}`}
+                >
                   {data.target.return >= 0 ? "+" : ""}
                   {data.target.return.toFixed(2)}%
-                  <span className={`ml-1 text-xs ${data.target.return > data.current.return ? "text-red-500" : "text-blue-500"}`}>
-                    ({data.target.return > data.current.return ? "+" : ""}{(data.target.return - data.current.return).toFixed(2)}%p)
+                  <span
+                    className={`ml-1 text-xs ${data.target.return > data.current.return ? "text-red-500" : "text-blue-500"}`}
+                  >
+                    ({data.target.return > data.current.return ? "+" : ""}
+                    {(data.target.return - data.current.return).toFixed(2)}%p)
                   </span>
                 </p>
               </div>

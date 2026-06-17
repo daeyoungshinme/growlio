@@ -24,7 +24,10 @@ export function TaxRecommendationList({ recommendations }: Props) {
       </div>
       <ul className="space-y-1.5">
         {recommendations.map(({ pos, label, taxSaved }) => (
-          <li key={`rec-${posKey(pos)}`} className="flex flex-wrap items-start justify-between gap-y-1 text-xs">
+          <li
+            key={`rec-${posKey(pos)}`}
+            className="flex flex-wrap items-start justify-between gap-y-1 text-xs"
+          >
             <span className="flex-1 min-w-0 text-gray-700 dark:text-gray-300">
               <span className="font-medium">{pos.ticker}</span>{" "}
               <span className="text-gray-500 dark:text-gray-400">{label}</span>

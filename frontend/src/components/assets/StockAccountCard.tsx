@@ -30,10 +30,23 @@ interface Props {
   isDeleting: boolean;
 }
 
-export default function StockAccountCard({ account, stats, onDelete, onManagePositions, onTransactions, onEdit, onEditDeposit, onEditName, onSync, isSyncing, isDeleting }: Props) {
+export default function StockAccountCard({
+  account,
+  stats,
+  onDelete,
+  onManagePositions,
+  onTransactions,
+  onEdit,
+  onEditDeposit,
+  onEditName,
+  onSync,
+  isSyncing,
+  isDeleting,
+}: Props) {
   const typeLabel = STOCK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
   const accountNo = account.kis_account_no ?? account.kiwoom_account_no ?? null;
-  const hasStats = stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
+  const hasStats =
+    stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
   const [editDepositMode, setEditDepositMode] = useState(false);
@@ -71,46 +84,77 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                 {[account.institution, accountNo].filter(Boolean).join(" · ")}
               </span>
             )}
-            <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">{typeLabel}</span>
+            <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
+              {typeLabel}
+            </span>
             {account.has_own_kis_credentials && (
-              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">API 키</span>
+              <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">
+                API 키
+              </span>
             )}
             {account.has_own_kiwoom_credentials && (
-              <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">키움 API 키</span>
+              <span className="px-1.5 py-px border border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 text-xs rounded-full shrink-0">
+                키움 API 키
+              </span>
             )}
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => onEdit(account)}
+          <button
+            onClick={() => onEdit(account)}
             title="계좌 수정"
             aria-label="계좌 수정"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg transition-colors">
+            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg transition-colors"
+          >
             <Settings size={16} />
           </button>
           {(account.data_source === "KIS_API" || account.data_source === "KIWOOM_API") && (
-            <button onClick={() => { impact("light"); onSync(account.id); }} disabled={isSyncing}
-              title={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
-              aria-label={account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"}
-              className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50">
+            <button
+              onClick={() => {
+                impact("light");
+                onSync(account.id);
+              }}
+              disabled={isSyncing}
+              title={
+                account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"
+              }
+              aria-label={
+                account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"
+              }
+              className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50"
+            >
               {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
           )}
-          <button onClick={() => onManagePositions({ id: account.id, name: account.name, dataSource: account.data_source })}
+          <button
+            onClick={() =>
+              onManagePositions({
+                id: account.id,
+                name: account.name,
+                dataSource: account.data_source,
+              })
+            }
             title="종목 관리"
             aria-label="종목 관리"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors">
+            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors"
+          >
             <BarChart2 size={16} />
           </button>
-          <button onClick={() => onTransactions({ id: account.id, name: account.name })}
+          <button
+            onClick={() => onTransactions({ id: account.id, name: account.name })}
             title="입출금 내역"
             aria-label="입출금 내역"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors">
+            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors"
+          >
             <Receipt size={16} />
           </button>
-          <button onClick={() => onDelete(account.id)} disabled={isDeleting}
+          <button
+            onClick={() => onDelete(account.id)}
+            disabled={isDeleting}
             title="계좌 삭제"
             aria-label="계좌 삭제"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50">
+            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
+          >
             <Trash2 size={16} />
           </button>
         </div>
@@ -119,12 +163,15 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
         <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
-            <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(stats!.amount_krw)}</p>
+            <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+              {fmtKrw(stats!.amount_krw)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
             <p className={`text-xs font-semibold mt-0.5 ${pnlColor(pnl)}`}>
-              {pnl >= 0 ? "+" : ""}{fmtKrw(pnl)}({fmtPct(ret)})
+              {pnl >= 0 ? "+" : ""}
+              {fmtKrw(pnl)}({fmtPct(ret)})
             </p>
           </div>
           <div>
@@ -133,7 +180,10 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
               <div className="mt-0.5 space-y-1">
                 <div className="flex items-center gap-1">
                   <input
-                    type="number" inputMode="decimal" autoFocus min={0}
+                    type="number"
+                    inputMode="decimal"
+                    autoFocus
+                    min={0}
                     value={editKrwValue}
                     onChange={(e) => setEditKrwValue(e.target.value)}
                     onKeyDown={(e) => {
@@ -148,7 +198,10 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                 <div className="flex items-center gap-1">
                   <span className="text-xs text-gray-400 shrink-0">$</span>
                   <input
-                    type="number" inputMode="decimal" min={0} step="0.01"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
                     value={editUsdValue}
                     onChange={(e) => setEditUsdValue(e.target.value)}
                     onKeyDown={(e) => {
@@ -161,11 +214,20 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                   <span className="text-xs text-gray-400 shrink-0">USD</span>
                 </div>
                 {convertUsdToKrw(Number(editUsdValue), usdRate) > 0 && (
-                  <p className="text-xs text-gray-400">≈ {fmtKrw(convertUsdToKrw(Number(editUsdValue), usdRate))}</p>
+                  <p className="text-xs text-gray-400">
+                    ≈ {fmtKrw(convertUsdToKrw(Number(editUsdValue), usdRate))}
+                  </p>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={handleSave} className="text-xs text-blue-500 hover:text-blue-700">저장</button>
-                  <button onClick={handleCancel} className="text-xs text-gray-400">취소</button>
+                  <button
+                    onClick={handleSave}
+                    className="text-xs text-blue-500 hover:text-blue-700"
+                  >
+                    저장
+                  </button>
+                  <button onClick={handleCancel} className="text-xs text-gray-400">
+                    취소
+                  </button>
                 </div>
               </div>
             ) : (
@@ -200,7 +262,8 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
                     setEditDepositMode(true);
                   }}
                   aria-label="예수금 수정"
-                  className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0">
+                  className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0"
+                >
                   <Pencil size={12} />
                 </button>
               </div>
@@ -208,11 +271,15 @@ export default function StockAccountCard({ account, stats, onDelete, onManagePos
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">{fmtKrw(stats!.deposit_total)}</p>
+            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+              {fmtKrw(stats!.deposit_total)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
-            <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">{fmtKrw(stats!.dividend_total)}</p>
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
+              {fmtKrw(stats!.dividend_total)}
+            </p>
           </div>
         </div>
       )}

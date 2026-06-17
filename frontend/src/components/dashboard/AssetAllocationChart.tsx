@@ -7,8 +7,8 @@ const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"
 
 const CONFIG = {
   compact: { height: 180, innerRadius: 38, outerRadius: 70 },
-  mobile:  { height: 220, innerRadius: 60, outerRadius: 100 },
-  full:    { height: 400, innerRadius: 100, outerRadius: 158 },
+  mobile: { height: 220, innerRadius: 60, outerRadius: 100 },
+  full: { height: 400, innerRadius: 100, outerRadius: 158 },
 };
 
 interface Props {

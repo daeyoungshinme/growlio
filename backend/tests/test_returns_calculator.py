@@ -91,6 +91,7 @@ class TestCalcReturns:
 
     def test_future_first_date_returns_none(self):
         from datetime import timedelta
+
         future = date.today() + timedelta(days=30)
         annualized, cumulative = calc_returns(10000.0, 5000.0, future)
         assert annualized is None

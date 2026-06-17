@@ -1,4 +1,5 @@
 """키움증권 REST API OAuth2 토큰 발급 — Redis 캐시 → DB → API 순으로 시도."""
+
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -35,8 +36,13 @@ async def get_access_token(
     if force_refresh:
         await redis.delete(cache_key)
         return await _fetch_and_store_token(
-            app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-            user_id=user_id, account_id=account_id,
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=user_id,
+            account_id=account_id,
         )
 
     # 1. Redis 캐시 확인
@@ -65,8 +71,13 @@ async def get_access_token(
 
     # 3. 키움 API에서 신규 발급
     return await _fetch_and_store_token(
-        app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-        user_id=user_id, account_id=account_id,
+        app_key,
+        app_secret,
+        is_mock=is_mock,
+        redis=redis,
+        db=db,
+        user_id=user_id,
+        account_id=account_id,
     )
 
 

@@ -39,13 +39,10 @@ export function usePushNotifications() {
       });
 
       // 앱 포그라운드 상태에서 알림 수신
-      const h2 = await PushNotifications.addListener(
-        "pushNotificationReceived",
-        (notification) => {
-          if (cancelled) return;
-          toast(notification.body ?? notification.title ?? "새 알림이 도착했습니다");
-        }
-      );
+      const h2 = await PushNotifications.addListener("pushNotificationReceived", (notification) => {
+        if (cancelled) return;
+        toast(notification.body ?? notification.title ?? "새 알림이 도착했습니다");
+      });
 
       if (!cancelled) {
         handles.push(h1, h2);

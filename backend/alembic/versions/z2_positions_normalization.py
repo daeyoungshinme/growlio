@@ -63,9 +63,7 @@ def upgrade() -> None:
     # 2. asset_accounts.manual_positions JSONB → positions (snapshot_id IS NULL)
     conn = op.get_bind()
     accounts = conn.execute(
-        sa.text(
-            "SELECT id, manual_positions FROM asset_accounts WHERE manual_positions IS NOT NULL"
-        )
+        sa.text("SELECT id, manual_positions FROM asset_accounts WHERE manual_positions IS NOT NULL")
     ).fetchall()
 
     for row in accounts:
@@ -91,9 +89,7 @@ def upgrade() -> None:
                     "qty": float(p.get("qty", 0)),
                     "avg_price": float(p.get("avg_price", 0)),
                     "avg_price_usd": float(p["avg_price_usd"]) if p.get("avg_price_usd") else None,
-                    "current_price": float(p.get("current_price"))
-                    if p.get("current_price")
-                    else None,
+                    "current_price": float(p.get("current_price")) if p.get("current_price") else None,
                     "value_krw": float(p.get("value_krw")) if p.get("value_krw") else None,
                     "currency": p.get("currency", "KRW"),
                     "usd_rate": float(p["usd_rate"]) if p.get("usd_rate") else None,
@@ -102,10 +98,7 @@ def upgrade() -> None:
 
     # 3. asset_snapshots.positions JSONB → positions (snapshot_id = snap.id)
     snapshots = conn.execute(
-        sa.text(
-            "SELECT id, account_id FROM asset_snapshots "
-            "WHERE positions IS NOT NULL AND account_id IS NOT NULL"
-        )
+        sa.text("SELECT id, account_id FROM asset_snapshots WHERE positions IS NOT NULL AND account_id IS NOT NULL")
     ).fetchall()
 
     for snap_row in snapshots:
@@ -138,9 +131,7 @@ def upgrade() -> None:
                     "qty": float(p.get("qty", 0)),
                     "avg_price": float(p.get("avg_price", 0)),
                     "avg_price_usd": float(p["avg_price_usd"]) if p.get("avg_price_usd") else None,
-                    "current_price": float(p.get("current_price"))
-                    if p.get("current_price")
-                    else None,
+                    "current_price": float(p.get("current_price")) if p.get("current_price") else None,
                     "value_krw": float(p.get("value_krw") or p.get("value_usd", 0) or 0) or None,
                     "currency": p.get("currency", "KRW"),
                     "usd_rate": float(p["usd_rate"]) if p.get("usd_rate") else None,
@@ -163,9 +154,7 @@ def downgrade() -> None:
     conn = op.get_bind()
 
     # account 현재 포지션 (snapshot_id IS NULL)
-    acc_ids = conn.execute(
-        sa.text("SELECT DISTINCT account_id FROM positions WHERE snapshot_id IS NULL")
-    ).fetchall()
+    acc_ids = conn.execute(sa.text("SELECT DISTINCT account_id FROM positions WHERE snapshot_id IS NULL")).fetchall()
     for (acc_id,) in acc_ids:
         rows = conn.execute(
             sa.text("SELECT * FROM positions WHERE account_id = :aid AND snapshot_id IS NULL"),

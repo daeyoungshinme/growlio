@@ -1,4 +1,5 @@
 """email_templates.py 단위 테스트 — 순수 함수이므로 외부 의존 없음."""
+
 from __future__ import annotations
 
 from app.services.email_templates import (
@@ -11,36 +12,26 @@ from app.services.email_templates import (
 
 class TestExchangeRateAlertTemplate:
     def test_returns_subject_and_html_tuple(self):
-        subject, html = exchange_rate_alert_template(
-            target_rate=1300.0, direction="BELOW", current_rate=1295.5
-        )
+        subject, html = exchange_rate_alert_template(target_rate=1300.0, direction="BELOW", current_rate=1295.5)
         assert isinstance(subject, str)
         assert isinstance(html, str)
 
     def test_subject_contains_target_rate(self):
-        subject, _ = exchange_rate_alert_template(
-            target_rate=1300.0, direction="BELOW", current_rate=1295.0
-        )
+        subject, _ = exchange_rate_alert_template(target_rate=1300.0, direction="BELOW", current_rate=1295.0)
         assert "1,300" in subject
 
     def test_below_direction_label(self):
-        subject, html = exchange_rate_alert_template(
-            target_rate=1300.0, direction="BELOW", current_rate=1295.0
-        )
+        subject, html = exchange_rate_alert_template(target_rate=1300.0, direction="BELOW", current_rate=1295.0)
         assert "이하" in subject
         assert "이하" in html
 
     def test_above_direction_label(self):
-        subject, html = exchange_rate_alert_template(
-            target_rate=1400.0, direction="ABOVE", current_rate=1405.0
-        )
+        subject, html = exchange_rate_alert_template(target_rate=1400.0, direction="ABOVE", current_rate=1405.0)
         assert "이상" in subject
         assert "이상" in html
 
     def test_html_contains_current_rate(self):
-        _, html = exchange_rate_alert_template(
-            target_rate=1300.0, direction="BELOW", current_rate=1295.55
-        )
+        _, html = exchange_rate_alert_template(target_rate=1300.0, direction="BELOW", current_rate=1295.55)
         assert "1,295.55" in html
 
     def test_html_is_nonempty(self):
@@ -111,8 +102,11 @@ class TestStockPriceAlertTemplate:
 
     def test_direction_label_in_subject(self):
         subject, _ = stock_price_alert_template(
-            ticker="005930", name="삼성전자",
-            target_price=70000.0, current_price=68000.0, direction="BELOW",
+            ticker="005930",
+            name="삼성전자",
+            target_price=70000.0,
+            current_price=68000.0,
+            direction="BELOW",
         )
         assert "이하" in subject
 

@@ -26,8 +26,6 @@ export interface InsightsSummary {
   ALERT: number;
 }
 
-export const fetchInsights = () =>
-  apiGet<Insight[]>("/insights");
+export const fetchInsights = () => apiGet<Insight[]>("/insights");
 
-export const fetchInsightsSummary = () =>
-  apiGet<InsightsSummary>("/insights/summary");
+export const fetchInsightsSummary = () => apiGet<InsightsSummary>("/insights/summary");

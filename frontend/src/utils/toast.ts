@@ -17,6 +17,6 @@ export function toast(message: string, type: ToastType = "error") {
   window.dispatchEvent(
     new CustomEvent<ToastEvent>("growlio:toast", {
       detail: { message, type, id: ++_seq },
-    })
+    }),
   );
 }

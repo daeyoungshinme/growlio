@@ -1,4 +1,5 @@
 """리밸런싱 전략 서비스 — 팩터 노출도 + 효율적 프론티어를 종합해 전략 방향을 제시한다."""
+
 from __future__ import annotations
 
 import asyncio
@@ -17,7 +18,7 @@ from app.services.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import TTL_REBALANCING_STRATEGY, RedisType
 
 logger = structlog.get_logger()
-_RISK_FREE_RATE = 3.0       # Sharpe 계산 기준 무위험 수익률 (%)
+_RISK_FREE_RATE = 3.0  # Sharpe 계산 기준 무위험 수익률 (%)
 
 _FACTOR_LABELS: dict[str, str] = {
     "value": "가치",
@@ -41,16 +42,8 @@ def _sharpe(ret: float, risk: float) -> float | None:
 
 def _factor_reason(factor_changes: dict) -> str:
     """팩터 변화에서 핵심 변화 요약 문장 생성."""
-    positives = [
-        f"{_FACTOR_LABELS.get(k, k)} 팩터 강화"
-        for k, v in factor_changes.items()
-        if v["delta"] > 5
-    ]
-    negatives = [
-        f"{_FACTOR_LABELS.get(k, k)} 팩터 완화"
-        for k, v in factor_changes.items()
-        if v["delta"] < -5
-    ]
+    positives = [f"{_FACTOR_LABELS.get(k, k)} 팩터 강화" for k, v in factor_changes.items() if v["delta"] > 5]
+    negatives = [f"{_FACTOR_LABELS.get(k, k)} 팩터 완화" for k, v in factor_changes.items() if v["delta"] < -5]
     parts = positives + negatives
     return "、".join(parts) if parts else "팩터 구성 변화"
 
@@ -101,29 +94,33 @@ def _build_trade_recommendations(
             action = _ACTION_DECREASE
             reason = "리스크 감소 또는 비중 조정"
 
-        recommendations.append({
-            "action": action,
-            "ticker": target["ticker"],
-            "market": target["market"],
-            "name": target["name"],
-            "current_weight": round(cur_w, 2),
-            "target_weight": round(tgt_w, 2),
-            "reason": reason,
-        })
+        recommendations.append(
+            {
+                "action": action,
+                "ticker": target["ticker"],
+                "market": target["market"],
+                "name": target["name"],
+                "current_weight": round(cur_w, 2),
+                "target_weight": round(tgt_w, 2),
+                "reason": reason,
+            }
+        )
 
     # 현재 보유하지만 목표 포트폴리오에 없는 종목
     for key, cur_w_val in current_weights.items():
         if key not in target_map and cur_w_val >= _WEIGHT_THRESHOLD:
             pos = current_pos_map[key]
-            recommendations.append({
-                "action": _ACTION_SELL,
-                "ticker": pos["ticker"],
-                "market": pos["market"],
-                "name": pos.get("name", pos["ticker"]),
-                "current_weight": round(cur_w_val, 2),
-                "target_weight": 0.0,
-                "reason": "목표 포트폴리오 미포함",
-            })
+            recommendations.append(
+                {
+                    "action": _ACTION_SELL,
+                    "ticker": pos["ticker"],
+                    "market": pos["market"],
+                    "name": pos.get("name", pos["ticker"]),
+                    "current_weight": round(cur_w_val, 2),
+                    "target_weight": 0.0,
+                    "reason": "목표 포트폴리오 미포함",
+                }
+            )
 
     # 절대 변화량 기준 정렬 (큰 변화 먼저)
     recommendations.sort(key=lambda r: abs(r["target_weight"] - r["current_weight"]), reverse=True)
@@ -152,11 +149,7 @@ def _build_summary(
     if abs(risk_change) >= 0.5:
         direction = "감소" if risk_change < 0 else "증가"
         parts.append(f"변동성이 {abs(risk_change):.1f}%p {direction}하고")
-    improving_factors = [
-        _FACTOR_LABELS.get(k, k)
-        for k, v in factor_changes.items()
-        if v["delta"] > 5
-    ]
+    improving_factors = [_FACTOR_LABELS.get(k, k) for k, v in factor_changes.items() if v["delta"] > 5]
     if improving_factors:
         parts.append(f"{'·'.join(improving_factors)} 팩터 노출도가 강화됩니다")
     if sharpe_improvement:
@@ -185,9 +178,7 @@ async def get_rebalancing_strategy(
             logger.debug("strategy_cache_read_error", cache_key=cache_key, error=str(e))
 
     portfolio = await db.scalar(
-        select(Portfolio)
-        .options(selectinload(Portfolio.items))
-        .where(Portfolio.id == portfolio_id)
+        select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
     )
     if not portfolio:
         return {"error": "포트폴리오를 찾을 수 없습니다"}
@@ -220,11 +211,7 @@ async def get_rebalancing_strategy(
         return_change = round(tgt_pos["return"] - cur_pos["return"], 2)
         cur_sharpe = _sharpe(cur_pos["return"], cur_pos["risk"])
         tgt_sharpe = _sharpe(tgt_pos["return"], tgt_pos["risk"])
-        sharpe_improvement = (
-            tgt_sharpe is not None
-            and cur_sharpe is not None
-            and tgt_sharpe > cur_sharpe
-        )
+        sharpe_improvement = tgt_sharpe is not None and cur_sharpe is not None and tgt_sharpe > cur_sharpe
         frontier_changes = {
             "current_risk": cur_pos["risk"],
             "current_return": cur_pos["return"],
@@ -256,15 +243,11 @@ async def get_rebalancing_strategy(
     current_pos_map = await query_latest_position_map(user_id, db, include_name=True)
 
     # 4. 거래 추천
-    trade_recommendations = _build_trade_recommendations(
-        current_pos_map, portfolio.items, factor_changes
-    )
+    trade_recommendations = _build_trade_recommendations(current_pos_map, portfolio.items, factor_changes)
 
     # 5. 종합 방향 및 요약
     direction = _overall_direction(risk_change, return_change, sharpe_improvement)
-    summary = _build_summary(
-        portfolio.name, factor_changes, risk_change, return_change, sharpe_improvement, direction
-    )
+    summary = _build_summary(portfolio.name, factor_changes, risk_change, return_change, sharpe_improvement, direction)
 
     result_data: dict = {
         "portfolio_id": str(portfolio_id),

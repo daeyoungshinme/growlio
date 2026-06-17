@@ -24,7 +24,10 @@ interface UseRebalancingAlertFormOpts {
   accountIds?: string[] | null;
 }
 
-export function useRebalancingAlertQueries({ portfolioId, accountIds }: UseRebalancingAlertFormOpts) {
+export function useRebalancingAlertQueries({
+  portfolioId,
+  accountIds,
+}: UseRebalancingAlertFormOpts) {
   const { data: alert, isLoading } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlert(portfolioId),
     queryFn: () => fetchRebalancingAlert(portfolioId),
@@ -146,19 +149,32 @@ export function useRebalancingAlertFormState({
 
   return {
     // form state
-    scheduleType, setScheduleType,
-    dayOfWeek, setDayOfWeek,
-    dayOfMonth, setDayOfMonth,
-    triggerCondition, setTriggerCondition,
-    threshold, setThreshold,
-    mode, setMode,
-    strategy, setStrategy,
-    accountId, setAccountId,
-    orderType, setOrderType,
-    marketConditionMode, setMarketConditionMode,
-    depositTriggerEnabled, setDepositTriggerEnabled,
-    depositTriggerAccountId, setDepositTriggerAccountId,
-    depositTriggerMinAmount, setDepositTriggerMinAmount,
+    scheduleType,
+    setScheduleType,
+    dayOfWeek,
+    setDayOfWeek,
+    dayOfMonth,
+    setDayOfMonth,
+    triggerCondition,
+    setTriggerCondition,
+    threshold,
+    setThreshold,
+    mode,
+    setMode,
+    strategy,
+    setStrategy,
+    accountId,
+    setAccountId,
+    orderType,
+    setOrderType,
+    marketConditionMode,
+    setMarketConditionMode,
+    depositTriggerEnabled,
+    setDepositTriggerEnabled,
+    depositTriggerAccountId,
+    setDepositTriggerAccountId,
+    depositTriggerMinAmount,
+    setDepositTriggerMinAmount,
     // mutations
     upsertMut,
     deleteMut,

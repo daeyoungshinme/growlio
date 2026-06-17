@@ -1,4 +1,5 @@
 """종목 검색 및 환율 API 테스트 (GET /api/v1/stocks)."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from fastapi.testclient import TestClient
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -37,10 +39,9 @@ class TestSearchNaverUnit:
         from unittest.mock import patch as p
 
         from app.api.v1.stocks import _search_naver
+
         mock_resp = MM()
-        mock_resp.json.return_value = {
-            "items": [{"code": "005930", "name": "삼성전자", "typeCode": "KOSPI"}]
-        }
+        mock_resp.json.return_value = {"items": [{"code": "005930", "name": "삼성전자", "typeCode": "KOSPI"}]}
         mock_resp.raise_for_status = MM()
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -59,6 +60,7 @@ class TestSearchNaverUnit:
         from unittest.mock import patch as p
 
         from app.api.v1.stocks import _search_naver
+
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
             mock_ctx.__aenter__ = AM(return_value=mock_ctx)
@@ -75,6 +77,7 @@ class TestSearchNaverUnit:
         from unittest.mock import patch as p
 
         from app.api.v1.stocks import _search_naver
+
         many_items = [{"code": f"00593{i}", "name": f"종목{i}", "typeCode": "KOSPI"} for i in range(10)]
         mock_resp = MM()
         mock_resp.json.return_value = {"items": many_items}
@@ -97,6 +100,7 @@ class TestSearchYahooUnit:
         from unittest.mock import patch as p
 
         from app.api.v1.stocks import _search_yahoo
+
         mock_resp = MM()
         mock_resp.json.return_value = {
             "quotes": [{"symbol": "AAPL", "shortname": "Apple Inc.", "quoteType": "EQUITY", "exchange": "NMS"}]
@@ -119,6 +123,7 @@ class TestSearchYahooUnit:
         from unittest.mock import patch as p
 
         from app.api.v1.stocks import _search_yahoo
+
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
             mock_ctx.__aenter__ = AM(return_value=mock_ctx)
@@ -132,6 +137,7 @@ class TestSearchYahooUnit:
 class TestStockSearch:
     def test_search_returns_200(self, override_settings):
         from app.main import app
+
         with (
             patch("app.api.v1.stocks._search_naver", new_callable=AsyncMock, return_value=_SEARCH_RESULTS),
             patch("app.api.v1.stocks._search_yahoo", new_callable=AsyncMock, return_value=[]),
@@ -145,6 +151,7 @@ class TestStockSearch:
     def test_search_requires_query(self, override_settings):
         """q 파라미터 없으면 422."""
         from app.main import app
+
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/stocks/search")
         assert resp.status_code == 422
@@ -152,6 +159,7 @@ class TestStockSearch:
     def test_search_with_short_query_returns_empty(self, override_settings):
         """q 길이 1이하면 빈 배열 반환."""
         from app.main import app
+
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/stocks/search?q=a")
         assert resp.status_code in (200, 422, 400)
@@ -163,6 +171,7 @@ class TestExchangeRate:
     def test_returns_200_with_cached_rate(self, override_settings):
         """Redis 캐시에서 환율 반환."""
         from app.main import app
+
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=b"1350.0")
         with (
@@ -178,6 +187,7 @@ class TestExchangeRate:
         from httpx import ASGITransport, AsyncClient
 
         from app.main import app
+
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
@@ -195,6 +205,7 @@ class TestExchangeRate:
 class TestStockPrice:
     def test_returns_200_for_domestic_ticker(self, override_settings):
         from app.main import app
+
         with (
             patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
             TestClient(app, raise_server_exceptions=False) as client,
@@ -207,6 +218,7 @@ class TestStockPrice:
 
     def test_requires_ticker_and_market(self, override_settings):
         from app.main import app
+
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/stocks/price")
         assert resp.status_code == 422

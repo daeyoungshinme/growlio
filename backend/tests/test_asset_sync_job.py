@@ -1,4 +1,5 @@
 """asset_sync Job 테스트."""
+
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,6 +22,7 @@ class TestRunDailyAssetSync:
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
+
             await run_daily_asset_sync()
 
         mock_sync.assert_not_called()
@@ -42,6 +44,7 @@ class TestRunDailyAssetSync:
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
+
             await run_daily_asset_sync()
 
         assert mock_sync.call_count == 2
@@ -71,6 +74,7 @@ class TestRunDailyAssetSync:
             patch("app.jobs.asset_sync.sync_account", side_effect=mock_sync_side_effect),
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
+
             await run_daily_asset_sync()
 
         assert call_count == 2
@@ -94,6 +98,7 @@ class TestRunIntradayAssetSync:
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_intraday_asset_sync
+
             await run_intraday_asset_sync()
 
         assert mock_sync.call_count == 2

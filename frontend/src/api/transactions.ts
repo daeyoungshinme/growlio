@@ -34,5 +34,4 @@ export const createTransaction = (data: TransactionCreate) =>
 export const updateTransaction = (id: string, data: Partial<TransactionCreate>) =>
   apiPut<Transaction>(`/transactions/${id}`, data);
 
-export const deleteTransaction = (id: string) =>
-  apiDelete(`/transactions/${id}`);
+export const deleteTransaction = (id: string) => apiDelete(`/transactions/${id}`);

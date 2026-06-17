@@ -20,9 +20,9 @@ class CircuitOpenError(Exception):
 
 
 class _State(StrEnum):
-    CLOSED = "closed"       # 정상 운영
-    OPEN = "open"           # 차단 중 (빠른 실패)
-    HALF_OPEN = "half_open" # 복구 테스트 중
+    CLOSED = "closed"  # 정상 운영
+    OPEN = "open"  # 차단 중 (빠른 실패)
+    HALF_OPEN = "half_open"  # 복구 테스트 중
 
 
 class CircuitBreaker:
@@ -77,8 +77,7 @@ class CircuitBreaker:
         """
         if not self.is_available():
             raise CircuitOpenError(
-                f"{self.name} API가 일시적으로 응답하지 않습니다 "
-                f"({self.reset_timeout:.0f}초 후 자동 재시도)."
+                f"{self.name} API가 일시적으로 응답하지 않습니다 ({self.reset_timeout:.0f}초 후 자동 재시도)."
             )
         try:
             result = await func(*args, **kwargs)
@@ -94,6 +93,7 @@ class CircuitBreaker:
 def _is_bypass(exc: BaseException) -> bool:
     """설정/인증 오류는 실패 카운트에서 제외한다 (재시도해도 의미 없음). 지연 import."""
     from app.exceptions import KisAuthError, KiwoomAuthError, ProviderCredentialError
+
     return isinstance(exc, (ProviderCredentialError, KisAuthError, KiwoomAuthError))
 
 
@@ -101,6 +101,7 @@ def _is_bypass(exc: BaseException) -> bool:
 # 임계값은 config.py의 cb_* 필드로 조정 가능
 def _cfg() -> Settings:
     from app.config import settings
+
     return settings
 
 

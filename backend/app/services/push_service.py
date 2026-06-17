@@ -2,6 +2,7 @@
 
 FIREBASE_CREDENTIALS_JSON 환경변수가 없으면 모든 호출이 no-op으로 처리됩니다.
 """
+
 from __future__ import annotations
 
 import asyncio

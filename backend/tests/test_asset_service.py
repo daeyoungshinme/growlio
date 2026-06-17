@@ -9,6 +9,7 @@ import pytest
 
 # ── _upsert_snapshot 테스트 ─────────────────────────────────
 
+
 class TestUpsertSnapshot:
     """_upsert_snapshot: 스냅샷 upsert 로직 검증.
 
@@ -26,8 +27,12 @@ class TestUpsertSnapshot:
         today = date.today()
 
         snap = SimpleNamespace(
-            id=uuid.uuid4(), account_id=account_id, user_id=user_id,
-            snapshot_date=today, amount_krw=5_000_000.0, source="MANUAL",
+            id=uuid.uuid4(),
+            account_id=account_id,
+            user_id=user_id,
+            snapshot_date=today,
+            amount_krw=5_000_000.0,
+            source="MANUAL",
         )
         mock_execute_result = MagicMock()
         mock_execute_result.scalar_one.return_value = snap
@@ -75,11 +80,13 @@ class TestUpsertSnapshot:
 
 # ── ManualProvider 테스트 ──────────────────────────────
 
+
 class TestManualProvider:
     """수동 계좌 동기화 로직 검증 (ManualProvider)."""
 
-    def _mock_position(self, ticker="005930", name="삼성전자", market="KOSPI",
-                       qty=10, avg_price=70000, current_price=80000):
+    def _mock_position(
+        self, ticker="005930", name="삼성전자", market="KOSPI", qty=10, avg_price=70000, current_price=80000
+    ):
         p = MagicMock()
         p.ticker = ticker
         p.name = name
@@ -137,11 +144,12 @@ class TestManualProvider:
         balance = await provider.sync(account, mock_db, redis=None)
 
         assert balance.total_value_krw == 800_000.0  # 80000 * 10
-        assert balance.invested_krw == 700_000.0      # 70000 * 10
-        assert balance.pnl_krw == 100_000.0           # 800k - 700k
+        assert balance.invested_krw == 700_000.0  # 70000 * 10
+        assert balance.pnl_krw == 100_000.0  # 800k - 700k
 
 
 # ── KISProvider 테스트 ─────────────────────────────────
+
 
 class TestKISProvider:
     """KIS 계좌 동기화 시 manual_positions 자동 설정 검증."""
@@ -155,9 +163,18 @@ class TestKISProvider:
 
         domestic_result = {
             "positions": [
-                {"ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                 "qty": 10, "avg_price": 70000.0, "current_price": 75000.0,
-                 "value_krw": 750000.0, "pnl": 50000.0, "pnl_pct": 7.14, "currency": "KRW"},
+                {
+                    "ticker": "005930",
+                    "name": "삼성전자",
+                    "market": "KOSPI",
+                    "qty": 10,
+                    "avg_price": 70000.0,
+                    "current_price": 75000.0,
+                    "value_krw": 750000.0,
+                    "pnl": 50000.0,
+                    "pnl_pct": 7.14,
+                    "currency": "KRW",
+                },
             ],
             "total_value_krw": 750000.0,
             "deposit_krw": 100000.0,
@@ -166,9 +183,18 @@ class TestKISProvider:
         }
         overseas_result = {
             "positions": [
-                {"ticker": "AAPL", "name": "Apple", "market": "NASD",
-                 "qty": 5, "avg_price": 180.0, "current_price": 190.0,
-                 "value_usd": 950.0, "pnl_usd": 50.0, "pnl_pct": 5.56, "currency": "USD"},
+                {
+                    "ticker": "AAPL",
+                    "name": "Apple",
+                    "market": "NASD",
+                    "qty": 5,
+                    "avg_price": 180.0,
+                    "current_price": 190.0,
+                    "value_usd": 950.0,
+                    "pnl_usd": 50.0,
+                    "pnl_pct": 5.56,
+                    "currency": "USD",
+                },
             ],
             "total_value_usd": 950.0,
             "deposit_usd": 0.0,
@@ -215,6 +241,7 @@ class TestKISProvider:
 
 
 # ── 계좌별 수익률 계산 테스트 ───────────────────────────────
+
 
 class TestStockReturnCalc:
     """주식 수익률 계산 단순 로직 검증 (단위 테스트)."""

@@ -10,11 +10,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -70,9 +75,12 @@ describe("api/alerts — exchange rate alerts", () => {
   it("createExchangeRateAlert uses default max_trigger_count=1", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: mockExchangeAlert });
     await createExchangeRateAlert(1300, "BELOW");
-    expect(api.post).toHaveBeenCalledWith("/alerts/exchange-rate", expect.objectContaining({
-      max_trigger_count: 1,
-    }));
+    expect(api.post).toHaveBeenCalledWith(
+      "/alerts/exchange-rate",
+      expect.objectContaining({
+        max_trigger_count: 1,
+      }),
+    );
   });
 
   it("reactivateExchangeRateAlert calls PATCH /alerts/exchange-rate/:id/reactivate", async () => {
@@ -139,9 +147,12 @@ describe("api/alerts — rebalancing alerts", () => {
       deposit_trigger_account_id: null,
       deposit_trigger_min_amount_krw: null,
     });
-    expect(api.put).toHaveBeenCalledWith("/alerts/rebalancing/port-1", expect.objectContaining({
-      portfolio_id: "port-1",
-    }));
+    expect(api.put).toHaveBeenCalledWith(
+      "/alerts/rebalancing/port-1",
+      expect.objectContaining({
+        portfolio_id: "port-1",
+      }),
+    );
   });
 
   it("deleteRebalancingAlert calls DELETE /alerts/rebalancing/:portfolioId", async () => {
@@ -177,7 +188,13 @@ describe("api/alerts — stock price alerts", () => {
 
   it("createStockPriceAlert calls POST /alerts/stock-price", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: mockStockAlert });
-    const body = { ticker: "005930", market: "KOSPI", name: "삼성전자", target_price: 80000, direction: "ABOVE" as const };
+    const body = {
+      ticker: "005930",
+      market: "KOSPI",
+      name: "삼성전자",
+      target_price: 80000,
+      direction: "ABOVE" as const,
+    };
     await createStockPriceAlert(body);
     expect(api.post).toHaveBeenCalledWith("/alerts/stock-price", body);
   });

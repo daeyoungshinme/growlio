@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
     # Redis 연결 확인 — 실패 시 즉시 종료
     try:
         redis = await get_redis()
-        await redis.ping()
+        await redis.ping()  # type: ignore[misc]
         logger.info("redis_connected")
     except Exception as e:
         logger.error("redis_startup_failed", error=str(e))

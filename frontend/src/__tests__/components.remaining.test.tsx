@@ -236,40 +236,30 @@ describe("BacktestMetricsTable", () => {
 // =========================================
 describe("BacktestResultChart", () => {
   it("renders without crash", () => {
-    renderWithProviders(
-      <BacktestResultChart dates={mockDates} series={mockSeries} />
-    );
+    renderWithProviders(<BacktestResultChart dates={mockDates} series={mockSeries} />);
     expect(document.body).toBeDefined();
   });
 
   it("shows cumulative view by default", () => {
-    renderWithProviders(
-      <BacktestResultChart dates={mockDates} series={mockSeries} />
-    );
+    renderWithProviders(<BacktestResultChart dates={mockDates} series={mockSeries} />);
     // Should have view toggle buttons
     expect(screen.getAllByText(/누적/i).length).toBeGreaterThan(0);
   });
 
   it("shows annual returns button", () => {
-    renderWithProviders(
-      <BacktestResultChart dates={mockDates} series={mockSeries} />
-    );
+    renderWithProviders(<BacktestResultChart dates={mockDates} series={mockSeries} />);
     expect(screen.getByText(/연도별/i)).toBeDefined();
   });
 
   it("shows drawdown button", () => {
-    renderWithProviders(
-      <BacktestResultChart dates={mockDates} series={mockSeries} />
-    );
+    renderWithProviders(<BacktestResultChart dates={mockDates} series={mockSeries} />);
     const ddBtn = screen.queryByText(/낙폭|Drawdown|MDD/i);
     if (ddBtn) expect(ddBtn).toBeDefined();
     else expect(document.body).toBeDefined();
   });
 
   it("can switch to annual view", () => {
-    renderWithProviders(
-      <BacktestResultChart dates={mockDates} series={mockSeries} />
-    );
+    renderWithProviders(<BacktestResultChart dates={mockDates} series={mockSeries} />);
     const annualBtn = screen.queryByText(/연간/i);
     if (annualBtn) {
       fireEvent.click(annualBtn);
@@ -292,7 +282,7 @@ describe("RebalancingAlertModal", () => {
           portfolioName="테스트 포트폴리오"
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -307,7 +297,7 @@ describe("RebalancingAlertModal", () => {
           portfolioName="테스트 포트폴리오"
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Should show some content
@@ -323,7 +313,7 @@ describe("RebalancingAlertModal", () => {
           portfolioName="테스트 포트폴리오"
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const buttons = screen.getAllByRole("button");
@@ -339,7 +329,7 @@ describe("RebalancingAlertModal", () => {
           portfolioName="테스트 포트폴리오"
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Should have schedule-related text
@@ -357,7 +347,7 @@ describe("RebalancingAlertModal", () => {
           accountIds={["acc-1"]}
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -373,7 +363,7 @@ describe("RebalancingAlertModal", () => {
           accountIds={null}
           onClose={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -392,7 +382,7 @@ describe("TransactionModal", () => {
         accountName="한국투자"
         depositKrw={1000000}
         onClose={vi.fn()}
-      />
+      />,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -406,7 +396,7 @@ describe("TransactionModal", () => {
         accountName="한국투자"
         depositKrw={1000000}
         onClose={vi.fn()}
-      />
+      />,
     );
     await waitFor(() => {
       expect(screen.getAllByText("한국투자").length).toBeGreaterThan(0);
@@ -416,11 +406,7 @@ describe("TransactionModal", () => {
   it("has close button", async () => {
     const onClose = vi.fn();
     renderWithProviders(
-      <TransactionModal
-        accountId="acc1"
-        accountName="한국투자"
-        onClose={onClose}
-      />
+      <TransactionModal accountId="acc1" accountName="한국투자" onClose={onClose} />,
     );
     await waitFor(() => {
       const buttons = screen.getAllByRole("button");
@@ -430,11 +416,7 @@ describe("TransactionModal", () => {
 
   it("shows transaction form", async () => {
     renderWithProviders(
-      <TransactionModal
-        accountId="acc1"
-        accountName="한국투자"
-        onClose={vi.fn()}
-      />
+      <TransactionModal accountId="acc1" accountName="한국투자" onClose={vi.fn()} />,
     );
     await waitFor(() => {
       // Should have form elements
@@ -467,12 +449,8 @@ describe("UnifiedPortfolioEditor", () => {
   it("renders create mode", () => {
     renderWithProviders(
       <MemoryRouter>
-        <UnifiedPortfolioEditor
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-          saving={false}
-        />
-      </MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={vi.fn()} saving={false} />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
@@ -486,7 +464,7 @@ describe("UnifiedPortfolioEditor", () => {
           onClose={vi.fn()}
           saving={false}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
@@ -494,12 +472,8 @@ describe("UnifiedPortfolioEditor", () => {
   it("shows portfolio name input", () => {
     renderWithProviders(
       <MemoryRouter>
-        <UnifiedPortfolioEditor
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-          saving={false}
-        />
-      </MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={vi.fn()} saving={false} />
+      </MemoryRouter>,
     );
     const inputs = document.querySelectorAll("input");
     expect(inputs.length).toBeGreaterThan(0);
@@ -508,12 +482,8 @@ describe("UnifiedPortfolioEditor", () => {
   it("shows cancel button", () => {
     renderWithProviders(
       <MemoryRouter>
-        <UnifiedPortfolioEditor
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-          saving={false}
-        />
-      </MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={vi.fn()} saving={false} />
+      </MemoryRouter>,
     );
     const cancelBtn = screen.queryByText("취소");
     if (cancelBtn) expect(cancelBtn).toBeDefined();
@@ -524,12 +494,8 @@ describe("UnifiedPortfolioEditor", () => {
     const onClose = vi.fn();
     renderWithProviders(
       <MemoryRouter>
-        <UnifiedPortfolioEditor
-          onSave={vi.fn()}
-          onClose={onClose}
-          saving={false}
-        />
-      </MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={onClose} saving={false} />
+      </MemoryRouter>,
     );
     const cancelBtn = screen.queryByText("취소");
     if (cancelBtn) {
@@ -543,12 +509,8 @@ describe("UnifiedPortfolioEditor", () => {
   it("shows loading state", () => {
     renderWithProviders(
       <MemoryRouter>
-        <UnifiedPortfolioEditor
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-          saving={true}
-        />
-      </MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={vi.fn()} saving={true} />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
@@ -562,7 +524,7 @@ describe("UnifiedPortfolioEditor", () => {
           onClose={vi.fn()}
           saving={false}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const appleTexts = screen.queryAllByText(/Apple|AAPL/i);
     if (appleTexts.length > 0) expect(appleTexts[0]).toBeDefined();

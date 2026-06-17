@@ -1,4 +1,5 @@
 """ws/connection_manager.py 단위 테스트."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock
@@ -85,10 +86,13 @@ class TestSubscribe:
         ws = AsyncMock()
         ws_id = await manager.connect(ws)
 
-        await manager.subscribe(ws_id, [
-            {"ticker": "AAPL", "market": "NASDAQ"},
-            {"ticker": "TSLA", "market": "NASDAQ"},
-        ])
+        await manager.subscribe(
+            ws_id,
+            [
+                {"ticker": "AAPL", "market": "NASDAQ"},
+                {"ticker": "TSLA", "market": "NASDAQ"},
+            ],
+        )
 
         tickers = manager.get_all_subscribed_tickers()
         assert len(tickers) == 2
@@ -120,9 +124,9 @@ class TestBroadcastPrices:
         ws_id = await manager.connect(ws)
         await manager.subscribe(ws_id, [{"ticker": "AAPL", "market": "NASDAQ"}])
 
-        await manager.broadcast_prices({
-            "AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "2024-01-01T00:00:00Z"}
-        })
+        await manager.broadcast_prices(
+            {"AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "2024-01-01T00:00:00Z"}}
+        )
 
         ws.send_text.assert_called_once()
         call_arg = ws.send_text.call_args[0][0]
@@ -136,9 +140,7 @@ class TestBroadcastPrices:
         ws_id = await manager.connect(ws)
         await manager.subscribe(ws_id, [{"ticker": "AAPL", "market": "NASDAQ"}])
 
-        await manager.broadcast_prices({
-            "AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "now"}
-        })
+        await manager.broadcast_prices({"AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "now"}})
 
         assert manager.connection_count == 0
 
@@ -165,8 +167,6 @@ class TestBroadcastPricesEdgeCases:
         # Simulate stale subscription by removing from connections only
         manager._connections.pop(ws_id, None)
 
-        await manager.broadcast_prices({
-            "AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "now"}
-        })
+        await manager.broadcast_prices({"AAPL": {"price": 185.0, "market": "NASDAQ", "updated_at": "now"}})
 
         ws.send_text.assert_not_called()

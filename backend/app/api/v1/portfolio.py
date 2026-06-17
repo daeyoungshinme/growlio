@@ -92,7 +92,11 @@ async def portfolio_summary(
     results = await asyncio.gather(*[_fetch(acc.kis_account_no) for acc in kis_accounts])  # type: ignore[arg-type]
 
     merged_domestic: dict = {
-        "total_value_krw": 0.0, "invested_krw": 0.0, "pnl_krw": 0.0, "deposit_krw": 0.0, "positions": [],
+        "total_value_krw": 0.0,
+        "invested_krw": 0.0,
+        "pnl_krw": 0.0,
+        "deposit_krw": 0.0,
+        "positions": [],
     }
     merged_overseas: dict = {"total_value_usd": 0.0, "deposit_usd": 0.0, "positions": []}
     account_details = []
@@ -126,6 +130,7 @@ async def portfolio_summary(
 # ---------------------------------------------------------------------------
 # 위험 분석
 # ---------------------------------------------------------------------------
+
 
 @router.get("/risk")
 @limiter.limit("5/minute")

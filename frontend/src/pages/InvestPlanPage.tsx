@@ -73,7 +73,9 @@ export default function InvestPlanPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">적립식 DCA 복리계산 및 월/년 목표달성율</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+            적립식 DCA 복리계산 및 월/년 목표달성율
+          </p>
         </div>
         <button
           onClick={openEdit}
@@ -93,31 +95,49 @@ export default function InvestPlanPage() {
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">월 적립액</p>
             <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-              {s?.monthly_deposit_amount ? fmtKrw(s.monthly_deposit_amount) : <span className="text-gray-300 dark:text-gray-600">미설정</span>}
+              {s?.monthly_deposit_amount ? (
+                fmtKrw(s.monthly_deposit_amount)
+              ) : (
+                <span className="text-gray-300 dark:text-gray-600">미설정</span>
+              )}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">목표 연수익률</p>
             <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-              {s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : <span className="text-gray-300 dark:text-gray-600">미설정</span>}
+              {s?.goal_annual_return_pct ? (
+                `${s.goal_annual_return_pct}%`
+              ) : (
+                <span className="text-gray-300 dark:text-gray-600">미설정</span>
+              )}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">목표 금액</p>
             <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-              {s?.goal_amount ? fmtKrw(s.goal_amount) : <span className="text-gray-300 dark:text-gray-600">미설정</span>}
+              {s?.goal_amount ? (
+                fmtKrw(s.goal_amount)
+              ) : (
+                <span className="text-gray-300 dark:text-gray-600">미설정</span>
+              )}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">투자 시작일</p>
             <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-              {s?.goal_start_date ?? <span className="text-gray-300 dark:text-gray-600">미설정</span>}
+              {s?.goal_start_date ?? (
+                <span className="text-gray-300 dark:text-gray-600">미설정</span>
+              )}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">시작시점 자산</p>
             <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-              {s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : <span className="text-gray-300 dark:text-gray-600">스냅샷 자동</span>}
+              {s?.goal_initial_amount ? (
+                fmtKrw(s.goal_initial_amount)
+              ) : (
+                <span className="text-gray-300 dark:text-gray-600">스냅샷 자동</span>
+              )}
             </p>
           </div>
         </div>
@@ -165,17 +185,39 @@ export default function InvestPlanPage() {
             className="bg-white dark:bg-gray-900 rounded-2xl p-6 w-full max-w-md mx-4 border border-gray-200 dark:border-gray-700 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">투자 목표 설정</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
+              투자 목표 설정
+            </h2>
 
             <div className="space-y-4">
               {[
                 { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
                 { label: "목표 연수익률 (%)", key: "goal_annual_return_pct", placeholder: "8" },
                 { label: "목표 금액 (원)", key: "goal_amount", placeholder: "500000000" },
-                { label: "투자 시작일", key: "goal_start_date", placeholder: "2024-01-01", type: "date" },
-                { label: "투자 시작시점 자산 (원)", key: "goal_initial_amount", placeholder: "100000000", hint: "비워두면 스냅샷 자동 사용" },
-                { label: "연간 입금 목표 (원)", key: "annual_deposit_goal", placeholder: "24000000", hint: "대시보드 입금 달성률에 표시" },
-                { label: "은퇴 목표시점 (연도)", key: "retirement_target_year", placeholder: "2045", hint: "대시보드 은퇴 카운트다운에 표시" },
+                {
+                  label: "투자 시작일",
+                  key: "goal_start_date",
+                  placeholder: "2024-01-01",
+                  type: "date",
+                },
+                {
+                  label: "투자 시작시점 자산 (원)",
+                  key: "goal_initial_amount",
+                  placeholder: "100000000",
+                  hint: "비워두면 스냅샷 자동 사용",
+                },
+                {
+                  label: "연간 입금 목표 (원)",
+                  key: "annual_deposit_goal",
+                  placeholder: "24000000",
+                  hint: "대시보드 입금 달성률에 표시",
+                },
+                {
+                  label: "은퇴 목표시점 (연도)",
+                  key: "retirement_target_year",
+                  placeholder: "2045",
+                  hint: "대시보드 은퇴 카운트다운에 표시",
+                },
               ].map(({ label, key, placeholder, type, hint }) => (
                 <FormInput
                   key={key}
@@ -214,7 +256,10 @@ export default function InvestPlanPage() {
           confirmLabel="닫기"
           cancelLabel="계속 편집"
           danger={false}
-          onConfirm={() => { setShowCloseConfirm(false); setEditing(false); }}
+          onConfirm={() => {
+            setShowCloseConfirm(false);
+            setEditing(false);
+          }}
           onCancel={() => setShowCloseConfirm(false)}
         />
       )}

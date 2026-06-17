@@ -24,9 +24,6 @@ from app.database import Base
 VALID_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX", "OTHER"})
 
 
-
-
-
 class AssetAccount(Base):
     """자산 계좌 마스터 — 수동/KIS API/오픈뱅킹 계좌를 통합 관리"""
 
@@ -138,12 +135,15 @@ class AssetSnapshot(Base):
         Index("idx_asset_snapshots_account_date", "account_id", "snapshot_date"),
         Index(
             "idx_snapshots_account_date_desc",
-            "account_id", "snapshot_date",
+            "account_id",
+            "snapshot_date",
             postgresql_ops={"snapshot_date": "DESC"},
         ),
         Index(
             "idx_asset_snapshots_user_account_date",
-            "user_id", "account_id", "snapshot_date",
+            "user_id",
+            "account_id",
+            "snapshot_date",
             postgresql_ops={"snapshot_date": "DESC"},
         ),
     )
@@ -181,11 +181,11 @@ class Transaction(Base):
         Index("idx_transactions_account_type_date", "account_id", "transaction_type", "transaction_date"),
         Index(
             "uq_div_account_ticker_date",
-            "account_id", "ticker", "transaction_date",
+            "account_id",
+            "ticker",
+            "transaction_date",
             unique=True,
-            postgresql_where=text(
-                "transaction_type = 'DIVIDEND' AND account_id IS NOT NULL AND ticker IS NOT NULL"
-            ),
+            postgresql_where=text("transaction_type = 'DIVIDEND' AND account_id IS NOT NULL AND ticker IS NOT NULL"),
         ),
     )
 
@@ -287,9 +287,9 @@ class Position(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     market: Mapped[str] = mapped_column(String(20), nullable=False)
     qty: Mapped[float] = mapped_column(Numeric(18, 4), nullable=False)
-    avg_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)       # 항상 KRW
-    avg_price_usd: Mapped[float | None] = mapped_column(Numeric(18, 4))            # 원본 USD 평단가 (해외)
-    current_price: Mapped[float | None] = mapped_column(Numeric(18, 2))            # 항상 KRW
+    avg_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)  # 항상 KRW
+    avg_price_usd: Mapped[float | None] = mapped_column(Numeric(18, 4))  # 원본 USD 평단가 (해외)
+    current_price: Mapped[float | None] = mapped_column(Numeric(18, 2))  # 항상 KRW
     value_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
     currency: Mapped[str] = mapped_column(String(3), default="KRW", nullable=False)
     usd_rate: Mapped[float | None] = mapped_column(Numeric(10, 4))

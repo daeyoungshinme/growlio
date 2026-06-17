@@ -1,4 +1,5 @@
 """포트폴리오 CRUD API 테스트 (GET/POST/PUT/DELETE /api/v1/portfolios)."""
+
 import json
 import uuid
 from datetime import UTC
@@ -21,6 +22,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -56,6 +58,7 @@ def _make_portfolio(user_id=None, portfolio_id=None):
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -85,6 +88,7 @@ def _setup_app(user, db):
 
 def _make_full_portfolio(user_id, portfolio_id=None):
     from datetime import datetime
+
     _id = portfolio_id or uuid.uuid4()
     return SimpleNamespace(
         id=_id,
@@ -115,6 +119,7 @@ class TestUpdatePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -133,8 +138,11 @@ class TestUpdatePortfolio:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -146,6 +154,7 @@ class TestUpdatePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -154,6 +163,7 @@ class TestListPortfolios:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/portfolios")
@@ -165,8 +175,11 @@ class TestListPortfolios:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get("/api/v1/portfolios", headers={"Authorization": "Bearer fake"})
@@ -175,6 +188,7 @@ class TestListPortfolios:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -194,9 +208,11 @@ class TestCreatePortfolio:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock(),
-                                            delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock(), delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.post(
@@ -208,6 +224,7 @@ class TestCreatePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -226,6 +243,7 @@ class TestCreatePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -239,8 +257,11 @@ class TestDeletePortfolio:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.delete(
@@ -251,6 +272,7 @@ class TestDeletePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -264,8 +286,11 @@ class TestDeletePortfolio:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.delete(
@@ -276,6 +301,7 @@ class TestDeletePortfolio:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -290,22 +316,28 @@ class TestReorderPortfolios:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.patch(
                     "/api/v1/portfolios/reorder",
-                    json={"items": [
-                        {"id": str(pid1), "sort_order": 0},
-                        {"id": str(pid2), "sort_order": 1},
-                    ]},
+                    json={
+                        "items": [
+                            {"id": str(pid1), "sort_order": 0},
+                            {"id": str(pid2), "sort_order": 1},
+                        ]
+                    },
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code in (204, 200)
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -325,6 +357,7 @@ class TestReorderPortfolios:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -332,6 +365,7 @@ class TestReorderPortfolios:
 def _cleanup(app):
     from app.api.deps import get_current_user
     from app.database import get_db
+
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_db, None)
 
@@ -351,8 +385,11 @@ class TestCreatePortfolioExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -384,8 +421,11 @@ class TestCreatePortfolioExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -436,18 +476,28 @@ class TestListPortfoliosExtended:
         user = _make_user()
         db = _make_mock_db()
 
-        cached = json.dumps([{
-            "id": str(uuid.uuid4()), "name": "캐시 포트폴리오",
-            "items": [], "base_type": "STOCK_ONLY", "sort_order": 0,
-            "account_ids": None,
-            "created_at": "2026-01-01T00:00:00+00:00",
-            "updated_at": "2026-01-01T00:00:00+00:00",
-        }])
+        cached = json.dumps(
+            [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "캐시 포트폴리오",
+                    "items": [],
+                    "base_type": "STOCK_ONLY",
+                    "sort_order": 0,
+                    "account_ids": None,
+                    "created_at": "2026-01-01T00:00:00+00:00",
+                    "updated_at": "2026-01-01T00:00:00+00:00",
+                }
+            ]
+        )
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=cached))),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=cached)),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get("/api/v1/portfolios")
@@ -463,11 +513,14 @@ class TestListPortfoliosExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(
-                          get=AsyncMock(side_effect=Exception("redis error")),
-                          setex=AsyncMock(),
-                      )),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(
+                        get=AsyncMock(side_effect=Exception("redis error")),
+                        setex=AsyncMock(),
+                    ),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get("/api/v1/portfolios")
@@ -482,11 +535,14 @@ class TestListPortfoliosExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(
-                          get=AsyncMock(return_value=None),
-                          setex=AsyncMock(side_effect=Exception("redis write error")),
-                      )),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(
+                        get=AsyncMock(return_value=None),
+                        setex=AsyncMock(side_effect=Exception("redis write error")),
+                    ),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get("/api/v1/portfolios")
@@ -516,8 +572,11 @@ class TestUpdatePortfolioExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -539,8 +598,11 @@ class TestUpdatePortfolioExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -567,8 +629,11 @@ class TestUpdatePortfolioExtended:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.portfolios.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.portfolios.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):

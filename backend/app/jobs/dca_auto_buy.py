@@ -1,4 +1,5 @@
 """DCA 자동매매 Job — 매일 09:00 KST 실행, auto_dca_day와 오늘 날짜 비교 후 매수."""
+
 from __future__ import annotations
 
 import math
@@ -52,9 +53,7 @@ async def _run_dca_auto_execution(today: date, redis) -> None:
         try:
             async with AsyncSessionLocal() as db:
                 await _execute_dca_for_user(settings, db, redis)
-                settings_row = await db.scalar(
-                    select(UserSettings).where(UserSettings.user_id == settings.user_id)
-                )
+                settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == settings.user_id))
                 if settings_row:
                     settings_row.auto_dca_last_executed_at = datetime.now(UTC)
                     await db.commit()
@@ -130,21 +129,32 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
         try:
             if is_overseas_market(market):
                 await place_overseas_order(
-                    app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
-                    ticker=ticker, market=market,
-                    quantity=qty, is_mock=account.is_mock_mode,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account.kis_account_no,  # type: ignore[arg-type]
+                    side="BUY",
+                    ticker=ticker,
+                    market=market,
+                    quantity=qty,
+                    is_mock=account.is_mock_mode,
                 )
             else:
                 await place_domestic_order(
-                    app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
-                    ticker=ticker, quantity=qty,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account.kis_account_no,  # type: ignore[arg-type]
+                    side="BUY",
+                    ticker=ticker,
+                    quantity=qty,
                     is_mock=account.is_mock_mode,
                 )
             logger.info(
                 "dca_order_placed",
-                ticker=ticker, qty=qty, price=price,
+                ticker=ticker,
+                qty=qty,
+                price=price,
                 is_mock=account.is_mock_mode,
             )
         except Exception as e:

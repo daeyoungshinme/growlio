@@ -46,5 +46,4 @@ export interface MarketSignalResponse {
   data_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";
 }
 
-export const fetchMarketSignal = () =>
-  apiGet<MarketSignalResponse>("/market-signals");
+export const fetchMarketSignal = () => apiGet<MarketSignalResponse>("/market-signals");

@@ -39,7 +39,7 @@ class TestComputeMetrics:
         assert result.mdd_pct == pytest.approx(50.0, abs=1.0)
 
     def test_sharpe_positive_for_positive_trend(self):
-        values = [100.0 * (1.001 ** i) for i in range(253)]
+        values = [100.0 * (1.001**i) for i in range(253)]
         result = compute_metrics("bull", values)
         assert result.sharpe_ratio > 0
         assert result.volatility_pct >= 0
@@ -69,9 +69,7 @@ class TestComputePortfolioSeries:
     def _make_price_data(self):
         # KR 종목 → yf symbol은 "005930.KS"
         dates = ["2023-01-02", "2023-01-03", "2023-01-04"]
-        return {
-            "005930.KS": [(d, 60000.0 + i * 1000) for i, d in enumerate(dates)]
-        }, dates
+        return {"005930.KS": [(d, 60000.0 + i * 1000) for i, d in enumerate(dates)]}, dates
 
     def test_single_holding_series(self):
         holdings = self._make_holdings()

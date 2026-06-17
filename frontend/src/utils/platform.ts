@@ -19,6 +19,7 @@ export function isNativePlatform(): boolean {
  */
 export function getApiBaseUrl(): string {
   if (!isNativePlatform()) return "";
-  const domain = (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "growlio-api.onrender.com";
+  const domain =
+    (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "growlio-api.onrender.com";
   return `https://${domain}`;
 }

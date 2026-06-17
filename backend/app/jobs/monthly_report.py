@@ -1,4 +1,5 @@
 """월별 포트폴리오 리포트 Job — 매월 1일 09:00 KST 실행."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -29,9 +30,7 @@ async def run_monthly_report() -> None:
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(User, UserSettings)
-            .join(UserSettings, User.id == UserSettings.user_id)
-            .where(User.is_active == True)  # noqa: E712
+            select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)  # noqa: E712
         )
         users = result.all()
 
@@ -73,16 +72,20 @@ async def run_monthly_report() -> None:
 
             # 이메일 발송 성공 후 인앱 AlertHistory 저장
             async with AsyncSessionLocal() as db:
-                db.add(AlertHistory(
-                    user_id=user.id,
-                    alert_type="MONTHLY_REPORT",
-                    message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
-                ))
+                db.add(
+                    AlertHistory(
+                        user_id=user.id,
+                        alert_type="MONTHLY_REPORT",
+                        message=f"{report_month} 월간 포트폴리오 리포트가 발송되었습니다.",
+                    )
+                )
                 await db.commit()
 
             logger.info(
                 "monthly_report_sent",
-                user_id=str(user.id), to=to_email, month=report_month,
+                user_id=str(user.id),
+                to=to_email,
+                month=report_month,
             )
         except Exception as e:
             logger.error("monthly_report_failed", user_id=str(user.id), error=str(e))

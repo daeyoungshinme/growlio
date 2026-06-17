@@ -3,6 +3,7 @@
 경로 및 응답 필드명: openapi.kiwoom.com/guide/apiguide (kt00018 계좌평가잔고내역요청) 기준.
 잔고조회 응답 필드명은 공식 문서 확인 후 수정 필요할 수 있음.
 """
+
 from typing import Any
 
 from app.kiwoom.client import kiwoom_request
@@ -39,7 +40,7 @@ async def get_domestic_balance(
         json={
             "acnt_no": account_no,
             "acnt_prdt_cd": "01",
-            "inqr_dvsn_1": "1",   # 1: 잔고
+            "inqr_dvsn_1": "1",  # 1: 잔고
             "inqr_dvsn_2": "0",
         },
     )

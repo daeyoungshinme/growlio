@@ -20,8 +20,12 @@ import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
-const PortfolioAnalysisTab = lazy(() => import("../components/portfolio-analysis/PortfolioAnalysisTab"));
-const TaxOptimizationCard = lazy(() => import("../components/portfolio-analysis/TaxOptimizationCard"));
+const PortfolioAnalysisTab = lazy(
+  () => import("../components/portfolio-analysis/PortfolioAnalysisTab"),
+);
+const TaxOptimizationCard = lazy(
+  () => import("../components/portfolio-analysis/TaxOptimizationCard"),
+);
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -50,9 +54,12 @@ export default function PortfolioPage() {
   const tab: Tab = TABS.includes(urlTab) ? urlTab : "종목 현황";
   const portfolioId = searchParams.get("portfolioId") ?? undefined;
 
-  const handleTabChange = useCallback((next: Tab) => {
-    setSearchParams({ tab: next }, { replace: true });
-  }, [setSearchParams]);
+  const handleTabChange = useCallback(
+    (next: Tab) => {
+      setSearchParams({ tab: next }, { replace: true });
+    },
+    [setSearchParams],
+  );
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
   const [chartsOpen, setChartsOpen] = useState(true);
@@ -64,7 +71,11 @@ export default function PortfolioPage() {
     refetchInterval: isNativePlatform() ? false : REFETCH_INTERVAL.PORTFOLIO,
   });
 
-  const { data: dividendData = [], isLoading: divLoading, isError: divError } = useQuery({
+  const {
+    data: dividendData = [],
+    isLoading: divLoading,
+    isError: divError,
+  } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
     staleTime: STALE_TIME.LONG,
@@ -102,7 +113,7 @@ export default function PortfolioPage() {
   const handleSyncAll = async () => {
     if (!data) return;
     const accounts = data.accounts.filter(
-      (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER"
+      (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER",
     );
     setSyncingAll(true);
     setSyncProgress({ done: 0, total: accounts.length });
@@ -114,7 +125,7 @@ export default function PortfolioPage() {
           } finally {
             setSyncProgress((p) => ({ ...p, done: p.done + 1 }));
           }
-        })
+        }),
       );
       await invalidateSyncData(qc);
       const failed = results.filter((r) => r.status === "rejected").length;
@@ -130,8 +141,11 @@ export default function PortfolioPage() {
   };
 
   const stockAccounts = useMemo(
-    () => data?.accounts.filter((a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER") ?? [],
-    [data]
+    () =>
+      data?.accounts.filter(
+        (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER",
+      ) ?? [],
+    [data],
   );
 
   const marketChartData = useMemo(() => {
@@ -141,43 +155,50 @@ export default function PortfolioPage() {
     const total = domestic + foreign;
     if (total === 0) return [];
     const items = [];
-    if (domestic > 0) items.push({ name: "국내 주식", value: domestic, pct: (domestic / total) * 100 });
-    if (foreign > 0) items.push({ name: "해외 주식", value: foreign, pct: (foreign / total) * 100 });
+    if (domestic > 0)
+      items.push({ name: "국내 주식", value: domestic, pct: (domestic / total) * 100 });
+    if (foreign > 0)
+      items.push({ name: "해외 주식", value: foreign, pct: (foreign / total) * 100 });
     return items;
   }, [data]);
 
   const stockChartData = useMemo(
-    () => (data?.stock_allocation ?? []).map((a) => ({
-      name: a.name,
-      ticker: a.ticker,
-      value: a.value_krw ?? 0,
-      pct: a.pct,
-    })),
-    [data]
+    () =>
+      (data?.stock_allocation ?? []).map((a) => ({
+        name: a.name,
+        ticker: a.ticker,
+        value: a.value_krw ?? 0,
+        pct: a.pct,
+      })),
+    [data],
   );
 
-  if (isLoading) return (
-    <div className="space-y-6">
-      <div className="card">
-        <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
-          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
+  if (isLoading)
+    return (
+      <div className="space-y-6">
+        <div className="card">
+          <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
+            {[0, 1, 2, 3].map((i) => (
+              <SkeletonStatBox key={i} />
+            ))}
+          </div>
         </div>
+        <SkeletonCard rows={5} height="h-4" />
+        <SkeletonCard rows={3} height="h-4" />
       </div>
-      <SkeletonCard rows={5} height="h-4" />
-      <SkeletonCard rows={3} height="h-4" />
-    </div>
-  );
-  if (error || !data) return (
-    <div className="flex flex-col items-center justify-center h-64 gap-3">
-      <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
-      <button
-        onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview })}
-        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        다시 시도
-      </button>
-    </div>
-  );
+    );
+  if (error || !data)
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
+        <button
+          onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview })}
+          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          다시 시도
+        </button>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -189,23 +210,27 @@ export default function PortfolioPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
-            {syncingAll
-              ? `${syncProgress.done}/${syncProgress.total} 갱신 중...`
-              : "전체 갱신"}
+            {syncingAll ? `${syncProgress.done}/${syncProgress.total} 갱신 중...` : "전체 갱신"}
           </button>
-          <span className="text-xs text-gray-400 dark:text-gray-500">{stockAccounts.length}개 증권사 계좌</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">
+            {stockAccounts.length}개 증권사 계좌
+          </span>
         </div>
       </div>
 
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
-        <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">주식 총평가액</p>
+        <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
+          주식 총평가액
+        </p>
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600">
           {fmtKrwPrice(data.total_stock_krw)}
         </p>
         <div className="mt-2">
           <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
-            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}{fmtKrwPrice(data.unrealized_pnl_krw)}({data.stock_return_pct >= 0 ? "+" : ""}{data.stock_return_pct.toFixed(2)}%)
+            평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}
+            {fmtKrwPrice(data.unrealized_pnl_krw)}({data.stock_return_pct >= 0 ? "+" : ""}
+            {data.stock_return_pct.toFixed(2)}%)
           </span>
         </div>
       </div>
@@ -230,7 +255,7 @@ export default function PortfolioPage() {
           </button>
           {(() => {
             const dividendMap = Object.fromEntries(
-              dividendData.map((d) => [`${d.ticker}-${d.market}`, d])
+              dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
             );
             return (
               <StockHoldingsTable
@@ -272,7 +297,6 @@ export default function PortfolioPage() {
           </Suspense>
         </ErrorBoundary>
       )}
-
     </div>
   );
 }

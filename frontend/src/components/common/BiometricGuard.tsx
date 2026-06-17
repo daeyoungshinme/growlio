@@ -37,9 +37,7 @@ export default function BiometricGuard({ children }: Props) {
           <h1 className="text-xl font-semibold text-slate-100">
             {error ? "인증 실패" : "Growlio"}
           </h1>
-          <p className="text-sm text-slate-400">
-            {error ?? "생체 인증으로 계속하세요"}
-          </p>
+          <p className="text-sm text-slate-400">{error ?? "생체 인증으로 계속하세요"}</p>
         </div>
 
         <button

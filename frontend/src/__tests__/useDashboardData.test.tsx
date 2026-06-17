@@ -58,12 +58,17 @@ describe("useDashboardData", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { fetchDashboard } = await import("../api/dashboard");
-    const { fetchPortfolioOverview, fetchPortfolioOverviewLite } = await import("../api/portfolios");
+    const { fetchPortfolioOverview, fetchPortfolioOverviewLite } =
+      await import("../api/portfolios");
     const { fetchDCAAnalysis } = await import("../api/invest");
     const { fetchAccounts, fetchExchangeRate } = await import("../api/assets");
     vi.mocked(fetchDashboard).mockResolvedValue(mockDashboardData as unknown as DashboardData);
-    vi.mocked(fetchPortfolioOverview).mockResolvedValue(mockOverview as unknown as PortfolioOverview);
-    vi.mocked(fetchPortfolioOverviewLite).mockResolvedValue(mockOverview as unknown as PortfolioOverview);
+    vi.mocked(fetchPortfolioOverview).mockResolvedValue(
+      mockOverview as unknown as PortfolioOverview,
+    );
+    vi.mocked(fetchPortfolioOverviewLite).mockResolvedValue(
+      mockOverview as unknown as PortfolioOverview,
+    );
     vi.mocked(fetchDCAAnalysis).mockResolvedValue(null as unknown as DCAAnalysisData);
     vi.mocked(fetchAccounts).mockResolvedValue([]);
     vi.mocked(fetchExchangeRate).mockResolvedValue({ usd_krw: 1350 });

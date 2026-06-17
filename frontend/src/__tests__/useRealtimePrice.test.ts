@@ -64,9 +64,9 @@ describe("useRealtimePrice", () => {
     // @ts-expect-error — WebSocket mock
     global.WebSocket = MockWebSocket;
     Object.defineProperty(global.WebSocket, "CONNECTING", { value: 0, configurable: true });
-    Object.defineProperty(global.WebSocket, "OPEN",       { value: 1, configurable: true });
-    Object.defineProperty(global.WebSocket, "CLOSING",    { value: 2, configurable: true });
-    Object.defineProperty(global.WebSocket, "CLOSED",     { value: 3, configurable: true });
+    Object.defineProperty(global.WebSocket, "OPEN", { value: 1, configurable: true });
+    Object.defineProperty(global.WebSocket, "CLOSING", { value: 2, configurable: true });
+    Object.defineProperty(global.WebSocket, "CLOSED", { value: 3, configurable: true });
   });
 
   afterEach(() => {
@@ -134,7 +134,9 @@ describe("useRealtimePrice", () => {
     act(() =>
       ws.simulateMessage({
         type: "price_update",
-        prices: { "005930": { price: 75_000, market: "KOSPI", updated_at: "2026-01-01T00:00:00Z" } },
+        prices: {
+          "005930": { price: 75_000, market: "KOSPI", updated_at: "2026-01-01T00:00:00Z" },
+        },
       }),
     );
 
@@ -184,7 +186,9 @@ describe("useRealtimePrice", () => {
     act(() =>
       ws.simulateMessage({
         type: "price_update",
-        prices: { "005930": { price: 75_000, market: "KOSPI", updated_at: "2026-01-01T00:00:00Z" } },
+        prices: {
+          "005930": { price: 75_000, market: "KOSPI", updated_at: "2026-01-01T00:00:00Z" },
+        },
       }),
     );
 
@@ -210,16 +214,17 @@ describe("useRealtimePrice", () => {
 
   it("tickers 내용 변경 시 subscribe 메시지를 재전송한다", async () => {
     let tickers = [{ ticker: "005930", market: "KOSPI" }];
-    const { rerender } = renderHook(() =>
-      useRealtimePrice({ tickers, enabled: true }),
-    );
+    const { rerender } = renderHook(() => useRealtimePrice({ tickers, enabled: true }));
     await act(flush);
 
     const ws = MockWebSocket.instances[0];
     act(() => ws.simulateOpen());
     const callsBefore = ws.send.mock.calls.length;
 
-    tickers = [{ ticker: "005930", market: "KOSPI" }, { ticker: "000660", market: "KOSPI" }];
+    tickers = [
+      { ticker: "005930", market: "KOSPI" },
+      { ticker: "000660", market: "KOSPI" },
+    ];
     rerender();
 
     await waitFor(() => expect(ws.send.mock.calls.length).toBeGreaterThan(callsBefore));

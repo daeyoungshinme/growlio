@@ -1,29 +1,32 @@
 """backtest_service 단위 테스트 — 순수 계산 함수 검증."""
 
 
-
-
 class TestToYfSymbol:
     """_to_yf_symbol: Yahoo Finance 심볼 변환."""
 
     def test_kospi_appends_ks(self):
         from app.services.backtest_service import _to_yf_symbol
+
         assert _to_yf_symbol("005930", "KOSPI") == "005930.KS"
 
     def test_krx_appends_ks(self):
         from app.services.backtest_service import _to_yf_symbol
+
         assert _to_yf_symbol("069500", "KRX") == "069500.KS"
 
     def test_kosdaq_appends_kq(self):
         from app.services.backtest_service import _to_yf_symbol
+
         assert _to_yf_symbol("035720", "KOSDAQ") == "035720.KQ"
 
     def test_overseas_no_suffix(self):
         from app.services.backtest_service import _to_yf_symbol
+
         assert _to_yf_symbol("AAPL", "NASDAQ") == "AAPL"
 
     def test_short_ticker_zero_padded(self):
         from app.services.backtest_service import _to_yf_symbol
+
         assert _to_yf_symbol("5930", "KOSPI") == "005930.KS"
 
 
@@ -32,6 +35,7 @@ class TestComputeMetrics:
 
     def test_returns_zeros_for_single_value(self):
         from app.services.backtest_service import _compute_metrics
+
         m = _compute_metrics("test", [100.0])
         assert m.sharpe_ratio == 0
         assert m.mdd_pct == 0
@@ -39,11 +43,13 @@ class TestComputeMetrics:
 
     def test_returns_zeros_for_empty_values(self):
         from app.services.backtest_service import _compute_metrics
+
         m = _compute_metrics("test", [])
         assert m.total_return_pct == 0
 
     def test_monotone_increase_has_positive_total_return(self):
         from app.services.backtest_service import _compute_metrics
+
         # 100 → 200: 100% 수익
         values = [100.0 + i for i in range(253)]
         m = _compute_metrics("test", values)
@@ -51,6 +57,7 @@ class TestComputeMetrics:
 
     def test_monotone_decrease_has_positive_mdd(self):
         from app.services.backtest_service import _compute_metrics
+
         # 100 → 50: MDD 50%
         values = [100.0 - i * 0.2 for i in range(251)]
         m = _compute_metrics("test", values)
@@ -58,19 +65,22 @@ class TestComputeMetrics:
 
     def test_mdd_correct_on_simple_drawdown(self):
         from app.services.backtest_service import _compute_metrics
+
         # [100, 150, 75] → peak=150, trough=75, MDD = (150-75)/150 = 50%
         m = _compute_metrics("test", [100.0, 150.0, 75.0])
         assert abs(m.mdd_pct - 50.0) < 0.01
 
     def test_sharpe_positive_for_trending_up(self):
         from app.services.backtest_service import _compute_metrics
+
         # 꾸준히 오르는 시리즈 → 양의 Sharpe
-        values = [100.0 * (1.001 ** i) for i in range(300)]
+        values = [100.0 * (1.001**i) for i in range(300)]
         m = _compute_metrics("test", values)
         assert m.sharpe_ratio > 0
 
     def test_volatility_zero_for_flat_series(self):
         from app.services.backtest_service import _compute_metrics
+
         # 완전히 평평한 시리즈 → 변동성 0
         values = [100.0] * 300
         m = _compute_metrics("test", values)
@@ -79,6 +89,7 @@ class TestComputeMetrics:
 
     def test_total_return_matches_expected(self):
         from app.services.backtest_service import _compute_metrics
+
         # 100 기준 시작, 200 기준 끝 → 총수익률 100%
         # values는 지수 기준 (100 = 시작)
         # values[-1] = 200 → (200/100 - 1)*100 = 100%
@@ -88,7 +99,8 @@ class TestComputeMetrics:
 
     def test_metrics_are_rounded(self):
         from app.services.backtest_service import _compute_metrics
-        values = [100.0 * (1.001 ** i) for i in range(300)]
+
+        values = [100.0 * (1.001**i) for i in range(300)]
         m = _compute_metrics("test", values)
         # 소수점 2~3자리까지만 반환
         assert m.sharpe_ratio == round(m.sharpe_ratio, 3)

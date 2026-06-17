@@ -1,4 +1,5 @@
 """키움증권 OpenAPI+ 브로커 프로바이더."""
+
 from __future__ import annotations
 
 import asyncio
@@ -46,16 +47,27 @@ class KiwoomProvider(BrokerProvider):
 
         async def _do() -> dict:
             token = await kiwoom_get_access_token(
-                app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-                user_id=str(account.user_id), account_id=str(account.id),
+                app_key,
+                app_secret,
+                is_mock=is_mock,
+                redis=redis,
+                db=db,
+                user_id=str(account.user_id),
+                account_id=str(account.id),
             )
             try:
                 return await kiwoom_get_balance(token, account_no, is_mock=is_mock)
             except KiwoomTokenExpiredError:
                 logger.warning("kiwoom_token_expired_refreshing", account_no=account_no)
                 refreshed = await kiwoom_get_access_token(
-                    app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-                    user_id=str(account.user_id), account_id=str(account.id), force_refresh=True,
+                    app_key,
+                    app_secret,
+                    is_mock=is_mock,
+                    redis=redis,
+                    db=db,
+                    user_id=str(account.user_id),
+                    account_id=str(account.id),
+                    force_refresh=True,
                 )
                 return await kiwoom_get_balance(refreshed, account_no, is_mock=is_mock)
 
@@ -65,9 +77,7 @@ class KiwoomProvider(BrokerProvider):
             logger.error("kiwoom_sync_timeout", account_no=account.kiwoom_account_no)
             raise ProviderNetworkError("키움 API 응답 시간 초과 (50초). 잠시 후 다시 시도하세요.") from e
         except KiwoomApiError as e:
-            raise ProviderApiError(
-                f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})"
-            ) from e
+            raise ProviderApiError(f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})") from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code >= 500:
                 raise ProviderApiError("키움 API 오류: 모의투자/실계좌 설정을 확인하세요.", http_status=502) from e
@@ -81,9 +91,7 @@ class KiwoomProvider(BrokerProvider):
         except RuntimeError as e:
             msg = str(e)
             if "토큰 발급 실패" in msg:
-                raise ProviderApiError(
-                    f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요."
-                ) from e
+                raise ProviderApiError(f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.") from e
             raise ProviderApiError(msg, http_status=502) from e
 
         usd_krw_rate = await get_usd_krw_rate(redis)
@@ -107,7 +115,9 @@ class KiwoomProvider(BrokerProvider):
 
 def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
     return Position(
-        ticker=p["ticker"], name=p["name"], market=p["market"],
+        ticker=p["ticker"],
+        name=p["name"],
+        market=p["market"],
         qty=int(p.get("qty", 0)),
         avg_price=float(p.get("avg_price", 0)),
         current_price=float(p.get("current_price", 0)),

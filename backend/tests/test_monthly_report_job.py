@@ -1,4 +1,5 @@
 """monthly_report Job 테스트."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -55,6 +56,7 @@ class TestRunMonthlyReport:
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
+
             await run_monthly_report()
 
         mock_email.assert_not_called()
@@ -78,6 +80,7 @@ class TestRunMonthlyReport:
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
+
             await run_monthly_report()
 
         mock_email.assert_not_called()
@@ -100,11 +103,11 @@ class TestRunMonthlyReport:
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
-            patch("app.jobs.monthly_report.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
+
             await run_monthly_report()
 
         mock_email.assert_called_once()
@@ -130,11 +133,11 @@ class TestRunMonthlyReport:
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
-            patch("app.jobs.monthly_report.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
+
             await run_monthly_report()
 
         mock_email.assert_called_once()
@@ -168,11 +171,11 @@ class TestRunMonthlyReport:
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
-            patch("app.jobs.monthly_report.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
+            patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", side_effect=failing_email),
         ):
             from app.jobs.monthly_report import run_monthly_report
+
             await run_monthly_report()
 
         assert call_count[0] == 2
@@ -183,6 +186,7 @@ class TestPrevMonthLabel:
         from datetime import date
 
         from app.jobs.monthly_report import _prev_month_label
+
         result = _prev_month_label(date(2026, 1, 15))
         assert result == "2025년 12월"
 
@@ -190,5 +194,6 @@ class TestPrevMonthLabel:
         from datetime import date
 
         from app.jobs.monthly_report import _prev_month_label
+
         result = _prev_month_label(date(2026, 6, 1))
         assert result == "2026년 5월"

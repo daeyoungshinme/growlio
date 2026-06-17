@@ -20,13 +20,10 @@ def latest_snapshot_subquery(
     - account_ids: 특정 계좌 ID 목록을 기준으로 필터
     양쪽 모두 지정하면 AND 조건이 된다.
     """
-    q = (
-        select(
-            AssetSnapshot.account_id,
-            func.max(AssetSnapshot.snapshot_date).label("max_date"),
-        )
-        .group_by(AssetSnapshot.account_id)
-    )
+    q = select(
+        AssetSnapshot.account_id,
+        func.max(AssetSnapshot.snapshot_date).label("max_date"),
+    ).group_by(AssetSnapshot.account_id)
     if user_id is not None:
         q = q.where(AssetSnapshot.user_id == user_id)
     if account_ids is not None:

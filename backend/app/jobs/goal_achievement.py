@@ -1,4 +1,5 @@
 """투자 목표 달성 알림 Job — 매일 18:45 KST 실행."""
+
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
@@ -42,8 +43,7 @@ async def run_goal_achievement_check() -> None:
             .join(UserSettings, User.id == UserSettings.user_id)
             .where(
                 User.is_active == True,  # noqa: E712
-                UserSettings.goal_amount.isnot(None)
-                | UserSettings.annual_deposit_goal.isnot(None),
+                UserSettings.goal_amount.isnot(None) | UserSettings.annual_deposit_goal.isnot(None),
             )
         )
         users = result.all()
@@ -72,27 +72,22 @@ async def run_goal_achievement_check() -> None:
                         current_amount=total_assets,
                         achievement_pct=goal_pct,
                     )
-                    msg = (
-                        f"총 자산 목표 달성 {goal_pct:.1f}%"
-                        f" — {total_assets:,.0f}원 / {goal_amount:,.0f}원"
+                    msg = f"총 자산 목표 달성 {goal_pct:.1f}% — {total_assets:,.0f}원 / {goal_amount:,.0f}원"
+                    db.add(
+                        AlertHistory(
+                            user_id=user.id,
+                            alert_type="GOAL_ASSET",
+                            message=msg,
+                        )
                     )
-                    db.add(AlertHistory(
-                        user_id=user.id,
-                        alert_type="GOAL_ASSET",
-                        message=msg,
-                    ))
                     await db.commit()
-                    logger.info(
-                        "goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct
-                    )
+                    logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
 
                 if (
                     settings_row.annual_deposit_goal
                     and deposit_pct is not None
                     and deposit_pct >= 100
-                    and not await _already_notified_this_month(
-                        db, user.id, "GOAL_DEPOSIT"
-                    )
+                    and not await _already_notified_this_month(db, user.id, "GOAL_DEPOSIT")
                 ):
                     deposit_goal = float(settings_row.annual_deposit_goal)
                     current_deposit = deposit_goal * deposit_pct / 100
@@ -103,19 +98,16 @@ async def run_goal_achievement_check() -> None:
                         current_amount=current_deposit,
                         achievement_pct=deposit_pct,
                     )
-                    msg = (
-                        f"연간 입금 목표 달성 {deposit_pct:.1f}%"
-                        f" — {current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
+                    msg = f"연간 입금 목표 달성 {deposit_pct:.1f}% — {current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
+                    db.add(
+                        AlertHistory(
+                            user_id=user.id,
+                            alert_type="GOAL_DEPOSIT",
+                            message=msg,
+                        )
                     )
-                    db.add(AlertHistory(
-                        user_id=user.id,
-                        alert_type="GOAL_DEPOSIT",
-                        message=msg,
-                    ))
                     await db.commit()
-                    logger.info(
-                        "goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct
-                    )
+                    logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
 
         except Exception as e:
             logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))

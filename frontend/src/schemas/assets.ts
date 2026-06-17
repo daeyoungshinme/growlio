@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-const VALID_MARKETS = ["KOSPI", "KOSDAQ", "KONEX", "NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "LSE"] as const;
+const VALID_MARKETS = [
+  "KOSPI",
+  "KOSDAQ",
+  "KONEX",
+  "NYSE",
+  "NASDAQ",
+  "AMEX",
+  "TSE",
+  "HKEX",
+  "LSE",
+] as const;
 
 export const realEstateDetailsSchema = z.object({
   address: z.string().min(1, "주소를 입력해주세요"),
@@ -40,7 +50,10 @@ export const manualPositionSchema = z.object({
   ticker: z.string().min(1, "티커를 입력해주세요").max(20, "티커는 20자 이하여야 합니다"),
   name: z.string().min(1, "종목명을 입력해주세요").max(200, "종목명은 200자 이하여야 합니다"),
   market: z.enum(VALID_MARKETS, { error: "유효하지 않은 시장입니다" }),
-  qty: z.number().positive("수량은 0보다 커야 합니다").max(1_000_000, "수량은 100만 이하여야 합니다"),
+  qty: z
+    .number()
+    .positive("수량은 0보다 커야 합니다")
+    .max(1_000_000, "수량은 100만 이하여야 합니다"),
   avg_price: z.number().positive("평균단가는 0보다 커야 합니다"),
   avg_price_usd: z.number().positive("달러 평균단가는 0보다 커야 합니다").optional().nullable(),
   usd_rate: z.number().min(0).max(9999, "환율은 10,000 미만이어야 합니다").optional().nullable(),

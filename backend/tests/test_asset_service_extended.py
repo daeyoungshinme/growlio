@@ -1,4 +1,5 @@
 """asset_service.py 추가 단위 테스트 — sync_account, get_provider."""
+
 from __future__ import annotations
 
 import uuid
@@ -52,9 +53,7 @@ class TestGetProvider:
 
 class TestSyncAccount:
     @pytest.mark.asyncio
-    async def test_sync_account_calls_provider_and_returns_snapshot(
-        self, mock_db, override_settings, make_account
-    ):
+    async def test_sync_account_calls_provider_and_returns_snapshot(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult
         from app.services.asset_service import sync_account
 
@@ -137,9 +136,7 @@ class TestSyncAccount:
         assert account.deposit_usd == 500.0
 
     @pytest.mark.asyncio
-    async def test_sync_account_with_positions_deletes_old_positions(
-        self, mock_db, override_settings, make_account
-    ):
+    async def test_sync_account_with_positions_deletes_old_positions(self, mock_db, override_settings, make_account):
         from app.providers.base import BalanceResult, Position
         from app.services.asset_service import sync_account
 

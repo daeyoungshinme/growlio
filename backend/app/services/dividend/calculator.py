@@ -43,15 +43,19 @@ def calculate_position_dividend(
         if investment_yield > 50.0:
             logger.warning(
                 "investment_yield_abnormal",
-                ticker=ticker, market=market,
+                ticker=ticker,
+                market=market,
                 investment_yield=investment_yield,
-                dps=dps, cost_per_share=cost_per_share, yield_decimal=yield_decimal,
+                dps=dps,
+                cost_per_share=cost_per_share,
+                yield_decimal=yield_decimal,
             )
             investment_yield = round(yield_decimal * 100, 2) if yield_decimal > 0 else 0.0
     else:
         annual = value_krw * yield_decimal
         investment_yield = (
-            round(annual / invested_krw * 100, 2) if (invested_krw > 0 and yield_decimal > 0)
+            round(annual / invested_krw * 100, 2)
+            if (invested_krw > 0 and yield_decimal > 0)
             else round(yield_decimal * 100, 2)
         )
 

@@ -2,6 +2,7 @@
 
 I/O 없는 수학 로직만 포함 — 테스트 시 외부 의존성 불필요.
 """
+
 from __future__ import annotations
 
 import math
@@ -16,8 +17,13 @@ def compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
     """수익률 시리즈로 주요 지표(CAGR, MDD, Sharpe, Sortino) 계산."""
     if len(values) < 2:
         return PortfolioMetrics(
-            name=name, total_return_pct=0, cagr_pct=0, mdd_pct=0,
-            sharpe_ratio=0, volatility_pct=0, sortino_ratio=0,
+            name=name,
+            total_return_pct=0,
+            cagr_pct=0,
+            mdd_pct=0,
+            sharpe_ratio=0,
+            volatility_pct=0,
+            sortino_ratio=0,
         )
 
     total_return = (values[-1] / 100.0 - 1) * 100
@@ -41,7 +47,9 @@ def compute_metrics(name: str, values: list[float]) -> PortfolioMetrics:
             total_return_pct=round(total_return, 2),
             cagr_pct=round(cagr, 2),
             mdd_pct=round(max_dd, 2),
-            sharpe_ratio=0, volatility_pct=0, sortino_ratio=0,
+            sharpe_ratio=0,
+            volatility_pct=0,
+            sortino_ratio=0,
         )
 
     mean_r = sum(daily_rets) / n

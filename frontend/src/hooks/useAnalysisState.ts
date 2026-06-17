@@ -46,7 +46,11 @@ export function useAnalysisState({
       const ids = new Set(selectedIdStr ? selectedIdStr.split(",") : []);
       if (s.mode === "strategy" || s.mode === "rebalancing") {
         if (ids.size !== 1) return INITIAL_STATE;
-        if (s.mode === "rebalancing" && s.analysis && !ids.has(s.analysis.portfolio_id.toString())) {
+        if (
+          s.mode === "rebalancing" &&
+          s.analysis &&
+          !ids.has(s.analysis.portfolio_id.toString())
+        ) {
           return INITIAL_STATE;
         }
       }

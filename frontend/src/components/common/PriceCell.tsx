@@ -10,7 +10,12 @@ interface PriceCellProps {
  * 해외 종목(isOverseas=true)이고 usd 값이 있으면 USD 주표시 + KRW 보조.
  * 국내 종목이면 KRW 원 단위 표시.
  */
-export default function PriceCell({ krw, usd, isOverseas = false, className = "" }: PriceCellProps) {
+export default function PriceCell({
+  krw,
+  usd,
+  isOverseas = false,
+  className = "",
+}: PriceCellProps) {
   const textClass = `text-sm font-medium text-gray-700 dark:text-gray-300 ${className}`;
 
   if (isOverseas && usd) {
@@ -24,7 +29,5 @@ export default function PriceCell({ krw, usd, isOverseas = false, className = ""
     );
   }
 
-  return (
-    <span className={textClass}>{((krw ?? 0)).toLocaleString()}원</span>
-  );
+  return <span className={textClass}>{(krw ?? 0).toLocaleString()}원</span>;
 }

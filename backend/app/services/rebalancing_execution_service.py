@@ -1,4 +1,5 @@
 """리밸런싱 실행 서비스 — KIS/키움 API를 통해 매수/매도 주문을 일괄 실행한다."""
+
 import uuid
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -106,9 +107,13 @@ async def execute_rebalancing(
             app_key, app_secret = await _load_kiwoom_credentials(account)
             account_no = account.kiwoom_account_no
             access_token = await kiwoom_get_access_token(
-                app_key, app_secret,
-                is_mock=is_mock, redis=redis, db=db,
-                user_id=str(user_id), account_id=str(acc_uuid),
+                app_key,
+                app_secret,
+                is_mock=is_mock,
+                redis=redis,
+                db=db,
+                user_id=str(user_id),
+                account_id=str(acc_uuid),
             )
 
             sells = [o for o in group_orders if o.side == "SELL"]
@@ -118,7 +123,10 @@ async def execute_rebalancing(
             for order in sells + buys:
                 account_results.append(
                     await _execute_kiwoom_single_order(
-                        order, access_token, account_no, is_mock,  # type: ignore[arg-type]
+                        order,
+                        access_token,
+                        account_no,  # type: ignore[arg-type]
+                        is_mock,
                         kiwoom_place_order,
                     )
                 )
@@ -128,9 +136,13 @@ async def execute_rebalancing(
             account_no = account.kis_account_no
 
             access_token = await get_access_token(
-                app_key, app_secret,
-                is_mock=is_mock, redis=redis, db=db,
-                user_id=str(user_id), account_id=str(acc_uuid),
+                app_key,
+                app_secret,
+                is_mock=is_mock,
+                redis=redis,
+                db=db,
+                user_id=str(user_id),
+                account_id=str(acc_uuid),
             )
 
             sells = [o for o in group_orders if o.side == "SELL"]
@@ -140,7 +152,12 @@ async def execute_rebalancing(
             for order in sells + buys:
                 account_results.append(
                     await _execute_single_order(
-                        order, app_key, app_secret, access_token, account_no, is_mock  # type: ignore[arg-type]
+                        order,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,  # type: ignore[arg-type]
+                        is_mock,
                     )
                 )
 
@@ -157,21 +174,21 @@ async def execute_rebalancing(
             failed=fail_count,
         )
 
-        results.append(ExecutionResult(
-            account_id=str(account.id),
-            account_name=account.name,
-            is_mock=is_mock,
-            orders=account_results,
-            success_count=success_count,
-            fail_count=fail_count,
-            executed_at=datetime.now(UTC).isoformat(),
-        ))
+        results.append(
+            ExecutionResult(
+                account_id=str(account.id),
+                account_name=account.name,
+                is_mock=is_mock,
+                orders=account_results,
+                success_count=success_count,
+                fail_count=fail_count,
+                executed_at=datetime.now(UTC).isoformat(),
+            )
+        )
 
     total_success = sum(r.success_count for r in results)
     total_fail = sum(r.fail_count for r in results)
-    total_skipped = sum(
-        sum(1 for o in r.orders if o.status == "SKIPPED") for r in results
-    )
+    total_skipped = sum(sum(1 for o in r.orders if o.status == "SKIPPED") for r in results)
     logger.info(
         "rebalancing_executed",
         user_id=str(user_id),
@@ -197,21 +214,23 @@ async def execute_rebalancing(
 
         for exec_result in results:
             for placed in exec_result.orders:
-                db.add(RebalancingExecutionResult(
-                    execution_id=execution.id,
-                    account_id=exec_result.account_id,
-                    account_name=exec_result.account_name,
-                    is_mock=exec_result.is_mock,
-                    action=placed.side,
-                    ticker=placed.ticker,
-                    name=placed.name,
-                    market=placed.market,
-                    quantity=placed.quantity,
-                    status=placed.status,
-                    order_no=placed.order_no,
-                    error_message=placed.error_msg,
-                    order_type=placed.order_type,
-                ))
+                db.add(
+                    RebalancingExecutionResult(
+                        execution_id=execution.id,
+                        account_id=exec_result.account_id,
+                        account_name=exec_result.account_name,
+                        is_mock=exec_result.is_mock,
+                        action=placed.side,
+                        ticker=placed.ticker,
+                        name=placed.name,
+                        market=placed.market,
+                        quantity=placed.quantity,
+                        status=placed.status,
+                        order_no=placed.order_no,
+                        error_message=placed.error_msg,
+                        order_type=placed.order_type,
+                    )
+                )
 
         await db.commit()
     except Exception as e:
@@ -231,38 +250,65 @@ async def _execute_kiwoom_single_order(
     """키움 단건 주문 실행 — 국내주식만 지원 (해외주식 미지원)."""
     if order.quantity <= 0:
         return OrderResult(
-            ticker=order.ticker, name=order.name, market=order.market,
-            side=order.side, quantity=order.quantity, status="SKIPPED",
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="SKIPPED",
             error_msg="주문 수량이 0 이하입니다.",
         )
     if is_overseas_market(order.market):
         return OrderResult(
-            ticker=order.ticker, name=order.name, market=order.market,
-            side=order.side, quantity=order.quantity, status="SKIPPED",
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="SKIPPED",
             error_msg="키움 연동은 국내주식만 지원합니다.",
         )
 
     try:
         result = await place_order_fn(
-            access_token, account_no,
-            side=order.side, ticker=order.ticker, quantity=order.quantity, is_mock=is_mock,
-            order_type=order.order_type, limit_price=order.limit_price,
+            access_token,
+            account_no,
+            side=order.side,
+            ticker=order.ticker,
+            quantity=order.quantity,
+            is_mock=is_mock,
+            order_type=order.order_type,
+            limit_price=order.limit_price,
         )
         logger.info(
-            "kiwoom_order_placed", ticker=order.ticker, side=order.side,
-            quantity=order.quantity, order_no=result.get("order_no"), is_mock=is_mock,
+            "kiwoom_order_placed",
+            ticker=order.ticker,
+            side=order.side,
+            quantity=order.quantity,
+            order_no=result.get("order_no"),
+            is_mock=is_mock,
             order_type=order.order_type,
         )
         return OrderResult(
-            ticker=order.ticker, name=order.name, market=order.market,
-            side=order.side, quantity=order.quantity, status="SUCCESS",
-            order_no=result.get("order_no"), order_type=order.order_type,
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="SUCCESS",
+            order_no=result.get("order_no"),
+            order_type=order.order_type,
         )
     except Exception as e:
         logger.warning("kiwoom_order_failed", ticker=order.ticker, side=order.side, error=str(e))
         return OrderResult(
-            ticker=order.ticker, name=order.name, market=order.market,
-            side=order.side, quantity=order.quantity, status="FAILED", error_msg=str(e),
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="FAILED",
+            error_msg=str(e),
             order_type=order.order_type,
         )
 
@@ -289,7 +335,10 @@ async def _execute_single_order(
     try:
         if is_overseas_market(order.market):
             result = await place_overseas_order(
-                app_key, app_secret, access_token, account_no,
+                app_key,
+                app_secret,
+                access_token,
+                account_no,
                 side=order.side,
                 ticker=order.ticker,
                 market=order.market,
@@ -300,7 +349,10 @@ async def _execute_single_order(
             )
         else:
             result = await place_domestic_order(
-                app_key, app_secret, access_token, account_no,
+                app_key,
+                app_secret,
+                access_token,
+                account_no,
                 side=order.side,
                 ticker=order.ticker,
                 quantity=order.quantity,

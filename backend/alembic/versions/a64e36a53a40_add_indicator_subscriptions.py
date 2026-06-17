@@ -34,13 +34,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "user_id", "indicator_code", name="uq_indicator_subscription_user_code"
-        ),
+        sa.UniqueConstraint("user_id", "indicator_code", name="uq_indicator_subscription_user_code"),
     )
-    op.create_index(
-        "idx_indicator_subscriptions_user", "indicator_subscriptions", ["user_id"], unique=False
-    )
+    op.create_index("idx_indicator_subscriptions_user", "indicator_subscriptions", ["user_id"], unique=False)
     op.drop_index(op.f("ix_asset_accounts_target_portfolio_id"), table_name="asset_accounts")
     op.drop_index(op.f("idx_asset_snapshots_user_account_date"), table_name="asset_snapshots")
     op.create_index(

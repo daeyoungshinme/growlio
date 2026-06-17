@@ -18,9 +18,7 @@ async def refresh_all_user_tokens() -> None:
     # 오픈뱅킹 토큰 갱신
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(User, UserSettings)
-            .join(UserSettings, UserSettings.user_id == User.id)
-            .where(User.is_active == True)  # noqa: E712
+            select(User, UserSettings).join(UserSettings, UserSettings.user_id == User.id).where(User.is_active == True)  # noqa: E712
         )
         rows = result.all()
 
@@ -28,6 +26,7 @@ async def refresh_all_user_tokens() -> None:
         if settings_row.ob_refresh_token:
             try:
                 from app.providers.openbanking import ensure_ob_token_fresh
+
                 async with AsyncSessionLocal() as db:
                     settings_fresh = await db.get(UserSettings, user.id)
                     if settings_fresh and settings_fresh.ob_refresh_token:
@@ -62,6 +61,4 @@ async def refresh_all_user_tokens() -> None:
                 )
             logger.info("kis_account_token_refreshed", account_id=str(account.id))
         except Exception as e:
-            logger.error(
-                "kis_account_token_refresh_failed", account_id=str(account.id), error=str(e)
-            )
+            logger.error("kis_account_token_refresh_failed", account_id=str(account.id), error=str(e))

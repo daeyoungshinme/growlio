@@ -70,9 +70,7 @@ async def _try_kis_etf(ticker: str, kis_creds: dict) -> dict:
 async def _try_fdr(ticker: str, loop: asyncio.AbstractEventLoop) -> dict:
     """FinanceDataReader ETF 배당 조회. 실패 시 빈 결과 반환."""
     try:
-        return await fdr_circuit.call(
-            loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)
-        )
+        return await fdr_circuit.call(loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker))
     except Exception as e:
         logger.warning("fdr_dividend_circuit_skipped", ticker=ticker, error=str(e))
         return {"dps": 0, "dividend_yield": 0}
@@ -267,17 +265,25 @@ async def fetch_ticker_dividend_info(
 
     async with sem:
         yield_decimal, dps, ex_dividend_date, months, need_months_fetch = await _fetch_from_network(
-            ticker, market, is_korean, is_etf, yahoo_sym, loop,
-            dps, yield_decimal, months, need_months_fetch, kis_creds, dart_key,
+            ticker,
+            market,
+            is_korean,
+            is_etf,
+            yahoo_sym,
+            loop,
+            dps,
+            yield_decimal,
+            months,
+            need_months_fetch,
+            kis_creds,
+            dart_key,
         )
 
     if need_months_fetch:
         await redis.setex(months_cache_key, TTL_DIVIDEND_MONTHS, json.dumps(months))
 
     if dps > 0 or yield_decimal > 0:
-        await redis.setex(
-            info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal})
-        )
+        await redis.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 

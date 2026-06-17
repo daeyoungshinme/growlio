@@ -151,11 +151,9 @@ async def broker_request(
                 is_api_rate_limit = _is_rate_limit_body(e.response)
                 if e.response.status_code == 429 or is_api_rate_limit:
                     if attempt >= retries - 1:
-                        raise MaxRetriesExceededError(
-                            f"{log_prefix} API 속도 제한 초과 (재시도 {retries}회)"
-                        ) from e
+                        raise MaxRetriesExceededError(f"{log_prefix} API 속도 제한 초과 (재시도 {retries}회)") from e
                     # 기저 2s 추가 — KIS rate limit 윈도우 확실히 벗어나도록
-                    wait = 2.0 + (2 ** attempt) + (random.uniform(0, 1) if is_api_rate_limit else 0)
+                    wait = 2.0 + (2**attempt) + (random.uniform(0, 1) if is_api_rate_limit else 0)
                     label = "api_rate_limit" if is_api_rate_limit else "rate_limit"
                     logger.warning(f"{log_prefix}_{label}", attempt=attempt, wait=round(wait, 2), path=path)
                     await asyncio.sleep(wait)

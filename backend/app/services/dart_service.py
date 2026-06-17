@@ -16,7 +16,7 @@ logger = structlog.get_logger()
 DART_BASE = "https://opendart.fss.or.kr/api"
 
 # ── 종목코드 → corp_code 캐시 ───────────────────────────
-_corp_code_map: dict[str, str] = {}       # "005930" → "00126380"
+_corp_code_map: dict[str, str] = {}  # "005930" → "00126380"
 _corp_code_loaded_at: datetime | None = None
 _corp_code_lock = asyncio.Lock()
 _CORP_CODE_TTL_HOURS = 24
@@ -141,12 +141,7 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
             other_items.append(item)  # 합계·소계 행 등
 
     # 해당 종목 타입에 맞는 행 우선 선택, 없으면 순차 폴백
-    candidate_items = (
-        (pref_items if is_preferred else common_items)
-        or common_items
-        or pref_items
-        or other_items
-    )
+    candidate_items = (pref_items if is_preferred else common_items) or common_items or pref_items or other_items
 
     for item in candidate_items:
         raw_yield = (item.get("cash_dwnd_rate") or "").replace(",", "").strip()
@@ -157,9 +152,7 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
 
             # DPS 합리성 검증: 주당 배당금이 100만원 초과이면 합계/총액 행으로 판단하고 스킵
             if dps > 1_000_000:
-                logger.warning(
-                    "dart_dps_abnormal_skipped", ticker=ticker, dps=dps, se=item.get("se")
-                )
+                logger.warning("dart_dps_abnormal_skipped", ticker=ticker, dps=dps, se=item.get("se"))
                 continue
 
             if yld > 0:
@@ -240,15 +233,17 @@ async def fetch_disclosures_for_tickers(
             items = []
             for item in data.get("list", []):
                 rcept_no = item.get("rcept_no", "")
-                items.append({
-                    "rcept_no": rcept_no,
-                    "corp_name": item.get("corp_name", ""),
-                    "ticker": ticker,
-                    "report_nm": item.get("report_nm", ""),
-                    "rcept_dt": item.get("rcept_dt", ""),
-                    "rm": item.get("rm", ""),
-                    "dart_url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
-                })
+                items.append(
+                    {
+                        "rcept_no": rcept_no,
+                        "corp_name": item.get("corp_name", ""),
+                        "ticker": ticker,
+                        "report_nm": item.get("report_nm", ""),
+                        "rcept_dt": item.get("rcept_dt", ""),
+                        "rm": item.get("rm", ""),
+                        "dart_url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcept_no}",
+                    }
+                )
             return items
 
     tasks = [_fetch_one(ticker, corp_code) for ticker, corp_code in ticker_corp_pairs]
@@ -260,7 +255,5 @@ async def fetch_disclosures_for_tickers(
             all_items.extend(r)
 
     all_items.sort(key=lambda x: x.get("rcept_dt", ""), reverse=True)
-    logger.info(
-        "dart_disclosures_fetched", ticker_count=len(ticker_corp_pairs), total=len(all_items)
-    )
+    logger.info("dart_disclosures_fetched", ticker_count=len(ticker_corp_pairs), total=len(all_items))
     return all_items

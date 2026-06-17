@@ -99,6 +99,7 @@ class TestCircuitBreakerCall:
     async def test_call_bypasses_credential_error(self, override_settings):
         cb = CircuitBreaker("test", fail_max=3, reset_timeout=60)
         from app.exceptions import ProviderCredentialError
+
         mock_func = AsyncMock(side_effect=ProviderCredentialError("bad cred"))
         with pytest.raises(ProviderCredentialError):
             await cb.call(mock_func)

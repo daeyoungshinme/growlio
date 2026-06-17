@@ -56,16 +56,22 @@ async def sync_snapshot_positions(
     commit은 호출자가 처리한다.
     """
     # Row-level lock to prevent concurrent syncs for the same snapshot.
-    await db.execute(
-        select(AssetSnapshot).where(AssetSnapshot.id == snapshot_id).with_for_update()
-    )
+    await db.execute(select(AssetSnapshot).where(AssetSnapshot.id == snapshot_id).with_for_update())
     await db.execute(sql_delete(Position).where(Position.snapshot_id == snapshot_id))
     for p in positions:
-        db.add(Position(
-            account_id=account_id,
-            snapshot_id=snapshot_id,
-            ticker=p.ticker, name=p.name, market=p.market,
-            qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
-            current_price=p.current_price, value_krw=p.value_krw,
-            currency=p.currency, usd_rate=p.usd_rate,
-        ))
+        db.add(
+            Position(
+                account_id=account_id,
+                snapshot_id=snapshot_id,
+                ticker=p.ticker,
+                name=p.name,
+                market=p.market,
+                qty=p.qty,
+                avg_price=p.avg_price,
+                avg_price_usd=p.avg_price_usd,
+                current_price=p.current_price,
+                value_krw=p.value_krw,
+                currency=p.currency,
+                usd_rate=p.usd_rate,
+            )
+        )

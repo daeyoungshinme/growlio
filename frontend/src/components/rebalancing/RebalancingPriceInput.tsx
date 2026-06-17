@@ -41,7 +41,11 @@ export function RebalancingPriceInput({
           value={nativeVal || ""}
           placeholder={overseas ? "USD" : "KRW"}
           onChange={(e) =>
-            dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: parseFloat(e.target.value) || 0 })
+            dispatch({
+              type: "SET_LIMIT_PRICE",
+              key: orderKey,
+              price: parseFloat(e.target.value) || 0,
+            })
           }
           className="w-24 bg-gray-800 border border-indigo-600/50 rounded px-2 py-0.5 text-right text-indigo-300 font-medium text-xs focus:outline-none focus:border-indigo-500"
         />
@@ -49,7 +53,9 @@ export function RebalancingPriceInput({
       </div>
       {priceState === "loaded" && currentNativePrice != null && (
         <button
-          onClick={() => dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })}
+          onClick={() =>
+            dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })
+          }
           className="text-xs text-indigo-400 hover:text-indigo-300 mt-0.5 block ml-auto"
         >
           현재가로

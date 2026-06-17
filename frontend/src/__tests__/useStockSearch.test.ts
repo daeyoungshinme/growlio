@@ -30,10 +30,14 @@ describe("useStockSearch", () => {
       { ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" },
     ]);
 
-    act(() => { result.current.search("삼성"); });
+    act(() => {
+      result.current.search("삼성");
+    });
     await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
 
-    act(() => { result.current.search(""); });
+    act(() => {
+      result.current.search("");
+    });
     expect(result.current.suggestions).toEqual([]);
     expect(result.current.isSearchError).toBe(false);
   });
@@ -42,8 +46,12 @@ describe("useStockSearch", () => {
     const { result } = renderHook(() => useStockSearch(0));
     const { searchStocks } = await import("@/api/assets");
 
-    act(() => { result.current.search("   "); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    act(() => {
+      result.current.search("   ");
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     expect(searchStocks).not.toHaveBeenCalled();
     expect(result.current.suggestions).toEqual([]);
@@ -52,10 +60,14 @@ describe("useStockSearch", () => {
   it("debounce 후 searchStocks를 호출한다", async () => {
     const { result } = renderHook(() => useStockSearch(0));
     const { searchStocks } = await import("@/api/assets");
-    const mockSuggestions = [{ ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" }];
+    const mockSuggestions = [
+      { ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" },
+    ];
     vi.mocked(searchStocks).mockResolvedValue(mockSuggestions);
 
-    act(() => { result.current.search("삼성"); });
+    act(() => {
+      result.current.search("삼성");
+    });
     await waitFor(() => expect(result.current.suggestions).toEqual(mockSuggestions));
     expect(vi.mocked(searchStocks).mock.calls[0][0]).toBe("삼성");
   });
@@ -66,7 +78,9 @@ describe("useStockSearch", () => {
     const { toast } = await import("@/utils/toast");
     vi.mocked(searchStocks).mockRejectedValue(new Error("네트워크 오류"));
 
-    act(() => { result.current.search("삼성"); });
+    act(() => {
+      result.current.search("삼성");
+    });
     await waitFor(() => expect(result.current.isSearchError).toBe(true));
 
     expect(toast).toHaveBeenCalledWith("종목 검색에 실패했습니다", "error");
@@ -81,10 +95,14 @@ describe("useStockSearch", () => {
       { ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" },
     ]);
 
-    act(() => { result.current.search("삼성"); });
+    act(() => {
+      result.current.search("삼성");
+    });
     await waitFor(() => expect(result.current.suggestions).toHaveLength(1));
 
-    act(() => { result.current.clearSuggestions(); });
+    act(() => {
+      result.current.clearSuggestions();
+    });
     expect(result.current.suggestions).toEqual([]);
     expect(result.current.isSearchError).toBe(false);
   });
@@ -96,9 +114,15 @@ describe("useStockSearch", () => {
       const { searchStocks } = await import("@/api/assets");
       vi.mocked(searchStocks).mockResolvedValue([]);
 
-      act(() => { result.current.search("삼"); });
-      act(() => { result.current.search("삼성"); });
-      act(() => { result.current.search("삼성전"); });
+      act(() => {
+        result.current.search("삼");
+      });
+      act(() => {
+        result.current.search("삼성");
+      });
+      act(() => {
+        result.current.search("삼성전");
+      });
 
       await act(async () => {
         vi.runAllTimers();
@@ -121,8 +145,12 @@ describe("useStockSearch", () => {
       return new Promise(() => {});
     });
 
-    act(() => { result.current.search("삼성"); });
-    await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
+    act(() => {
+      result.current.search("삼성");
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10));
+    });
 
     unmount();
     expect(capturedSignal?.aborted).toBe(true);

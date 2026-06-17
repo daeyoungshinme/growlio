@@ -8,8 +8,7 @@ import { convertUsdToKrw } from "@/utils/format";
 const VALID_TX_TYPES = ["DEPOSIT", "WITHDRAWAL", "DIVIDEND"] as const;
 type TxType = (typeof VALID_TX_TYPES)[number];
 
-const isValidTxType = (val: unknown): val is TxType =>
-  VALID_TX_TYPES.includes(val as TxType);
+const isValidTxType = (val: unknown): val is TxType => VALID_TX_TYPES.includes(val as TxType);
 
 const makeEmptyForm = (accountId: string): TransactionCreate => ({
   account_id: accountId,
@@ -114,17 +113,33 @@ export function useTransactionFormState(accountId: string) {
   };
 
   return {
-    form, set, setForm, formError, setFormError,
-    currency, amountUsd, usdRate,
-    tickerDirect, setTickerDirect,
-    tickerQuery, setTickerQuery,
-    tickerSuggestions, tickerSearchLoading,
-    showTickerSuggestions, setShowTickerSuggestions,
+    form,
+    set,
+    setForm,
+    formError,
+    setFormError,
+    currency,
+    amountUsd,
+    usdRate,
+    tickerDirect,
+    setTickerDirect,
+    tickerQuery,
+    setTickerQuery,
+    tickerSuggestions,
+    tickerSearchLoading,
+    showTickerSuggestions,
+    setShowTickerSuggestions,
     clearTickerSuggestions,
-    editingTx, setEditingTx,
-    depositPrompt, setDepositPrompt,
-    resetForm, startEdit, triggerDepositPrompt,
-    handleCurrencySwitch, handleUsdAmountChange,
-    handleTxTypeChange, handleTickerQueryChange,
+    editingTx,
+    setEditingTx,
+    depositPrompt,
+    setDepositPrompt,
+    resetForm,
+    startEdit,
+    triggerDepositPrompt,
+    handleCurrencySwitch,
+    handleUsdAmountChange,
+    handleTxTypeChange,
+    handleTickerQueryChange,
   };
 }

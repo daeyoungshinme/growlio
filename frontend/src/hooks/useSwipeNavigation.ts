@@ -2,17 +2,11 @@ import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { triggerHaptic } from "./useHaptic";
 
-const NAV_ORDER = [
-  "/dashboard",
-  "/portfolio",
-  "/asset-management",
-  "/invest-plan",
-  "/settings",
-];
+const NAV_ORDER = ["/dashboard", "/portfolio", "/asset-management", "/invest-plan", "/settings"];
 
-const SWIPE_THRESHOLD = 50;     // px
+const SWIPE_THRESHOLD = 50; // px
 const VELOCITY_THRESHOLD = 0.3; // px/ms
-const ANGLE_RATIO = 1.5;        // 수평 성분이 수직 성분보다 이 배 이상이어야 탭 전환
+const ANGLE_RATIO = 1.5; // 수평 성분이 수직 성분보다 이 배 이상이어야 탭 전환
 
 interface TouchState {
   startX: number;
@@ -63,7 +57,7 @@ export function useSwipeNavigation(containerRef: React.RefObject<HTMLElement | n
         navigate(NAV_ORDER[currentIndex - 1]);
       }
     },
-    [pathname, navigate]
+    [pathname, navigate],
   );
 
   useEffect(() => {

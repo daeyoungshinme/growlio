@@ -23,7 +23,9 @@ export function RebalancingResultSection({ results }: Props) {
             <span className="text-xs text-gray-300">
               <span className="text-green-400 font-medium">{result.success_count}건 성공</span>
               {result.fail_count > 0 && (
-                <>, <span className="text-red-400 font-medium">{result.fail_count}건 실패</span></>
+                <>
+                  , <span className="text-red-400 font-medium">{result.fail_count}건 실패</span>
+                </>
               )}
             </span>
           </div>
@@ -45,7 +47,9 @@ export function RebalancingResultSection({ results }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400 flex-wrap">
-                  <span className={`px-1.5 py-0.5 rounded font-medium text-[11px] ${o.order_type === "LIMIT" ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40" : "bg-gray-700 text-gray-400"}`}>
+                  <span
+                    className={`px-1.5 py-0.5 rounded font-medium text-[11px] ${o.order_type === "LIMIT" ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40" : "bg-gray-700 text-gray-400"}`}
+                  >
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>
                   {(o.order_no ?? o.error_msg) && (
@@ -75,18 +79,24 @@ export function RebalancingResultSection({ results }: Props) {
                     <div className="font-medium truncate max-w-[120px]">{o.name}</div>
                     <div className="text-gray-400 text-[11px]">{o.ticker}</div>
                   </td>
-                  <td className="px-3 py-2 text-center"><SideBadge isBuy={o.side === "BUY"} /></td>
                   <td className="px-3 py-2 text-center">
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
-                      o.order_type === "LIMIT"
-                        ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40"
-                        : "bg-gray-700 text-gray-400"
-                    }`}>
+                    <SideBadge isBuy={o.side === "BUY"} />
+                  </td>
+                  <td className="px-3 py-2 text-center">
+                    <span
+                      className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                        o.order_type === "LIMIT"
+                          ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40"
+                          : "bg-gray-700 text-gray-400"
+                      }`}
+                    >
                       {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                     </span>
                   </td>
                   <td className="px-3 py-2 text-right">{o.quantity}주</td>
-                  <td className="px-3 py-2 text-center"><StatusBadge status={o.status} /></td>
+                  <td className="px-3 py-2 text-center">
+                    <StatusBadge status={o.status} />
+                  </td>
                   <td className="px-3 py-2 text-gray-400 max-w-[160px] truncate">
                     {o.order_no ?? o.error_msg ?? "-"}
                   </td>

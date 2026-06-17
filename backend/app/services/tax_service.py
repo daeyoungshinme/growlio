@@ -26,12 +26,12 @@ class _GeuMTRates(TypedDict):
 
 
 class _TaxRates(TypedDict):
-    dividend: float           # 배당소득세율
-    overseas_gain: float      # 해외 양도세율
-    overseas_deduction: int   # 해외 양도소득 공제 (원)
+    dividend: float  # 배당소득세율
+    overseas_gain: float  # 해외 양도세율
+    overseas_deduction: int  # 해외 양도소득 공제 (원)
     geumt_domestic_deduction: int  # 금투세 국내 공제 (원)
-    geumt_standard: float     # 금투세 기본세율
-    geumt_excess: float       # 금투세 3억 초과 세율
+    geumt_standard: float  # 금투세 기본세율
+    geumt_excess: float  # 금투세 3억 초과 세율
 
 
 _TAX_RATES: dict[int, _TaxRates] = {
@@ -90,9 +90,7 @@ def _calc_geumt_tax(taxable_gain: float, rates: _TaxRates) -> float:
     )
 
 
-def _simulate_geumt_tax(
-    overseas_gain: float, domestic_gain: float, rates: _TaxRates
-) -> GeuMTSimulationResult:
+def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float, rates: _TaxRates) -> GeuMTSimulationResult:
     """금융투자소득세 시뮬레이션 (2025년 이후 유예 중).
 
     미실현 손익 기준 추정치. 실제 과세는 실현 손익 기준.
@@ -171,10 +169,7 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
         "total_fees_krw": round(total_fees, 0),
         "harvesting_recommendations": harvesting,
         "financial_investment_tax_simulation": geumt_simulation,
-        "note": (
-            "해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. "
-            "실제 납부액은 실현 손익 기준으로 계산됩니다."
-        ),
+        "note": ("해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. 실제 납부액은 실현 손익 기준으로 계산됩니다."),
         "rates": {
             "dividend_tax_rate_pct": rates["dividend"] * 100,
             "overseas_tax_rate_pct": rates["overseas_gain"] * 100,
@@ -182,9 +177,7 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     }
 
 
-async def get_overseas_positions_detail(
-    user_id: uuid.UUID, db: AsyncSession
-) -> list[dict]:
+async def get_overseas_positions_detail(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """해외 종목별 미실현 손익 목록 반환.
 
     최신 스냅샷 기준. 수익·손실 종목 모두 포함.
@@ -195,8 +188,7 @@ async def get_overseas_positions_detail(
         .options(selectinload(AssetSnapshot.position_items))
         .join(
             subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
+            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(
@@ -276,8 +268,7 @@ def _build_harvesting_recommendations(
 
 async def _calc_total_fees(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
     result = await db.execute(
-        select(func.sum(Transaction.fee).label("total"))
-        .where(
+        select(func.sum(Transaction.fee).label("total")).where(
             Transaction.user_id == user_id,
             Transaction.fee.is_not(None),
             func.extract("year", Transaction.transaction_date) == year,
@@ -289,8 +280,7 @@ async def _calc_total_fees(user_id: uuid.UUID, year: int, db: AsyncSession) -> f
 
 async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
     result = await db.execute(
-        select(func.sum(Transaction.amount).label("total"))
-        .where(
+        select(func.sum(Transaction.amount).label("total")).where(
             Transaction.user_id == user_id,
             Transaction.transaction_type == "DIVIDEND",
             func.extract("year", Transaction.transaction_date) == year,
@@ -300,9 +290,7 @@ async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession)
     return float(total) if total else 0.0
 
 
-async def _calc_stock_unrealized(
-    user_id: uuid.UUID, db: AsyncSession
-) -> tuple[float, float, float]:
+async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[float, float, float]:
     """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
 
     Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw)
@@ -313,8 +301,7 @@ async def _calc_stock_unrealized(
         .options(selectinload(AssetSnapshot.position_items))
         .join(
             subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
+            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(

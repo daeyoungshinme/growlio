@@ -96,7 +96,7 @@ describe("invalidateRebalancingAlertData", () => {
     expect(keys).toContain("rebalancing-alerts");
     expect(keys).toContain("rebalancing-alert");
     const alertCall = qc.invalidateQueries.mock.calls.find(
-      (c) => c[0].queryKey[0] === "rebalancing-alert"
+      (c) => c[0].queryKey[0] === "rebalancing-alert",
     );
     expect(alertCall![0].queryKey[1]).toBe("portfolio-123");
   });

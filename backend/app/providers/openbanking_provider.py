@@ -1,4 +1,5 @@
 """금융결제원 오픈뱅킹 브로커 프로바이더."""
+
 from __future__ import annotations
 
 import secrets
@@ -24,9 +25,7 @@ class OpenBankingProvider(BrokerProvider):
         from app.models.user import UserSettings
         from app.providers.openbanking import ensure_ob_token_fresh, get_account_balance
 
-        settings_row = await db.scalar(
-            select(UserSettings).where(UserSettings.user_id == account.user_id)
-        )
+        settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == account.user_id))
         if not settings_row or not settings_row.ob_access_token:
             raise ProviderCredentialError("오픈뱅킹 토큰이 없습니다. 다시 연결해주세요.")
         if not account.ob_fintech_use_no:

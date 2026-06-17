@@ -133,8 +133,10 @@ async def get_settings(
         return SettingsResponse(
             has_kis=has_kis,
             has_dart=False,
-            has_open_banking=False, ob_token_expires_at=None,
-            goal_amount=None, goal_annual_return_pct=None,
+            has_open_banking=False,
+            ob_token_expires_at=None,
+            goal_amount=None,
+            goal_annual_return_pct=None,
             annual_deposit_goal=None,
             user_email=current_user.email,
             notification_email=None,
@@ -212,6 +214,7 @@ async def update_goal(
         row.retirement_target_year = req.retirement_target_year
     if req.goal_start_date is not None:
         from datetime import datetime
+
         row.goal_start_date = datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
     if req.goal_initial_amount is not None:
         row.goal_initial_amount = req.goal_initial_amount

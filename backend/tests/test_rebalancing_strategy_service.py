@@ -1,4 +1,5 @@
 """rebalancing_strategy_service.py 순수 함수 단위 테스트."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -109,9 +110,7 @@ class TestBuildTradeRecommendations:
         assert any(r["action"] == "비중 축소" for r in recs)
 
     def test_sell_action_for_missing_from_target(self):
-        current = {
-            "999999-KOSPI": {"ticker": "999999", "market": "KOSPI", "name": "구종목", "value_krw": 5000000.0}
-        }
+        current = {"999999-KOSPI": {"ticker": "999999", "market": "KOSPI", "name": "구종목", "value_krw": 5000000.0}}
         items = []
         recs = _build_trade_recommendations(current, items, {})
         assert any(r["action"] == "전량 매도" and r["ticker"] == "999999" for r in recs)
@@ -120,10 +119,7 @@ class TestBuildTradeRecommendations:
         assert _build_trade_recommendations({}, [], {}) == []
 
     def test_results_limited_to_10(self):
-        items = [
-            self._make_item(f"00{i:04d}", "KOSPI", f"종목{i}", 5.0)
-            for i in range(15)
-        ]
+        items = [self._make_item(f"00{i:04d}", "KOSPI", f"종목{i}", 5.0) for i in range(15)]
         recs = _build_trade_recommendations({}, items, {})
         assert len(recs) <= 10
 

@@ -1,4 +1,5 @@
 """backtest_service.run_backtest 및 compute_correlation 통합 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -154,17 +155,22 @@ class TestRunBacktestWithPortfolio:
         snap_exec.all.return_value = [(snap_id,)]
 
         pos = SimpleNamespace(
-            ticker="AAPL", market="NASDAQ", value_krw=500_000,
-            current_price=None, qty=5,
+            ticker="AAPL",
+            market="NASDAQ",
+            value_krw=500_000,
+            current_price=None,
+            qty=5,
         )
         pos_exec = MagicMock()
         pos_exec.scalars.return_value.all.return_value = [pos]
 
-        mock_db.execute = AsyncMock(side_effect=[
-            portfolio_exec,   # portfolios
-            snap_exec,        # snap_ids
-            pos_exec,         # positions
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                portfolio_exec,  # portfolios
+                snap_exec,  # snap_ids
+                pos_exec,  # positions
+            ]
+        )
 
         price_data = {
             "AAPL": [("2024-01-02", 185.0), ("2024-01-03", 190.0)],
@@ -198,10 +204,12 @@ class TestRunBacktestWithPortfolio:
         snap_exec = MagicMock()
         snap_exec.all.return_value = []
 
-        mock_db.execute = AsyncMock(side_effect=[
-            portfolio_exec,
-            snap_exec,  # snap_ids query returns empty
-        ])
+        mock_db.execute = AsyncMock(
+            side_effect=[
+                portfolio_exec,
+                snap_exec,  # snap_ids query returns empty
+            ]
+        )
 
         price_data = {
             "AAPL": [("2024-01-02", 185.0), ("2024-01-03", 190.0)],
@@ -227,10 +235,12 @@ class TestRunBacktestWithPortfolio:
         """CASH 티커는 yfinance 조회에서 제외."""
         from app.services.backtest_service import run_backtest
 
-        port = _make_portfolio(items=[
-            SimpleNamespace(ticker="CASH", market="KRW", weight=50.0, name="현금"),
-            SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=50.0, name="Apple"),
-        ])
+        port = _make_portfolio(
+            items=[
+                SimpleNamespace(ticker="CASH", market="KRW", weight=50.0, name="현금"),
+                SimpleNamespace(ticker="AAPL", market="NASDAQ", weight=50.0, name="Apple"),
+            ]
+        )
         exec_res = MagicMock()
         exec_res.scalars.return_value.all.return_value = [port]
         mock_db.execute = AsyncMock(return_value=exec_res)

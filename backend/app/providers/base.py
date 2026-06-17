@@ -21,24 +21,24 @@ class Position:
     name: str
     market: str
     qty: int
-    avg_price: float        # 항상 KRW
-    current_price: float    # 항상 KRW
-    currency: str           # KRW | USD (원본 통화)
+    avg_price: float  # 항상 KRW
+    current_price: float  # 항상 KRW
+    currency: str  # KRW | USD (원본 통화)
     value_krw: float = 0.0
     pnl: float = 0.0
     pnl_pct: float = 0.0
-    avg_price_usd: float | None = None   # 해외 종목 원본 USD 평단가 (표시용)
-    usd_rate: float | None = None        # 평단가 환산에 사용한 환율 (표시용)
+    avg_price_usd: float | None = None  # 해외 종목 원본 USD 평단가 (표시용)
+    usd_rate: float | None = None  # 평단가 환산에 사용한 환율 (표시용)
 
 
 @dataclass
 class BalanceResult:
     positions: list[Position] = field(default_factory=list)
     total_value_krw: float = 0.0
-    deposit_krw: float = 0.0          # 예수금 (KRW)
-    deposit_foreign: float = 0.0      # 해외 예수금 (원화 환산 전)
-    invested_krw: float = 0.0         # 매입금액
-    pnl_krw: float = 0.0              # 평가손익
+    deposit_krw: float = 0.0  # 예수금 (KRW)
+    deposit_foreign: float = 0.0  # 해외 예수금 (원화 환산 전)
+    invested_krw: float = 0.0  # 매입금액
+    pnl_krw: float = 0.0  # 평가손익
     usd_krw_rate: float = field(default_factory=lambda: settings.usd_krw_fallback_rate)
     extra: dict[str, Any] = field(default_factory=dict)
 

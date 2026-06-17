@@ -1,4 +1,5 @@
 """ManualPosition Pydantic 스키마 유효성 검증 테스트."""
+
 from __future__ import annotations
 
 import pytest
@@ -20,10 +21,12 @@ def _valid_position(**overrides):
 class TestManualPositionSchema:
     def _make(self, **kwargs):
         from app.schemas.asset import ManualPosition
+
         return ManualPosition(**{**_valid_position(), **kwargs})
 
     def _raises(self, **kwargs):
         from app.schemas.asset import ManualPosition
+
         with pytest.raises(ValidationError):
             ManualPosition(**{**_valid_position(), **kwargs})
 

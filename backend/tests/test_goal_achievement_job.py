@@ -1,4 +1,5 @@
 """투자 목표 달성 알림 Job 테스트."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -48,12 +49,11 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock,
-                  return_value=AsyncMock()),
-            patch("app.jobs.goal_achievement.send_goal_achievement_email",
-                  new_callable=AsyncMock) as mock_email,
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
+
             await run_goal_achievement_check()
 
         mock_email.assert_not_called()
@@ -76,14 +76,16 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock,
-                  return_value=AsyncMock()),
-            patch("app.jobs.goal_achievement.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY_NOT_ACHIEVED),
-            patch("app.jobs.goal_achievement.send_goal_achievement_email",
-                  new_callable=AsyncMock) as mock_email,
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.jobs.goal_achievement.get_dashboard_summary",
+                new_callable=AsyncMock,
+                return_value=_MOCK_SUMMARY_NOT_ACHIEVED,
+            ),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
+
             await run_goal_achievement_check()
 
         mock_email.assert_not_called()
@@ -119,14 +121,16 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock,
-                  return_value=AsyncMock()),
-            patch("app.jobs.goal_achievement.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY_ACHIEVED),
-            patch("app.jobs.goal_achievement.send_goal_achievement_email",
-                  new_callable=AsyncMock) as mock_email,
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.jobs.goal_achievement.get_dashboard_summary",
+                new_callable=AsyncMock,
+                return_value=_MOCK_SUMMARY_ACHIEVED,
+            ),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
+
             await run_goal_achievement_check()
 
         assert mock_email.called
@@ -162,14 +166,16 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock,
-                  return_value=AsyncMock()),
-            patch("app.jobs.goal_achievement.get_dashboard_summary",
-                  new_callable=AsyncMock, return_value=_MOCK_SUMMARY_ACHIEVED),
-            patch("app.jobs.goal_achievement.send_goal_achievement_email",
-                  new_callable=AsyncMock) as mock_email,
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.jobs.goal_achievement.get_dashboard_summary",
+                new_callable=AsyncMock,
+                return_value=_MOCK_SUMMARY_ACHIEVED,
+            ),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
+
             await run_goal_achievement_check()
 
         assert mock_email.called
@@ -203,13 +209,12 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock,
-                  return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.goal_achievement.get_dashboard_summary", side_effect=fail_first),
-            patch("app.jobs.goal_achievement.send_goal_achievement_email",
-                  new_callable=AsyncMock),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock),
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
+
             await run_goal_achievement_check()
 
         assert call_count[0] == 2

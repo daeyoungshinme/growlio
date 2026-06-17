@@ -38,6 +38,7 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
     yield는 trailingAnnualDividendYield 우선, forward dividendYield 폴백.
     """
     import yfinance as yf
+
     try:
         ticker = yf.Ticker(yahoo_symbol)
         info = ticker.info
@@ -58,7 +59,9 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
         if trailing_dps > 0 and last_price > 0 and trailing_dps / last_price > 0.5:
             logger.warning(
                 "yahoo_dps_unit_corrected",
-                symbol=yahoo_symbol, raw_dps=trailing_dps, price=last_price,
+                symbol=yahoo_symbol,
+                raw_dps=trailing_dps,
+                price=last_price,
             )
             trailing_dps = trailing_dps / 100
 
@@ -106,7 +109,9 @@ def sync_pykrx_etf_dividend_info(ticker: str) -> dict:
 
         logger.info(
             "pykrx_etf_dividend_fetched",
-            ticker=ticker, annual_dps=annual_dps, yield_decimal=yield_decimal,
+            ticker=ticker,
+            annual_dps=annual_dps,
+            yield_decimal=yield_decimal,
         )
         return {"dps": annual_dps, "dividend_yield": yield_decimal}
     except Exception as e:
@@ -251,6 +256,7 @@ def sync_naver_stock_dividend_info(ticker: str) -> dict:
 def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
     """과거 2년 배당락일에서 지급월 추출. calendar로 ex-date/payment-date 오프셋 보정."""
     import yfinance as yf
+
     try:
         t = yf.Ticker(yahoo_symbol)
 

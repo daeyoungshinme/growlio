@@ -20,7 +20,9 @@ export function useAllocationHistory(months = 12) {
     const points = data.map((point) => {
       const entry: Record<string, unknown> = { month: point.month.slice(2, 7).replace("-", ".") };
       const byType = Object.fromEntries(point.allocations.map((a) => [a.asset_type, a.amount_krw]));
-      types.forEach((t) => { entry[t] = byType[t] ?? 0; });
+      types.forEach((t) => {
+        entry[t] = byType[t] ?? 0;
+      });
       return entry;
     });
     return { chartData: points, allTypes: types };
@@ -29,7 +31,11 @@ export function useAllocationHistory(months = 12) {
   const labelMap = useMemo(() => {
     if (!data || data.length === 0) return {} as Record<string, string>;
     const map: Record<string, string> = {};
-    data.forEach((point) => point.allocations.forEach((a) => { map[a.asset_type] = a.label; }));
+    data.forEach((point) =>
+      point.allocations.forEach((a) => {
+        map[a.asset_type] = a.label;
+      }),
+    );
     return map;
   }, [data]);
 

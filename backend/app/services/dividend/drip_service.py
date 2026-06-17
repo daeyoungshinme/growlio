@@ -1,4 +1,5 @@
 """배당 현금흐름 최적화 — DRIP 시뮬레이션, 월별 균등화 제안."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,6 +8,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 # DRIP 시뮬레이션
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class DRIPSimulationPoint:
@@ -58,12 +60,14 @@ def simulate_drip(
         portfolio_cash = (portfolio_cash + monthly_contribution) * monthly_return
 
         if month == 12 or i == 0:
-            points.append({
-                "year": year,
-                "portfolio_value_drip": round(portfolio_drip, 0),
-                "portfolio_value_cash": round(portfolio_cash, 0),
-                "cumulative_dividend_krw": round(total_dividend_received, 0),
-            })
+            points.append(
+                {
+                    "year": year,
+                    "portfolio_value_drip": round(portfolio_drip, 0),
+                    "portfolio_value_cash": round(portfolio_cash, 0),
+                    "cumulative_dividend_krw": round(total_dividend_received, 0),
+                }
+            )
 
     final_drip = points[-1]["portfolio_value_drip"] if points else 0.0
     final_cash = points[-1]["portfolio_value_cash"] if points else 0.0
@@ -87,6 +91,7 @@ def simulate_drip(
 # ---------------------------------------------------------------------------
 # 월별 균등화 제안
 # ---------------------------------------------------------------------------
+
 
 def calc_monthly_optimization(
     ticker_summaries: list[dict],
@@ -127,14 +132,16 @@ def calc_monthly_optimization(
         for weak_month in weak_months:
             if weak_month in item_months:
                 per_payment = estimated_annual / len(item_months)
-                suggestions.append({
-                    "month": weak_month,
-                    "ticker": item.get("ticker", ""),
-                    "name": item.get("name") or item.get("ticker", ""),
-                    "market": item.get("market", ""),
-                    "estimated_monthly_krw": round(per_payment, 0),
-                    "current_monthly_total_krw": round(monthly_totals[weak_month], 0),
-                })
+                suggestions.append(
+                    {
+                        "month": weak_month,
+                        "ticker": item.get("ticker", ""),
+                        "name": item.get("name") or item.get("ticker", ""),
+                        "market": item.get("market", ""),
+                        "estimated_monthly_krw": round(per_payment, 0),
+                        "current_monthly_total_krw": round(monthly_totals[weak_month], 0),
+                    }
+                )
 
     # 약한 달, 추정금액 기준 정렬
     suggestions.sort(key=lambda x: (x["month"], -x["estimated_monthly_krw"]))

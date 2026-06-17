@@ -29,11 +29,9 @@ export interface AutoDcaPayload {
   account_id: string | null;
 }
 
-export const fetchSettings = (): Promise<SettingsData> =>
-  apiGet<SettingsData>("/settings");
+export const fetchSettings = (): Promise<SettingsData> => apiGet<SettingsData>("/settings");
 
-export const updateAutoDca = (payload: AutoDcaPayload) =>
-  apiPut("/settings/auto-dca", payload);
+export const updateAutoDca = (payload: AutoDcaPayload) => apiPut("/settings/auto-dca", payload);
 
 export const registerPushToken = (fcm_token: string | null) =>
   apiPut("/settings/push-token", { fcm_token });

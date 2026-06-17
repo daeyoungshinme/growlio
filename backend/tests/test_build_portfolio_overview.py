@@ -1,4 +1,5 @@
 """portfolio_service.build_portfolio_overview 통합 테스트."""
+
 from __future__ import annotations
 
 import json
@@ -87,12 +88,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         snapshot = _make_snapshot(snap_id, acc_id)
         position = _make_position(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),   # 1. accounts
-            _exec_result([snapshot]),  # 2. snapshots
-            _exec_result([position]),  # 3. snap positions
-            _exec_result([]),          # 4. current positions
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),  # 1. accounts
+                _exec_result([snapshot]),  # 2. snapshots
+                _exec_result([position]),  # 3. snap positions
+                _exec_result([]),  # 4. current positions
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -112,12 +115,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         account = _make_account(acc_id=acc_id)
         snapshot = _make_snapshot(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([]),  # snap positions (empty)
-            _exec_result([]),  # current positions
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([]),  # snap positions (empty)
+                _exec_result([]),  # current positions
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
         # invested_amount=9M, pnl=1M → return = 1/9*100 ≈ 11.11%
@@ -134,11 +139,13 @@ class TestBuildPortfolioOverviewWithAccounts:
         snapshot = _make_snapshot(snap_id, acc_id)
 
         # BANK_ACCOUNT: snap_ids=[snap_id] → call3, acc_ids=[] → no call4
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([]),  # snap positions (nothing for bank)
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([]),  # snap positions (nothing for bank)
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -156,12 +163,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         account = _make_account(acc_id=acc_id, include_in_total=False)
         snapshot = _make_snapshot(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([]),  # snap positions
-            _exec_result([]),  # current positions
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([]),  # snap positions
+                _exec_result([]),  # current positions
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
         assert result["total_assets_krw"] == 0
@@ -177,12 +186,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         snapshot = _make_snapshot(snap_id, acc_id)
         position = _make_position(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([position]),
-            _exec_result([]),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db, lite=True)
 
@@ -196,19 +207,27 @@ class TestBuildPortfolioOverviewWithAccounts:
         acc_id = uuid.uuid4()
 
         account = SimpleNamespace(
-            id=acc_id, name="아파트", asset_type="REAL_ESTATE",
-            data_source="MANUAL", is_active=True, include_in_total=True,
-            institution=None, is_mock_mode=False,
+            id=acc_id,
+            name="아파트",
+            asset_type="REAL_ESTATE",
+            data_source="MANUAL",
+            is_active=True,
+            include_in_total=True,
+            institution=None,
+            is_mock_mode=False,
             manual_amount=500_000_000,
             real_estate_details={"mortgage_balance_krw": 200_000_000},
-            sort_order=0, created_at=None,
+            sort_order=0,
+            created_at=None,
         )
 
         # REAL_ESTATE: snap_ids=[], acc_ids=[] → only 2 DB calls
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([]),  # no snapshots
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([]),  # no snapshots
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -241,11 +260,13 @@ class TestBuildPortfolioOverviewWithAccounts:
         acc_id = uuid.uuid4()
         # Need a real account so the function doesn't return early (setex only called after full build)
         account = _make_account(acc_id=acc_id, asset_type="BANK_ACCOUNT")
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),  # 1. accounts
-            _exec_result([]),         # 2. snapshots (none)
-            # BANK_ACCOUNT not in STOCK_TYPES → no current positions query
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),  # 1. accounts
+                _exec_result([]),  # 2. snapshots (none)
+                # BANK_ACCOUNT not in STOCK_TYPES → no current positions query
+            ]
+        )
 
         await build_portfolio_overview(uuid.uuid4(), db, redis=redis)
 
@@ -259,12 +280,14 @@ class TestBuildPortfolioOverviewWithAccounts:
 
         account = _make_account(acc_id=acc_id)  # manual_amount=None
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([]),  # no snapshots
-            # snap_ids=[] → no call3
-            _exec_result([]),  # current positions (acc_ids=[acc_id])
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([]),  # no snapshots
+                # snap_ids=[] → no call3
+                _exec_result([]),  # current positions (acc_ids=[acc_id])
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -280,12 +303,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         account = _make_account(acc_id=acc_id, asset_type="STOCK_KIS")
         snapshot = _make_snapshot(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([]),
-            _exec_result([]),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([]),
+                _exec_result([]),
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -303,12 +328,14 @@ class TestBuildPortfolioOverviewWithAccounts:
         snapshot = _make_snapshot(snap_id, acc_id)
         position = _make_position(snap_id, acc_id)
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([position]),
-            _exec_result([]),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 
@@ -341,17 +368,24 @@ class TestBuildPortfolioOverviewWithAccounts:
         cur_pos = SimpleNamespace(
             snapshot_id=None,
             account_id=acc_id,
-            ticker="000660", name="SK하이닉스",
-            market="KOSPI", qty=5, avg_price=100_000,
-            current_price=120_000, value_krw=600_000, currency="KRW",
+            ticker="000660",
+            name="SK하이닉스",
+            market="KOSPI",
+            qty=5,
+            avg_price=100_000,
+            current_price=120_000,
+            value_krw=600_000,
+            currency="KRW",
         )
 
-        db.execute = AsyncMock(side_effect=[
-            _exec_result([account]),
-            _exec_result([snapshot]),
-            _exec_result([snap_pos]),
-            _exec_result([cur_pos]),
-        ])
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([snap_pos]),
+                _exec_result([cur_pos]),
+            ]
+        )
 
         result = await build_portfolio_overview(uuid.uuid4(), db)
 

@@ -193,9 +193,12 @@ async def get_snapshots(
         )
     limit = min(limit, _MAX_SNAPSHOTS_LIMIT)
     return await _list_snapshots_in_range(
-        current_user.id, db,
-        start_date=start_date, end_date=end_date,
-        skip=skip, limit=limit,
+        current_user.id,
+        db,
+        start_date=start_date,
+        end_date=end_date,
+        skip=skip,
+        limit=limit,
     )
 
 
@@ -246,7 +249,12 @@ async def update_account(
         account.kiwoom_app_key = encrypt(req.kiwoom_app_key) if req.kiwoom_app_key else None
         account.kiwoom_app_secret = encrypt(req.kiwoom_app_secret) if req.kiwoom_app_secret else None
 
-    if req.manual_amount is not None or req.deposit_krw is not None or req.deposit_usd is not None or req.real_estate_details is not None:  # noqa: E501
+    if (
+        req.manual_amount is not None
+        or req.deposit_krw is not None
+        or req.deposit_usd is not None
+        or req.real_estate_details is not None
+    ):  # noqa: E501
         account.manual_updated_at = datetime.now(UTC)
     await db.commit()
     await db.refresh(account)
@@ -274,14 +282,13 @@ async def update_account(
         )
         snap_id = latest_snap.id if latest_snap else None
         if snap_id:
-            pos_result = await db.execute(
-                select(Position).where(Position.snapshot_id == snap_id)
-            )
+            pos_result = await db.execute(select(Position).where(Position.snapshot_id == snap_id))
             pos_list = list(pos_result.scalars().all())
         else:
             cur_result = await db.execute(
                 select(Position).where(
-                    Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
+                    Position.account_id == account.id,
+                    Position.snapshot_id == None,  # noqa: E711
                 )
             )
             pos_list = list(cur_result.scalars().all())
@@ -327,9 +334,13 @@ async def delete_account_kis_credentials(
     from app.models.token import KisToken
 
     await _delete_account_credentials(
-        account_id, current_user.id, db,
-        app_key_attr="kis_app_key", app_secret_attr="kis_app_secret",
-        token_model=KisToken, redis_key=f"kis_token:account:{account_id}",
+        account_id,
+        current_user.id,
+        db,
+        app_key_attr="kis_app_key",
+        app_secret_attr="kis_app_secret",
+        token_model=KisToken,
+        redis_key=f"kis_token:account:{account_id}",
     )
 
 
@@ -343,9 +354,13 @@ async def delete_account_kiwoom_credentials(
     from app.models.token import KiwoomToken
 
     await _delete_account_credentials(
-        account_id, current_user.id, db,
-        app_key_attr="kiwoom_app_key", app_secret_attr="kiwoom_app_secret",
-        token_model=KiwoomToken, redis_key=f"kiwoom_token:account:{account_id}",
+        account_id,
+        current_user.id,
+        db,
+        app_key_attr="kiwoom_app_key",
+        app_secret_attr="kiwoom_app_secret",
+        token_model=KiwoomToken,
+        redis_key=f"kiwoom_token:account:{account_id}",
     )
 
 
@@ -412,7 +427,6 @@ async def sync_account(
                 detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
         return await _do_sync(account, current_user, db, redis)
-
 
 
 async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
@@ -482,4 +496,3 @@ async def set_target_portfolio(
     await db.commit()
     await db.refresh(account)
     return _account_response(account)
-

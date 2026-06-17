@@ -23,9 +23,15 @@ interface PositionsResponse {
 }
 
 const EMPTY_ROW: Position = {
-  ticker: "", name: "", market: "KOSPI",
-  qty: 0, avg_price: 0, avg_price_usd: null,
-  usd_rate: null, current_price: null, current_price_usd: null,
+  ticker: "",
+  name: "",
+  market: "KOSPI",
+  qty: 0,
+  avg_price: 0,
+  avg_price_usd: null,
+  usd_rate: null,
+  current_price: null,
+  current_price_usd: null,
 };
 
 export default function StockPositionsModal({
@@ -49,15 +55,21 @@ export default function StockPositionsModal({
   const editor = usePositionsEditor([], usdRate);
 
   useEffect(() => {
-    api.get<PositionsResponse>(`/assets/${accountId}/positions`).then((r) => {
-      const positions = r.data.positions;
-      editor.setRows(editor.enrichRows(positions.length ? positions : (readonly ? [] : [{ ...EMPTY_ROW }])));
-      setSummary(r.data.summary);
-    }).catch((e) => {
-      setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
-    }).finally(() => setLoading(false));
-  // editor.setRows/enrichRows는 렌더마다 새 참조 → dep 포함 시 무한 루프. accountId/readonly 변경 시만 재조회.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    api
+      .get<PositionsResponse>(`/assets/${accountId}/positions`)
+      .then((r) => {
+        const positions = r.data.positions;
+        editor.setRows(
+          editor.enrichRows(positions.length ? positions : readonly ? [] : [{ ...EMPTY_ROW }]),
+        );
+        setSummary(r.data.summary);
+      })
+      .catch((e) => {
+        setError(extractErrorMessage(e, "포지션 조회에 실패했습니다"));
+      })
+      .finally(() => setLoading(false));
+    // editor.setRows/enrichRows는 렌더마다 새 참조 → dep 포함 시 무한 루프. accountId/readonly 변경 시만 재조회.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountId, readonly]);
 
   const liveSummary: Summary = editor.liveRows.reduce(
@@ -67,7 +79,7 @@ export default function StockPositionsModal({
       total_pnl: acc.total_pnl + (r.pnl ?? 0),
       total_pnl_pct: 0,
     }),
-    { total_invested: 0, total_value: 0, total_pnl: 0, total_pnl_pct: 0 }
+    { total_invested: 0, total_value: 0, total_pnl: 0, total_pnl_pct: 0 },
   );
   if (liveSummary.total_invested > 0) {
     liveSummary.total_pnl_pct = (liveSummary.total_pnl / liveSummary.total_invested) * 100;
@@ -75,22 +87,31 @@ export default function StockPositionsModal({
 
   const handleSave = async () => {
     const valid = editor.rows.filter((r) => r.ticker || r.name || r.qty || r.avg_price);
-    setSaving(true); setError(null);
+    setSaving(true);
+    setError(null);
     try {
       const r = await api.put<PositionsResponse>(`/assets/${accountId}/positions`, valid);
-      editor.setRows(editor.enrichRows(r.data.positions)); setSummary(r.data.summary);
-    } catch (e) { setError(extractErrorMessage(e, "저장에 실패했습니다")); }
-    finally { setSaving(false); }
+      editor.setRows(editor.enrichRows(r.data.positions));
+      setSummary(r.data.summary);
+    } catch (e) {
+      setError(extractErrorMessage(e, "저장에 실패했습니다"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleSyncAll = async () => {
-    setSyncing(true); setError(null);
+    setSyncing(true);
+    setError(null);
     try {
       const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
-      editor.setRows(editor.enrichRows(r.data.positions)); setSummary(r.data.summary);
+      editor.setRows(editor.enrichRows(r.data.positions));
+      setSummary(r.data.summary);
     } catch (e: unknown) {
       setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
-    } finally { setSyncing(false); }
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const displaySummary = summary ?? liveSummary;
@@ -106,10 +127,18 @@ export default function StockPositionsModal({
         <div className="flex items-center gap-3">
           {usdRate && (
             <span className="text-xs text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-1.5">
-              USD/KRW <strong className="text-gray-600 dark:text-gray-300">{usdRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}원</strong>
+              USD/KRW{" "}
+              <strong className="text-gray-600 dark:text-gray-300">
+                {usdRate.toLocaleString(undefined, { maximumFractionDigits: 0 })}원
+              </strong>
             </span>
           )}
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400"><X size={18} /></button>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400"
+          >
+            <X size={18} />
+          </button>
         </div>
       </div>
 
@@ -137,10 +166,12 @@ export default function StockPositionsModal({
         <div>
           <p className="text-gray-400 dark:text-gray-500 text-xs mb-0.5">손익/수익률</p>
           <p className={`font-bold text-sm ${pnlColor(displaySummary.total_pnl)}`}>
-            {displaySummary.total_pnl >= 0 ? "+" : ""}{fmtKrwShort(displaySummary.total_pnl)}원
+            {displaySummary.total_pnl >= 0 ? "+" : ""}
+            {fmtKrwShort(displaySummary.total_pnl)}원
           </p>
           <p className={`text-xs ${pnlColor(displaySummary.total_pnl_pct)}`}>
-            {displaySummary.total_pnl_pct >= 0 ? "+" : ""}{displaySummary.total_pnl_pct.toFixed(2)}%
+            {displaySummary.total_pnl_pct >= 0 ? "+" : ""}
+            {displaySummary.total_pnl_pct.toFixed(2)}%
           </p>
         </div>
       </div>
@@ -195,7 +226,12 @@ export default function StockPositionsModal({
           전체 현재가 갱신
         </button>
         <div className="flex gap-3 sm:justify-end">
-          <button onClick={onClose} className="flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-white dark:hover:bg-gray-700">닫기</button>
+          <button
+            onClick={onClose}
+            className="flex-1 sm:flex-none px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-white dark:hover:bg-gray-700"
+          >
+            닫기
+          </button>
           {!readonly && (
             <button
               onClick={handleSave}

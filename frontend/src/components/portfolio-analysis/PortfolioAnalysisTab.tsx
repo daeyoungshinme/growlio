@@ -39,7 +39,9 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   const sortedPortfolios = useMemo(() => {
     if (!localOrder.length || localOrder.length !== portfolios.length) return portfolios;
     const orderMap = new Map(localOrder.map((id, i) => [id, i]));
-    return [...portfolios].sort((a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity));
+    return [...portfolios].sort(
+      (a, b) => (orderMap.get(a.id) ?? Infinity) - (orderMap.get(b.id) ?? Infinity),
+    );
   }, [portfolios, localOrder]);
 
   const { data: accountsRaw } = useQuery({
@@ -100,16 +102,38 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   }
 
   const createMut = useMutation({
-    mutationFn: (args: { name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
-      createPortfolio(args),
-    onSuccess: () => { invalidatePortfolioData(qc); setEditorOpen(false); },
+    mutationFn: (args: {
+      name: string;
+      items: PortfolioItem[];
+      base_type: string;
+      account_ids: string[] | null;
+    }) => createPortfolio(args),
+    onSuccess: () => {
+      invalidatePortfolioData(qc);
+      setEditorOpen(false);
+    },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });
 
   const updateMut = useMutation({
-    mutationFn: (args: { id: string; name: string; items: PortfolioItem[]; base_type: string; account_ids: string[] | null }) =>
-      updatePortfolio(args.id, { name: args.name, items: args.items, base_type: args.base_type, account_ids: args.account_ids }),
-    onSuccess: () => { invalidatePortfolioData(qc); setEditingPortfolio(null); setEditorOpen(false); },
+    mutationFn: (args: {
+      id: string;
+      name: string;
+      items: PortfolioItem[];
+      base_type: string;
+      account_ids: string[] | null;
+    }) =>
+      updatePortfolio(args.id, {
+        name: args.name,
+        items: args.items,
+        base_type: args.base_type,
+        account_ids: args.account_ids,
+      }),
+    onSuccess: () => {
+      invalidatePortfolioData(qc);
+      setEditingPortfolio(null);
+      setEditorOpen(false);
+    },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 수정에 실패했습니다"), "error"),
   });
 
@@ -117,14 +141,23 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     mutationFn: deletePortfolio,
     onSuccess: (_, id) => {
       invalidatePortfolioData(qc);
-      setSelectedIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 삭제에 실패했습니다"), "error"),
   });
 
   const batchTargetMut = useMutation({
-    mutationFn: ({ portfolioId: pid, accountIds }: { portfolioId: string | null; accountIds: string[] }) =>
-      batchSetTargetPortfolio(pid, accountIds),
+    mutationFn: ({
+      portfolioId: pid,
+      accountIds,
+    }: {
+      portfolioId: string | null;
+      accountIds: string[];
+    }) => batchSetTargetPortfolio(pid, accountIds),
     onSuccess: (_, { portfolioId: pid, accountIds }) => {
       invalidateAccountData(qc);
       if (pid === null) {
@@ -137,9 +170,20 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     onError: (e) => toast(extractErrorMessage(e, "목표 포트폴리오 설정에 실패했습니다"), "error"),
   });
 
-  function handleSave(name: string, items: PortfolioItem[], baseType: string, accountIds: string[] | null) {
+  function handleSave(
+    name: string,
+    items: PortfolioItem[],
+    baseType: string,
+    accountIds: string[] | null,
+  ) {
     if (editingPortfolio) {
-      updateMut.mutate({ id: editingPortfolio.id, name, items, base_type: baseType, account_ids: accountIds });
+      updateMut.mutate({
+        id: editingPortfolio.id,
+        name,
+        items,
+        base_type: baseType,
+        account_ids: accountIds,
+      });
     } else {
       createMut.mutate({ name, items, base_type: baseType, account_ids: accountIds });
     }
@@ -171,14 +215,20 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
           onToggleSelect={(id) =>
             setSelectedIds((prev) => {
               const next = new Set(prev);
-              if (next.has(id)) next.delete(id); else next.add(id);
+              if (next.has(id)) next.delete(id);
+              else next.add(id);
               return next;
             })
           }
-          onOpenEditor={(p) => { setEditingPortfolio(p); setEditorOpen(true); }}
+          onOpenEditor={(p) => {
+            setEditingPortfolio(p);
+            setEditorOpen(true);
+          }}
           onOpenAlertModal={setAlertModalPortfolioId}
           onConfirmDelete={setConfirmDeleteId}
-          onBatchSetTarget={(pid, accountIds) => batchTargetMut.mutate({ portfolioId: pid, accountIds })}
+          onBatchSetTarget={(pid, accountIds) =>
+            batchTargetMut.mutate({ portfolioId: pid, accountIds })
+          }
           onRefresh={async () => {
             await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
           }}
@@ -203,7 +253,10 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
           initial={editingPortfolio}
           accounts={stockAccounts}
           onSave={handleSave}
-          onClose={() => { setEditorOpen(false); setEditingPortfolio(null); }}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditingPortfolio(null);
+          }}
           saving={createMut.isPending || updateMut.isPending}
         />
       )}
@@ -211,7 +264,10 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
         <ConfirmModal
           message="포트폴리오를 삭제하시겠습니까?"
           confirmLabel="삭제"
-          onConfirm={() => { deleteMut.mutate(confirmDeleteId); setConfirmDeleteId(null); }}
+          onConfirm={() => {
+            deleteMut.mutate(confirmDeleteId);
+            setConfirmDeleteId(null);
+          }}
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
@@ -220,7 +276,9 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
           key={alertModalPortfolioId}
           portfolioId={alertModalPortfolioId}
           portfolioName={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
-          accountIds={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null}
+          accountIds={
+            sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null
+          }
           onClose={() => setAlertModalPortfolioId(null)}
         />
       )}

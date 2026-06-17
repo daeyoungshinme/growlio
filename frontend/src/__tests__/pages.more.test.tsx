@@ -68,9 +68,7 @@ describe("ForgotPasswordPage", () => {
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.submit(
-      screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!
-    );
+    fireEvent.submit(screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!);
     await waitFor(() => {
       expect(forgotPasswordMock).toHaveBeenCalledWith("user@example.com");
     });
@@ -82,9 +80,7 @@ describe("ForgotPasswordPage", () => {
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.submit(
-      screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!
-    );
+    fireEvent.submit(screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!);
     await waitFor(() => {
       expect(screen.getByText(/이메일을 확인해주세요/)).toBeInTheDocument();
     });
@@ -98,13 +94,9 @@ describe("ForgotPasswordPage", () => {
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.submit(
-      screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!
-    );
+    fireEvent.submit(screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!);
     await waitFor(() => {
-      expect(
-        screen.getByText(/요청 중 오류가 발생했습니다/)
-      ).toBeInTheDocument();
+      expect(screen.getByText(/요청 중 오류가 발생했습니다/)).toBeInTheDocument();
     });
   });
 
@@ -113,15 +105,13 @@ describe("ForgotPasswordPage", () => {
     forgotPasswordMock.mockReturnValue(
       new Promise<void>((resolve) => {
         resolveFn = resolve;
-      })
+      }),
     );
     renderWithRouter(<ForgotPasswordPage />);
     fireEvent.change(screen.getByPlaceholderText("you@example.com"), {
       target: { value: "user@example.com" },
     });
-    fireEvent.submit(
-      screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!
-    );
+    fireEvent.submit(screen.getByRole("button", { name: /재설정 링크 발송/ }).closest("form")!);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /전송 중/ })).toBeInTheDocument();
     });
@@ -132,15 +122,16 @@ describe("ForgotPasswordPage", () => {
     renderWithRouter(<ForgotPasswordPage />);
     expect(screen.getByRole("link", { name: /아이디 찾기/ })).toHaveAttribute(
       "href",
-      "/find-account"
+      "/find-account",
     );
   });
 
   it("has a link back to login page", () => {
     renderWithRouter(<ForgotPasswordPage />);
-    expect(
-      screen.getByRole("link", { name: /로그인으로 돌아가기/ })
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: /로그인으로 돌아가기/ })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 });
 
@@ -159,9 +150,7 @@ describe("FindAccountPage", () => {
 
   it("renders form with disabled button initially", () => {
     renderWithRouter(<FindAccountPage />);
-    expect(
-      screen.getByPlaceholderText(/가입 시 사용한 이름/)
-    ).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/가입 시 사용한 이름/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /이메일 확인/ })).toBeDisabled();
   });
 
@@ -187,9 +176,7 @@ describe("FindAccountPage", () => {
     fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
       target: { value: "testuser" },
     });
-    fireEvent.submit(
-      screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!
-    );
+    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
     await waitFor(() => {
       expect(findAccountMock).toHaveBeenCalledWith("testuser");
     });
@@ -201,9 +188,7 @@ describe("FindAccountPage", () => {
     fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
       target: { value: "testuser" },
     });
-    fireEvent.submit(
-      screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!
-    );
+    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
     await waitFor(() => {
       expect(screen.getByText("email found: user@example.com")).toBeInTheDocument();
     });
@@ -215,9 +200,7 @@ describe("FindAccountPage", () => {
     fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
       target: { value: "testuser" },
     });
-    fireEvent.submit(
-      screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!
-    );
+    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
     await waitFor(() => {
       expect(screen.getByText(/조회 중 오류가 발생했습니다/)).toBeInTheDocument();
     });
@@ -228,15 +211,13 @@ describe("FindAccountPage", () => {
     findAccountMock.mockReturnValue(
       new Promise<string>((resolve) => {
         resolveFn = resolve;
-      })
+      }),
     );
     renderWithRouter(<FindAccountPage />);
     fireEvent.change(screen.getByPlaceholderText(/가입 시 사용한 이름/), {
       target: { value: "testuser" },
     });
-    fireEvent.submit(
-      screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!
-    );
+    fireEvent.submit(screen.getByPlaceholderText(/가입 시 사용한 이름/).closest("form")!);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /조회 중/ })).toBeInTheDocument();
     });
@@ -245,12 +226,14 @@ describe("FindAccountPage", () => {
 
   it("has links to other auth pages", () => {
     renderWithRouter(<FindAccountPage />);
-    expect(
-      screen.getByRole("link", { name: /비밀번호 찾기/ })
-    ).toHaveAttribute("href", "/forgot-password");
-    expect(
-      screen.getByRole("link", { name: /로그인으로 돌아가기/ })
-    ).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: /비밀번호 찾기/ })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
+    expect(screen.getByRole("link", { name: /로그인으로 돌아가기/ })).toHaveAttribute(
+      "href",
+      "/login",
+    );
   });
 });
 
@@ -275,26 +258,23 @@ describe("ResetPasswordPage", () => {
 
   it("shows waiting screen when session not ready", () => {
     renderWithRouter(<ResetPasswordPage />);
-    expect(
-      screen.getByText(/비밀번호 재설정 링크를 확인 중입니다/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/비밀번호 재설정 링크를 확인 중입니다/)).toBeInTheDocument();
     expect(screen.queryByLabelText("새 비밀번호")).not.toBeInTheDocument();
   });
 
   it("shows link back to forgot-password when not ready", () => {
     renderWithRouter(<ResetPasswordPage />);
-    expect(
-      screen.getByRole("link", { name: /비밀번호 찾기로 돌아가기/ })
-    ).toHaveAttribute("href", "/forgot-password");
+    expect(screen.getByRole("link", { name: /비밀번호 찾기로 돌아가기/ })).toHaveAttribute(
+      "href",
+      "/forgot-password",
+    );
   });
 
   it("shows the form after PASSWORD_RECOVERY event", async () => {
-    onAuthStateChangeMock.mockImplementation(
-      (callback: (event: string) => void) => {
-        callback("PASSWORD_RECOVERY");
-        return { data: { subscription: { unsubscribe: vi.fn() } } };
-      }
-    );
+    onAuthStateChangeMock.mockImplementation((callback: (event: string) => void) => {
+      callback("PASSWORD_RECOVERY");
+      return { data: { subscription: { unsubscribe: vi.fn() } } };
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
     renderWithRouter(<ResetPasswordPage />);
@@ -306,73 +286,55 @@ describe("ResetPasswordPage", () => {
 
   describe("with form visible (PASSWORD_RECOVERY fired)", () => {
     beforeEach(() => {
-      onAuthStateChangeMock.mockImplementation(
-        (callback: (event: string) => void) => {
-          callback("PASSWORD_RECOVERY");
-          return { data: { subscription: { unsubscribe: vi.fn() } } };
-        }
-      );
+      onAuthStateChangeMock.mockImplementation((callback: (event: string) => void) => {
+        callback("PASSWORD_RECOVERY");
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
     });
 
     it("shows error when password is less than 8 chars", async () => {
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "short" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "short" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(
-          screen.getByText(/비밀번호는 8자 이상이어야 합니다/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/비밀번호는 8자 이상이어야 합니다/)).toBeInTheDocument();
       });
     });
 
     it("shows error when passwords do not match", async () => {
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "password123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "different123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(
-          screen.getByText(/비밀번호가 일치하지 않습니다/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/비밀번호가 일치하지 않습니다/)).toBeInTheDocument();
       });
     });
 
     it("shows success message on successful reset", async () => {
       resetPasswordMock.mockResolvedValue(undefined);
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "newpassword123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "newpassword123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
         expect(screen.getByText(/비밀번호가 변경되었습니다/)).toBeInTheDocument();
       });
@@ -381,22 +343,16 @@ describe("ResetPasswordPage", () => {
     it("shows generic error on API failure", async () => {
       resetPasswordMock.mockRejectedValue(new Error("update failed"));
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "newpassword123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "newpassword123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(
-          screen.getByText(/비밀번호 변경에 실패했습니다/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/비밀번호 변경에 실패했습니다/)).toBeInTheDocument();
       });
     });
 
@@ -404,48 +360,32 @@ describe("ResetPasswordPage", () => {
       const weakErr = Object.assign(new Error("weak"), { code: "weak_password" });
       resetPasswordMock.mockRejectedValue(weakErr);
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "password123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "password123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(toast).toHaveBeenCalledWith(
-          expect.stringContaining("유출된 비밀번호"),
-          "error"
-        );
+        expect(toast).toHaveBeenCalledWith(expect.stringContaining("유출된 비밀번호"), "error");
       });
     });
 
     it("shows toast for 'should not be too common' error", async () => {
-      resetPasswordMock.mockRejectedValue(
-        new Error("Password should not be too common")
-      );
+      resetPasswordMock.mockRejectedValue(new Error("Password should not be too common"));
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "password123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "password123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(toast).toHaveBeenCalledWith(
-          expect.stringContaining("유출된 비밀번호"),
-          "error"
-        );
+        expect(toast).toHaveBeenCalledWith(expect.stringContaining("유출된 비밀번호"), "error");
       });
     });
 
@@ -454,21 +394,17 @@ describe("ResetPasswordPage", () => {
       resetPasswordMock.mockReturnValue(
         new Promise<void>((resolve) => {
           resolveFn = resolve;
-        })
+        }),
       );
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "password123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "password123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
         expect(screen.getByRole("button", { name: /변경 중/ })).toBeInTheDocument();
       });
@@ -478,31 +414,21 @@ describe("ResetPasswordPage", () => {
     it("hides login link after successful reset", async () => {
       resetPasswordMock.mockResolvedValue(undefined);
       renderWithRouter(<ResetPasswordPage />);
-      await waitFor(() =>
-        expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument()
-      );
+      await waitFor(() => expect(screen.getByLabelText("새 비밀번호")).toBeInTheDocument());
       // Before submit
-      expect(
-        screen.getByRole("link", { name: /로그인으로 돌아가기/ })
-      ).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /로그인으로 돌아가기/ })).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText("새 비밀번호"), {
         target: { value: "newpassword123" },
       });
       fireEvent.change(screen.getByLabelText("비밀번호 확인"), {
         target: { value: "newpassword123" },
       });
-      fireEvent.submit(
-        screen.getByLabelText("새 비밀번호").closest("form")!
-      );
+      fireEvent.submit(screen.getByLabelText("새 비밀번호").closest("form")!);
       await waitFor(() => {
-        expect(
-          screen.getByText(/비밀번호가 변경되었습니다/)
-        ).toBeInTheDocument();
+        expect(screen.getByText(/비밀번호가 변경되었습니다/)).toBeInTheDocument();
       });
       // After success, !success && <link> so login link is hidden
-      expect(
-        screen.queryByRole("link", { name: /로그인으로 돌아가기/ })
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /로그인으로 돌아가기/ })).not.toBeInTheDocument();
     });
   });
 });

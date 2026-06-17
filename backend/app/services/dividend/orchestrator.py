@@ -102,9 +102,7 @@ async def _get_kis_dividend_fallback(
     db: AsyncSession,
 ) -> dict | None:
     """사용자의 KIS 계좌로 국내 종목 배당 정보 조회. KIS 계좌 없거나 데이터 없으면 None 반환."""
-    return await _call_kis_dividend_api(
-        ticker, user_id, db, get_domestic_dividend_info, "kis_dividend_fallback"
-    )
+    return await _call_kis_dividend_api(ticker, user_id, db, get_domestic_dividend_info, "kis_dividend_fallback")
 
 
 async def _get_kis_etf_dividend_fallback(
@@ -125,10 +123,7 @@ async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | N
 async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
     """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → 포지션 정보 맵 수집."""
     subq = latest_snapshot_subquery(user_id=user_id)
-    snap_date_match = (
-        (AssetSnapshot.account_id == subq.c.account_id)
-        & (AssetSnapshot.snapshot_date == subq.c.max_date)
-    )
+    snap_date_match = (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -161,7 +156,10 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
                 key = (ticker, market)
                 if key not in positions_map:
                     positions_map[key] = {
-                        "value_krw": 0.0, "name": name, "invested_krw": 0.0, "qty": 0.0,
+                        "value_krw": 0.0,
+                        "name": name,
+                        "invested_krw": 0.0,
+                        "qty": 0.0,
                     }
                 positions_map[key]["value_krw"] += value
                 positions_map[key]["invested_krw"] += invested
@@ -170,19 +168,11 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
     return positions_map
 
 
-async def _load_user_overrides(
-    user_id: uuid.UUID, db: AsyncSession
-) -> dict[tuple[str, str], list[int]]:
+async def _load_user_overrides(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], list[int]]:
     """사용자 ticker 설정에서 배당월 override map 로드."""
-    result = await db.execute(
-        select(UserTickerSettings).where(UserTickerSettings.user_id == user_id)
-    )
+    result = await db.execute(select(UserTickerSettings).where(UserTickerSettings.user_id == user_id))
     rows = result.scalars().all()
-    return {
-        (row.ticker, row.market): list(row.dividend_months)
-        for row in rows
-        if row.dividend_months
-    }
+    return {(row.ticker, row.market): list(row.dividend_months) for row in rows if row.dividend_months}
 
 
 def _build_ticker_output_entry(
@@ -197,12 +187,8 @@ def _build_ticker_output_entry(
     if est_keys:
         primary = estimated_map[est_keys[0]]
         combined_annual = sum(estimated_map[k].get("estimated_annual_krw", 0) for k in est_keys)
-        combined_monthly = sum(
-            estimated_map[k].get("estimated_monthly_krw", 0) for k in est_keys
-        )
-        combined_months = sorted(
-            {m for k in est_keys for m in estimated_map[k].get("dividend_months", [])}
-        )
+        combined_monthly = sum(estimated_map[k].get("estimated_monthly_krw", 0) for k in est_keys)
+        combined_months = sorted({m for k in est_keys for m in estimated_map[k].get("dividend_months", [])})
         market_val = primary.get("market")
         yield_decimal = primary.get("yield_decimal", 0.0)
         dps = primary.get("dps", 0.0)
@@ -211,7 +197,8 @@ def _build_ticker_output_entry(
         currency = primary.get("currency", "KRW")
         combined_monthly_usd = (
             round(sum(estimated_map[k].get("estimated_monthly_usd") or 0 for k in est_keys), 2)
-            if currency == "USD" else None
+            if currency == "USD"
+            else None
         )
     else:
         combined_annual = combined_monthly = 0
@@ -282,18 +269,22 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
     kis_creds = await _get_kis_credentials(user_id, db)
     usd_krw_rate: float = await get_usd_krw_rate(redis)
 
-    async def _fetch_estimated(
-        ticker: str, market: str, value_krw: float, invested_krw: float, qty: float
-    ) -> dict:
+    async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, _ = await fetch_ticker_dividend_info(
             ticker, market, redis, sem, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
-            ticker=ticker, market=market,
-            yield_decimal=yield_decimal, dps=dps, months=months,
-            value_krw=value_krw, invested_krw=invested_krw, qty=qty,
-            usd_krw_rate=usd_krw_rate, override_months=override_months,
+            ticker=ticker,
+            market=market,
+            yield_decimal=yield_decimal,
+            dps=dps,
+            months=months,
+            value_krw=value_krw,
+            invested_krw=invested_krw,
+            qty=qty,
+            usd_krw_rate=usd_krw_rate,
+            override_months=override_months,
         )
 
     tasks = [
@@ -313,18 +304,18 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
             estimated_map[em_key] = item
         else:
             existing = estimated_map[em_key]
-            existing["estimated_annual_krw"] = (
-                existing.get("estimated_annual_krw", 0) + item.get("estimated_annual_krw", 0)
+            existing["estimated_annual_krw"] = existing.get("estimated_annual_krw", 0) + item.get(
+                "estimated_annual_krw", 0
             )
-            existing["estimated_monthly_krw"] = (
-                existing.get("estimated_monthly_krw", 0) + item.get("estimated_monthly_krw", 0)
+            existing["estimated_monthly_krw"] = existing.get("estimated_monthly_krw", 0) + item.get(
+                "estimated_monthly_krw", 0
             )
             existing["dividend_months"] = sorted(
                 set(existing.get("dividend_months", []) + item.get("dividend_months", []))
             )
 
     ticker_to_est_keys: dict[str, list[tuple[str, str]]] = {}
-    for (tkr, mkt) in estimated_map:
+    for tkr, mkt in estimated_map:
         ticker_to_est_keys.setdefault(tkr, []).append((tkr, mkt))
 
     all_tickers: set[str] = set(received_map.keys()) | set(ticker_to_est_keys.keys())
@@ -332,14 +323,23 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
     for ticker_key in all_tickers:
         if ticker_key == "__unclassified__":
-            output.append({
-                "ticker": None, "name": "미분류", "market": None,
-                "received_krw": received_map.get("__unclassified__", 0),
-                "estimated_annual_krw": 0, "estimated_monthly_krw": 0,
-                "dividend_yield": 0.0, "dps": 0.0, "dividend_months": [],
-                "dividend_months_is_manual": False, "investment_yield": 0.0,
-                "currency": "KRW", "estimated_monthly_usd": None,
-            })
+            output.append(
+                {
+                    "ticker": None,
+                    "name": "미분류",
+                    "market": None,
+                    "received_krw": received_map.get("__unclassified__", 0),
+                    "estimated_annual_krw": 0,
+                    "estimated_monthly_krw": 0,
+                    "dividend_yield": 0.0,
+                    "dps": 0.0,
+                    "dividend_months": [],
+                    "dividend_months_is_manual": False,
+                    "investment_yield": 0.0,
+                    "currency": "KRW",
+                    "estimated_monthly_usd": None,
+                }
+            )
             continue
 
         pos_entry = next(
@@ -374,18 +374,22 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
     sem = asyncio.Semaphore(5)
     redis = await get_redis()
 
-    async def fetch_one(
-        ticker: str, market: str, value_krw: float, invested_krw: float, qty: float
-    ) -> dict:
+    async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
             ticker, market, redis, sem, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
-            ticker=ticker, market=market,
-            yield_decimal=yield_decimal, dps=dps, months=months,
-            value_krw=value_krw, invested_krw=invested_krw, qty=qty,
-            override_months=override_months, ex_dividend_date=ex_dividend_date,
+            ticker=ticker,
+            market=market,
+            yield_decimal=yield_decimal,
+            dps=dps,
+            months=months,
+            value_krw=value_krw,
+            invested_krw=invested_krw,
+            qty=qty,
+            override_months=override_months,
+            ex_dividend_date=ex_dividend_date,
         )
 
     tasks = [
@@ -405,9 +409,8 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
 
 # ── ticker 설정 CRUD ───────────────────────────────────────
 
-async def get_ticker_settings(
-    user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession
-) -> dict | None:
+
+async def get_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession) -> dict | None:
     row = await db.scalar(
         select(UserTickerSettings).where(
             UserTickerSettings.user_id == user_id,
@@ -446,14 +449,14 @@ async def upsert_ticker_settings(
     logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
 
     return {
-        "ticker": ticker, "market": market,
-        "dividend_months": dividend_months, "is_manual": True,
+        "ticker": ticker,
+        "market": market,
+        "dividend_months": dividend_months,
+        "is_manual": True,
     }
 
 
-async def delete_ticker_settings(
-    user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession
-) -> bool:
+async def delete_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession) -> bool:
     row = await db.scalar(
         select(UserTickerSettings).where(
             UserTickerSettings.user_id == user_id,

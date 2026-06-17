@@ -11,6 +11,7 @@ from app.kis.constants import (
 
 logger = structlog.get_logger()
 
+
 async def get_domestic_price(
     app_key: str,
     app_secret: str,
@@ -87,8 +88,11 @@ async def get_domestic_dividend_info(
     raw_divi_amt = output.get("per_divi_amt")
 
     logger.info(
-        "kis_dividend_raw_output", ticker=ticker, is_mock=is_mock,
-        stck_divi_rate=raw_divi_rate, per_divi_amt=raw_divi_amt,
+        "kis_dividend_raw_output",
+        ticker=ticker,
+        is_mock=is_mock,
+        stck_divi_rate=raw_divi_rate,
+        per_divi_amt=raw_divi_amt,
     )
 
     try:
@@ -158,8 +162,11 @@ async def get_domestic_etf_dividend_info(
     raw_divi_amt = output.get("etf_divi_amt") or output.get("per_divi_amt")
 
     logger.info(
-        "kis_etf_dividend_raw_output", ticker=ticker, is_mock=is_mock,
-        etf_divi_rt=raw_divi_rt, etf_divi_amt=raw_divi_amt,
+        "kis_etf_dividend_raw_output",
+        ticker=ticker,
+        is_mock=is_mock,
+        etf_divi_rt=raw_divi_rt,
+        etf_divi_amt=raw_divi_amt,
     )
 
     try:
@@ -178,4 +185,3 @@ async def get_domestic_etf_dividend_info(
 
     logger.info("kis_etf_dividend_parsed", ticker=ticker, is_mock=is_mock, dps=divi_amt, dividend_yield=yield_decimal)
     return {"dps": divi_amt, "dividend_yield": yield_decimal}
-

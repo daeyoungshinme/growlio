@@ -1,4 +1,5 @@
 """factor_service.py 단위 테스트."""
+
 from __future__ import annotations
 
 import json
@@ -22,6 +23,7 @@ from app.services.factor_service import (
 )
 
 # ── 팩터 점수 순수 함수 ──────────────────────────────────────
+
 
 class TestScoreValue:
     def test_low_pb_pe_high_score(self, override_settings):
@@ -105,6 +107,7 @@ class TestScoreMomentum:
 
 # ── 헬퍼 함수 ───────────────────────────────────────────────
 
+
 class TestBuildHoldings:
     def test_basic(self, override_settings):
         positions = [{"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "value_krw": 1000.0}]
@@ -151,6 +154,7 @@ class TestPortfolioFactors:
 
 # ── _safe_float ────────────────────────────────────────────
 
+
 class TestSafeFloat:
     def test_normal_float(self, override_settings):
         assert _safe_float(3.14) == pytest.approx(3.14)
@@ -176,6 +180,7 @@ class TestSafeFloat:
 
 # ── 빈 결과 ────────────────────────────────────────────────
 
+
 class TestEmptyFactorResult:
     def test_structure(self, override_settings):
         result = _empty_factor_result()
@@ -185,6 +190,7 @@ class TestEmptyFactorResult:
 
 
 # ── get_factor_analysis_for_portfolio (DB mock) ────────────
+
 
 class TestGetFactorAnalysisForPortfolio:
     @pytest.mark.asyncio
@@ -214,9 +220,7 @@ class TestGetFactorAnalysisForPortfolio:
         portfolio.name = "테스트포트폴리오"
         mock_db.scalar = AsyncMock(return_value=portfolio)
 
-        factor_data = {
-            "005930.KS": {"pe_ratio": 12.0, "pb_ratio": 1.2, "market_cap": 3e11, "momentum_pct": 5.0}
-        }
+        factor_data = {"005930.KS": {"pe_ratio": 12.0, "pb_ratio": 1.2, "market_cap": 3e11, "momentum_pct": 5.0}}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
@@ -276,9 +280,7 @@ class TestGetFactorAnalysisForPortfolio:
         redis.get = AsyncMock(return_value=None)
         redis.setex = AsyncMock()
 
-        factor_data = {
-            "035420.KS": {"pe_ratio": 30.0, "pb_ratio": 3.0, "market_cap": 1e11, "momentum_pct": 10.0}
-        }
+        factor_data = {"035420.KS": {"pe_ratio": 30.0, "pb_ratio": 3.0, "market_cap": 1e11, "momentum_pct": 10.0}}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
@@ -301,6 +303,7 @@ class TestGetFactorAnalysisForPortfolio:
 
 
 # ── get_factor_analysis (DB mock) ─────────────────────────
+
 
 class TestGetFactorAnalysis:
     @pytest.mark.asyncio
@@ -347,8 +350,11 @@ class TestGetFactorAnalysis:
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos = SimpleNamespace(
-            ticker="005930", market="KOSPI", name="삼성전자",
-            value_krw=1_000_000.0, snapshot_id=snap.id,
+            ticker="005930",
+            market="KOSPI",
+            name="삼성전자",
+            value_krw=1_000_000.0,
+            snapshot_id=snap.id,
         )
 
         snap_result = MagicMock()
@@ -358,9 +364,7 @@ class TestGetFactorAnalysis:
 
         mock_db.execute = AsyncMock(side_effect=[snap_result, pos_result])
 
-        factor_data = {
-            "005930.KS": {"pe_ratio": 12.0, "pb_ratio": 1.2, "market_cap": 3e11, "momentum_pct": 5.0}
-        }
+        factor_data = {"005930.KS": {"pe_ratio": 12.0, "pb_ratio": 1.2, "market_cap": 3e11, "momentum_pct": 5.0}}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
@@ -393,8 +397,11 @@ class TestGetFactorAnalysis:
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos = SimpleNamespace(
-            ticker="005930", market="KOSPI", name="삼성전자",
-            value_krw=1_000_000.0, snapshot_id=snap.id,
+            ticker="005930",
+            market="KOSPI",
+            name="삼성전자",
+            value_krw=1_000_000.0,
+            snapshot_id=snap.id,
         )
 
         snap_result = MagicMock()

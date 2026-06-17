@@ -10,11 +10,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 

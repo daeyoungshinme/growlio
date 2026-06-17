@@ -42,9 +42,7 @@ _get_monthly_trend = get_monthly_trend
 logger = structlog.get_logger()
 
 
-async def _get_scalar_init_data(
-    user_id: uuid.UUID, db: AsyncSession
-) -> tuple[date | None, float]:
+async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[date | None, float]:
     """first_snap_date + net_deposits_ytd를 CTE 단일 쿼리로 조회."""
     year = date.today().year
     row = (
@@ -95,9 +93,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     )
 
     # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
-    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(
-        user_id, db, redis
-    )
+    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, redis)
 
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
@@ -142,16 +138,12 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     }
     if redis:
         with contextlib.suppress(RedisError):
-            await redis.setex(
-                dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result)
-            )
+            await redis.setex(dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result))
     return result
 
 
 async def _get_first_snap_date(user_id: uuid.UUID, db: AsyncSession) -> date | None:
-    result = await db.execute(
-        select(func.min(AssetSnapshot.snapshot_date)).where(AssetSnapshot.user_id == user_id)
-    )
+    result = await db.execute(select(func.min(AssetSnapshot.snapshot_date)).where(AssetSnapshot.user_id == user_id))
     return result.scalar()
 
 

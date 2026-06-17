@@ -76,8 +76,15 @@ export default function ResetPasswordPage() {
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       const msg = (err as Error)?.message ?? "";
-      if (code === "weak_password" || msg.toLowerCase().includes("should not be too common") || msg.toLowerCase().includes("data breach")) {
-        toast("유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.", "error");
+      if (
+        code === "weak_password" ||
+        msg.toLowerCase().includes("should not be too common") ||
+        msg.toLowerCase().includes("data breach")
+      ) {
+        toast(
+          "유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.",
+          "error",
+        );
       } else {
         setError("비밀번호 변경에 실패했습니다. 다시 시도해주세요.");
       }
@@ -94,20 +101,32 @@ export default function ResetPasswordPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
         </div>
 
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">새 비밀번호 설정</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">새로 사용할 비밀번호를 입력해주세요.</p>
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">
+          새 비밀번호 설정
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          새로 사용할 비밀번호를 입력해주세요.
+        </p>
 
         {success ? (
           <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700">
             <p className="text-sm text-green-700 dark:text-green-300 text-center">
-              비밀번호가 변경되었습니다.<br />
-              <span className="text-xs text-gray-500 dark:text-gray-400">3초 후 로그인 페이지로 이동합니다...</span>
+              비밀번호가 변경되었습니다.
+              <br />
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                3초 후 로그인 페이지로 이동합니다...
+              </span>
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="reset-new-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">새 비밀번호</label>
+              <label
+                htmlFor="reset-new-password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                새 비밀번호
+              </label>
               <input
                 id="reset-new-password"
                 type="password"
@@ -119,7 +138,12 @@ export default function ResetPasswordPage() {
               />
             </div>
             <div>
-              <label htmlFor="reset-confirm-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호 확인</label>
+              <label
+                htmlFor="reset-confirm-password"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                비밀번호 확인
+              </label>
               <input
                 id="reset-confirm-password"
                 type="password"
@@ -145,7 +169,9 @@ export default function ResetPasswordPage() {
 
         {!success && (
           <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
-            <Link to="/login" className="hover:underline">로그인으로 돌아가기</Link>
+            <Link to="/login" className="hover:underline">
+              로그인으로 돌아가기
+            </Link>
           </p>
         )}
       </div>

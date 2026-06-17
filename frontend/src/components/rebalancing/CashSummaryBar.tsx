@@ -34,7 +34,9 @@ export function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
       )}
       {surplusKnown && hasBuy && (
         <span className={surplus! >= 0 ? "text-green-400" : "text-amber-400"}>
-          {surplus! >= 0 ? `여유 +${fmtKrwPrice(surplus!)}` : `부족 ${fmtKrwPrice(Math.abs(surplus!))}`}
+          {surplus! >= 0
+            ? `여유 +${fmtKrwPrice(surplus!)}`
+            : `부족 ${fmtKrwPrice(Math.abs(surplus!))}`}
         </span>
       )}
     </div>

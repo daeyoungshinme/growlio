@@ -1,4 +1,5 @@
 """시장 위험 신호 서비스 — VIX, 장단기 금리차(T10Y2Y), Fear & Greed Index 통합."""
+
 from __future__ import annotations
 
 import contextlib

@@ -99,7 +99,13 @@ const mockSignal: MarketSignalResponse = {
   signals: {
     vix: { value: 20.5, level: "MEDIUM", date: "2024-01-15", sub_score: 1 },
     yield_curve: { value: -0.5, state: "INVERTED", date: "2024-01-15", sub_score: 1 },
-    fear_greed: { value: 45, label: "공포", label_en: "Fear", classification: "FEAR", sub_score: 1 },
+    fear_greed: {
+      value: 45,
+      label: "공포",
+      label_en: "Fear",
+      classification: "FEAR",
+      sub_score: 1,
+    },
   },
 };
 
@@ -133,7 +139,11 @@ describe("MarketSignalBanner", () => {
   });
 
   it("shows contrarian buy message when true", () => {
-    const contrarian = { ...mockSignal, fear_greed_contrarian_buy: true, composite_level: "GREEN" as const };
+    const contrarian = {
+      ...mockSignal,
+      fear_greed_contrarian_buy: true,
+      composite_level: "GREEN" as const,
+    };
     render(<MarketSignalBanner signal={contrarian} />);
     expect(screen.getByText(/역발상 매수 기회/)).toBeDefined();
   });
@@ -155,7 +165,7 @@ describe("PriceCell", () => {
         priceState="loading"
         livePricesKrw={{}}
         livePricesUsd={{}}
-      />
+      />,
     );
     expect(screen.getByText("조회 중")).toBeDefined();
   });
@@ -168,7 +178,7 @@ describe("PriceCell", () => {
         priceState="loaded"
         livePricesKrw={{ "005930": 75000 }}
         livePricesUsd={{}}
-      />
+      />,
     );
     expect(screen.getByText(/75,000/)).toBeDefined();
   });
@@ -180,8 +190,8 @@ describe("PriceCell", () => {
         market="NASDAQ"
         priceState="loaded"
         livePricesKrw={{ AAPL: 170000 }}
-        livePricesUsd={{ AAPL: 125.50 }}
-      />
+        livePricesUsd={{ AAPL: 125.5 }}
+      />,
     );
     expect(screen.getByText(/125\.50/)).toBeDefined();
   });
@@ -194,7 +204,7 @@ describe("PriceCell", () => {
         priceState="loaded"
         livePricesKrw={{}}
         livePricesUsd={{}}
-      />
+      />,
     );
     expect(screen.getByText("—")).toBeDefined();
   });
@@ -239,7 +249,7 @@ describe("WeightDiffBadge", () => {
 describe("WeightBar", () => {
   it("renders weight bar", () => {
     const { container } = render(<WeightBar current={30} target={40} />);
-    expect(container.querySelector('.rounded-full')).toBeDefined();
+    expect(container.querySelector(".rounded-full")).toBeDefined();
   });
 });
 
@@ -299,7 +309,9 @@ describe("Return10yCell", () => {
   });
 
   it("renders null cagr", () => {
-    render(<Return10yCell item={{ ...mockRebalancingItem, cagr_10y_pct: null, return_10y_pct: null }} />);
+    render(
+      <Return10yCell item={{ ...mockRebalancingItem, cagr_10y_pct: null, return_10y_pct: null }} />,
+    );
     expect(screen.getByText("—")).toBeDefined();
   });
 });

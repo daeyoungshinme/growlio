@@ -43,7 +43,7 @@ describe("BottomNav", () => {
     renderWithProviders(
       <MemoryRouter>
         <BottomNav />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("대시보드")).toBeDefined();
     expect(screen.getByText("포트폴리오")).toBeDefined();
@@ -57,7 +57,7 @@ describe("BottomNav", () => {
     renderWithProviders(
       <MemoryRouter>
         <BottomNav />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByRole("navigation", { name: "하단 내비게이션" })).toBeDefined();
   });
@@ -66,7 +66,7 @@ describe("BottomNav", () => {
     renderWithProviders(
       <MemoryRouter initialEntries={["/dashboard"]}>
         <BottomNav />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const link = screen.getByText("대시보드").closest("a");
     expect(link?.className).toContain("text-blue-600");
@@ -79,7 +79,7 @@ describe("Sidebar", () => {
     renderWithProviders(
       <MemoryRouter>
         <Sidebar />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("대시보드")).toBeDefined();
     expect(screen.getByText("Growlio")).toBeDefined();
@@ -89,7 +89,7 @@ describe("Sidebar", () => {
     renderWithProviders(
       <MemoryRouter>
         <Sidebar />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByLabelText("로그아웃")).toBeDefined();
   });
@@ -98,7 +98,7 @@ describe("Sidebar", () => {
     renderWithProviders(
       <MemoryRouter>
         <Sidebar />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByLabelText(/다크 모드로 전환/)).toBeDefined();
   });
@@ -114,7 +114,7 @@ describe("AppLayout", () => {
             <Route index element={<div>Content</div>} />
           </Route>
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("Content")).toBeDefined();
   });
@@ -140,7 +140,7 @@ describe("AppLayout", () => {
             <Route index element={<div>Inner</div>} />
           </Route>
         </Routes>
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // Could render banner or not depending on mock cache
     // Just verify it renders without crash

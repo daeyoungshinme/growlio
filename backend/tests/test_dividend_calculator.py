@@ -1,6 +1,5 @@
 """dividend/calculator.py 순수 함수 단위 테스트."""
 
-
 from app.services.dividend.calculator import calculate_position_dividend
 
 

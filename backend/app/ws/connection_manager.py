@@ -1,4 +1,5 @@
 """WebSocket ConnectionManager — 실시간 가격 구독 연결 관리."""
+
 from __future__ import annotations
 
 import asyncio

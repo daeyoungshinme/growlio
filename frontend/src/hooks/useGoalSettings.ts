@@ -47,9 +47,8 @@ export function useGoalSettings() {
   const [initialForm, setInitialForm] = useState<GoalForm | null>(null);
   const [form, setForm] = useState<GoalForm>(EMPTY_FORM);
 
-  const isDirty = editing && initialForm !== null
-    ? JSON.stringify(form) !== JSON.stringify(initialForm)
-    : false;
+  const isDirty =
+    editing && initialForm !== null ? JSON.stringify(form) !== JSON.stringify(initialForm) : false;
 
   const handleCloseModal = () => {
     if (isDirty) {
@@ -65,8 +64,12 @@ export function useGoalSettings() {
     let retirement_target_year = "";
     if (data) {
       const settingsData = await fetchSettings();
-      annual_deposit_goal = settingsData.annual_deposit_goal ? String(settingsData.annual_deposit_goal) : "";
-      retirement_target_year = settingsData.retirement_target_year ? String(settingsData.retirement_target_year) : "";
+      annual_deposit_goal = settingsData.annual_deposit_goal
+        ? String(settingsData.annual_deposit_goal)
+        : "";
+      retirement_target_year = settingsData.retirement_target_year
+        ? String(settingsData.retirement_target_year)
+        : "";
     }
     const newForm: GoalForm = {
       monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
@@ -100,13 +103,19 @@ export function useGoalSettings() {
     setSaving(true);
     try {
       await api.put("/settings/goal", {
-        monthly_deposit_amount: form.monthly_deposit_amount ? Number(form.monthly_deposit_amount) : null,
-        goal_annual_return_pct: form.goal_annual_return_pct ? Number(form.goal_annual_return_pct) : null,
+        monthly_deposit_amount: form.monthly_deposit_amount
+          ? Number(form.monthly_deposit_amount)
+          : null,
+        goal_annual_return_pct: form.goal_annual_return_pct
+          ? Number(form.goal_annual_return_pct)
+          : null,
         goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
         goal_start_date: form.goal_start_date || null,
         goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
         annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
-        retirement_target_year: form.retirement_target_year ? Number(form.retirement_target_year) : null,
+        retirement_target_year: form.retirement_target_year
+          ? Number(form.retirement_target_year)
+          : null,
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);

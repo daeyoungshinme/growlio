@@ -27,22 +27,30 @@ import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
 
 const TABS = ASSET_MANAGEMENT_TABS;
-type Tab = typeof TABS[number];
-
+type Tab = (typeof TABS)[number];
 
 export default function AssetManagementPage() {
   const [tab, setTab] = useState<Tab>("은행계좌");
 
   const {
-    showBankModal, setShowBankModal,
-    showStockModal, setShowStockModal,
-    showRealEstateModal, setShowRealEstateModal,
-    editingRealEstate, setEditingRealEstate,
-    editingBankAccount, setEditingBankAccount,
-    editingStockAccount, setEditingStockAccount,
-    confirmDeleteId, setConfirmDeleteId,
-    positionsAccount, setPositionsAccount,
-    txAccount, setTxAccount,
+    showBankModal,
+    setShowBankModal,
+    showStockModal,
+    setShowStockModal,
+    showRealEstateModal,
+    setShowRealEstateModal,
+    editingRealEstate,
+    setEditingRealEstate,
+    editingBankAccount,
+    setEditingBankAccount,
+    editingStockAccount,
+    setEditingStockAccount,
+    confirmDeleteId,
+    setConfirmDeleteId,
+    positionsAccount,
+    setPositionsAccount,
+    txAccount,
+    setTxAccount,
   } = useAssetModals();
 
   const queryClient = useQueryClient();
@@ -54,10 +62,19 @@ export default function AssetManagementPage() {
   const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);
 
   const {
-    createMutation, deleteMutation,
-    updateBankMutation, updateStockMutation, updateDepositMutation, updateNameMutation, updateRealEstateMutation,
-    handleSyncBank, handleSyncKisAccount,
-    deletingId, setDeletingId, syncingBankId, syncingStockIds,
+    createMutation,
+    deleteMutation,
+    updateBankMutation,
+    updateStockMutation,
+    updateDepositMutation,
+    updateNameMutation,
+    updateRealEstateMutation,
+    handleSyncBank,
+    handleSyncKisAccount,
+    deletingId,
+    setDeletingId,
+    syncingBankId,
+    syncingStockIds,
   } = useAccountMutations({
     onBankModalClose: () => setShowBankModal(false),
     onStockModalClose: () => setShowStockModal(false),
@@ -66,9 +83,12 @@ export default function AssetManagementPage() {
     onEditStockClose: () => setEditingStockAccount(null),
   });
 
-  const handleDelete = useCallback((id: string) => {
-    setConfirmDeleteId(id);
-  }, [setConfirmDeleteId]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      setConfirmDeleteId(id);
+    },
+    [setConfirmDeleteId],
+  );
 
   const handleConfirmDelete = useCallback(() => {
     if (!confirmDeleteId) return;
@@ -83,9 +103,7 @@ export default function AssetManagementPage() {
   const currentBankOrStock = tab === "은행계좌" ? bankAccounts : stockAccounts;
 
   const stockAccountStats = useMemo(() => {
-    const portfolioAccMap = Object.fromEntries(
-      (overview?.accounts ?? []).map((a) => [a.id, a])
-    );
+    const portfolioAccMap = Object.fromEntries((overview?.accounts ?? []).map((a) => [a.id, a]));
     const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
     for (const t of allTx) {
       if (!t.account_id) continue;
@@ -112,10 +130,18 @@ export default function AssetManagementPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-6">
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">계좌를 등록하고 입출금·배당 내역을 관리합니다.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          계좌를 등록하고 입출금·배당 내역을 관리합니다.
+        </p>
       </div>
 
-      <Tabs tabs={TABS} activeTab={tab} onChange={setTab} variant="pill" className="w-full sm:w-fit mb-6" />
+      <Tabs
+        tabs={TABS}
+        activeTab={tab}
+        onChange={setTab}
+        variant="pill"
+        className="w-full sm:w-fit mb-6"
+      />
 
       {tab === "입출금·배당" && <TransactionHistoryTab accounts={accounts} />}
 
@@ -128,8 +154,10 @@ export default function AssetManagementPage() {
                 부동산 {isLoading ? "" : `(${realEstateAccounts.length}개)`}
               </span>
             </div>
-            <button onClick={() => setShowRealEstateModal(true)}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            <button
+              onClick={() => setShowRealEstateModal(true)}
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
               <Plus size={16} />
               부동산 추가
             </button>
@@ -146,10 +174,13 @@ export default function AssetManagementPage() {
           ) : (
             <div className="space-y-3">
               {realEstateAccounts.map((account) => (
-                <RealEstateAccountCard key={account.id} account={account}
+                <RealEstateAccountCard
+                  key={account.id}
+                  account={account}
                   onDelete={handleDelete}
                   onEdit={(acc) => setEditingRealEstate(acc)}
-                  isDeleting={deletingId === account.id && deleteMutation.isPending} />
+                  isDeleting={deletingId === account.id && deleteMutation.isPending}
+                />
               ))}
             </div>
           )}
@@ -166,8 +197,11 @@ export default function AssetManagementPage() {
               </span>
             </div>
             <button
-              onClick={() => tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true)}
-              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+              onClick={() =>
+                tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true)
+              }
+              className="flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
               <Plus size={16} />
               계좌 추가
             </button>
@@ -181,14 +215,17 @@ export default function AssetManagementPage() {
                 title={`등록된 ${tab}이 없습니다.`}
                 action={{
                   label: "+ 계좌 추가하기",
-                  onClick: () => tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true),
+                  onClick: () =>
+                    tab === "은행계좌" ? setShowBankModal(true) : setShowStockModal(true),
                 }}
               />
             </div>
           ) : tab === "은행계좌" ? (
             <div className="space-y-3">
               {bankAccounts.map((account) => (
-                <BankAccountCard key={account.id} account={account}
+                <BankAccountCard
+                  key={account.id}
+                  account={account}
                   onDelete={handleDelete}
                   onEditModal={(id) => {
                     const acc = bankAccounts.find((a) => a.id === id);
@@ -197,7 +234,8 @@ export default function AssetManagementPage() {
                   onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                   onSync={handleSyncBank}
                   isDeleting={deletingId === account.id && deleteMutation.isPending}
-                  isSyncing={syncingBankId === account.id} />
+                  isSyncing={syncingBankId === account.id}
+                />
               ))}
             </div>
           ) : (
@@ -211,16 +249,24 @@ export default function AssetManagementPage() {
               />
               {/* 계좌별 카드 */}
               {stockAccountStats.map(({ account, stats }) => (
-                <StockAccountCard key={account.id} account={account} stats={stats}
+                <StockAccountCard
+                  key={account.id}
+                  account={account}
+                  stats={stats}
                   onDelete={handleDelete}
                   onManagePositions={setPositionsAccount}
-                  onTransactions={(a) => setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })}
+                  onTransactions={(a) =>
+                    setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })
+                  }
                   onEdit={setEditingStockAccount}
-                  onEditDeposit={(id, krw, usd) => updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })}
+                  onEditDeposit={(id, krw, usd) =>
+                    updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })
+                  }
                   onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                   onSync={(id) => handleSyncKisAccount(id, accounts)}
                   isSyncing={syncingStockIds.has(account.id)}
-                  isDeleting={deletingId === account.id && deleteMutation.isPending} />
+                  isDeleting={deletingId === account.id && deleteMutation.isPending}
+                />
               ))}
             </div>
           )}
@@ -228,46 +274,58 @@ export default function AssetManagementPage() {
       )}
 
       {showBankModal && (
-        <BankAccountModal onClose={() => setShowBankModal(false)}
+        <BankAccountModal
+          onClose={() => setShowBankModal(false)}
           onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending} />
+          isLoading={createMutation.isPending}
+        />
       )}
       {editingBankAccount && (
         <BankAccountModal
           initialAccount={editingBankAccount}
           onClose={() => setEditingBankAccount(null)}
           onSubmit={(data) => updateBankMutation.mutate({ id: editingBankAccount.id, data })}
-          isLoading={updateBankMutation.isPending} />
+          isLoading={updateBankMutation.isPending}
+        />
       )}
       {showStockModal && (
-        <StockAccountModal onClose={() => setShowStockModal(false)}
+        <StockAccountModal
+          onClose={() => setShowStockModal(false)}
           onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending} />
+          isLoading={createMutation.isPending}
+        />
       )}
       {editingStockAccount && (
         <StockAccountModal
           initialAccount={editingStockAccount}
           onClose={() => setEditingStockAccount(null)}
           onSubmit={(data) => updateStockMutation.mutate({ id: editingStockAccount.id, data })}
-          isLoading={updateStockMutation.isPending} />
+          isLoading={updateStockMutation.isPending}
+        />
       )}
       {showRealEstateModal && (
-        <RealEstateAccountModal onClose={() => setShowRealEstateModal(false)}
+        <RealEstateAccountModal
+          onClose={() => setShowRealEstateModal(false)}
           onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending} />
+          isLoading={createMutation.isPending}
+        />
       )}
       {editingRealEstate && (
         <RealEstateEditModal
           account={editingRealEstate}
           onClose={() => setEditingRealEstate(null)}
           onSubmit={(id, data) => updateRealEstateMutation.mutate({ id, data })}
-          isLoading={updateRealEstateMutation.isPending} />
+          isLoading={updateRealEstateMutation.isPending}
+        />
       )}
       {positionsAccount && (
         <StockPositionsModal
           accountId={positionsAccount.id}
           accountName={positionsAccount.name}
-          readonly={positionsAccount.dataSource === "KIS_API" || positionsAccount.dataSource === "KIWOOM_API"}
+          readonly={
+            positionsAccount.dataSource === "KIS_API" ||
+            positionsAccount.dataSource === "KIWOOM_API"
+          }
           onClose={() => {
             setPositionsAccount(null);
             void invalidateAccountData(queryClient);
@@ -275,13 +333,18 @@ export default function AssetManagementPage() {
         />
       )}
       {txAccount && (
-        <TransactionModal accountId={txAccount.id} accountName={txAccount.name}
+        <TransactionModal
+          accountId={txAccount.id}
+          accountName={txAccount.name}
           depositKrw={txAccount.depositKrw}
-          onDepositUpdate={(newDeposit) => updateDepositMutation.mutate({ id: txAccount.id, deposit_krw: newDeposit })}
+          onDepositUpdate={(newDeposit) =>
+            updateDepositMutation.mutate({ id: txAccount.id, deposit_krw: newDeposit })
+          }
           onClose={() => {
             setTxAccount(null);
             void invalidateAccountData(queryClient);
-          }} />
+          }}
+        />
       )}
       {confirmDeleteId && (
         <ConfirmModal

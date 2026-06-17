@@ -1,4 +1,5 @@
 """alert_service 단위 테스트 — 환율/주가/리밸런싱 알림 트리거 로직 검증."""
+
 from __future__ import annotations
 
 import uuid
@@ -9,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ── _should_fire_today 테스트 ────────────────────────────────
+
 
 class TestShouldFireToday:
     def _make_alert(self, schedule_type="DAILY", **kwargs):
@@ -90,6 +92,7 @@ class TestShouldFireToday:
 
 # ── _already_fired_today 테스트 ──────────────────────────────
 
+
 class TestAlreadyFiredToday:
     def test_returns_false_when_never_triggered(self):
         from app.services.alert_calculator import already_fired_today
@@ -113,6 +116,7 @@ class TestAlreadyFiredToday:
 
 
 # ── check_and_trigger_alerts (환율) ─────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_check_and_trigger_alerts_no_rate(mock_db):
@@ -151,6 +155,7 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
+
         await check_and_trigger_alerts(mock_db)
 
     mock_email.assert_called_once()
@@ -185,6 +190,7 @@ async def test_check_and_trigger_alerts_above_not_met(mock_db):
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
+
         await check_and_trigger_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -217,6 +223,7 @@ async def test_check_and_trigger_alerts_multi_trigger_cooldown(mock_db):
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
+
         await check_and_trigger_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -251,6 +258,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
         ),
     ):
         from app.services.alert_service import check_and_trigger_alerts
+
         await check_and_trigger_alerts(mock_db)
 
     # 이메일 실패 → commit 없음
@@ -258,6 +266,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
 
 
 # ── check_and_trigger_stock_price_alerts ────────────────────
+
 
 @pytest.mark.asyncio
 async def test_check_stock_price_alerts_no_alerts(mock_db, mock_redis):
@@ -269,6 +278,7 @@ async def test_check_stock_price_alerts_no_alerts(mock_db, mock_redis):
     # fetch_prices_batch는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
     with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
+
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_db.commit.assert_not_called()
@@ -306,6 +316,7 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_redis):
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
+
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_email.assert_called_once()
@@ -345,6 +356,7 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_redis):
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
+
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_email.assert_not_called()
@@ -352,6 +364,7 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_redis):
 
 
 # ── _save_alert_history ──────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_save_alert_history_adds_to_session(mock_db):
@@ -370,6 +383,7 @@ async def test_save_alert_history_adds_to_session(mock_db):
 
 
 # ── check_rebalancing_alerts ─────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
@@ -392,15 +406,18 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         strategy="BUY_ONLY",
         order_type="MARKET",
     )
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     drifting_item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0,
-        diff_krw=500_000, shares_to_trade=5.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=15.0,
+        diff_krw=500_000,
+        shares_to_trade=5.0,
     )
     analysis = SimpleNamespace(items=[drifting_item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -411,6 +428,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_called_once()
@@ -436,15 +454,18 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
         mode="NOTIFY",
         account_id=None,
     )
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
-        diff_krw=100_000, shares_to_trade=1.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=2.0,
+        diff_krw=100_000,
+        shares_to_trade=1.0,
     )
     analysis = SimpleNamespace(items=[item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -455,6 +476,7 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -486,11 +508,13 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview",
-              new=AsyncMock(side_effect=Exception("DB Error"))),
+        patch(
+            "app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(side_effect=Exception("DB Error"))
+        ),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -517,15 +541,18 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         strategy="BUY_ONLY",
         order_type="MARKET",
     )
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
-        diff_krw=100_000, shares_to_trade=1.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=2.0,
+        diff_krw=100_000,
+        shares_to_trade=1.0,
     )
     analysis = SimpleNamespace(items=[item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -536,6 +563,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_called_once()
@@ -543,6 +571,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
 
 
 # ── check_and_trigger_stock_price_alerts (multi-trigger) ──
+
 
 @pytest.mark.asyncio
 async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_redis):
@@ -569,11 +598,11 @@ async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_redis):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch",
-              new=AsyncMock(return_value={"005930": current_price})),
+        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
         patch("app.services.email_service.send_stock_price_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
+
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_email.assert_not_called()
@@ -604,18 +633,18 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.price_service.fetch_prices_batch",
-              new=AsyncMock(return_value={"005930": current_price})),
-        patch("app.services.email_service.send_stock_price_alert",
-              new=AsyncMock(side_effect=Exception("SMTP Error"))),
+        patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
+        patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(side_effect=Exception("SMTP Error"))),
     ):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
+
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
     mock_db.commit.assert_not_called()
 
 
 # ── trigger_condition=BOTH 테스트 ─────────────────────────────
+
 
 def _make_both_alert(user_id, portfolio_id, schedule_type="DAILY"):
     return SimpleNamespace(
@@ -641,15 +670,18 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
     user_id = uuid.uuid4()
     portfolio_id = uuid.uuid4()
     alert = _make_both_alert(user_id, portfolio_id, schedule_type="DAILY")
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
-        diff_krw=100_000, shares_to_trade=1.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=2.0,
+        diff_krw=100_000,
+        shares_to_trade=1.0,
     )
     analysis = SimpleNamespace(items=[item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -660,6 +692,7 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_called_once()
@@ -674,20 +707,24 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
     user_id = uuid.uuid4()
     portfolio_id = uuid.uuid4()
     from datetime import timedelta, timezone
+
     today_weekday = datetime.now(tz=timezone(timedelta(hours=9))).weekday()
     wrong_day = (today_weekday + 1) % 7
 
     alert = _make_both_alert(user_id, portfolio_id, schedule_type="WEEKLY")
     alert.schedule_day_of_week = wrong_day
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     drifting_item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0,
-        diff_krw=500_000, shares_to_trade=5.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=15.0,
+        diff_krw=500_000,
+        shares_to_trade=5.0,
     )
     analysis = SimpleNamespace(items=[drifting_item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -698,6 +735,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     if today_weekday != wrong_day:
@@ -712,20 +750,24 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
     user_id = uuid.uuid4()
     portfolio_id = uuid.uuid4()
     from datetime import timedelta, timezone
+
     today_weekday = datetime.now(tz=timezone(timedelta(hours=9))).weekday()
     wrong_day = (today_weekday + 1) % 7
 
     alert = _make_both_alert(user_id, portfolio_id, schedule_type="WEEKLY")
     alert.schedule_day_of_week = wrong_day
-    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None,
-                                base_type="STOCK", items=[])
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
     execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
-        ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=2.0,
-        diff_krw=100_000, shares_to_trade=1.0,
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=2.0,
+        diff_krw=100_000,
+        shares_to_trade=1.0,
     )
     analysis = SimpleNamespace(items=[item])
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
@@ -736,6 +778,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     if today_weekday != wrong_day:

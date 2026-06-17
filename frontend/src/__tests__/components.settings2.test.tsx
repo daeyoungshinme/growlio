@@ -165,10 +165,7 @@ const mockAnalysis: RebalancingAnalysis = {
 describe("ExchangeRateAlertSection", () => {
   it("renders without crash", async () => {
     renderWithProviders(
-      <ExchangeRateAlertSection
-        userEmail="test@test.com"
-        onSettingsChange={vi.fn()}
-      />
+      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -177,10 +174,7 @@ describe("ExchangeRateAlertSection", () => {
 
   it("shows current exchange rate", async () => {
     renderWithProviders(
-      <ExchangeRateAlertSection
-        userEmail="test@test.com"
-        onSettingsChange={vi.fn()}
-      />
+      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
     );
     await waitFor(() => {
       // Shows some content about exchange rate alerts
@@ -190,10 +184,7 @@ describe("ExchangeRateAlertSection", () => {
 
   it("has direction select", async () => {
     renderWithProviders(
-      <ExchangeRateAlertSection
-        userEmail="test@test.com"
-        onSettingsChange={vi.fn()}
-      />
+      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
     );
     await waitFor(() => {
       const selects = document.querySelectorAll("select");
@@ -203,10 +194,7 @@ describe("ExchangeRateAlertSection", () => {
 
   it("renders with no email", async () => {
     renderWithProviders(
-      <ExchangeRateAlertSection
-        userEmail={undefined}
-        onSettingsChange={vi.fn()}
-      />
+      <ExchangeRateAlertSection userEmail={undefined} onSettingsChange={vi.fn()} />,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -247,9 +235,7 @@ describe("StockPriceAlertSection", () => {
 // =========================================
 describe("DCASettingsSection", () => {
   it("renders without crash", async () => {
-    renderWithProviders(
-      <DCASettingsSection current={null} onSettingsChange={vi.fn()} />
-    );
+    renderWithProviders(<DCASettingsSection current={null} onSettingsChange={vi.fn()} />);
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
@@ -266,18 +252,14 @@ describe("DCASettingsSection", () => {
       has_open_banking: false,
     } as unknown as SettingsData;
 
-    renderWithProviders(
-      <DCASettingsSection current={current} onSettingsChange={vi.fn()} />
-    );
+    renderWithProviders(<DCASettingsSection current={current} onSettingsChange={vi.fn()} />);
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
   });
 
   it("shows save button", async () => {
-    renderWithProviders(
-      <DCASettingsSection current={null} onSettingsChange={vi.fn()} />
-    );
+    renderWithProviders(<DCASettingsSection current={null} onSettingsChange={vi.fn()} />);
     await waitFor(() => {
       const saveBtn = screen.queryByText("저장");
       if (saveBtn) expect(saveBtn).toBeDefined();
@@ -294,7 +276,7 @@ describe("ResetPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ResetPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // sessionReady starts false, so should show "비밀번호 재설정 링크를 확인 중입니다..."
     expect(screen.getByText("비밀번호 재설정 링크를 확인 중입니다...")).toBeDefined();
@@ -304,7 +286,7 @@ describe("ResetPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ResetPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("비밀번호 찾기로 돌아가기")).toBeDefined();
   });
@@ -313,7 +295,7 @@ describe("ResetPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ResetPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // In waiting state the Growlio header isn't shown, but main text is
     expect(screen.getByText(/비밀번호 재설정/)).toBeDefined();
@@ -331,7 +313,7 @@ describe("RebalancingTable", () => {
         portfolioId="p1"
         accounts={[mockAccount]}
         onExecuted={vi.fn()}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -343,7 +325,7 @@ describe("RebalancingTable", () => {
         portfolioId="p1"
         accounts={[mockAccount]}
         onExecuted={vi.fn()}
-      />
+      />,
     );
     expect(screen.getAllByText("AAPL").length).toBeGreaterThan(0);
   });
@@ -355,7 +337,7 @@ describe("RebalancingTable", () => {
         portfolioId="p1"
         accounts={[mockAccount]}
         onExecuted={vi.fn()}
-      />
+      />,
     );
     expect(screen.getAllByText("Apple Inc.").length).toBeGreaterThan(0);
   });
@@ -368,7 +350,7 @@ describe("RebalancingTable", () => {
         accounts={[mockAccount]}
         onExecuted={vi.fn()}
         onAlertClick={vi.fn()}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -381,7 +363,7 @@ describe("RebalancingTable", () => {
         portfolioId="p1"
         accounts={[]}
         onExecuted={vi.fn()}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -417,7 +399,7 @@ describe("RebalancingTable", () => {
         accounts={[]}
         onExecuted={vi.fn()}
         existingAlert={mockAlert}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });

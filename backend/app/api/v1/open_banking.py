@@ -57,25 +57,19 @@ async def open_banking_callback(
     """오픈뱅킹 OAuth2 콜백 — 토큰 교환 후 계좌 목록 저장."""
     user_id = await redis.getdel(ob_state_key(state))
     if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 
     # state에 바인딩된 user_id가 실제로 DB에 존재하는지 검증
     try:
         uid = uuid.UUID(user_id.decode() if isinstance(user_id, bytes) else user_id)
     except ValueError:
         logger.warning("ob_callback_invalid_user_id", user_id=user_id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
-        ) from None
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다") from None
 
     user_exists = await db.scalar(select(User).where(User.id == uid))
     if not user_exists:
         logger.warning("ob_callback_user_not_found", user_id=user_id)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 state 값입니다")
 
     try:
         token_data = await exchange_code_for_token(code)
@@ -113,9 +107,7 @@ async def list_ob_accounts(
     db: AsyncSession = Depends(get_db),
 ):
     """오픈뱅킹으로 연결된 은행 계좌 목록 조회."""
-    settings_row = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == current_user.id)
-    )
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
     if not settings_row or not settings_row.ob_access_token:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -178,9 +170,7 @@ async def disconnect_open_banking(
     db: AsyncSession = Depends(get_db),
 ):
     """오픈뱅킹 연결 해제."""
-    settings_row = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == current_user.id)
-    )
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
     if settings_row:
         settings_row.ob_access_token = None
         settings_row.ob_refresh_token = None

@@ -1,4 +1,5 @@
 """Redis 분산 락 — 동일 계좌 동시 sync 방지."""
+
 from __future__ import annotations
 
 import uuid

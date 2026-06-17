@@ -1,4 +1,5 @@
 """포지션(종목) CRUD 및 현재가 동기화 라우터 — /assets/{account_id}/positions"""
+
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -40,14 +41,16 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
         invested, value, pnl, rate = calc_position_pnl(qty, avg, cur)
         total_invested += invested
         total_value += value
-        items.append({
-            **p,
-            "current_price": cur,
-            "invested_amount": invested,
-            "value_amount": value,
-            "pnl": pnl,
-            "pnl_pct": round(rate, 2),
-        })
+        items.append(
+            {
+                **p,
+                "current_price": cur,
+                "invested_amount": invested,
+                "value_amount": value,
+                "pnl": pnl,
+                "pnl_pct": round(rate, 2),
+            }
+        )
 
     total_pnl = total_value - total_invested
     total_pnl_pct = (total_pnl / total_invested * 100) if total_invested else 0.0
@@ -107,16 +110,26 @@ async def save_positions(
         def _build(p: ManualPosition, snapshot_id) -> Position:
             eff_price = p.current_price or p.avg_price
             return Position(
-                account_id=account.id, snapshot_id=snapshot_id,
-                ticker=p.ticker, name=p.name, market=p.market,
-                qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
-                current_price=eff_price, value_krw=eff_price * p.qty,
-                currency="USD" if p.avg_price_usd else "KRW", usd_rate=p.usd_rate,
+                account_id=account.id,
+                snapshot_id=snapshot_id,
+                ticker=p.ticker,
+                name=p.name,
+                market=p.market,
+                qty=p.qty,
+                avg_price=p.avg_price,
+                avg_price_usd=p.avg_price_usd,
+                current_price=eff_price,
+                value_krw=eff_price * p.qty,
+                currency="USD" if p.avg_price_usd else "KRW",
+                usd_rate=p.usd_rate,
             )
 
-        await db.execute(sql_delete(Position).where(
-            Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
-        ))
+        await db.execute(
+            sql_delete(Position).where(
+                Position.account_id == account.id,
+                Position.snapshot_id == None,  # noqa: E711
+            )
+        )
         for p in positions:
             db.add(_build(p, None))
 
@@ -167,7 +180,8 @@ async def sync_position_prices(
 
         pos_result = await db.execute(
             select(Position).where(
-                Position.account_id == account.id, Position.snapshot_id == None  # noqa: E711
+                Position.account_id == account.id,
+                Position.snapshot_id == None,  # noqa: E711
             )
         )
         pos_objs = pos_result.scalars().all()

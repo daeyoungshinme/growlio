@@ -1,7 +1,11 @@
 import { useCallback, useState } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
-import { TickerDividendItem, updateTickerDividendMonths, deleteTickerDividendMonths } from "@/api/dashboard";
+import {
+  TickerDividendItem,
+  updateTickerDividendMonths,
+  deleteTickerDividendMonths,
+} from "@/api/dashboard";
 import DividendMonthsModal from "./DividendMonthsModal";
 import { fmtKrwShort } from "@/utils/format";
 import { toast } from "@/utils/toast";
@@ -48,8 +52,15 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
   const totalEstimated = items.reduce((s, d) => s + d.estimated_annual_krw, 0);
 
   const saveMutation = useMutation({
-    mutationFn: ({ ticker, market, months }: { ticker: string; market: string; months: number[] }) =>
-      updateTickerDividendMonths(ticker, market, months),
+    mutationFn: ({
+      ticker,
+      market,
+      months,
+    }: {
+      ticker: string;
+      market: string;
+      months: number[];
+    }) => updateTickerDividendMonths(ticker, market, months),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
       qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
@@ -87,21 +98,30 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
         {isLoading ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : items.length === 0 ? (
-          <div className="py-6 text-center text-xs text-gray-300 dark:text-gray-600">보유 종목 없음</div>
+          <div className="py-6 text-center text-xs text-gray-300 dark:text-gray-600">
+            보유 종목 없음
+          </div>
         ) : (
           items.map((item, idx) => {
             const pct = totalEstimated > 0 ? (item.estimated_annual_krw / totalEstimated) * 100 : 0;
             const barColor = weightBarColor(pct);
-            const freqInfo = dividendFreqInfo(item.dividend_months ?? [], item.dividend_months_is_manual ?? false);
+            const freqInfo = dividendFreqInfo(
+              item.dividend_months ?? [],
+              item.dividend_months_is_manual ?? false,
+            );
             const months = item.dividend_months ?? [];
 
             return (
               <div key={item.ticker ?? `unclassified-${idx}`} className="px-4 py-3">
                 {/* Row 1: 종목명 + 연간 배당액 */}
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">{item.name}</p>
+                  <p className="font-semibold text-sm text-gray-900 dark:text-gray-50 truncate">
+                    {item.name}
+                  </p>
                   <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 shrink-0 whitespace-nowrap">
-                    {item.estimated_annual_krw > 0 ? `${fmtKrwShort(item.estimated_annual_krw)}원` : "—"}
+                    {item.estimated_annual_krw > 0
+                      ? `${fmtKrwShort(item.estimated_annual_krw)}원`
+                      : "—"}
                   </span>
                 </div>
 
@@ -109,10 +129,13 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
                 <div className="flex items-center justify-between mt-0.5 gap-2">
                   <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                      {item.ticker ?? "미분류"}{item.market ? ` · ${item.market}` : ""}
+                      {item.ticker ?? "미분류"}
+                      {item.market ? ` · ${item.market}` : ""}
                     </span>
                     {(item.investment_yield ?? 0) > 0 && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${yieldBadgeClass(item.investment_yield)}`}>
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded-full ${yieldBadgeClass(item.investment_yield)}`}
+                      >
                         {item.investment_yield.toFixed(2)}%
                       </span>
                     )}
@@ -120,9 +143,14 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
                   {item.estimated_annual_krw > 0 && (
                     <div className="flex items-center gap-1.5 shrink-0">
                       <div className="w-14 bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                        <div className={`${barColor} h-full rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        <div
+                          className={`${barColor} h-full rounded-full`}
+                          style={{ width: `${Math.min(pct, 100)}%` }}
+                        />
                       </div>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">{pct.toFixed(1)}%</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 w-9 text-right">
+                        {pct.toFixed(1)}%
+                      </span>
                     </div>
                   )}
                 </div>
@@ -132,10 +160,13 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
 
                 {/* Row 3: 빈도 배지 + 월 배지들 + 편집 버튼 */}
                 <div className="flex items-center gap-1 flex-wrap">
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}>
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${freqInfo.cls}`}
+                  >
                     {freqInfo.label}
                   </span>
-                  {months.length > 0 && months.length < 12 &&
+                  {months.length > 0 &&
+                    months.length < 12 &&
                     months.map((m) => (
                       <span
                         key={m}
@@ -143,8 +174,7 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
                       >
                         {m}월
                       </span>
-                    ))
-                  }
+                    ))}
                   {item.ticker && (
                     <button
                       onClick={() => handleEditClick(item)}
@@ -163,7 +193,9 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
         {!isLoading && items.length > 0 && (
           <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
             <span className="text-sm font-semibold text-gray-500 dark:text-gray-400">합계</span>
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">{fmtKrwShort(totalEstimated)}원</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+              {fmtKrwShort(totalEstimated)}원
+            </span>
           </div>
         )}
       </div>

@@ -27,7 +27,11 @@ export function StockPriceAlertSection() {
   const { suggestions, isSearching, search: runSearch, clearSuggestions } = useStockSearch();
   const [selectedStock, setSelectedStock] = useState<StockSuggestion | null>(null);
 
-  const { items: stockAlerts, reactivateMutation, deleteMutation } = useAlertCrud<StockPriceAlert>({
+  const {
+    items: stockAlerts,
+    reactivateMutation,
+    deleteMutation,
+  } = useAlertCrud<StockPriceAlert>({
     queryKey: QUERY_KEYS.stockPriceAlerts,
     queryFn: fetchStockPriceAlerts,
     reactivateFn: reactivateStockPriceAlert,
@@ -99,7 +103,9 @@ export function StockPriceAlertSection() {
                   }}
                 >
                   <span className="font-medium text-gray-800 dark:text-gray-200">{s.name}</span>
-                  <span className="ml-2 text-xs text-gray-400">{s.ticker} · {s.market}</span>
+                  <span className="ml-2 text-xs text-gray-400">
+                    {s.ticker} · {s.market}
+                  </span>
                 </button>
               ))}
             </div>
@@ -123,7 +129,9 @@ export function StockPriceAlertSection() {
             <select
               className={inputClass}
               value={form.direction}
-              onChange={(e) => setForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))
+              }
             >
               <option value="BELOW">이하 (↓)</option>
               <option value="ABOVE">이상 (↑)</option>

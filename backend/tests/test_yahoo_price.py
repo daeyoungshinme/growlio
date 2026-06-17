@@ -1,4 +1,5 @@
 """yahoo_price.py 단위 테스트 (yfinance mocked)."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -7,33 +8,41 @@ import pandas as pd
 
 # ── _to_yahoo_symbol (순수 함수) ──────────────────────────────
 
+
 class TestToYahooSymbol:
     def test_kospi(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("005930", "KOSPI") == "005930.KS"
 
     def test_krx(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("069500", "KRX") == "069500.KS"
 
     def test_kosdaq(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("035720", "KOSDAQ") == "035720.KQ"
 
     def test_nasdaq_unchanged(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("AAPL", "NASDAQ") == "AAPL"
 
     def test_short_kospi_padded(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("5930", "KOSPI") == "005930.KS"
 
     def test_case_insensitive(self, override_settings):
         from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
+
         assert _to_yahoo_symbol("005930", "kospi") == "005930.KS"
 
 
 # ── _sync_usdkrw (yfinance mocked) ───────────────────────────
+
 
 class TestSyncUsdkrw:
     def test_returns_rate_from_yfinance(self, override_settings):
@@ -73,6 +82,7 @@ class TestSyncUsdkrw:
 
 # ── _sync_yahoo_price (yfinance mocked) ──────────────────────
 
+
 class TestSyncYahooPrice:
     def test_returns_price_from_history(self, override_settings):
         from app.services.yahoo_price import _sync_yahoo_price
@@ -110,6 +120,7 @@ class TestSyncYahooPrice:
 
 
 # ── _sync_yahoo_batch (yfinance mocked) ──────────────────────
+
 
 class TestSyncYahooBatch:
     def test_empty_items_returns_empty(self, override_settings):
@@ -171,6 +182,7 @@ class TestSyncYahooBatch:
 
 # ── _sync_calc_return (yfinance mocked) ──────────────────────
 
+
 class TestSyncCalcReturn:
     def test_returns_none_on_empty_hist(self, override_settings):
         from app.services.yahoo_price import _sync_calc_return
@@ -188,9 +200,7 @@ class TestSyncCalcReturn:
 
         from app.services.yahoo_price import _sync_calc_return
 
-        dates = pd.date_range(
-            end=date.today().isoformat(), periods=300, freq="B", tz="UTC"
-        )
+        dates = pd.date_range(end=date.today().isoformat(), periods=300, freq="B", tz="UTC")
         prices = [100.0 + i * 0.05 for i in range(300)]
         hist_df = pd.DataFrame({"Close": prices}, index=dates)
         mock_ticker = MagicMock()
@@ -254,4 +264,3 @@ class TestSyncCalcReturn:
             result = _sync_calc_return("AAPL", "NASDAQ", years=10)
 
         assert result is None
-

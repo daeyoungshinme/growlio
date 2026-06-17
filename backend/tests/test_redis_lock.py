@@ -1,4 +1,5 @@
 """redis_lock.py 단위 테스트."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock

@@ -9,11 +9,16 @@ vi.mock("@/api/client", () => {
   const mockApi = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -44,7 +49,11 @@ vi.mock("@/hooks/useHaptic", () => ({ triggerHaptic: vi.fn().mockResolvedValue(u
 
 import { useRebalancingBalances } from "@/hooks/useRebalancingBalances";
 import { useRebalancingPrices } from "@/hooks/useRebalancingPrices";
-import { useRebalancingExecution, getActionableItems, executionReducer } from "@/hooks/rebalancingExecution/index";
+import {
+  useRebalancingExecution,
+  getActionableItems,
+  executionReducer,
+} from "@/hooks/rebalancingExecution/index";
 import type { ExecutionState, ExecutionAction } from "@/hooks/rebalancingExecution/types";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import type { AssetAccount } from "@/api/assets";
@@ -95,12 +104,30 @@ const mockAnalysis: RebalancingAnalysis = {
   current_portfolio_annual_dividend: 0,
   target_portfolio_annual_dividend: 0,
   ticker_account_map: {
-    "005930": [{ account_id: "acc1", account_name: "KIS 계좌", asset_type: "STOCK_KIS", quantity: 10, value_krw: 700000, is_mock_mode: false }],
-    "AAPL": [{ account_id: "acc1", account_name: "KIS 계좌", asset_type: "STOCK_KIS", quantity: 5, value_krw: 900000, is_mock_mode: false }],
+    "005930": [
+      {
+        account_id: "acc1",
+        account_name: "KIS 계좌",
+        asset_type: "STOCK_KIS",
+        quantity: 10,
+        value_krw: 700000,
+        is_mock_mode: false,
+      },
+    ],
+    AAPL: [
+      {
+        account_id: "acc1",
+        account_name: "KIS 계좌",
+        asset_type: "STOCK_KIS",
+        quantity: 5,
+        value_krw: 900000,
+        is_mock_mode: false,
+      },
+    ],
   },
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const mockKisAccounts: AssetAccount[] = [
   {
     id: "acc1",
@@ -149,7 +176,19 @@ describe("executionReducer", () => {
   it("BALANCES_LOADED — 잔고와 입금을 업데이트한다", () => {
     const action: ExecutionAction = {
       type: "BALANCES_LOADED",
-      balances: { acc1: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price: 70000, current_price: 70000, name: "삼성전자", market: "KRX" }] },
+      balances: {
+        acc1: [
+          {
+            ticker: "005930",
+            quantity: 10,
+            value_krw: 700000,
+            avg_price: 70000,
+            current_price: 70000,
+            name: "삼성전자",
+            market: "KRX",
+          },
+        ],
+      },
       deposits: { acc1: 1000000 },
       orderables: { acc1: 800000 },
       states: { acc1: "loaded" },
@@ -274,7 +313,11 @@ describe("executionReducer", () => {
   });
 
   it("ADD_BUY_ACCOUNT — 매수 계좌를 추가한다", () => {
-    const action: ExecutionAction = { type: "ADD_BUY_ACCOUNT", ticker: "005930", accountId: "acc2" };
+    const action: ExecutionAction = {
+      type: "ADD_BUY_ACCOUNT",
+      ticker: "005930",
+      accountId: "acc2",
+    };
     const result = executionReducer(baseState, action);
     expect(result.buyAccounts["005930"]).toContain("acc2");
   });
@@ -285,7 +328,11 @@ describe("executionReducer", () => {
       buyAccounts: { "005930": ["acc1", "acc2"] },
       selected: new Set(["buy_005930_acc1"]),
     };
-    const action: ExecutionAction = { type: "REMOVE_BUY_ACCOUNT", ticker: "005930", accountId: "acc1" };
+    const action: ExecutionAction = {
+      type: "REMOVE_BUY_ACCOUNT",
+      ticker: "005930",
+      accountId: "acc1",
+    };
     const result = executionReducer(state, action);
     expect(result.buyAccounts["005930"]).not.toContain("acc1");
     expect(result.selected.has("buy_005930_acc1")).toBe(false);
@@ -363,24 +410,35 @@ describe("useRebalancingBalances", () => {
       account_id: "acc1",
       account_name: "KIS 계좌",
       is_mock: false,
-      positions: [{ ticker: "005930", quantity: 10, value_krw: 700000, avg_price: 70000, current_price: 70000, name: "삼성전자", market: "KRX" }],
+      positions: [
+        {
+          ticker: "005930",
+          quantity: 10,
+          value_krw: 700000,
+          avg_price: 70000,
+          current_price: 70000,
+          name: "삼성전자",
+          market: "KRX",
+        },
+      ],
       deposit_krw: 1000000,
       orderable_krw: 800000,
       error: null,
     });
 
     const dispatch = vi.fn();
-    const { result } = renderHook(
-      () => useRebalancingBalances(dispatch, mockKisAccounts),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useRebalancingBalances(dispatch, mockKisAccounts), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.loadLiveBalance("acc1");
     });
 
     expect(dispatch).toHaveBeenCalledWith({ type: "BALANCE_LOADING", accountId: "acc1" });
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "BALANCE_LOADED", accountId: "acc1" }));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "BALANCE_LOADED", accountId: "acc1" }),
+    );
   });
 
   it("loadLiveBalance — 에러 시 BALANCE_ERROR를 dispatch한다", async () => {
@@ -388,25 +446,25 @@ describe("useRebalancingBalances", () => {
     vi.mocked(fetchBrokerBalance).mockRejectedValue(new Error("네트워크 오류"));
 
     const dispatch = vi.fn();
-    const { result } = renderHook(
-      () => useRebalancingBalances(dispatch, mockKisAccounts),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useRebalancingBalances(dispatch, mockKisAccounts), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.loadLiveBalance("acc1");
     });
 
     expect(dispatch).toHaveBeenCalledWith({ type: "BALANCE_LOADING", accountId: "acc1" });
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "BALANCE_ERROR", accountId: "acc1" }));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "BALANCE_ERROR", accountId: "acc1" }),
+    );
   });
 
   it("loadAllLiveBalances — kisAccounts가 비어있으면 아무 것도 하지 않는다", async () => {
     const dispatch = vi.fn();
-    const { result } = renderHook(
-      () => useRebalancingBalances(dispatch, []),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useRebalancingBalances(dispatch, []), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.loadAllLiveBalances();
@@ -430,10 +488,9 @@ describe("useRebalancingBalances", () => {
     ]);
 
     const dispatch = vi.fn();
-    const { result } = renderHook(
-      () => useRebalancingBalances(dispatch, mockKisAccounts),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useRebalancingBalances(dispatch, mockKisAccounts), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.loadAllLiveBalances();
@@ -458,10 +515,9 @@ describe("useRebalancingBalances", () => {
     ]);
 
     const dispatch = vi.fn();
-    const { result } = renderHook(
-      () => useRebalancingBalances(dispatch, mockKisAccounts),
-      { wrapper: createWrapper() }
-    );
+    const { result } = renderHook(() => useRebalancingBalances(dispatch, mockKisAccounts), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await result.current.loadAllLiveBalances();
@@ -510,15 +566,17 @@ describe("useRebalancingPrices", () => {
 
   it("loadAllPrices — PRICES_DONE 또는 PRICES_START를 dispatch한다", async () => {
     const { fetchStockPrice } = await import("@/api/assets");
-    vi.mocked(fetchStockPrice).mockResolvedValue({ price_krw: 80000, price_usd: null, usd_rate: null });
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: 80000,
+      price_usd: null,
+      usd_rate: null,
+    });
 
     const dispatch = vi.fn();
     // Use a fresh analysis with unique tickers to avoid price cache
     const freshAnalysis: RebalancingAnalysis = {
       ...mockAnalysis,
-      items: [
-        { ...mockAnalysis.items[0], ticker: "FRESH1" },
-      ],
+      items: [{ ...mockAnalysis.items[0], ticker: "FRESH1" }],
       untracked_holdings: [],
       ticker_account_map: {},
     };
@@ -543,15 +601,20 @@ describe("useRebalancingExecution", () => {
     const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
     const { fetchStockPrice } = await import("@/api/assets");
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
-    vi.mocked(fetchStockPrice).mockResolvedValue({ price_krw: 70000, price_usd: null, usd_rate: null });
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: 70000,
+      price_usd: null,
+      usd_rate: null,
+    });
 
     const { result } = renderHook(
-      () => useRebalancingExecution({
-        portfolioId: "p1",
-        analysis: mockAnalysis,
-        accounts: mockKisAccounts,
-      }),
-      { wrapper: createWrapper() }
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.state.phase).toBe("confirm");
@@ -564,12 +627,13 @@ describe("useRebalancingExecution", () => {
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
 
     const { result } = renderHook(
-      () => useRebalancingExecution({
-        portfolioId: "p1",
-        analysis: mockAnalysis,
-        accounts: mockKisAccounts,
-      }),
-      { wrapper: createWrapper() }
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.actionableItems).toHaveLength(2);
@@ -580,12 +644,13 @@ describe("useRebalancingExecution", () => {
     vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
 
     const { result } = renderHook(
-      () => useRebalancingExecution({
-        portfolioId: "p1",
-        analysis: mockAnalysis,
-        accounts: mockKisAccounts,
-      }),
-      { wrapper: createWrapper() }
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
     );
 
     act(() => {

@@ -38,10 +38,7 @@ export default function IndicatorHistoryChart({ data, name, unit, isDark }: Prop
   const maxVal = Math.max(...values);
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
 
-  const yDomain: [number, number] = [
-    Math.floor(minVal * 0.999),
-    Math.ceil(maxVal * 1.001),
-  ];
+  const yDomain: [number, number] = [Math.floor(minVal * 0.999), Math.ceil(maxVal * 1.001)];
 
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
 

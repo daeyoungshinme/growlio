@@ -16,12 +16,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)"
-    )
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)")
 
 
 def downgrade() -> None:
-    op.execute(
-        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(32)"
-    )
+    op.execute("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(32)")

@@ -1,4 +1,5 @@
 """market_signal_service.py 순수 함수 단위 테스트."""
+
 from __future__ import annotations
 
 from app.services.market_signal_service import compute_composite_signal
@@ -87,9 +88,13 @@ class TestResultStructure:
     def test_all_required_keys_present(self):
         result = compute_composite_signal(_vix(0), _yc(0), _fg(0))
         required_keys = {
-            "composite_level", "composite_score",
-            "fear_greed_contrarian_buy", "fear_greed_extreme_greed",
-            "signals", "computed_at", "data_freshness",
+            "composite_level",
+            "composite_score",
+            "fear_greed_contrarian_buy",
+            "fear_greed_extreme_greed",
+            "signals",
+            "computed_at",
+            "data_freshness",
         }
         assert required_keys.issubset(result.keys())
 

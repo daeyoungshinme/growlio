@@ -1,4 +1,5 @@
 """알림 API — 환율/리밸런싱/주가 알림 집계 + 이력 조회."""
+
 from __future__ import annotations
 
 import uuid

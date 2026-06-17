@@ -41,5 +41,4 @@ export interface DCAAnalysisData {
   is_configured: boolean;
 }
 
-export const fetchDCAAnalysis = () =>
-  apiGet<DCAAnalysisData>("/invest/dca-analysis");
+export const fetchDCAAnalysis = () => apiGet<DCAAnalysisData>("/invest/dca-analysis");

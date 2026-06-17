@@ -103,7 +103,10 @@ export default function App() {
   const prefetchDashboardData = useCallback(() => {
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
+    queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.portfolioOverviewLite,
+      queryFn: fetchPortfolioOverviewLite,
+    });
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
     queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
     import("./pages/DashboardPage").catch(() => {});

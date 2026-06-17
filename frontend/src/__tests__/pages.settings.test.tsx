@@ -14,11 +14,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -48,7 +53,9 @@ vi.mock("@/components/settings/ExchangeRateAlertSection", () => ({
   ),
 }));
 vi.mock("@/components/settings/StockPriceAlertSection", () => ({
-  StockPriceAlertSection: () => <div data-testid="stock-price-alert-section">StockPriceAlertSection</div>,
+  StockPriceAlertSection: () => (
+    <div data-testid="stock-price-alert-section">StockPriceAlertSection</div>
+  ),
 }));
 
 import SettingsPage from "@/pages/SettingsPage";
@@ -72,7 +79,7 @@ function renderSettings() {
       <MemoryRouter>
         <SettingsPage />
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -195,7 +202,11 @@ describe("SettingsPage", () => {
 
   it("ob_token_expires_at이 있으면 토큰 만료 날짜를 표시한다", async () => {
     vi.mocked(api.get).mockResolvedValue({
-      data: { ...mockSettings, has_open_banking: true, ob_token_expires_at: "2025-01-01T00:00:00Z" },
+      data: {
+        ...mockSettings,
+        has_open_banking: true,
+        ob_token_expires_at: "2025-01-01T00:00:00Z",
+      },
     });
     renderSettings();
     await waitFor(() => {
@@ -255,7 +266,9 @@ describe("SettingsPage", () => {
   });
 
   it("ExchangeRateAlertSection에 user_email을 전달한다", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { ...mockSettings, user_email: "test@test.com" } });
+    vi.mocked(api.get).mockResolvedValue({
+      data: { ...mockSettings, user_email: "test@test.com" },
+    });
     renderSettings();
     await waitFor(() => {
       expect(screen.getByTestId("exchange-rate-alert-section")).toHaveTextContent("test@test.com");

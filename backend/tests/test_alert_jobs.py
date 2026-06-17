@@ -1,4 +1,5 @@
 """알림 Job 단위 테스트 — 스케줄 작업 진입점 검증."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -18,6 +19,7 @@ async def test_run_exchange_rate_alert_check_calls_service():
         patch("app.jobs.exchange_rate_alert.check_and_trigger_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
+
         await run_exchange_rate_alert_check()
 
     mock_check.assert_called_once_with(mock_db)
@@ -32,10 +34,12 @@ async def test_run_exchange_rate_alert_check_handles_exception():
 
     with (
         patch("app.jobs.exchange_rate_alert.AsyncSessionLocal", return_value=mock_db),
-        patch("app.jobs.exchange_rate_alert.check_and_trigger_alerts",
-              new=AsyncMock(side_effect=RuntimeError("DB error"))),
+        patch(
+            "app.jobs.exchange_rate_alert.check_and_trigger_alerts", new=AsyncMock(side_effect=RuntimeError("DB error"))
+        ),
     ):
         from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
+
         await run_exchange_rate_alert_check()  # 예외 전파 없어야 함
 
 
@@ -51,6 +55,7 @@ async def test_run_rebalancing_alert_check_calls_service():
         patch("app.jobs.rebalancing_alert.check_rebalancing_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.rebalancing_alert import run_rebalancing_alert_check
+
         await run_rebalancing_alert_check()
 
     mock_check.assert_called_once_with(mock_db)
@@ -65,10 +70,12 @@ async def test_run_rebalancing_alert_check_handles_exception():
 
     with (
         patch("app.jobs.rebalancing_alert.AsyncSessionLocal", return_value=mock_db),
-        patch("app.jobs.rebalancing_alert.check_rebalancing_alerts",
-              new=AsyncMock(side_effect=ValueError("분석 실패"))),
+        patch(
+            "app.jobs.rebalancing_alert.check_rebalancing_alerts", new=AsyncMock(side_effect=ValueError("분석 실패"))
+        ),
     ):
         from app.jobs.rebalancing_alert import run_rebalancing_alert_check
+
         await run_rebalancing_alert_check()  # 예외 전파 없어야 함
 
 
@@ -83,10 +90,10 @@ async def test_run_stock_price_alert_check_calls_service():
     with (
         patch("app.jobs.stock_price_alert.get_redis", new=AsyncMock(return_value=mock_redis)),
         patch("app.jobs.stock_price_alert.AsyncSessionLocal", return_value=mock_db),
-        patch("app.jobs.stock_price_alert.check_and_trigger_stock_price_alerts",
-              new=AsyncMock()) as mock_check,
+        patch("app.jobs.stock_price_alert.check_and_trigger_stock_price_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.stock_price_alert import run_stock_price_alert_check
+
         await run_stock_price_alert_check()
 
     mock_check.assert_called_once_with(mock_db, mock_redis)

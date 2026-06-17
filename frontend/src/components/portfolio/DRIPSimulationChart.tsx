@@ -1,5 +1,13 @@
 import { Loader2 } from "lucide-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { fmtKrwShort, fmtPct } from "@/utils/format";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
@@ -22,7 +30,9 @@ export default function DRIPSimulationChart() {
     <div className="space-y-4">
       {/* 컨트롤 */}
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">시뮬레이션 기간</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+          시뮬레이션 기간
+        </span>
         <div className="flex gap-1">
           {DRIP_YEARS_OPTIONS.map((y) => (
             <button
@@ -82,7 +92,10 @@ export default function DRIPSimulationChart() {
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData} margin={{ top: 4, right: 8, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#374151" : "#f3f4f6"} />
-                <XAxis dataKey="year" tick={{ fontSize: 10, fill: isDark ? "#9CA3AF" : "#6B7280" }} />
+                <XAxis
+                  dataKey="year"
+                  tick={{ fontSize: 10, fill: isDark ? "#9CA3AF" : "#6B7280" }}
+                />
                 <YAxis
                   tickFormatter={(v) => `${v}만`}
                   tick={{ fontSize: 10, fill: isDark ? "#9CA3AF" : "#6B7280" }}

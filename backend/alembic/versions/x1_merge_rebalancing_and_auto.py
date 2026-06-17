@@ -99,9 +99,7 @@ def downgrade() -> None:
         "user_settings",
         sa.Column("auto_rebalance_enabled", sa.Boolean(), nullable=False, server_default="false"),
     )
-    op.add_column(
-        "user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True)
-    )
+    op.add_column("user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True))
     op.add_column("user_settings", sa.Column("auto_rebalance_account_id", sa.UUID(), nullable=True))
     op.add_column(
         "user_settings",
@@ -114,9 +112,7 @@ def downgrade() -> None:
     )
     op.add_column(
         "user_settings",
-        sa.Column(
-            "auto_rebalance_strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"
-        ),
+        sa.Column("auto_rebalance_strategy", sa.String(20), nullable=False, server_default="BUY_ONLY"),
     )
     op.add_column(
         "user_settings",
@@ -124,9 +120,7 @@ def downgrade() -> None:
     )
     op.add_column(
         "user_settings",
-        sa.Column(
-            "auto_rebalance_order_type", sa.String(20), nullable=False, server_default="MARKET"
-        ),
+        sa.Column("auto_rebalance_order_type", sa.String(20), nullable=False, server_default="MARKET"),
     )
     op.add_column(
         "user_settings",

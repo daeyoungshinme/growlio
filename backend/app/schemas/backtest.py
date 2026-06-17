@@ -1,4 +1,5 @@
 """백테스팅 Pydantic 스키마."""
+
 import uuid
 from datetime import date, datetime
 
@@ -45,6 +46,7 @@ class BacktestPortfolioResponse(BaseModel):
 
 # ── 백테스팅 실행 ─────────────────────────────────────────
 
+
 class BacktestRunRequest(BaseModel):
     portfolio_ids: list[uuid.UUID]
     start_date: date
@@ -78,7 +80,7 @@ class PortfolioMetrics(BaseModel):
 
 
 class BacktestResult(BaseModel):
-    dates: list[str]       # "YYYY-MM-DD" 목록
+    dates: list[str]  # "YYYY-MM-DD" 목록
     series: list[SeriesData]
     metrics: list[PortfolioMetrics]
 

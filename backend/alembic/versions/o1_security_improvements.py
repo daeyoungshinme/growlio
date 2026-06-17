@@ -33,10 +33,7 @@ def upgrade() -> None:
             encrypted_access = encrypt(row.ob_access_token) if row.ob_access_token else None
             encrypted_refresh = encrypt(row.ob_refresh_token) if row.ob_refresh_token else None
             conn.execute(
-                text(
-                    "UPDATE user_settings SET ob_access_token = :at, ob_refresh_token = :rt "
-                    "WHERE user_id = :uid"
-                ),
+                text("UPDATE user_settings SET ob_access_token = :at, ob_refresh_token = :rt WHERE user_id = :uid"),
                 {"at": encrypted_access, "rt": encrypted_refresh, "uid": str(row.user_id)},
             )
     except Exception as e:

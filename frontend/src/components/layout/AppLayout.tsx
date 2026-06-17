@@ -57,51 +57,58 @@ export default function AppLayout() {
 
   return (
     <ExchangeRateProvider>
-    <RefreshContext.Provider value={{ registerRefresh }}>
-      <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {needsPasswordReset && (
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-700 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between">
-              <span>보안 업그레이드로 인해 비밀번호 재설정이 필요합니다.</span>
-              <button
-                onClick={handleSendResetEmail}
-                className="ml-4 underline font-medium hover:text-yellow-900 dark:hover:text-yellow-200 transition-colors"
-              >
-                재설정 이메일 받기
-              </button>
-            </div>
-          )}
-          <OfflineBanner />
-          {/* Pull-to-Refresh 인디케이터 */}
-          {(isPulling || isRefreshing) && (
-            <div
-              className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none lg:hidden"
-              style={{ height: `${Math.max(pullDistance, isRefreshing ? 40 : 0)}px` }}
-            >
+      <RefreshContext.Provider value={{ registerRefresh }}>
+        <div className="flex h-screen bg-gray-50 dark:bg-gray-950">
+          <Sidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {needsPasswordReset && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-700 px-4 py-2 text-sm text-yellow-800 dark:text-yellow-300 flex items-center justify-between">
+                <span>보안 업그레이드로 인해 비밀번호 재설정이 필요합니다.</span>
+                <button
+                  onClick={handleSendResetEmail}
+                  className="ml-4 underline font-medium hover:text-yellow-900 dark:hover:text-yellow-200 transition-colors"
+                >
+                  재설정 이메일 받기
+                </button>
+              </div>
+            )}
+            <OfflineBanner />
+            {/* Pull-to-Refresh 인디케이터 */}
+            {(isPulling || isRefreshing) && (
               <div
-                className={`w-7 h-7 rounded-full border-2 border-blue-500 border-t-transparent ${
-                  isRefreshing ? "animate-spin" : ""
-                }`}
-                style={
-                  !isRefreshing
-                    ? { transform: `rotate(${(pullDistance / 60) * 270}deg)`, opacity: pullDistance / 60 }
-                    : {}
-                }
-              />
-            </div>
-          )}
-          <main
-            ref={mainRef}
-            className="flex-1 overflow-auto overscroll-y-contain px-3 py-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:p-6 lg:pb-6"
-            style={isPulling ? { transform: `translateY(${pullDistance}px)`, transition: "none" } : { transition: "transform 0.2s ease" }}
-          >
-            <Outlet />
-          </main>
+                className="absolute top-0 left-0 right-0 z-50 flex items-center justify-center pointer-events-none lg:hidden"
+                style={{ height: `${Math.max(pullDistance, isRefreshing ? 40 : 0)}px` }}
+              >
+                <div
+                  className={`w-7 h-7 rounded-full border-2 border-blue-500 border-t-transparent ${
+                    isRefreshing ? "animate-spin" : ""
+                  }`}
+                  style={
+                    !isRefreshing
+                      ? {
+                          transform: `rotate(${(pullDistance / 60) * 270}deg)`,
+                          opacity: pullDistance / 60,
+                        }
+                      : {}
+                  }
+                />
+              </div>
+            )}
+            <main
+              ref={mainRef}
+              className="flex-1 overflow-auto overscroll-y-contain px-3 py-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:p-6 lg:pb-6"
+              style={
+                isPulling
+                  ? { transform: `translateY(${pullDistance}px)`, transition: "none" }
+                  : { transition: "transform 0.2s ease" }
+              }
+            >
+              <Outlet />
+            </main>
+          </div>
+          <BottomNav />
         </div>
-        <BottomNav />
-      </div>
-    </RefreshContext.Provider>
+      </RefreshContext.Provider>
     </ExchangeRateProvider>
   );
 }

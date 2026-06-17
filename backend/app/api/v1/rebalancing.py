@@ -1,4 +1,5 @@
 """리밸런싱 API."""
+
 import asyncio
 import uuid
 from functools import partial
@@ -77,19 +78,11 @@ async def analyze_portfolio(
 
     # query param 우선, 없으면 portfolio에 저장된 account_ids 사용, 그것도 없으면 전체 계좌
     saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids = account_ids or (
-        [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
-    )
-    overview = await build_portfolio_overview(
-        current_user.id, db, account_ids=effective_account_ids
-    )
+    effective_account_ids = account_ids or ([uuid.UUID(aid) for aid in saved_ids] if saved_ids else None)
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_account_ids)
 
     dividend_items = await get_ticker_dividend_summary(current_user.id, db)
-    dividend_map = {
-        (item["ticker"], item["market"]): item
-        for item in dividend_items
-        if item.get("ticker")
-    }
+    dividend_map = {(item["ticker"], item["market"]): item for item in dividend_items if item.get("ticker")}
 
     # 목표 포트폴리오 종목 중 현재 미보유(dividend_map에 없음)인 종목 배당수익률 보완
     loop = asyncio.get_running_loop()
@@ -134,8 +127,10 @@ async def analyze_portfolio(
 
     # 목표 포트폴리오 종목 10년 수익률 수집 (CASH 제외)
     target_tickers = [
-        (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
-         raw_item["market"] if isinstance(raw_item, dict) else raw_item.market)
+        (
+            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
+            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
+        )
         for raw_item in portfolio.items
         if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) != "CASH"
         and (raw_item["market"] if isinstance(raw_item, dict) else raw_item.market) != "KR_PROPERTY"
@@ -178,6 +173,7 @@ async def execute_portfolio_rebalancing(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     from app.services.rebalancing_execution_service import execute_rebalancing
+
     return await execute_rebalancing(
         user_id=current_user.id,
         account_id=body.account_id,
@@ -256,15 +252,17 @@ async def quick_execute_rebalancing(
             continue
         if strategy == "BUY_ONLY" and side == "SELL":
             continue
-        orders.append(ExecItem(
-            ticker=item.ticker,
-            name=item.name,
-            market=item.market,
-            side=side,
-            quantity=qty,
-            account_id=str(account_id),
-            order_type=order_type,
-        ))
+        orders.append(
+            ExecItem(
+                ticker=item.ticker,
+                name=item.name,
+                market=item.market,
+                side=side,
+                quantity=qty,
+                account_id=str(account_id),
+                order_type=order_type,
+            )
+        )
 
     if not orders:
         raise HTTPException(
@@ -334,17 +332,19 @@ async def get_rebalancing_execution_detail(
             by_account[key]["account_name"] = ri.account_name or ""
             by_account[key]["is_mock"] = ri.is_mock
             by_account[key]["executed_at"] = execution.executed_at.isoformat()
-            by_account[key]["orders"].append(OrderResult(
-                ticker=ri.ticker or "",
-                name=ri.name or "",
-                market=ri.market or "",
-                side=ri.action,
-                quantity=ri.quantity or 0,
-                status=ri.status,
-                order_no=ri.order_no,
-                error_msg=ri.error_message,
-                order_type=ri.order_type,
-            ))
+            by_account[key]["orders"].append(
+                OrderResult(
+                    ticker=ri.ticker or "",
+                    name=ri.name or "",
+                    market=ri.market or "",
+                    side=ri.action,
+                    quantity=ri.quantity or 0,
+                    status=ri.status,
+                    order_no=ri.order_no,
+                    error_msg=ri.error_message,
+                    order_type=ri.order_type,
+                )
+            )
         detail.results = [
             ExecutionResult(
                 account_id=acc_id,
@@ -377,9 +377,13 @@ async def _fetch_broker_balance(
         app_secret = decrypt(account.kis_app_secret)
         is_mock = account.is_mock_mode
         access_token = await get_access_token(
-            app_key, app_secret,
-            is_mock=is_mock, redis=redis, db=db,
-            user_id=str(account.user_id), account_id=str(account.id),
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(account.user_id),
+            account_id=str(account.id),
         )
         domestic = await get_domestic_balance(
             app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
@@ -393,14 +397,20 @@ async def _fetch_broker_balance(
             orderable = None
         positions: list[KisBalancePosition] = [
             KisBalancePosition(
-                ticker=p["ticker"], name=p["name"], market=p["market"],
-                quantity=int(p["qty"]), avg_price=float(p["avg_price"]),
-                current_price=float(p["current_price"]), value_krw=float(p["value_krw"]),
+                ticker=p["ticker"],
+                name=p["name"],
+                market=p["market"],
+                quantity=int(p["qty"]),
+                avg_price=float(p["avg_price"]),
+                current_price=float(p["current_price"]),
+                value_krw=float(p["value_krw"]),
             )
             for p in domestic.get("positions", [])
         ]
         return KisBalanceResponse(
-            account_id=str(account.id), account_name=account.name, is_mock=is_mock,
+            account_id=str(account.id),
+            account_name=account.name,
+            is_mock=is_mock,
             positions=positions,
             deposit_krw=float(domestic.get("deposit_krw", 0)),
             orderable_krw=orderable,
@@ -414,23 +424,35 @@ async def _fetch_broker_balance(
         app_secret = decrypt(account.kiwoom_app_secret)
         is_mock = account.is_mock_mode
         access_token = await kiwoom_get_access_token(
-            app_key, app_secret,
-            is_mock=is_mock, redis=redis, db=db,
-            user_id=str(account.user_id), account_id=str(account.id),
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(account.user_id),
+            account_id=str(account.id),
         )
         domestic = await kiwoom_get_domestic_balance(
-            access_token, account.kiwoom_account_no, is_mock=is_mock  # type: ignore[arg-type]
+            access_token,
+            account.kiwoom_account_no,  # type: ignore[arg-type]
+            is_mock=is_mock,
         )
         positions = [
             KisBalancePosition(
-                ticker=p["ticker"], name=p["name"], market=p["market"],
-                quantity=int(p["qty"]), avg_price=float(p["avg_price"]),
-                current_price=float(p["current_price"]), value_krw=float(p["value_krw"]),
+                ticker=p["ticker"],
+                name=p["name"],
+                market=p["market"],
+                quantity=int(p["qty"]),
+                avg_price=float(p["avg_price"]),
+                current_price=float(p["current_price"]),
+                value_krw=float(p["value_krw"]),
             )
             for p in domestic.get("positions", [])
         ]
         return KisBalanceResponse(
-            account_id=str(account.id), account_name=account.name, is_mock=is_mock,
+            account_id=str(account.id),
+            account_name=account.name,
+            is_mock=is_mock,
             positions=positions,
             deposit_krw=float(domestic.get("deposit_krw", 0)),
         )
@@ -505,7 +527,8 @@ async def get_all_broker_balances(
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [
-        r if not isinstance(r, Exception)
+        r
+        if not isinstance(r, Exception)
         else KisBalanceResponse(
             account_id=str(acc.id),
             account_name=acc.name,

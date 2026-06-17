@@ -28,8 +28,7 @@ const queryClient = new QueryClient({
       gcTime: 30 * 60 * 1000,
       refetchIntervalInBackground: false,
       // window focus 시 60초 이내 갱신된 쿼리는 재조회 생략 (thundering herd 방지)
-      refetchOnWindowFocus: (query) =>
-        Date.now() - (query.state.dataUpdatedAt ?? 0) > 60_000,
+      refetchOnWindowFocus: (query) => Date.now() - (query.state.dataUpdatedAt ?? 0) > 60_000,
     },
   },
 });
@@ -52,13 +51,12 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         buster: "v1",
         maxAge: 24 * 60 * 60 * 1000,
         dehydrateOptions: {
-          shouldDehydrateQuery: (query) =>
-            PERSIST_QUERY_KEYS.has(query.queryKey[0] as string),
+          shouldDehydrateQuery: (query) => PERSIST_QUERY_KEYS.has(query.queryKey[0] as string),
         },
       }}
     >
       <App />
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </PersistQueryClientProvider>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

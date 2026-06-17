@@ -80,12 +80,7 @@ vi.mock("@/components/common/FormInput", () => ({
   }) => (
     <div>
       <label htmlFor={label}>{label}</label>
-      <input
-        id={label}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-      />
+      <input id={label} value={value} onChange={onChange} placeholder={placeholder} />
     </div>
   ),
 }));
@@ -150,14 +145,16 @@ function renderPage() {
       <MemoryRouter>
         <InvestPlanPage />
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
 describe("InvestPlanPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(api.get).mockResolvedValue({ data: { annual_deposit_goal: null, retirement_target_year: null } });
+    vi.mocked(api.get).mockResolvedValue({
+      data: { annual_deposit_goal: null, retirement_target_year: null },
+    });
     vi.mocked(fetchSettings).mockResolvedValue({
       annual_deposit_goal: null,
       retirement_target_year: null,
@@ -351,4 +348,3 @@ describe("InvestPlanPage", () => {
     });
   });
 });
-

@@ -3,7 +3,11 @@ import { loginSchema, registerSchema, resetPasswordSchema } from "@/schemas/auth
 import { transactionSchema } from "@/schemas/transaction";
 import { investGoalSchema } from "@/schemas/settings";
 import { portfolioItemSchema, portfolioCreateSchema } from "@/schemas/portfolios";
-import { realEstateDetailsSchema, assetAccountCreateSchema, manualPositionSchema } from "@/schemas/assets";
+import {
+  realEstateDetailsSchema,
+  assetAccountCreateSchema,
+  manualPositionSchema,
+} from "@/schemas/assets";
 
 // ────────────────────────────────────────────
 // auth schemas
@@ -45,14 +49,22 @@ describe("loginSchema", () => {
 });
 
 describe("registerSchema", () => {
-  const valid = { email: "user@example.com", password: "password123", confirmPassword: "password123" };
+  const valid = {
+    email: "user@example.com",
+    password: "password123",
+    confirmPassword: "password123",
+  };
 
   it("유효한 회원가입 데이터를 수락한다", () => {
     expect(registerSchema.safeParse(valid).success).toBe(true);
   });
 
   it("비밀번호가 8자 미만이면 실패한다", () => {
-    const result = registerSchema.safeParse({ ...valid, password: "short", confirmPassword: "short" });
+    const result = registerSchema.safeParse({
+      ...valid,
+      password: "short",
+      confirmPassword: "short",
+    });
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues[0].message).toBe("비밀번호는 8자 이상이어야 합니다");
@@ -74,13 +86,19 @@ describe("registerSchema", () => {
   });
 
   it("정확히 8자 비밀번호는 유효하다", () => {
-    expect(registerSchema.safeParse({ ...valid, password: "12345678", confirmPassword: "12345678" }).success).toBe(true);
+    expect(
+      registerSchema.safeParse({ ...valid, password: "12345678", confirmPassword: "12345678" })
+        .success,
+    ).toBe(true);
   });
 });
 
 describe("resetPasswordSchema", () => {
   it("유효한 데이터를 수락한다", () => {
-    expect(resetPasswordSchema.safeParse({ password: "newpass12", confirmPassword: "newpass12" }).success).toBe(true);
+    expect(
+      resetPasswordSchema.safeParse({ password: "newpass12", confirmPassword: "newpass12" })
+        .success,
+    ).toBe(true);
   });
 
   it("8자 미만 비밀번호는 실패한다", () => {
@@ -92,7 +110,10 @@ describe("resetPasswordSchema", () => {
   });
 
   it("비밀번호 불일치 시 실패한다", () => {
-    const result = resetPasswordSchema.safeParse({ password: "newpass12", confirmPassword: "different" });
+    const result = resetPasswordSchema.safeParse({
+      password: "newpass12",
+      confirmPassword: "different",
+    });
     expect(result.success).toBe(false);
     if (!result.success) {
       const mismatch = result.error.issues.find((i) => i.path.includes("confirmPassword"));
@@ -121,11 +142,15 @@ describe("transactionSchema", () => {
   });
 
   it("WITHDRAWAL 타입을 수락한다", () => {
-    expect(transactionSchema.safeParse({ ...valid, transaction_type: "WITHDRAWAL" }).success).toBe(true);
+    expect(transactionSchema.safeParse({ ...valid, transaction_type: "WITHDRAWAL" }).success).toBe(
+      true,
+    );
   });
 
   it("DIVIDEND 타입을 수락한다", () => {
-    expect(transactionSchema.safeParse({ ...valid, transaction_type: "DIVIDEND" }).success).toBe(true);
+    expect(transactionSchema.safeParse({ ...valid, transaction_type: "DIVIDEND" }).success).toBe(
+      true,
+    );
   });
 
   it("음수 금액은 실패한다", () => {
@@ -181,7 +206,7 @@ describe("investGoalSchema", () => {
         annual_investment_goal: 12000000,
         target_asset_amount: 500000000,
         target_year: 2035,
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -353,11 +378,15 @@ describe("portfolioCreateSchema", () => {
   });
 
   it("base_type이 STOCK_ONLY면 수락한다", () => {
-    expect(portfolioCreateSchema.safeParse({ ...valid, base_type: "STOCK_ONLY" }).success).toBe(true);
+    expect(portfolioCreateSchema.safeParse({ ...valid, base_type: "STOCK_ONLY" }).success).toBe(
+      true,
+    );
   });
 
   it("base_type이 TOTAL_ASSETS면 수락한다", () => {
-    expect(portfolioCreateSchema.safeParse({ ...valid, base_type: "TOTAL_ASSETS" }).success).toBe(true);
+    expect(portfolioCreateSchema.safeParse({ ...valid, base_type: "TOTAL_ASSETS" }).success).toBe(
+      true,
+    );
   });
 
   it("base_type이 유효하지 않으면 실패한다", () => {
@@ -370,7 +399,7 @@ describe("portfolioCreateSchema", () => {
       portfolioCreateSchema.safeParse({
         ...valid,
         account_ids: ["550e8400-e29b-41d4-a716-446655440000"],
-      }).success
+      }).success,
     ).toBe(true);
   });
 
@@ -419,7 +448,9 @@ describe("realEstateDetailsSchema", () => {
   });
 
   it("모기지 잔액이 0이면 허용된다", () => {
-    expect(realEstateDetailsSchema.safeParse({ ...valid, mortgage_balance_krw: 0 }).success).toBe(true);
+    expect(realEstateDetailsSchema.safeParse({ ...valid, mortgage_balance_krw: 0 }).success).toBe(
+      true,
+    );
   });
 
   it("모기지 잔액이 음수이면 실패한다", () => {
@@ -467,18 +498,24 @@ describe("assetAccountCreateSchema", () => {
   });
 
   it("유효한 KIS 계좌번호 형식 (12345678-01)을 수락한다", () => {
-    expect(assetAccountCreateSchema.safeParse({ ...valid, kis_account_no: "12345678-01" }).success).toBe(true);
+    expect(
+      assetAccountCreateSchema.safeParse({ ...valid, kis_account_no: "12345678-01" }).success,
+    ).toBe(true);
   });
 
   it("유효한 KIS 계좌번호 형식 (1234567890)을 수락한다", () => {
-    expect(assetAccountCreateSchema.safeParse({ ...valid, kis_account_no: "1234567890" }).success).toBe(true);
+    expect(
+      assetAccountCreateSchema.safeParse({ ...valid, kis_account_no: "1234567890" }).success,
+    ).toBe(true);
   });
 
   it("잘못된 KIS 계좌번호 형식이면 실패한다", () => {
     const result = assetAccountCreateSchema.safeParse({ ...valid, kis_account_no: "INVALID" });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.issues[0].message).toBe("KIS 계좌번호 형식이 올바르지 않습니다 (예: 12345678-01)");
+      expect(result.error.issues[0].message).toBe(
+        "KIS 계좌번호 형식이 올바르지 않습니다 (예: 12345678-01)",
+      );
     }
   });
 
@@ -511,7 +548,9 @@ describe("assetAccountCreateSchema", () => {
   });
 
   it("notes가 500자 이하이면 수락한다", () => {
-    expect(assetAccountCreateSchema.safeParse({ ...valid, notes: "a".repeat(500) }).success).toBe(true);
+    expect(assetAccountCreateSchema.safeParse({ ...valid, notes: "a".repeat(500) }).success).toBe(
+      true,
+    );
   });
 
   it("notes가 501자 이상이면 실패한다", () => {
@@ -566,7 +605,17 @@ describe("manualPositionSchema", () => {
   });
 
   it("모든 유효한 시장을 수락한다", () => {
-    const markets = ["KOSPI", "KOSDAQ", "KONEX", "NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "LSE"] as const;
+    const markets = [
+      "KOSPI",
+      "KOSDAQ",
+      "KONEX",
+      "NYSE",
+      "NASDAQ",
+      "AMEX",
+      "TSE",
+      "HKEX",
+      "LSE",
+    ] as const;
     for (const market of markets) {
       expect(manualPositionSchema.safeParse({ ...valid, market }).success).toBe(true);
     }

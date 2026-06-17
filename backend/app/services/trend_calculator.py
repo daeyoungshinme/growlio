@@ -1,4 +1,5 @@
 """월별 자산 추이 계산 — DB·Redis 의존, 비즈니스 로직 없음."""
+
 from __future__ import annotations
 
 import contextlib

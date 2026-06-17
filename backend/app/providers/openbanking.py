@@ -84,6 +84,7 @@ async def refresh_access_token(refresh_token: str) -> dict[str, Any]:
 
 async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
     """연결된 은행 계좌 목록 조회 (핀테크이용번호 포함)."""
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
     async def _call() -> list[dict]:
         client = _get_client(ssl_verify=True)
@@ -122,9 +123,7 @@ async def ensure_ob_token_fresh(settings_row: UserSettings, db: AsyncSession) ->
             if "refresh_token" in token_data:
                 settings_row.ob_refresh_token = encrypt(token_data["refresh_token"])
             if "expires_in" in token_data:
-                settings_row.ob_token_expires_at = datetime.now(UTC) + timedelta(
-                    seconds=int(token_data["expires_in"])
-                )
+                settings_row.ob_token_expires_at = datetime.now(UTC) + timedelta(seconds=int(token_data["expires_in"]))
             await db.commit()
             logger.info("ob_token_refreshed", user_id=str(settings_row.user_id))
             current_access = token_data["access_token"]

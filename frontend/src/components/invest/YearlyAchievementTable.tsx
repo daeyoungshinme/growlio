@@ -18,7 +18,9 @@ export default function YearlyAchievementTable({ data }: Props) {
   if (past.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">연별 달성율</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
+          연별 달성율
+        </h3>
         <EmptyState title="스냅샷 데이터가 없습니다." compact />
       </div>
     );
@@ -30,21 +32,31 @@ export default function YearlyAchievementTable({ data }: Props) {
       {/* 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {[...past].reverse().map((row) => {
-          const diff = row.actual_year_end_krw !== null ? row.actual_year_end_krw - row.projected_year_end_krw : null;
+          const diff =
+            row.actual_year_end_krw !== null
+              ? row.actual_year_end_krw - row.projected_year_end_krw
+              : null;
           return (
             <div key={row.year} className="py-2.5">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{row.year}년</p>
-                <span className={`text-sm font-bold ${row.achievement_pct !== null ? pctColor(row.achievement_pct) : "text-gray-400 dark:text-gray-500"}`}>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                  {row.year}년
+                </p>
+                <span
+                  className={`text-sm font-bold ${row.achievement_pct !== null ? pctColor(row.achievement_pct) : "text-gray-400 dark:text-gray-500"}`}
+                >
                   {row.achievement_pct !== null ? `${row.achievement_pct.toFixed(1)}%` : "—"}
                 </span>
               </div>
               <div className="flex items-center gap-3 mt-1 text-xs text-gray-400 dark:text-gray-500 flex-wrap">
                 <span>이론 {fmtKrw(row.projected_year_end_krw)}</span>
-                <span>실제 {row.actual_year_end_krw !== null ? fmtKrw(row.actual_year_end_krw) : "—"}</span>
+                <span>
+                  실제 {row.actual_year_end_krw !== null ? fmtKrw(row.actual_year_end_krw) : "—"}
+                </span>
                 {diff !== null && (
                   <span className={diff >= 0 ? "text-red-500" : "text-blue-500"}>
-                    {diff >= 0 ? "+" : ""}{fmtKrw(diff)}
+                    {diff >= 0 ? "+" : ""}
+                    {fmtKrw(diff)}
                   </span>
                 )}
               </div>
@@ -72,8 +84,13 @@ export default function YearlyAchievementTable({ data }: Props) {
                   ? row.actual_year_end_krw - row.projected_year_end_krw
                   : null;
               return (
-                <tr key={row.year} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <td className="py-2.5 pr-3 font-medium text-gray-800 dark:text-gray-200">{row.year}년</td>
+                <tr
+                  key={row.year}
+                  className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <td className="py-2.5 pr-3 font-medium text-gray-800 dark:text-gray-200">
+                    {row.year}년
+                  </td>
                   <td className="py-2.5 px-3 text-right text-gray-600 dark:text-gray-400">
                     {fmtKrw(row.projected_year_end_krw)}
                   </td>
@@ -87,17 +104,15 @@ export default function YearlyAchievementTable({ data }: Props) {
                         : "text-gray-400 dark:text-gray-500"
                     }`}
                   >
-                    {row.achievement_pct !== null
-                      ? `${row.achievement_pct.toFixed(1)}%`
-                      : "—"}
+                    {row.achievement_pct !== null ? `${row.achievement_pct.toFixed(1)}%` : "—"}
                   </td>
                   <td
                     className={`py-2.5 pl-3 text-right text-xs ${
                       diff === null
                         ? "text-gray-400 dark:text-gray-500"
                         : diff >= 0
-                        ? "text-red-500"
-                        : "text-blue-500"
+                          ? "text-red-500"
+                          : "text-blue-500"
                     }`}
                   >
                     {diff !== null ? `${diff >= 0 ? "+" : ""}${fmtKrw(diff)}` : "—"}

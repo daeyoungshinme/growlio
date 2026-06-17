@@ -92,43 +92,41 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
       </div>
 
       <div className="min-h-[200px]">
-      <ResponsiveContainer width="100%" height={hasTarget ? 240 : 220}>
-        <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-          <PolarGrid stroke={isDark ? "#374151" : "#E5E7EB"} />
-          <PolarAngleAxis
-            dataKey="factor"
-            tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
-          />
-          <Radar
-            name="현재 포트폴리오"
-            dataKey="current"
-            stroke="#3B82F6"
-            fill="#3B82F6"
-            fillOpacity={0.25}
-            dot={{ r: 3, fill: "#3B82F6" }}
-          />
-          {hasTarget && (
+        <ResponsiveContainer width="100%" height={hasTarget ? 240 : 220}>
+          <RadarChart data={radarData} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
+            <PolarGrid stroke={isDark ? "#374151" : "#E5E7EB"} />
+            <PolarAngleAxis
+              dataKey="factor"
+              tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
+            />
             <Radar
-              name={targetData?.portfolio_name ?? "목표 포트폴리오"}
-              dataKey="target"
-              stroke="#F59E0B"
-              fill="#F59E0B"
-              fillOpacity={0.15}
-              dot={{ r: 3, fill: "#F59E0B" }}
+              name="현재 포트폴리오"
+              dataKey="current"
+              stroke="#3B82F6"
+              fill="#3B82F6"
+              fillOpacity={0.25}
+              dot={{ r: 3, fill: "#3B82F6" }}
             />
-          )}
-          <Tooltip
-            contentStyle={contentStyle}
-            labelStyle={labelStyle}
-            formatter={(v: number, name: string) => [`${v.toFixed(1)} / 100`, name]}
-          />
-          {hasTarget && (
-            <Legend
-              wrapperStyle={{ fontSize: 11, color: isDark ? "#9CA3AF" : "#6B7280" }}
+            {hasTarget && (
+              <Radar
+                name={targetData?.portfolio_name ?? "목표 포트폴리오"}
+                dataKey="target"
+                stroke="#F59E0B"
+                fill="#F59E0B"
+                fillOpacity={0.15}
+                dot={{ r: 3, fill: "#F59E0B" }}
+              />
+            )}
+            <Tooltip
+              contentStyle={contentStyle}
+              labelStyle={labelStyle}
+              formatter={(v: number, name: string) => [`${v.toFixed(1)} / 100`, name]}
             />
-          )}
-        </RadarChart>
-      </ResponsiveContainer>
+            {hasTarget && (
+              <Legend wrapperStyle={{ fontSize: 11, color: isDark ? "#9CA3AF" : "#6B7280" }} />
+            )}
+          </RadarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* 팩터 델타 뱃지 (목표 포트폴리오 선택 시) */}
@@ -151,8 +149,8 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
                     isUp
                       ? "font-semibold text-amber-600 dark:text-amber-400"
                       : isDown
-                      ? "font-semibold text-blue-500"
-                      : "text-gray-400 dark:text-gray-500"
+                        ? "font-semibold text-blue-500"
+                        : "text-gray-400 dark:text-gray-500"
                   }
                 >
                   {isUp ? "+" : ""}
@@ -168,10 +166,22 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
       {/* 팩터 설명 (목표 비선택 시) */}
       {!hasTarget && (
         <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 dark:text-gray-400">
-          <span><span className="font-medium text-gray-700 dark:text-gray-300">가치</span> — 낮은 P/E·P/B</span>
-          <span><span className="font-medium text-gray-700 dark:text-gray-300">성장</span> — 높은 P/E·P/B</span>
-          <span><span className="font-medium text-gray-700 dark:text-gray-300">소형주</span> — 낮은 시가총액</span>
-          <span><span className="font-medium text-gray-700 dark:text-gray-300">모멘텀</span> — 12-1M 수익률</span>
+          <span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">가치</span> — 낮은
+            P/E·P/B
+          </span>
+          <span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">성장</span> — 높은
+            P/E·P/B
+          </span>
+          <span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">소형주</span> — 낮은
+            시가총액
+          </span>
+          <span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">모멘텀</span> — 12-1M
+            수익률
+          </span>
         </div>
       )}
 
@@ -181,10 +191,18 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-700">
-                <th className="text-left py-1.5 pr-2 font-medium text-gray-400 dark:text-gray-500">종목</th>
-                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">P/E</th>
-                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">P/B</th>
-                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">모멘텀</th>
+                <th className="text-left py-1.5 pr-2 font-medium text-gray-400 dark:text-gray-500">
+                  종목
+                </th>
+                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">
+                  P/E
+                </th>
+                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">
+                  P/B
+                </th>
+                <th className="text-right py-1.5 px-1 font-medium text-gray-400 dark:text-gray-500">
+                  모멘텀
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -208,13 +226,15 @@ export default function FactorExposureChart({ selectedPortfolioId }: Props) {
                     <td className="py-1.5 px-1 text-right text-gray-600 dark:text-gray-400">
                       {h.pb_ratio != null ? h.pb_ratio.toFixed(2) : "—"}
                     </td>
-                    <td className={`py-1.5 px-1 text-right font-medium ${
-                      h.momentum_pct == null
-                        ? "text-gray-400 dark:text-gray-500"
-                        : h.momentum_pct >= 0
-                        ? "text-red-500"
-                        : "text-blue-500"
-                    }`}>
+                    <td
+                      className={`py-1.5 px-1 text-right font-medium ${
+                        h.momentum_pct == null
+                          ? "text-gray-400 dark:text-gray-500"
+                          : h.momentum_pct >= 0
+                            ? "text-red-500"
+                            : "text-blue-500"
+                      }`}
+                    >
                       {h.momentum_pct != null
                         ? `${h.momentum_pct >= 0 ? "+" : ""}${h.momentum_pct.toFixed(1)}%`
                         : "—"}

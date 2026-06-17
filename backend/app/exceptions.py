@@ -1,9 +1,11 @@
 """앱 전용 예외 클래스. 서비스 레이어에서 raise → API 레이어에서 HTTPException으로 변환."""
+
 from __future__ import annotations
 
 
 class AppError(Exception):
     """기본 앱 예외. status_code와 detail을 지정하면 전역 핸들러가 HTTP 응답으로 변환."""
+
     status_code: int = 500
     detail: str = "서버 오류가 발생했습니다."
 
@@ -69,6 +71,7 @@ class KiwoomAuthError(ExternalAPIError):
 
 # ── 증권사 동기화 오류 계층 ─────────────────────────────────────────────────────
 # asset_service / BrokerProvider 구현체에서 raise → API 레이어에서 HTTPException 변환
+
 
 class SyncError(Exception):
     """증권사 동기화 최상위 예외."""

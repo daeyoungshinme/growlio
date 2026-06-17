@@ -25,17 +25,23 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
   return (
     <div className="flex-1 text-center">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{label}</p>
-      <p className={`text-lg font-bold mt-0.5 ${color ?? "text-gray-900 dark:text-gray-50"}`}>{value}</p>
+      <p className={`text-lg font-bold mt-0.5 ${color ?? "text-gray-900 dark:text-gray-50"}`}>
+        {value}
+      </p>
     </div>
   );
 }
-
 
 export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAllocation }: Props) {
   const chartData = useMemo(
     () =>
       stockAllocation && stockAllocation.length > 0
-        ? stockAllocation.map((item) => ({ name: item.name, ticker: item.ticker, value: item.value_krw ?? 0, pct: item.pct }))
+        ? stockAllocation.map((item) => ({
+            name: item.name,
+            ticker: item.ticker,
+            value: item.value_krw ?? 0,
+            pct: item.pct,
+          }))
         : null,
     [stockAllocation],
   );
@@ -44,9 +50,15 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
     return (
       <div className="space-y-4">
         <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
-          <div className="flex-1 px-2"><SkeletonStatBox /></div>
-          <div className="flex-1 px-2"><SkeletonStatBox /></div>
-          <div className="flex-1 px-2"><SkeletonStatBox /></div>
+          <div className="flex-1 px-2">
+            <SkeletonStatBox />
+          </div>
+          <div className="flex-1 px-2">
+            <SkeletonStatBox />
+          </div>
+          <div className="flex-1 px-2">
+            <SkeletonStatBox />
+          </div>
         </div>
         <SkeletonCard rows={4} />
       </div>
@@ -54,7 +66,11 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
   }
 
   if (!overview) {
-    return <div className="py-6 text-center text-gray-300 dark:text-gray-600 text-sm">데이터를 불러올 수 없습니다</div>;
+    return (
+      <div className="py-6 text-center text-gray-300 dark:text-gray-600 text-sm">
+        데이터를 불러올 수 없습니다
+      </div>
+    );
   }
 
   const pnlColorClass = pnlColor(overview.unrealized_pnl_krw);
@@ -64,7 +80,13 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
     <div className="space-y-4">
       {/* 요약 stat */}
       <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
-        <StatBox label="주식 총평가액" value={fmtKrw(Math.round(overview.total_invested_krw / 1e6) * 1e6 + Math.round(overview.unrealized_pnl_krw / 1e6) * 1e6)} />
+        <StatBox
+          label="주식 총평가액"
+          value={fmtKrw(
+            Math.round(overview.total_invested_krw / 1e6) * 1e6 +
+              Math.round(overview.unrealized_pnl_krw / 1e6) * 1e6,
+          )}
+        />
         <StatBox
           label="평가손익"
           value={`${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`}
@@ -87,7 +109,6 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
           <PortfolioTreemapChart data={chartData} />
         </Suspense>
       ) : null}
-
     </div>
   );
 });

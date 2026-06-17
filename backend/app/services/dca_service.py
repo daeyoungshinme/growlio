@@ -81,9 +81,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
         months_to_goal if months_to_goal else _elapsed_months(start_date, today) + 1,
     )
 
-    projection_months = _build_projection_curve(
-        initial_value, pmt, r, start_date, total_months, monthly_actuals
-    )
+    projection_months = _build_projection_curve(initial_value, pmt, r, start_date, total_months, monthly_actuals)
     yearly_achievements = _build_yearly_achievements(projection_months)
 
     current_actual = monthly_actuals.get(_month_key(today))
@@ -142,9 +140,7 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
     return float(row.total) if row else 0.0
 
 
-async def _get_monthly_actual_values(
-    user_id: uuid.UUID, start_date: date, db: AsyncSession
-) -> dict[str, float]:
+async def _get_monthly_actual_values(user_id: uuid.UUID, start_date: date, db: AsyncSession) -> dict[str, float]:
     """start_date부터 현재까지 각 월의 마지막 스냅샷 날짜 기준 전체 계좌 합계 반환.
 
     반환: {"2024-01": 10500000.0, "2024-02": 11200000.0, ...}

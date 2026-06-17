@@ -10,11 +10,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -34,7 +39,12 @@ import {
   fetchStockPrice,
 } from "@/api/assets";
 
-const mockAccount = { id: "acc-1", name: "테스트", asset_type: "STOCK_KIS", data_source: "KIS_API" };
+const mockAccount = {
+  id: "acc-1",
+  name: "테스트",
+  asset_type: "STOCK_KIS",
+  data_source: "KIS_API",
+};
 
 describe("api/assets", () => {
   beforeEach(() => {
@@ -126,7 +136,9 @@ describe("api/assets", () => {
   });
 
   it("searchStocks calls GET /stocks/search with query", async () => {
-    const mockSuggestions = [{ ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" }];
+    const mockSuggestions = [
+      { ticker: "005930", name: "삼성전자", market: "KOSPI", exchange: "KRX" },
+    ];
     vi.mocked(api.get).mockResolvedValue({ data: mockSuggestions });
     const result = await searchStocks("삼성");
     expect(api.get).toHaveBeenCalledWith("/stocks/search", {

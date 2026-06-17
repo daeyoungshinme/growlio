@@ -1,4 +1,5 @@
 """dart_service.py 단위 테스트 — httpx 모킹."""
+
 from __future__ import annotations
 
 import io
@@ -157,9 +158,7 @@ class TestFetchDartDividend:
 
         api_response = {
             "status": "000",
-            "list": [
-                {"se": "보통주", "cash_dwnd_rate": "2.15", "per_sto_dvdn_amt": "1500"}
-            ],
+            "list": [{"se": "보통주", "cash_dwnd_rate": "2.15", "per_sto_dvdn_amt": "1500"}],
         }
         mock_resp = MagicMock()
         mock_resp.json.return_value = api_response
@@ -342,8 +341,13 @@ class TestFetchDisclosuresForTickers:
         api_response = {
             "status": "000",
             "list": [
-                {"rcept_no": "2024001", "corp_name": "삼성전자", "report_nm": "연간보고서",
-                 "rcept_dt": "20240315", "rm": ""},
+                {
+                    "rcept_no": "2024001",
+                    "corp_name": "삼성전자",
+                    "report_nm": "연간보고서",
+                    "rcept_dt": "20240315",
+                    "rm": "",
+                },
             ],
         }
         mock_resp = MagicMock()

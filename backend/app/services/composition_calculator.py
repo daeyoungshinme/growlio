@@ -1,4 +1,5 @@
 """자산 구성 계산 — 최신 스냅샷 기반 총자산·유형별 금액 집계."""
+
 from __future__ import annotations
 
 import uuid
@@ -17,9 +18,7 @@ from app.utils.pnl import invested_value as _invested_value
 _STOCK_TYPES = {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER}
 
 
-async def get_latest_snapshot_rows(
-    user_id: uuid.UUID, db: AsyncSession
-) -> tuple[list, set]:
+async def get_latest_snapshot_rows(user_id: uuid.UUID, db: AsyncSession) -> tuple[list, set]:
     """활성 계좌의 최신 스냅샷 행과 스냅샷이 있는 계좌 ID 집합을 반환한다."""
     subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
@@ -33,9 +32,7 @@ async def get_latest_snapshot_rows(
     return list(rows), snapped_ids
 
 
-async def get_no_snap_accounts(
-    user_id: uuid.UUID, db: AsyncSession, snapped_ids: set
-) -> list:
+async def get_no_snap_accounts(user_id: uuid.UUID, db: AsyncSession, snapped_ids: set) -> list:
     """스냅샷 없이 manual_amount/deposit만 있는 활성 계좌를 반환한다."""
     conditions = [
         AssetAccount.user_id == user_id,
@@ -52,15 +49,11 @@ async def get_no_snap_accounts(
     return list(result.scalars().all())
 
 
-async def fetch_position_maps(
-    snap_ids: list, stock_acc_ids: list, db: AsyncSession
-) -> tuple[dict, dict]:
+async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSession) -> tuple[dict, dict]:
     """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
     snap_positions: dict[uuid.UUID, list[Position]] = {}
     if snap_ids:
-        pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
+        pos_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
         for pos in pos_result.scalars().all():
             if pos.snapshot_id is not None:
                 snap_positions.setdefault(pos.snapshot_id, []).append(pos)

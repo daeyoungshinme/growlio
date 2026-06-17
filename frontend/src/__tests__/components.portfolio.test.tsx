@@ -8,7 +8,20 @@ vi.mock("@/stores/themeStore", () => ({
 }));
 
 vi.mock("@/utils/dividendUtils", () => ({
-  MONTH_LABELS: ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"],
+  MONTH_LABELS: [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월",
+  ],
   dividendFreqInfo: vi.fn(() => ({ label: "분기", cls: "text-blue-500" })),
   weightBarColor: vi.fn(() => "bg-blue-500"),
   yieldBadgeClass: vi.fn(() => "bg-green-100 text-green-600"),
@@ -93,7 +106,7 @@ describe("MonthlyDividendChart", () => {
         selectedMonth={1}
         isDark={false}
         onMonthSelect={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/월별 배당 현황/)).toBeDefined();
   });
@@ -125,7 +138,7 @@ describe("MonthlyTickerDetail", () => {
         monthStr="2024-03"
         monthlyEstimate={41666}
         monthTickerActualMap={{}}
-      />
+      />,
     );
     expect(screen.getAllByText("Apple Inc.").length).toBeGreaterThan(0);
   });
@@ -139,7 +152,7 @@ describe("MonthlyTickerDetail", () => {
         monthStr="2024-02"
         monthlyEstimate={0}
         monthTickerActualMap={{}}
-      />
+      />,
     );
     expect(screen.getByText("이 달에 배당 예정 종목이 없습니다.")).toBeDefined();
   });
@@ -153,7 +166,7 @@ describe("MonthlyTickerDetail", () => {
         monthStr="2024-03"
         monthlyEstimate={41666}
         monthTickerActualMap={{ "2024-03-AAPL": 80000 }}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });

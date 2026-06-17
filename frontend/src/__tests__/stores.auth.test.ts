@@ -24,11 +24,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -108,7 +113,7 @@ describe("authStore — register", () => {
 
     const store = await getStore();
     await expect(store.register("new@example.com", "password123")).rejects.toThrow(
-      "EMAIL_CONFIRMATION_REQUIRED"
+      "EMAIL_CONFIRMATION_REQUIRED",
     );
   });
 
@@ -138,7 +143,7 @@ describe("authStore — register", () => {
 
     const store = await getStore();
     await expect(store.register("dup@example.com", "password123")).rejects.toThrow(
-      "Email already in use"
+      "Email already in use",
     );
   });
 
@@ -321,7 +326,10 @@ describe("authStore — forgotPassword", () => {
   });
 
   it("성공 시 에러를 던지지 않는다", async () => {
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+      data: {},
+      error: null,
+    } as never);
     const store = await getStore();
     await expect(store.forgotPassword("user@example.com")).resolves.not.toThrow();
   });

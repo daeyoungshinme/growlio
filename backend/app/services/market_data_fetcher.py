@@ -3,6 +3,7 @@
 factor_service, portfolio_optimizer, risk_service 세 곳에서 동일하게 사용되는
 yfinance batch download + MultiIndex 파싱 + NaN 필터링 패턴을 한 곳에서 관리한다.
 """
+
 from __future__ import annotations
 
 import math

@@ -18,9 +18,15 @@ export default function PortfolioAccountSelector({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">분석 대상 계좌</label>
+        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          분석 대상 계좌
+        </label>
         {!isAllSelected && (
-          <button type="button" onClick={onSelectAll} className="text-xs text-blue-600 hover:underline">
+          <button
+            type="button"
+            onClick={onSelectAll}
+            className="text-xs text-blue-600 hover:underline"
+          >
             전체 선택
           </button>
         )}

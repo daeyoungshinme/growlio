@@ -1,4 +1,5 @@
 """주가 목표 알림 Job — 10분 간격 실행."""
+
 from __future__ import annotations
 
 from app.database import AsyncSessionLocal

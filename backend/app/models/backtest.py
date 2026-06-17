@@ -25,6 +25,4 @@ class BacktestPortfolio(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    __table_args__ = (
-        Index("idx_backtest_portfolios_user", "user_id"),
-    )
+    __table_args__ = (Index("idx_backtest_portfolios_user", "user_id"),)

@@ -19,7 +19,13 @@ export default function MarketPage() {
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [historyMonths] = useState(24);
 
-  const { data: indicators = [], isLoading, isError, refetch, isFetching } = useEconomicIndicators();
+  const {
+    data: indicators = [],
+    isLoading,
+    isError,
+    refetch,
+    isFetching,
+  } = useEconomicIndicators();
   const { data: calendar = [], isLoading: isCalendarLoading } = useIndicatorCalendar();
   const { data: history = [], isLoading: isHistoryLoading } = useIndicatorHistory(
     selectedCode ?? "",
@@ -69,7 +75,9 @@ export default function MarketPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-800 dark:text-gray-200">
             증시 캘린더
-            <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">향후 90일</span>
+            <span className="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500">
+              향후 90일
+            </span>
           </h2>
         </div>
         {isCalendarLoading ? (

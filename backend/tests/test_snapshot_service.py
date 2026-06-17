@@ -1,4 +1,5 @@
 """snapshot_service.py 단위 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -13,16 +14,28 @@ class TestSyncSnapshotPositions:
         from app.services.snapshot_service import sync_snapshot_positions
 
         pos1 = SimpleNamespace(
-            ticker="AAPL", name="Apple", market="NASDAQ",
-            qty=10, avg_price=150_000.0, avg_price_usd=100.0,
-            current_price=185_000.0, value_krw=1_850_000.0,
-            currency="USD", usd_rate=1350.0,
+            ticker="AAPL",
+            name="Apple",
+            market="NASDAQ",
+            qty=10,
+            avg_price=150_000.0,
+            avg_price_usd=100.0,
+            current_price=185_000.0,
+            value_krw=1_850_000.0,
+            currency="USD",
+            usd_rate=1350.0,
         )
         pos2 = SimpleNamespace(
-            ticker="TSLA", name="Tesla", market="NASDAQ",
-            qty=5, avg_price=200_000.0, avg_price_usd=None,
-            current_price=250_000.0, value_krw=1_250_000.0,
-            currency="USD", usd_rate=1350.0,
+            ticker="TSLA",
+            name="Tesla",
+            market="NASDAQ",
+            qty=5,
+            avg_price=200_000.0,
+            avg_price_usd=None,
+            current_price=250_000.0,
+            value_krw=1_250_000.0,
+            currency="USD",
+            usd_rate=1350.0,
         )
 
         await sync_snapshot_positions(

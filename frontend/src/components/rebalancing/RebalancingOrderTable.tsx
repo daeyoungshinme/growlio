@@ -71,7 +71,10 @@ export function RebalancingOrderTable({
   return (
     <ErrorBoundary variant="section">
       {priceState === "error" && (
-        <div role="alert" className="mx-3 mb-2 px-3 py-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg">
+        <div
+          role="alert"
+          className="mx-3 mb-2 px-3 py-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg"
+        >
           현재가 조회 실패 — 지정가를 직접 입력하거나 잠시 후 다시 시도하세요.
         </div>
       )}
@@ -84,7 +87,12 @@ export function RebalancingOrderTable({
               const key = `sell_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
+              const currentNativePrice = getNativePrice(
+                item.ticker,
+                item.market,
+                livePricesKrw,
+                livePricesUsd,
+              );
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
               const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
@@ -126,7 +134,12 @@ export function RebalancingOrderTable({
                 ? getBuyTotalInfo(item.ticker)
                 : { allocated: 0, needed: 0 };
               const nativeLimitPrice = getLimitPriceNative(key, item.ticker, item.market);
-              const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
+              const currentNativePrice = getNativePrice(
+                item.ticker,
+                item.market,
+                livePricesKrw,
+                livePricesUsd,
+              );
               const est = getEstimateKrw(key, item.ticker, item.market, qty);
               const estKrw = getLimitEstKrw(nativeLimitPrice, qty, item.market, globalUsdRate);
               return (
@@ -186,12 +199,22 @@ export function RebalancingOrderTable({
           <thead>
             <tr className="text-[11px] text-gray-500 border-b border-gray-700/50">
               <th scope="col" />
-              <th scope="col" className="px-3 py-2 text-left font-normal">종목</th>
-              <th scope="col" className="px-3 py-2 text-center font-normal">구분</th>
-              <th scope="col" className="px-2 py-2 text-right font-normal">현재가</th>
-              <th scope="col" className="px-3 py-2 text-right font-normal">수량</th>
+              <th scope="col" className="px-3 py-2 text-left font-normal">
+                종목
+              </th>
+              <th scope="col" className="px-3 py-2 text-center font-normal">
+                구분
+              </th>
+              <th scope="col" className="px-2 py-2 text-right font-normal">
+                현재가
+              </th>
+              <th scope="col" className="px-3 py-2 text-right font-normal">
+                수량
+              </th>
               {orderType === "LIMIT" && (
-                <th scope="col" className="px-2 py-2 text-right font-normal">지정가</th>
+                <th scope="col" className="px-2 py-2 text-right font-normal">
+                  지정가
+                </th>
               )}
               <th scope="col" />
             </tr>
@@ -212,7 +235,12 @@ export function RebalancingOrderTable({
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
+                  const currentNativePrice = getNativePrice(
+                    item.ticker,
+                    item.market,
+                    livePricesKrw,
+                    livePricesUsd,
+                  );
                   return (
                     <tr
                       key={key}
@@ -304,7 +332,12 @@ export function RebalancingOrderTable({
                   const qty = qtyOverrides[key] ?? suggestedQty;
                   const est = getEstimateKrw(key, item.ticker, item.market, qty);
                   const nativeVal = getLimitPriceNative(key, item.ticker, item.market);
-                  const currentNativePrice = getNativePrice(item.ticker, item.market, livePricesKrw, livePricesUsd);
+                  const currentNativePrice = getNativePrice(
+                    item.ticker,
+                    item.market,
+                    livePricesKrw,
+                    livePricesUsd,
+                  );
                   const isMultiAccount = (buyAccounts[item.ticker] ?? []).length > 1;
                   const isOnlyAccount = !isMultiAccount;
                   const { allocated, needed } = isMultiAccount

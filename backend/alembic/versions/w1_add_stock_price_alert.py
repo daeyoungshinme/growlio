@@ -17,9 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    direction_enum = postgresql.ENUM(
-        "BELOW", "ABOVE", name="stock_alert_direction_enum", create_type=False
-    )
+    direction_enum = postgresql.ENUM("BELOW", "ABOVE", name="stock_alert_direction_enum", create_type=False)
     direction_enum.create(op.get_bind(), checkfirst=True)
 
     op.create_table(
@@ -40,13 +38,9 @@ def upgrade() -> None:
         sa.Column("max_trigger_count", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("trigger_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("triggered_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-        ),
+        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
     )
-    op.create_index(
-        "idx_stock_price_alerts_user_active", "stock_price_alerts", ["user_id", "is_active"]
-    )
+    op.create_index("idx_stock_price_alerts_user_active", "stock_price_alerts", ["user_id", "is_active"])
 
 
 def downgrade() -> None:

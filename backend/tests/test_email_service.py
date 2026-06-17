@@ -1,4 +1,5 @@
 """email_service 단위 테스트 — SMTP 전송 없이 함수 로직 검증."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
@@ -6,6 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 # ── _send_html_email 래퍼 테스트 ─────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_html_email_calls_aiosmtplib(monkeypatch):
@@ -27,6 +29,7 @@ async def test_send_html_email_calls_aiosmtplib(monkeypatch):
 
 
 # ── send_exchange_rate_alert ────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_smtp_not_configured(monkeypatch):
@@ -64,6 +67,7 @@ async def test_send_exchange_rate_alert_success(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_exchange_rate_alert(
@@ -95,6 +99,7 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_exchange_rate_alert(
@@ -108,6 +113,7 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
 
 
 # ── send_stock_price_alert ──────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_smtp_not_configured(monkeypatch):
@@ -147,6 +153,7 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_stock_price_alert(
@@ -163,6 +170,7 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
 
 
 # ── send_monthly_report_email ───────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_smtp_not_configured(monkeypatch):
@@ -210,6 +218,7 @@ async def test_send_monthly_report_email_includes_month(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_monthly_report_email(
@@ -261,6 +270,7 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_monthly_report_email(
@@ -290,6 +300,7 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
 
 # ── send_goal_achievement_email ─────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_asset_type(monkeypatch):
     """총 자산 목표 달성 이메일 제목에 달성률이 포함된다."""
@@ -308,6 +319,7 @@ async def test_send_goal_achievement_email_asset_type(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_goal_achievement_email(
@@ -339,6 +351,7 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_goal_achievement_email(
@@ -353,6 +366,7 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
 
 
 # ── send_test_email ─────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_test_email_raises_when_no_smtp(monkeypatch):
@@ -379,6 +393,7 @@ async def test_send_test_email_success(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_test_email("user@example.com")
@@ -386,6 +401,7 @@ async def test_send_test_email_success(monkeypatch):
 
 
 # ── send_password_reset_email ───────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_password_reset_email_smtp_not_configured(monkeypatch):
@@ -420,17 +436,17 @@ async def test_send_password_reset_email_includes_link(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
-        await em.send_password_reset_email(
-            "user@example.com", "https://growlio.app/reset-password?token=abc123"
-        )
+        await em.send_password_reset_email("user@example.com", "https://growlio.app/reset-password?token=abc123")
 
     if html_captured:
         assert "abc123" in html_captured[0]
 
 
 # ── send_rebalancing_alert ──────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_smtp_not_configured(monkeypatch):
@@ -482,6 +498,7 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_rebalancing_alert(
@@ -508,10 +525,16 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
 
     from types import SimpleNamespace
+
     item = SimpleNamespace(
-        name="삼성전자", ticker="005930",
-        target_weight_pct=50.0, current_weight_pct=45.0, weight_diff_pct=5.0,
-        diff_krw=500_000, shares_to_trade=10, market="KOSPI",
+        name="삼성전자",
+        ticker="005930",
+        target_weight_pct=50.0,
+        current_weight_pct=45.0,
+        weight_diff_pct=5.0,
+        diff_krw=500_000,
+        shares_to_trade=10,
+        market="KOSPI",
     )
     captured = {}
 
@@ -522,6 +545,7 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_rebalancing_alert(
@@ -556,6 +580,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
         from importlib import reload
 
         import app.services.email_service as em
+
         reload(em)
 
         await em.send_monthly_report_email(
@@ -581,6 +606,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
 
 
 # ── Exception handlers ────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_exception_raised(monkeypatch):
@@ -645,10 +671,14 @@ async def test_send_monthly_report_exception_raised(monkeypatch):
             to_email="user@example.com",
             report_month="2026년 5월",
             total_assets_krw=100_000_000.0,
-            mom_change_krw=None, mom_change_pct=None,
-            annual_return_pct=None, xirr_pct=None,
-            goal_amount=None, goal_achievement_pct=None,
-            annual_deposit_goal=None, deposit_achievement_pct=None,
+            mom_change_krw=None,
+            mom_change_pct=None,
+            annual_return_pct=None,
+            xirr_pct=None,
+            goal_amount=None,
+            goal_achievement_pct=None,
+            annual_deposit_goal=None,
+            deposit_achievement_pct=None,
             annual_dividends_received=0.0,
             asset_allocation=[],
         )
@@ -730,6 +760,4 @@ async def test_send_password_reset_exception_silenced(monkeypatch):
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
         # 예외가 propagate되지 않아야 함
-        await em.send_password_reset_email(
-            "user@example.com", "https://growlio.app/reset?token=abc"
-        )
+        await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")

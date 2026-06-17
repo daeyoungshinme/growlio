@@ -81,7 +81,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("실업률")).toBeDefined();
     expect(screen.getByText("3.70%")).toBeDefined();
@@ -95,7 +95,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByLabelText("구독 해제")).toBeDefined();
   });
@@ -108,7 +108,7 @@ describe("IndicatorCard", () => {
         isSelected={true}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     // Multiple buttons exist (main card button + subscribe button), just verify component renders
     const buttons = screen.getAllByRole("button");
@@ -124,7 +124,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={onSelect}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole("button", { name: /실업률/ }));
     expect(onSelect).toHaveBeenCalled();
@@ -139,7 +139,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={onToggle}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText("구독"));
     expect(onToggle).toHaveBeenCalled();
@@ -154,7 +154,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/\+2\.50%/)).toBeDefined();
   });
@@ -168,7 +168,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("변동 없음")).toBeDefined();
   });
@@ -182,7 +182,7 @@ describe("IndicatorCard", () => {
         isSelected={false}
         onSelect={vi.fn()}
         onToggleSubscribe={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("—")).toBeDefined();
   });
@@ -200,7 +200,9 @@ describe("IndicatorHistoryChart", () => {
       { date: "2024-01", value: 3.7 },
       { date: "2024-02", value: 3.8 },
     ];
-    renderWithProviders(<IndicatorHistoryChart data={data} name="실업률" unit="%" isDark={false} />);
+    renderWithProviders(
+      <IndicatorHistoryChart data={data} name="실업률" unit="%" isDark={false} />,
+    );
     expect(screen.getByTestId("recharts-container")).toBeDefined();
   });
 
@@ -219,20 +221,24 @@ describe("IndicatorCalendarList", () => {
   });
 
   it("renders events", () => {
-    const events: EconomicCalendarEvent[] = [{
-      ...mockCalendarEvent,
-      event: "FOMC 회의",
-      date: "2026-12-20T00:00:00Z",
-    }];
+    const events: EconomicCalendarEvent[] = [
+      {
+        ...mockCalendarEvent,
+        event: "FOMC 회의",
+        date: "2026-12-20T00:00:00Z",
+      },
+    ];
     renderWithProviders(<IndicatorCalendarList events={events} />);
     expect(screen.getByText("FOMC 회의")).toBeDefined();
   });
 
   it("renders event with estimate", () => {
-    const events: EconomicCalendarEvent[] = [{
-      ...mockCalendarEvent,
-      estimate: 5.25,
-    }];
+    const events: EconomicCalendarEvent[] = [
+      {
+        ...mockCalendarEvent,
+        estimate: 5.25,
+      },
+    ];
     renderWithProviders(<IndicatorCalendarList events={events} />);
     expect(screen.getByText("5.25")).toBeDefined();
   });

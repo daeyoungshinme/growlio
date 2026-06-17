@@ -34,7 +34,9 @@ function AlertHistorySection() {
       {isLoading ? (
         <div className="h-20 bg-gray-50 dark:bg-gray-800 rounded animate-pulse" />
       ) : !history || history.length === 0 ? (
-        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">발송된 알림 이력이 없습니다.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 py-2">
+          발송된 알림 이력이 없습니다.
+        </p>
       ) : (
         <div className="max-h-64 overflow-y-auto space-y-2">
           {history.map((item: AlertHistoryItem) => (
@@ -121,9 +123,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-xl">
       {/* DART OpenAPI */}
-      <SectionCard title="DART OpenAPI (금융감독원)" badge={current?.has_dart ? <ConnectedBadge /> : undefined}>
+      <SectionCard
+        title="DART OpenAPI (금융감독원)"
+        badge={current?.has_dart ? <ConnectedBadge /> : undefined}
+      >
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          opendart.fss.or.kr에서 발급받은 API 키를 입력하세요. 국내 주식 배당 데이터 조회에 사용됩니다.
+          opendart.fss.or.kr에서 발급받은 API 키를 입력하세요. 국내 주식 배당 데이터 조회에
+          사용됩니다.
         </p>
         <div>
           <label className={labelClass}>API Key</label>
@@ -155,7 +161,10 @@ export default function SettingsPage() {
       </SectionCard>
 
       {/* 오픈뱅킹 */}
-      <SectionCard title="금융결제원 오픈뱅킹" badge={current?.has_open_banking ? <ConnectedBadge /> : undefined}>
+      <SectionCard
+        title="금융결제원 오픈뱅킹"
+        badge={current?.has_open_banking ? <ConnectedBadge /> : undefined}
+      >
         <p className="text-xs text-gray-500 dark:text-gray-400">
           오픈뱅킹을 연결하면 은행 통장 잔액을 자동으로 불러올 수 있습니다.
           {current?.ob_token_expires_at && (
@@ -208,7 +217,9 @@ export default function SettingsPage() {
             >
               <Fingerprint size={18} className={isEnabled ? "text-blue-500" : undefined} />
               생체 인증
-              <span className={`ml-auto text-xs font-medium ${isEnabled ? "text-blue-500" : "text-gray-400"}`}>
+              <span
+                className={`ml-auto text-xs font-medium ${isEnabled ? "text-blue-500" : "text-gray-400"}`}
+              >
                 {isEnabled ? "켜짐" : "꺼짐"}
               </span>
             </button>

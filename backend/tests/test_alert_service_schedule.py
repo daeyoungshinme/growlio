@@ -1,4 +1,5 @@
 """alert_service.py 스케줄 브랜치 커버리지 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -39,6 +40,7 @@ async def test_check_rebalancing_alerts_skips_when_should_not_fire_today(mock_db
 
     with patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email:
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -72,6 +74,7 @@ async def test_check_rebalancing_alerts_skips_when_already_fired_today(mock_db):
 
     with patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email:
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()
@@ -105,13 +108,12 @@ async def test_check_rebalancing_alerts_analysis_failure_continues(mock_db):
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview",
-              new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing",
-              side_effect=ValueError("분석 오류")),
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+        patch("app.services.rebalancing_service.analyze_rebalancing", side_effect=ValueError("분석 오류")),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_rebalancing_alerts
+
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()

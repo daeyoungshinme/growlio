@@ -9,7 +9,14 @@ interface Props {
   className?: string;
 }
 
-export default function EmptyState({ icon: Icon, title, description, action, compact, className }: Props) {
+export default function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+  compact,
+  className,
+}: Props) {
   return (
     <div
       className={`flex flex-col items-center justify-center text-center px-4 ${compact ? "py-6" : "py-12"} ${className ?? ""}`}

@@ -1,4 +1,5 @@
 """KIS(한국투자증권) 브로커 프로바이더."""
+
 from __future__ import annotations
 
 import asyncio
@@ -53,34 +54,61 @@ class KISProvider(BrokerProvider):
 
         try:
             access_token = await get_access_token(
-                app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-                user_id=user_id_str, account_id=account_id_str,
+                app_key,
+                app_secret,
+                is_mock=is_mock,
+                redis=redis,
+                db=db,
+                user_id=user_id_str,
+                account_id=account_id_str,
             )
             try:
                 domestic, overseas = await asyncio.gather(
                     get_domestic_balance(
-                        app_key, app_secret, access_token,
-                        account_no, is_mock=is_mock,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,
+                        is_mock=is_mock,
                     ),
                     _fetch_overseas_cached(
-                        app_key, app_secret, access_token,
-                        account_no, is_mock, account.id, redis,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,
+                        is_mock,
+                        account.id,
+                        redis,
                     ),
                 )
             except KisTokenExpiredError:
                 logger.warning("kis_token_expired_refreshing", account_no=account_no)
                 access_token = await get_access_token(
-                    app_key, app_secret, is_mock=is_mock, redis=redis, db=db,
-                    user_id=user_id_str, account_id=account_id_str, force_refresh=True,
+                    app_key,
+                    app_secret,
+                    is_mock=is_mock,
+                    redis=redis,
+                    db=db,
+                    user_id=user_id_str,
+                    account_id=account_id_str,
+                    force_refresh=True,
                 )
                 domestic, overseas = await asyncio.gather(
                     get_domestic_balance(
-                        app_key, app_secret, access_token,
-                        account_no, is_mock=is_mock,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,
+                        is_mock=is_mock,
                     ),
                     _fetch_overseas_cached(
-                        app_key, app_secret, access_token,
-                        account_no, is_mock, account.id, redis,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,
+                        is_mock,
+                        account.id,
+                        redis,
                     ),
                 )
         except KisApiError as e:
@@ -88,9 +116,7 @@ class KISProvider(BrokerProvider):
                 f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형 또는 API 권한 오류."
             ) from e
         except MaxRetriesExceededError as e:
-            raise ProviderApiError(
-                "KIS API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429
-            ) from e
+            raise ProviderApiError("KIS API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429) from e
         except httpx.HTTPStatusError as e:
             if e.response.status_code >= 500:
                 raise ProviderApiError("KIS API 오류: 모의투자/실계좌 설정을 확인하세요.", http_status=502) from e
@@ -107,8 +133,12 @@ class KISProvider(BrokerProvider):
             sample = overseas["positions"][0]
             try:
                 quote = await get_overseas_price(
-                    app_key, app_secret, access_token,
-                    sample["ticker"], sample["market"], is_mock=is_mock,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    sample["ticker"],
+                    sample["market"],
+                    is_mock=is_mock,
                 )
                 usd_krw_rate = quote["usd_krw_rate"]
                 await cache_usd_krw_rate(redis, usd_krw_rate)
@@ -118,8 +148,7 @@ class KISProvider(BrokerProvider):
         overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
         overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate
         overseas_invested_krw = sum(
-            float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate
-            for p in overseas["positions"]
+            float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
         )
 
         all_raw = domestic["positions"] + [
@@ -150,8 +179,13 @@ _EMPTY_OVERSEAS: dict = {"positions": [], "total_value_usd": 0.0, "deposit_usd":
 
 
 async def _fetch_overseas_cached(
-    app_key: str, app_secret: str, access_token: str,
-    account_no: str, is_mock: bool, account_id: uuid.UUID, redis: aioredis.Redis,
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+    account_id: uuid.UUID,
+    redis: aioredis.Redis,
 ) -> dict:
     """해외 잔고 조회 — Redis 캐시로 국내 전용 계좌의 해외 API 호출을 건너뛴다."""
     cached = await redis.get(has_overseas_key(account_id))
@@ -167,9 +201,7 @@ async def _fetch_overseas_cached(
     return result
 
 
-async def _safe_overseas(
-    app_key: str, app_secret: str, access_token: str, account_no: str, is_mock: bool
-) -> dict:
+async def _safe_overseas(app_key: str, app_secret: str, access_token: str, account_no: str, is_mock: bool) -> dict:
     """해외 잔고 조회. KisTokenExpiredError는 re-raise, 나머지 오류는 warn 후 빈 결과 반환."""
     try:
         return await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
@@ -186,7 +218,9 @@ def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
         cur_usd = float(p.get("current_price", 0))
         qty = int(p.get("qty", 0))
         return Position(
-            ticker=p["ticker"], name=p["name"], market=p["market"],
+            ticker=p["ticker"],
+            name=p["name"],
+            market=p["market"],
             qty=qty,
             avg_price=avg_usd * usd_krw_rate,
             current_price=cur_usd * usd_krw_rate,
@@ -198,7 +232,9 @@ def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
     qty = int(p.get("qty", 0))
     cur_price = float(p["current_price"]) if p.get("current_price") else 0.0
     return Position(
-        ticker=p["ticker"], name=p["name"], market=p["market"],
+        ticker=p["ticker"],
+        name=p["name"],
+        market=p["market"],
         qty=qty,
         avg_price=float(p.get("avg_price", 0)),
         current_price=cur_price,

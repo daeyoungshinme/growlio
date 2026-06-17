@@ -17,10 +17,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        text(
-            "CREATE INDEX IF NOT EXISTS idx_snapshots_user_date_desc "
-            "ON asset_snapshots (user_id, snapshot_date DESC)"
-        )
+        text("CREATE INDEX IF NOT EXISTS idx_snapshots_user_date_desc ON asset_snapshots (user_id, snapshot_date DESC)")
     )
 
 

@@ -3,6 +3,7 @@
 yfinance .info에서 P/E, P/B, 시가총액을 가져와 종목별·포트폴리오 가중 팩터 점수를 반환한다.
 Redis 1시간 캐시를 사용한다.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -68,6 +69,7 @@ def _sync_fetch_factor_data(symbols: list[str]) -> dict[str, FactorData]:
 # 팩터 점수 계산 (0-100)
 # ---------------------------------------------------------------------------
 
+
 def _score_value(pb: float | None, pe: float | None) -> float:
     """Value 점수. 낮은 P/B·P/E = 가치주 = 높은 점수."""
     scores: list[float] = []
@@ -121,24 +123,27 @@ def _build_holdings(
         pb = fd.get("pb_ratio")
         market_cap = fd.get("market_cap")
         momentum = fd.get("momentum_pct")
-        holdings.append({
-            "ticker": pos["ticker"],
-            "name": pos["name"],
-            "weight_pct": round(w * 100, 2),
-            "pe_ratio": pe,
-            "pb_ratio": pb,
-            "market_cap": market_cap,
-            "momentum_pct": momentum,
-            "value_score": _score_value(pb, pe),
-            "growth_score": _score_growth(pb, pe),
-            "size_score": _score_size(market_cap),
-            "momentum_score": _score_momentum(momentum),
-        })
+        holdings.append(
+            {
+                "ticker": pos["ticker"],
+                "name": pos["name"],
+                "weight_pct": round(w * 100, 2),
+                "pe_ratio": pe,
+                "pb_ratio": pb,
+                "market_cap": market_cap,
+                "momentum_pct": momentum,
+                "value_score": _score_value(pb, pe),
+                "growth_score": _score_growth(pb, pe),
+                "size_score": _score_size(market_cap),
+                "momentum_score": _score_momentum(momentum),
+            }
+        )
     return holdings
 
 
 def _portfolio_factors(holdings: list[dict]) -> dict:
     """holdings에서 가중 평균 팩터 점수를 계산한다."""
+
     def _weighted(key: str) -> float:
         return round(sum(h[key] * (h["weight_pct"] / 100) for h in holdings), 1)
 
@@ -153,6 +158,7 @@ def _portfolio_factors(holdings: list[dict]) -> dict:
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 async def get_factor_analysis_for_portfolio(
     portfolio_id: str,
@@ -173,17 +179,12 @@ async def get_factor_analysis_for_portfolio(
             logger.debug("factor_cache_read_error", cache_key=cache_key, error=str(e))
 
     portfolio = await db.scalar(
-        select(Portfolio)
-        .options(selectinload(Portfolio.items))
-        .where(Portfolio.id == portfolio_id)
+        select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
     )
     if not portfolio or not portfolio.items:
         return _empty_factor_result()
 
-    positions = [
-        {"ticker": item.ticker, "market": item.market, "name": item.name}
-        for item in portfolio.items
-    ]
+    positions = [{"ticker": item.ticker, "market": item.market, "name": item.name} for item in portfolio.items]
     weights = [float(item.weight) / 100.0 for item in portfolio.items]
 
     total_weight = sum(weights)

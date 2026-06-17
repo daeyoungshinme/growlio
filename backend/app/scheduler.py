@@ -46,6 +46,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.deposit_monitor import run_deposit_monitor
+
     scheduler.add_job(
         run_deposit_monitor,
         CronTrigger(hour=15, minute=35, timezone="Asia/Seoul"),
@@ -59,6 +60,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.dca_auto_buy import run_dca_auto_execution
+
     scheduler.add_job(
         run_dca_auto_execution,
         CronTrigger(hour=9, minute=0, timezone="Asia/Seoul"),
@@ -66,6 +68,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.stock_price_alert import run_stock_price_alert_check
+
     scheduler.add_job(
         run_stock_price_alert_check,
         IntervalTrigger(minutes=10),
@@ -73,6 +76,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.price_publisher import run_price_broadcast
+
     scheduler.add_job(
         run_price_broadcast,
         IntervalTrigger(seconds=30),
@@ -80,6 +84,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.monthly_report import run_monthly_report
+
     scheduler.add_job(
         run_monthly_report,
         CronTrigger(day=1, hour=9, minute=0, timezone="Asia/Seoul"),
@@ -87,6 +92,7 @@ def init_scheduler() -> None:
         replace_existing=True,
     )
     from app.jobs.goal_achievement import run_goal_achievement_check
+
     scheduler.add_job(
         run_goal_achievement_check,
         CronTrigger(hour=18, minute=45, timezone="Asia/Seoul"),
@@ -97,6 +103,7 @@ def init_scheduler() -> None:
         run_economic_indicator_alert_check,
         run_economic_indicator_sync,
     )
+
     scheduler.add_job(
         run_economic_indicator_sync,
         CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),

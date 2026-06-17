@@ -27,7 +27,7 @@ function getCached(ticker: string): PriceCacheEntry | null {
 
 export function useRebalancingPrices(
   dispatch: React.Dispatch<ExecutionAction>,
-  analysis: RebalancingAnalysis
+  analysis: RebalancingAnalysis,
 ) {
   async function loadAllPrices() {
     const tickerMarketMap = new Map<string, string>();
@@ -50,7 +50,7 @@ export function useRebalancingPrices(
         const result = await fetchStockPrice(ticker, market);
         _priceCache.set(ticker, { ...result, fetchedAt: Date.now() });
         dispatch({ type: "PRICES_PROGRESS", loaded: ++loaded });
-      })
+      }),
     );
 
     const failedCount = results.filter((r) => r.status === "rejected").length;

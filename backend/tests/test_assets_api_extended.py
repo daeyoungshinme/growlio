@@ -1,4 +1,5 @@
 """자산 API 추가 테스트 (get_account, update_account, get_snapshots)."""
+
 from __future__ import annotations
 
 import uuid
@@ -71,6 +72,7 @@ def _make_snapshot(user_id, account_id):
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -89,6 +91,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -175,6 +178,7 @@ class TestUpdateAccount:
 
         async def mock_refresh(obj):
             pass
+
         db.refresh = AsyncMock(side_effect=mock_refresh)
 
         app = _setup_app(user, db)

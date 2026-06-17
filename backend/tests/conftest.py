@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # ── 테스트용 설정 오버라이드 ─────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def override_settings(monkeypatch):
     """테스트 중 실제 환경 변수 없이 동작하도록 설정 오버라이드."""
@@ -18,6 +19,7 @@ def override_settings(monkeypatch):
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")
     from app.config import settings as _settings
+
     monkeypatch.setattr(_settings, "app_env", "test")
 
 
@@ -29,11 +31,13 @@ def reset_rate_limiter():
     카운터가 누적되어 포트폴리오 요약 등 다수 호출 테스트가 오동작한다.
     """
     from app.limiter import limiter
+
     limiter._storage.reset()
     return
 
 
 # ── DB 세션 Mock ────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_db() -> AsyncMock:
@@ -58,6 +62,7 @@ def mock_db() -> AsyncMock:
 
 # ── Redis Mock ──────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_redis() -> AsyncMock:
     redis = AsyncMock()
@@ -68,6 +73,7 @@ def mock_redis() -> AsyncMock:
 
 
 # ── 모델 팩토리 ─────────────────────────────────────────────
+
 
 @pytest.fixture
 def make_user_id() -> uuid.UUID:
@@ -148,6 +154,7 @@ def make_account(make_user_id):
 def make_snapshot(make_user_id):
     """AssetSnapshot 유사 객체."""
     from types import SimpleNamespace
+
     return SimpleNamespace(
         id=uuid.uuid4(),
         user_id=make_user_id,
@@ -166,6 +173,7 @@ def make_snapshot(make_user_id):
 def make_user_settings(make_user_id):
     """UserSettings 유사 객체."""
     from types import SimpleNamespace
+
     return SimpleNamespace(
         user_id=make_user_id,
         kis_app_key=None,
@@ -190,6 +198,7 @@ def make_user_settings(make_user_id):
 def mock_request():
     """slowapi @limiter.limit() 테스트에서 필요한 최소 Starlette Request 객체."""
     from starlette.requests import Request
+
     scope = {
         "type": "http",
         "method": "GET",
@@ -226,6 +235,7 @@ def _mock_redis_singleton():
 def mock_redis_for_app():
     """FastAPI app lifespan의 Redis 연결을 무력화하는 패치 컨텍스트."""
     from unittest.mock import AsyncMock, patch
+
     redis_mock = AsyncMock()
     redis_mock.ping = AsyncMock(return_value=True)
     return patch("app.redis_client.get_redis", return_value=redis_mock)

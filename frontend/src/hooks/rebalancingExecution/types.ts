@@ -1,7 +1,4 @@
-import type {
-  ExecutionResult,
-  KisBalancePosition,
-} from "@/api/rebalancing";
+import type { ExecutionResult, KisBalancePosition } from "@/api/rebalancing";
 
 export type Phase = "confirm" | "executing" | "result";
 export type BalanceLoadState = "idle" | "loading" | "loaded" | "error" | "not_found";
@@ -40,14 +37,31 @@ export interface ExecutionState {
 
 export type ExecutionAction =
   | { type: "BALANCES_START"; accountIds: string[] }
-  | { type: "BALANCES_LOADED"; balances: Record<string, KisBalancePosition[]>; deposits: Record<string, number>; orderables: Record<string, number>; states: Record<string, BalanceLoadState> }
+  | {
+      type: "BALANCES_LOADED";
+      balances: Record<string, KisBalancePosition[]>;
+      deposits: Record<string, number>;
+      orderables: Record<string, number>;
+      states: Record<string, BalanceLoadState>;
+    }
   | { type: "BALANCES_ERROR"; accountIds: string[] }
   | { type: "BALANCE_LOADING"; accountId: string }
-  | { type: "BALANCE_LOADED"; accountId: string; positions: KisBalancePosition[]; deposit: number; orderable: number | null }
+  | {
+      type: "BALANCE_LOADED";
+      accountId: string;
+      positions: KisBalancePosition[];
+      deposit: number;
+      orderable: number | null;
+    }
   | { type: "BALANCE_ERROR"; accountId: string; is404: boolean }
   | { type: "PRICES_START"; total: number }
   | { type: "PRICES_PROGRESS"; loaded: number }
-  | { type: "PRICES_DONE"; krw: Record<string, number>; usd: Record<string, number>; usdRate: number | null }
+  | {
+      type: "PRICES_DONE";
+      krw: Record<string, number>;
+      usd: Record<string, number>;
+      usdRate: number | null;
+    }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
   | { type: "SET_LIMIT_PRICE"; key: string; price: number }
   | { type: "SET_QTY"; key: string; qty: number }

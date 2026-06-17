@@ -9,11 +9,16 @@ vi.mock("@/api/client", () => {
   const mockApi = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -36,7 +41,9 @@ vi.mock("@/api/invest", () => ({
 }));
 
 vi.mock("@/api/settings", () => ({
-  fetchSettings: vi.fn().mockResolvedValue({ annual_deposit_goal: null, retirement_target_year: null }),
+  fetchSettings: vi
+    .fn()
+    .mockResolvedValue({ annual_deposit_goal: null, retirement_target_year: null }),
 }));
 
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
@@ -74,7 +81,9 @@ import { useGoalSettings } from "@/hooks/useGoalSettings";
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function createWrapper() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
+  const qc = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } },
+  });
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: qc }, children);
 }
@@ -153,7 +162,9 @@ describe("useIndicatorHistory", () => {
     const { fetchIndicatorHistory } = await import("@/api/economicIndicators");
     vi.mocked(fetchIndicatorHistory).mockResolvedValue(mockHistory);
 
-    const { result } = renderHook(() => useIndicatorHistory("CPI", 12), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useIndicatorHistory("CPI", 12), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(fetchIndicatorHistory).toHaveBeenCalledWith("CPI", 12);
@@ -343,7 +354,7 @@ describe("useGoalSettings", () => {
 
   it("editing 초기값이 false다", async () => {
     const { fetchDCAAnalysis } = await import("@/api/invest");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     vi.mocked(fetchDCAAnalysis).mockResolvedValue({
       settings: null as any,
       is_configured: false,

@@ -13,9 +13,7 @@ export function useAccountPositions(accountId: string, enabled: boolean) {
   const { data } = useQuery<{ positions: Position[] }>({
     queryKey: QUERY_KEYS.accountPositions(accountId),
     queryFn: () =>
-      api
-        .get<{ positions: Position[] }>(`/assets/${accountId}/positions`)
-        .then((r) => r.data),
+      api.get<{ positions: Position[] }>(`/assets/${accountId}/positions`).then((r) => r.data),
     enabled: enabled && !!accountId,
     staleTime: STALE_TIME.MEDIUM,
   });

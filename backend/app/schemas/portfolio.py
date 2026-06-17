@@ -1,4 +1,5 @@
 """통합 포트폴리오 Pydantic 스키마 (백테스팅·리밸런싱 공용)."""
+
 import uuid
 from datetime import datetime
 
@@ -10,6 +11,7 @@ from app.schemas._validators import validate_portfolio_weights, validate_portfol
 # ---------------------------------------------------------------------------
 # KIS 실시간 포트폴리오 서머리 (/portfolio/summary) 응답 스키마
 # ---------------------------------------------------------------------------
+
 
 class DomesticPosition(BaseModel):
     ticker: str
@@ -72,9 +74,9 @@ class PortfolioItem(BaseModel):
     model_config = {"from_attributes": True}
 
     ticker: str
-    name: str = ""   # 자동완성 없이 추가 시 빈 문자열 허용
+    name: str = ""  # 자동완성 없이 추가 시 빈 문자열 허용
     market: str
-    weight: float    # 0~100, 합계 = 100
+    weight: float  # 0~100, 합계 = 100
 
 
 class PortfolioCreate(BaseModel):

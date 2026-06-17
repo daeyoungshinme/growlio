@@ -197,6 +197,7 @@ class TestCacheUsdKrwRate:
 
 # ── fetch_usd_krw (force_refresh) ────────────────────────────
 
+
 class TestFetchUsdKrw:
     @pytest.mark.asyncio
     async def test_no_force_refresh_returns_cache(self, override_settings):
@@ -242,6 +243,7 @@ class TestFetchUsdKrw:
 
 
 # ── redis_lock ────────────────────────────────────────────────
+
 
 class TestRedisLock:
     @pytest.mark.asyncio

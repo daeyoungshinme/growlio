@@ -1,4 +1,5 @@
 """목표환율 알림 CRUD."""
+
 from __future__ import annotations
 
 import contextlib

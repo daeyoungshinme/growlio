@@ -75,7 +75,9 @@ export default function IndicatorCard({
         </button>
       </div>
 
-      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50 tabular-nums">{formattedValue}</p>
+      <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-50 tabular-nums">
+        {formattedValue}
+      </p>
 
       <div className="mt-2 space-y-1">
         <div className="flex items-center gap-1.5">
@@ -99,9 +101,7 @@ export default function IndicatorCard({
           )}
         </div>
         {formattedPrev && (
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            전월 {formattedPrev}
-          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">전월 {formattedPrev}</p>
         )}
       </div>
     </button>

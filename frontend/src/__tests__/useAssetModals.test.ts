@@ -18,59 +18,81 @@ describe("useAssetModals", () => {
 
   it("setShowBankModal이 showBankModal을 토글한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    act(() => { result.current.setShowBankModal(true); });
+    act(() => {
+      result.current.setShowBankModal(true);
+    });
     expect(result.current.showBankModal).toBe(true);
-    act(() => { result.current.setShowBankModal(false); });
+    act(() => {
+      result.current.setShowBankModal(false);
+    });
     expect(result.current.showBankModal).toBe(false);
   });
 
   it("setShowStockModal이 showStockModal을 토글한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    act(() => { result.current.setShowStockModal(true); });
+    act(() => {
+      result.current.setShowStockModal(true);
+    });
     expect(result.current.showStockModal).toBe(true);
   });
 
   it("setShowRealEstateModal이 showRealEstateModal을 토글한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    act(() => { result.current.setShowRealEstateModal(true); });
+    act(() => {
+      result.current.setShowRealEstateModal(true);
+    });
     expect(result.current.showRealEstateModal).toBe(true);
   });
 
   it("setEditingRealEstate가 부동산 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
     const mockAccount = { id: "acc-1", name: "내 아파트" } as unknown as AssetAccount;
-    act(() => { result.current.setEditingRealEstate(mockAccount); });
+    act(() => {
+      result.current.setEditingRealEstate(mockAccount);
+    });
     expect(result.current.editingRealEstate).toEqual(mockAccount);
-    act(() => { result.current.setEditingRealEstate(null); });
+    act(() => {
+      result.current.setEditingRealEstate(null);
+    });
     expect(result.current.editingRealEstate).toBeNull();
   });
 
   it("setEditingBankAccount가 은행 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
     const mockAccount = { id: "acc-2", name: "국민은행" } as unknown as AssetAccount;
-    act(() => { result.current.setEditingBankAccount(mockAccount); });
+    act(() => {
+      result.current.setEditingBankAccount(mockAccount);
+    });
     expect(result.current.editingBankAccount).toEqual(mockAccount);
   });
 
   it("setConfirmDeleteId가 삭제 확인 ID를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
-    act(() => { result.current.setConfirmDeleteId("acc-3"); });
+    act(() => {
+      result.current.setConfirmDeleteId("acc-3");
+    });
     expect(result.current.confirmDeleteId).toBe("acc-3");
-    act(() => { result.current.setConfirmDeleteId(null); });
+    act(() => {
+      result.current.setConfirmDeleteId(null);
+    });
     expect(result.current.confirmDeleteId).toBeNull();
   });
 
   it("setPositionsAccount가 포지션 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
     const info = { id: "acc-4", name: "KIS계좌", dataSource: "KIS_API" };
-    act(() => { result.current.setPositionsAccount(info); });
+    act(() => {
+      result.current.setPositionsAccount(info);
+    });
     expect(result.current.positionsAccount).toEqual(info);
   });
 
   it("setTxAccount가 거래 계좌를 설정한다", () => {
     const { result } = renderHook(() => useAssetModals());
     const info = { id: "acc-5", name: "내 계좌", depositKrw: 1000000 };
-    act(() => { result.current.setTxAccount(info); });
+    act(() => {
+      result.current.setTxAccount(info);
+    });
     expect(result.current.txAccount).toEqual(info);
   });
 });

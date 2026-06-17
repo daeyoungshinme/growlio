@@ -51,9 +51,7 @@ class PortfolioAccount(Base):
 
     portfolio: Mapped["Portfolio"] = relationship(back_populates="linked_accounts")
 
-    __table_args__ = (
-        PrimaryKeyConstraint("portfolio_id", "account_id"),
-    )
+    __table_args__ = (PrimaryKeyConstraint("portfolio_id", "account_id"),)
 
 
 class Portfolio(Base):
@@ -84,9 +82,7 @@ class Portfolio(Base):
         cascade="all, delete-orphan",
     )
 
-    __table_args__ = (
-        Index("idx_portfolios_user", "user_id"),
-    )
+    __table_args__ = (Index("idx_portfolios_user", "user_id"),)
 
     @property
     def account_ids(self) -> list[str] | None:

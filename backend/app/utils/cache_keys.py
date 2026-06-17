@@ -13,35 +13,37 @@ RedisType = AioRedis | None
 def _env_prefix() -> str:
     """app_env를 키 네임스페이스 prefix로 반환한다 (dev/staging/prod Redis 공유 시 충돌 방지)."""
     from app.config import settings  # lazy — 순환 임포트 방지
+
     return f"{settings.app_env}:"
+
 
 # ---------------------------------------------------------------------------
 # TTL 상수 (초)
 # ---------------------------------------------------------------------------
-TTL_PRICE_CURRENT = 900          # 현재가 15분
-TTL_MONTHLY_TREND = 300          # 월별 추이 5분
-TTL_DASHBOARD_SUMMARY = 300      # 대시보드 전체 응답 5분
-TTL_PRICE_RETURN = 86400         # 기간 수익률 1일
-TTL_BACKTEST = 86400             # 백테스트 결과 1일
-TTL_ALLOC_HISTORY = 86400        # 포트폴리오 배분 이력 1일
-TTL_DIVIDEND_INFO = 86400        # 배당 정보 1일
-TTL_DART = 3600                  # DART 공시 1시간
-TTL_DIVIDEND_MONTHS = 604800     # 배당 월별 데이터 7일
-TTL_OB_STATE = 600               # 오픈뱅킹 OAuth state 10분
-TTL_HAS_OVERSEAS_TRUE = 21600    # 해외 보유 중 6시간
-TTL_HAS_OVERSEAS_FALSE = 900     # 해외 없음 15분 (신규 매수 시 빠른 반영)
-TTL_DIVIDEND_SUMMARY = 3600      # 배당 집계 1시간
-TTL_PORTFOLIO_OVERVIEW = 1800    # 포트폴리오 overview 30분
-TTL_PORTFOLIO_LIST = 300         # 포트폴리오 목록 5분
-TTL_ACCOUNT_DETAIL = 300         # 계좌 상세 5분
-TTL_EXCHANGE_RATE_ALERTS = 300   # 환율 알림 목록 5분
-TTL_INDICATOR_LATEST = 3600      # 경제지표 최신값 1시간
-TTL_INDICATOR_HISTORY = 21600    # 경제지표 시계열 6시간
-TTL_INDICATOR_CALENDAR = 86400   # 경제지표 발표 일정 24시간
-TTL_MARKET_SIGNAL = 3600         # 복합 시장 신호 1시간
-TTL_FACTOR_ANALYSIS = 3600       # 팩터 분석 1시간
-TTL_PORTFOLIO_OPTIMIZER = 3600   # 포트폴리오 최적화 1시간
-TTL_RISK_ANALYSIS = 3600         # 위험 분석 1시간
+TTL_PRICE_CURRENT = 900  # 현재가 15분
+TTL_MONTHLY_TREND = 300  # 월별 추이 5분
+TTL_DASHBOARD_SUMMARY = 300  # 대시보드 전체 응답 5분
+TTL_PRICE_RETURN = 86400  # 기간 수익률 1일
+TTL_BACKTEST = 86400  # 백테스트 결과 1일
+TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
+TTL_DIVIDEND_INFO = 86400  # 배당 정보 1일
+TTL_DART = 3600  # DART 공시 1시간
+TTL_DIVIDEND_MONTHS = 604800  # 배당 월별 데이터 7일
+TTL_OB_STATE = 600  # 오픈뱅킹 OAuth state 10분
+TTL_HAS_OVERSEAS_TRUE = 21600  # 해외 보유 중 6시간
+TTL_HAS_OVERSEAS_FALSE = 900  # 해외 없음 15분 (신규 매수 시 빠른 반영)
+TTL_DIVIDEND_SUMMARY = 3600  # 배당 집계 1시간
+TTL_PORTFOLIO_OVERVIEW = 1800  # 포트폴리오 overview 30분
+TTL_PORTFOLIO_LIST = 300  # 포트폴리오 목록 5분
+TTL_ACCOUNT_DETAIL = 300  # 계좌 상세 5분
+TTL_EXCHANGE_RATE_ALERTS = 300  # 환율 알림 목록 5분
+TTL_INDICATOR_LATEST = 3600  # 경제지표 최신값 1시간
+TTL_INDICATOR_HISTORY = 21600  # 경제지표 시계열 6시간
+TTL_INDICATOR_CALENDAR = 86400  # 경제지표 발표 일정 24시간
+TTL_MARKET_SIGNAL = 3600  # 복합 시장 신호 1시간
+TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
+TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
+TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 
 # ---------------------------------------------------------------------------
@@ -192,9 +194,7 @@ async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.
     await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))
 
 
-async def invalidate_account_caches(
-    redis: RedisType, user_id: uuid.UUID, year: int | None = None
-) -> None:
+async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: int | None = None) -> None:
     """계좌 싱크 완료 후 관련 캐시 일괄 무효화."""
     from datetime import date as _date
 

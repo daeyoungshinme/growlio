@@ -33,7 +33,9 @@ export default function ForgotPasswordPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
         </div>
 
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">비밀번호 찾기</h2>
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">
+          비밀번호 찾기
+        </h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
           가입한 이메일 주소를 입력하면 비밀번호 재설정 링크를 보내드립니다.
         </p>
@@ -41,13 +43,17 @@ export default function ForgotPasswordPage() {
         {submitted ? (
           <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
             <p className="text-sm text-blue-700 dark:text-blue-300 text-center">
-              이메일을 확인해주세요.<br />비밀번호 재설정 링크를 보내드렸습니다.
+              이메일을 확인해주세요.
+              <br />
+              비밀번호 재설정 링크를 보내드렸습니다.
             </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">이메일</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                이메일
+              </label>
               <input
                 type="email"
                 value={email}

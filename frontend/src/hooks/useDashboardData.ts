@@ -12,7 +12,7 @@ export function useDashboardData() {
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
-    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 백엔드 Redis TTL(5분)과 동기화
+    staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 Redis TTL(5분)과 동기화
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: false,
   });
@@ -34,7 +34,7 @@ export function useDashboardData() {
   const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
-    staleTime: STALE_TIME.EXCHANGE_RATE,  // 5분 — 계좌 목록은 자주 변하지 않음
+    staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 계좌 목록은 자주 변하지 않음
   });
 
   const exchangeRate = useExchangeRate();
@@ -45,15 +45,26 @@ export function useDashboardData() {
   useQuery({
     queryKey: QUERY_KEYS.allocationHistory(12),
     queryFn: () => fetchAllocationHistory(12),
-    staleTime: STALE_TIME.LONG,  // 1시간 — 백엔드 Redis TTL 1일에 맞게 보수적 설정
+    staleTime: STALE_TIME.LONG, // 1시간 — 백엔드 Redis TTL 1일에 맞게 보수적 설정
     gcTime: STALE_TIME.LONG,
   });
   useQuery({
     queryKey: QUERY_KEYS.dartDisclosures(30),
     queryFn: () => fetchDartDisclosures(30),
     staleTime: STALE_TIME.LONG,
-    retry: false,  // DART 키 미설정 시 422 → 불필요한 재시도 방지
+    retry: false, // DART 키 미설정 시 422 → 불필요한 재시도 방지
   });
 
-  return { data, isLoading, error, dataUpdatedAt, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate };
+  return {
+    data,
+    isLoading,
+    error,
+    dataUpdatedAt,
+    overview,
+    overviewLoading,
+    dcaData,
+    accounts,
+    accountsLoading,
+    exchangeRate,
+  };
 }

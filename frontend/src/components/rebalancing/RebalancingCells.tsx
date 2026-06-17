@@ -8,7 +8,8 @@ export function DiffCell({ diff }: { diff: number }) {
   const isBuy = diff > 0;
   return (
     <span className={`font-medium ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
-      {isBuy ? "+" : ""}{fmtKrw(diff)}
+      {isBuy ? "+" : ""}
+      {fmtKrw(diff)}
     </span>
   );
 }
@@ -50,7 +51,8 @@ export function SharesCell({ item }: { item: RebalancingItem }) {
   const isBuy = shares > 0;
   return (
     <span className={`font-medium text-xs ${isBuy ? PROFIT_COLOR : LOSS_COLOR}`}>
-      {isBuy ? "+" : ""}{shares.toFixed(0)}주
+      {isBuy ? "+" : ""}
+      {shares.toFixed(0)}주
     </span>
   );
 }
@@ -60,7 +62,8 @@ export function DividendDiffCell({ diff }: { diff: number }) {
   const isIncrease = diff > 0;
   return (
     <span className={`font-medium text-xs ${isIncrease ? "text-green-400" : "text-red-400"}`}>
-      {isIncrease ? "+" : ""}{fmtKrw(diff)}
+      {isIncrease ? "+" : ""}
+      {fmtKrw(diff)}
     </span>
   );
 }
@@ -77,10 +80,12 @@ export function Return10yCell({ item }: { item: RebalancingItem }) {
   return (
     <div className="text-right">
       <div className={`font-medium text-xs ${colorClass}`}>
-        {isPos ? "+" : ""}{cagr.toFixed(1)}% /yr
+        {isPos ? "+" : ""}
+        {cagr.toFixed(1)}% /yr
       </div>
       <div className="text-xs text-gray-500">
-        ({isPos ? "+" : ""}{total.toFixed(0)}%, {yearLabel})
+        ({isPos ? "+" : ""}
+        {total.toFixed(0)}%, {yearLabel})
       </div>
     </div>
   );
@@ -93,7 +98,8 @@ export function CagrCard({ label, cagr }: { label: string; cagr: number | null |
     <div className="bg-gray-700 rounded-xl p-3 text-center">
       <div className="text-xs text-gray-400 mb-1">{label}</div>
       <div className={`text-sm font-semibold ${isPos ? "text-red-400" : "text-blue-400"}`}>
-        {isPos ? "+" : ""}{cagr.toFixed(1)}% /yr
+        {isPos ? "+" : ""}
+        {cagr.toFixed(1)}% /yr
       </div>
       <div className="text-xs text-gray-500">10년 CAGR</div>
     </div>

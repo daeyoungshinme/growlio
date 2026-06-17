@@ -1,4 +1,5 @@
 """포지션 집계 유틸리티 — 최신 스냅샷에서 ticker+market 기준 포지션 맵을 구성한다."""
+
 from __future__ import annotations
 
 import uuid
@@ -25,8 +26,7 @@ async def query_latest_position_map(
         select(AssetSnapshot, AssetAccount)
         .join(
             subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
+            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(AssetAccount.is_active == True)  # noqa: E712
@@ -36,9 +36,7 @@ async def query_latest_position_map(
     snap_ids = [snap.id for snap, _ in rows]
     pos_map: dict[str, dict] = {}
     if snap_ids:
-        all_pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
+        all_pos_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
         for pos in all_pos_result.scalars().all():
             key = f"{pos.ticker}-{pos.market}"
             if key not in pos_map:

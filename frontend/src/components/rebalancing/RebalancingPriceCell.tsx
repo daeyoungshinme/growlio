@@ -11,7 +11,14 @@ export interface PriceCellProps {
   livePricesUsd: Record<string, number>;
 }
 
-export function PriceCell({ ticker, market, large, priceState, livePricesKrw, livePricesUsd }: PriceCellProps) {
+export function PriceCell({
+  ticker,
+  market,
+  large,
+  priceState,
+  livePricesKrw,
+  livePricesUsd,
+}: PriceCellProps) {
   const krw = livePricesKrw[ticker];
   const usd = livePricesUsd[ticker];
   const priceCls = large ? "text-sm" : "text-[11px]";

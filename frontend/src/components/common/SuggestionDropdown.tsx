@@ -11,7 +11,12 @@ interface SuggestionDropdownProps {
 
 const MAX_DROPDOWN_H = 208;
 
-export function SuggestionDropdown({ rowIndex, suggestions, anchorEl, onSelect }: SuggestionDropdownProps) {
+export function SuggestionDropdown({
+  rowIndex,
+  suggestions,
+  anchorEl,
+  onSelect,
+}: SuggestionDropdownProps) {
   const [pos, setPos] = useState<{
     top?: number;
     bottom?: number;
@@ -104,6 +109,6 @@ export function SuggestionDropdown({ rowIndex, suggestions, anchorEl, onSelect }
         </button>
       ))}
     </div>,
-    document.body
+    document.body,
   );
 }

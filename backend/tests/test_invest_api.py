@@ -1,4 +1,5 @@
 """DCA 투자 API 테스트 (GET /api/v1/invest/dca-analysis)."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -33,6 +35,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -85,6 +88,7 @@ class TestDcaAnalysis:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/invest/dca-analysis")
@@ -94,10 +98,13 @@ class TestDcaAnalysis:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.invest.dca_service.get_dca_analysis",
-            AsyncMock(return_value=_MOCK_DCA),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.invest.dca_service.get_dca_analysis",
+                AsyncMock(return_value=_MOCK_DCA),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/invest/dca-analysis")
         assert resp.status_code == 200
 
@@ -105,10 +112,13 @@ class TestDcaAnalysis:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.invest.dca_service.get_dca_analysis",
-            AsyncMock(return_value=_MOCK_DCA),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.invest.dca_service.get_dca_analysis",
+                AsyncMock(return_value=_MOCK_DCA),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/invest/dca-analysis")
         data = resp.json()
         assert "projection_months" in data

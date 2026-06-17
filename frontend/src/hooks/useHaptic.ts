@@ -4,9 +4,7 @@ type HapticType = "light" | "medium" | "heavy" | "success" | "error";
 
 export async function triggerHaptic(type: HapticType): Promise<void> {
   try {
-    const { Haptics, ImpactStyle, NotificationType } = await import(
-      "@capacitor/haptics"
-    );
+    const { Haptics, ImpactStyle, NotificationType } = await import("@capacitor/haptics");
     if (type === "success") {
       await Haptics.notification({ type: NotificationType.Success });
     } else if (type === "error") {

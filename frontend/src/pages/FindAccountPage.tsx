@@ -34,12 +34,18 @@ export default function FindAccountPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-50">Growlio</h1>
         </div>
 
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">아이디 찾기</h2>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">가입 시 등록한 이름으로 이메일 주소를 확인합니다.</p>
+        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-100 mb-1">
+          아이디 찾기
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          가입 시 등록한 이름으로 이메일 주소를 확인합니다.
+        </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">이름</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              이름
+            </label>
             <input
               type="text"
               value={displayName}

@@ -1,4 +1,5 @@
 """alerts API 테스트 (GET/POST/DELETE /api/v1/alerts/...)."""
+
 from __future__ import annotations
 
 import uuid
@@ -22,6 +23,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -40,6 +42,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -87,6 +90,7 @@ class TestExchangeRateAlerts:
     def test_list_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/exchange-rate")
@@ -108,11 +112,11 @@ class TestExchangeRateAlerts:
         alert_orm = _make_alert_orm(user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
 
-
         app = _setup_app(user, db)
         payload = {"target_rate": 1300.0, "direction": "BELOW", "max_trigger_count": 1}
 
         from unittest.mock import patch
+
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.exchange_rate_alerts.ExchangeRateAlert") as MockAlert,
@@ -415,6 +419,7 @@ class TestStockPriceAlertExtended:
             "direction": "ABOVE",
         }
         from unittest.mock import patch
+
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.stock_price_alerts.StockPriceAlert") as MockAlert,

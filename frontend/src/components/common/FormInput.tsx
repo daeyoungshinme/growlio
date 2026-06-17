@@ -8,7 +8,16 @@ interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   inputSize?: "sm" | "md";
 }
 
-export default function FormInput({ label, hint, error, inputSize = "sm", id, required, className, ...inputProps }: Props) {
+export default function FormInput({
+  label,
+  hint,
+  error,
+  inputSize = "sm",
+  id,
+  required,
+  className,
+  ...inputProps
+}: Props) {
   const inputId = id ?? label.replace(/\s+/g, "-").toLowerCase();
   const baseClass = inputSize === "md" ? INPUT_MD : INPUT_SM;
   const labelClass = inputSize === "md" ? LABEL_MD : LABEL_SM;

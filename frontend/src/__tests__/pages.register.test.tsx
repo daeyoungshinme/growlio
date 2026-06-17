@@ -31,7 +31,11 @@ function fillForm(email: string, password: string, confirm: string) {
 }
 
 function renderPage() {
-  return render(<MemoryRouter><RegisterPage /></MemoryRouter>);
+  return render(
+    <MemoryRouter>
+      <RegisterPage />
+    </MemoryRouter>,
+  );
 }
 
 describe("RegisterPage", () => {
@@ -53,7 +57,7 @@ describe("RegisterPage", () => {
     fillForm("a@b.com", "short", "short");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
     await waitFor(() =>
-      expect(screen.getByText("비밀번호는 8자 이상이어야 합니다")).toBeInTheDocument()
+      expect(screen.getByText("비밀번호는 8자 이상이어야 합니다")).toBeInTheDocument(),
     );
     expect(mockRegister).not.toHaveBeenCalled();
   });
@@ -63,7 +67,7 @@ describe("RegisterPage", () => {
     fillForm("a@b.com", "password123", "different123");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
     await waitFor(() =>
-      expect(screen.getByText("비밀번호가 일치하지 않습니다")).toBeInTheDocument()
+      expect(screen.getByText("비밀번호가 일치하지 않습니다")).toBeInTheDocument(),
     );
   });
 
@@ -80,7 +84,7 @@ describe("RegisterPage", () => {
     fillForm("existing@example.com", "password123", "password123");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
     await waitFor(() =>
-      expect(screen.getByText("이미 사용 중인 이메일입니다")).toBeInTheDocument()
+      expect(screen.getByText("이미 사용 중인 이메일입니다")).toBeInTheDocument(),
     );
   });
 
@@ -89,9 +93,7 @@ describe("RegisterPage", () => {
     renderPage();
     fillForm("new@example.com", "password123", "password123");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
-    await waitFor(() =>
-      expect(screen.getByText(/인증 링크를 클릭/)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/인증 링크를 클릭/)).toBeInTheDocument());
   });
 
   it("일반 오류 발생 시 에러 메시지를 표시한다", async () => {
@@ -100,7 +102,7 @@ describe("RegisterPage", () => {
     fillForm("user@example.com", "password123", "password123");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
     await waitFor(() =>
-      expect(screen.getByText("회원가입 중 오류가 발생했습니다")).toBeInTheDocument()
+      expect(screen.getByText("회원가입 중 오류가 발생했습니다")).toBeInTheDocument(),
     );
   });
 });

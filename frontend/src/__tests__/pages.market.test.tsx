@@ -38,9 +38,7 @@ vi.mock("@/components/market/IndicatorCard", () => ({
     <div data-testid={`indicator-card-${indicator.code}`} data-selected={isSelected}>
       <span>{indicator.name}</span>
       <button onClick={onSelect}>select</button>
-      <button onClick={onToggleSubscribe}>
-        {subscribed ? "unsubscribe" : "subscribe"}
-      </button>
+      <button onClick={onToggleSubscribe}>{subscribed ? "unsubscribe" : "subscribe"}</button>
     </div>
   ),
 }));
@@ -52,9 +50,7 @@ vi.mock("@/components/market/EconomicCalendar", () => ({
 }));
 
 vi.mock("@/components/market/IndicatorHistoryChart", () => ({
-  default: ({ name }: { name: string }) => (
-    <div data-testid="history-chart">{name}</div>
-  ),
+  default: ({ name }: { name: string }) => <div data-testid="history-chart">{name}</div>,
 }));
 
 vi.mock("@/components/common/SkeletonCard", () => ({
@@ -98,13 +94,15 @@ const mockIndicators = [
 const mockSubscribeFn = vi.fn().mockResolvedValue({});
 const mockUnsubscribeFn = vi.fn().mockResolvedValue({});
 
-function setupMocks(overrides: Partial<{
-  isLoading: boolean;
-  isError: boolean;
-  indicators: typeof mockIndicators;
-  calendarLoading: boolean;
-  historyLoading: boolean;
-}> = {}) {
+function setupMocks(
+  overrides: Partial<{
+    isLoading: boolean;
+    isError: boolean;
+    indicators: typeof mockIndicators;
+    calendarLoading: boolean;
+    historyLoading: boolean;
+  }> = {},
+) {
   const {
     isLoading = false,
     isError = false,
@@ -150,7 +148,7 @@ function renderPage() {
       <MemoryRouter>
         <MarketPage />
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -177,9 +175,7 @@ describe("MarketPage", () => {
   it("shows error message when indicators fail to load", () => {
     setupMocks({ isError: true });
     renderPage();
-    expect(
-      screen.getByText(/지표 데이터를 불러오는 중 오류가 발생했습니다/)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/지표 데이터를 불러오는 중 오류가 발생했습니다/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
@@ -269,10 +265,7 @@ describe("MarketPage", () => {
     const subscribeBtn = screen.getAllByRole("button", { name: "subscribe" })[0];
     fireEvent.click(subscribeBtn);
     await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith(
-        expect.stringContaining("구독 처리 중 오류"),
-        "error"
-      );
+      expect(toast).toHaveBeenCalledWith(expect.stringContaining("구독 처리 중 오류"), "error");
     });
   });
 

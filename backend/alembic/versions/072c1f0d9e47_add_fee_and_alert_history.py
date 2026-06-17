@@ -36,9 +36,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "idx_alert_history_user_created", "alert_history", ["user_id", "created_at"], unique=False
-    )
+    op.create_index("idx_alert_history_user_created", "alert_history", ["user_id", "created_at"], unique=False)
     op.drop_index(op.f("idx_asset_snapshots_user_account_date"), table_name="asset_snapshots")
     op.create_index(
         "idx_asset_snapshots_user_account_date",
@@ -55,9 +53,7 @@ def upgrade() -> None:
         unique=False,
         postgresql_ops={"snapshot_date": "DESC"},
     )
-    op.add_column(
-        "transactions", sa.Column("fee", sa.Numeric(precision=18, scale=2), nullable=True)
-    )
+    op.add_column("transactions", sa.Column("fee", sa.Numeric(precision=18, scale=2), nullable=True))
     # ### end Alembic commands ###
 
 

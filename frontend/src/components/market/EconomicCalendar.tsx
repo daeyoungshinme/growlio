@@ -259,16 +259,16 @@ export default function EconomicCalendar({ events }: Props) {
             {formatSelectedDateHeader(selectedDate)}
           </p>
           {selectedEvents.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500 py-2">
-              예정된 발표가 없습니다.
-            </p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 py-2">예정된 발표가 없습니다.</p>
           ) : (
             <div className="space-y-2">
               {selectedEvents.map((event, i) => {
                 const flag = COUNTRY_FLAG[event.country] ?? "";
                 const hasResult = Number.isFinite(event.actual as number);
                 const showValue = hasResult || Number.isFinite(event.estimate as number);
-                const impactCls = event.impact ? IMPACT_BADGE_CLS[event.impact] : IMPACT_BADGE_CLS.Low;
+                const impactCls = event.impact
+                  ? IMPACT_BADGE_CLS[event.impact]
+                  : IMPACT_BADGE_CLS.Low;
 
                 return (
                   <div

@@ -17,7 +17,13 @@ interface Props {
   isLoading?: boolean;
 }
 
-export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, dataUpdatedAt, isLoading }: Props) {
+export default memo(function HeroSummaryCard({
+  data,
+  dcaData,
+  exchangeRate,
+  dataUpdatedAt,
+  isLoading,
+}: Props) {
   const currentYear = new Date().getFullYear();
 
   const updatedLabel = useMemo(() => {
@@ -34,7 +40,7 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
     const stockItems = data.asset_allocation.filter((item) => item.type.startsWith("STOCK_"));
     const cashItems = data.asset_allocation.filter((item) => CASH_TYPES.has(item.type));
     const otherItems = data.asset_allocation.filter(
-      (item) => !item.type.startsWith("STOCK_") && !CASH_TYPES.has(item.type)
+      (item) => !item.type.startsWith("STOCK_") && !CASH_TYPES.has(item.type),
     );
     const result = otherItems.map((item) => ({
       name: ASSET_TYPE_LABELS[item.type] ?? item.type,
@@ -69,10 +75,10 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
     currentProgressPct == null
       ? "text-gray-400 dark:text-gray-500"
       : currentProgressPct >= 100
-      ? "text-red-500"
-      : currentProgressPct >= 80
-      ? "text-orange-500"
-      : "text-gray-600 dark:text-gray-300";
+        ? "text-red-500"
+        : currentProgressPct >= 80
+          ? "text-orange-500"
+          : "text-gray-600 dark:text-gray-300";
 
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
 
@@ -80,7 +86,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
     return (
       <div className="card">
         <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
-          {[0, 1, 2, 3].map((i) => <SkeletonStatBox key={i} />)}
+          {[0, 1, 2, 3].map((i) => (
+            <SkeletonStatBox key={i} />
+          ))}
         </div>
       </div>
     );
@@ -107,16 +115,20 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
-                <p className={`text-lg sm:text-xl font-bold mt-0.5 ${
-                  data.cumulative_return_pct == null
-                    ? "text-gray-400 dark:text-gray-500"
-                    : pnlColor(data.cumulative_return_pct)
-                }`}>
+                <p
+                  className={`text-lg sm:text-xl font-bold mt-0.5 ${
+                    data.cumulative_return_pct == null
+                      ? "text-gray-400 dark:text-gray-500"
+                      : pnlColor(data.cumulative_return_pct)
+                  }`}
+                >
                   {fmtPct(data.cumulative_return_pct)}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                  환율(USD/KRW)
+                </p>
                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
                   {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
                 </p>
@@ -127,12 +139,18 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
           <div className="border-t border-gray-100 dark:border-gray-700 mt-4 pt-4">
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate">입금 달성률</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium truncate">
+                  입금 달성률
+                </p>
                 <p className={`text-sm font-semibold mt-0.5 ${depositColor}`}>
-                  {data.deposit_achievement_pct != null ? `${data.deposit_achievement_pct.toFixed(1)}%` : "목표 미설정"}
+                  {data.deposit_achievement_pct != null
+                    ? `${data.deposit_achievement_pct.toFixed(1)}%`
+                    : "목표 미설정"}
                 </p>
                 {data.annual_deposit_goal != null && (
-                  <p className="text-xs text-gray-300 dark:text-gray-600 truncate mt-0.5">목표 {fmtKrw(data.annual_deposit_goal)}</p>
+                  <p className="text-xs text-gray-300 dark:text-gray-600 truncate mt-0.5">
+                    목표 {fmtKrw(data.annual_deposit_goal)}
+                  </p>
                 )}
               </div>
               <div>
@@ -147,7 +165,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
                     </p>
                   </>
                 ) : (
-                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">미설정</p>
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+                    미설정
+                  </p>
                 )}
               </div>
             </div>
@@ -161,7 +181,9 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
             </Suspense>
           ) : (
             <div className="flex items-center justify-center h-44 text-gray-300 dark:text-gray-600 text-xs text-center">
-              자산<br />없음
+              자산
+              <br />
+              없음
             </div>
           )}
         </div>
@@ -187,16 +209,22 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
               {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
             </p>
             {goalAmountDisplay != null && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표 {fmtKrw(goalAmountDisplay)}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                목표 {fmtKrw(goalAmountDisplay)}
+              </p>
             )}
           </div>
           <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">목표 달성 예상</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">
+              목표 달성 예상
+            </p>
             <p className="text-sm sm:text-base lg:text-lg font-bold text-gray-900 dark:text-gray-50">
               {timeline?.expected_goal_date ? fmtMonth(timeline.expected_goal_date) : "—"}
             </p>
             {timeline?.months_to_goal != null && (
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">약 {timeline.months_to_goal}개월 후</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                약 {timeline.months_to_goal}개월 후
+              </p>
             )}
           </div>
           <div>
@@ -206,23 +234,31 @@ export default memo(function HeroSummaryCard({ data, dcaData, exchangeRate, data
             ) : timeline.lead_lag_months > 0 ? (
               <span className="flex flex-col gap-0.5 mt-1">
                 <span className={`text-xs font-medium ${PROFIT_COLOR} flex items-center gap-1`}>
-                  <TrendingUp size={12} />{timeline.lead_lag_months}개월 앞서
+                  <TrendingUp size={12} />
+                  {timeline.lead_lag_months}개월 앞서
                 </span>
                 {timeline.actual_expected_goal_date && (
-                  <span className="text-xs text-red-400 whitespace-nowrap">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                  <span className="text-xs text-red-400 whitespace-nowrap">
+                    {fmtMonth(timeline.actual_expected_goal_date)} 달성 예상
+                  </span>
                 )}
               </span>
             ) : timeline.lead_lag_months < 0 ? (
               <span className="flex flex-col gap-0.5 mt-1">
                 <span className={`text-xs font-medium ${LOSS_COLOR} flex items-center gap-1`}>
-                  <TrendingDown size={12} />{Math.abs(timeline.lead_lag_months)}개월 지연
+                  <TrendingDown size={12} />
+                  {Math.abs(timeline.lead_lag_months)}개월 지연
                 </span>
                 {timeline.actual_expected_goal_date && (
-                  <span className="text-xs text-blue-400 whitespace-nowrap">{fmtMonth(timeline.actual_expected_goal_date)} 달성 예상</span>
+                  <span className="text-xs text-blue-400 whitespace-nowrap">
+                    {fmtMonth(timeline.actual_expected_goal_date)} 달성 예상
+                  </span>
                 )}
               </span>
             ) : (
-              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">계획과 일치</p>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-1">
+                계획과 일치
+              </p>
             )}
           </div>
         </div>

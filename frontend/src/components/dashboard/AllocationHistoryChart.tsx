@@ -107,7 +107,9 @@ function AllocationHistoryChart() {
         className="mt-4 w-full flex items-center justify-between py-2 px-3 text-xs text-gray-400 dark:text-gray-500 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors"
       >
         <span>월별 상세</span>
-        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${showDetail ? "rotate-180" : ""}`} />
+        <ChevronDown
+          className={`w-4 h-4 transition-transform duration-200 ${showDetail ? "rotate-180" : ""}`}
+        />
       </button>
 
       {showDetail && (
@@ -115,23 +117,35 @@ function AllocationHistoryChart() {
           <table className="w-full">
             <thead className="sticky top-0 bg-white dark:bg-gray-900">
               <tr className="border-b border-gray-100 dark:border-gray-700">
-                <th className="py-1.5 px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">월</th>
-                <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">자산 합계</th>
-                <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">전월 대비</th>
+                <th className="py-1.5 px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  월
+                </th>
+                <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  자산 합계
+                </th>
+                <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                  전월 대비
+                </th>
                 <th className="py-1.5 px-1 w-6" />
               </tr>
             </thead>
             <tbody>
               {reversedMonthly.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="py-8 text-center text-gray-300 dark:text-gray-600 text-xs">데이터 없음</td>
+                  <td
+                    colSpan={4}
+                    className="py-8 text-center text-gray-300 dark:text-gray-600 text-xs"
+                  >
+                    데이터 없음
+                  </td>
                 </tr>
               ) : (
                 reversedMonthly.map((row, i, arr) => {
                   const prev = arr[i + 1];
-                  const change = prev && prev.total_krw > 0
-                    ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100
-                    : null;
+                  const change =
+                    prev && prev.total_krw > 0
+                      ? ((row.total_krw - prev.total_krw) / prev.total_krw) * 100
+                      : null;
                   const isExpanded = expandedMonth === row.month;
                   return (
                     <React.Fragment key={row.month}>
@@ -139,41 +153,61 @@ function AllocationHistoryChart() {
                         onClick={() => setExpandedMonth(isExpanded ? null : row.month)}
                         className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                       >
-                        <td className="py-2 px-2 text-xs text-gray-800 dark:text-gray-200">{fmtMonth(row.month)}</td>
+                        <td className="py-2 px-2 text-xs text-gray-800 dark:text-gray-200">
+                          {fmtMonth(row.month)}
+                        </td>
                         <td className="py-2 px-2 text-xs text-right font-medium text-gray-900 dark:text-gray-50">
                           {fmtKrw(row.total_krw)}
                         </td>
                         <td className="py-2 px-2 text-xs text-right">
                           {change != null ? (
                             <span className={`${pnlColor(change)} font-medium`}>
-                              {change >= 0 ? "+" : ""}{change.toFixed(2)}%
+                              {change >= 0 ? "+" : ""}
+                              {change.toFixed(2)}%
                             </span>
                           ) : (
                             <span className="text-gray-300 dark:text-gray-600">—</span>
                           )}
                         </td>
                         <td className="py-2 px-1 text-gray-400 dark:text-gray-500">
-                          <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
+                          <ChevronRight
+                            className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`}
+                          />
                         </td>
                       </tr>
                       {isExpanded && row.allocations.length > 0 && (
-                        <tr key={`${row.month}-detail`} className="border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                        <tr
+                          key={`${row.month}-detail`}
+                          className="border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50"
+                        >
                           <td colSpan={4} className="px-3 pt-2 pb-3">
                             <div className="space-y-1.5 pl-2 border-l-2 border-gray-200 dark:border-gray-600 ml-1">
                               {[...row.allocations]
                                 .sort((a, b) => b.amount_krw - a.amount_krw)
                                 .map((alloc) => (
-                                  <div key={alloc.asset_type} className="flex items-center justify-between gap-2 text-xs">
+                                  <div
+                                    key={alloc.asset_type}
+                                    className="flex items-center justify-between gap-2 text-xs"
+                                  >
                                     <div className="flex items-center gap-1.5">
                                       <span
                                         className="w-2 h-2 rounded-full flex-shrink-0"
-                                        style={{ backgroundColor: TYPE_COLORS[alloc.asset_type] ?? DEFAULT_COLOR }}
+                                        style={{
+                                          backgroundColor:
+                                            TYPE_COLORS[alloc.asset_type] ?? DEFAULT_COLOR,
+                                        }}
                                       />
-                                      <span className="text-gray-500 dark:text-gray-400">{alloc.label}</span>
+                                      <span className="text-gray-500 dark:text-gray-400">
+                                        {alloc.label}
+                                      </span>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                      <span className="text-gray-700 dark:text-gray-200 font-medium">{fmtKrw(alloc.amount_krw)}</span>
-                                      <span className="text-gray-400 dark:text-gray-500 w-11 text-right">{alloc.weight_pct.toFixed(1)}%</span>
+                                      <span className="text-gray-700 dark:text-gray-200 font-medium">
+                                        {fmtKrw(alloc.amount_krw)}
+                                      </span>
+                                      <span className="text-gray-400 dark:text-gray-500 w-11 text-right">
+                                        {alloc.weight_pct.toFixed(1)}%
+                                      </span>
                                     </div>
                                   </div>
                                 ))}

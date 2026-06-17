@@ -1,4 +1,5 @@
 """포지션 API 테스트 (GET/PUT /api/v1/assets/{account_id}/positions)."""
+
 from __future__ import annotations
 
 import uuid
@@ -41,6 +42,7 @@ def _make_account(user_id, account_id=None):
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -58,6 +60,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -93,8 +96,7 @@ class TestSavePositions:
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=None)
         app = _setup_app(user, db)
-        payload = [{"ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                    "qty": 10.0, "avg_price": 70000.0}]
+        payload = [{"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "qty": 10.0, "avg_price": 70000.0}]
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/assets/{uuid.uuid4()}/positions", json=payload)
         assert resp.status_code == 404
@@ -107,8 +109,11 @@ class TestSavePositions:
         app = _setup_app(user, db)
 
         mock_snap = SimpleNamespace(
-            id=uuid.uuid4(), account_id=account.id, user_id=user.id,
-            snapshot_date=date.today(), amount_krw=0.0,
+            id=uuid.uuid4(),
+            account_id=account.id,
+            user_id=user.id,
+            snapshot_date=date.today(),
+            amount_krw=0.0,
         )
 
         with patch("app.api.v1.positions.get_redis") as mock_get_redis:
@@ -137,6 +142,7 @@ class TestGetPositions:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         account_id = uuid.uuid4()
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -160,15 +166,24 @@ class TestGetPositions:
 
         result = MagicMock()
         mock_pos = SimpleNamespace(
-            ticker="005930", name="삼성전자", market="KOSPI",
-            qty=10.0, avg_price=70000.0, current_price=75000.0,
-            value_krw=750000.0, currency="KRW", usd_rate=None,
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            qty=10.0,
+            avg_price=70000.0,
+            current_price=75000.0,
+            value_krw=750000.0,
+            currency="KRW",
+            usd_rate=None,
             avg_price_usd=None,
         )
         mock_pos.to_dict = lambda: {
-            "ticker": mock_pos.ticker, "name": mock_pos.name,
-            "market": mock_pos.market, "qty": mock_pos.qty,
-            "avg_price": mock_pos.avg_price, "current_price": mock_pos.current_price,
+            "ticker": mock_pos.ticker,
+            "name": mock_pos.name,
+            "market": mock_pos.market,
+            "qty": mock_pos.qty,
+            "avg_price": mock_pos.avg_price,
+            "current_price": mock_pos.current_price,
         }
         result.scalars.return_value.all.return_value = [mock_pos]
         db.execute = AsyncMock(return_value=result)
@@ -214,10 +229,15 @@ class TestSavePositionsExtended:
             ):
                 resp = client.put(
                     f"/api/v1/assets/{account.id}/positions",
-                    json=[{
-                        "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                        "qty": 10.0, "avg_price": 70000.0,
-                    }],
+                    json=[
+                        {
+                            "ticker": "005930",
+                            "name": "삼성전자",
+                            "market": "KOSPI",
+                            "qty": 10.0,
+                            "avg_price": 70000.0,
+                        }
+                    ],
                 )
         assert resp.status_code == 200
         data = resp.json()
@@ -249,10 +269,15 @@ class TestSavePositionsExtended:
             ):
                 resp = client.put(
                     f"/api/v1/assets/{account.id}/positions",
-                    json=[{
-                        "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                        "qty": 5.0, "avg_price": 70000.0,
-                    }],
+                    json=[
+                        {
+                            "ticker": "005930",
+                            "name": "삼성전자",
+                            "market": "KOSPI",
+                            "qty": 5.0,
+                            "avg_price": 70000.0,
+                        }
+                    ],
                 )
         assert resp.status_code == 200
 
@@ -328,12 +353,20 @@ class TestSyncPositionPrices:
         db.scalar = AsyncMock(return_value=account)
 
         mock_pos = SimpleNamespace(
-            ticker="005930", name="삼성전자", market="KOSPI",
-            qty=10.0, avg_price=70000.0, current_price=75000.0, value_krw=750000.0,
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            qty=10.0,
+            avg_price=70000.0,
+            current_price=75000.0,
+            value_krw=750000.0,
         )
         mock_pos.to_dict = lambda: {
-            "ticker": mock_pos.ticker, "name": mock_pos.name, "market": mock_pos.market,
-            "qty": mock_pos.qty, "avg_price": mock_pos.avg_price,
+            "ticker": mock_pos.ticker,
+            "name": mock_pos.name,
+            "market": mock_pos.market,
+            "qty": mock_pos.qty,
+            "avg_price": mock_pos.avg_price,
             "current_price": mock_pos.current_price,
         }
 
@@ -350,17 +383,13 @@ class TestSyncPositionPrices:
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
-                patch("app.api.v1.positions.fetch_prices_batch",
-                      AsyncMock(return_value={"005930": 76000.0})),
+                patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"005930": 76000.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
-                patch("app.api.v1.positions._upsert_snapshot",
-                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
-                resp = client.post(
-                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                )
+                resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 200
         data = resp.json()
         assert "positions" in data
@@ -373,12 +402,20 @@ class TestSyncPositionPrices:
         db.scalar = AsyncMock(return_value=account)
 
         mock_pos = SimpleNamespace(
-            ticker="AAPL", name="애플", market="NASDAQ",
-            qty=5.0, avg_price=200000.0, current_price=200000.0, value_krw=1000000.0,
+            ticker="AAPL",
+            name="애플",
+            market="NASDAQ",
+            qty=5.0,
+            avg_price=200000.0,
+            current_price=200000.0,
+            value_krw=1000000.0,
         )
         mock_pos.to_dict = lambda: {
-            "ticker": mock_pos.ticker, "name": mock_pos.name, "market": mock_pos.market,
-            "qty": mock_pos.qty, "avg_price": mock_pos.avg_price,
+            "ticker": mock_pos.ticker,
+            "name": mock_pos.name,
+            "market": mock_pos.market,
+            "qty": mock_pos.qty,
+            "avg_price": mock_pos.avg_price,
             "current_price": mock_pos.current_price,
         }
 
@@ -395,17 +432,13 @@ class TestSyncPositionPrices:
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
-                patch("app.api.v1.positions.fetch_prices_batch",
-                      AsyncMock(return_value={"AAPL": 210.0})),
+                patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
-                patch("app.api.v1.positions._upsert_snapshot",
-                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
-                resp = client.post(
-                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                )
+                resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 200
         assert mock_pos.current_price == pytest.approx(210.0 * 1350.0)
 
@@ -417,12 +450,20 @@ class TestSyncPositionPrices:
         db.scalar = AsyncMock(return_value=account)
 
         mock_pos = SimpleNamespace(
-            ticker="005930", name="삼성전자", market="KOSPI",
-            qty=10.0, avg_price=70000.0, current_price=71000.0, value_krw=710000.0,
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            qty=10.0,
+            avg_price=70000.0,
+            current_price=71000.0,
+            value_krw=710000.0,
         )
         mock_pos.to_dict = lambda: {
-            "ticker": mock_pos.ticker, "name": mock_pos.name, "market": mock_pos.market,
-            "qty": mock_pos.qty, "avg_price": mock_pos.avg_price,
+            "ticker": mock_pos.ticker,
+            "name": mock_pos.name,
+            "market": mock_pos.market,
+            "qty": mock_pos.qty,
+            "avg_price": mock_pos.avg_price,
             "current_price": mock_pos.current_price,
         }
 
@@ -439,16 +480,14 @@ class TestSyncPositionPrices:
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
-                patch("app.api.v1.positions.fetch_prices_batch",
-                      AsyncMock(return_value={})),  # Empty → ticker not found
+                patch(
+                    "app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={})
+                ),  # Empty → ticker not found
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
-                patch("app.api.v1.positions._upsert_snapshot",
-                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
-                resp = client.post(
-                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                )
+                resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 200
         assert mock_pos.current_price == pytest.approx(71000.0)  # Unchanged

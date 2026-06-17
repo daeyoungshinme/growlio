@@ -1,4 +1,5 @@
 """거래 내역 CRUD API 테스트 (GET/POST/PUT/DELETE /api/v1/transactions)."""
+
 import uuid
 from datetime import date
 from types import SimpleNamespace
@@ -20,6 +21,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     result = MagicMock()
     result.scalars.return_value.all.return_value = []
@@ -55,6 +57,7 @@ def _make_tx(user_id=None, tx_id=None):
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -87,6 +90,7 @@ def _cleanup_app():
     from app.api.deps import get_current_user
     from app.database import get_db
     from app.main import app
+
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_db, None)
 
@@ -95,6 +99,7 @@ class TestListTransactions:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/transactions")
@@ -154,8 +159,11 @@ class TestCreateTransaction:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.transactions.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.post(
@@ -265,8 +273,11 @@ class TestUpdateTransaction:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.transactions.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -287,8 +298,11 @@ class TestUpdateTransaction:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.transactions.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -348,8 +362,11 @@ class TestDeleteTransaction:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.transactions.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(delete=AsyncMock())),
+                patch(
+                    "app.api.v1.transactions.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(delete=AsyncMock()),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.delete(

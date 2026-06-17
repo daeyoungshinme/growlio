@@ -30,30 +30,45 @@ export default function DCAProjectionChart({ data }: Props) {
   const chartData = [
     ...recentPast.map((d) => ({ ...d, projected_future_krw: undefined })),
     ...(boundaryPoint
-      ? [{ ...boundaryPoint, actual_krw: null, projected_future_krw: boundaryPoint.projected_krw, projected_krw: undefined }]
+      ? [
+          {
+            ...boundaryPoint,
+            actual_krw: null,
+            projected_future_krw: boundaryPoint.projected_krw,
+            projected_krw: undefined,
+          },
+        ]
       : []),
     ...(recentPast.length > 0
-      ? visibleFuture.map((d) => ({ ...d, actual_krw: null, projected_future_krw: d.projected_krw, projected_krw: undefined }))
+      ? visibleFuture.map((d) => ({
+          ...d,
+          actual_krw: null,
+          projected_future_krw: d.projected_krw,
+          projected_krw: undefined,
+        }))
       : visibleFuture.map((d) => ({ ...d, projected_future_krw: d.projected_krw }))),
   ];
 
-  const allChartNums = chartData.flatMap((d) => {
-    const row = d as Record<string, unknown>;
-    return [row.projected_krw, row.projected_future_krw, row.actual_krw];
-  }).filter((v): v is number => typeof v === "number" && isFinite(v));
+  const allChartNums = chartData
+    .flatMap((d) => {
+      const row = d as Record<string, unknown>;
+      return [row.projected_krw, row.projected_future_krw, row.actual_krw];
+    })
+    .filter((v): v is number => typeof v === "number" && isFinite(v));
   const actualNums = chartData
     .map((d) => d.actual_krw)
     .filter((v): v is number => typeof v === "number" && isFinite(v));
   const rawMax = allChartNums.length > 0 ? Math.max(...allChartNums) : 0;
   const actualMax = actualNums.length > 0 ? Math.max(...actualNums) : 0;
-  const yMax = actualMax > 0 && rawMax > actualMax * 4
-    ? Math.ceil(actualMax * 3)
-    : Math.ceil(rawMax * 1.05);
+  const yMax =
+    actualMax > 0 && rawMax > actualMax * 4 ? Math.ceil(actualMax * 3) : Math.ceil(rawMax * 1.05);
   const yDomain: [number, number] = [0, yMax];
 
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">이론 복리 곡선 vs 실제 자산</h3>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">
+        이론 복리 곡선 vs 실제 자산
+      </h3>
       <div className="flex items-center gap-4 flex-wrap mb-3 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 border-t-2 border-blue-500" />
@@ -89,9 +104,7 @@ export default function DCAProjectionChart({ data }: Props) {
           <Tooltip
             formatter={(value: number, name: string) => {
               const label =
-                name === "projected_krw" || name === "projected_future_krw"
-                  ? "이론값"
-                  : "실제값";
+                name === "projected_krw" || name === "projected_future_krw" ? "이론값" : "실제값";
               return [fmtKrw(value), label];
             }}
             labelFormatter={(label: string) => `${label}`}

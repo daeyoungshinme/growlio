@@ -1,4 +1,5 @@
 """주가 목표 알림 CRUD."""
+
 from __future__ import annotations
 
 import uuid

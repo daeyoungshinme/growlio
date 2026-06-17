@@ -28,6 +28,7 @@ def _make_user(user_id=None, email="user@example.com"):
 
 # ── 교차 유저 접근 제어 ───────────────────────────────────────
 
+
 class TestCrossUserAccess:
     """다른 유저의 계좌에 접근하면 404를 반환한다."""
 
@@ -126,6 +127,7 @@ class TestCrossUserAccess:
 
 # ── 토큰 검증 ────────────────────────────────────────────────
 
+
 class TestTokenValidation:
     """유효하지 않은 토큰은 401을 반환한다."""
 
@@ -164,6 +166,7 @@ class TestTokenValidation:
 
 
 # ── verify_supabase_token 단위 테스트 ─────────────────────────
+
 
 class TestVerifySupabaseToken:
     """auth_service.verify_supabase_token 단위 테스트."""

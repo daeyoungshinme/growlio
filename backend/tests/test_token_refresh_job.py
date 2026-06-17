@@ -1,4 +1,5 @@
 """token_refresh Job 테스트."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -51,6 +52,7 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
+
             await refresh_all_user_tokens()
 
     @pytest.mark.asyncio
@@ -77,6 +79,7 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh._fetch_and_store_token", new_callable=AsyncMock),
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
+
             await refresh_all_user_tokens()
 
         assert call_count["ob"] == 0
@@ -115,6 +118,7 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh._fetch_and_store_token", new_callable=AsyncMock) as mock_token,
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
+
             await refresh_all_user_tokens()
 
         assert mock_token.call_count == 1
@@ -155,4 +159,5 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh._fetch_and_store_token", side_effect=fail_token),
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
+
             await refresh_all_user_tokens()

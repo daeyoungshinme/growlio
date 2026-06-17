@@ -1,4 +1,5 @@
 """DCA 자동매매 Job 테스트."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -65,6 +66,7 @@ class TestRunDcaAutoExecution:
             mock_lock.return_value.__aexit__ = AsyncMock(return_value=None)
 
             from app.jobs.dca_auto_buy import run_dca_auto_execution
+
             await run_dca_auto_execution()
 
     @pytest.mark.asyncio
@@ -81,6 +83,7 @@ class TestRunDcaAutoExecution:
             mock_lock.return_value.__aexit__ = AsyncMock(return_value=None)
 
             from app.jobs.dca_auto_buy import run_dca_auto_execution
+
             await run_dca_auto_execution()
 
         mock_run.assert_not_called()
@@ -97,6 +100,7 @@ class TestExecuteDcaForUser:
 
         with patch("app.jobs.dca_auto_buy.fetch_prices_batch", new_callable=AsyncMock):
             from app.jobs.dca_auto_buy import _execute_dca_for_user
+
             await _execute_dca_for_user(settings, mock_db, mock_redis)
 
     @pytest.mark.asyncio
@@ -123,4 +127,5 @@ class TestExecuteDcaForUser:
 
         with patch("app.jobs.dca_auto_buy.fetch_prices_batch", new_callable=AsyncMock, return_value={}):
             from app.jobs.dca_auto_buy import _execute_dca_for_user
+
             await _execute_dca_for_user(settings, mock_db, mock_redis)

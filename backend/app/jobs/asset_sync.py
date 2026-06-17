@@ -23,13 +23,14 @@ async def _sync_accounts(accounts: list[AssetAccount], job_name: str) -> None:
             try:
                 async with AsyncSessionLocal() as db:
                     await sync_account(account, db, redis)
-                logger.info(
-                    "account_synced", job=job_name, account_id=str(account.id), name=account.name
-                )
+                logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
             except Exception as e:
                 logger.error(
                     "account_sync_failed",
-                    job=job_name, account_id=str(account.id), name=account.name, error=str(e),
+                    job=job_name,
+                    account_id=str(account.id),
+                    name=account.name,
+                    error=str(e),
                 )
                 failed.append((str(account.id), account.name, str(e)))
 

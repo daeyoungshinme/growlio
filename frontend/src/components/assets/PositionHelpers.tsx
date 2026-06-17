@@ -8,13 +8,23 @@ export function PnlCell({ val, pct }: { val: number; pct: number }) {
   const color = pnlColor(val);
   return (
     <div className="text-right text-xs">
-      <div className={`font-bold ${color}`}>{pct >= 0 ? "+" : ""}{pct.toFixed(2)}%</div>
-      <div className={color}>{val >= 0 ? "+" : ""}{fmtKrwShort(val)}원</div>
+      <div className={`font-bold ${color}`}>
+        {pct >= 0 ? "+" : ""}
+        {pct.toFixed(2)}%
+      </div>
+      <div className={color}>
+        {val >= 0 ? "+" : ""}
+        {fmtKrwShort(val)}원
+      </div>
     </div>
   );
 }
 
-export function MarketSelect({ value, disabled, onChange }: {
+export function MarketSelect({
+  value,
+  disabled,
+  onChange,
+}: {
   value: string;
   disabled: boolean;
   onChange: (market: string) => void;
@@ -26,7 +36,11 @@ export function MarketSelect({ value, disabled, onChange }: {
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
     >
-      {POSITION_MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
+      {POSITION_MARKETS.map((m) => (
+        <option key={m} value={m}>
+          {m}
+        </option>
+      ))}
     </select>
   );
 }

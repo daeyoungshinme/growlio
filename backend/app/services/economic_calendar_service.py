@@ -1,4 +1,5 @@
 """경제지표 발표 캘린더 서비스 — FRED API 기반으로 향후 발표 예정일 조회."""
+
 from __future__ import annotations
 
 import asyncio
@@ -57,17 +58,19 @@ async def _fetch_fred_calendar_events(days_ahead: int = _DAYS_AHEAD) -> list[dic
                 continue
             if not (today <= d <= cutoff):
                 continue
-            events.append({
-                "event": meta["name"],
-                "date": d.isoformat(),
-                "time_kst": None,
-                "country": "US",
-                "actual": None,
-                "estimate": None,
-                "previous": None,
-                "impact": _IMPACT.get(code),
-                "currency": None,
-            })
+            events.append(
+                {
+                    "event": meta["name"],
+                    "date": d.isoformat(),
+                    "time_kst": None,
+                    "country": "US",
+                    "actual": None,
+                    "estimate": None,
+                    "previous": None,
+                    "impact": _IMPACT.get(code),
+                    "currency": None,
+                }
+            )
 
     events.sort(key=lambda e: e["date"])
     return events

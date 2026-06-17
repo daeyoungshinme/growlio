@@ -49,12 +49,12 @@ describe("dividendFreqInfo", () => {
   });
 
   it("12개월이면 월배당", () => {
-    const { label } = dividendFreqInfo([1,2,3,4,5,6,7,8,9,10,11,12], false);
+    const { label } = dividendFreqInfo([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], false);
     expect(label).toBe("월배당");
   });
 
   it("4개월이면 분기배당", () => {
-    const { label } = dividendFreqInfo([3,6,9,12], false);
+    const { label } = dividendFreqInfo([3, 6, 9, 12], false);
     expect(label).toBe("분기배당");
   });
 
@@ -79,7 +79,7 @@ describe("dividendFreqInfo", () => {
   });
 
   it("결과에 cls 포함", () => {
-    const { cls } = dividendFreqInfo([3,6,9,12], false);
+    const { cls } = dividendFreqInfo([3, 6, 9, 12], false);
     expect(typeof cls).toBe("string");
     expect(cls.length).toBeGreaterThan(0);
   });

@@ -20,6 +20,7 @@ from app.services.dca_service import (
 
 # ── _elapsed_months ──────────────────────────────────────────
 
+
 class TestElapsedMonths:
     def test_same_date_is_zero(self, override_settings):
         d = date(2024, 1, 1)
@@ -38,6 +39,7 @@ class TestElapsedMonths:
 
 # ── _month_key ───────────────────────────────────────────────
 
+
 class TestMonthKey:
     def test_format_yyyy_mm(self, override_settings):
         assert _month_key(date(2024, 3, 15)) == "2024-03"
@@ -50,6 +52,7 @@ class TestMonthKey:
 
 
 # ── _calc_months_to_goal ─────────────────────────────────────
+
 
 class TestCalcMonthsToGoal:
     def test_zero_return_rate_linear_growth(self, override_settings):
@@ -85,6 +88,7 @@ class TestCalcMonthsToGoal:
 
 
 # ── _build_projection_curve ──────────────────────────────────
+
 
 class TestBuildProjectionCurve:
     def test_length_matches_total_months(self, override_settings):
@@ -136,7 +140,7 @@ class TestBuildProjectionCurve:
             total_months=3,
             monthly_actuals={},
         )
-        assert curve[0]["projected_krw"] == 0          # n=0: 0 + 1M*0 = 0
+        assert curve[0]["projected_krw"] == 0  # n=0: 0 + 1M*0 = 0
         assert curve[1]["projected_krw"] == 1_000_000  # n=1: 0 + 1M*1
         assert curve[2]["projected_krw"] == 2_000_000  # n=2: 0 + 1M*2
 
@@ -155,6 +159,7 @@ class TestBuildProjectionCurve:
 
 
 # ── _build_yearly_achievements ───────────────────────────────
+
 
 class TestBuildYearlyAchievements:
     def test_extracts_last_month_per_year(self, override_settings):
@@ -196,6 +201,7 @@ class TestBuildYearlyAchievements:
 
 # ── get_dca_analysis (미설정 케이스) ─────────────────────────
 
+
 class TestGetDcaAnalysis:
     @pytest.mark.asyncio
     async def test_returns_not_configured_when_no_settings(self, mock_db, override_settings):
@@ -231,11 +237,18 @@ class TestGetDcaAnalysis:
 
 # ── _calc_goal_timeline ──────────────────────────────────────
 
+
 class TestCalcGoalTimeline:
     def test_returns_required_keys(self, override_settings):
         result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 50_000_000.0, 0.0, date(2024, 1, 1), 50)
-        for key in ("months_to_goal", "expected_goal_date", "actual_expected_goal_date",
-                    "current_progress_pct", "on_track", "lead_lag_months"):
+        for key in (
+            "months_to_goal",
+            "expected_goal_date",
+            "actual_expected_goal_date",
+            "current_progress_pct",
+            "on_track",
+            "lead_lag_months",
+        ):
             assert key in result
 
     def test_none_months_to_goal_gives_no_expected_date(self, override_settings):
@@ -258,31 +271,44 @@ class TestCalcGoalTimeline:
 
     def test_with_return_rate(self, override_settings):
         result = _calc_goal_timeline(
-            initial_value=10_000_000.0, pmt=500_000.0, r=0.005,
-            goal_amount=100_000_000.0, current_actual=12_000_000.0,
-            start_date=date(2020, 1, 1), months_to_goal=120,
+            initial_value=10_000_000.0,
+            pmt=500_000.0,
+            r=0.005,
+            goal_amount=100_000_000.0,
+            current_actual=12_000_000.0,
+            start_date=date(2020, 1, 1),
+            months_to_goal=120,
         )
         assert result["months_to_goal"] == 120
         assert result["on_track"] is not None
 
     def test_lead_lag_computed_when_near_goal(self, override_settings):
         result = _calc_goal_timeline(
-            initial_value=0.0, pmt=1_000_000.0, r=0.0,
-            goal_amount=10_000_000.0, current_actual=9_000_000.0,
-            start_date=date(2024, 1, 1), months_to_goal=10,
+            initial_value=0.0,
+            pmt=1_000_000.0,
+            r=0.0,
+            goal_amount=10_000_000.0,
+            current_actual=9_000_000.0,
+            start_date=date(2024, 1, 1),
+            months_to_goal=10,
         )
         assert result["lead_lag_months"] is not None or result["actual_expected_goal_date"] is not None
 
     def test_no_lead_lag_when_zero_current_actual(self, override_settings):
         result = _calc_goal_timeline(
-            initial_value=0.0, pmt=1_000_000.0, r=0.0,
-            goal_amount=50_000_000.0, current_actual=0.0,
-            start_date=date(2024, 1, 1), months_to_goal=50,
+            initial_value=0.0,
+            pmt=1_000_000.0,
+            r=0.0,
+            goal_amount=50_000_000.0,
+            current_actual=0.0,
+            start_date=date(2024, 1, 1),
+            months_to_goal=50,
         )
         assert result["lead_lag_months"] is None
 
 
 # ── get_dca_analysis (설정된 케이스) ─────────────────────────
+
 
 class TestGetDcaAnalysisConfigured:
     @pytest.mark.asyncio
@@ -384,9 +410,7 @@ class TestGetDcaAnalysisConfigured:
         assert result["projection_months"] == []
 
     @pytest.mark.asyncio
-    async def test_configured_with_historical_actuals_no_current_month(
-        self, mock_db, override_settings
-    ):
+    async def test_configured_with_historical_actuals_no_current_month(self, mock_db, override_settings):
         """이번 달 스냅샷 없고 과거 월 데이터 있을 때 최근 월 값 사용 (lines 78-79)."""
         from types import SimpleNamespace
         from unittest.mock import MagicMock

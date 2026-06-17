@@ -13,8 +13,5 @@ function createTestQueryClient() {
 
 export function renderWithProviders(ui: ReactNode, options?: RenderOptions) {
   const qc = createTestQueryClient();
-  return render(
-    <QueryClientProvider client={qc}>{ui}</QueryClientProvider>,
-    options
-  );
+  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>, options);
 }

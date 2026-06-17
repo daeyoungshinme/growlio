@@ -29,7 +29,12 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   const [suggestIdx, setSuggestIdx] = useState<number | null>(null);
   const [priceLoadingRows, setPriceLoadingRows] = useState<Set<number>>(new Set());
 
-  const { suggestions, isSearching: searchLoading, search: runStockSearch, clearSuggestions } = useStockSearch();
+  const {
+    suggestions,
+    isSearching: searchLoading,
+    search: runStockSearch,
+    clearSuggestions,
+  } = useStockSearch();
 
   const setRow = (i: number, patch: Partial<Position>) =>
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
@@ -37,12 +42,26 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
   const addRow = () =>
     setRows((prev) => [
       ...prev,
-      { ticker: "", name: "", market: "KOSPI", qty: 0, avg_price: 0, avg_price_usd: null, usd_rate: null, current_price: null, current_price_usd: null, _rowKey: crypto.randomUUID() },
+      {
+        ticker: "",
+        name: "",
+        market: "KOSPI",
+        qty: 0,
+        avg_price: 0,
+        avg_price_usd: null,
+        usd_rate: null,
+        current_price: null,
+        current_price_usd: null,
+        _rowKey: crypto.randomUUID(),
+      },
     ]);
 
   const removeRow = (i: number) => {
     setRows((prev) => prev.filter((_, idx) => idx !== i));
-    if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); }
+    if (suggestIdx === i) {
+      clearSuggestions();
+      setSuggestIdx(null);
+    }
   };
 
   const loadPrice = async (i: number, ticker: string, market: string) => {
@@ -60,26 +79,39 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
     } catch (e: unknown) {
       toast(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally {
-      setPriceLoadingRows((prev) => { const s = new Set(prev); s.delete(i); return s; });
+      setPriceLoadingRows((prev) => {
+        const s = new Set(prev);
+        s.delete(i);
+        return s;
+      });
     }
   };
 
   const handleNameChange = (i: number, value: string) => {
     setRow(i, { name: value });
-    if (!value.trim()) { clearSuggestions(); setSuggestIdx(null); return; }
+    if (!value.trim()) {
+      clearSuggestions();
+      setSuggestIdx(null);
+      return;
+    }
     setSuggestIdx(i);
     runStockSearch(value);
   };
 
   const handleNameBlur = (i: number) => {
-    setTimeout(() => { if (suggestIdx === i) { clearSuggestions(); setSuggestIdx(null); } }, SEARCH_DROPDOWN_HIDE_DELAY);
+    setTimeout(() => {
+      if (suggestIdx === i) {
+        clearSuggestions();
+        setSuggestIdx(null);
+      }
+    }, SEARCH_DROPDOWN_HIDE_DELAY);
   };
 
   const handleSelectSuggestion = (i: number, s: StockSuggestion) => {
     setRows((prev) =>
       prev.map((r, idx) =>
-        idx === i ? { ...r, ticker: s.ticker, name: s.name, market: s.market } : r
-      )
+        idx === i ? { ...r, ticker: s.ticker, name: s.name, market: s.market } : r,
+      ),
     );
     clearSuggestions();
     setSuggestIdx(null);
@@ -104,7 +136,14 @@ export function usePositionsEditor(initialRows: Position[], usdRate: number | nu
     const value = r.qty * cur;
     const pnl = value - invested;
     const pnl_pct = invested ? (pnl / invested) * 100 : 0;
-    return { ...r, current_price: cur, invested_amount: invested, value_amount: value, pnl, pnl_pct };
+    return {
+      ...r,
+      current_price: cur,
+      invested_amount: invested,
+      value_amount: value,
+      pnl,
+      pnl_pct,
+    };
   });
 
   const enrichRows = (positions: Position[]): Position[] =>

@@ -1,4 +1,5 @@
 """dividend_fetcher.py 단위 테스트 — fetch_ticker_dividend_info 폴백 체인."""
+
 from __future__ import annotations
 
 import asyncio
@@ -20,6 +21,7 @@ def mock_redis():
 async def _call_fetcher(ticker, market, redis, kis_creds=None, overrides=None, dart_key="test"):
     """fetch_ticker_dividend_info 호출 헬퍼."""
     from app.services.dividend_fetcher import fetch_ticker_dividend_info
+
     sem = asyncio.Semaphore(1)
     return await fetch_ticker_dividend_info(
         ticker=ticker,
@@ -37,17 +39,19 @@ class TestFetchTickerDividendInfo:
     async def test_cache_hit_skips_network(self, mock_redis, override_settings):
         """Redis 캐시에 dps + yield 있으면 네트워크 소스 생략 후 반환."""
         # months cache hit
-        mock_redis.get = AsyncMock(side_effect=[
-            json.dumps([3, 6, 9, 12]).encode(),  # months cache
-            json.dumps({"dps": 500.0, "yield_decimal": 0.025}).encode(),  # info cache
-        ])
+        mock_redis.get = AsyncMock(
+            side_effect=[
+                json.dumps([3, 6, 9, 12]).encode(),  # months cache
+                json.dumps({"dps": 500.0, "yield_decimal": 0.025}).encode(),  # info cache
+            ]
+        )
 
         with patch("app.services.dividend_fetcher.sync_yahoo_dividend_info") as mock_yahoo:
             result = await _call_fetcher("AAPL", "NASDAQ", mock_redis)
 
         mock_yahoo.assert_not_called()
         assert result[0] == pytest.approx(0.025)  # yield_decimal
-        assert result[1] == pytest.approx(500.0)   # dps
+        assert result[1] == pytest.approx(500.0)  # dps
 
     @pytest.mark.asyncio
     async def test_override_months_used_directly(self, mock_redis, override_settings):
@@ -57,10 +61,11 @@ class TestFetchTickerDividendInfo:
         overrides = {("AAPL", "NASDAQ"): [3, 6, 9, 12]}
 
         with (
-            patch("app.services.dividend_fetcher.sync_yahoo_dividend_info",
-                  return_value={"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None}),
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months",
-                  return_value=[]) as mock_months,
+            patch(
+                "app.services.dividend_fetcher.sync_yahoo_dividend_info",
+                return_value={"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None},
+            ),
+            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[]) as mock_months,
         ):
             loop_mock = MagicMock()
             loop_mock.run_in_executor = AsyncMock(side_effect=lambda _, fn, *args: fn(*args) if callable(fn) else None)
@@ -79,6 +84,7 @@ class TestFetchTickerDividendInfo:
         yahoo_result = {"dividend_yield": 0.015, "dps": 1.0, "ex_dividend_date": None}
 
         loop_mock = MagicMock()
+
         async def fake_executor(_, fn, *args):
             if callable(fn):
                 return fn(*args)
@@ -114,6 +120,7 @@ class TestFetchTickerDividendInfo:
         yahoo_result = {"dividend_yield": 0.02, "dps": 100.0, "ex_dividend_date": None}
 
         loop_mock = MagicMock()
+
         async def fake_executor(_, fn, *args):
             if callable(fn):
                 return fn(*args)
@@ -139,6 +146,7 @@ class TestFetchTickerDividendInfo:
         yahoo_result = {"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None}
 
         loop_mock = MagicMock()
+
         async def fake_executor(_, fn, *args):
             if callable(fn):
                 return fn(*args)

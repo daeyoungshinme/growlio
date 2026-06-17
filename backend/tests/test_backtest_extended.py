@@ -1,4 +1,5 @@
 """backtest_service.py 추가 단위 테스트 — _sync_download_history, _sync_compute_correlation."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -76,9 +77,7 @@ class TestComputeCorrelationSync:
         from app.services.backtest_service import _sync_compute_correlation
 
         with patch("yfinance.download", side_effect=Exception("error")):
-            labels, matrix = _sync_compute_correlation(
-                ["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1)
-            )
+            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1))
 
         assert labels == []
         assert matrix == []
@@ -89,9 +88,7 @@ class TestComputeCorrelationSync:
         from app.services.backtest_service import _sync_compute_correlation
 
         with patch("yfinance.download", return_value=pd.DataFrame()):
-            labels, matrix = _sync_compute_correlation(
-                ["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1)
-            )
+            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2021, 1, 1))
 
         assert labels == []
         assert matrix == []
@@ -106,9 +103,7 @@ class TestComputeCorrelationSync:
         df = pd.DataFrame({"AAPL": [150.0, 155.0, 160.0]}, index=idx)
 
         with patch("yfinance.download", return_value=df):
-            labels, matrix = _sync_compute_correlation(
-                ["AAPL"], ["Apple"], date(2020, 1, 1), date(2020, 3, 31)
-            )
+            labels, matrix = _sync_compute_correlation(["AAPL"], ["Apple"], date(2020, 1, 1), date(2020, 3, 31))
 
         assert labels == []
         assert matrix == []

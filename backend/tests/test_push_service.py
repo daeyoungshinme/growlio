@@ -1,4 +1,5 @@
 """push_service.py 단위 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -43,6 +44,7 @@ class TestSendPush:
     @pytest.mark.asyncio
     async def test_returns_true_on_successful_send(self, override_settings):
         import app.services.push_service as ps
+
         original_initialized = ps._firebase_initialized
         original_app = ps._firebase_app
 
@@ -54,10 +56,13 @@ class TestSendPush:
             with patch("app.services.push_service.asyncio.get_running_loop") as mock_loop:
                 mock_loop.return_value.run_in_executor = AsyncMock(return_value="msg_id")
 
-                with patch.dict("sys.modules", {
-                    "firebase_admin": MagicMock(),
-                    "firebase_admin.messaging": MagicMock(),
-                }):
+                with patch.dict(
+                    "sys.modules",
+                    {
+                        "firebase_admin": MagicMock(),
+                        "firebase_admin.messaging": MagicMock(),
+                    },
+                ):
                     result = await ps.send_push("valid-token", "제목", "내용")
 
             # Either True or False depending on whether the mock executed correctly
@@ -108,14 +113,17 @@ class TestGetFirebaseApp:
             ps._firebase_app = None
             cfg.settings.firebase_credentials_json = '{"type": "service_account"}'
 
-            with patch.dict("sys.modules", {
-                "firebase_admin": MagicMock(
-                    initialize_app=MagicMock(side_effect=Exception("init failed")),
-                ),
-                "firebase_admin.credentials": MagicMock(
-                    Certificate=MagicMock(return_value=MagicMock()),
-                ),
-            }):
+            with patch.dict(
+                "sys.modules",
+                {
+                    "firebase_admin": MagicMock(
+                        initialize_app=MagicMock(side_effect=Exception("init failed")),
+                    ),
+                    "firebase_admin.credentials": MagicMock(
+                        Certificate=MagicMock(return_value=MagicMock()),
+                    ),
+                },
+            ):
                 result = ps._get_firebase_app()
 
             # After failed init, _firebase_initialized=True, app=None
@@ -139,14 +147,20 @@ class TestSendPushException:
             ps._firebase_initialized = True
             ps._firebase_app = mock_app
 
-            with patch.dict("sys.modules", {
-                "firebase_admin.messaging": MagicMock(
-                    Message=MagicMock(return_value=MagicMock()),
-                    Notification=MagicMock(return_value=MagicMock()),
-                    send=MagicMock(side_effect=Exception("registration-token-not-registered")),
+            with (
+                patch.dict(
+                    "sys.modules",
+                    {
+                        "firebase_admin.messaging": MagicMock(
+                            Message=MagicMock(return_value=MagicMock()),
+                            Notification=MagicMock(return_value=MagicMock()),
+                            send=MagicMock(side_effect=Exception("registration-token-not-registered")),
+                        ),
+                        "firebase_admin": MagicMock(),
+                    },
                 ),
-                "firebase_admin": MagicMock(),
-            }), patch("asyncio.get_running_loop") as mock_loop:
+                patch("asyncio.get_running_loop") as mock_loop,
+            ):
                 mock_loop.return_value.run_in_executor = AsyncMock(
                     side_effect=Exception("registration-token-not-registered")
                 )
@@ -170,9 +184,7 @@ class TestSendPushException:
             ps._firebase_app = mock_app
 
             with patch("asyncio.get_running_loop") as mock_loop:
-                mock_loop.return_value.run_in_executor = AsyncMock(
-                    side_effect=Exception("some other error")
-                )
+                mock_loop.return_value.run_in_executor = AsyncMock(side_effect=Exception("some other error"))
                 result = await ps.send_push("valid-token", "제목", "내용")
 
             assert result is False

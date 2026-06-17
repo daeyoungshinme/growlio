@@ -20,7 +20,9 @@ function sortByMonthlyAmount(items: DividendByTicker[]): DividendByTicker[] {
   return [...items].sort((a, b) => {
     const aCount = a.dividend_months.length > 0 ? a.dividend_months.length : 12;
     const bCount = b.dividend_months.length > 0 ? b.dividend_months.length : 12;
-    return Math.round(b.estimated_annual_krw / bCount) - Math.round(a.estimated_annual_krw / aCount);
+    return (
+      Math.round(b.estimated_annual_krw / bCount) - Math.round(a.estimated_annual_krw / aCount)
+    );
   });
 }
 
@@ -49,7 +51,9 @@ export default function MonthlyTickerDetail({
             </span>
           ) : null}
         </h3>
-        <span className="text-xs text-gray-400 dark:text-gray-500">{selectedMonthTickers.length}개 종목</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {selectedMonthTickers.length}개 종목
+        </span>
       </div>
 
       {sorted.length > 0 ? (
@@ -59,13 +63,16 @@ export default function MonthlyTickerDetail({
             {sorted.map((d) => {
               const payCount = d.dividend_months.length > 0 ? d.dividend_months.length : 12;
               const payAmt = Math.round(d.estimated_annual_krw / payCount);
-              const usdPerPayment = d.estimated_monthly_usd != null ? (d.estimated_monthly_usd * 12) / payCount : null;
+              const usdPerPayment =
+                d.estimated_monthly_usd != null ? (d.estimated_monthly_usd * 12) / payCount : null;
               const actualAmt = monthTickerActualMap[`${monthStr}-${d.ticker ?? ""}`];
               return (
                 <div key={`${d.ticker}-${d.market}`} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-gray-50 truncate text-sm">{d.name}</p>
+                      <p className="font-medium text-gray-900 dark:text-gray-50 truncate text-sm">
+                        {d.name}
+                      </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                         {d.ticker} · {d.market}
                         {d.investment_yield > 0 && ` · ${d.investment_yield.toFixed(2)}%`}
@@ -73,11 +80,15 @@ export default function MonthlyTickerDetail({
                     </div>
                     <div className="text-right shrink-0">
                       {actualAmt && actualAmt > 0 ? (
-                        <p className="font-medium text-green-600 dark:text-green-400 text-sm">수령 {fmtKrw(actualAmt)}</p>
+                        <p className="font-medium text-green-600 dark:text-green-400 text-sm">
+                          수령 {fmtKrw(actualAmt)}
+                        </p>
                       ) : d.currency === "USD" && usdPerPayment != null && usdPerPayment > 0 ? (
                         <p className="text-sm text-gray-500 dark:text-gray-400">{fmtKrw(payAmt)}</p>
                       ) : payAmt > 0 ? (
-                        <p className="text-sm text-gray-500 dark:text-gray-400">예상 {fmtKrw(payAmt)}</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                          예상 {fmtKrw(payAmt)}
+                        </p>
                       ) : (
                         <p className="text-sm text-gray-300 dark:text-gray-600">—</p>
                       )}
@@ -102,10 +113,18 @@ export default function MonthlyTickerDetail({
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-                  <th className="py-2 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">종목</th>
-                  <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">투자배당수익율</th>
-                  <th className="py-2 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당금</th>
-                  <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">배당월 설정</th>
+                  <th className="py-2 px-5 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    종목
+                  </th>
+                  <th className="py-2 px-3 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    투자배당수익율
+                  </th>
+                  <th className="py-2 px-4 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    배당금
+                  </th>
+                  <th className="py-2 px-5 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    배당월 설정
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -113,7 +132,9 @@ export default function MonthlyTickerDetail({
                   const payCount = d.dividend_months.length > 0 ? d.dividend_months.length : 12;
                   const payAmt = Math.round(d.estimated_annual_krw / payCount);
                   const usdPerPayment =
-                    d.estimated_monthly_usd != null ? (d.estimated_monthly_usd * 12) / payCount : null;
+                    d.estimated_monthly_usd != null
+                      ? (d.estimated_monthly_usd * 12) / payCount
+                      : null;
                   const actualAmt = monthTickerActualMap[`${monthStr}-${d.ticker ?? ""}`];
                   return (
                     <tr
@@ -122,7 +143,9 @@ export default function MonthlyTickerDetail({
                     >
                       <td className="py-2 px-5">
                         <p className="font-medium text-gray-900 dark:text-gray-50">{d.name}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500">{d.ticker} · {d.market}</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {d.ticker} · {d.market}
+                        </p>
                       </td>
                       <td className="py-2 px-3 text-right font-medium text-green-600 dark:text-green-400">
                         {d.investment_yield > 0 ? `${d.investment_yield.toFixed(2)}%` : "—"}
@@ -137,7 +160,9 @@ export default function MonthlyTickerDetail({
                             {fmtKrw(payAmt)}(${usdPerPayment.toFixed(2)})
                           </span>
                         ) : payAmt > 0 ? (
-                          <span className="text-gray-500 dark:text-gray-400">예상 {fmtKrw(payAmt)}</span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            예상 {fmtKrw(payAmt)}
+                          </span>
                         ) : (
                           <span className="text-gray-300 dark:text-gray-600">—</span>
                         )}
@@ -161,7 +186,9 @@ export default function MonthlyTickerDetail({
           </div>
         </>
       ) : (
-        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">이 달에 배당 예정 종목이 없습니다.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+          이 달에 배당 예정 종목이 없습니다.
+        </p>
       )}
     </div>
   );

@@ -10,11 +10,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -54,10 +59,7 @@ describe("api/rebalancing", () => {
   it("executeRebalancing calls POST /rebalancing/portfolios/:id/execute", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: [] });
     await executeRebalancing("port-1", { orders: [] });
-    expect(api.post).toHaveBeenCalledWith(
-      "/rebalancing/portfolios/port-1/execute",
-      { orders: [] }
-    );
+    expect(api.post).toHaveBeenCalledWith("/rebalancing/portfolios/port-1/execute", { orders: [] });
   });
 
   it("fetchBrokerBalance calls GET /rebalancing/broker-balance/:accountId", async () => {

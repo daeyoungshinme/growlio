@@ -1,4 +1,5 @@
 """insight_service.py 단위 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -9,22 +10,26 @@ import pytest
 
 # ── _check_concentration ──────────────────────────────────────
 
+
 class TestCheckConcentration:
     @pytest.mark.asyncio
     async def test_empty_dashboard_returns_empty(self, override_settings):
         from app.services.insight_service import _check_concentration
+
         result = await _check_concentration({})
         assert result == []
 
     @pytest.mark.asyncio
     async def test_no_allocation_returns_empty(self, override_settings):
         from app.services.insight_service import _check_concentration
+
         result = await _check_concentration({"total_assets_krw": 1_000_000, "asset_allocation": []})
         assert result == []
 
     @pytest.mark.asyncio
     async def test_under_30_pct_returns_empty(self, override_settings):
         from app.services.insight_service import _check_concentration
+
         dashboard = {
             "total_assets_krw": 1_000_000,
             "asset_allocation": [{"type": "STOCK_KIS", "pct": 25.0}],
@@ -35,6 +40,7 @@ class TestCheckConcentration:
     @pytest.mark.asyncio
     async def test_over_30_returns_warning(self, override_settings):
         from app.services.insight_service import _check_concentration
+
         dashboard = {
             "total_assets_krw": 1_000_000,
             "asset_allocation": [{"type": "STOCK_KIS", "pct": 35.0}],
@@ -46,6 +52,7 @@ class TestCheckConcentration:
     @pytest.mark.asyncio
     async def test_over_40_returns_alert(self, override_settings):
         from app.services.insight_service import _check_concentration
+
         dashboard = {
             "total_assets_krw": 1_000_000,
             "asset_allocation": [{"type": "STOCK_KIS", "pct": 50.0}],
@@ -56,6 +63,7 @@ class TestCheckConcentration:
 
 
 # ── _check_rebalancing_opportunity ───────────────────────────
+
 
 class TestCheckRebalancingOpportunity:
     @pytest.mark.asyncio
@@ -90,8 +98,7 @@ class TestCheckRebalancingOpportunity:
                 {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 1_000_000},
             ],
         }
-        with patch("app.services.portfolio_service.build_portfolio_overview",
-                   new=AsyncMock(return_value=overview)):
+        with patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)):
             result = await _check_rebalancing_opportunity(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -99,13 +106,13 @@ class TestCheckRebalancingOpportunity:
 
 # ── _check_tax_loss_harvest ───────────────────────────────────
 
+
 class TestCheckTaxLossHarvest:
     @pytest.mark.asyncio
     async def test_no_positions_returns_empty(self, mock_db, override_settings):
         from app.services.insight_service import _check_tax_loss_harvest
 
-        with patch("app.services.insight_service.get_overseas_positions_detail",
-                   new=AsyncMock(return_value=[])):
+        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=[])):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -117,8 +124,7 @@ class TestCheckTaxLossHarvest:
         positions = [
             {"ticker": "AAPL", "unrealized_pnl_krw": 500_000, "qty": 5},
         ]
-        with patch("app.services.insight_service.get_overseas_positions_detail",
-                   new=AsyncMock(return_value=positions)):
+        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert result == []
@@ -131,8 +137,7 @@ class TestCheckTaxLossHarvest:
             {"ticker": "AAPL", "unrealized_pnl_krw": 3_000_000, "qty": 5},
             {"ticker": "TSLA", "unrealized_pnl_krw": -1_500_000, "qty": 3},
         ]
-        with patch("app.services.insight_service.get_overseas_positions_detail",
-                   new=AsyncMock(return_value=positions)):
+        with patch("app.services.insight_service.get_overseas_positions_detail", new=AsyncMock(return_value=positions)):
             result = await _check_tax_loss_harvest(uuid.uuid4(), mock_db)
 
         assert len(result) == 1
@@ -140,6 +145,7 @@ class TestCheckTaxLossHarvest:
 
 
 # ── generate_insights ─────────────────────────────────────────
+
 
 class TestGenerateInsights:
     @pytest.mark.asyncio
@@ -163,12 +169,12 @@ class TestGenerateInsights:
         mock_db.scalar = AsyncMock(return_value=None)
 
         with (
-            patch("app.services.insight_service.get_dashboard_summary",
-                  new=AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []})),
-            patch("app.services.insight_service._check_rebalancing_opportunity",
-                  new=AsyncMock(return_value=[])),
-            patch("app.services.insight_service._check_tax_loss_harvest",
-                  new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.insight_service.get_dashboard_summary",
+                new=AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []}),
+            ),
+            patch("app.services.insight_service._check_rebalancing_opportunity", new=AsyncMock(return_value=[])),
+            patch("app.services.insight_service._check_tax_loss_harvest", new=AsyncMock(return_value=[])),
         ):
             result = await generate_insights(uuid.uuid4(), mock_db)
 
@@ -186,12 +192,12 @@ class TestGenerateInsights:
         redis.setex = AsyncMock()
 
         with (
-            patch("app.services.insight_service.get_dashboard_summary",
-                  new=AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []})),
-            patch("app.services.insight_service._check_rebalancing_opportunity",
-                  new=AsyncMock(return_value=[])),
-            patch("app.services.insight_service._check_tax_loss_harvest",
-                  new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.insight_service.get_dashboard_summary",
+                new=AsyncMock(return_value={"total_assets_krw": 0, "asset_allocation": []}),
+            ),
+            patch("app.services.insight_service._check_rebalancing_opportunity", new=AsyncMock(return_value=[])),
+            patch("app.services.insight_service._check_tax_loss_harvest", new=AsyncMock(return_value=[])),
         ):
             await generate_insights(uuid.uuid4(), mock_db, redis=redis, force_refresh=True)
 

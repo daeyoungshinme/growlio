@@ -19,7 +19,9 @@ export default function MonthlyAchievementTable({ data }: Props) {
   if (past.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">월별 달성율</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
+          월별 달성율
+        </h3>
         <EmptyState title="스냅샷 데이터가 없습니다." compact />
       </div>
     );
@@ -27,7 +29,9 @@ export default function MonthlyAchievementTable({ data }: Props) {
 
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">월별 달성율 (최근 24개월)</h3>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
+        월별 달성율 (최근 24개월)
+      </h3>
       {/* 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {[...past].reverse().map((row) => {
@@ -36,7 +40,9 @@ export default function MonthlyAchievementTable({ data }: Props) {
             <div key={row.month} className="py-2.5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{row.month}</p>
-                <span className={`text-sm font-semibold ${row.achievement_pct !== null ? pctColor(row.achievement_pct) : "text-gray-400 dark:text-gray-500"}`}>
+                <span
+                  className={`text-sm font-semibold ${row.achievement_pct !== null ? pctColor(row.achievement_pct) : "text-gray-400 dark:text-gray-500"}`}
+                >
                   {row.achievement_pct !== null ? `${row.achievement_pct.toFixed(1)}%` : "—"}
                 </span>
               </div>
@@ -45,7 +51,8 @@ export default function MonthlyAchievementTable({ data }: Props) {
                 <span>실제 {row.actual_krw !== null ? fmtKrw(row.actual_krw) : "—"}</span>
                 {diff !== null && (
                   <span className={diff >= 0 ? "text-red-500" : "text-blue-500"}>
-                    {diff >= 0 ? "+" : ""}{fmtKrw(diff)}
+                    {diff >= 0 ? "+" : ""}
+                    {fmtKrw(diff)}
                   </span>
                 )}
               </div>
@@ -68,10 +75,12 @@ export default function MonthlyAchievementTable({ data }: Props) {
           </thead>
           <tbody>
             {[...past].reverse().map((row) => {
-              const diff =
-                row.actual_krw !== null ? row.actual_krw - row.projected_krw : null;
+              const diff = row.actual_krw !== null ? row.actual_krw - row.projected_krw : null;
               return (
-                <tr key={row.month} className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800">
+                <tr
+                  key={row.month}
+                  className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
                   <td className="py-2 pr-3 text-gray-700 dark:text-gray-300">{row.month}</td>
                   <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-400">
                     {fmtKrw(row.projected_krw)}
@@ -81,7 +90,9 @@ export default function MonthlyAchievementTable({ data }: Props) {
                   </td>
                   <td
                     className={`py-2 px-3 text-right font-semibold ${
-                      row.achievement_pct !== null ? pctColor(row.achievement_pct) : "text-gray-400 dark:text-gray-500"
+                      row.achievement_pct !== null
+                        ? pctColor(row.achievement_pct)
+                        : "text-gray-400 dark:text-gray-500"
                     }`}
                   >
                     {row.achievement_pct !== null ? `${row.achievement_pct.toFixed(1)}%` : "—"}
@@ -91,8 +102,8 @@ export default function MonthlyAchievementTable({ data }: Props) {
                       diff === null
                         ? "text-gray-400 dark:text-gray-500"
                         : diff >= 0
-                        ? "text-red-500"
-                        : "text-blue-500"
+                          ? "text-red-500"
+                          : "text-blue-500"
                     }`}
                   >
                     {diff !== null ? `${diff >= 0 ? "+" : ""}${fmtKrw(diff)}` : "—"}

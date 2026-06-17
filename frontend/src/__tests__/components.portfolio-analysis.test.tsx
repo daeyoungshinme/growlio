@@ -20,7 +20,7 @@ describe("PortfolioDiagnosisCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioDiagnosisCard />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("포트폴리오 진단 결과")).toBeDefined();
     expect(screen.getByText(/이상 없음/)).toBeDefined();
@@ -30,7 +30,7 @@ describe("PortfolioDiagnosisCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioDiagnosisCard portfolioName="내 포트폴리오" />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/'내 포트폴리오' 기준/)).toBeDefined();
   });
@@ -39,7 +39,7 @@ describe("PortfolioDiagnosisCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioDiagnosisCard />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const btn = screen.getByRole("button");
     fireEvent.click(btn);
@@ -51,7 +51,7 @@ describe("PortfolioDiagnosisCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioDiagnosisCard portfolioName="테스트" />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText(/테스트/)).toBeDefined();
   });
@@ -60,9 +60,7 @@ describe("PortfolioDiagnosisCard", () => {
 // ------- PortfolioWeightChart -------
 describe("PortfolioWeightChart", () => {
   it("renders null when no valid items", () => {
-    const { container } = renderWithProviders(
-      <PortfolioWeightChart items={[]} />
-    );
+    const { container } = renderWithProviders(<PortfolioWeightChart items={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
@@ -71,19 +69,13 @@ describe("PortfolioWeightChart", () => {
       { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 40 },
       { ticker: "005930", name: "삼성전자", market: "KOSPI", weight: 30 },
     ];
-    renderWithProviders(
-      <PortfolioWeightChart items={items} />
-    );
+    renderWithProviders(<PortfolioWeightChart items={items} />);
     expect(document.body).toBeDefined();
   });
 
   it("shows concentration warning when weight > 50", () => {
-    const items = [
-      { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 60 },
-    ];
-    renderWithProviders(
-      <PortfolioWeightChart items={items} />
-    );
+    const items = [{ ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 60 }];
+    renderWithProviders(<PortfolioWeightChart items={items} />);
     expect(screen.getByText(/집중 투자 위험/)).toBeDefined();
   });
 });
@@ -147,7 +139,7 @@ describe("PortfolioAccountSelector", () => {
         isAllSelected={true}
         onToggleAccount={vi.fn()}
         onSelectAll={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("한국투자 주식계좌")).toBeDefined();
     expect(screen.getByText("키움 모의계좌")).toBeDefined();
@@ -161,7 +153,7 @@ describe("PortfolioAccountSelector", () => {
         isAllSelected={true}
         onToggleAccount={vi.fn()}
         onSelectAll={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("(모의)")).toBeDefined();
   });
@@ -174,7 +166,7 @@ describe("PortfolioAccountSelector", () => {
         isAllSelected={false}
         onToggleAccount={vi.fn()}
         onSelectAll={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("전체 선택")).toBeDefined();
   });
@@ -188,7 +180,7 @@ describe("PortfolioAccountSelector", () => {
         isAllSelected={true}
         onToggleAccount={onToggle}
         onSelectAll={vi.fn()}
-      />
+      />,
     );
     const checkboxes = screen.getAllByRole("checkbox");
     fireEvent.click(checkboxes[0]);
@@ -203,7 +195,7 @@ describe("PortfolioAccountSelector", () => {
         isAllSelected={false}
         onToggleAccount={vi.fn()}
         onSelectAll={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/1개 계좌만 분석에 포함됩니다/)).toBeDefined();
   });
@@ -250,7 +242,7 @@ describe("PortfolioComparisonPanel", () => {
         proposedAnalysis={mockAnalysis}
         onReplace={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -263,7 +255,7 @@ describe("PortfolioComparisonPanel", () => {
         proposedAnalysis={mockAnalysis}
         onReplace={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     // Find buttons
     const buttons = screen.getAllByRole("button");

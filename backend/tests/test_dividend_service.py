@@ -87,6 +87,7 @@ class TestGetDividendSummary:
 
 # ── 배당월 예측 로직 테스트 ─────────────────────────────────
 
+
 class TestDividendMonthPrediction:
     """알려진 배당 일정 vs. 실제 내역 우선순위 검증."""
 

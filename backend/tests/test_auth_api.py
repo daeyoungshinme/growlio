@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 
 # ── 공통 헬퍼 ────────────────────────────────────────────────
 
+
 def _make_mock_db(existing_user=None):
     from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +42,7 @@ def _valid_jwt_payload(user_id: str, email: str = "test@example.com") -> dict:
 
 
 # ── GET /auth/me ──────────────────────────────────────────────
+
 
 class TestMe:
     """GET /api/v1/auth/me"""
@@ -76,6 +78,7 @@ class TestMe:
 
 
 # ── POST /auth/sync-profile ───────────────────────────────────
+
 
 class TestSyncProfile:
     """POST /api/v1/auth/sync-profile"""
@@ -162,6 +165,7 @@ class TestSyncProfile:
 
 # ── POST /auth/find-account ───────────────────────────────────
 
+
 class TestFindAccount:
     """POST /api/v1/auth/find-account"""
 
@@ -174,8 +178,12 @@ class TestFindAccount:
         from app.schemas.auth import FindAccountRequest
 
         scope = {
-            "type": "http", "method": "POST", "path": "/api/v1/auth/find-account",
-            "query_string": b"", "headers": [], "client": ("127.0.0.1", 12345),
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/auth/find-account",
+            "query_string": b"",
+            "headers": [],
+            "client": ("127.0.0.1", 12345),
         }
         mock_req = Request(scope=scope)
         body = FindAccountRequest(display_name="홍길동")

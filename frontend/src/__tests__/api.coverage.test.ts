@@ -12,11 +12,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -67,14 +72,18 @@ describe("api/economicIndicators", () => {
     const mockHistory = [{ date: "2024-01", value: 3.2 }];
     vi.mocked(api.get).mockResolvedValue({ data: mockHistory });
     const result = await fetchIndicatorHistory("CPI", 12);
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/CPI/history", { params: { months: 12 } });
+    expect(api.get).toHaveBeenCalledWith("/economic-indicators/CPI/history", {
+      params: { months: 12 },
+    });
     expect(result).toEqual(mockHistory);
   });
 
   it("fetchIndicatorHistory uses default months=24", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchIndicatorHistory("FEDFUNDS");
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/FEDFUNDS/history", { params: { months: 24 } });
+    expect(api.get).toHaveBeenCalledWith("/economic-indicators/FEDFUNDS/history", {
+      params: { months: 24 },
+    });
   });
 
   it("fetchIndicatorSubscriptions calls GET /economic-indicators/subscriptions", async () => {
@@ -127,7 +136,13 @@ describe("api/marketSignals", () => {
       signals: {
         vix: { value: 35, level: "HIGH" as const, date: "2024-01-01", sub_score: 10 },
         yield_curve: null,
-        fear_greed: { value: 15, classification: "EXTREME_FEAR" as const, label: "극도의 공포", label_en: "Extreme Fear", sub_score: 5 },
+        fear_greed: {
+          value: 15,
+          classification: "EXTREME_FEAR" as const,
+          label: "극도의 공포",
+          label_en: "Extreme Fear",
+          sub_score: 5,
+        },
       },
       computed_at: "2024-01-01T00:00:00Z",
       data_freshness: "CACHED" as const,
@@ -266,7 +281,10 @@ describe("api/backtest", () => {
 
   it("createBacktestPortfolio calls POST /backtest/portfolios", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: mockPortfolio });
-    const body = { name: "Test Portfolio", holdings: [{ ticker: "005930", market: "KRX", weight: 100 }] };
+    const body = {
+      name: "Test Portfolio",
+      holdings: [{ ticker: "005930", market: "KRX", weight: 100 }],
+    };
     const result = await createBacktestPortfolio(body);
     expect(api.post).toHaveBeenCalledWith("/backtest/portfolios", body);
     expect(result).toEqual(mockPortfolio);
@@ -302,7 +320,13 @@ describe("api/backtest", () => {
   });
 
   it("runCorrelation calls POST /backtest/correlation", async () => {
-    const mockCorrelation = { labels: ["Portfolio A", "SPY"], matrix: [[1, 0.8], [0.8, 1]] };
+    const mockCorrelation = {
+      labels: ["Portfolio A", "SPY"],
+      matrix: [
+        [1, 0.8],
+        [0.8, 1],
+      ],
+    };
     vi.mocked(api.post).mockResolvedValue({ data: mockCorrelation });
     const req = {
       portfolio_ids: ["bt1"],

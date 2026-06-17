@@ -7,10 +7,7 @@ import {
   POSITION_MARKETS,
   isOverseasMarket,
 } from "@/constants/markets";
-import {
-  BACKTEST_DEFAULT_END_DATE,
-  BACKTEST_DEFAULT_START_DATE,
-} from "@/constants/defaults";
+import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
 import { STALE_TIME, REFETCH_INTERVAL, PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { ASSET_MANAGEMENT_TABS, PORTFOLIO_TABS } from "@/constants/tabs";
 

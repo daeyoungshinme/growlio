@@ -18,7 +18,15 @@ import { useRebalancingPrices } from "../useRebalancingPrices";
 import type { CashAnalysis, OrderType, Phase, PriceLoadState } from "./types";
 import { executionReducer } from "./reducer";
 
-export type { Phase, BalanceLoadState, OrderType, PriceLoadState, CashAnalysis, ExecutionState, ExecutionAction } from "./types";
+export type {
+  Phase,
+  BalanceLoadState,
+  OrderType,
+  PriceLoadState,
+  CashAnalysis,
+  ExecutionState,
+  ExecutionAction,
+} from "./types";
 export { executionReducer } from "./reducer";
 export { isOverseasMarket, OVERSEAS_MARKET_SET };
 
@@ -28,19 +36,21 @@ export function getActionableItems(analysis: RebalancingAnalysis): RebalancingIt
       i.ticker !== CASH_TICKER &&
       i.market !== KR_PROPERTY_MARKET &&
       i.shares_to_trade !== null &&
-      Math.abs(i.shares_to_trade) >= 1
+      Math.abs(i.shares_to_trade) >= 1,
   );
 }
 
 function computeInitialBuyAndSelected(
   analysis: RebalancingAnalysis,
-  kisAccounts: AssetAccount[]
+  kisAccounts: AssetAccount[],
 ): { buyAccounts: Record<string, string[]>; selected: Set<string> } {
   const actionableItems = getActionableItems(analysis);
   const defaultAccId = kisAccounts[0]?.id ?? "";
 
   function getPrimaryAccountId(ticker: string): string {
-    const infos = (analysis.ticker_account_map[ticker] ?? []).filter((a) => a.asset_type === "STOCK_KIS");
+    const infos = (analysis.ticker_account_map[ticker] ?? []).filter(
+      (a) => a.asset_type === "STOCK_KIS",
+    );
     if (infos.length === 0) return defaultAccId;
     return infos.reduce((best, a) => (a.quantity > best.quantity ? a : best), infos[0]).account_id;
   }
@@ -77,9 +87,16 @@ interface UseRebalancingExecutionParams {
   onExecuted?: (results: ExecutionResult[]) => void;
 }
 
-export function useRebalancingExecution({ portfolioId, analysis, accounts, onExecuted }: UseRebalancingExecutionParams) {
+export function useRebalancingExecution({
+  portfolioId,
+  analysis,
+  accounts,
+  onExecuted,
+}: UseRebalancingExecutionParams) {
   const queryClient = useQueryClient();
-  const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM");
+  const kisAccounts = accounts.filter(
+    (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
+  );
 
   const [state, dispatch] = useReducer(
     executionReducer,
@@ -106,10 +123,20 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
         errorMsg: null,
         confirmed: false,
       };
-    }
+    },
   );
 
-  const { liveBalances, qtyOverrides, buyAccounts, selected, orderType, limitPriceOverrides, livePricesKrw, livePricesUsd, globalUsdRate } = state;
+  const {
+    liveBalances,
+    qtyOverrides,
+    buyAccounts,
+    selected,
+    orderType,
+    limitPriceOverrides,
+    livePricesKrw,
+    livePricesUsd,
+    globalUsdRate,
+  } = state;
 
   const actionableItems = getActionableItems(analysis);
   const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(dispatch, kisAccounts);
@@ -118,7 +145,10 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
   function getAccountQuantity(ticker: string, accountId: string): number {
     const livePos = liveBalances[accountId]?.find((p) => p.ticker === ticker);
     if (livePos !== undefined) return livePos.quantity;
-    return (analysis.ticker_account_map[ticker] ?? []).find((a) => a.account_id === accountId)?.quantity ?? 0;
+    return (
+      (analysis.ticker_account_map[ticker] ?? []).find((a) => a.account_id === accountId)
+        ?.quantity ?? 0
+    );
   }
 
   function accountHoldsTicker(ticker: string, accountId: string): boolean {
@@ -126,7 +156,10 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       return liveBalances[accountId].some((p) => p.ticker === ticker && p.quantity > 0);
     }
     return (analysis.ticker_account_map[ticker] ?? []).some(
-      (a) => a.account_id === accountId && (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.quantity > 0
+      (a) =>
+        a.account_id === accountId &&
+        (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") &&
+        a.quantity > 0,
     );
   }
 
@@ -139,32 +172,43 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     if (orderType === "LIMIT") {
       const native = getLimitPriceNative(key, ticker, market);
       if (native <= 0) return null;
-      if (isOverseasMarket(market)) return globalUsdRate != null ? native * globalUsdRate * qty : null;
+      if (isOverseasMarket(market))
+        return globalUsdRate != null ? native * globalUsdRate * qty : null;
       return native * qty;
     }
     const priceKrw = livePricesKrw[ticker] ?? null;
     return priceKrw != null ? priceKrw * qty : null;
   }
 
-  function getSellRows(accountId: string): { item: RebalancingItem; currentQty: number; suggestedQty: number }[] {
+  function getSellRows(
+    accountId: string,
+  ): { item: RebalancingItem; currentQty: number; suggestedQty: number }[] {
     const rows: { item: RebalancingItem; currentQty: number; suggestedQty: number }[] = [];
     for (const item of actionableItems) {
       if ((item.shares_to_trade ?? 0) >= 0) continue;
       if (!accountHoldsTicker(item.ticker, accountId)) continue;
       const currentQty = getAccountQuantity(item.ticker, accountId);
       if (currentQty <= 0) continue;
-      const allKisQty = kisAccounts.reduce((sum, acc) => sum + getAccountQuantity(item.ticker, acc.id), 0);
-      const suggested = allKisQty > 0
-        ? Math.round(Math.abs(item.shares_to_trade!) * currentQty / allKisQty)
-        : Math.abs(Math.round(item.shares_to_trade!));
+      const allKisQty = kisAccounts.reduce(
+        (sum, acc) => sum + getAccountQuantity(item.ticker, acc.id),
+        0,
+      );
+      const suggested =
+        allKisQty > 0
+          ? Math.round((Math.abs(item.shares_to_trade!) * currentQty) / allKisQty)
+          : Math.abs(Math.round(item.shares_to_trade!));
       if (suggested > 0) rows.push({ item, currentQty, suggestedQty: suggested });
     }
     return rows;
   }
 
-  function getBuyRows(accountId: string): { item: RebalancingItem; suggestedQty: number; currentQty: number }[] {
+  function getBuyRows(
+    accountId: string,
+  ): { item: RebalancingItem; suggestedQty: number; currentQty: number }[] {
     return actionableItems
-      .filter((i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId))
+      .filter(
+        (i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId),
+      )
       .map((i) => ({
         item: i,
         suggestedQty: Math.abs(Math.round(i.shares_to_trade!)),
@@ -176,14 +220,14 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
     const map: Record<string, ReturnType<typeof getSellRows>> = {};
     for (const acc of kisAccounts) map[acc.id] = getSellRows(acc.id);
     return map;
-  // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
+    // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
   }, [actionableItems, liveBalances, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
     for (const acc of kisAccounts) map[acc.id] = getBuyRows(acc.id);
     return map;
-  // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
+    // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
   }, [actionableItems, liveBalances, buyAccounts, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
@@ -206,9 +250,17 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
           orders.push({
-            ticker: item.ticker, name: item.name, market: item.market, side: "SELL", quantity: qty, account_id: acc.id,
+            ticker: item.ticker,
+            name: item.name,
+            market: item.market,
+            side: "SELL",
+            quantity: qty,
+            account_id: acc.id,
             order_type: orderType,
-            limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, item.ticker, item.market) || null : null,
+            limit_price:
+              orderType === "LIMIT"
+                ? getLimitPriceNative(key, item.ticker, item.market) || null
+                : null,
           });
       });
       (buyRowsByAccount[acc.id] ?? []).forEach(({ item, suggestedQty }) => {
@@ -217,9 +269,17 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
         const qty = qtyOverrides[key] ?? suggestedQty;
         if (qty > 0)
           orders.push({
-            ticker: item.ticker, name: item.name, market: item.market, side: "BUY", quantity: qty, account_id: acc.id,
+            ticker: item.ticker,
+            name: item.name,
+            market: item.market,
+            side: "BUY",
+            quantity: qty,
+            account_id: acc.id,
             order_type: orderType,
-            limit_price: orderType === "LIMIT" ? getLimitPriceNative(key, item.ticker, item.market) || null : null,
+            limit_price:
+              orderType === "LIMIT"
+                ? getLimitPriceNative(key, item.ticker, item.market) || null
+                : null,
           });
       });
     });
@@ -232,31 +292,42 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       ? (state.orderableKrw[accountId] ?? null)
       : (state.depositKrw[accountId] ?? null);
     let sellProceeds: number | null = 0;
-    for (const { item, suggestedQty } of (sellRowsByAccount[accountId] ?? [])) {
+    for (const { item, suggestedQty } of sellRowsByAccount[accountId] ?? []) {
       const key = `sell_${item.ticker}_${accountId}`;
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
       const est = getEstimateKrw(key, item.ticker, item.market, qty);
-      if (est === null) { sellProceeds = null; break; }
+      if (est === null) {
+        sellProceeds = null;
+        break;
+      }
       sellProceeds = (sellProceeds ?? 0) + est;
     }
     let buyCost: number | null = 0;
-    for (const { item, suggestedQty } of (buyRowsByAccount[accountId] ?? [])) {
+    for (const { item, suggestedQty } of buyRowsByAccount[accountId] ?? []) {
       const key = `buy_${item.ticker}_${accountId}`;
       if (!selected.has(key)) continue;
       const qty = qtyOverrides[key] ?? suggestedQty;
       const est = getEstimateKrw(key, item.ticker, item.market, qty);
-      if (est === null) { buyCost = null; break; }
+      if (est === null) {
+        buyCost = null;
+        break;
+      }
       buyCost = (buyCost ?? 0) + est;
     }
-    const totalAvailable = deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
+    const totalAvailable =
+      deposit !== null && sellProceeds !== null ? deposit + sellProceeds : null;
     const surplus = totalAvailable !== null && buyCost !== null ? totalAvailable - buyCost : null;
     return { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus };
   }
 
   function getAccountSummary(accountId: string) {
-    const sells = (sellRowsByAccount[accountId] ?? []).filter((r) => selected.has(`sell_${r.item.ticker}_${accountId}`)).length;
-    const buys = (buyRowsByAccount[accountId] ?? []).filter((r) => selected.has(`buy_${r.item.ticker}_${accountId}`)).length;
+    const sells = (sellRowsByAccount[accountId] ?? []).filter((r) =>
+      selected.has(`sell_${r.item.ticker}_${accountId}`),
+    ).length;
+    const buys = (buyRowsByAccount[accountId] ?? []).filter((r) =>
+      selected.has(`buy_${r.item.ticker}_${accountId}`),
+    ).length;
     return { sells, buys };
   }
 
@@ -282,12 +353,19 @@ export function useRebalancingExecution({ portfolioId, analysis, accounts, onExe
       onExecuted?.(res);
     } catch (e: unknown) {
       void triggerHaptic("error");
-      dispatch({ type: "EXECUTE_ERROR", msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다.") });
+      dispatch({
+        type: "EXECUTE_ERROR",
+        msg: extractErrorMessage(e, "주문 실행 중 오류가 발생했습니다."),
+      });
     }
   }
 
-  function getSellRowsCached(accountId: string) { return sellRowsByAccount[accountId] ?? []; }
-  function getBuyRowsCached(accountId: string) { return buyRowsByAccount[accountId] ?? []; }
+  function getSellRowsCached(accountId: string) {
+    return sellRowsByAccount[accountId] ?? [];
+  }
+  function getBuyRowsCached(accountId: string) {
+    return buyRowsByAccount[accountId] ?? [];
+  }
 
   return {
     state,
@@ -315,6 +393,7 @@ export const RebalancingExecutionContext = createContext<RebalancingExecutionHoo
 
 export function useRebalancingExecutionContext(): RebalancingExecutionHook {
   const ctx = useContext(RebalancingExecutionContext);
-  if (!ctx) throw new Error("useRebalancingExecutionContext must be used inside RebalancingExecutionModal");
+  if (!ctx)
+    throw new Error("useRebalancingExecutionContext must be used inside RebalancingExecutionModal");
   return ctx;
 }

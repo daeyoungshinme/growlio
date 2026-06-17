@@ -37,8 +37,22 @@ describe("groupPositionsByTicker", () => {
 
   it("같은 ticker+market은 합산", () => {
     const positions = [
-      makePos({ account_id: "acc-1", qty: 10, value_krw: 750000, invested_krw: 700000, pnl: 50000, weight_in_stock: 10 }),
-      makePos({ account_id: "acc-2", qty: 5, value_krw: 375000, invested_krw: 350000, pnl: 25000, weight_in_stock: 5 }),
+      makePos({
+        account_id: "acc-1",
+        qty: 10,
+        value_krw: 750000,
+        invested_krw: 700000,
+        pnl: 50000,
+        weight_in_stock: 10,
+      }),
+      makePos({
+        account_id: "acc-2",
+        qty: 5,
+        value_krw: 375000,
+        invested_krw: 350000,
+        pnl: 25000,
+        weight_in_stock: 5,
+      }),
     ];
     const result = groupPositionsByTicker(positions);
     expect(result).toHaveLength(1);

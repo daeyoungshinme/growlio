@@ -10,11 +10,16 @@ vi.mock("@/api/client", () => {
   const mockApi = { get: vi.fn(), post: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -64,19 +69,36 @@ vi.mock("recharts", () => ({
   BarChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   PieChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  Line: () => <div />, Bar: () => <div />, Area: () => <div />, Pie: () => <div />,
-  XAxis: () => <div />, YAxis: () => <div />, CartesianGrid: () => <div />,
-  Tooltip: () => <div />, Legend: () => <div />, Cell: () => <div />,
+  Line: () => <div />,
+  Bar: () => <div />,
+  Area: () => <div />,
+  Pie: () => <div />,
+  XAxis: () => <div />,
+  YAxis: () => <div />,
+  CartesianGrid: () => <div />,
+  Tooltip: () => <div />,
+  Legend: () => <div />,
+  Cell: () => <div />,
   Treemap: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ReferenceLine: () => <div />,
 }));
 
 // Lazy-loaded component stubs
-vi.mock("../components/portfolio/TreemapChart", () => ({ default: () => <div data-testid="treemap" /> }));
-vi.mock("../components/portfolio/DomesticForeignBar", () => ({ default: () => <div data-testid="domestic-bar" /> }));
-vi.mock("../components/portfolio-analysis/PortfolioAnalysisTab", () => ({ default: () => <div data-testid="portfolio-analysis" /> }));
-vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({ default: () => <div data-testid="tax-opt" /> }));
-vi.mock("../components/invest/DCAProjectionChart", () => ({ default: () => <div data-testid="dca-chart" /> }));
+vi.mock("../components/portfolio/TreemapChart", () => ({
+  default: () => <div data-testid="treemap" />,
+}));
+vi.mock("../components/portfolio/DomesticForeignBar", () => ({
+  default: () => <div data-testid="domestic-bar" />,
+}));
+vi.mock("../components/portfolio-analysis/PortfolioAnalysisTab", () => ({
+  default: () => <div data-testid="portfolio-analysis" />,
+}));
+vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
+  default: () => <div data-testid="tax-opt" />,
+}));
+vi.mock("../components/invest/DCAProjectionChart", () => ({
+  default: () => <div data-testid="dca-chart" />,
+}));
 
 vi.mock("@/hooks/useGoalSettings", () => ({
   useGoalSettings: vi.fn(() => ({
@@ -129,15 +151,24 @@ vi.mock("@/hooks/useAssetManagementData", () => ({
 
 vi.mock("@/hooks/useAssetModals", () => ({
   useAssetModals: vi.fn(() => ({
-    showBankModal: false, setShowBankModal: vi.fn(),
-    showStockModal: false, setShowStockModal: vi.fn(),
-    showRealEstateModal: false, setShowRealEstateModal: vi.fn(),
-    editingRealEstate: null, setEditingRealEstate: vi.fn(),
-    editingBankAccount: null, setEditingBankAccount: vi.fn(),
-    editingStockAccount: null, setEditingStockAccount: vi.fn(),
-    confirmDeleteId: null, setConfirmDeleteId: vi.fn(),
-    positionsAccount: null, setPositionsAccount: vi.fn(),
-    txAccount: null, setTxAccount: vi.fn(),
+    showBankModal: false,
+    setShowBankModal: vi.fn(),
+    showStockModal: false,
+    setShowStockModal: vi.fn(),
+    showRealEstateModal: false,
+    setShowRealEstateModal: vi.fn(),
+    editingRealEstate: null,
+    setEditingRealEstate: vi.fn(),
+    editingBankAccount: null,
+    setEditingBankAccount: vi.fn(),
+    editingStockAccount: null,
+    setEditingStockAccount: vi.fn(),
+    confirmDeleteId: null,
+    setConfirmDeleteId: vi.fn(),
+    positionsAccount: null,
+    setPositionsAccount: vi.fn(),
+    txAccount: null,
+    setTxAccount: vi.fn(),
   })),
 }));
 
@@ -152,7 +183,8 @@ vi.mock("@/hooks/useAccountMutations", () => ({
     updateRealEstateMutation: { mutate: vi.fn(), isPending: false },
     handleSyncBank: vi.fn(),
     handleSyncKisAccount: vi.fn(),
-    deletingId: null, setDeletingId: vi.fn(),
+    deletingId: null,
+    setDeletingId: vi.fn(),
     syncingBankId: null,
     syncingStockIds: new Set(),
   })),
@@ -185,7 +217,9 @@ vi.mock("@/api/alerts", () => ({
 }));
 
 vi.mock("@/api/settings", () => ({
-  fetchSettings: vi.fn().mockResolvedValue({ annual_deposit_goal: null, retirement_target_year: null }),
+  fetchSettings: vi
+    .fn()
+    .mockResolvedValue({ annual_deposit_goal: null, retirement_target_year: null }),
 }));
 
 vi.mock("@/api/invest", () => ({
@@ -352,7 +386,9 @@ describe("SettingsPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     const { api } = await import("@/api/client");
-    vi.mocked(api.get).mockResolvedValue({ data: { has_dart: false, has_open_banking: false, user_email: "test@example.com" } });
+    vi.mocked(api.get).mockResolvedValue({
+      data: { has_dart: false, has_open_banking: false, user_email: "test@example.com" },
+    });
   });
 
   it("크래시 없이 렌더링된다", () => {
@@ -406,7 +442,15 @@ describe("PortfolioPage", () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioOverview });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      if (url === "/dividends/summary") return Promise.resolve({ data: { annual_received: 0, estimated_annual: 0, monthly_breakdown: [], monthly_ticker_breakdown: [] } });
+      if (url === "/dividends/summary")
+        return Promise.resolve({
+          data: {
+            annual_received: 0,
+            estimated_annual: 0,
+            monthly_breakdown: [],
+            monthly_ticker_breakdown: [],
+          },
+        });
       if (url === "/dividends/by-ticker") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });

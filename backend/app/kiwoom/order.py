@@ -2,6 +2,7 @@
 
 경로 및 파라미터: openapi.kiwoom.com/guide/apiguide (kt10000/kt10001) 기준.
 """
+
 from typing import Any
 
 from app.kiwoom.client import kiwoom_request
@@ -39,17 +40,17 @@ async def place_domestic_order(
     headers = _auth_headers(access_token, api_id)
 
     if order_type == "LIMIT" and limit_price is not None:
-        trde_tp = "0"                   # 보통(지정가)
+        trde_tp = "0"  # 보통(지정가)
         ord_uv = str(int(limit_price))
     else:
-        trde_tp = "3"   # 시장가
+        trde_tp = "3"  # 시장가
         ord_uv = "0"
 
     body: dict[str, Any] = {
         "acnt_no": account_no,
-        "dmst_stex_tp": "KRX",      # 거래소: KRX / NXT / SOR
-        "stk_cd": ticker,            # 종목코드
-        "ord_qty": str(quantity),    # 주문수량
+        "dmst_stex_tp": "KRX",  # 거래소: KRX / NXT / SOR
+        "stk_cd": ticker,  # 종목코드
+        "ord_qty": str(quantity),  # 주문수량
         "ord_uv": ord_uv,
         "trde_tp": trde_tp,
     }

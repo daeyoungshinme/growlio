@@ -15,7 +15,7 @@ describe("Tooltip", () => {
     renderWithProviders(
       <Tooltip content="도움말 텍스트">
         <button>버튼</button>
-      </Tooltip>
+      </Tooltip>,
     );
     expect(screen.getByText("버튼")).toBeInTheDocument();
     expect(screen.getByRole("tooltip")).toBeInTheDocument();
@@ -26,7 +26,7 @@ describe("Tooltip", () => {
     renderWithProviders(
       <Tooltip content="툴팁">
         <span>요소</span>
-      </Tooltip>
+      </Tooltip>,
     );
     const tooltip = screen.getByRole("tooltip");
     expect(tooltip.className).toContain("bottom-full");
@@ -36,7 +36,7 @@ describe("Tooltip", () => {
     renderWithProviders(
       <Tooltip content="툴팁" position="bottom">
         <span>요소</span>
-      </Tooltip>
+      </Tooltip>,
     );
     expect(screen.getByRole("tooltip").className).toContain("top-full");
   });

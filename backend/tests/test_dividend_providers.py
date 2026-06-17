@@ -1,4 +1,5 @@
 """dividend_providers.py 단위 테스트 — 동기 배당 데이터 수집 함수."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -6,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 # ── sync_yahoo_dividend_info ──────────────────────────────────
+
 
 class TestSyncYahooDividendInfo:
     def test_success_returns_yield_and_dps(self, override_settings):
@@ -21,6 +23,7 @@ class TestSyncYahooDividendInfo:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_yahoo_dividend_info
+
             result = sync_yahoo_dividend_info("005930.KS")
 
         assert result["dividend_yield"] == pytest.approx(0.025)
@@ -40,6 +43,7 @@ class TestSyncYahooDividendInfo:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_yahoo_dividend_info
+
             result = sync_yahoo_dividend_info("005930.KS")
 
         assert result["dividend_yield"] == pytest.approx(0.027)
@@ -58,6 +62,7 @@ class TestSyncYahooDividendInfo:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_yahoo_dividend_info
+
             result = sync_yahoo_dividend_info("005930.KS")
 
         assert result["dps"] == pytest.approx(400.0)
@@ -65,6 +70,7 @@ class TestSyncYahooDividendInfo:
     def test_exception_returns_zeros(self, override_settings):
         with patch("yfinance.Ticker", side_effect=Exception("network error")):
             from app.services.dividend_providers import sync_yahoo_dividend_info
+
             result = sync_yahoo_dividend_info("INVALID")
 
         assert result["dividend_yield"] == 0.0
@@ -84,6 +90,7 @@ class TestSyncYahooDividendInfo:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_yahoo_dividend_info
+
             result = sync_yahoo_dividend_info("AAPL")
 
         assert result["dividend_yield"] == pytest.approx(0.03)
@@ -91,10 +98,12 @@ class TestSyncYahooDividendInfo:
 
 # ── sync_pykrx_etf_dividend_info ─────────────────────────────
 
+
 class TestSyncPykrxEtfDividendInfo:
     def test_api_error_returns_zeros(self, override_settings):
         """pykrx API 오류 시 0 반환 (AttributeError → except Exception)."""
         from app.services.dividend_providers import sync_pykrx_etf_dividend_info
+
         # pykrx.stock.get_market_dividend_by_date doesn't exist → AttributeError → 0 returned
         result = sync_pykrx_etf_dividend_info("INVALID_TICKER_XYZ")
         assert result["dps"] == 0.0
@@ -103,11 +112,13 @@ class TestSyncPykrxEtfDividendInfo:
 
 # ── sync_fdr_etf_dividend_info ────────────────────────────────
 
+
 class TestSyncFdrEtfDividendInfo:
     def test_exception_returns_zeros(self, override_settings):
         """FinanceDataReader import 실패 시 0 반환."""
         with patch.dict("sys.modules", {"FinanceDataReader": None}):
             from app.services.dividend_providers import sync_fdr_etf_dividend_info
+
             result = sync_fdr_etf_dividend_info("069500")
 
         assert result["dps"] == 0.0
@@ -124,6 +135,7 @@ class TestSyncFdrEtfDividendInfo:
             from importlib import reload
 
             import app.services.dividend_providers as dp_mod
+
             reload(dp_mod)
             result = dp_mod.sync_fdr_etf_dividend_info("069500")
 
@@ -131,6 +143,7 @@ class TestSyncFdrEtfDividendInfo:
 
 
 # ── sync_naver_etf_dividend_info ─────────────────────────────
+
 
 class TestSyncNaverEtfDividendInfo:
     def test_success_returns_data(self, override_settings):
@@ -147,6 +160,7 @@ class TestSyncNaverEtfDividendInfo:
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_etf_dividend_info
+
             result = sync_naver_etf_dividend_info("069500")
 
         assert result["dividend_yield"] == pytest.approx(0.035)
@@ -162,6 +176,7 @@ class TestSyncNaverEtfDividendInfo:
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_etf_dividend_info
+
             result = sync_naver_etf_dividend_info("069500")
 
         assert result["dps"] == 0.0
@@ -174,6 +189,7 @@ class TestSyncNaverEtfDividendInfo:
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_etf_dividend_info
+
             result = sync_naver_etf_dividend_info("069500")
 
         assert result["dps"] == 0.0
@@ -181,17 +197,17 @@ class TestSyncNaverEtfDividendInfo:
 
 # ── sync_naver_stock_dividend_info ────────────────────────────
 
+
 class TestSyncNaverStockDividendInfo:
     def test_success_returns_yield(self, override_settings):
         """성공적인 Naver 주식 배당수익률 반환."""
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {
-            "stockItemDetail": {"dividendYield": "2.8"}
-        }
+        mock_resp.json.return_value = {"stockItemDetail": {"dividendYield": "2.8"}}
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_stock_dividend_info
+
             result = sync_naver_stock_dividend_info("005930")
 
         assert result["dividend_yield"] == pytest.approx(0.028)
@@ -201,12 +217,11 @@ class TestSyncNaverStockDividendInfo:
         """배당수익률 0이면 빈 결과 반환."""
         mock_resp = MagicMock()
         mock_resp.raise_for_status.return_value = None
-        mock_resp.json.return_value = {
-            "stockItemDetail": {"dividendYield": "0"}
-        }
+        mock_resp.json.return_value = {"stockItemDetail": {"dividendYield": "0"}}
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_stock_dividend_info
+
             result = sync_naver_stock_dividend_info("005930")
 
         assert result["dividend_yield"] == 0.0
@@ -219,12 +234,14 @@ class TestSyncNaverStockDividendInfo:
 
         with patch("requests.get", return_value=mock_resp):
             from app.services.dividend_providers import sync_naver_stock_dividend_info
+
             result = sync_naver_stock_dividend_info("005930")
 
         assert result["dividend_yield"] == 0.0
 
 
 # ── sync_fetch_dividend_months ────────────────────────────────
+
 
 class TestSyncFetchDividendMonths:
     def test_returns_months_from_dividends(self, override_settings):
@@ -239,6 +256,7 @@ class TestSyncFetchDividendMonths:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_fetch_dividend_months
+
             result = sync_fetch_dividend_months("AAPL")
 
         assert isinstance(result, list)
@@ -254,6 +272,7 @@ class TestSyncFetchDividendMonths:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_fetch_dividend_months
+
             result = sync_fetch_dividend_months("AAPL")
 
         assert result == []
@@ -262,6 +281,7 @@ class TestSyncFetchDividendMonths:
         """예외 시 빈 리스트 반환."""
         with patch("yfinance.Ticker", side_effect=Exception("network")):
             from app.services.dividend_providers import sync_fetch_dividend_months
+
             result = sync_fetch_dividend_months("INVALID")
 
         assert result == []
@@ -283,6 +303,7 @@ class TestSyncFetchDividendMonths:
 
         with patch("yfinance.Ticker", return_value=mock_ticker):
             from app.services.dividend_providers import sync_fetch_dividend_months
+
             result = sync_fetch_dividend_months("AAPL")
 
         assert isinstance(result, list)

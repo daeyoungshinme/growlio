@@ -1,4 +1,5 @@
 """대시보드 API 테스트 (GET /api/v1/dashboard)."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -8,6 +9,7 @@ from fastapi.testclient import TestClient
 def _make_user():
     import uuid
     from types import SimpleNamespace
+
     return SimpleNamespace(
         id=uuid.uuid4(),
         email="test@example.com",
@@ -21,6 +23,7 @@ def _make_mock_db():
     from unittest.mock import AsyncMock, MagicMock
 
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -57,6 +60,7 @@ _MOCK_DASHBOARD = {
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -71,6 +75,7 @@ class TestDashboardApi:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/dashboard")
@@ -96,7 +101,8 @@ class TestDashboardApi:
             with (
                 patch(
                     "app.api.v1.dashboard.get_dashboard_summary",
-                    new_callable=AsyncMock, return_value=_MOCK_DASHBOARD,
+                    new_callable=AsyncMock,
+                    return_value=_MOCK_DASHBOARD,
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -135,7 +141,8 @@ class TestDashboardApi:
                 patch("app.api.v1.dashboard.get_redis", new_callable=AsyncMock, return_value=mock_redis),
                 patch(
                     "app.api.v1.dashboard.get_dashboard_summary",
-                    new_callable=AsyncMock, return_value=_MOCK_DASHBOARD,
+                    new_callable=AsyncMock,
+                    return_value=_MOCK_DASHBOARD,
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):

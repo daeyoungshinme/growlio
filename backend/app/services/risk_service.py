@@ -3,6 +3,7 @@
 VaR, 베타, 연율화 변동성, 분산도 점수를 계산한다.
 yfinance 1년 일별 수익률 데이터를 기반으로 하며 Redis 1시간 캐시를 사용한다.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -137,9 +138,7 @@ async def get_portfolio_risk_metrics(
     weights = [p["value_krw"] / total_value for p in positions]
 
     loop = asyncio.get_running_loop()
-    returns_map = await loop.run_in_executor(
-        None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL]
-    )
+    returns_map = await loop.run_in_executor(None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL])
 
     # 포트폴리오 가중 수익률 시계열 구성
     min_len = min(
@@ -243,9 +242,7 @@ async def get_currency_exposure(
     # 배치 조회로 N+1 방지
     snap_ids = [snap.id for snap, _ in rows]
     if snap_ids:
-        all_pos_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
+        all_pos_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
         for pos in all_pos_result.scalars().all():
             val = float(pos.value_krw or 0)
             currency = (pos.currency or "KRW").upper()
@@ -271,6 +268,7 @@ async def get_currency_exposure(
 
     if redis:
         import contextlib
+
         with contextlib.suppress(Exception):
             await redis.setex(cache_key, TTL_RISK_ANALYSIS, json.dumps(data))
 

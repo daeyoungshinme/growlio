@@ -16,7 +16,7 @@ let failedQueue: QueueEntry[] = [];
 let cachedToken: string | null = null;
 
 // 앱 시작 시 현재 세션 토큰 초기화
-supabase.auth.getSession().then(({ data: { session } }) => {
+void supabase.auth.getSession().then(({ data: { session } }) => {
   cachedToken = session?.access_token ?? null;
 });
 // 로그인·로그아웃·토큰 갱신 시 캐시 자동 갱신
@@ -93,7 +93,7 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 type ApiConfig = Parameters<typeof api.get>[1];

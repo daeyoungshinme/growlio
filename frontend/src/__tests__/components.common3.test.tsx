@@ -49,7 +49,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <div>Hello</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText("Hello")).toBeDefined();
   });
@@ -58,7 +58,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <BrokenComponent shouldThrow />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText(/페이지를 불러올 수 없습니다/)).toBeDefined();
     expect(screen.getByRole("button", { name: /새로고침/ })).toBeDefined();
@@ -68,7 +68,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary variant="section">
         <BrokenComponent shouldThrow />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByText(/이 섹션을 불러올 수 없습니다/)).toBeDefined();
   });
@@ -77,7 +77,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <BrokenComponent shouldThrow />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(Sentry.captureException).toHaveBeenCalled();
   });
@@ -86,7 +86,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary variant="section">
         <BrokenComponent shouldThrow />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     const retryBtn = screen.getByRole("button", { name: /다시 시도/ });
     fireEvent.click(retryBtn);
@@ -104,7 +104,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary variant="section">
         <ChunkError />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
     expect(screen.getByRole("button", { name: /새로고침/ })).toBeDefined();
   });
@@ -227,8 +227,17 @@ describe("TreemapCell", () => {
   it("renders with small dimensions (no text)", () => {
     const { container } = render(
       <svg>
-        <TreemapCell x={0} y={0} width={30} height={20} name="TEST" pct={12.5} ticker="TST" index={0} />
-      </svg>
+        <TreemapCell
+          x={0}
+          y={0}
+          width={30}
+          height={20}
+          name="TEST"
+          pct={12.5}
+          ticker="TST"
+          index={0}
+        />
+      </svg>,
     );
     expect(container.querySelector("rect")).toBeDefined();
   });
@@ -236,8 +245,17 @@ describe("TreemapCell", () => {
   it("renders text when dimensions are large enough", () => {
     render(
       <svg>
-        <TreemapCell x={0} y={0} width={100} height={80} name="삼성전자" pct={25.5} ticker="005930" index={1} />
-      </svg>
+        <TreemapCell
+          x={0}
+          y={0}
+          width={100}
+          height={80}
+          name="삼성전자"
+          pct={25.5}
+          ticker="005930"
+          index={1}
+        />
+      </svg>,
     );
     expect(screen.getByText(/25\.5/)).toBeDefined();
   });
@@ -245,8 +263,17 @@ describe("TreemapCell", () => {
   it("renders ticker when height > 55", () => {
     render(
       <svg>
-        <TreemapCell x={0} y={0} width={120} height={70} name="Apple" pct={10} ticker="AAPL" index={2} />
-      </svg>
+        <TreemapCell
+          x={0}
+          y={0}
+          width={120}
+          height={70}
+          name="Apple"
+          pct={10}
+          ticker="AAPL"
+          index={2}
+        />
+      </svg>,
     );
     expect(screen.getByText("AAPL")).toBeDefined();
   });
@@ -254,8 +281,17 @@ describe("TreemapCell", () => {
   it("truncates long name", () => {
     const { container } = render(
       <svg>
-        <TreemapCell x={0} y={0} width={100} height={60} name="이름이매우길어요" pct={5} ticker="TST" index={0} />
-      </svg>
+        <TreemapCell
+          x={0}
+          y={0}
+          width={100}
+          height={60}
+          name="이름이매우길어요"
+          pct={5}
+          ticker="TST"
+          index={0}
+        />
+      </svg>,
     );
     // truncated text node exists (sliced + ellipsis)
     const textNodes = container.querySelectorAll("text");
@@ -296,7 +332,7 @@ describe("Tooltip", () => {
     render(
       <Tooltip content="도움말">
         <button>hover me</button>
-      </Tooltip>
+      </Tooltip>,
     );
     expect(screen.getByText("hover me")).toBeDefined();
     expect(screen.getByRole("tooltip")).toBeDefined();
@@ -307,7 +343,7 @@ describe("Tooltip", () => {
     const { container } = render(
       <Tooltip content="아래" position="bottom">
         <span>target</span>
-      </Tooltip>
+      </Tooltip>,
     );
     expect(container.querySelector('[role="tooltip"]')).toBeDefined();
   });

@@ -11,6 +11,7 @@ Protocol (S→C):
   {"type": "price_update", "prices": {"005930": {"price": 75000, "market": "KOSPI", ...}}}
   {"type": "pong"} / {"type": "error", "detail": "..."}
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,9 +41,7 @@ async def ws_prices(websocket: WebSocket) -> None:
 
     # 인증 메시지 대기 (타임아웃 내 미수신 시 종료)
     try:
-        raw_auth = await asyncio.wait_for(
-            websocket.receive_text(), timeout=_AUTH_TIMEOUT_SECONDS
-        )
+        raw_auth = await asyncio.wait_for(websocket.receive_text(), timeout=_AUTH_TIMEOUT_SECONDS)
         auth_msg = json.loads(raw_auth)
         if auth_msg.get("type") != "auth":
             raise ValueError("auth 메시지가 아님")

@@ -1,4 +1,5 @@
 """providers/manual_provider.py 단위 테스트."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -11,6 +12,7 @@ from app.providers.manual_provider import ManualProvider, _db_to_provider_positi
 
 def _make_db_position(**kwargs):
     import uuid
+
     defaults = dict(
         id=uuid.uuid4(),
         account_id=uuid.uuid4(),
@@ -53,8 +55,11 @@ class TestDbToProviderPosition:
 
     def test_converts_usd_position(self):
         p = _make_db_position(
-            ticker="AAPL", market="NASDAQ",
-            avg_price=150000.0, avg_price_usd=100.0, usd_rate=1350.0,
+            ticker="AAPL",
+            market="NASDAQ",
+            avg_price=150000.0,
+            avg_price_usd=100.0,
+            usd_rate=1350.0,
         )
         pos = _db_to_provider_position(p)
         assert pos.avg_price_usd == pytest.approx(100.0)
@@ -98,6 +103,7 @@ class TestManualProviderSync:
             patch("app.providers.manual_provider.ManualProvider.sync") as mock_sync,
         ):
             from app.providers.base import BalanceResult
+
             mock_sync.return_value = BalanceResult(
                 positions=[],
                 total_value_krw=750000.0,
@@ -111,6 +117,7 @@ class TestManualProviderSync:
     @pytest.mark.asyncio
     async def test_sync_raises_when_no_amount_and_no_positions(self, override_settings, make_account):
         from app.exceptions import BadRequestError
+
         account = make_account(manual_amount=0.0, asset_type="STOCK_OTHER")
         db = _make_mock_db(positions=[])
         redis = AsyncMock()
@@ -142,16 +149,13 @@ class TestManualProviderSync:
     async def test_sync_fetches_prices_when_positions_and_redis(self, override_settings, make_account):
         """redis 비-None + 포지션 있을 때 가격 조회 경로 (lines 33-54)."""
         account = make_account(asset_type="STOCK_OTHER")
-        pos = _make_db_position(
-            ticker="005930", market="KOSPI", qty=10.0, avg_price=70000.0, current_price=70000.0
-        )
+        pos = _make_db_position(ticker="005930", market="KOSPI", qty=10.0, avg_price=70000.0, current_price=70000.0)
         db = _make_mock_db(positions=[pos])
         redis = AsyncMock()
 
         provider = ManualProvider()
         with (
-            patch("app.services.price_service.fetch_prices_batch",
-                  AsyncMock(return_value={"005930": 75000.0})),
+            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={"005930": 75000.0})),
             patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
         ):
             result = await provider.sync(account, db, redis)
@@ -163,16 +167,13 @@ class TestManualProviderSync:
     async def test_sync_overseas_position_applies_usd_rate(self, override_settings, make_account):
         """해외 종목 USD 환율 적용 경로 (lines 40-48 — has_overseas branch)."""
         account = make_account(asset_type="STOCK_OTHER")
-        pos = _make_db_position(
-            ticker="AAPL", market="NASDAQ", qty=5.0, avg_price=200000.0, current_price=200000.0
-        )
+        pos = _make_db_position(ticker="AAPL", market="NASDAQ", qty=5.0, avg_price=200000.0, current_price=200000.0)
         db = _make_mock_db(positions=[pos])
         redis = AsyncMock()
 
         provider = ManualProvider()
         with (
-            patch("app.services.price_service.fetch_prices_batch",
-                  AsyncMock(return_value={"AAPL": 210.0})),
+            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
             patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
         ):
             await provider.sync(account, db, redis)
@@ -183,6 +184,7 @@ class TestManualProviderSync:
     async def test_real_estate_raises_when_gross_is_zero(self, override_settings, make_account):
         """부동산 시세 0 설정 시 BadRequestError (line 71)."""
         from app.exceptions import BadRequestError
+
         account = make_account(
             asset_type="REAL_ESTATE",
             manual_amount=0.0,
@@ -218,9 +220,7 @@ class TestManualProviderSync:
     async def test_sync_price_not_in_map_uses_fallback(self, override_settings, make_account):
         """가격 맵에 없는 종목은 기존 current_price 유지 (line 50 — else branch)."""
         account = make_account(asset_type="STOCK_OTHER")
-        pos = _make_db_position(
-            ticker="UNKNOWN", market="KOSPI", qty=10.0, avg_price=50000.0, current_price=50000.0
-        )
+        pos = _make_db_position(ticker="UNKNOWN", market="KOSPI", qty=10.0, avg_price=50000.0, current_price=50000.0)
         db = _make_mock_db(positions=[pos])
         redis = AsyncMock()
 

@@ -1,4 +1,5 @@
 """목표환율 / 리밸런싱 알림 체크 서비스."""
+
 from __future__ import annotations
 
 import uuid
@@ -36,8 +37,10 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
 
     result = await db.execute(
         select(
-            ExchangeRateAlert, User.email,
-            UserSettings.notification_email, UserSettings.fcm_token,
+            ExchangeRateAlert,
+            User.email,
+            UserSettings.notification_email,
+            UserSettings.fcm_token,
         )
         .join(User, User.id == ExchangeRateAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
@@ -137,9 +140,7 @@ async def _process_rebalancing_alert(
     # 시장 신호 기반 자동 실행 게이트
     if mode == "AUTO":
         market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        _blocked = (
-            market_mode == "CAUTIOUS" and composite_level == "RED"
-        ) or (
+        _blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
             market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
         )
         if _blocked:
@@ -267,14 +268,10 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             continue
 
         saved_ids = getattr(portfolio, "account_ids", None)
-        effective_account_ids: list[uuid.UUID] | None = (
-            [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
-        )
+        effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
 
         try:
-            overview = await build_portfolio_overview(
-                alert.user_id, db, account_ids=effective_account_ids
-            )
+            overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
         except Exception as exc:
             logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
             continue
@@ -313,10 +310,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             db,
             alert.user_id,
             "REBALANCING",
-            (
-                f"리밸런싱 알림: {portfolio.name} — {drift_desc}"
-                f" ({alert.schedule_type}) [시장신호: {composite_level}]"
-            ),
+            (f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) [시장신호: {composite_level}]"),
         )
         alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1
@@ -335,8 +329,10 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
 
     result = await db.execute(
         select(
-            StockPriceAlert, User.email,
-            UserSettings.notification_email, UserSettings.fcm_token,
+            StockPriceAlert,
+            User.email,
+            UserSettings.notification_email,
+            UserSettings.fcm_token,
         )
         .join(User, User.id == StockPriceAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
@@ -389,10 +385,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
             db,
             alert.user_id,
             "STOCK_PRICE",
-            (
-                f"주가 알림: {alert.name}({alert.ticker})"
-                f" {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})"
-            ),
+            (f"주가 알림: {alert.name}({alert.ticker}) {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})"),
         )
         triggered_count += 1
 
@@ -409,6 +402,7 @@ async def list_alert_history(
     limit: int = 50,
 ):
     from app.models.alert import AlertHistory
+
     result = await db.execute(
         select(AlertHistory)
         .where(AlertHistory.user_id == user_id)

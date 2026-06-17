@@ -53,81 +53,179 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
   const inputCls = `w-full ${INPUT_SM}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 추가</h2>
-          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
             <X size={18} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="re-create-name" className={FORM_LABEL}>부동산 이름 *</label>
-            <input id="re-create-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              placeholder="예: 강남 아파트" className={inputCls} />
+            <label htmlFor="re-create-name" className={FORM_LABEL}>
+              부동산 이름 *
+            </label>
+            <input
+              id="re-create-name"
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="예: 강남 아파트"
+              className={inputCls}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-create-type" className={FORM_LABEL}>종류</label>
-              <select id="re-create-type" value={form.property_type} onChange={(e) => setForm({ ...form, property_type: e.target.value })}
-                className={inputCls}>
-                {PROPERTY_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              <label htmlFor="re-create-type" className={FORM_LABEL}>
+                종류
+              </label>
+              <select
+                id="re-create-type"
+                value={form.property_type}
+                onChange={(e) => setForm({ ...form, property_type: e.target.value })}
+                className={inputCls}
+              >
+                {PROPERTY_TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label htmlFor="re-create-purchase-date" className={FORM_LABEL}>매입일</label>
-              <input id="re-create-purchase-date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
-                className={inputCls} />
+              <label htmlFor="re-create-purchase-date" className={FORM_LABEL}>
+                매입일
+              </label>
+              <input
+                id="re-create-purchase-date"
+                type="date"
+                value={form.purchase_date}
+                onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
-            <label htmlFor="re-create-address" className={FORM_LABEL}>주소</label>
-            <input id="re-create-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-              placeholder="예: 서울시 강남구 ..." className={inputCls} />
+            <label htmlFor="re-create-address" className={FORM_LABEL}>
+              주소
+            </label>
+            <input
+              id="re-create-address"
+              type="text"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              placeholder="예: 서울시 강남구 ..."
+              className={inputCls}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-create-market-value" className={FORM_LABEL}>현재 시세 (원) *</label>
-              <input id="re-create-market-value" type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
-                placeholder="예: 800000000" className={inputCls} />
+              <label htmlFor="re-create-market-value" className={FORM_LABEL}>
+                현재 시세 (원) *
+              </label>
+              <input
+                id="re-create-market-value"
+                type="number"
+                inputMode="decimal"
+                required
+                min={0}
+                value={form.market_value}
+                onChange={(e) => setForm({ ...form, market_value: e.target.value })}
+                placeholder="예: 800000000"
+                className={inputCls}
+              />
             </div>
             <div>
-              <label htmlFor="re-create-purchase-price" className={FORM_LABEL}>매입가 (원)</label>
-              <input id="re-create-purchase-price" type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-                placeholder="예: 600000000" className={inputCls} />
+              <label htmlFor="re-create-purchase-price" className={FORM_LABEL}>
+                매입가 (원)
+              </label>
+              <input
+                id="re-create-purchase-price"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={form.purchase_price}
+                onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+                placeholder="예: 600000000"
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
-            <label htmlFor="re-create-mortgage" className={FORM_LABEL}>담보대출 잔액 (원)</label>
-            <input id="re-create-mortgage" type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
-              placeholder="0" className={inputCls} />
+            <label htmlFor="re-create-mortgage" className={FORM_LABEL}>
+              담보대출 잔액 (원)
+            </label>
+            <input
+              id="re-create-mortgage"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={form.mortgage_balance}
+              onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
+              placeholder="0"
+              className={inputCls}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="include-in-total-create" checked={form.include_in_total}
-              onChange={(e) => setForm({ ...form, include_in_total: e.target.checked })} className="w-4 h-4 text-blue-600" />
-            <label htmlFor="include-in-total-create" className="text-sm text-gray-700 dark:text-gray-300">전체 자산에 포함</label>
+            <input
+              type="checkbox"
+              id="include-in-total-create"
+              checked={form.include_in_total}
+              onChange={(e) => setForm({ ...form, include_in_total: e.target.checked })}
+              className="w-4 h-4 text-blue-600"
+            />
+            <label
+              htmlFor="include-in-total-create"
+              className="text-sm text-gray-700 dark:text-gray-300"
+            >
+              전체 자산에 포함
+            </label>
           </div>
           {marketValue > 0 && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm space-y-1">
               <div className="flex justify-between text-gray-500 dark:text-gray-400">
-                <span>시세</span><span>{fmtKrw(marketValue)}</span>
+                <span>시세</span>
+                <span>{fmtKrw(marketValue)}</span>
               </div>
               {mortgage > 0 && (
                 <div className="flex justify-between text-gray-500 dark:text-gray-400">
-                  <span>담보대출</span><span className="text-blue-500">−{fmtKrw(mortgage)}</span>
+                  <span>담보대출</span>
+                  <span className="text-blue-500">−{fmtKrw(mortgage)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
-                <span>순자산</span><span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>{fmtKrw(equity)}</span>
+                <span>순자산</span>
+                <span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>
+                  {fmtKrw(equity)}
+                </span>
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
-            <button type="submit" disabled={isLoading}
-              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
               {isLoading ? "저장 중..." : "추가"}
             </button>
           </div>
@@ -142,7 +240,10 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
 interface EditModalProps {
   account: AssetAccount;
   onClose: () => void;
-  onSubmit: (id: string, data: Partial<AssetAccountCreate & { real_estate_details: RealEstateDetails }>) => void;
+  onSubmit: (
+    id: string,
+    data: Partial<AssetAccountCreate & { real_estate_details: RealEstateDetails }>,
+  ) => void;
   isLoading: boolean;
 }
 
@@ -182,81 +283,174 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
   const inputCls = `w-full ${INPUT_SM}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">부동산 수정</h2>
-          <button onClick={onClose} aria-label="닫기" className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            aria-label="닫기"
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
             <X size={18} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="re-edit-name" className={FORM_LABEL}>부동산 이름 *</label>
-            <input id="re-edit-name" type="text" required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className={inputCls} />
+            <label htmlFor="re-edit-name" className={FORM_LABEL}>
+              부동산 이름 *
+            </label>
+            <input
+              id="re-edit-name"
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className={inputCls}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-edit-type" className={FORM_LABEL}>종류</label>
-              <select id="re-edit-type" value={form.property_type} onChange={(e) => setForm({ ...form, property_type: e.target.value })}
-                className={inputCls}>
-                {PROPERTY_TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+              <label htmlFor="re-edit-type" className={FORM_LABEL}>
+                종류
+              </label>
+              <select
+                id="re-edit-type"
+                value={form.property_type}
+                onChange={(e) => setForm({ ...form, property_type: e.target.value })}
+                className={inputCls}
+              >
+                {PROPERTY_TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label htmlFor="re-edit-purchase-date" className={FORM_LABEL}>매입일</label>
-              <input id="re-edit-purchase-date" type="date" value={form.purchase_date} onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
-                className={inputCls} />
+              <label htmlFor="re-edit-purchase-date" className={FORM_LABEL}>
+                매입일
+              </label>
+              <input
+                id="re-edit-purchase-date"
+                type="date"
+                value={form.purchase_date}
+                onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
-            <label htmlFor="re-edit-address" className={FORM_LABEL}>주소</label>
-            <input id="re-edit-address" type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className={inputCls} />
+            <label htmlFor="re-edit-address" className={FORM_LABEL}>
+              주소
+            </label>
+            <input
+              id="re-edit-address"
+              type="text"
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              className={inputCls}
+            />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="re-edit-market-value" className={FORM_LABEL}>현재 시세 (원) *</label>
-              <input id="re-edit-market-value" type="number" inputMode="decimal" required min={0} value={form.market_value} onChange={(e) => setForm({ ...form, market_value: e.target.value })}
-                className={inputCls} />
+              <label htmlFor="re-edit-market-value" className={FORM_LABEL}>
+                현재 시세 (원) *
+              </label>
+              <input
+                id="re-edit-market-value"
+                type="number"
+                inputMode="decimal"
+                required
+                min={0}
+                value={form.market_value}
+                onChange={(e) => setForm({ ...form, market_value: e.target.value })}
+                className={inputCls}
+              />
             </div>
             <div>
-              <label htmlFor="re-edit-purchase-price" className={FORM_LABEL}>매입가 (원)</label>
-              <input id="re-edit-purchase-price" type="number" inputMode="decimal" min={0} value={form.purchase_price} onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
-                className={inputCls} />
+              <label htmlFor="re-edit-purchase-price" className={FORM_LABEL}>
+                매입가 (원)
+              </label>
+              <input
+                id="re-edit-purchase-price"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                value={form.purchase_price}
+                onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+                className={inputCls}
+              />
             </div>
           </div>
           <div>
-            <label htmlFor="re-edit-mortgage" className={FORM_LABEL}>담보대출 잔액 (원)</label>
-            <input id="re-edit-mortgage" type="number" inputMode="decimal" min={0} value={form.mortgage_balance} onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
-              className={inputCls} />
+            <label htmlFor="re-edit-mortgage" className={FORM_LABEL}>
+              담보대출 잔액 (원)
+            </label>
+            <input
+              id="re-edit-mortgage"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              value={form.mortgage_balance}
+              onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
+              className={inputCls}
+            />
           </div>
           <div className="flex items-center gap-2">
-            <input type="checkbox" id="include-in-total-edit" checked={form.include_in_total}
-              onChange={(e) => setForm({ ...form, include_in_total: e.target.checked })} className="w-4 h-4 text-blue-600" />
-            <label htmlFor="include-in-total-edit" className="text-sm text-gray-700 dark:text-gray-300">전체 자산에 포함</label>
+            <input
+              type="checkbox"
+              id="include-in-total-edit"
+              checked={form.include_in_total}
+              onChange={(e) => setForm({ ...form, include_in_total: e.target.checked })}
+              className="w-4 h-4 text-blue-600"
+            />
+            <label
+              htmlFor="include-in-total-edit"
+              className="text-sm text-gray-700 dark:text-gray-300"
+            >
+              전체 자산에 포함
+            </label>
           </div>
           {marketValue > 0 && (
             <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 text-sm space-y-1">
               <div className="flex justify-between text-gray-500 dark:text-gray-400">
-                <span>시세</span><span>{fmtKrw(marketValue)}</span>
+                <span>시세</span>
+                <span>{fmtKrw(marketValue)}</span>
               </div>
               {mortgage > 0 && (
                 <div className="flex justify-between text-gray-500 dark:text-gray-400">
-                  <span>담보대출</span><span className="text-blue-500">−{fmtKrw(mortgage)}</span>
+                  <span>담보대출</span>
+                  <span className="text-blue-500">−{fmtKrw(mortgage)}</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
-                <span>순자산</span><span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>{fmtKrw(equity)}</span>
+                <span>순자산</span>
+                <span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>
+                  {fmtKrw(equity)}
+                </span>
               </div>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">취소</button>
-            <button type="submit" disabled={isLoading}
-              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            >
               {isLoading ? "저장 중..." : "수정"}
             </button>
           </div>
@@ -288,24 +482,45 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 truncate">{account.name}</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 truncate">
+              {account.name}
+            </span>
             {re?.property_type && (
-              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 text-xs rounded-full shrink-0">{re.property_type}</span>
+              <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 text-xs rounded-full shrink-0">
+                {re.property_type}
+              </span>
             )}
             {!account.include_in_total && (
-              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">자산 제외</span>
+              <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
+                자산 제외
+              </span>
             )}
           </div>
-          {re?.address && <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{re.address}</p>}
-          {re?.purchase_date && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">매입일: {re.purchase_date}</p>}
+          {re?.address && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{re.address}</p>
+          )}
+          {re?.purchase_date && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              매입일: {re.purchase_date}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button onClick={() => onEdit(account)} title="수정" aria-label="수정"
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors">
+          <button
+            onClick={() => onEdit(account)}
+            title="수정"
+            aria-label="수정"
+            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+          >
             <Pencil size={15} />
           </button>
-          <button onClick={() => onDelete(account.id)} disabled={isDeleting} title="삭제" aria-label="삭제"
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50">
+          <button
+            onClick={() => onDelete(account.id)}
+            disabled={isDeleting}
+            title="삭제"
+            aria-label="삭제"
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
+          >
             <Trash2 size={15} />
           </button>
         </div>
@@ -313,21 +528,32 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
       <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">현재 시세</p>
-          <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">{fmtKrw(marketValue)}</p>
+          <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+            {fmtKrw(marketValue)}
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">담보대출</p>
-          <p className="text-xs font-semibold text-blue-500 mt-0.5">{mortgage > 0 ? `−${fmtKrw(mortgage)}` : "—"}</p>
+          <p className="text-xs font-semibold text-blue-500 mt-0.5">
+            {mortgage > 0 ? `−${fmtKrw(mortgage)}` : "—"}
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">순자산</p>
-          <p className={`text-xs font-semibold mt-0.5 ${equity >= 0 ? "text-red-500" : "text-blue-500"}`}>{fmtKrw(equity)}</p>
+          <p
+            className={`text-xs font-semibold mt-0.5 ${equity >= 0 ? "text-red-500" : "text-blue-500"}`}
+          >
+            {fmtKrw(equity)}
+          </p>
         </div>
         {appreciation !== null && (
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">매입차익</p>
-            <p className={`text-xs font-semibold mt-0.5 ${appreciation >= 0 ? "text-red-500" : "text-blue-500"}`}>
-              {appreciation >= 0 ? "+" : ""}{fmtKrw(appreciation)}
+            <p
+              className={`text-xs font-semibold mt-0.5 ${appreciation >= 0 ? "text-red-500" : "text-blue-500"}`}
+            >
+              {appreciation >= 0 ? "+" : ""}
+              {fmtKrw(appreciation)}
             </p>
           </div>
         )}

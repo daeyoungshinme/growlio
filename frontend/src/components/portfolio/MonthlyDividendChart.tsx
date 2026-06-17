@@ -19,7 +19,13 @@ interface Props {
   onMonthSelect: (month: number) => void;
 }
 
-export default function MonthlyDividendChart({ barData, currentYear, selectedMonth, isDark, onMonthSelect }: Props) {
+export default function MonthlyDividendChart({
+  barData,
+  currentYear,
+  selectedMonth,
+  isDark,
+  onMonthSelect,
+}: Props) {
   return (
     <div className="card">
       <h3 className="font-semibold text-gray-800 dark:text-gray-200 mb-4">
@@ -44,7 +50,11 @@ export default function MonthlyDividendChart({ barData, currentYear, selectedMon
           />
           <YAxis
             tickFormatter={(v: number) =>
-              v >= 1e8 ? `${(v / 1e8).toFixed(1)}억` : v >= 1e4 ? `${Math.round(v / 1e4)}만` : `${v}`
+              v >= 1e8
+                ? `${(v / 1e8).toFixed(1)}억`
+                : v >= 1e4
+                  ? `${Math.round(v / 1e4)}만`
+                  : `${v}`
             }
             tick={{ fontSize: 11, fill: "#9CA3AF" }}
             axisLine={false}
@@ -74,8 +84,12 @@ export default function MonthlyDividendChart({ barData, currentYear, selectedMon
                 key={entry.month}
                 fill={
                   entry.month === selectedMonth
-                    ? (entry.isPast ? "#9CA3AF" : "#4ADE80")
-                    : (entry.isPast ? "#D1D5DB" : "#86EFAC")
+                    ? entry.isPast
+                      ? "#9CA3AF"
+                      : "#4ADE80"
+                    : entry.isPast
+                      ? "#D1D5DB"
+                      : "#86EFAC"
                 }
                 opacity={entry.month === selectedMonth ? 1 : 0.75}
               />
@@ -84,7 +98,8 @@ export default function MonthlyDividendChart({ barData, currentYear, selectedMon
         </BarChart>
       </ResponsiveContainer>
       <p className="text-xs text-gray-300 dark:text-gray-600 mt-2 text-right">
-        진한 초록: 실수령 · 연한 초록: 예상(미래) · 회색: 예상(과거 미수령) | 막대 클릭 시 해당 월 상세 표시
+        진한 초록: 실수령 · 연한 초록: 예상(미래) · 회색: 예상(과거 미수령) | 막대 클릭 시 해당 월
+        상세 표시
       </p>
     </div>
   );

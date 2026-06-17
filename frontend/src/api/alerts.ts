@@ -11,8 +11,7 @@ export interface ExchangeRateAlert {
   created_at: string;
 }
 
-export const fetchExchangeRateAlerts = () =>
-  apiGet<ExchangeRateAlert[]>("/alerts/exchange-rate");
+export const fetchExchangeRateAlerts = () => apiGet<ExchangeRateAlert[]>("/alerts/exchange-rate");
 
 export const createExchangeRateAlert = (
   target_rate: number,
@@ -28,8 +27,7 @@ export const createExchangeRateAlert = (
 export const reactivateExchangeRateAlert = (id: string) =>
   apiPatch<ExchangeRateAlert>(`/alerts/exchange-rate/${id}/reactivate`);
 
-export const deleteExchangeRateAlert = (id: string) =>
-  apiDelete(`/alerts/exchange-rate/${id}`);
+export const deleteExchangeRateAlert = (id: string) => apiDelete(`/alerts/exchange-rate/${id}`);
 
 // ── 리밸런싱 알림 ──────────────────────────────────────────────────────────
 
@@ -78,8 +76,7 @@ export interface RebalancingAlertUpsert {
   deposit_trigger_min_amount_krw: number | null;
 }
 
-export const fetchRebalancingAlerts = () =>
-  apiGet<RebalancingAlert[]>("/alerts/rebalancing");
+export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");
 
 export const fetchRebalancingAlert = (portfolioId: string) =>
   apiGet<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`);
@@ -112,8 +109,7 @@ export interface StockPriceAlert {
   created_at: string;
 }
 
-export const fetchStockPriceAlerts = () =>
-  apiGet<StockPriceAlert[]>("/alerts/stock-price");
+export const fetchStockPriceAlerts = () => apiGet<StockPriceAlert[]>("/alerts/stock-price");
 
 export const createStockPriceAlert = (body: {
   ticker: string;
@@ -127,8 +123,7 @@ export const createStockPriceAlert = (body: {
 export const reactivateStockPriceAlert = (id: string) =>
   apiPatch<StockPriceAlert>(`/alerts/stock-price/${id}/reactivate`);
 
-export const deleteStockPriceAlert = (id: string) =>
-  apiDelete(`/alerts/stock-price/${id}`);
+export const deleteStockPriceAlert = (id: string) => apiDelete(`/alerts/stock-price/${id}`);
 
 export interface AlertHistoryItem {
   id: string;

@@ -36,9 +36,7 @@ async def get_disclosures(
     db: AsyncSession = Depends(get_db),
 ):
     """보유 국내 주식 종목의 최근 DART 공시 목록을 반환한다."""
-    settings_row = await db.scalar(
-        select(UserSettings).where(UserSettings.user_id == current_user.id)
-    )
+    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
     if not settings_row or not settings_row.dart_api_key:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

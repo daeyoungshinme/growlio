@@ -42,7 +42,7 @@ function renderWithRouter(ui: React.ReactElement) {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>{ui}</MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -79,13 +79,17 @@ describe("LoginPage", () => {
     fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "wrong" } });
     fireEvent.submit(screen.getByRole("button", { name: "로그인" }));
     await waitFor(() =>
-      expect(screen.getByText("이메일 또는 비밀번호가 올바르지 않습니다")).toBeInTheDocument()
+      expect(screen.getByText("이메일 또는 비밀번호가 올바르지 않습니다")).toBeInTheDocument(),
     );
   });
 
   it("로그인 중에는 버튼이 비활성화된다", async () => {
     let resolve: () => void;
-    mockLogin.mockReturnValue(new Promise<void>((r) => { resolve = r; }));
+    mockLogin.mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r;
+      }),
+    );
     renderWithRouter(<LoginPage />);
     fireEvent.change(screen.getByLabelText("이메일"), { target: { value: "test@example.com" } });
     fireEvent.change(screen.getByLabelText("비밀번호"), { target: { value: "pw" } });
@@ -117,9 +121,7 @@ describe("ForgotPasswordPage", () => {
       target: { value: "user@example.com" },
     });
     fireEvent.submit(screen.getByRole("button"));
-    await waitFor(() =>
-      expect(screen.getByText(/이메일을 확인해주세요/)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/이메일을 확인해주세요/)).toBeInTheDocument());
   });
 
   it("폼 제출 실패 시 에러 메시지를 표시한다", async () => {
@@ -129,9 +131,7 @@ describe("ForgotPasswordPage", () => {
       target: { value: "unknown@example.com" },
     });
     fireEvent.submit(screen.getByRole("button"));
-    await waitFor(() =>
-      expect(screen.getByText(/오류가 발생했습니다/)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/오류가 발생했습니다/)).toBeInTheDocument());
   });
 });
 
@@ -156,8 +156,6 @@ describe("FindAccountPage", () => {
     const input = screen.getByRole("textbox");
     fireEvent.change(input, { target: { value: "홍길동" } });
     fireEvent.submit(screen.getByRole("button", { name: /이메일 확인/ }));
-    await waitFor(() =>
-      expect(screen.getByText(/가입된 계정이 있습니다/)).toBeInTheDocument()
-    );
+    await waitFor(() => expect(screen.getByText(/가입된 계정이 있습니다/)).toBeInTheDocument());
   });
 });

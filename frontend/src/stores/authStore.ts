@@ -36,7 +36,12 @@ interface OptimisticAuth {
 }
 
 function getOptimisticAuthState(): OptimisticAuth {
-  const fallback: OptimisticAuth = { isAuthChecking: true, isAuthenticated: false, userId: null, needsPasswordReset: false };
+  const fallback: OptimisticAuth = {
+    isAuthChecking: true,
+    isAuthenticated: false,
+    userId: null,
+    needsPasswordReset: false,
+  };
   try {
     const raw = localStorage.getItem(AUTH_ME_CACHE_KEY);
     if (!raw) return fallback;
@@ -46,7 +51,12 @@ function getOptimisticAuthState(): OptimisticAuth {
       (k) => k.startsWith("sb-") && k.endsWith("-auth-token"),
     );
     if (!hasSbSession) return fallback;
-    return { isAuthChecking: false, isAuthenticated: true, userId: cached.userId, needsPasswordReset: cached.needsPasswordReset };
+    return {
+      isAuthChecking: false,
+      isAuthenticated: true,
+      userId: cached.userId,
+      needsPasswordReset: cached.needsPasswordReset,
+    };
   } catch {
     return fallback;
   }
@@ -54,7 +64,13 @@ function getOptimisticAuthState(): OptimisticAuth {
 
 export const useAuthStore = create<AuthState>((set) => {
   const setLoggedIn = (user: { email?: string | null; id: string }, needsReset = false) =>
-    set({ isAuthenticated: true, email: user.email ?? null, userId: user.id, needsPasswordReset: needsReset, isAuthChecking: false });
+    set({
+      isAuthenticated: true,
+      email: user.email ?? null,
+      userId: user.id,
+      needsPasswordReset: needsReset,
+      isAuthChecking: false,
+    });
   const setLoggedOut = () =>
     set({ isAuthenticated: false, userId: null, email: null, isAuthChecking: false });
 
@@ -87,9 +103,15 @@ export const useAuthStore = create<AuthState>((set) => {
           if (!res?.data) return;
           localStorage.setItem(
             AUTH_ME_CACHE_KEY,
-            JSON.stringify({ userId, needsPasswordReset: res.data.needs_password_reset ?? false, cachedAt: Date.now() } satisfies AuthMeCache),
+            JSON.stringify({
+              userId,
+              needsPasswordReset: res.data.needs_password_reset ?? false,
+              cachedAt: Date.now(),
+            } satisfies AuthMeCache),
           );
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       })();
     },
 
@@ -144,7 +166,11 @@ export const useAuthStore = create<AuthState>((set) => {
           const needsPasswordReset = data.needs_password_reset ?? false;
           localStorage.setItem(
             AUTH_ME_CACHE_KEY,
-            JSON.stringify({ userId: session.user.id, needsPasswordReset, cachedAt: Date.now() } satisfies AuthMeCache),
+            JSON.stringify({
+              userId: session.user.id,
+              needsPasswordReset,
+              cachedAt: Date.now(),
+            } satisfies AuthMeCache),
           );
           setLoggedIn(session.user, needsPasswordReset);
         } catch (err) {
@@ -157,7 +183,11 @@ export const useAuthStore = create<AuthState>((set) => {
               const needsPasswordReset = data.needs_password_reset ?? false;
               localStorage.setItem(
                 AUTH_ME_CACHE_KEY,
-                JSON.stringify({ userId: session.user.id, needsPasswordReset, cachedAt: Date.now() } satisfies AuthMeCache),
+                JSON.stringify({
+                  userId: session.user.id,
+                  needsPasswordReset,
+                  cachedAt: Date.now(),
+                } satisfies AuthMeCache),
               );
               setLoggedIn(session.user, needsPasswordReset);
               return;

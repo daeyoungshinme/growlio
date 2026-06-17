@@ -18,7 +18,7 @@ describe("DepositGoalCard", () => {
 
   it("goal과 achievementPct가 있으면 달성률을 표시한다", () => {
     renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={45.6} netDeposits={4560000} />
+      <DepositGoalCard goal={10000000} achievementPct={45.6} netDeposits={4560000} />,
     );
     expect(screen.getByText("45.6%")).toBeInTheDocument();
     expect(screen.getByText("달성")).toBeInTheDocument();
@@ -26,21 +26,19 @@ describe("DepositGoalCard", () => {
 
   it("달성률이 100% 초과 시 100%로 클램핑된다", () => {
     renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={120} netDeposits={12000000} />
+      <DepositGoalCard goal={10000000} achievementPct={120} netDeposits={12000000} />,
     );
     expect(screen.getByText("100.0%")).toBeInTheDocument();
   });
 
   it("netDeposits가 없으면 '—'를 표시한다", () => {
-    renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={30} netDeposits={null} />
-    );
+    renderWithProviders(<DepositGoalCard goal={10000000} achievementPct={30} netDeposits={null} />);
     expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("올해 순입금액과 남은 금액 레이블을 표시한다", () => {
     renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={50} netDeposits={5000000} />
+      <DepositGoalCard goal={10000000} achievementPct={50} netDeposits={5000000} />,
     );
     expect(screen.getByText("올해 순입금액")).toBeInTheDocument();
     expect(screen.getByText(/남음/)).toBeInTheDocument();
@@ -85,7 +83,7 @@ describe("DividendSection", () => {
         estimatedAnnual={600000}
         estimatedMonthly={50000}
         overallDividendYield={2.5}
-      />
+      />,
     );
     expect(screen.getByText("연간 배당금")).toBeInTheDocument();
     expect(screen.getByText("실제 배당금")).toBeInTheDocument();
@@ -94,11 +92,7 @@ describe("DividendSection", () => {
 
   it("estimatedAnnual이 null이면 연간 배당금을 '—'로 표시한다", () => {
     renderWithProviders(
-      <DividendSection
-        annualReceived={null}
-        estimatedAnnual={null}
-        estimatedMonthly={null}
-      />
+      <DividendSection annualReceived={null} estimatedAnnual={null} estimatedMonthly={null} />,
     );
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(3);
@@ -111,7 +105,7 @@ describe("DividendSection", () => {
         estimatedAnnual={600000}
         estimatedMonthly={50000}
         overallDividendYield={2.5}
-      />
+      />,
     );
     expect(screen.getByText("(2.50%)")).toBeInTheDocument();
   });
@@ -123,18 +117,14 @@ describe("DividendSection", () => {
         estimatedAnnual={600000}
         estimatedMonthly={50000}
         overallDividendYield={null}
-      />
+      />,
     );
     expect(screen.queryByText(/%\)/)).toBeNull();
   });
 
   it("estimatedAnnual이 0이면 연간 배당금을 '—'로 표시한다", () => {
     renderWithProviders(
-      <DividendSection
-        annualReceived={0}
-        estimatedAnnual={0}
-        estimatedMonthly={0}
-      />
+      <DividendSection annualReceived={0} estimatedAnnual={0} estimatedMonthly={0} />,
     );
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(3);

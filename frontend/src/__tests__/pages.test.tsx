@@ -86,7 +86,11 @@ vi.mock("@/api/invest", () => ({
     },
     projection_months: [],
     yearly_achievements: [],
-    goal_timeline: { months_to_goal: 200, goal_date: "2036-01-01", expected_amount_at_target: 300000000 },
+    goal_timeline: {
+      months_to_goal: 200,
+      goal_date: "2036-01-01",
+      expected_amount_at_target: 300000000,
+    },
   }),
 }));
 
@@ -208,7 +212,7 @@ describe("DashboardPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <DashboardPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     // Loading or data state - just verify it renders
     expect(document.body).toBeDefined();
@@ -218,7 +222,7 @@ describe("DashboardPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <DashboardPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -234,7 +238,7 @@ describe("MarketPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <MarketPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("시장 지표")).toBeDefined();
@@ -245,7 +249,7 @@ describe("MarketPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <MarketPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("증시 캘린더")).toBeDefined();
@@ -256,7 +260,7 @@ describe("MarketPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <MarketPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("주요 지표 현황")).toBeDefined();
@@ -267,7 +271,7 @@ describe("MarketPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <MarketPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByLabelText("새로고침")).toBeDefined();
@@ -278,7 +282,7 @@ describe("MarketPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <MarketPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const btn = screen.getByLabelText("새로고침");
@@ -296,7 +300,7 @@ describe("SettingsPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeDefined();
@@ -307,7 +311,7 @@ describe("SettingsPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("금융결제원 오픈뱅킹")).toBeDefined();
@@ -318,7 +322,7 @@ describe("SettingsPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(screen.getByText("저장")).toBeDefined();
@@ -329,7 +333,7 @@ describe("SettingsPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <SettingsPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const input = document.querySelector<HTMLInputElement>("input[type='password']");
@@ -350,7 +354,7 @@ describe("InvestPlanPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <InvestPlanPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Either loading or content visible
@@ -362,7 +366,7 @@ describe("InvestPlanPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <InvestPlanPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // With is_configured=true and data loaded
@@ -375,7 +379,7 @@ describe("InvestPlanPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <InvestPlanPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const section = screen.queryByText("적립 계획 설정");
@@ -389,7 +393,9 @@ describe("InvestPlanPage", () => {
   });
 
   it("renders without crashing when data not configured", async () => {
-    const { fetchDCAAnalysis } = await vi.importMock("@/api/invest") as { fetchDCAAnalysis: ReturnType<typeof vi.fn> };
+    const { fetchDCAAnalysis } = (await vi.importMock("@/api/invest")) as {
+      fetchDCAAnalysis: ReturnType<typeof vi.fn>;
+    };
     fetchDCAAnalysis.mockResolvedValueOnce({
       is_configured: false,
       settings: null,
@@ -400,7 +406,7 @@ describe("InvestPlanPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <InvestPlanPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -416,7 +422,7 @@ describe("PortfolioPage", () => {
     renderWithProviders(
       <MemoryRouter initialEntries={["/?tab=종목 현황"]}>
         <PortfolioPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -427,7 +433,7 @@ describe("PortfolioPage", () => {
     renderWithProviders(
       <MemoryRouter initialEntries={["/?tab=종목 현황"]}>
         <PortfolioPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Either the tab or loading state
@@ -444,7 +450,7 @@ describe("AssetManagementPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <AssetManagementPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Initial tab is 은행계좌
@@ -456,7 +462,7 @@ describe("AssetManagementPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <AssetManagementPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const bankTab = screen.queryByText("은행계좌");
@@ -468,7 +474,7 @@ describe("AssetManagementPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <AssetManagementPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const addBtn = screen.queryByText("계좌 추가");
@@ -484,7 +490,7 @@ describe("AssetManagementPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <AssetManagementPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       const emptyText = screen.queryByText(/등록된.*없습니다/);
@@ -505,7 +511,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("비밀번호 찾기")).toBeDefined();
   });
@@ -514,7 +520,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByPlaceholderText("you@example.com")).toBeDefined();
   });
@@ -523,7 +529,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("재설정 링크 발송")).toBeDefined();
   });
@@ -532,7 +538,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const input = screen.getByPlaceholderText("you@example.com");
     fireEvent.change(input, { target: { value: "test@test.com" } });
@@ -543,7 +549,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const input = screen.getByPlaceholderText("you@example.com");
     fireEvent.change(input, { target: { value: "test@test.com" } });
@@ -560,7 +566,7 @@ describe("ForgotPasswordPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <ForgotPasswordPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("아이디 찾기")).toBeDefined();
     expect(screen.getByText("로그인으로 돌아가기")).toBeDefined();
@@ -575,7 +581,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("아이디 찾기")).toBeDefined();
   });
@@ -584,7 +590,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByPlaceholderText("가입 시 사용한 이름")).toBeDefined();
   });
@@ -593,7 +599,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("이메일 확인")).toBeDefined();
   });
@@ -602,7 +608,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const btn = screen.getByText("이메일 확인");
     expect((btn as HTMLButtonElement).disabled).toBe(true);
@@ -612,7 +618,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const input = screen.getByPlaceholderText("가입 시 사용한 이름");
     fireEvent.change(input, { target: { value: "홍길동" } });
@@ -624,7 +630,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     const input = screen.getByPlaceholderText("가입 시 사용한 이름");
     fireEvent.change(input, { target: { value: "홍길동" } });
@@ -641,7 +647,7 @@ describe("FindAccountPage", () => {
     renderWithProviders(
       <MemoryRouter>
         <FindAccountPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("비밀번호 찾기")).toBeDefined();
     expect(screen.getByText("로그인으로 돌아가기")).toBeDefined();

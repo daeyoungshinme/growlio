@@ -1,4 +1,5 @@
 """economic_indicator_service._parse_fred_obs 단위 테스트."""
+
 from __future__ import annotations
 
 import pytest

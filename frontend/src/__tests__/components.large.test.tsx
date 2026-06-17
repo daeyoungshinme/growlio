@@ -75,7 +75,9 @@ vi.mock("@/api/alerts", () => ({
 }));
 
 vi.mock("@/api/backtest", () => ({
-  runBacktest: vi.fn().mockResolvedValue({ portfolio_returns: [], spy_returns: [], real_returns: [], metrics: {} }),
+  runBacktest: vi
+    .fn()
+    .mockResolvedValue({ portfolio_returns: [], spy_returns: [], real_returns: [], metrics: {} }),
   BACKTEST_DEFAULT_START_DATE: "2015-01-01",
   BACKTEST_DEFAULT_END_DATE: "2024-01-01",
 }));
@@ -122,7 +124,20 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 }));
 
 vi.mock("@/utils/dividendUtils", () => ({
-  MONTH_LABELS: ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"],
+  MONTH_LABELS: [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월",
+  ],
   dividendFreqInfo: vi.fn(() => ({ label: "분기", cls: "text-blue-500" })),
   weightBarColor: vi.fn(() => "bg-blue-500"),
   yieldBadgeClass: vi.fn(() => "bg-green-100 text-green-600"),
@@ -304,18 +319,14 @@ describe("StockAccountCard", () => {
 // =========================================
 describe("TransactionHistoryTab", () => {
   it("renders without crash", async () => {
-    renderWithProviders(
-      <TransactionHistoryTab accounts={[mockStockAccount]} />
-    );
+    renderWithProviders(<TransactionHistoryTab accounts={[mockStockAccount]} />);
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
   });
 
   it("shows year selector", async () => {
-    renderWithProviders(
-      <TransactionHistoryTab accounts={[mockStockAccount]} />
-    );
+    renderWithProviders(<TransactionHistoryTab accounts={[mockStockAccount]} />);
     await waitFor(() => {
       const year = new Date().getFullYear().toString();
       // Year appears as option or selected value
@@ -324,18 +335,14 @@ describe("TransactionHistoryTab", () => {
   });
 
   it("shows empty state when no transactions", async () => {
-    renderWithProviders(
-      <TransactionHistoryTab accounts={[]} />
-    );
+    renderWithProviders(<TransactionHistoryTab accounts={[]} />);
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
   });
 
   it("shows add transaction button", async () => {
-    renderWithProviders(
-      <TransactionHistoryTab accounts={[mockStockAccount]} />
-    );
+    renderWithProviders(<TransactionHistoryTab accounts={[mockStockAccount]} />);
     await waitFor(() => {
       // Should have plus/add button
       expect(document.body).toBeDefined();
@@ -355,7 +362,7 @@ describe("StockHoldingsTable", () => {
         dividendMap={{}}
         divLoading={false}
         divError={false}
-      />
+      />,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -370,7 +377,7 @@ describe("StockHoldingsTable", () => {
         dividendMap={{}}
         divLoading={false}
         divError={false}
-      />
+      />,
     );
     await waitFor(() => {
       // Component renders positions - may show ticker in aggregated view
@@ -386,7 +393,7 @@ describe("StockHoldingsTable", () => {
         dividendMap={{}}
         divLoading={true}
         divError={false}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -399,7 +406,7 @@ describe("StockHoldingsTable", () => {
         dividendMap={{}}
         divLoading={false}
         divError={true}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -457,7 +464,7 @@ describe("RebalancingTab", () => {
     renderWithProviders(
       <MemoryRouter>
         <RebalancingTab />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -468,7 +475,7 @@ describe("RebalancingTab", () => {
     renderWithProviders(
       <MemoryRouter>
         <RebalancingTab />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       // Should have analysis or history tab
@@ -488,9 +495,7 @@ describe("AnalysisPanel", () => {
     sort_order: 0,
     created_at: "2024-01-01",
     updated_at: "2024-01-01",
-    items: [
-      { ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 50 },
-    ],
+    items: [{ ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 50 }],
   };
 
   it("renders without crash", async () => {
@@ -503,7 +508,7 @@ describe("AnalysisPanel", () => {
           activeAccounts={[mockStockAccount]}
           onOpenAlertModal={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -520,7 +525,7 @@ describe("AnalysisPanel", () => {
           activeAccounts={[]}
           onOpenAlertModal={vi.fn()}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -536,7 +541,7 @@ describe("PortfolioAnalysisTab", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioAnalysisTab />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();
@@ -547,7 +552,7 @@ describe("PortfolioAnalysisTab", () => {
     renderWithProviders(
       <MemoryRouter>
         <PortfolioAnalysisTab portfolioId="p1" />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     await waitFor(() => {
       expect(document.body).toBeDefined();

@@ -21,11 +21,7 @@ def upgrade() -> None:
         "transactions",
         ["account_id", "ticker", "transaction_date"],
         unique=True,
-        postgresql_where=(
-            "transaction_type = 'DIVIDEND' "
-            "AND account_id IS NOT NULL "
-            "AND ticker IS NOT NULL"
-        ),
+        postgresql_where=("transaction_type = 'DIVIDEND' AND account_id IS NOT NULL AND ticker IS NOT NULL"),
     )
 
 

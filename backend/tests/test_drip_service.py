@@ -1,4 +1,5 @@
 """dividend/drip_service.py 단위 테스트 — 순수 함수."""
+
 from __future__ import annotations
 
 from app.services.dividend.drip_service import (

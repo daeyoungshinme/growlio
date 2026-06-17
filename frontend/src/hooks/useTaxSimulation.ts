@@ -26,7 +26,7 @@ export function useTaxSimulation(positions: OverseasPositionDetail[]) {
       positions
         .filter((p) => p.unrealized_pnl_krw > 0)
         .sort((a, b) => a.unrealized_pnl_krw - b.unrealized_pnl_krw),
-    [positions]
+    [positions],
   );
 
   const lossPositions = useMemo(
@@ -34,12 +34,12 @@ export function useTaxSimulation(positions: OverseasPositionDetail[]) {
       positions
         .filter((p) => p.unrealized_pnl_krw <= 0)
         .sort((a, b) => a.unrealized_pnl_krw - b.unrealized_pnl_krw),
-    [positions]
+    [positions],
   );
 
   const totalLoss = useMemo(
     () => lossPositions.reduce((s, p) => s + p.unrealized_pnl_krw, 0),
-    [lossPositions]
+    [lossPositions],
   );
 
   const remainingDeduction = Math.max(0, TAX_DEDUCTION - alreadyRealized);
@@ -54,7 +54,7 @@ export function useTaxSimulation(positions: OverseasPositionDetail[]) {
         const pnlPs = p.qty > 0 ? p.unrealized_pnl_krw / p.qty : 0;
         return s + pnlPs * qty;
       }, 0),
-    [sellQtyMap, profitPositions, lossPositions]
+    [sellQtyMap, profitPositions, lossPositions],
   );
 
   const hasAnyQtyInput = Object.values(sellQtyMap).some((q) => q > 0);

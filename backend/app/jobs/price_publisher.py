@@ -3,6 +3,7 @@
 30초 간격으로 WebSocket 구독 종목의 현재가를 Yahoo Finance로 조회해 broadcast한다.
 구독자가 없으면 조회를 건너뛴다.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -40,9 +41,7 @@ async def run_price_broadcast() -> None:
     loop = asyncio.get_running_loop()
     try:
         async with _yfinance_sem:
-            price_map: dict[str, float] = await loop.run_in_executor(
-                None, partial(_sync_yahoo_batch, tickers)
-            )
+            price_map: dict[str, float] = await loop.run_in_executor(None, partial(_sync_yahoo_batch, tickers))
         if price_map:
             yahoo_circuit.record_success()
         else:

@@ -144,10 +144,14 @@ describe("useTransactionFormState", () => {
     await waitFor(() => expect(result.current.usdRate).toBe(1350));
 
     // set amount first, then switch currency in a separate act
-    act(() => { result.current.set("amount", 1350000); });
+    act(() => {
+      result.current.set("amount", 1350000);
+    });
     await waitFor(() => expect(result.current.form.amount).toBe(1350000));
 
-    act(() => { result.current.handleCurrencySwitch("USD"); });
+    act(() => {
+      result.current.handleCurrencySwitch("USD");
+    });
     expect(result.current.currency).toBe("USD");
     expect(result.current.amountUsd).toBeCloseTo(1000, 1);
   });
@@ -169,8 +173,12 @@ describe("useTransactionFormState", () => {
       wrapper: createWrapper(),
     });
     await waitFor(() => expect(result.current.usdRate).toBe(1350));
-    act(() => { result.current.handleCurrencySwitch("USD"); });
-    act(() => { result.current.handleCurrencySwitch("KRW"); });
+    act(() => {
+      result.current.handleCurrencySwitch("USD");
+    });
+    act(() => {
+      result.current.handleCurrencySwitch("KRW");
+    });
     expect(result.current.currency).toBe("KRW");
     expect(result.current.amountUsd).toBe(0);
   });

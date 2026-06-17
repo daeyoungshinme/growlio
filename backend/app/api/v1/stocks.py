@@ -1,4 +1,5 @@
 """종목 검색 및 환율 조회 API."""
+
 from __future__ import annotations
 
 import asyncio
@@ -55,12 +56,14 @@ async def _search_naver(q: str, limit: int) -> list[dict]:
     for item in data.get("items", []):
         type_code = item.get("typeCode", "")
         market = type_code if type_code in ("KOSPI", "KOSDAQ") else type_code
-        results.append({
-            "ticker": item.get("code", ""),
-            "name": item.get("name", ""),
-            "market": market,
-            "exchange": type_code,
-        })
+        results.append(
+            {
+                "ticker": item.get("code", ""),
+                "name": item.get("name", ""),
+                "market": market,
+                "exchange": type_code,
+            }
+        )
         if len(results) >= limit:
             break
     return results

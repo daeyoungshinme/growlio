@@ -1,4 +1,5 @@
 """경제지표 API — 미국 주요 경제지표 및 FRED 증시 캘린더 조회."""
+
 from __future__ import annotations
 
 import structlog

@@ -7,10 +7,23 @@ import { PnlCell } from "./PositionHelpers";
 import type { EditablePositionRowProps } from "./PositionHelpers";
 
 export function EditableMobilePositionCard({
-  row, rawRow, index: i, usdRate, priceLoading,
-  suggestions, suggestIdx, searchLoading, setSuggestIdx,
-  handleNameChange, handleNameBlur, handleSelectSuggestion,
-  setRow, removeRow, handleAvgPriceUsd, handleCurrentPriceUsd, handleMarketChange,
+  row,
+  rawRow,
+  index: i,
+  usdRate,
+  priceLoading,
+  suggestions,
+  suggestIdx,
+  searchLoading,
+  setSuggestIdx,
+  handleNameChange,
+  handleNameBlur,
+  handleSelectSuggestion,
+  setRow,
+  removeRow,
+  handleAvgPriceUsd,
+  handleCurrentPriceUsd,
+  handleMarketChange,
 }: EditablePositionRowProps) {
   const [activeInputEl, setActiveInputEl] = useState<HTMLInputElement | null>(null);
   const overseas = isOverseasMarket(row.market);
@@ -28,7 +41,11 @@ export function EditableMobilePositionCard({
             const el = e.currentTarget;
             setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
           }}
-          onBlur={(e) => { setActiveInputEl(null); handleNameBlur(i); void e; }}
+          onBlur={(e) => {
+            setActiveInputEl(null);
+            handleNameBlur(i);
+            void e;
+          }}
           placeholder="종목명 또는 코드 검색..."
           autoComplete="off"
         />
@@ -58,20 +75,32 @@ export function EditableMobilePositionCard({
             value={row.market}
             onChange={(e) => handleMarketChange(i, e.target.value, row.market)}
           >
-            {POSITION_MARKETS.map((m) => <option key={m} value={m}>{m}</option>)}
+            {POSITION_MARKETS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
           </select>
         </div>
-        <button onClick={() => removeRow(i)} className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg">
+        <button
+          onClick={() => removeRow(i)}
+          className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
+        >
           <Trash2 size={16} />
         </button>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">보유수량</p>
-          <input type="number" inputMode="numeric"
+          <input
+            type="number"
+            inputMode="numeric"
             className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-            value={row.qty || ""} onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
-            min={0} placeholder="0" />
+            value={row.qty || ""}
+            onChange={(e) => setRow(i, { qty: Number(e.target.value) })}
+            min={0}
+            placeholder="0"
+          />
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">평단가</p>
@@ -79,10 +108,16 @@ export function EditableMobilePositionCard({
             <div>
               <div className="flex items-center gap-1">
                 <span className="text-sm text-gray-400 shrink-0">$</span>
-                <input type="number" inputMode="decimal"
+                <input
+                  type="number"
+                  inputMode="decimal"
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-                  value={row.avg_price_usd ?? ""} onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
-                  placeholder="0.00" min={0} step="0.01" />
+                  value={row.avg_price_usd ?? ""}
+                  onChange={(e) => handleAvgPriceUsd(i, e.target.value)}
+                  placeholder="0.00"
+                  min={0}
+                  step="0.01"
+                />
               </div>
               {convertUsdToKrw(row.avg_price_usd, usdRate) > 0 && (
                 <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
@@ -91,24 +126,43 @@ export function EditableMobilePositionCard({
               )}
             </div>
           ) : (
-            <input type="number" inputMode="decimal"
+            <input
+              type="number"
+              inputMode="decimal"
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50"
-              value={row.avg_price || ""} onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
-              min={0} placeholder="0" />
+              value={row.avg_price || ""}
+              onChange={(e) => setRow(i, { avg_price: Number(e.target.value) })}
+              min={0}
+              placeholder="0"
+            />
           )}
         </div>
       </div>
       <div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">{overseas ? "현재가($)" : "현재가(원)"}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
+          {overseas ? "현재가($)" : "현재가(원)"}
+        </p>
         {overseas ? (
           <div className="relative">
-            <span className="absolute left-3 top-2 text-sm text-gray-400 dark:text-gray-500 pointer-events-none">$</span>
-            <input type="number" inputMode="decimal"
+            <span className="absolute left-3 top-2 text-sm text-gray-400 dark:text-gray-500 pointer-events-none">
+              $
+            </span>
+            <input
+              type="number"
+              inputMode="decimal"
               className={`w-full border border-gray-300 dark:border-gray-600 rounded-lg pl-6 pr-3 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 transition-opacity ${priceLoading ? "opacity-50" : ""}`}
               value={rawRow.current_price_usd ?? ""}
               onChange={(e) => handleCurrentPriceUsd(i, e.target.value)}
-              placeholder="자동조회" min={0} step="0.01" disabled={priceLoading} />
-            {priceLoading && <span className="absolute right-3 top-2.5"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
+              placeholder="자동조회"
+              min={0}
+              step="0.01"
+              disabled={priceLoading}
+            />
+            {priceLoading && (
+              <span className="absolute right-3 top-2.5">
+                <Loader2 size={14} className="animate-spin text-blue-400" />
+              </span>
+            )}
             {convertUsdToKrw(rawRow.current_price_usd, usdRate) > 0 && (
               <div className="text-xs text-gray-400 dark:text-gray-500 text-right mt-0.5">
                 ≈ ₩{convertUsdToKrw(rawRow.current_price_usd, usdRate).toLocaleString()}
@@ -117,23 +171,38 @@ export function EditableMobilePositionCard({
           </div>
         ) : (
           <div className="relative">
-            <input type="number" inputMode="decimal"
+            <input
+              type="number"
+              inputMode="decimal"
               className={`w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-base text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 transition-opacity ${priceLoading ? "opacity-50" : ""}`}
               value={rawRow.current_price ?? ""}
-              onChange={(e) => setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })}
-              placeholder="자동조회" min={0} disabled={priceLoading} />
-            {priceLoading && <span className="absolute right-3 top-2.5"><Loader2 size={14} className="animate-spin text-blue-400" /></span>}
+              onChange={(e) =>
+                setRow(i, { current_price: e.target.value ? Number(e.target.value) : null })
+              }
+              placeholder="자동조회"
+              min={0}
+              disabled={priceLoading}
+            />
+            {priceLoading && (
+              <span className="absolute right-3 top-2.5">
+                <Loader2 size={14} className="animate-spin text-blue-400" />
+              </span>
+            )}
           </div>
         )}
       </div>
       <div className="border-t border-gray-100 dark:border-gray-800 pt-2 grid grid-cols-3 gap-x-3 pb-1">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">매입금액</p>
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5 text-right">{fmtKrwShort(row.invested_amount ?? 0)}원</p>
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5 text-right">
+            {fmtKrwShort(row.invested_amount ?? 0)}원
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5 text-right">{fmtKrwShort(row.value_amount ?? 0)}원</p>
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5 text-right">
+            {fmtKrwShort(row.value_amount ?? 0)}원
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">수익률</p>

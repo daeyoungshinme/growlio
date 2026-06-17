@@ -1,5 +1,6 @@
 """asset_aggregator.py 추가 커버리지 테스트 (_get_latest_snapshot_rows, _get_no_snap_accounts,
 _fetch_position_maps, _get_scalar_init_data, get_dashboard_summary, _calc_returns 등)."""
+
 from __future__ import annotations
 
 import uuid
@@ -11,21 +12,25 @@ import pytest
 
 # ── _calc_returns (순수 함수) ─────────────────────────────────
 
+
 class TestCalcReturns:
     def test_no_base_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         ann, cum = _calc_returns(1_000_000, 0.0, date(2024, 1, 1))
         assert ann is None
         assert cum is None
 
     def test_no_first_date_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         ann, cum = _calc_returns(1_100_000, 1_000_000, None)
         assert ann is None
         assert cum is None
 
     def test_first_date_in_future_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         future = date.today() + timedelta(days=30)
         ann, cum = _calc_returns(1_100_000, 1_000_000, future)
         assert ann is None
@@ -33,12 +38,14 @@ class TestCalcReturns:
 
     def test_first_date_today_returns_none(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         ann, cum = _calc_returns(1_100_000, 1_000_000, date.today())
         assert ann is None
         assert cum is None
 
     def test_positive_return(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         one_year_ago = date.today().replace(year=date.today().year - 1)
         ann, cum = _calc_returns(1_100_000, 1_000_000, one_year_ago)
         assert ann is not None
@@ -47,6 +54,7 @@ class TestCalcReturns:
 
     def test_negative_return(self, override_settings):
         from app.services.returns_calculator import calc_returns as _calc_returns
+
         one_year_ago = date.today().replace(year=date.today().year - 1)
         ann, cum = _calc_returns(900_000, 1_000_000, one_year_ago)
         assert ann is not None
@@ -55,6 +63,7 @@ class TestCalcReturns:
 
 
 # ── _get_latest_snapshot_rows (DB mock) ──────────────────────
+
 
 class TestGetLatestSnapshotRows:
     @pytest.mark.asyncio
@@ -89,6 +98,7 @@ class TestGetLatestSnapshotRows:
 
 # ── _get_no_snap_accounts (DB mock) ──────────────────────────
 
+
 class TestGetNoSnapAccounts:
     @pytest.mark.asyncio
     async def test_returns_accounts_not_in_snapped_ids(self, mock_db, override_settings):
@@ -117,6 +127,7 @@ class TestGetNoSnapAccounts:
 
 
 # ── _fetch_position_maps (DB mock) ───────────────────────────
+
 
 class TestFetchPositionMaps:
     @pytest.mark.asyncio
@@ -164,6 +175,7 @@ class TestFetchPositionMaps:
 
 # ── _get_scalar_init_data (DB mock) ──────────────────────────
 
+
 class TestGetScalarInitData:
     @pytest.mark.asyncio
     async def test_no_data_returns_none_and_zero(self, mock_db, override_settings):
@@ -195,6 +207,7 @@ class TestGetScalarInitData:
 
 # ── _get_first_snap_date (DB mock) ───────────────────────────
 
+
 class TestGetFirstSnapDate:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_snapshots(self, mock_db, override_settings):
@@ -222,6 +235,7 @@ class TestGetFirstSnapDate:
 
 
 # ── _get_monthly_trend (DB mock) ─────────────────────────────
+
 
 class TestGetMonthlyTrend:
     @pytest.mark.asyncio
@@ -273,6 +287,7 @@ class TestGetMonthlyTrend:
 
 # ── get_dashboard_summary (all sub-functions mocked) ─────────
 
+
 class TestGetDashboardSummary:
     @pytest.mark.asyncio
     async def test_returns_required_fields(self, mock_db, override_settings):
@@ -281,28 +296,35 @@ class TestGetDashboardSummary:
         mock_db.scalar = AsyncMock(return_value=None)  # no settings
 
         with (
-            patch("app.services.asset_aggregator._get_scalar_init_data",
-                  new=AsyncMock(return_value=(None, 0.0))),
-            patch("app.services.asset_aggregator._build_asset_totals",
-                  new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
-            patch("app.services.asset_aggregator._get_monthly_trend",
-                  new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator.get_dividend_summary",
-                  new=AsyncMock(return_value={
-                      "annual_received": 0.0,
-                      "estimated_annual": 0.0,
-                      "monthly_breakdown": [],
-                  })),
-            patch("app.services.asset_aggregator._calc_xirr",
-                  new=AsyncMock(return_value=(None, False))),
+            patch("app.services.asset_aggregator._get_scalar_init_data", new=AsyncMock(return_value=(None, 0.0))),
+            patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(
+                    return_value={
+                        "annual_received": 0.0,
+                        "estimated_annual": 0.0,
+                        "monthly_breakdown": [],
+                    }
+                ),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
         ):
             result = await get_dashboard_summary(uuid.uuid4(), mock_db)
 
         required = [
-            "total_assets_krw", "asset_allocation", "goal_amount",
-            "goal_achievement_pct", "stock_return_pct", "annual_return_pct",
-            "cumulative_return_pct", "xirr_pct", "monthly_trend",
-            "annual_dividends_received", "estimated_annual_dividends",
+            "total_assets_krw",
+            "asset_allocation",
+            "goal_amount",
+            "goal_achievement_pct",
+            "stock_return_pct",
+            "annual_return_pct",
+            "cumulative_return_pct",
+            "xirr_pct",
+            "monthly_trend",
+            "annual_dividends_received",
+            "estimated_annual_dividends",
         ]
         for key in required:
             assert key in result, f"Missing: {key}"
@@ -335,20 +357,25 @@ class TestGetDashboardSummary:
         mock_db.scalar = AsyncMock(return_value=settings)
 
         with (
-            patch("app.services.asset_aggregator._get_scalar_init_data",
-                  new=AsyncMock(return_value=(None, 12_000_000.0))),
-            patch("app.services.asset_aggregator._build_asset_totals",
-                  new=AsyncMock(return_value=(50_000_000.0, 40_000_000.0, 50_000_000.0, {"STOCK_KIS": 50_000_000.0}))),
-            patch("app.services.asset_aggregator._get_monthly_trend",
-                  new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator.get_dividend_summary",
-                  new=AsyncMock(return_value={
-                      "annual_received": 500_000.0,
-                      "estimated_annual": 600_000.0,
-                      "monthly_breakdown": [],
-                  })),
-            patch("app.services.asset_aggregator._calc_xirr",
-                  new=AsyncMock(return_value=(8.5, False))),
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data", new=AsyncMock(return_value=(None, 12_000_000.0))
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(return_value=(50_000_000.0, 40_000_000.0, 50_000_000.0, {"STOCK_KIS": 50_000_000.0})),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(
+                    return_value={
+                        "annual_received": 500_000.0,
+                        "estimated_annual": 600_000.0,
+                        "monthly_breakdown": [],
+                    }
+                ),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(8.5, False))),
         ):
             result = await get_dashboard_summary(uuid.uuid4(), mock_db)
 
@@ -369,18 +396,20 @@ class TestGetDashboardSummary:
         redis.setex = AsyncMock()
 
         with (
-            patch("app.services.asset_aggregator._get_scalar_init_data",
-                  new=AsyncMock(return_value=(None, 0.0))),
-            patch("app.services.asset_aggregator._build_asset_totals",
-                  new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
-            patch("app.services.asset_aggregator._get_monthly_trend",
-                  new=AsyncMock(return_value=[])),
-            patch("app.services.asset_aggregator.get_dividend_summary",
-                  new=AsyncMock(return_value={
-                      "annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": [],
-                  })),
-            patch("app.services.asset_aggregator._calc_xirr",
-                  new=AsyncMock(return_value=(None, False))),
+            patch("app.services.asset_aggregator._get_scalar_init_data", new=AsyncMock(return_value=(None, 0.0))),
+            patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(
+                    return_value={
+                        "annual_received": 0.0,
+                        "estimated_annual": 0.0,
+                        "monthly_breakdown": [],
+                    }
+                ),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
         ):
             await get_dashboard_summary(uuid.uuid4(), mock_db, redis=redis)
 
@@ -388,6 +417,7 @@ class TestGetDashboardSummary:
 
 
 # ── _build_asset_totals ─────────────────────────────────────────
+
 
 class TestBuildAssetTotals:
     @pytest.mark.asyncio
@@ -416,8 +446,11 @@ class TestBuildAssetTotals:
 
         snap = SimpleNamespace(id=uuid.uuid4(), amount_krw=5_000_000.0, invested_amount=None)
         acc = SimpleNamespace(
-            id=uuid.uuid4(), asset_type="BANK_ACCOUNT",
-            include_in_total=True, deposit_krw=None, deposit_usd=None,
+            id=uuid.uuid4(),
+            asset_type="BANK_ACCOUNT",
+            include_in_total=True,
+            deposit_krw=None,
+            deposit_usd=None,
         )
 
         with (
@@ -440,9 +473,11 @@ class TestBuildAssetTotals:
 
         snap = SimpleNamespace(id=uuid.uuid4(), amount_krw=5_000_000.0, invested_amount=None)
         acc = SimpleNamespace(
-            id=uuid.uuid4(), asset_type="BANK_ACCOUNT",
+            id=uuid.uuid4(),
+            asset_type="BANK_ACCOUNT",
             include_in_total=False,
-            deposit_krw=None, deposit_usd=None,
+            deposit_krw=None,
+            deposit_usd=None,
         )
 
         with (
@@ -463,9 +498,12 @@ class TestBuildAssetTotals:
         from app.services.composition_calculator import build_asset_totals
 
         acc = SimpleNamespace(
-            id=uuid.uuid4(), asset_type="CASH_OTHER",
-            include_in_total=True, manual_amount=3_000_000.0,
-            deposit_krw=None, deposit_usd=None,
+            id=uuid.uuid4(),
+            asset_type="CASH_OTHER",
+            include_in_total=True,
+            manual_amount=3_000_000.0,
+            deposit_krw=None,
+            deposit_usd=None,
             real_estate_details=None,
         )
 
@@ -484,6 +522,7 @@ class TestBuildAssetTotals:
 
 
 # ── _calc_net_deposits_this_year ────────────────────────────────
+
 
 class TestCalcNetDepositsThisYear:
     @pytest.mark.asyncio

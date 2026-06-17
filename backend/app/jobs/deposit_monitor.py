@@ -4,6 +4,7 @@
   current deposit_krw - last_known_deposit_krw >= deposit_trigger_min_amount_krw 이면
   포트폴리오 비중대로 입금 증분을 즉시 배분 매수(AUTO) 또는 알림(NOTIFY) 발송.
 """
+
 from __future__ import annotations
 
 import math
@@ -77,8 +78,13 @@ async def _run_deposit_monitor(redis) -> None:
     for alert, portfolio, user_email, notification_email, fcm_token in rows:
         try:
             fired = await _process_deposit_alert(
-                alert, portfolio, user_email, notification_email, fcm_token,
-                composite_level, redis,
+                alert,
+                portfolio,
+                user_email,
+                notification_email,
+                fcm_token,
+                composite_level,
+                redis,
             )
             if fired:
                 triggered_count += 1
@@ -153,9 +159,7 @@ async def _process_deposit_alert(
         if effective_mode == "AUTO":
             await _execute_dca_by_deposit_increment(alert, portfolio, deposit_increment, db, redis)
         else:
-            await _notify_deposit_rebalancing(
-                alert, portfolio, deposit_increment, email, fcm_token, db
-            )
+            await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, email, fcm_token, db)
 
         await _update_deposit_baseline(db, alert.id, current_deposit)
         await save_alert_history(
@@ -178,9 +182,7 @@ async def _process_deposit_alert(
         return True
 
 
-async def _update_deposit_baseline(
-    db: AsyncSession, alert_id: uuid.UUID, current_deposit: float
-) -> None:
+async def _update_deposit_baseline(db: AsyncSession, alert_id: uuid.UUID, current_deposit: float) -> None:
     fresh = await db.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert_id))
     if fresh:
         fresh.last_known_deposit_krw = current_deposit
@@ -256,24 +258,36 @@ async def _execute_dca_by_deposit_increment(
         try:
             if is_overseas_market(market):
                 await place_overseas_order(
-                    app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
-                    ticker=ticker, market=market,
-                    quantity=qty, is_mock=account.is_mock_mode,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account.kis_account_no,  # type: ignore[arg-type]
+                    side="BUY",
+                    ticker=ticker,
+                    market=market,
+                    quantity=qty,
+                    is_mock=account.is_mock_mode,
                     order_type=order_type,
                 )
             else:
                 await place_domestic_order(
-                    app_key, app_secret, access_token,
-                    account.kis_account_no, side="BUY",  # type: ignore[arg-type]
-                    ticker=ticker, quantity=qty,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account.kis_account_no,  # type: ignore[arg-type]
+                    side="BUY",
+                    ticker=ticker,
+                    quantity=qty,
                     is_mock=account.is_mock_mode,
                     order_type=order_type,
                 )
             logger.info(
                 "deposit_monitor_order_placed",
-                ticker=ticker, qty=qty, price=price,
-                alloc=alloc_amount, is_mock=account.is_mock_mode,
+                ticker=ticker,
+                qty=qty,
+                price=price,
+                alloc=alloc_amount,
+                is_mock=account.is_mock_mode,
             )
         except Exception as exc:
             logger.error("deposit_monitor_order_failed", ticker=ticker, error=str(exc))
@@ -308,8 +322,7 @@ async def _notify_deposit_rebalancing(
         # 부족한(underweight) 종목만 추출: diff_krw < 0이면 현재 < 목표 (매수 필요)
         # CASH는 매수 대상에서 제외 (예수금이 부족하면 현금 보유를 늘려야 하므로 투자 불필요)
         underweight = [
-            i for i in analysis.items
-            if i.diff_krw < 0 and i.ticker != "CASH" and i.shares_to_trade is not None
+            i for i in analysis.items if i.diff_krw < 0 and i.ticker != "CASH" and i.shares_to_trade is not None
         ]
 
         if underweight:
@@ -318,13 +331,15 @@ async def _notify_deposit_rebalancing(
             for item in underweight:
                 alloc_ratio = abs(item.diff_krw) / total_deficit if total_deficit > 0 else 0
                 alloc_amount = deposit_increment * alloc_ratio
-                notify_items.append({
-                    "ticker": item.ticker,
-                    "name": item.name,
-                    "weight_pct": float(item.target_weight_pct),
-                    "alloc_amount": alloc_amount,
-                    "weight_diff_pct": float(item.weight_diff_pct),
-                })
+                notify_items.append(
+                    {
+                        "ticker": item.ticker,
+                        "name": item.name,
+                        "weight_pct": float(item.target_weight_pct),
+                        "alloc_amount": alloc_amount,
+                        "weight_diff_pct": float(item.weight_diff_pct),
+                    }
+                )
     except Exception as exc:
         logger.warning(
             "deposit_notify_analysis_failed_fallback_to_proportional",
@@ -338,12 +353,14 @@ async def _notify_deposit_rebalancing(
         total_weight = sum(float(pi.weight) for pi in p_items) if p_items else 0
         for pi in p_items:
             w = float(pi.weight) / total_weight if total_weight > 0 else 0
-            notify_items.append({
-                "ticker": pi.ticker,
-                "name": pi.name,
-                "weight_pct": float(pi.weight),
-                "alloc_amount": deposit_increment * w,
-            })
+            notify_items.append(
+                {
+                    "ticker": pi.ticker,
+                    "name": pi.name,
+                    "weight_pct": float(pi.weight),
+                    "alloc_amount": deposit_increment * w,
+                }
+            )
 
     await send_deposit_trigger_alert(
         to_email=email,
@@ -352,9 +369,7 @@ async def _notify_deposit_rebalancing(
         items=notify_items,
     )
 
-    push_body = (
-        f"+{deposit_increment:,.0f}원 입금 감지 → {portfolio.name} 비중 매수 추천"
-    )
+    push_body = f"+{deposit_increment:,.0f}원 입금 감지 → {portfolio.name} 비중 매수 추천"
     await send_push_to_user(
         user_id=alert.user_id,
         title="예수금 입금 감지",

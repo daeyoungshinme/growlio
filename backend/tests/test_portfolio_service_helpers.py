@@ -53,7 +53,7 @@ class TestCalcAccountAmounts:
         amount, invested, pnl, _ = _calc_account_amounts(acc, snap, positions)
         assert amount == 10_000_000
         assert invested == pytest.approx(500_000)  # 10 * 50_000
-        assert pnl == pytest.approx(100_000)        # (600_000 - 500_000)
+        assert pnl == pytest.approx(100_000)  # (600_000 - 500_000)
 
     def test_snap_without_invested_no_positions(self, override_settings):
         snap = _snap(amount=5_000_000, invested=None, pnl=None)
@@ -99,12 +99,18 @@ class TestCalcAccountAmounts:
 # ── _build_position_details ──────────────────────────────────────────────────
 
 
-def _raw_pos(ticker="005930", name="삼성전자", market="KOSPI", qty=10,
-             avg=70_000, cur=80_000, value_krw=None, currency="KRW"):
+def _raw_pos(
+    ticker="005930", name="삼성전자", market="KOSPI", qty=10, avg=70_000, cur=80_000, value_krw=None, currency="KRW"
+):
     return SimpleNamespace(
-        ticker=ticker, name=name, market=market,
-        qty=qty, avg_price=avg, current_price=cur,
-        value_krw=value_krw, currency=currency,
+        ticker=ticker,
+        name=name,
+        market=market,
+        qty=qty,
+        avg_price=avg,
+        current_price=cur,
+        value_krw=value_krw,
+        currency=currency,
     )
 
 

@@ -78,16 +78,28 @@ export function useAccountMutations({
   });
 
   const updateDepositMutation = useMutation({
-    mutationFn: ({ id, deposit_krw, deposit_usd }: { id: string; deposit_krw: number; deposit_usd?: number }) =>
-      updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
-    onSuccess: () => { invalidateAll(); toast("예수금이 업데이트되었습니다", "success"); },
+    mutationFn: ({
+      id,
+      deposit_krw,
+      deposit_usd,
+    }: {
+      id: string;
+      deposit_krw: number;
+      deposit_usd?: number;
+    }) => updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
+    onSuccess: () => {
+      invalidateAll();
+      toast("예수금이 업데이트되었습니다", "success");
+    },
     onError: (e) => toast(extractErrorMessage(e, "예수금 수정에 실패했습니다"), "error"),
   });
 
   const updateNameMutation = useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      updateAccount(id, { name }),
-    onSuccess: () => { invalidateAll(); toast("계좌명이 저장되었습니다", "success"); },
+    mutationFn: ({ id, name }: { id: string; name: string }) => updateAccount(id, { name }),
+    onSuccess: () => {
+      invalidateAll();
+      toast("계좌명이 저장되었습니다", "success");
+    },
     onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
   });
 
@@ -113,37 +125,43 @@ export function useAccountMutations({
     onError: (e) => toast(extractErrorMessage(e, "부동산 정보 수정에 실패했습니다"), "error"),
   });
 
-  const handleSyncBank = useCallback(async (id: string) => {
-    setSyncingBankId(id);
-    try {
-      await syncAccount(id);
-      invalidateAll();
-      toast("동기화 완료", "success");
-    } catch {
-      toast("동기화에 실패했습니다");
-    } finally {
-      setSyncingBankId(null);
-    }
-  }, [invalidateAll]);
+  const handleSyncBank = useCallback(
+    async (id: string) => {
+      setSyncingBankId(id);
+      try {
+        await syncAccount(id);
+        invalidateAll();
+        toast("동기화 완료", "success");
+      } catch {
+        toast("동기화에 실패했습니다");
+      } finally {
+        setSyncingBankId(null);
+      }
+    },
+    [invalidateAll],
+  );
 
-  const handleSyncKisAccount = useCallback(async (id: string, accounts: AssetAccount[]) => {
-    const acc = accounts.find((a) => a.id === id);
-    setSyncingStockIds((prev) => new Set(prev).add(id));
-    try {
-      await syncAccount(id);
-      await invalidateSyncData(queryClient);
-      toast("동기화 완료", "success");
-    } catch {
-      const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
-      toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);
-    } finally {
-      setSyncingStockIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, [queryClient]);
+  const handleSyncKisAccount = useCallback(
+    async (id: string, accounts: AssetAccount[]) => {
+      const acc = accounts.find((a) => a.id === id);
+      setSyncingStockIds((prev) => new Set(prev).add(id));
+      try {
+        await syncAccount(id);
+        await invalidateSyncData(queryClient);
+        toast("동기화 완료", "success");
+      } catch {
+        const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
+        toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);
+      } finally {
+        setSyncingStockIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [queryClient],
+  );
 
   return {
     createMutation,

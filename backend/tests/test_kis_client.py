@@ -1,4 +1,5 @@
 """KIS 클라이언트 테스트 — KisApiError 처리 및 transient 재시도."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -9,6 +10,7 @@ from app.kis.client import KisApiError, kis_request
 @pytest.fixture
 def mock_rate_limiter(monkeypatch):
     from app.kis import client as kis_client
+
     mock = AsyncMock()
     monkeypatch.setattr(kis_client, "_rate_limiter", mock)
     return mock
@@ -43,7 +45,8 @@ class TestKisRequestTransientRetry:
 
         with patch("app.kis.client.broker_request", side_effect=flaky_broker_request):
             result = await kis_request(
-                "GET", "/path",
+                "GET",
+                "/path",
                 is_mock=True,
                 headers={"Authorization": "Bearer token"},
             )
@@ -66,7 +69,8 @@ class TestKisRequestTransientRetry:
             pytest.raises(KisApiError) as exc_info,
         ):
             await kis_request(
-                "GET", "/path",
+                "GET",
+                "/path",
                 is_mock=True,
                 headers={"Authorization": "Bearer token"},
             )
@@ -77,6 +81,7 @@ class TestKisRequestTransientRetry:
     @pytest.mark.asyncio
     async def test_raises_after_two_transient_failures(self, mock_rate_limiter, override_settings):
         """transient 오류가 2회 연속 발생하면 예외를 전파한다."""
+
         async def always_fail(*args, **kwargs):
             raise KisApiError("1", "MCI오류")
 
@@ -85,7 +90,8 @@ class TestKisRequestTransientRetry:
             pytest.raises(KisApiError),
         ):
             await kis_request(
-                "GET", "/path",
+                "GET",
+                "/path",
                 is_mock=True,
                 headers={"Authorization": "Bearer token"},
             )

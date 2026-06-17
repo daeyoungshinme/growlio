@@ -8,6 +8,7 @@ from app.utils.pnl import calc_position_pnl, eval_value, invested_value, pnl_pct
 
 # ── eval_value ──────────────────────────────────────────────
 
+
 class TestEvalValue:
     """현재가 기준 평가금액 합계."""
 
@@ -36,6 +37,7 @@ class TestEvalValue:
 
 # ── invested_value ──────────────────────────────────────────
 
+
 class TestInvestedValue:
     """매수가 기준 투자금액 합계."""
 
@@ -56,6 +58,7 @@ class TestInvestedValue:
 
 # ── pnl_pct ─────────────────────────────────────────────────
 
+
 class TestPnlPct:
     """수익률(%) 계산."""
 
@@ -73,6 +76,7 @@ class TestPnlPct:
 
 
 # ── calc_position_pnl ────────────────────────────────────────
+
 
 class TestCalcPositionPnl:
     """단일 포지션의 투자금/평가금/손익/수익률 반환."""

@@ -1,4 +1,5 @@
 """dividend_aggregator.py 단위 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -42,8 +43,7 @@ class TestGetDividendSummary:
         exec_result.all.return_value = [row_annual, row_monthly, row_ticker]
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary",
-                   new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             result = await get_dividend_summary(uuid.uuid4(), mock_db)
 
         assert result["annual_received"] == 300_000.0
@@ -62,8 +62,7 @@ class TestGetDividendSummary:
         redis.get = AsyncMock(return_value=None)
         redis.setex = AsyncMock()
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary",
-                   new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             await get_dividend_summary(uuid.uuid4(), mock_db, redis=redis)
 
         redis.setex.assert_called_once()
@@ -76,8 +75,7 @@ class TestGetDividendSummary:
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary",
-                   new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             result = await get_dividend_summary(uuid.uuid4(), mock_db)
 
         assert result["annual_received"] == 0.0

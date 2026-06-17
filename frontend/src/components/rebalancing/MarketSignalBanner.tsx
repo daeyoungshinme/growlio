@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import type { MarketSignalResponse, MarketRiskLevel, VixLevel, YieldCurveState, FearGreedClassification } from "@/api/marketSignals";
+import type {
+  MarketSignalResponse,
+  MarketRiskLevel,
+  VixLevel,
+  YieldCurveState,
+  FearGreedClassification,
+} from "@/api/marketSignals";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 
 interface Props {
@@ -102,9 +108,12 @@ export default function MarketSignalBanner({ signal }: Props) {
             {yield_curve ? (
               <>
                 <span className="text-xs font-semibold text-gray-100">
-                  {yield_curve.value >= 0 ? "+" : ""}{yield_curve.value.toFixed(2)}%
+                  {yield_curve.value >= 0 ? "+" : ""}
+                  {yield_curve.value.toFixed(2)}%
                 </span>
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${YC_CLS[yield_curve.state]}`}>
+                <span
+                  className={`text-xs px-1.5 py-0.5 rounded font-medium ${YC_CLS[yield_curve.state]}`}
+                >
                   {YC_LABEL[yield_curve.state]}
                 </span>
               </>
@@ -119,7 +128,9 @@ export default function MarketSignalBanner({ signal }: Props) {
             {fear_greed ? (
               <>
                 <span className="text-xs font-semibold text-gray-100">{fear_greed.value}</span>
-                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${FG_CLS[fear_greed.classification]}`}>
+                <span
+                  className={`text-xs px-1.5 py-0.5 rounded font-medium ${FG_CLS[fear_greed.classification]}`}
+                >
                   {fear_greed.label}
                 </span>
               </>

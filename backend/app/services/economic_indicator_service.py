@@ -1,4 +1,5 @@
 """경제지표 서비스 — FRED(미국) + ECOS 한국은행(한국) API 연동."""
+
 from __future__ import annotations
 
 import math
@@ -281,8 +282,7 @@ async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> li
 async def get_user_subscriptions(user_id, db) -> list[str]:
     """사용자가 구독 중인 indicator_code 목록."""
     result = await db.execute(
-        select(IndicatorSubscription.indicator_code)
-        .where(IndicatorSubscription.user_id == user_id)
+        select(IndicatorSubscription.indicator_code).where(IndicatorSubscription.user_id == user_id)
     )
     return [row[0] for row in result.all()]
 
@@ -330,6 +330,7 @@ def _now_utc() -> datetime:
 async def sync_all_to_cache(redis) -> dict[str, dict[str, Any]]:
     """모든 지표 최신값을 FRED/ECOS에서 강제 갱신 후 반환."""
     import asyncio
+
     await invalidate_user_caches(redis, *[economic_indicator_latest_key(c) for c in INDICATORS])
 
     results = {}

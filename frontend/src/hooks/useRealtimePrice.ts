@@ -24,7 +24,8 @@ const RECONNECT_DELAYS = [1_000, 3_000, 10_000];
 
 function getWsBaseUrl(): string {
   if (isNativePlatform()) {
-    const domain = (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "growlio-api.onrender.com";
+    const domain =
+      (import.meta.env.VITE_API_DOMAIN as string | undefined) ?? "growlio-api.onrender.com";
     return `wss://${domain}`;
   }
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
@@ -38,11 +39,7 @@ function getWsBaseUrl(): string {
  * tickers 목록이 변경되면 재구독 메시지를 자동 전송한다.
  * 연결 끊김 시 최대 3회 지수 백오프 재연결을 시도한다.
  */
-export function useRealtimePrice({
-  tickers,
-  enabled = true,
-  onPrice,
-}: UseRealtimePriceOptions) {
+export function useRealtimePrice({ tickers, enabled = true, onPrice }: UseRealtimePriceOptions) {
   const [prices, setPrices] = useState<Record<string, RealtimePriceData>>({});
   const [connected, setConnected] = useState(false);
 

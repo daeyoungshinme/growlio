@@ -22,8 +22,12 @@ def _make_order(
     account_id: str | None = None,
 ) -> ExecutionOrderItem:
     return ExecutionOrderItem(
-        ticker=ticker, name=name, market=market,
-        side=side, quantity=quantity, account_id=account_id,
+        ticker=ticker,
+        name=name,
+        market=market,
+        side=side,
+        quantity=quantity,
+        account_id=account_id,
     )
 
 
@@ -50,6 +54,7 @@ def _make_kis_account(
 
 
 # ── _load_account 테스트 ────────────────────────────────────
+
 
 class TestLoadAccount:
     """_load_account: DB에서 계좌 유효성 검증."""
@@ -103,6 +108,7 @@ class TestLoadAccount:
 
 # ── _execute_kiwoom_single_order 테스트 ────────────────────
 
+
 class TestExecuteKiwoomSingleOrder:
     """_execute_kiwoom_single_order: 키움 단건 주문 실행."""
 
@@ -150,6 +156,7 @@ class TestExecuteKiwoomSingleOrder:
 
 # ── execute_rebalancing 테스트 ──────────────────────────────
 
+
 class TestExecuteRebalancing:
     """execute_rebalancing: 주문 그룹화 및 SELL-BUY 순서 검증."""
 
@@ -179,8 +186,12 @@ class TestExecuteRebalancing:
         async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
             executed_tickers.append(f"{order.side}:{order.ticker}")
             return OrderResult(
-                ticker=order.ticker, name=order.name, market=order.market,
-                side=order.side, quantity=order.quantity, status="SUCCESS",
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
             )
 
         mock_db.scalar = AsyncMock(return_value=account)
@@ -224,8 +235,12 @@ class TestExecuteRebalancing:
             # _execute_single_order는 내부에서 예외를 잡아 FAILED를 반환함
             status = "FAILED" if order.ticker == "A" else "SUCCESS"
             return OrderResult(
-                ticker=order.ticker, name=order.name, market=order.market,
-                side=order.side, quantity=order.quantity, status=status,
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status=status,
                 error_msg="API 오류" if status == "FAILED" else None,
             )
 
@@ -257,10 +272,16 @@ class TestRebalancingSchemaValidators:
     def test_execution_order_item_limit_with_no_price_raises(self):
         """order_type=LIMIT이고 limit_price 없으면 ValidationError (line 81)."""
         from pydantic import ValidationError
+
         with pytest.raises(ValidationError, match="지정가 주문"):
             ExecutionOrderItem(
-                ticker="005930", name="삼성전자", market="KOSPI",
-                side="BUY", quantity=10, order_type="LIMIT", limit_price=None,
+                ticker="005930",
+                name="삼성전자",
+                market="KOSPI",
+                side="BUY",
+                quantity=10,
+                order_type="LIMIT",
+                limit_price=None,
             )
 
     def test_execution_request_empty_orders_raises(self):
@@ -268,12 +289,14 @@ class TestRebalancingSchemaValidators:
         from pydantic import ValidationError
 
         from app.schemas.rebalancing import ExecutionRequest
+
         with pytest.raises(ValidationError, match="최소 1개"):
             ExecutionRequest(orders=[])
 
     def test_execution_request_valid_orders_accepted(self):
         """유효한 orders로 ExecutionRequest 생성 성공 (line 94)."""
         from app.schemas.rebalancing import ExecutionRequest
+
         order = _make_order()
         req = ExecutionRequest(orders=[order])
         assert len(req.orders) == 1

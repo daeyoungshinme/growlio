@@ -5,7 +5,9 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "BALANCES_START":
       return {
         ...state,
-        balanceState: Object.fromEntries(action.accountIds.map((id) => [id, "loading" as BalanceLoadState])),
+        balanceState: Object.fromEntries(
+          action.accountIds.map((id) => [id, "loading" as BalanceLoadState]),
+        ),
       };
     case "BALANCES_LOADED":
       return {
@@ -18,7 +20,9 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "BALANCES_ERROR":
       return {
         ...state,
-        balanceState: Object.fromEntries(action.accountIds.map((id) => [id, "error" as BalanceLoadState])),
+        balanceState: Object.fromEntries(
+          action.accountIds.map((id) => [id, "error" as BalanceLoadState]),
+        ),
       };
     case "BALANCE_LOADING":
       return { ...state, balanceState: { ...state.balanceState, [action.accountId]: "loading" } };
@@ -42,7 +46,11 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         },
       };
     case "PRICES_START":
-      return { ...state, priceState: "loading", priceLoadProgress: { loaded: 0, total: action.total } };
+      return {
+        ...state,
+        priceState: "loading",
+        priceLoadProgress: { loaded: 0, total: action.total },
+      };
     case "PRICES_PROGRESS":
       return { ...state, priceLoadProgress: { ...state.priceLoadProgress, loaded: action.loaded } };
     case "PRICES_DONE":
@@ -56,23 +64,41 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
     case "SET_ORDER_TYPE":
       return { ...state, orderType: action.orderType };
     case "SET_LIMIT_PRICE":
-      return { ...state, limitPriceOverrides: { ...state.limitPriceOverrides, [action.key]: Math.max(0, action.price) } };
+      return {
+        ...state,
+        limitPriceOverrides: {
+          ...state.limitPriceOverrides,
+          [action.key]: Math.max(0, action.price),
+        },
+      };
     case "SET_QTY":
-      return { ...state, qtyOverrides: { ...state.qtyOverrides, [action.key]: Math.max(0, action.qty) } };
+      return {
+        ...state,
+        qtyOverrides: { ...state.qtyOverrides, [action.key]: Math.max(0, action.qty) },
+      };
     case "SET_QTY_AND_SELECT": {
       const next = new Set(state.selected);
-      if (action.qty > 0) next.add(action.key); else next.delete(action.key);
-      return { ...state, qtyOverrides: { ...state.qtyOverrides, [action.key]: Math.max(0, action.qty) }, selected: next };
+      if (action.qty > 0) next.add(action.key);
+      else next.delete(action.key);
+      return {
+        ...state,
+        qtyOverrides: { ...state.qtyOverrides, [action.key]: Math.max(0, action.qty) },
+        selected: next,
+      };
     }
     case "TOGGLE_SELECTED": {
       const next = new Set(state.selected);
-      if (next.has(action.key)) next.delete(action.key); else next.add(action.key);
+      if (next.has(action.key)) next.delete(action.key);
+      else next.add(action.key);
       return { ...state, selected: next };
     }
     case "ADD_BUY_ACCOUNT":
       return {
         ...state,
-        buyAccounts: { ...state.buyAccounts, [action.ticker]: [...(state.buyAccounts[action.ticker] ?? []), action.accountId] },
+        buyAccounts: {
+          ...state.buyAccounts,
+          [action.ticker]: [...(state.buyAccounts[action.ticker] ?? []), action.accountId],
+        },
         qtyOverrides: { ...state.qtyOverrides, [`buy_${action.ticker}_${action.accountId}`]: 0 },
       };
     case "REMOVE_BUY_ACCOUNT": {
@@ -83,7 +109,12 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
       delete nextQty[key];
       return {
         ...state,
-        buyAccounts: { ...state.buyAccounts, [action.ticker]: (state.buyAccounts[action.ticker] ?? []).filter((id) => id !== action.accountId) },
+        buyAccounts: {
+          ...state.buyAccounts,
+          [action.ticker]: (state.buyAccounts[action.ticker] ?? []).filter(
+            (id) => id !== action.accountId,
+          ),
+        },
         selected: next,
         qtyOverrides: nextQty,
       };

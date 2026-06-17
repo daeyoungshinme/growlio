@@ -1,4 +1,5 @@
 """스마트 인사이트 & 포트폴리오 진단 API."""
+
 from __future__ import annotations
 
 import redis.asyncio as aioredis

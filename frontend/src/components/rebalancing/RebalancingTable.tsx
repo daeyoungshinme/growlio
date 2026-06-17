@@ -103,7 +103,7 @@ function RebalancingDividendSection({ analysis }: RebalancingDividendSectionProp
   const divDiffPct = totalCurrentDiv > 0 ? (divDiff / totalCurrentDiv) * 100 : 0;
 
   const dividendItems = analysis.items.filter(
-    (i) => i.ticker !== "CASH" && (i.dividend_yield ?? 0) > 0
+    (i) => i.ticker !== "CASH" && (i.dividend_yield ?? 0) > 0,
   );
 
   return (
@@ -146,11 +146,13 @@ function RebalancingDividendSection({ analysis }: RebalancingDividendSectionProp
           <div
             className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-400" : "text-red-400"}`}
           >
-            {divDiff >= 0 ? "+" : ""}{fmtKrw(divDiff)}
+            {divDiff >= 0 ? "+" : ""}
+            {fmtKrw(divDiff)}
           </div>
           {totalCurrentDiv > 0 && (
             <div className={`text-xs ${divDiff >= 0 ? "text-green-500" : "text-red-500"}`}>
-              ({divDiff >= 0 ? "+" : ""}{divDiffPct.toFixed(1)}%)
+              ({divDiff >= 0 ? "+" : ""}
+              {divDiffPct.toFixed(1)}%)
             </div>
           )}
         </div>
@@ -177,9 +179,13 @@ function RebalancingDividendSection({ analysis }: RebalancingDividendSectionProp
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 overflow-hidden">
-                  <span className="truncate">현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}</span>
+                  <span className="truncate">
+                    현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}
+                  </span>
                   <span className="shrink-0">→</span>
-                  <span className="truncate">목표 {fmtKrw(item.annual_dividend_target_krw ?? 0)}</span>
+                  <span className="truncate">
+                    목표 {fmtKrw(item.annual_dividend_target_krw ?? 0)}
+                  </span>
                 </div>
               </div>
             ))}
@@ -255,8 +261,7 @@ export default function RebalancingTable({
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
     (analysis.total_current_annual_dividend ?? analysis.current_portfolio_annual_dividend ?? 0) > 0;
   const hasCagrData =
-    analysis.target_weighted_cagr_10y_pct != null ||
-    analysis.current_weighted_cagr_10y_pct != null;
+    analysis.target_weighted_cagr_10y_pct != null || analysis.current_weighted_cagr_10y_pct != null;
 
   return (
     <div className="space-y-4">
@@ -322,7 +327,7 @@ export default function RebalancingTable({
           <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
           <div className={`text-sm font-semibold ${PROFIT_COLOR}`}>
             {fmtKrw(
-              analysis.items.filter((i) => i.diff_krw > 0).reduce((s, i) => s + i.diff_krw, 0)
+              analysis.items.filter((i) => i.diff_krw > 0).reduce((s, i) => s + i.diff_krw, 0),
             )}
           </div>
         </div>
@@ -331,8 +336,8 @@ export default function RebalancingTable({
           <div className={`text-sm font-semibold ${LOSS_COLOR}`}>
             {fmtKrw(
               Math.abs(
-                analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0)
-              )
+                analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
+              ),
             )}
           </div>
         </div>
@@ -341,10 +346,7 @@ export default function RebalancingTable({
       {/* 집중도 지표 (HHI) + 거래 비용 */}
       {(() => {
         const TRADING_FEE_RATE = 0.00014;
-        const currentHHI = analysis.items.reduce(
-          (s, i) => s + i.current_weight_pct ** 2,
-          0
-        );
+        const currentHHI = analysis.items.reduce((s, i) => s + i.current_weight_pct ** 2, 0);
         const targetHHI = analysis.items
           .filter((i) => i.target_weight_pct > 0)
           .reduce((s, i) => s + i.target_weight_pct ** 2, 0);
@@ -359,7 +361,7 @@ export default function RebalancingTable({
           .filter((i) => i.diff_krw > 0)
           .reduce((s, i) => s + i.diff_krw, 0);
         const totalSell = Math.abs(
-          analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0)
+          analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
         );
         const estFee = (totalBuy + totalSell) * TRADING_FEE_RATE;
         const curLabel = hhiLabel(currentHHI);
@@ -388,8 +390,7 @@ export default function RebalancingTable({
             {estFee > 0 && (
               <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
                 <span className="text-gray-400">
-                  예상 거래 비용{" "}
-                  <span className="text-gray-500">(수수료 0.014%)</span>
+                  예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span>
                 </span>
                 <span className="text-gray-200 font-medium">{fmtKrw(estFee)}</span>
               </div>
@@ -418,7 +419,9 @@ export default function RebalancingTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-700 text-xs text-gray-400">
-              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">종목</th>
+              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">
+                종목
+              </th>
               <th className="text-right py-2 px-3 font-medium">현재 비중</th>
               <th className="text-left py-2 px-3 font-medium">목표 비중</th>
               <th className="text-right py-2 px-3 font-medium">차이</th>

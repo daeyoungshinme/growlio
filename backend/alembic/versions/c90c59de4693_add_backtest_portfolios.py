@@ -43,9 +43,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        "idx_backtest_portfolios_user", "backtest_portfolios", ["user_id"], unique=False
-    )
+    op.create_index("idx_backtest_portfolios_user", "backtest_portfolios", ["user_id"], unique=False)
     # ### end Alembic commands ###
 
 

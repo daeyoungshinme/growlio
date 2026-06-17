@@ -34,7 +34,7 @@ export function usePullToRefresh({
       startYRef.current = e.touches[0].clientY;
       hapticFiredRef.current = false;
     },
-    [disabled, containerRef]
+    [disabled, containerRef],
   );
 
   const handleTouchMove = useCallback(
@@ -57,7 +57,7 @@ export function usePullToRefresh({
         void triggerHaptic("medium");
       }
     },
-    [disabled, containerRef, threshold]
+    [disabled, containerRef, threshold],
   );
 
   const handleTouchEnd = useCallback(async () => {

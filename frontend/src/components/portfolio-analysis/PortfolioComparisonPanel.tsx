@@ -46,7 +46,10 @@ function buildMergedRows(a: RebalancingAnalysis, b: RebalancingAnalysis): Merged
     });
   }
 
-  return rows.sort((x, y) => Math.max(y.targetAWeight, y.targetBWeight) - Math.max(x.targetAWeight, x.targetBWeight));
+  return rows.sort(
+    (x, y) =>
+      Math.max(y.targetAWeight, y.targetBWeight) - Math.max(x.targetAWeight, x.targetBWeight),
+  );
 }
 
 function DiffBadge({ value }: { value: number }) {
@@ -54,7 +57,8 @@ function DiffBadge({ value }: { value: number }) {
   const positive = value > 0;
   return (
     <span className={positive ? "text-red-500" : "text-blue-500"}>
-      {positive ? "+" : ""}{fmtKrwNullable(value)}
+      {positive ? "+" : ""}
+      {fmtKrwNullable(value)}
     </span>
   );
 }
@@ -96,9 +100,13 @@ export default function PortfolioComparisonPanel({
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">기대 CAGR (10y)</p>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-600 dark:text-gray-300">{cagrA != null ? fmtPct(cagrA) : "—"}</span>
+            <span className="text-gray-600 dark:text-gray-300">
+              {cagrA != null ? fmtPct(cagrA) : "—"}
+            </span>
             <ArrowRight size={12} className="text-gray-400" />
-            <span className={`font-semibold ${cagrB != null && cagrA != null && cagrB > cagrA ? "text-red-500" : "text-blue-500"}`}>
+            <span
+              className={`font-semibold ${cagrB != null && cagrA != null && cagrB > cagrA ? "text-red-500" : "text-blue-500"}`}
+            >
               {cagrB != null ? fmtPct(cagrB) : "—"}
             </span>
           </div>
@@ -106,9 +114,13 @@ export default function PortfolioComparisonPanel({
         <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-3 space-y-2">
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400">예상 배당수익률</p>
           <div className="flex items-center gap-2 text-sm">
-            <span className="text-gray-600 dark:text-gray-300">{divYieldA != null ? fmtPct(divYieldA) : "—"}</span>
+            <span className="text-gray-600 dark:text-gray-300">
+              {divYieldA != null ? fmtPct(divYieldA) : "—"}
+            </span>
             <ArrowRight size={12} className="text-gray-400" />
-            <span className={`font-semibold ${divYieldB != null && divYieldA != null && divYieldB > divYieldA ? "text-red-500" : "text-blue-500"}`}>
+            <span
+              className={`font-semibold ${divYieldB != null && divYieldA != null && divYieldB > divYieldA ? "text-red-500" : "text-blue-500"}`}
+            >
               {divYieldB != null ? fmtPct(divYieldB) : "—"}
             </span>
           </div>
@@ -120,29 +132,54 @@ export default function PortfolioComparisonPanel({
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-              <th className="text-left py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">종목</th>
-              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">현재</th>
-              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">기존 목표</th>
-              <th className="text-right py-2.5 px-3 font-medium text-blue-600 dark:text-blue-400">새 목표</th>
-              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">기존 매매</th>
-              <th className="text-right py-2.5 px-3 font-medium text-blue-600 dark:text-blue-400">새 매매</th>
+              <th className="text-left py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">
+                종목
+              </th>
+              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">
+                현재
+              </th>
+              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">
+                기존 목표
+              </th>
+              <th className="text-right py-2.5 px-3 font-medium text-blue-600 dark:text-blue-400">
+                새 목표
+              </th>
+              <th className="text-right py-2.5 px-3 font-medium text-gray-500 dark:text-gray-400">
+                기존 매매
+              </th>
+              <th className="text-right py-2.5 px-3 font-medium text-blue-600 dark:text-blue-400">
+                새 매매
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
             {rows.map((row) => (
-              <tr key={`${row.ticker}:${row.market}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+              <tr
+                key={`${row.ticker}:${row.market}`}
+                className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+              >
                 <td className="py-2 px-3">
                   <span className="font-medium text-gray-800 dark:text-gray-200">{row.ticker}</span>
-                  <span className="text-gray-400 dark:text-gray-500 ml-1 hidden sm:inline">{row.market}</span>
+                  <span className="text-gray-400 dark:text-gray-500 ml-1 hidden sm:inline">
+                    {row.market}
+                  </span>
                 </td>
                 <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-300">
                   {fmtPct(row.currentWeight)}
                 </td>
                 <td className="py-2 px-3 text-right text-gray-600 dark:text-gray-300">
-                  {row.targetAWeight > 0 ? fmtPct(row.targetAWeight) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                  {row.targetAWeight > 0 ? (
+                    fmtPct(row.targetAWeight)
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                  )}
                 </td>
                 <td className="py-2 px-3 text-right font-medium text-blue-700 dark:text-blue-300">
-                  {row.targetBWeight > 0 ? fmtPct(row.targetBWeight) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                  {row.targetBWeight > 0 ? (
+                    fmtPct(row.targetBWeight)
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">—</span>
+                  )}
                 </td>
                 <td className="py-2 px-3 text-right">
                   <DiffBadge value={row.diffAKrw} />

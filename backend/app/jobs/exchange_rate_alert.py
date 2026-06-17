@@ -1,4 +1,5 @@
 """목표환율 알림 체크 — 5분 간격 실행."""
+
 import structlog
 
 from app.database import AsyncSessionLocal

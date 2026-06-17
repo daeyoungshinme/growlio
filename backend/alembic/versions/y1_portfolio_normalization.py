@@ -124,14 +124,11 @@ def downgrade() -> None:
     for (pid,) in portfolio_ids:
         items = conn.execute(
             sa.text(
-                "SELECT ticker, name, market, weight FROM portfolio_items "
-                "WHERE portfolio_id = :pid ORDER BY sort_order"
+                "SELECT ticker, name, market, weight FROM portfolio_items WHERE portfolio_id = :pid ORDER BY sort_order"
             ),
             {"pid": pid},
         ).fetchall()
-        items_list = [
-            {"ticker": r[0], "name": r[1], "market": r[2], "weight": float(r[3])} for r in items
-        ]
+        items_list = [{"ticker": r[0], "name": r[1], "market": r[2], "weight": float(r[3])} for r in items]
 
         accounts = conn.execute(
             sa.text("SELECT account_id FROM portfolio_accounts WHERE portfolio_id = :pid"),
@@ -142,10 +139,7 @@ def downgrade() -> None:
         import json
 
         conn.execute(
-            sa.text(
-                "UPDATE portfolios SET items = :items::jsonb, account_ids = :aids::jsonb "
-                "WHERE id = :pid"
-            ),
+            sa.text("UPDATE portfolios SET items = :items::jsonb, account_ids = :aids::jsonb WHERE id = :pid"),
             {
                 "items": json.dumps(items_list),
                 "aids": json.dumps(account_ids_list) if account_ids_list else None,

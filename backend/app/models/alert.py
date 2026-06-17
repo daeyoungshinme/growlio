@@ -28,16 +28,12 @@ class ExchangeRateAlert(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     target_rate: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
-    direction: Mapped[str] = mapped_column(
-        Enum("BELOW", "ABOVE", name="alert_direction_enum"), nullable=False
-    )
+    direction: Mapped[str] = mapped_column(Enum("BELOW", "ABOVE", name="alert_direction_enum"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (Index("idx_exchange_rate_alerts_user", "user_id"),)
 
@@ -70,9 +66,7 @@ class RebalancingAlert(Base):
     # 주문 유형: MARKET | LIMIT
     order_type: Mapped[str] = mapped_column(String(10), nullable=False, default="MARKET")
     # 시장 신호 연동 모드: DISABLED | CAUTIOUS(RED 시 건너뜀) | STRICT(YELLOW|RED 시 건너뜀)
-    market_condition_mode: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="DISABLED"
-    )
+    market_condition_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="DISABLED")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # ── 예수금 입금 감지 트리거 ──────────────────────────────────────
     deposit_trigger_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -81,12 +75,8 @@ class RebalancingAlert(Base):
     )
     deposit_trigger_min_amount_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_known_deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-    last_deposit_checked_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    last_deposit_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -108,16 +98,12 @@ class StockPriceAlert(Base):
     market: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     target_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
-    direction: Mapped[str] = mapped_column(
-        Enum("BELOW", "ABOVE", name="stock_alert_direction_enum"), nullable=False
-    )
+    direction: Mapped[str] = mapped_column(Enum("BELOW", "ABOVE", name="stock_alert_direction_enum"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),
@@ -137,10 +123,6 @@ class AlertHistory(Base):
     # EXCHANGE_RATE | REBALANCING | STOCK_PRICE
     alert_type: Mapped[str] = mapped_column(String(20), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    __table_args__ = (
-        Index("idx_alert_history_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("idx_alert_history_user_created", "user_id", "created_at"),)

@@ -20,12 +20,15 @@ def patch_encryption_key(monkeypatch):
     monkeypatch.setattr(cs_mod.settings, "kis_cred_encryption_key", test_key)
 
 
-@pytest.mark.parametrize("plaintext", [
-    "simple-api-key",
-    "a" * 200,        # 긴 문자열
-    "한국어-키값-테스트",  # 유니코드
-    "special!@#$%^&*()",
-])
+@pytest.mark.parametrize(
+    "plaintext",
+    [
+        "simple-api-key",
+        "a" * 200,  # 긴 문자열
+        "한국어-키값-테스트",  # 유니코드
+        "special!@#$%^&*()",
+    ],
+)
 def test_encrypt_decrypt_roundtrip(plaintext):
     """암호화 후 복호화하면 원문이 복원된다."""
     from app.services.credential_service import decrypt, encrypt

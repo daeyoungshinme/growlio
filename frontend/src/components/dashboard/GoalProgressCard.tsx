@@ -23,7 +23,15 @@ export default function GoalProgressCard({ current, goal, pct }: Props) {
       {/* 원형 progress */}
       <div className="relative w-36 h-36">
         <svg viewBox="0 0 36 36" className="w-36 h-36 -rotate-90">
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#374151" strokeWidth="2.5" className="stroke-gray-200 dark:stroke-gray-700" />
+          <circle
+            cx="18"
+            cy="18"
+            r="15.9"
+            fill="none"
+            stroke="#374151"
+            strokeWidth="2.5"
+            className="stroke-gray-200 dark:stroke-gray-700"
+          />
           <circle
             cx="18"
             cy="18"
@@ -36,7 +44,9 @@ export default function GoalProgressCard({ current, goal, pct }: Props) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">{clampedPct.toFixed(1)}%</span>
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {clampedPct.toFixed(1)}%
+          </span>
           <span className="text-xs text-gray-400 dark:text-gray-500">달성</span>
         </div>
       </div>
@@ -45,7 +55,9 @@ export default function GoalProgressCard({ current, goal, pct }: Props) {
         <p className="text-sm text-gray-500 dark:text-gray-400">현재 자산</p>
         <p className="text-xl font-bold text-gray-900 dark:text-gray-50">{fmtKrw(current)}</p>
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표: {fmtKrw(goal)}</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">남은 금액: {fmtKrw(Math.max(goal - current, 0))}</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          남은 금액: {fmtKrw(Math.max(goal - current, 0))}
+        </p>
       </div>
     </div>
   );

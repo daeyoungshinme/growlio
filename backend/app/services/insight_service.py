@@ -1,4 +1,5 @@
 """규칙 기반 포트폴리오 인사이트 & 진단 서비스."""
+
 from __future__ import annotations
 
 import asyncio
@@ -34,6 +35,7 @@ def insights_key(user_id: uuid.UUID) -> str:
 # 타입 정의
 # ---------------------------------------------------------------------------
 
+
 class InsightSeverity(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
@@ -60,6 +62,7 @@ class Insight:
 # ---------------------------------------------------------------------------
 # 진입점
 # ---------------------------------------------------------------------------
+
 
 async def generate_insights(
     user_id: uuid.UUID,
@@ -129,6 +132,7 @@ async def get_insights_summary(
 # 체커 1: 집중도
 # ---------------------------------------------------------------------------
 
+
 async def _check_concentration(dashboard: dict) -> list[Insight]:
     """단일 종목/유형 집중도 > 30% 경고."""
     insights: list[Insight] = []
@@ -141,31 +145,36 @@ async def _check_concentration(dashboard: dict) -> list[Insight]:
         pct = float(item.get("pct") or 0)
         asset_type = item.get("type", "")
         if pct >= 40:
-            insights.append(Insight(
-                type=InsightType.CONCENTRATION,
-                severity=InsightSeverity.ALERT,
-                title="자산 집중도 위험",
-                detail=f"{asset_type} 비중이 {pct:.1f}%로 40%를 초과합니다. 분산 투자를 검토하세요.",
-                action_label="자산 현황 보기",
-                action_url="/assets",
-                metric_value=round(pct, 1),
-            ))
+            insights.append(
+                Insight(
+                    type=InsightType.CONCENTRATION,
+                    severity=InsightSeverity.ALERT,
+                    title="자산 집중도 위험",
+                    detail=f"{asset_type} 비중이 {pct:.1f}%로 40%를 초과합니다. 분산 투자를 검토하세요.",
+                    action_label="자산 현황 보기",
+                    action_url="/assets",
+                    metric_value=round(pct, 1),
+                )
+            )
         elif pct >= 30:
-            insights.append(Insight(
-                type=InsightType.CONCENTRATION,
-                severity=InsightSeverity.WARNING,
-                title="자산 집중도 주의",
-                detail=f"{asset_type} 비중이 {pct:.1f}%로 30%를 초과합니다.",
-                action_label="자산 현황 보기",
-                action_url="/assets",
-                metric_value=round(pct, 1),
-            ))
+            insights.append(
+                Insight(
+                    type=InsightType.CONCENTRATION,
+                    severity=InsightSeverity.WARNING,
+                    title="자산 집중도 주의",
+                    detail=f"{asset_type} 비중이 {pct:.1f}%로 30%를 초과합니다.",
+                    action_label="자산 현황 보기",
+                    action_url="/assets",
+                    metric_value=round(pct, 1),
+                )
+            )
     return insights
 
 
 # ---------------------------------------------------------------------------
 # 체커 2: 리밸런싱 기회
 # ---------------------------------------------------------------------------
+
 
 async def _check_rebalancing_opportunity(
     user_id: uuid.UUID,
@@ -225,25 +234,29 @@ async def _check_rebalancing_opportunity(
             max_drift = max(max_drift, abs(target_w - cur_w))
 
         if max_drift >= 10:
-            insights.append(Insight(
-                type=InsightType.REBALANCING_OPPORTUNITY,
-                severity=InsightSeverity.ALERT,
-                title="리밸런싱 필요",
-                detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다. 리밸런싱이 필요합니다.",
-                action_label="리밸런싱 분석",
-                action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
-                metric_value=round(max_drift, 1),
-            ))
+            insights.append(
+                Insight(
+                    type=InsightType.REBALANCING_OPPORTUNITY,
+                    severity=InsightSeverity.ALERT,
+                    title="리밸런싱 필요",
+                    detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다. 리밸런싱이 필요합니다.",
+                    action_label="리밸런싱 분석",
+                    action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
+                    metric_value=round(max_drift, 1),
+                )
+            )
         elif max_drift >= 5:
-            insights.append(Insight(
-                type=InsightType.REBALANCING_OPPORTUNITY,
-                severity=InsightSeverity.WARNING,
-                title="리밸런싱 권장",
-                detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다.",
-                action_label="리밸런싱 분석",
-                action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
-                metric_value=round(max_drift, 1),
-            ))
+            insights.append(
+                Insight(
+                    type=InsightType.REBALANCING_OPPORTUNITY,
+                    severity=InsightSeverity.WARNING,
+                    title="리밸런싱 권장",
+                    detail=f"포트폴리오 '{pf.name}' 최대 드리프트가 {max_drift:.1f}%p입니다.",
+                    action_label="리밸런싱 분석",
+                    action_url=f"/portfolio?tab=포트폴리오 분석&portfolioId={pf.id}",
+                    metric_value=round(max_drift, 1),
+                )
+            )
 
     # ALERT 우선, 없으면 WARNING 1개
     alerts = [i for i in insights if i.severity == InsightSeverity.ALERT]
@@ -253,6 +266,7 @@ async def _check_rebalancing_opportunity(
 # ---------------------------------------------------------------------------
 # 체커 3: Tax-Loss Harvesting
 # ---------------------------------------------------------------------------
+
 
 async def _check_tax_loss_harvest(
     user_id: uuid.UUID,
@@ -270,6 +284,7 @@ async def _check_tax_loss_harvest(
         return []
 
     from datetime import date
+
     rates = _get_rates(date.today().year)
 
     # 연 250만원 기본 공제 적용 — 공제 후 과세 이익이 없으면 절세 불필요
@@ -290,23 +305,26 @@ async def _check_tax_loss_harvest(
     loss_tickers = ", ".join(p["ticker"] for p in loss_positions[:3])
     suffix = f" 외 {len(loss_positions) - 3}개" if len(loss_positions) > 3 else ""
 
-    return [Insight(
-        type=InsightType.TAX_LOSS_HARVEST,
-        severity=InsightSeverity.INFO,
-        title="절세 기회: 손실 수확(Tax-Loss Harvesting)",
-        detail=(
-            f"{loss_tickers}{suffix} 매도 시 최대 {tax_saved:,.0f}원 절세 가능합니다. "
-            "세금 상세 페이지에서 확인하세요."
-        ),
-        action_label="세금 계획 보기",
-        action_url="/portfolio?tab=analysis",
-        metric_value=round(tax_saved, 0),
-    )]
+    return [
+        Insight(
+            type=InsightType.TAX_LOSS_HARVEST,
+            severity=InsightSeverity.INFO,
+            title="절세 기회: 손실 수확(Tax-Loss Harvesting)",
+            detail=(
+                f"{loss_tickers}{suffix} 매도 시 최대 {tax_saved:,.0f}원 절세 가능합니다. "
+                "세금 상세 페이지에서 확인하세요."
+            ),
+            action_label="세금 계획 보기",
+            action_url="/portfolio?tab=analysis",
+            metric_value=round(tax_saved, 0),
+        )
+    ]
 
 
 # ---------------------------------------------------------------------------
 # 캐시 무효화 헬퍼
 # ---------------------------------------------------------------------------
+
 
 async def invalidate_insights_cache(user_id: uuid.UUID, redis: RedisType) -> None:
     if redis is None:

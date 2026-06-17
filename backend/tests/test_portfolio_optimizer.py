@@ -1,4 +1,5 @@
 """portfolio_optimizer.py 단위 테스트."""
+
 from __future__ import annotations
 
 import json
@@ -12,14 +13,13 @@ from app.services.portfolio_optimizer import get_efficient_frontier
 
 # ── get_efficient_frontier (DB mock) ──────────────────────
 
+
 class TestGetEfficientFrontier:
     @pytest.mark.asyncio
     async def test_single_position_returns_not_enough(self, mock_db, override_settings):
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
-        pos = SimpleNamespace(
-            ticker="005930", market="KOSPI", value_krw=1_000_000.0, snapshot_id=snap.id
-        )
+        pos = SimpleNamespace(ticker="005930", market="KOSPI", value_krw=1_000_000.0, snapshot_id=snap.id)
 
         snap_result = MagicMock()
         snap_result.all.return_value = [(snap, acc)]
@@ -75,12 +75,8 @@ class TestGetEfficientFrontier:
     async def test_with_two_positions_calls_optimizer(self, mock_db, override_settings):
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
-        pos1 = SimpleNamespace(
-            ticker="005930", market="KOSPI", value_krw=500_000.0, snapshot_id=snap.id
-        )
-        pos2 = SimpleNamespace(
-            ticker="AAPL", market="NASDAQ", value_krw=500_000.0, snapshot_id=snap.id
-        )
+        pos1 = SimpleNamespace(ticker="005930", market="KOSPI", value_krw=500_000.0, snapshot_id=snap.id)
+        pos2 = SimpleNamespace(ticker="AAPL", market="NASDAQ", value_krw=500_000.0, snapshot_id=snap.id)
 
         snap_result = MagicMock()
         snap_result.all.return_value = [(snap, acc)]
@@ -101,9 +97,7 @@ class TestGetEfficientFrontier:
                 "005930.KS": [0.01] * 252,
                 "AAPL": [0.008] * 252,
             }
-            mock_loop.return_value.run_in_executor = AsyncMock(
-                side_effect=[returns_map, expected]
-            )
+            mock_loop.return_value.run_in_executor = AsyncMock(side_effect=[returns_map, expected])
 
             result = await get_efficient_frontier(uuid.uuid4(), mock_db)
 
@@ -153,6 +147,7 @@ class TestGetEfficientFrontier:
 
 # ── _compute_frontier 순수 로직 (numpy/scipy 직접 호출) ──
 
+
 class TestComputeFrontierLogic:
     def test_insufficient_data_returns_note(self, override_settings):
         from app.services.portfolio_optimizer import _compute_frontier
@@ -179,6 +174,7 @@ class TestComputeFrontierLogic:
     def test_with_valid_data_produces_frontier(self, override_settings):
         """실제 scipy로 최소 2종목 효율적 프론티어 계산."""
         import random
+
         random.seed(42)
         from app.services.portfolio_optimizer import _compute_frontier
 

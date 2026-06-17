@@ -9,7 +9,20 @@ vi.mock("@/stores/themeStore", () => ({
 }));
 
 vi.mock("@/utils/dividendUtils", () => ({
-  MONTH_LABELS: ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"],
+  MONTH_LABELS: [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월",
+  ],
   dividendFreqInfo: vi.fn(() => ({ label: "분기", cls: "text-blue-500" })),
   weightBarColor: vi.fn(() => "bg-blue-500"),
   yieldBadgeClass: vi.fn(() => "bg-green-100 text-green-600"),
@@ -32,9 +45,27 @@ import { TaxPositionTable } from "@/components/invest/TaxPositionTable";
 // ------- DCAProjectionChart -------
 describe("DCAProjectionChart", () => {
   const mockData: DCAProjectionPoint[] = [
-    { month: "2024-01", projected_krw: 1000000, actual_krw: 950000, achievement_pct: 95, has_data: true },
-    { month: "2024-02", projected_krw: 2000000, actual_krw: null, achievement_pct: null, has_data: false },
-    { month: "2025-01", projected_krw: 5000000, actual_krw: null, achievement_pct: null, has_data: false },
+    {
+      month: "2024-01",
+      projected_krw: 1000000,
+      actual_krw: 950000,
+      achievement_pct: 95,
+      has_data: true,
+    },
+    {
+      month: "2024-02",
+      projected_krw: 2000000,
+      actual_krw: null,
+      achievement_pct: null,
+      has_data: false,
+    },
+    {
+      month: "2025-01",
+      projected_krw: 5000000,
+      actual_krw: null,
+      achievement_pct: null,
+      has_data: false,
+    },
   ];
 
   it("renders without crash with data", () => {
@@ -50,7 +81,13 @@ describe("DCAProjectionChart", () => {
 
   it("shows no actual data warning", () => {
     const noActualData: DCAProjectionPoint[] = [
-      { month: "2024-01", projected_krw: 1000000, actual_krw: null, achievement_pct: null, has_data: false },
+      {
+        month: "2024-01",
+        projected_krw: 1000000,
+        actual_krw: null,
+        achievement_pct: null,
+        has_data: false,
+      },
     ];
     renderWithProviders(<DCAProjectionChart data={noActualData} />);
     expect(screen.getByText(/실제 자산 데이터가 없습니다/)).toBeDefined();
@@ -108,7 +145,13 @@ describe("GoalTimelineCard", () => {
 describe("MonthlyAchievementTable", () => {
   it("renders empty state when no past data", () => {
     const futureData: DCAProjectionPoint[] = [
-      { month: "2099-01", projected_krw: 1000000, actual_krw: null, achievement_pct: null, has_data: false },
+      {
+        month: "2099-01",
+        projected_krw: 1000000,
+        actual_krw: null,
+        achievement_pct: null,
+        has_data: false,
+      },
     ];
     renderWithProviders(<MonthlyAchievementTable data={futureData} />);
     expect(screen.getByText("스냅샷 데이터가 없습니다.")).toBeDefined();
@@ -116,8 +159,20 @@ describe("MonthlyAchievementTable", () => {
 
   it("renders monthly data", () => {
     const pastData: DCAProjectionPoint[] = [
-      { month: "2023-01", projected_krw: 1000000, actual_krw: 950000, achievement_pct: 95, has_data: true },
-      { month: "2023-02", projected_krw: 2000000, actual_krw: 2100000, achievement_pct: 105, has_data: true },
+      {
+        month: "2023-01",
+        projected_krw: 1000000,
+        actual_krw: 950000,
+        achievement_pct: 95,
+        has_data: true,
+      },
+      {
+        month: "2023-02",
+        projected_krw: 2000000,
+        actual_krw: 2100000,
+        achievement_pct: 105,
+        has_data: true,
+      },
     ];
     renderWithProviders(<MonthlyAchievementTable data={pastData} />);
     expect(screen.getByText(/월별 달성율/)).toBeDefined();
@@ -133,8 +188,20 @@ describe("YearlyAchievementTable", () => {
 
   it("renders yearly data", () => {
     const yearlyData: YearlyAchievement[] = [
-      { year: 2023, projected_year_end_krw: 10000000, actual_year_end_krw: 9500000, achievement_pct: 95, has_data: true },
-      { year: 2024, projected_year_end_krw: 20000000, actual_year_end_krw: null, achievement_pct: null, has_data: false },
+      {
+        year: 2023,
+        projected_year_end_krw: 10000000,
+        actual_year_end_krw: 9500000,
+        achievement_pct: 95,
+        has_data: true,
+      },
+      {
+        year: 2024,
+        projected_year_end_krw: 20000000,
+        actual_year_end_krw: null,
+        achievement_pct: null,
+        has_data: false,
+      },
     ];
     renderWithProviders(<YearlyAchievementTable data={yearlyData} />);
     expect(screen.getAllByText("연별 달성율").length).toBeGreaterThan(0);
@@ -153,7 +220,7 @@ describe("TaxSimulationCard", () => {
         simTax={0}
         simTaxDiff={0}
         currentTax={0}
-      />
+      />,
     );
     expect(screen.getByText("매도 시뮬레이션 합계")).toBeDefined();
     expect(screen.getByText("0원")).toBeDefined();
@@ -168,7 +235,7 @@ describe("TaxSimulationCard", () => {
         simTax={605000}
         simTaxDiff={605000}
         currentTax={0}
-      />
+      />,
     );
     expect(screen.getByText("예상 납부 세금")).toBeDefined();
   });
@@ -182,7 +249,7 @@ describe("TaxSimulationCard", () => {
         simTax={374000}
         simTaxDiff={374000}
         currentTax={0}
-      />
+      />,
     );
     expect(screen.getByText("기존 실현 손익")).toBeDefined();
   });
@@ -208,9 +275,7 @@ describe("TaxRecommendationList", () => {
   };
 
   it("renders recommendations list", () => {
-    const recommendations = [
-      { pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 },
-    ];
+    const recommendations = [{ pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 }];
     renderWithProviders(<TaxRecommendationList recommendations={recommendations} />);
     expect(screen.getByText(/절세 추천/)).toBeDefined();
     expect(screen.getByText("AAPL")).toBeDefined();
@@ -254,7 +319,7 @@ describe("TaxPositionTable", () => {
         totalLoss={0}
         hasAnyQtyInput={false}
         handleQtyChange={vi.fn()}
-      />
+      />,
     );
     expect(screen.getAllByText("AAPL").length).toBeGreaterThan(0);
   });
@@ -269,7 +334,7 @@ describe("TaxPositionTable", () => {
         totalLoss={-1000000}
         hasAnyQtyInput={false}
         handleQtyChange={vi.fn()}
-      />
+      />,
     );
     expect(screen.getAllByText("TSLA").length).toBeGreaterThan(0);
   });
@@ -285,7 +350,7 @@ describe("TaxPositionTable", () => {
         totalLoss={0}
         hasAnyQtyInput={true}
         handleQtyChange={handleQtyChange}
-      />
+      />,
     );
     const inputs = screen.getAllByRole("spinbutton");
     if (inputs.length > 0) {

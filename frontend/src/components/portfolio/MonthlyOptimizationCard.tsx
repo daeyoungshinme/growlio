@@ -2,7 +2,20 @@ import { TrendingUp } from "lucide-react";
 import { fmtKrw } from "@/utils/format";
 import { useOptimizationSuggestions } from "@/hooks/useOptimizationSuggestions";
 
-const MONTH_KO = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+const MONTH_KO = [
+  "1월",
+  "2월",
+  "3월",
+  "4월",
+  "5월",
+  "6월",
+  "7월",
+  "8월",
+  "9월",
+  "10월",
+  "11월",
+  "12월",
+];
 
 export default function MonthlyOptimizationCard() {
   const { suggestions, isLoading } = useOptimizationSuggestions();
@@ -61,9 +74,16 @@ export default function MonthlyOptimizationCard() {
                     className="flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center gap-2">
-                      <TrendingUp size={12} className="text-amber-500 dark:text-amber-400 shrink-0" />
-                      <span className="font-medium text-gray-700 dark:text-gray-300">{item.ticker}</span>
-                      <span className="text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{item.name}</span>
+                      <TrendingUp
+                        size={12}
+                        className="text-amber-500 dark:text-amber-400 shrink-0"
+                      />
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        {item.ticker}
+                      </span>
+                      <span className="text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
+                        {item.name}
+                      </span>
                       <span className="px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px]">
                         {item.market}
                       </span>

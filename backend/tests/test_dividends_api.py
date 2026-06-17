@@ -1,4 +1,5 @@
 """배당금 API 테스트 (GET /api/v1/dividends/...)."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -35,6 +37,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -69,6 +72,7 @@ class TestDividendSummary:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/dividends/summary")
@@ -78,10 +82,13 @@ class TestDividendSummary:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.get_dividend_summary",
-            AsyncMock(return_value=_MOCK_SUMMARY),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_dividend_summary",
+                AsyncMock(return_value=_MOCK_SUMMARY),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dividends/summary")
         assert resp.status_code == 200
 
@@ -91,10 +98,13 @@ class TestDividendPositions:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.get_position_dividend_yields",
-            AsyncMock(return_value=[]),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_position_dividend_yields",
+                AsyncMock(return_value=[]),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dividends/positions")
         assert resp.status_code == 200
         assert resp.json() == []
@@ -105,10 +115,13 @@ class TestDividendByTicker:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.get_ticker_dividend_summary",
-            AsyncMock(return_value=[]),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_ticker_dividend_summary",
+                AsyncMock(return_value=[]),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dividends/by-ticker")
         assert resp.status_code == 200
 
@@ -118,10 +131,13 @@ class TestTickerSettings:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.get_ticker_settings",
-            AsyncMock(return_value=None),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_ticker_settings",
+                AsyncMock(return_value=None),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dividends/ticker-settings/005930?market=KOSPI")
         assert resp.status_code == 200
         data = resp.json()
@@ -132,10 +148,13 @@ class TestTickerSettings:
         db = _make_mock_db()
         app = _setup_app(user, db)
         mock_result = {"ticker": "005930", "market": "KOSPI", "dividend_months": [3, 6, 9, 12], "is_manual": True}
-        with patch(
-            "app.api.v1.dividends.get_ticker_settings",
-            AsyncMock(return_value=mock_result),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_ticker_settings",
+                AsyncMock(return_value=mock_result),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dividends/ticker-settings/005930?market=KOSPI")
         assert resp.status_code == 200
         assert resp.json()["dividend_months"] == [3, 6, 9, 12]
@@ -145,10 +164,13 @@ class TestTickerSettings:
         db = _make_mock_db()
         app = _setup_app(user, db)
         mock_result = {"ticker": "005930", "market": "KOSPI", "dividend_months": [3, 9], "is_manual": True}
-        with patch(
-            "app.api.v1.dividends.upsert_ticker_settings",
-            AsyncMock(return_value=mock_result),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.upsert_ticker_settings",
+                AsyncMock(return_value=mock_result),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.put(
                 "/api/v1/dividends/ticker-settings/005930",
                 json={"market": "KOSPI", "dividend_months": [3, 9]},
@@ -181,10 +203,13 @@ class TestTickerSettings:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.delete_ticker_settings",
-            AsyncMock(return_value=False),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.delete_ticker_settings",
+                AsyncMock(return_value=False),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.delete("/api/v1/dividends/ticker-settings/005930?market=KOSPI")
         assert resp.status_code == 404
 
@@ -192,10 +217,13 @@ class TestTickerSettings:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.dividends.delete_ticker_settings",
-            AsyncMock(return_value=True),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.delete_ticker_settings",
+                AsyncMock(return_value=True),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.delete("/api/v1/dividends/ticker-settings/005930?market=KOSPI")
         assert resp.status_code == 200
         assert resp.json()["deleted"] is True
@@ -293,12 +321,16 @@ class TestDividendDripSimulation:
         app = _setup_app(user, db)
         mock_div_summary = {"total_dividend_krw": 0.0, "estimated_annual": 0.0, "estimated_annual_krw": 0.0}
         mock_result = {"annual_dividends": [], "compounding_years": []}
-        with patch(
-            "app.api.v1.dividends.get_dividend_summary",
-            AsyncMock(return_value=mock_div_summary),
-        ), patch(
-            "app.api.v1.dividends.simulate_drip",
-            MagicMock(return_value=mock_result),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.dividends.get_dividend_summary",
+                AsyncMock(return_value=mock_div_summary),
+            ),
+            patch(
+                "app.api.v1.dividends.simulate_drip",
+                MagicMock(return_value=mock_result),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post("/api/v1/dividends/drip-simulation", json={})
         assert resp.status_code == 200

@@ -34,12 +34,17 @@ class KisToken(Base):
 
     __table_args__ = (
         Index(
-            "uq_kis_token_account", "account_id",
-            unique=True, postgresql_where="account_id IS NOT NULL",
+            "uq_kis_token_account",
+            "account_id",
+            unique=True,
+            postgresql_where="account_id IS NOT NULL",
         ),
         Index(
-            "uq_kis_token_user_mode", "user_id", "is_mock_mode",
-            unique=True, postgresql_where="account_id IS NULL",
+            "uq_kis_token_user_mode",
+            "user_id",
+            "is_mock_mode",
+            unique=True,
+            postgresql_where="account_id IS NULL",
         ),
     )
 

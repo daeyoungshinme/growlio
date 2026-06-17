@@ -33,8 +33,7 @@ export interface HistoryPoint {
   value: number;
 }
 
-export const fetchIndicators = () =>
-  apiGet<IndicatorLatest[]>("/economic-indicators");
+export const fetchIndicators = () => apiGet<IndicatorLatest[]>("/economic-indicators");
 
 export const fetchIndicatorCalendar = () =>
   apiGet<EconomicCalendarEvent[]>("/economic-indicators/calendar");

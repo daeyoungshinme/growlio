@@ -74,7 +74,7 @@ export interface ExecutionOrderItem {
   quantity: number;
   account_id?: string | null;
   order_type: "MARKET" | "LIMIT";
-  limit_price?: number | null;  // 국내=KRW, 해외=USD
+  limit_price?: number | null; // 국내=KRW, 해외=USD
 }
 
 export interface ExecutionRequest {

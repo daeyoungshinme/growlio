@@ -17,7 +17,12 @@ const POSITION_CLASSES: Record<Position, string> = {
   right: "left-full top-1/2 -translate-y-1/2 ml-2",
 };
 
-export default function Tooltip({ content, children, position = "top", maxWidth = "max-w-xs" }: Props) {
+export default function Tooltip({
+  content,
+  children,
+  position = "top",
+  maxWidth = "max-w-xs",
+}: Props) {
   return (
     <span className="relative inline-flex group">
       {cloneElement(children, { tabIndex: 0 })}

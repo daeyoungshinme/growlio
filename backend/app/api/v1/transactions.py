@@ -39,11 +39,7 @@ async def list_transactions(
         stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
     if transaction_type:
         stmt = stmt.where(Transaction.transaction_type == transaction_type)
-    stmt = (
-        stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-    )
+    stmt = stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

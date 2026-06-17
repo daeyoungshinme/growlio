@@ -36,9 +36,7 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redi
 
     ticker_summaries = await get_ticker_dividend_summary(user_id, db)
     estimated_annual = sum(
-        item["estimated_annual_krw"]
-        for item in ticker_summaries
-        if item.get("estimated_annual_krw", 0) > 0
+        item["estimated_annual_krw"] for item in ticker_summaries if item.get("estimated_annual_krw", 0) > 0
     )
 
     result = {
@@ -50,9 +48,7 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redi
 
     if redis:
         with contextlib.suppress(RedisError):
-            await redis.setex(
-                dividend_summary_key(user_id), TTL_DIVIDEND_SUMMARY, json.dumps(result)
-            )
+            await redis.setex(dividend_summary_key(user_id), TTL_DIVIDEND_SUMMARY, json.dumps(result))
 
     return result
 
@@ -108,8 +104,6 @@ async def _fetch_dividend_aggregates(
         elif row.kind == "monthly":
             monthly_breakdown.append({"month": row.month, "amount": float(row.total)})
         else:
-            monthly_ticker_breakdown.append(
-                {"month": row.month, "ticker": row.ticker, "amount": float(row.total)}
-            )
+            monthly_ticker_breakdown.append({"month": row.month, "ticker": row.ticker, "amount": float(row.total)})
 
     return annual_received, monthly_breakdown, monthly_ticker_breakdown

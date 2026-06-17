@@ -1,4 +1,5 @@
 """알림 관련 DB 접근 — 이력 저장."""
+
 from __future__ import annotations
 
 import uuid

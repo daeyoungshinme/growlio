@@ -1,4 +1,5 @@
 """dividend/orchestrator.py 추가 단위 테스트."""
+
 from __future__ import annotations
 
 import json
@@ -81,8 +82,13 @@ class TestCollectPositions:
         from app.services.dividend.orchestrator import _collect_positions
 
         pos1 = SimpleNamespace(
-            ticker="AAPL", market="NASDAQ", name="Apple",
-            value_krw=1_000_000.0, qty=10.0, current_price=100_000.0, avg_price=95_000.0,
+            ticker="AAPL",
+            market="NASDAQ",
+            name="Apple",
+            value_krw=1_000_000.0,
+            qty=10.0,
+            current_price=100_000.0,
+            avg_price=95_000.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos1])
         acc = SimpleNamespace(id=uuid.uuid4())
@@ -101,8 +107,13 @@ class TestCollectPositions:
         from app.services.dividend.orchestrator import _collect_positions
 
         pos_zero = SimpleNamespace(
-            ticker="DEAD", market="NASDAQ", name="Dead Stock",
-            value_krw=0.0, qty=0.0, current_price=0.0, avg_price=0.0,
+            ticker="DEAD",
+            market="NASDAQ",
+            name="Dead Stock",
+            value_krw=0.0,
+            qty=0.0,
+            current_price=0.0,
+            avg_price=0.0,
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos_zero])
         acc = SimpleNamespace(id=uuid.uuid4())
@@ -202,9 +213,11 @@ class TestGetTickerDividendSummary:
 
         with patch(
             "app.services.dividend.orchestrator.get_redis",
-            new=AsyncMock(return_value=AsyncMock(
-                get=AsyncMock(return_value=json.dumps(cached).encode()),
-            )),
+            new=AsyncMock(
+                return_value=AsyncMock(
+                    get=AsyncMock(return_value=json.dumps(cached).encode()),
+                )
+            ),
         ):
             result = await get_ticker_dividend_summary(uuid.uuid4(), mock_db)
 

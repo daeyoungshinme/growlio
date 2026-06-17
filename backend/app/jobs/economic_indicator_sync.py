@@ -1,4 +1,5 @@
 """경제지표 동기화 잡 — 매일 08:00 KST FRED 최신값 갱신 + FMP 캘린더 캐싱 및 구독자 알림."""
+
 from __future__ import annotations
 
 import structlog
@@ -27,6 +28,7 @@ async def run_economic_indicator_sync() -> None:
 
     try:
         from app.services.economic_calendar_service import sync_calendar_to_cache
+
         await sync_calendar_to_cache(redis)
     except Exception as e:
         logger.error("fmp_calendar_sync_failed", error=str(e))
@@ -89,11 +91,13 @@ async def run_economic_indicator_alert_check() -> None:
                 names = ", ".join(d["name"] for d in indicators_data[:3])
                 if len(indicators_data) > 3:
                     names += f" 외 {len(indicators_data) - 3}개"
-                db.add(AlertHistory(
-                    user_id=user.id,
-                    alert_type="INDICATOR_RESULT",
-                    message=f"경제지표 발표 알림: {names}",
-                ))
+                db.add(
+                    AlertHistory(
+                        user_id=user.id,
+                        alert_type="INDICATOR_RESULT",
+                        message=f"경제지표 발표 알림: {names}",
+                    )
+                )
                 await db.commit()
 
             logger.info(

@@ -1,4 +1,5 @@
 """USD/KRW 환율 Redis 캐싱 유틸리티."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,9 +12,7 @@ from app.config import settings
 from app.utils.cache_keys import USD_KRW_RATE as _REDIS_USD_KRW_KEY
 
 
-async def get_usd_krw_rate(
-    redis: aioredis.Redis | None, fallback_rate: float | None = None
-) -> float:
+async def get_usd_krw_rate(redis: aioredis.Redis | None, fallback_rate: float | None = None) -> float:
     """Redis 캐시에서 USD/KRW 환율 조회. 캐시 미적중 시 config fallback 반환."""
     rate = fallback_rate if fallback_rate is not None else settings.usd_krw_fallback_rate
     if redis is None:

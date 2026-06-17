@@ -11,6 +11,7 @@ from app.models.asset import VALID_MARKETS
 
 class ManualPosition(BaseModel):
     """수동 종목 입력 스키마."""
+
     ticker: str
     name: str
     market: str = "KOSPI"
@@ -95,10 +96,7 @@ class RealEstateDetails(BaseModel):
 
     @model_validator(mode="after")
     def mortgage_not_exceed_value(self) -> "RealEstateDetails":
-        if (
-            self.purchase_price_krw is not None
-            and self.mortgage_balance_krw > self.purchase_price_krw
-        ):
+        if self.purchase_price_krw is not None and self.mortgage_balance_krw > self.purchase_price_krw:
             raise ValueError("모기지 잔액이 부동산 가치를 초과할 수 없습니다")
         return self
 
@@ -121,10 +119,10 @@ class AssetAccountCreate(BaseModel):
     data_source: DataSource = DataSource.MANUAL
     institution: str | None = None
     kis_account_no: str | None = None
-    kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_key: str | None = None  # 계좌별 KIS App Key (평문, 저장 시 암호화)
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
     kiwoom_account_no: str | None = None
-    kiwoom_app_key: str | None = None     # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
     ob_fintech_use_no: str | None = None
     ob_bank_code: str | None = None
@@ -170,9 +168,9 @@ class AssetAccountCreate(BaseModel):
 class AssetAccountUpdate(BaseModel):
     name: str | None = None
     institution: str | None = None
-    kis_app_key: str | None = None     # 계좌별 KIS App Key (평문, 저장 시 암호화)
+    kis_app_key: str | None = None  # 계좌별 KIS App Key (평문, 저장 시 암호화)
     kis_app_secret: str | None = None  # 계좌별 KIS App Secret (평문, 저장 시 암호화)
-    kiwoom_app_key: str | None = None     # 키움 App Key (평문, 저장 시 암호화)
+    kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
     manual_amount: float | None = None
     deposit_krw: float | None = None
@@ -215,7 +213,7 @@ class AssetAccountResponse(BaseModel):
     sort_order: int
     notes: str | None
     created_at: datetime
-    has_own_kis_credentials: bool = False     # KIS 계좌별 API 키 보유 여부
+    has_own_kis_credentials: bool = False  # KIS 계좌별 API 키 보유 여부
     has_own_kiwoom_credentials: bool = False  # 키움 계좌별 API 키 보유 여부
     target_portfolio_id: UUID | None = None
 

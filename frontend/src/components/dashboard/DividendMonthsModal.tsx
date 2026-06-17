@@ -15,20 +15,32 @@ interface Props {
 }
 
 export default function DividendMonthsModal({
-  ticker, market, name, currentMonths, isManual, onClose, onSave, onReset, isSaving,
+  ticker,
+  market,
+  name,
+  currentMonths,
+  isManual,
+  onClose,
+  onSave,
+  onReset,
+  isSaving,
 }: Props) {
   const [selected, setSelected] = useState<Set<number>>(new Set(currentMonths));
 
   const toggle = (m: number) => {
     setSelected((prev) => {
       const next = new Set(prev);
-      if (next.has(m)) next.delete(m); else next.add(m);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
       return next;
     });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
       <div
         className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-80 p-5"
         onClick={(e) => e.stopPropagation()}
@@ -36,14 +48,21 @@ export default function DividendMonthsModal({
         <div className="flex items-center justify-between mb-4">
           <div>
             <p className="font-semibold text-gray-900 dark:text-gray-50">{name}</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">{ticker} · {market}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {ticker} · {market}
+            </p>
           </div>
-          <button onClick={onClose} className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors">
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          >
             <X size={16} />
           </button>
         </div>
 
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">배당 지급 월 선택 (복수 선택 가능)</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          배당 지급 월 선택 (복수 선택 가능)
+        </p>
 
         <div className="grid grid-cols-4 gap-2 mb-5">
           {MONTH_LABELS.map((label, i) => {

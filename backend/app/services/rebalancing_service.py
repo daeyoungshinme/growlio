@@ -1,4 +1,5 @@
 """리밸런싱 분석 서비스."""
+
 from __future__ import annotations
 
 import uuid
@@ -65,18 +66,14 @@ def _build_target_items(
         target_value = base_krw * (weight / 100.0)
 
         if ticker == "CASH":
-            current_value = (
-                float(overview.get("total_assets_krw", 0))
-                - float(overview.get("total_stock_krw", 0))
-            )
+            current_value = float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0))
             current_price = None
             shares = None
         elif market == "KR_PROPERTY":
             current_value = sum(
                 float(acc.get("amount_krw", 0))
                 for acc in overview.get("accounts", [])
-                if acc.get("asset_type") == "REAL_ESTATE"
-                and acc.get("include_in_total", True)
+                if acc.get("asset_type") == "REAL_ESTATE" and acc.get("include_in_total", True)
             )
             current_price = None
             shares = None
@@ -85,11 +82,7 @@ def _build_target_items(
             current_value = pos["value_krw"]
             current_price = pos.get("current_price")
             diff_krw = target_value - current_value
-            shares = (
-                round(diff_krw / float(current_price), 0)
-                if current_price and float(current_price) > 0
-                else None
-            )
+            shares = round(diff_krw / float(current_price), 0) if current_price and float(current_price) > 0 else None
 
         current_weight_pct = (current_value / base_krw * 100) if base_krw > 0 else 0.0
         diff_krw = target_value - current_value
@@ -104,32 +97,30 @@ def _build_target_items(
             elif div_yield and div_yield > 0:
                 annual_div_target = target_value * (div_yield / 100)
 
-        ret = (
-            returns_map.get(key)
-            if (returns_map and ticker != "CASH" and market != "KR_PROPERTY")
-            else None
-        )
+        ret = returns_map.get(key) if (returns_map and ticker != "CASH" and market != "KR_PROPERTY") else None
 
-        result_items.append(RebalancingItem(
-            ticker=ticker,
-            name=name,
-            market=market,
-            target_weight_pct=round(weight, 2),
-            current_weight_pct=round(current_weight_pct, 2),
-            weight_diff_pct=round(weight - current_weight_pct, 2),
-            current_value_krw=round(current_value, 0),
-            target_value_krw=round(target_value, 0),
-            diff_krw=round(diff_krw, 0),
-            shares_to_trade=shares,
-            current_price_krw=float(current_price) if current_price is not None else None,
-            dividend_yield=div_yield,
-            annual_dividend_current_krw=round(annual_div_current, 0),
-            annual_dividend_target_krw=round(annual_div_target, 0),
-            annual_dividend_diff_krw=round(annual_div_target - annual_div_current, 0),
-            return_10y_pct=ret["cumulative_return_pct"] if ret else None,
-            cagr_10y_pct=ret["cagr_pct"] if ret else None,
-            actual_years_10y=ret["actual_years"] if ret else None,
-        ))
+        result_items.append(
+            RebalancingItem(
+                ticker=ticker,
+                name=name,
+                market=market,
+                target_weight_pct=round(weight, 2),
+                current_weight_pct=round(current_weight_pct, 2),
+                weight_diff_pct=round(weight - current_weight_pct, 2),
+                current_value_krw=round(current_value, 0),
+                target_value_krw=round(target_value, 0),
+                diff_krw=round(diff_krw, 0),
+                shares_to_trade=shares,
+                current_price_krw=float(current_price) if current_price is not None else None,
+                dividend_yield=div_yield,
+                annual_dividend_current_krw=round(annual_div_current, 0),
+                annual_dividend_target_krw=round(annual_div_target, 0),
+                annual_dividend_diff_krw=round(annual_div_target - annual_div_current, 0),
+                return_10y_pct=ret["cumulative_return_pct"] if ret else None,
+                cagr_10y_pct=ret["cagr_pct"] if ret else None,
+                actual_years_10y=ret["actual_years"] if ret else None,
+            )
+        )
 
     return result_items, target_keys
 
@@ -152,34 +143,34 @@ def _build_untracked_items(
         weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
         diff_u = -current_value_u
         shares_u: float | None = (
-            round(diff_u / float(current_price_u), 0)
-            if current_price_u and float(current_price_u) > 0
-            else None
+            round(diff_u / float(current_price_u), 0) if current_price_u and float(current_price_u) > 0 else None
         )
 
         div_yield_u, annual_div_current_u = _div_info(ticker_u, market_u, dividend_map)
         ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None
 
-        items.append(RebalancingItem(
-            ticker=ticker_u,
-            name=data["name"],
-            market=market_u,
-            target_weight_pct=0.0,
-            current_weight_pct=round(weight_u, 2),
-            weight_diff_pct=round(-weight_u, 2),
-            current_value_krw=round(current_value_u, 0),
-            target_value_krw=0.0,
-            diff_krw=round(diff_u, 0),
-            shares_to_trade=shares_u,
-            current_price_krw=float(current_price_u) if current_price_u is not None else None,
-            dividend_yield=div_yield_u,
-            annual_dividend_current_krw=round(annual_div_current_u, 0),
-            annual_dividend_target_krw=0.0,
-            annual_dividend_diff_krw=round(-annual_div_current_u, 0),
-            return_10y_pct=ret_u["cumulative_return_pct"] if ret_u else None,
-            cagr_10y_pct=ret_u["cagr_pct"] if ret_u else None,
-            actual_years_10y=ret_u["actual_years"] if ret_u else None,
-        ))
+        items.append(
+            RebalancingItem(
+                ticker=ticker_u,
+                name=data["name"],
+                market=market_u,
+                target_weight_pct=0.0,
+                current_weight_pct=round(weight_u, 2),
+                weight_diff_pct=round(-weight_u, 2),
+                current_value_krw=round(current_value_u, 0),
+                target_value_krw=0.0,
+                diff_krw=round(diff_u, 0),
+                shares_to_trade=shares_u,
+                current_price_krw=float(current_price_u) if current_price_u is not None else None,
+                dividend_yield=div_yield_u,
+                annual_dividend_current_krw=round(annual_div_current_u, 0),
+                annual_dividend_target_krw=0.0,
+                annual_dividend_diff_krw=round(-annual_div_current_u, 0),
+                return_10y_pct=ret_u["cumulative_return_pct"] if ret_u else None,
+                cagr_10y_pct=ret_u["cagr_pct"] if ret_u else None,
+                actual_years_10y=ret_u["actual_years"] if ret_u else None,
+            )
+        )
     return items
 
 
@@ -190,8 +181,7 @@ def _calc_portfolio_cagrs(
 ) -> tuple[float | None, float | None]:
     """목표 포트폴리오와 현재 보유 포트폴리오의 가중 CAGR을 계산한다."""
     items_with_return = [
-        i for i in result_items
-        if i.cagr_10y_pct is not None and i.ticker != "CASH" and i.market != "KR_PROPERTY"
+        i for i in result_items if i.cagr_10y_pct is not None and i.ticker != "CASH" and i.market != "KR_PROPERTY"
     ]
 
     target_weighted_cagr: float | None = None
@@ -199,8 +189,7 @@ def _calc_portfolio_cagrs(
         target_w_sum = sum(i.target_weight_pct for i in items_with_return)
         if target_w_sum > 0:
             target_weighted_cagr = round(
-                sum(i.target_weight_pct * (i.cagr_10y_pct or 0.0) for i in items_with_return)
-                / target_w_sum,
+                sum(i.target_weight_pct * (i.cagr_10y_pct or 0.0) for i in items_with_return) / target_w_sum,
                 2,
             )
 
@@ -216,9 +205,7 @@ def _calc_portfolio_cagrs(
         if holdings:
             total_val = sum(v for v, _ in holdings)
             if total_val > 0:
-                current_weighted_cagr = round(
-                    sum(v * c for v, c in holdings) / total_val, 2
-                )
+                current_weighted_cagr = round(sum(v * c for v, c in holdings) / total_val, 2)
 
     return target_weighted_cagr, current_weighted_cagr
 
@@ -248,14 +235,16 @@ def _build_ticker_account_map(overview: dict) -> dict[str, list[TickerAccountInf
     ticker_account_map: dict[str, list[TickerAccountInfo]] = {}
     for (pos_ticker, acc_id), data in holding_map.items():
         meta = account_meta_map.get(acc_id, {})
-        ticker_account_map.setdefault(pos_ticker, []).append(TickerAccountInfo(
-            account_id=acc_id,
-            account_name=data["account_name"],
-            asset_type=meta.get("asset_type", "UNKNOWN"),
-            quantity=round(data["qty"], 4),
-            value_krw=round(data["val"], 0),
-            is_mock_mode=meta.get("is_mock_mode", False),
-        ))
+        ticker_account_map.setdefault(pos_ticker, []).append(
+            TickerAccountInfo(
+                account_id=acc_id,
+                account_name=data["account_name"],
+                asset_type=meta.get("asset_type", "UNKNOWN"),
+                quantity=round(data["qty"], 4),
+                value_krw=round(data["val"], 0),
+                is_mock_mode=meta.get("is_mock_mode", False),
+            )
+        )
     return ticker_account_map
 
 
@@ -328,9 +317,7 @@ def analyze_rebalancing(
     result_items, target_keys = _build_target_items(
         portfolio, base_krw, overview, current_map, dividend_map, returns_map
     )
-    result_items += _build_untracked_items(
-        current_map, target_keys, base_krw, dividend_map, returns_map
-    )
+    result_items += _build_untracked_items(current_map, target_keys, base_krw, dividend_map, returns_map)
 
     if include_implicit_cash and portfolio.base_type == "TOTAL_ASSETS":
         cash_item = _build_implicit_cash_item(result_items, overview, base_krw)
@@ -338,9 +325,7 @@ def analyze_rebalancing(
             result_items.append(cash_item)
 
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
-    target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(
-        result_items, current_map, returns_map
-    )
+    target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(result_items, current_map, returns_map)
     ticker_account_map = _build_ticker_account_map(overview)
 
     return RebalancingAnalysis(
@@ -352,9 +337,7 @@ def analyze_rebalancing(
         untracked_holdings=[],
         analyzed_at=datetime.now(UTC).isoformat(),
         current_portfolio_annual_dividend=target_div_sum,
-        target_portfolio_annual_dividend=round(
-            sum(i.annual_dividend_target_krw for i in result_items), 0
-        ),
+        target_portfolio_annual_dividend=round(sum(i.annual_dividend_target_krw for i in result_items), 0),
         total_current_annual_dividend=target_div_sum,
         target_weighted_cagr_10y_pct=target_weighted_cagr,
         current_weighted_cagr_10y_pct=current_weighted_cagr,

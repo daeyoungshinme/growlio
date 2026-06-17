@@ -37,7 +37,6 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
 
   const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS" && a.is_active);
 
-
   const saveMutation = useMutation({
     mutationFn: () =>
       updateAutoDca({
@@ -57,7 +56,8 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
   return (
     <SectionCard title="자동 정기매수 (DCA)">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        매월 설정한 날에 지정 포트폴리오 비중대로 KIS 계좌에서 자동 매수합니다. 실거래 주문이 실행되므로 신중히 설정하세요.
+        매월 설정한 날에 지정 포트폴리오 비중대로 KIS 계좌에서 자동 매수합니다. 실거래 주문이
+        실행되므로 신중히 설정하세요.
       </p>
       <div className="flex items-center gap-3">
         <label className="relative inline-flex items-center cursor-pointer">
@@ -84,7 +84,9 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
                 onChange={(e) => setDcaForm((f) => ({ ...f, day: e.target.value }))}
               >
                 {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
-                  <option key={d} value={d}>{d}일</option>
+                  <option key={d} value={d}>
+                    {d}일
+                  </option>
                 ))}
               </select>
             </div>
@@ -110,7 +112,9 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
             >
               <option value="">선택하세요</option>
               {portfolios.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
               ))}
             </select>
           </div>
@@ -123,11 +127,15 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
             >
               <option value="">선택하세요</option>
               {kisAccounts.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
             {kisAccounts.length === 0 && (
-              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">KIS 계좌를 먼저 등록해주세요.</p>
+              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1">
+                KIS 계좌를 먼저 등록해주세요.
+              </p>
             )}
           </div>
         </div>
@@ -148,4 +156,3 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
     </SectionCard>
   );
 }
-

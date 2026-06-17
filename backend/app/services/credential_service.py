@@ -20,9 +20,7 @@ def _get_key() -> bytes:
     key_hex = settings.kis_cred_encryption_key
     key_bytes = binascii.unhexlify(key_hex.replace("-", ""))
     if len(key_bytes) != 32:
-        raise ValueError(
-            f"KIS_CRED_ENCRYPTION_KEY는 64자 hex(32바이트)여야 합니다. 현재 {len(key_bytes)}바이트."
-        )
+        raise ValueError(f"KIS_CRED_ENCRYPTION_KEY는 64자 hex(32바이트)여야 합니다. 현재 {len(key_bytes)}바이트.")
     return key_bytes
 
 

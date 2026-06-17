@@ -1,4 +1,5 @@
 """rebalancing_service 단위 테스트."""
+
 import uuid
 from types import SimpleNamespace
 
@@ -33,14 +34,15 @@ class TestAnalyzeRebalancingBuyCase:
 
     def test_buy_diff_and_shares(self):
         """현재 30%, 목표 50% → diff +200,000, shares 매수."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 300_000, "current_price": 250_000},
+                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 300_000, "current_price": 250_000},
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -50,9 +52,11 @@ class TestAnalyzeRebalancingBuyCase:
 
     def test_not_held_position(self):
         """보유 없는 종목 → current_value=0, diff=target_value."""
-        portfolio = _make_portfolio([
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(total_stock_krw=1_000_000, all_positions=[])
         result = analyze_rebalancing(portfolio, overview)
         item = result.items[0]
@@ -66,24 +70,24 @@ class TestAnalyzeRebalancingSellCase:
 
     def test_sell_diff_negative(self):
         """현재 80%, 목표 50% → diff 음수."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 50},
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 50},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 50},
+                {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 50},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 800_000, "current_price": 200_000},
-                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla",
-                 "value_krw": 200_000, "current_price": 100_000},
+                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 800_000, "current_price": 200_000},
+                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla", "value_krw": 200_000, "current_price": 100_000},
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
         aapl = next(i for i in result.items if i.ticker == "AAPL")
         tsla = next(i for i in result.items if i.ticker == "TSLA")
         assert aapl.diff_krw == -300_000  # 매도
-        assert tsla.diff_krw == 300_000   # 매수
+        assert tsla.diff_krw == 300_000  # 매수
         assert aapl.shares_to_trade == -2  # -300000 / 200000 = -1.5 → round = -2
 
 
@@ -92,9 +96,11 @@ class TestCashItem:
 
     def test_cash_has_no_shares(self):
         """CASH 항목은 shares_to_trade=None."""
-        portfolio = _make_portfolio([
-            {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 100},
+            ]
+        )
         overview = _make_overview(total_assets_krw=2_000_000, total_stock_krw=1_500_000)
         result = analyze_rebalancing(portfolio, overview)
         item = result.items[0]
@@ -124,10 +130,19 @@ class TestTotalAssetsBaseType:
             [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}],
             base_type="TOTAL_ASSETS",
         )
-        overview = _make_overview(total_assets_krw=2_000_000, total_stock_krw=1_000_000, all_positions=[
-            {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-             "value_krw": 1_000_000, "current_price": 500_000},
-        ])
+        overview = _make_overview(
+            total_assets_krw=2_000_000,
+            total_stock_krw=1_000_000,
+            all_positions=[
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000,
+                    "current_price": 500_000,
+                },
+            ],
+        )
         result = analyze_rebalancing(portfolio, overview)
         assert result.base_value_krw == 2_000_000
         item = result.items[0]
@@ -139,16 +154,16 @@ class TestUntrackedHoldings:
 
     def test_untracked_appears_as_sell_item(self):
         """TSLA 보유 중인데 목표 포트폴리오에 없으면 items에 target=0 매도 아이템으로 포함."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 600_000, "current_price": 200_000},
-                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla",
-                 "value_krw": 400_000, "current_price": 100_000},
+                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 600_000, "current_price": 200_000},
+                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla", "value_krw": 400_000, "current_price": 100_000},
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -161,14 +176,21 @@ class TestUntrackedHoldings:
 
     def test_all_tracked_empty_untracked(self):
         """모든 보유 종목이 목표 포트폴리오에 있으면 untracked_holdings 비어 있음."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 1_000_000, "current_price": 200_000},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000,
+                    "current_price": 200_000,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -180,14 +202,15 @@ class TestShareCalculationEdgeCases:
 
     def test_zero_price_no_shares(self):
         """current_price=0 이면 shares_to_trade=None."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 500_000, "current_price": 0},
+                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 500_000, "current_price": 0},
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -195,9 +218,11 @@ class TestShareCalculationEdgeCases:
 
     def test_no_positions_zero_base(self):
         """보유 자산이 없어 base_krw=0 이면 current_weight_pct=0."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(total_stock_krw=0, all_positions=[])
         result = analyze_rebalancing(portfolio, overview)
         assert result.base_value_krw == 0
@@ -244,18 +269,22 @@ class TestWeightValidation:
 
 # ── _div_info 순수 함수 ─────────────────────────────────────
 
+
 class TestDivInfo:
     def test_none_map_returns_none_zero(self):
         from app.services.rebalancing_service import _div_info
+
         assert _div_info("AAPL", "NASDAQ", None) == (None, 0.0)
 
     def test_ticker_not_in_map_returns_none_zero(self):
         from app.services.rebalancing_service import _div_info
+
         div_map = {("TSLA", "NASDAQ"): {"dividend_yield": 1.5, "estimated_annual_krw": 1000}}
         assert _div_info("AAPL", "NASDAQ", div_map) == (None, 0.0)
 
     def test_with_positive_yield(self):
         from app.services.rebalancing_service import _div_info
+
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 2.5, "estimated_annual_krw": 50_000}}
         yp, annual = _div_info("AAPL", "NASDAQ", div_map)
         assert yp == pytest.approx(2.5)
@@ -263,11 +292,13 @@ class TestDivInfo:
 
     def test_zero_yield_and_annual_returns_none_zero(self):
         from app.services.rebalancing_service import _div_info
+
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 0, "estimated_annual_krw": 0}}
         assert _div_info("AAPL", "NASDAQ", div_map) == (None, 0.0)
 
     def test_only_annual_positive_returns_none_and_annual(self):
         from app.services.rebalancing_service import _div_info
+
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 0, "estimated_annual_krw": 30_000}}
         yp, annual = _div_info("AAPL", "NASDAQ", div_map)
         assert yp is None
@@ -276,12 +307,15 @@ class TestDivInfo:
 
 # ── KR_PROPERTY 시장 ────────────────────────────────────────
 
+
 class TestKrPropertyItem:
     def test_kr_property_uses_real_estate_value(self):
         """KR_PROPERTY 항목은 REAL_ESTATE 계좌 값 합산."""
-        portfolio = _make_portfolio([
-            {"ticker": "HOUSE", "name": "아파트", "market": "KR_PROPERTY", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "HOUSE", "name": "아파트", "market": "KR_PROPERTY", "weight": 100},
+            ]
+        )
         overview = {
             "total_assets_krw": 500_000_000,
             "total_stock_krw": 0,
@@ -297,9 +331,11 @@ class TestKrPropertyItem:
 
     def test_kr_property_no_real_estate_accounts_gives_zero(self):
         """REAL_ESTATE 계좌 없으면 current_value=0."""
-        portfolio = _make_portfolio([
-            {"ticker": "HOUSE", "name": "아파트", "market": "KR_PROPERTY", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "HOUSE", "name": "아파트", "market": "KR_PROPERTY", "weight": 100},
+            ]
+        )
         overview = {
             "total_assets_krw": 1_000_000,
             "total_stock_krw": 1_000_000,
@@ -313,17 +349,25 @@ class TestKrPropertyItem:
 
 # ── 배당 정보가 있는 포트폴리오 ─────────────────────────────
 
+
 class TestDividendMapInAnalysis:
     def test_dividend_info_included_in_items(self):
         """dividend_map 전달 시 배당 정보가 items에 포함된다."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 1_000_000, "current_price": 200_000},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000,
+                    "current_price": 200_000,
+                },
             ],
         )
         div_map = {
@@ -335,9 +379,11 @@ class TestDividendMapInAnalysis:
 
     def test_dividend_target_estimated_from_yield(self):
         """annual_div_current=0이지만 yield>0이면 target 배당금 추정."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(total_stock_krw=1_000_000, all_positions=[])
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 2.0, "estimated_annual_krw": 0}}
         result = analyze_rebalancing(portfolio, overview, dividend_map=div_map)
@@ -348,22 +394,39 @@ class TestDividendMapInAnalysis:
 
 # ── weighted CAGR (_calc_portfolio_cagrs) ────────────────────
 
+
 class TestWeightedCagr:
     def test_weighted_cagr_set_with_returns_map(self):
         """returns_map이 있으면 target/current weighted CAGR 계산."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 60},
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 40},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 60},
+                {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "weight": 40},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 600_000, "current_price": 100_000,
-                 "account_id": str(uuid.uuid4()), "account_name": "계좌", "qty": 6},
-                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla",
-                 "value_krw": 400_000, "current_price": 80_000,
-                 "account_id": str(uuid.uuid4()), "account_name": "계좌", "qty": 5},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 600_000,
+                    "current_price": 100_000,
+                    "account_id": str(uuid.uuid4()),
+                    "account_name": "계좌",
+                    "qty": 6,
+                },
+                {
+                    "ticker": "TSLA",
+                    "market": "NASDAQ",
+                    "name": "Tesla",
+                    "value_krw": 400_000,
+                    "current_price": 80_000,
+                    "account_id": str(uuid.uuid4()),
+                    "account_name": "계좌",
+                    "qty": 5,
+                },
             ],
         )
         returns_map = {
@@ -376,9 +439,11 @@ class TestWeightedCagr:
 
     def test_no_returns_map_gives_none_cagr(self):
         """returns_map 없으면 cagr=None."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = _make_overview(total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview, returns_map=None)
         assert result.target_weighted_cagr_10y_pct is None
@@ -386,20 +451,30 @@ class TestWeightedCagr:
 
 # ── _build_ticker_account_map ─────────────────────────────────
 
+
 class TestTickerAccountMap:
     def test_ticker_account_map_populated(self):
         """all_positions + accounts → ticker_account_map 구성."""
         acc_id = str(uuid.uuid4())
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         overview = {
             "total_assets_krw": 1_000_000,
             "total_stock_krw": 1_000_000,
             "all_positions": [
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple",
-                 "value_krw": 1_000_000, "current_price": 200_000,
-                 "account_id": acc_id, "account_name": "계좌1", "qty": 5},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000,
+                    "current_price": 200_000,
+                    "account_id": acc_id,
+                    "account_name": "계좌1",
+                    "qty": 5,
+                },
             ],
             "accounts": [
                 {"id": acc_id, "asset_type": "STOCK_KIS", "is_mock_mode": False},
@@ -412,14 +487,17 @@ class TestTickerAccountMap:
 
     def test_empty_positions_gives_empty_map(self):
         """all_positions 없으면 ticker_account_map 비어 있음."""
-        portfolio = _make_portfolio([
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ]
+        )
         result = analyze_rebalancing(portfolio, _make_overview())
         assert result.ticker_account_map == {}
 
 
 # ── include_implicit_cash 테스트 ─────────────────────────────
+
 
 class TestImplicitCash:
     """analyze_rebalancing include_implicit_cash=True 동작 검증."""

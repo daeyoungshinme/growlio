@@ -1,4 +1,5 @@
 """API 의존성 함수 단위 테스트 (deps.py)."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -19,6 +20,7 @@ class TestExtractToken:
     @pytest.mark.asyncio
     async def test_raises_401_when_no_authorization(self):
         from app.api.deps import get_current_user
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(authorization=None, db=AsyncMock())
         assert exc_info.value.status_code == 401
@@ -26,6 +28,7 @@ class TestExtractToken:
     @pytest.mark.asyncio
     async def test_raises_401_when_no_bearer_prefix(self):
         from app.api.deps import get_current_user
+
         with pytest.raises(HTTPException) as exc_info:
             await get_current_user(authorization="Token abc123", db=AsyncMock())
         assert exc_info.value.status_code == 401
@@ -74,8 +77,7 @@ class TestGetCurrentUser:
 
         mock_db.scalar = AsyncMock(return_value=None)
         with (
-            patch("app.api.deps.verify_supabase_token",
-                  return_value={"sub": str(uuid.uuid4())}),
+            patch("app.api.deps.verify_supabase_token", return_value={"sub": str(uuid.uuid4())}),
             pytest.raises(HTTPException) as exc_info,
         ):
             await get_current_user(authorization="Bearer token", db=mock_db)
@@ -88,8 +90,7 @@ class TestGetCurrentUser:
 
         user = _make_user()
         mock_db.scalar = AsyncMock(return_value=user)
-        with patch("app.api.deps.verify_supabase_token",
-                   return_value={"sub": str(user.id)}):
+        with patch("app.api.deps.verify_supabase_token", return_value={"sub": str(user.id)}):
             result = await get_current_user(authorization="Bearer token", db=mock_db)
 
         assert result is user

@@ -8,8 +8,14 @@ interface Props {
 }
 
 export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
-  const { months_to_goal, expected_goal_date, actual_expected_goal_date, current_progress_pct, on_track, lead_lag_months } =
-    timeline;
+  const {
+    months_to_goal,
+    expected_goal_date,
+    actual_expected_goal_date,
+    current_progress_pct,
+    on_track,
+    lead_lag_months,
+  } = timeline;
 
   const leadLagLabel = () => {
     if (lead_lag_months === null || lead_lag_months === undefined) return null;
@@ -21,7 +27,9 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
             {lead_lag_months}개월 앞서고 있음
           </span>
           {actual_expected_goal_date && (
-            <span className="text-xs text-red-400">{fmtMonth(actual_expected_goal_date)} 달성 예상</span>
+            <span className="text-xs text-red-400">
+              {fmtMonth(actual_expected_goal_date)} 달성 예상
+            </span>
           )}
         </span>
       );
@@ -33,7 +41,9 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
             {Math.abs(lead_lag_months)}개월 뒤처지고 있음
           </span>
           {actual_expected_goal_date && (
-            <span className="text-xs text-blue-400">{fmtMonth(actual_expected_goal_date)} 달성 예상</span>
+            <span className="text-xs text-blue-400">
+              {fmtMonth(actual_expected_goal_date)} 달성 예상
+            </span>
           )}
         </span>
       );
@@ -42,7 +52,9 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
 
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">목표 달성 전망</h3>
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
+        목표 달성 전망
+      </h3>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 진행율</p>
@@ -50,7 +62,9 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
             {current_progress_pct !== null ? `${current_progress_pct.toFixed(1)}%` : "—"}
           </p>
           {goalAmount && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표 {fmtKrw(goalAmount)}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              목표 {fmtKrw(goalAmount)}
+            </p>
           )}
         </div>
         <div>
@@ -59,7 +73,9 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
             {expected_goal_date ?? "—"}
           </p>
           {months_to_goal && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">약 {months_to_goal}개월 후</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+              약 {months_to_goal}개월 후
+            </p>
           )}
         </div>
         <div>

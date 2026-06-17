@@ -37,7 +37,9 @@ export default function ConfirmModal({
           {danger && (
             <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           )}
-          <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">{message}</p>
+          <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
+            {message}
+          </p>
         </div>
         <div className="flex gap-3 justify-end">
           <button

@@ -1,4 +1,5 @@
 """Supabase JWT 검증 서비스."""
+
 from datetime import timedelta
 
 import jwt

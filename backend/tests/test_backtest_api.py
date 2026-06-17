@@ -1,4 +1,5 @@
 """백테스트 API 테스트 (GET/POST /api/v1/backtest/...)."""
+
 from __future__ import annotations
 
 import contextlib
@@ -23,6 +24,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -39,6 +41,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -75,8 +78,10 @@ _MOCK_BACKTEST_PORTFOLIO = {
     "updated_at": datetime.now(UTC).isoformat(),
 }
 
+
 def _make_backtest_result():
     from app.schemas.backtest import BacktestResult
+
     return BacktestResult(dates=["2020-01-01"], series=[], metrics=[])
 
 
@@ -84,6 +89,7 @@ class TestBacktestPortfolios:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/backtest/portfolios")
@@ -202,10 +208,13 @@ class TestRunCorrelation:
         from app.schemas.backtest import CorrelationResult
 
         mock_result = CorrelationResult(labels=["AAPL"], matrix=[[1.0]])
-        with patch(
-            "app.api.v1.backtest.compute_correlation",
-            AsyncMock(return_value=mock_result),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.backtest.compute_correlation",
+                AsyncMock(return_value=mock_result),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post("/api/v1/backtest/correlation", json=payload)
         assert resp.status_code == 200
 
@@ -236,9 +245,12 @@ class TestRunBacktest:
             "include_real_portfolio": True,
             "reinvest_dividends": True,
         }
-        with patch(
-            "app.api.v1.backtest.run_backtest",
-            AsyncMock(return_value=_make_backtest_result()),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.backtest.run_backtest",
+                AsyncMock(return_value=_make_backtest_result()),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post("/api/v1/backtest/run", json=payload)
         assert resp.status_code == 200

@@ -126,15 +126,11 @@ export interface RebalancingStrategy {
 // ---------------------------------------------------------------------------
 
 export const fetchPortfolioRisk = (portfolioId?: string) =>
-  apiGet<PortfolioRiskMetrics>(
-    portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk",
-  );
+  apiGet<PortfolioRiskMetrics>(portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk");
 
-export const fetchCurrencyExposure = () =>
-  apiGet<CurrencyExposure>("/portfolio/currency-exposure");
+export const fetchCurrencyExposure = () => apiGet<CurrencyExposure>("/portfolio/currency-exposure");
 
-export const fetchFactorAnalysis = () =>
-  apiGet<FactorAnalysis>("/portfolio/factor-analysis");
+export const fetchFactorAnalysis = () => apiGet<FactorAnalysis>("/portfolio/factor-analysis");
 
 export const fetchPortfolioFactorAnalysis = (portfolioId: string) =>
   apiGet<FactorAnalysis>(`/portfolio/factor-analysis/${portfolioId}`);

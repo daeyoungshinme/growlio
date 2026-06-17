@@ -1,4 +1,5 @@
 """통합 포트폴리오 CRUD API (백테스팅·리밸런싱 공용)."""
+
 import json
 import uuid
 
@@ -112,14 +113,16 @@ async def create_portfolio(
     await db.flush()  # id 생성
 
     for idx, item in enumerate(body.items):
-        db.add(PortfolioItem(
-            portfolio_id=portfolio.id,
-            ticker=item.ticker,
-            name=item.name,
-            market=item.market,
-            weight=item.weight,
-            sort_order=idx,
-        ))
+        db.add(
+            PortfolioItem(
+                portfolio_id=portfolio.id,
+                ticker=item.ticker,
+                name=item.name,
+                market=item.market,
+                weight=item.weight,
+                sort_order=idx,
+            )
+        )
 
     if body.account_ids:
         for aid in body.account_ids:
@@ -138,9 +141,7 @@ async def create_portfolio(
     redis = await get_redis()
     await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
 
-    result = await db.execute(
-        _with_relations(select(Portfolio).where(Portfolio.id == portfolio.id))
-    )
+    result = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio.id)))
     return result.scalar_one()
 
 
@@ -164,9 +165,7 @@ async def update_portfolio(
     )
     portfolio = result.scalar_one_or_none()
     if not portfolio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     if body.account_ids is not None:
         await _validate_account_ids(body.account_ids, current_user.id, db)
@@ -178,14 +177,16 @@ async def update_portfolio(
     if body.items is not None:
         await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))
         for idx, item in enumerate(body.items):
-            db.add(PortfolioItem(
-                portfolio_id=portfolio.id,
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                weight=item.weight,
-                sort_order=idx,
-            ))
+            db.add(
+                PortfolioItem(
+                    portfolio_id=portfolio.id,
+                    ticker=item.ticker,
+                    name=item.name,
+                    market=item.market,
+                    weight=item.weight,
+                    sort_order=idx,
+                )
+            )
 
     if body.account_ids is not None:
         old_ids = {str(la.account_id) for la in portfolio.linked_accounts}
@@ -193,9 +194,7 @@ async def update_portfolio(
         added = new_ids - old_ids
         removed = old_ids - new_ids
 
-        await db.execute(
-            delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id)
-        )
+        await db.execute(delete(PortfolioAccount).where(PortfolioAccount.portfolio_id == portfolio_id))
         for aid in body.account_ids:
             db.add(PortfolioAccount(portfolio_id=portfolio.id, account_id=aid))
 
@@ -223,9 +222,7 @@ async def update_portfolio(
     redis = await get_redis()
     await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
 
-    result2 = await db.execute(
-        _with_relations(select(Portfolio).where(Portfolio.id == portfolio_id))
-    )
+    result2 = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio_id)))
     return result2.scalar_one()
 
 
@@ -245,9 +242,7 @@ async def delete_portfolio(
         )
     )
     if not portfolio:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     await db.delete(portfolio)
     await db.commit()

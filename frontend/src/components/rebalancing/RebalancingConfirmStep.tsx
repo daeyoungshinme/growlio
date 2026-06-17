@@ -52,9 +52,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
         </div>
       )}
 
-      <div className="text-xs text-gray-500">
-        시장이 닫혀 있을 경우 주문이 예약될 수 있습니다.
-      </div>
+      <div className="text-xs text-gray-500">시장이 닫혀 있을 경우 주문이 예약될 수 있습니다.</div>
 
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs text-gray-400">주문 유형</span>
@@ -77,15 +75,18 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
           <div className="w-full sm:w-48 space-y-1">
             <div className="flex justify-between text-xs text-gray-500">
               <span>현재가 조회 중...</span>
-              <span>{priceLoadProgress.loaded}/{priceLoadProgress.total}</span>
+              <span>
+                {priceLoadProgress.loaded}/{priceLoadProgress.total}
+              </span>
             </div>
             <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-indigo-500 rounded-full transition-all duration-300"
                 style={{
-                  width: priceLoadProgress.total > 0
-                    ? `${(priceLoadProgress.loaded / priceLoadProgress.total) * 100}%`
-                    : "0%"
+                  width:
+                    priceLoadProgress.total > 0
+                      ? `${(priceLoadProgress.loaded / priceLoadProgress.total) * 100}%`
+                      : "0%",
                 }}
               />
             </div>
@@ -118,8 +119,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
             const bState = balanceState[acc.id] ?? "idle";
             const unassignedBuyItems = actionableItems.filter(
               (i) =>
-                (i.shares_to_trade ?? 0) > 0 &&
-                !(buyAccounts[i.ticker] ?? []).includes(acc.id)
+                (i.shares_to_trade ?? 0) > 0 && !(buyAccounts[i.ticker] ?? []).includes(acc.id),
             );
             const hasData =
               sellRows.length > 0 || buyRows.length > 0 || unassignedBuyItems.length > 0;
@@ -172,12 +172,12 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       {bState === "loading"
                         ? "조회 중..."
                         : bState === "loaded"
-                        ? "✓ 잔고 반영"
-                        : bState === "not_found"
-                        ? "계좌 없음"
-                        : bState === "error"
-                        ? "오류 (재시도)"
-                        : "잔고 조회"}
+                          ? "✓ 잔고 반영"
+                          : bState === "not_found"
+                            ? "계좌 없음"
+                            : bState === "error"
+                              ? "오류 (재시도)"
+                              : "잔고 조회"}
                     </button>
                   </div>
                 </div>

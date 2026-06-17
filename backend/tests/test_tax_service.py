@@ -20,23 +20,21 @@ _RATES_2025 = _get_rates(2025)
 
 # ── _build_harvesting_recommendations ────────────────────────
 
+
 class TestBuildHarvestingRecommendations:
     """Tax-Loss Harvesting 추천 순수 로직 검증."""
 
     def test_no_gain_returns_empty(self, override_settings):
         """과세 대상 이익이 없으면 빈 리스트."""
-        positions = [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ",
-                      "unrealized_pnl_krw": -500_000, "qty": 5}]
+        positions = [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "unrealized_pnl_krw": -500_000, "qty": 5}]
         assert _build_harvesting_recommendations(positions, 0.0, _RATES_2025) == []
         assert _build_harvesting_recommendations(positions, -100_000, _RATES_2025) == []
 
     def test_loss_positions_only_selected(self, override_settings):
         """손실 포지션만 추천 목록에 포함된다."""
         positions = [
-            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ",
-             "unrealized_pnl_krw": 200_000, "qty": 3},
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
-             "unrealized_pnl_krw": -400_000, "qty": 2},
+            {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "unrealized_pnl_krw": 200_000, "qty": 3},
+            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "unrealized_pnl_krw": -400_000, "qty": 2},
         ]
         result = _build_harvesting_recommendations(positions, 500_000, _RATES_2025)
         tickers = [r["ticker"] for r in result]
@@ -46,8 +44,7 @@ class TestBuildHarvestingRecommendations:
     def test_tax_saved_calculation(self, override_settings):
         """tax_saved_krw = min(loss, remaining_gain) × 0.22"""
         positions = [
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
-             "unrealized_pnl_krw": -1_000_000, "qty": 5},
+            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "unrealized_pnl_krw": -1_000_000, "qty": 5},
         ]
         result = _build_harvesting_recommendations(positions, 500_000, _RATES_2025)
         assert len(result) == 1
@@ -57,10 +54,8 @@ class TestBuildHarvestingRecommendations:
     def test_stops_when_gain_fully_offset(self, override_settings):
         """과세이익이 상쇄되면 더 이상 추천하지 않는다."""
         positions = [
-            {"ticker": "A", "name": "A", "market": "NYSE",
-             "unrealized_pnl_krw": -2_000_000, "qty": 10},
-            {"ticker": "B", "name": "B", "market": "NYSE",
-             "unrealized_pnl_krw": -1_000_000, "qty": 5},
+            {"ticker": "A", "name": "A", "market": "NYSE", "unrealized_pnl_krw": -2_000_000, "qty": 10},
+            {"ticker": "B", "name": "B", "market": "NYSE", "unrealized_pnl_krw": -1_000_000, "qty": 5},
         ]
         # gain=1_500_000 → A(-2M)로 완전 상쇄되므로 B 추천 불필요
         result = _build_harvesting_recommendations(positions, 1_500_000, _RATES_2025)
@@ -70,10 +65,8 @@ class TestBuildHarvestingRecommendations:
     def test_sorted_by_largest_loss_first(self, override_settings):
         """손실이 큰 종목이 먼저 추천된다."""
         positions = [
-            {"ticker": "X", "name": "X", "market": "NYSE",
-             "unrealized_pnl_krw": -300_000, "qty": 3},
-            {"ticker": "Y", "name": "Y", "market": "NYSE",
-             "unrealized_pnl_krw": -800_000, "qty": 4},
+            {"ticker": "X", "name": "X", "market": "NYSE", "unrealized_pnl_krw": -300_000, "qty": 3},
+            {"ticker": "Y", "name": "Y", "market": "NYSE", "unrealized_pnl_krw": -800_000, "qty": 4},
         ]
         result = _build_harvesting_recommendations(positions, 2_000_000, _RATES_2025)
         assert result[0]["ticker"] == "Y"
@@ -82,8 +75,7 @@ class TestBuildHarvestingRecommendations:
     def test_result_includes_required_fields(self, override_settings):
         """추천 결과에 필수 필드 포함."""
         positions = [
-            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ",
-             "unrealized_pnl_krw": -500_000, "qty": 2},
+            {"ticker": "TSLA", "name": "Tesla", "market": "NASDAQ", "unrealized_pnl_krw": -500_000, "qty": 2},
         ]
         result = _build_harvesting_recommendations(positions, 1_000_000, _RATES_2025)
         assert len(result) == 1
@@ -97,6 +89,7 @@ class TestBuildHarvestingRecommendations:
 
 
 # ── get_tax_summary ──────────────────────────────────────────
+
 
 class TestGetTaxSummary:
     """get_tax_summary: 연도별 세금 추정 요약."""
@@ -119,14 +112,22 @@ class TestGetTaxSummary:
             result = await get_tax_summary(user_id, 2025, mock_db)
 
         required = [
-            "year", "dividend_income_krw", "dividend_tax_krw",
-            "overseas_unrealized_gain_krw", "overseas_gain_deduction_krw",
-            "overseas_tax_estimated_krw", "domestic_stock_value_krw",
+            "year",
+            "dividend_income_krw",
+            "dividend_tax_krw",
+            "overseas_unrealized_gain_krw",
+            "overseas_gain_deduction_krw",
+            "overseas_tax_estimated_krw",
+            "domestic_stock_value_krw",
             "domestic_unrealized_gain_krw",
-            "domestic_large_holder_warning", "comprehensive_tax_warning",
-            "total_estimated_tax_krw", "total_fees_krw",
-            "harvesting_recommendations", "financial_investment_tax_simulation",
-            "note", "rates",
+            "domestic_large_holder_warning",
+            "comprehensive_tax_warning",
+            "total_estimated_tax_krw",
+            "total_fees_krw",
+            "harvesting_recommendations",
+            "financial_investment_tax_simulation",
+            "note",
+            "rates",
         ]
         for key in required:
             assert key in result, f"Missing key: {key}"
@@ -279,6 +280,7 @@ class TestGetTaxSummary:
 
 
 # ── _calc_total_fees / _calc_dividend_income DB 헬퍼 ────────
+
 
 class TestCalcTotalFeesDb:
     @pytest.mark.asyncio

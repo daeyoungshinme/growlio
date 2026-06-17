@@ -29,7 +29,10 @@ export default function LoginPage() {
       // await 없이 실행하므로 navigate와 병렬 진행 — 청크 로드 완료 시점에 캐시가 채워짐.
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.portfolioOverviewLite, queryFn: fetchPortfolioOverviewLite });
+      queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.portfolioOverviewLite,
+        queryFn: fetchPortfolioOverviewLite,
+      });
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
       queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
       navigate("/dashboard");
@@ -50,7 +53,12 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">이메일</label>
+            <label
+              htmlFor="login-email"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              이메일
+            </label>
             <input
               id="login-email"
               type="email"
@@ -62,7 +70,12 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호</label>
+            <label
+              htmlFor="login-password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              비밀번호
+            </label>
             <input
               id="login-password"
               type="password"

@@ -6,24 +6,29 @@ from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
 # ── Yahoo 심볼 변환 테스트 ──────────────────────────────────
 
+
 class TestToYahooSymbol:
     """_to_yahoo_symbol: 시장별 티커 변환 로직."""
 
-    @pytest.mark.parametrize(("ticker", "market", "expected"), [
-        ("005930", "KOSPI", "005930.KS"),
-        ("5930", "KOSPI", "005930.KS"),   # zero-padding
-        ("5930", "KRX", "005930.KS"),
-        ("035720", "KOSDAQ", "035720.KQ"),
-        ("35720", "KOSDAQ", "035720.KQ"),  # zero-padding
-        ("AAPL", "NYSE", "AAPL"),           # 해외: 그대로
-        ("TSLA", "NASDAQ", "TSLA"),
-        ("NVDA", "nasdaq", "NVDA"),         # 소문자 market도 처리
-    ])
+    @pytest.mark.parametrize(
+        ("ticker", "market", "expected"),
+        [
+            ("005930", "KOSPI", "005930.KS"),
+            ("5930", "KOSPI", "005930.KS"),  # zero-padding
+            ("5930", "KRX", "005930.KS"),
+            ("035720", "KOSDAQ", "035720.KQ"),
+            ("35720", "KOSDAQ", "035720.KQ"),  # zero-padding
+            ("AAPL", "NYSE", "AAPL"),  # 해외: 그대로
+            ("TSLA", "NASDAQ", "TSLA"),
+            ("NVDA", "nasdaq", "NVDA"),  # 소문자 market도 처리
+        ],
+    )
     def test_symbol_conversion(self, ticker, market, expected):
         assert _to_yahoo_symbol(ticker, market) == expected
 
 
 # ── fetch_current_price 우선순위 체인 테스트 ────────────────
+
 
 class TestFetchCurrentPrice:
     """Yahoo 실패 → KIS → LS 순서로 fallback 되는지 검증."""
@@ -33,6 +38,7 @@ class TestFetchCurrentPrice:
         """Yahoo Finance 가격 조회 성공 시 바로 반환."""
         import uuid
         from unittest.mock import AsyncMock, patch
+
         user_id = uuid.uuid4()
 
         with (
@@ -43,6 +49,7 @@ class TestFetchCurrentPrice:
             mock_loop.return_value.run_in_executor = mock_executor
 
             from app.services.price_service import fetch_current_price
+
             # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
             # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
             mock_db.scalar.return_value = None  # UserSettings 없음 → KIS/LS skip
@@ -64,11 +71,13 @@ class TestFetchCurrentPrice:
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=None)
 
             from app.services.price_service import fetch_current_price
+
             price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_redis)
             assert price is None
 
 
 # ── 배치 조회 테스트 ────────────────────────────────────────
+
 
 class TestFetchPricesBatch:
     """fetch_prices_batch: 여러 종목 일괄 조회."""
@@ -96,6 +105,7 @@ class TestFetchPricesBatch:
             mock_circuit.is_available.return_value = False
 
             from app.services.price_service import fetch_prices_batch
+
             result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis)
 
         assert isinstance(result, dict)
@@ -120,19 +130,20 @@ class TestFetchPricesBatch:
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
                 from app.services.price_service import fetch_prices_batch
-                result = await fetch_prices_batch(
-                    user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis
-                )
+
+                result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis)
 
         assert result.get("AAPL") == 180.0
 
 
 # ── get_historical_returns ────────────────────────────────────
 
+
 class TestGetHistoricalReturns:
     @pytest.mark.asyncio
     async def test_empty_tickers_returns_empty(self, override_settings):
         from app.services.price_service import get_historical_returns
+
         result = await get_historical_returns([])
         assert result == {}
 
@@ -146,6 +157,7 @@ class TestGetHistoricalReturns:
         redis.get = AsyncMock(return_value=json.dumps(cached_data).encode())
 
         from app.services.price_service import get_historical_returns
+
         result = await get_historical_returns([("AAPL", "NASDAQ")], redis=redis)
 
         assert ("AAPL", "NASDAQ") in result
@@ -159,6 +171,7 @@ class TestGetHistoricalReturns:
             mock_circuit.is_available.return_value = False
 
             from app.services.price_service import get_historical_returns
+
             result = await get_historical_returns([("AAPL", "NASDAQ")])
 
         assert result == {}
@@ -181,12 +194,14 @@ class TestGetHistoricalReturns:
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
                 from app.services.price_service import get_historical_returns
+
                 result = await get_historical_returns([("AAPL", "NASDAQ")])
 
         assert ("AAPL", "NASDAQ") in result
 
 
 # ── fetch_current_price cache hit ─────────────────────────────
+
 
 class TestFetchCurrentPriceCacheHit:
     @pytest.mark.asyncio
@@ -199,6 +214,7 @@ class TestFetchCurrentPriceCacheHit:
         redis.get = AsyncMock(return_value=b"75000.0")
 
         from app.services.price_service import fetch_current_price
+
         price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, redis)
 
         assert price == 75000.0

@@ -1,4 +1,5 @@
 """리밸런싱 알림 체크 — 매일 18:30 KST 실행."""
+
 from __future__ import annotations
 
 import structlog

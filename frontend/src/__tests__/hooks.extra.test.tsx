@@ -13,9 +13,7 @@ function createWrapper(options?: { path?: string }) {
   return function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={qc}>
-        <MemoryRouter initialEntries={[options?.path ?? "/"]}>
-          {children}
-        </MemoryRouter>
+        <MemoryRouter initialEntries={[options?.path ?? "/"]}>{children}</MemoryRouter>
       </QueryClientProvider>
     );
   };
@@ -54,7 +52,11 @@ vi.mock("@/api/invest", () => ({
     },
     projection_months: [],
     yearly_achievements: [],
-    goal_timeline: { months_to_goal: 200, goal_date: "2036-01-01", expected_amount_at_target: 300000000 },
+    goal_timeline: {
+      months_to_goal: 200,
+      goal_date: "2036-01-01",
+      expected_amount_at_target: 300000000,
+    },
   }),
 }));
 
@@ -145,7 +147,11 @@ describe("useExchangeRate", () => {
 
   it("shows toast on error", async () => {
     const { useExchangeRateContext } = await import("@/context/ExchangeRateContext");
-    vi.mocked(useExchangeRateContext).mockReturnValueOnce({ rate: null, isLoading: false, error: new Error("Network error") });
+    vi.mocked(useExchangeRateContext).mockReturnValueOnce({
+      rate: null,
+      isLoading: false,
+      error: new Error("Network error"),
+    });
     const { useExchangeRate } = await import("@/hooks/useExchangeRate");
     const wrapper = createWrapper();
     const { result } = renderHook(() => useExchangeRate(), { wrapper });
@@ -361,9 +367,11 @@ describe("useLogout", () => {
     const wrapper = createWrapper();
     const { result } = renderHook(() => useLogout(), { wrapper });
     // Should not throw when called
-    await expect(act(async () => {
-      await result.current();
-    })).resolves.not.toThrow();
+    await expect(
+      act(async () => {
+        await result.current();
+      }),
+    ).resolves.not.toThrow();
   });
 });
 
@@ -377,7 +385,7 @@ describe("usePullToRefresh", () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>
-      usePullToRefresh({ onRefresh, containerRef, threshold: 60 })
+      usePullToRefresh({ onRefresh, containerRef, threshold: 60 }),
     );
 
     expect(result.current.isPulling).toBe(false);
@@ -391,7 +399,7 @@ describe("usePullToRefresh", () => {
     const onRefresh = vi.fn().mockResolvedValue(undefined);
 
     const { result } = renderHook(() =>
-      usePullToRefresh({ onRefresh, containerRef, threshold: 60, disabled: true })
+      usePullToRefresh({ onRefresh, containerRef, threshold: 60, disabled: true }),
     );
 
     expect(result.current.isPulling).toBe(false);
@@ -449,8 +457,16 @@ describe("useSwipeNavigation", () => {
     );
     renderHook(() => useSwipeNavigation(containerRef), { wrapper });
 
-    expect(addEventListenerSpy).toHaveBeenCalledWith("touchstart", expect.any(Function), expect.any(Object));
-    expect(addEventListenerSpy).toHaveBeenCalledWith("touchend", expect.any(Function), expect.any(Object));
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      "touchstart",
+      expect.any(Function),
+      expect.any(Object),
+    );
+    expect(addEventListenerSpy).toHaveBeenCalledWith(
+      "touchend",
+      expect.any(Function),
+      expect.any(Object),
+    );
 
     document.body.removeChild(container);
   });

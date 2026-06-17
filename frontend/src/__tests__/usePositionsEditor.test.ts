@@ -55,7 +55,9 @@ describe("usePositionsEditor", () => {
 
   it("addRow가 새 빈 행을 추가한다", () => {
     const { result } = renderHook(() => usePositionsEditor([], null));
-    act(() => { result.current.addRow(); });
+    act(() => {
+      result.current.addRow();
+    });
     expect(result.current.rows).toHaveLength(1);
     expect(result.current.rows[0].ticker).toBe("");
   });
@@ -63,38 +65,54 @@ describe("usePositionsEditor", () => {
   it("removeRow가 지정 인덱스 행을 삭제한다", () => {
     const initial = [makePos({ ticker: "005930" }), makePos({ ticker: "000660" })];
     const { result } = renderHook(() => usePositionsEditor(initial, null));
-    act(() => { result.current.removeRow(0); });
+    act(() => {
+      result.current.removeRow(0);
+    });
     expect(result.current.rows).toHaveLength(1);
     expect(result.current.rows[0].ticker).toBe("000660");
   });
 
   it("setRow가 특정 행의 필드를 업데이트한다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], null));
-    act(() => { result.current.setRow(0, { qty: 20 }); });
+    act(() => {
+      result.current.setRow(0, { qty: 20 });
+    });
     expect(result.current.rows[0].qty).toBe(20);
   });
 
   it("handleNameChange가 이름을 업데이트하고 종목 검색을 실행한다", async () => {
     const { result } = renderHook(() => usePositionsEditor([makePos({ name: "" })], null));
-    act(() => { result.current.handleNameChange(0, "삼성"); });
+    act(() => {
+      result.current.handleNameChange(0, "삼성");
+    });
     expect(result.current.rows[0].name).toBe("삼성");
     expect(result.current.suggestIdx).toBe(0);
   });
 
   it("handleNameChange 빈 문자열은 제안을 지운다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], null));
-    act(() => { result.current.handleNameChange(0, "삼성"); });
-    act(() => { result.current.handleNameChange(0, ""); });
+    act(() => {
+      result.current.handleNameChange(0, "삼성");
+    });
+    act(() => {
+      result.current.handleNameChange(0, "");
+    });
     expect(result.current.suggestIdx).toBeNull();
   });
 
   it("handleSelectSuggestion이 행을 업데이트하고 제안을 지운다", async () => {
     const { fetchStockPrice } = await import("@/api/assets");
-    vi.mocked(fetchStockPrice).mockResolvedValue({ price_krw: 75000, price_usd: null, usd_rate: null });
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: 75000,
+      price_usd: null,
+      usd_rate: null,
+    });
 
     const { result } = renderHook(() => usePositionsEditor([makePos({ ticker: "" })], null));
     const suggestion = { ticker: "000660", name: "SK하이닉스", market: "KOSPI", exchange: "KRX" };
-    act(() => { result.current.handleSelectSuggestion(0, suggestion); });
+    act(() => {
+      result.current.handleSelectSuggestion(0, suggestion);
+    });
     expect(result.current.rows[0].ticker).toBe("000660");
     expect(result.current.rows[0].name).toBe("SK하이닉스");
     expect(result.current.suggestIdx).toBeNull();
@@ -103,7 +121,9 @@ describe("usePositionsEditor", () => {
 
   it("handleAvgPriceUsd가 USD 가격을 KRW로 환산한다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], 1350));
-    act(() => { result.current.handleAvgPriceUsd(0, "100"); });
+    act(() => {
+      result.current.handleAvgPriceUsd(0, "100");
+    });
     expect(result.current.rows[0].avg_price_usd).toBe(100);
     expect(result.current.rows[0].avg_price).toBe(135000);
     expect(result.current.rows[0].usd_rate).toBe(1350);
@@ -111,28 +131,39 @@ describe("usePositionsEditor", () => {
 
   it("handleAvgPriceUsd 빈 문자열은 0으로 처리한다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], 1350));
-    act(() => { result.current.handleAvgPriceUsd(0, ""); });
+    act(() => {
+      result.current.handleAvgPriceUsd(0, "");
+    });
     expect(result.current.rows[0].avg_price_usd).toBeNull();
     expect(result.current.rows[0].avg_price).toBe(0);
   });
 
   it("handleCurrentPriceUsd가 현재가를 업데이트한다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], 1350));
-    act(() => { result.current.handleCurrentPriceUsd(0, "50"); });
+    act(() => {
+      result.current.handleCurrentPriceUsd(0, "50");
+    });
     expect(result.current.rows[0].current_price_usd).toBe(50);
     expect(result.current.rows[0].current_price).toBe(67500);
   });
 
   it("handleCurrentPriceUsd 빈 문자열은 null로 처리한다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos()], 1350));
-    act(() => { result.current.handleCurrentPriceUsd(0, ""); });
+    act(() => {
+      result.current.handleCurrentPriceUsd(0, "");
+    });
     expect(result.current.rows[0].current_price_usd).toBeNull();
     expect(result.current.rows[0].current_price).toBeNull();
   });
 
   it("enrichRows가 해외 종목 current_price_usd를 계산한다", () => {
     const { result } = renderHook(() => usePositionsEditor([], 1350));
-    const pos = makePos({ market: "NASDAQ", current_price: 135000, usd_rate: 1350, current_price_usd: null });
+    const pos = makePos({
+      market: "NASDAQ",
+      current_price: 135000,
+      usd_rate: 1350,
+      current_price_usd: null,
+    });
     const enriched = result.current.enrichRows([pos]);
     expect(enriched[0].current_price_usd).toBeCloseTo(100, 2);
   });
@@ -160,8 +191,12 @@ describe("usePositionsEditor", () => {
 
   it("removeRow가 현재 suggestIdx 행 삭제 시 제안을 지운다", () => {
     const { result } = renderHook(() => usePositionsEditor([makePos(), makePos()], null));
-    act(() => { result.current.setSuggestIdx(0); });
-    act(() => { result.current.removeRow(0); });
+    act(() => {
+      result.current.setSuggestIdx(0);
+    });
+    act(() => {
+      result.current.removeRow(0);
+    });
     expect(result.current.suggestIdx).toBeNull();
   });
 });

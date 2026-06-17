@@ -1,4 +1,5 @@
 """DART API 테스트 (GET /api/v1/dart/disclosures)."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -36,6 +38,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -68,6 +71,7 @@ class TestDartDisclosures:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/dart/disclosures")
@@ -126,10 +130,14 @@ class TestDartDisclosures:
         mock_disclosures = [{"title": "삼성전자 공시", "ticker": "005930"}]
 
         app = _setup_app(user, db)
-        with patch("app.api.v1.dart.decrypt", return_value="real-dart-key"), patch(
-            "app.api.v1.dart.fetch_disclosures_for_tickers",
-            AsyncMock(return_value=mock_disclosures),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch("app.api.v1.dart.decrypt", return_value="real-dart-key"),
+            patch(
+                "app.api.v1.dart.fetch_disclosures_for_tickers",
+                AsyncMock(return_value=mock_disclosures),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/dart/disclosures")
         assert resp.status_code == 200
         assert len(resp.json()) == 1

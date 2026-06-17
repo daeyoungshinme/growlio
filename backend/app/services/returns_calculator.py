@@ -1,4 +1,5 @@
 """수익률 및 XIRR 계산 — 순수 수학 함수 + DB 조회."""
+
 from __future__ import annotations
 
 import asyncio
@@ -30,9 +31,7 @@ def xirr(cashflows: list[tuple[date, float]]) -> float | None:
     for _ in range(_XIRR_MAX_ITERATIONS):
         try:
             npv = sum(cf / (1 + rate) ** (d / 365.0) for cf, d in pairs)
-            dnpv = sum(
-                -cf * (d / 365.0) / (1 + rate) ** (d / 365.0 + 1) for cf, d in pairs
-            )
+            dnpv = sum(-cf * (d / 365.0) / (1 + rate) ** (d / 365.0 + 1) for cf, d in pairs)
         except (ZeroDivisionError, OverflowError):
             return None
         if abs(dnpv) < 1e-12:
@@ -48,9 +47,7 @@ def xirr(cashflows: list[tuple[date, float]]) -> float | None:
     return None
 
 
-def calc_returns(
-    current_total: float, base: float, first_date: date | None
-) -> tuple[float | None, float | None]:
+def calc_returns(current_total: float, base: float, first_date: date | None) -> tuple[float | None, float | None]:
     """연환산 수익률과 누적 수익률을 반환. (annualized, cumulative)"""
     if base <= 0 or not first_date:
         return None, None
@@ -64,9 +61,7 @@ def calc_returns(
     return annualized, cumulative
 
 
-async def calc_xirr(
-    user_id: uuid.UUID, current_total: float, db: AsyncSession
-) -> tuple[float | None, bool]:
+async def calc_xirr(user_id: uuid.UUID, current_total: float, db: AsyncSession) -> tuple[float | None, bool]:
     """Transaction 기반 XIRR 계산. 트랜잭션 없으면 스냅샷으로 추정."""
 
     result = await db.execute(

@@ -3,6 +3,7 @@
 scipy.optimize.minimize(SLSQP)를 사용하며, 1년 일별 수익률 데이터를 기반으로 한다.
 Redis 1시간 캐시를 사용한다.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -21,9 +22,9 @@ from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, RedisType
 
 logger = structlog.get_logger()
-_MIN_POSITIONS = 2           # 최적화에 필요한 최소 종목 수
-_FRONTIER_POINTS = 20        # 효율적 프론티어 산점도 포인트 수
-_MIN_RETURN_DAYS = 30        # 최적화에 필요한 최소 수익률 데이터 일수
+_MIN_POSITIONS = 2  # 최적화에 필요한 최소 종목 수
+_FRONTIER_POINTS = 20  # 효율적 프론티어 산점도 포인트 수
+_MIN_RETURN_DAYS = 30  # 최적화에 필요한 최소 수익률 데이터 일수
 
 
 def _sync_fetch_returns(symbols: list[str]) -> dict[str, list[float]]:
@@ -56,10 +57,7 @@ def _compute_frontier(
             "frontier": [],
             "current": None,
             "assets": [],
-            "note": (
-                f"최적화에 충분한 데이터 없음 "
-                f"({_MIN_POSITIONS}종목 이상, {_MIN_RETURN_DAYS}일+ 수익률 필요)"
-            ),
+            "note": (f"최적화에 충분한 데이터 없음 ({_MIN_POSITIONS}종목 이상, {_MIN_RETURN_DAYS}일+ 수익률 필요)"),
         }
 
     valid_syms, valid_weights = zip(*valid_pairs, strict=False)
@@ -92,9 +90,7 @@ def _compute_frontier(
     ret_max = float(mean_annual.max())
     frontier: list[dict] = []
     for target in np.linspace(ret_min, ret_max, _FRONTIER_POINTS):
-        cons = base_constraints + [
-            {"type": "eq", "fun": lambda w, t=target: float(w @ mean_annual) - float(t)}
-        ]
+        cons = base_constraints + [{"type": "eq", "fun": lambda w, t=target: float(w @ mean_annual) - float(t)}]
         res = minimize(
             lambda w: float(w @ cov_annual @ w),
             x0=w_arr,
@@ -131,6 +127,7 @@ def _compute_frontier(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def _compute_portfolio_position(
     symbols: list[str],
@@ -202,8 +199,11 @@ async def get_efficient_frontier(  # noqa: C901
     total_value = sum(p["value_krw"] for p in pos_map.values())
     if total_value <= 0:
         return {
-            "frontier": [], "current": None, "target": None,
-            "assets": [], "note": "포지션 데이터 없음",
+            "frontier": [],
+            "current": None,
+            "target": None,
+            "assets": [],
+            "note": "포지션 데이터 없음",
         }
 
     positions = list(pos_map.values())
@@ -215,6 +215,7 @@ async def get_efficient_frontier(  # noqa: C901
     compare_weights: list[float] = []
     if compare_portfolio_id:
         from app.models.portfolio import Portfolio
+
         portfolio = await db.get(
             Portfolio,
             compare_portfolio_id,
@@ -232,9 +233,7 @@ async def get_efficient_frontier(  # noqa: C901
 
     loop = asyncio.get_running_loop()
     returns_map = await loop.run_in_executor(None, _sync_fetch_returns, all_symbols)
-    result_data = await loop.run_in_executor(
-        None, _compute_frontier, yf_symbols, weights, returns_map
-    )
+    result_data = await loop.run_in_executor(None, _compute_frontier, yf_symbols, weights, returns_map)
 
     # 비교 포트폴리오 위치 계산
     target_pos = None

@@ -1,4 +1,5 @@
 """리밸런싱 API 테스트 (GET /api/v1/rebalancing)."""
+
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -19,6 +20,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -37,6 +39,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -78,6 +81,7 @@ class TestRebalancingAnalyze:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         pid = uuid.uuid4()
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -92,8 +96,11 @@ class TestRebalancingAnalyze:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.rebalancing.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=None))),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get(
@@ -104,6 +111,7 @@ class TestRebalancingAnalyze:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -112,6 +120,7 @@ class TestRebalancingHistory:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/rebalancing/history")
@@ -134,6 +143,7 @@ class TestRebalancingHistory:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -142,6 +152,7 @@ class TestBrokerBalance:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(f"/api/v1/rebalancing/broker-balance/{uuid.uuid4()}")
@@ -155,8 +166,11 @@ class TestBrokerBalance:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.rebalancing.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=None))),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get(
@@ -167,6 +181,7 @@ class TestBrokerBalance:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
@@ -193,8 +208,11 @@ class TestBrokerBalance:
         app = _setup_app(user, db)
         try:
             with (
-                patch("app.api.v1.rebalancing.get_redis", new_callable=AsyncMock,
-                      return_value=AsyncMock(get=AsyncMock(return_value=None))),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
                 patch("app.api.v1.rebalancing.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
                 patch(
                     "app.api.v1.rebalancing._fetch_broker_balance",
@@ -212,5 +230,6 @@ class TestBrokerBalance:
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
+
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)

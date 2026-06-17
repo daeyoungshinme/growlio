@@ -15,11 +15,7 @@ vi.mock("@/hooks/useHaptic", () => ({
 describe("ConfirmModal", () => {
   it("메시지와 버튼을 렌더링한다", () => {
     renderWithProviders(
-      <ConfirmModal
-        message="정말 삭제하시겠습니까?"
-        onConfirm={vi.fn()}
-        onCancel={vi.fn()}
-      />
+      <ConfirmModal message="정말 삭제하시겠습니까?" onConfirm={vi.fn()} onCancel={vi.fn()} />,
     );
     expect(screen.getByText("정말 삭제하시겠습니까?")).toBeInTheDocument();
     expect(screen.getByText("확인")).toBeInTheDocument();
@@ -34,7 +30,7 @@ describe("ConfirmModal", () => {
         cancelLabel="아니오"
         onConfirm={vi.fn()}
         onCancel={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("삭제")).toBeInTheDocument();
     expect(screen.getByText("아니오")).toBeInTheDocument();
@@ -42,18 +38,14 @@ describe("ConfirmModal", () => {
 
   it("확인 버튼 클릭 시 onConfirm을 호출한다", () => {
     const onConfirm = vi.fn();
-    renderWithProviders(
-      <ConfirmModal message="메시지" onConfirm={onConfirm} onCancel={vi.fn()} />
-    );
+    renderWithProviders(<ConfirmModal message="메시지" onConfirm={onConfirm} onCancel={vi.fn()} />);
     fireEvent.click(screen.getByText("확인"));
     expect(onConfirm).toHaveBeenCalled();
   });
 
   it("취소 버튼 클릭 시 onCancel을 호출한다", () => {
     const onCancel = vi.fn();
-    renderWithProviders(
-      <ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={onCancel} />
-    );
+    renderWithProviders(<ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={onCancel} />);
     fireEvent.click(screen.getByText("취소"));
     expect(onCancel).toHaveBeenCalled();
   });
@@ -61,7 +53,7 @@ describe("ConfirmModal", () => {
   it("배경 클릭 시 onCancel을 호출한다", () => {
     const onCancel = vi.fn();
     const { container } = renderWithProviders(
-      <ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={onCancel} />
+      <ConfirmModal message="메시지" onConfirm={vi.fn()} onCancel={onCancel} />,
     );
     fireEvent.click(container.firstChild as Element);
     expect(onCancel).toHaveBeenCalled();
@@ -90,9 +82,7 @@ describe("FormInput", () => {
   });
 
   it("error가 있으면 hint를 숨긴다", () => {
-    renderWithProviders(
-      <FormInput label="비밀번호" hint="힌트" error="에러" />
-    );
+    renderWithProviders(<FormInput label="비밀번호" hint="힌트" error="에러" />);
     expect(screen.queryByText("힌트")).toBeNull();
     expect(screen.getByText("에러")).toBeInTheDocument();
   });
@@ -103,7 +93,7 @@ describe("Modal", () => {
     renderWithProviders(
       <Modal title="모달 제목" onClose={vi.fn()}>
         <div>콘텐츠</div>
-      </Modal>
+      </Modal>,
     );
     expect(screen.getByText("모달 제목")).toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -114,7 +104,7 @@ describe("Modal", () => {
     renderWithProviders(
       <Modal title="제목" onClose={onClose}>
         <div>내용</div>
-      </Modal>
+      </Modal>,
     );
     fireEvent.click(screen.getByLabelText("닫기"));
     expect(onClose).toHaveBeenCalled();
@@ -125,7 +115,7 @@ describe("Modal", () => {
     const { container } = renderWithProviders(
       <Modal title="제목" onClose={onClose} closeOnBackdrop>
         <div>내용</div>
-      </Modal>
+      </Modal>,
     );
     fireEvent.click(container.firstChild as Element);
     expect(onClose).toHaveBeenCalled();
@@ -135,7 +125,7 @@ describe("Modal", () => {
     renderWithProviders(
       <Modal onClose={vi.fn()}>
         <div>콘텐츠만</div>
-      </Modal>
+      </Modal>,
     );
     expect(screen.getByText("콘텐츠만")).toBeInTheDocument();
     expect(screen.queryByLabelText("닫기")).toBeNull();
@@ -146,7 +136,7 @@ describe("Modal", () => {
     renderWithProviders(
       <Modal title="제목" onClose={onClose}>
         <button>포커스 대상</button>
-      </Modal>
+      </Modal>,
     );
     fireEvent.keyDown(document, { key: "Escape" });
     expect(onClose).toHaveBeenCalled();

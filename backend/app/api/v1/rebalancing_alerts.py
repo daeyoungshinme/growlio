@@ -1,4 +1,5 @@
 """리밸런싱 알림 CRUD."""
+
 from __future__ import annotations
 
 import uuid

@@ -1,4 +1,5 @@
 """오픈뱅킹 API 테스트 (GET /api/v1/open-banking/...)."""
+
 from __future__ import annotations
 
 import uuid
@@ -21,6 +22,7 @@ def _make_user():
 
 def _make_mock_db():
     from sqlalchemy.ext.asyncio import AsyncSession
+
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
     result = MagicMock()
@@ -37,6 +39,7 @@ def _make_mock_db():
 def mock_redis_scheduler(monkeypatch):
     import app.redis_client as rc
     import app.scheduler as sched
+
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
@@ -70,6 +73,7 @@ class TestOpenBankingConnect:
     def test_connect_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
         from app.main import app
+
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/open-banking/connect")
@@ -79,10 +83,13 @@ class TestOpenBankingConnect:
         user = _make_user()
         db = _make_mock_db()
         app = _setup_app(user, db)
-        with patch(
-            "app.api.v1.open_banking.get_authorize_url",
-            return_value="https://openbanking.example.com/oauth",
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.api.v1.open_banking.get_authorize_url",
+                return_value="https://openbanking.example.com/oauth",
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.get("/api/v1/open-banking/connect")
         assert resp.status_code == 200
         assert "authorize_url" in resp.json()
@@ -93,6 +100,7 @@ class TestOpenBankingCallback:
         from app.api.deps import get_current_user
         from app.database import get_db
         from app.main import app
+
         db = _make_mock_db()
 
         async def override_db():
@@ -102,6 +110,7 @@ class TestOpenBankingCallback:
         app.dependency_overrides[get_db] = override_db
 
         import app.redis_client as rc
+
         rc.redis_client.getdel = AsyncMock(return_value=None)
 
         with TestClient(app, raise_server_exceptions=False) as client:

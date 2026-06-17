@@ -34,10 +34,10 @@ class Settings(BaseSettings):
     kiwoom_default_retries: int = 3
 
     # Circuit breaker 공통 임계값
-    cb_default_fail_max: int = 5        # 실패 횟수 임계값 (기본)
+    cb_default_fail_max: int = 5  # 실패 횟수 임계값 (기본)
     cb_default_reset_timeout: float = 60.0  # 복구 대기(초) (기본)
-    cb_ext_fail_max: int = 3            # 외부 API (Naver, FDR, Yahoo) 실패 임계값
-    cb_ext_reset_timeout: float = 120.0 # 외부 API 복구 대기(초)
+    cb_ext_fail_max: int = 3  # 외부 API (Naver, FDR, Yahoo) 실패 임계값
+    cb_ext_reset_timeout: float = 120.0  # 외부 API 복구 대기(초)
 
     migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
 
@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     dart_api_key: str = ""  # .env의 DART_API_KEY로 설정 (opendart.fss.or.kr)
 
     fred_api_key: str = ""  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
-    fmp_api_key: str = ""   # financialmodelingprep.com — 증시 캘린더 (무료 API 키)
+    fmp_api_key: str = ""  # financialmodelingprep.com — 증시 캘린더 (무료 API 키)
 
     open_banking_client_id: str = ""
     open_banking_client_secret: str = ""
@@ -96,7 +96,7 @@ class Settings(BaseSettings):
         if all(c == "0" for c in self.kis_cred_encryption_key):
             raise ValueError(
                 "KIS_CRED_ENCRYPTION_KEY must not be all zeros — "
-                "generate with: python3 -c \"import secrets; print(secrets.token_hex(32))\""
+                'generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'
             )
         # supabase_jwt_secret은 RS256 JWKS 방식 사용 시 불필요 (선택적)
         return self

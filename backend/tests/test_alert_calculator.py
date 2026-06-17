@@ -1,4 +1,5 @@
 """alert_calculator.py 단위 테스트 — 순수 함수 검증."""
+
 from __future__ import annotations
 
 import uuid
@@ -46,6 +47,7 @@ def _make_stock_alert(**kwargs):
 
 
 # ── should_trigger_exchange_rate ─────────────────────────────────────────────
+
 
 class TestShouldTriggerExchangeRate:
     def test_below_triggers_when_rate_at_or_below_target(self):
@@ -108,6 +110,7 @@ class TestShouldTriggerExchangeRate:
 
 # ── should_trigger_stock_price ───────────────────────────────────────────────
 
+
 class TestShouldTriggerStockPrice:
     def test_below_triggers_when_price_at_or_below_target(self):
         alert = _make_stock_alert(target_price=50000.0, direction="BELOW")
@@ -160,6 +163,7 @@ class TestShouldTriggerStockPrice:
 
 # ── should_fire_today (edge case) ────────────────────────────────────────────
 
+
 def test_should_fire_today_semiannual_after_cooldown():
     today = datetime.now(tz=_KST).date()
     last_triggered = datetime.now(tz=_KST) - timedelta(days=180)
@@ -194,6 +198,7 @@ def test_should_fire_today_annual_after_cooldown():
 
 
 # ── already_fired_today (edge case) ──────────────────────────────────────────
+
 
 def test_already_fired_today_exact_utc_now():
     """UTC 기준 지금 시각도 오늘로 인식된다."""

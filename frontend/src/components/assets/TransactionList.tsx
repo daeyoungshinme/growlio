@@ -40,10 +40,18 @@ export function TransactionList({
     <table className="w-full text-sm">
       <thead>
         <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
-          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">날짜</th>
-          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">구분</th>
-          <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">금액</th>
-          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">메모</th>
+          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+            날짜
+          </th>
+          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+            구분
+          </th>
+          <th className="text-right px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+            금액
+          </th>
+          <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+            메모
+          </th>
           <th className="px-3 py-2.5" />
         </tr>
       </thead>
@@ -56,7 +64,9 @@ export function TransactionList({
             <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
               {tx.transaction_date}
             </td>
-            <td className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}>
+            <td
+              className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}
+            >
               <span>{TX_LABELS[tx.transaction_type]}</span>
               {tx.ticker && (
                 <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">

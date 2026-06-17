@@ -4,7 +4,9 @@ export interface AggregatedPositionWithSubs extends AggregatedPosition {
   sub_positions: PortfolioPosition[];
 }
 
-export function groupPositionsByTicker(positions: PortfolioPosition[]): AggregatedPositionWithSubs[] {
+export function groupPositionsByTicker(
+  positions: PortfolioPosition[],
+): AggregatedPositionWithSubs[] {
   const map = new Map<string, AggregatedPositionWithSubs>();
   for (const p of positions) {
     const key = `${p.ticker}-${p.market}`;
@@ -35,9 +37,7 @@ export function groupPositionsByTicker(positions: PortfolioPosition[]): Aggregat
     }
   }
   for (const agg of map.values()) {
-    agg.pnl_pct = agg.total_invested_krw > 0
-      ? (agg.total_pnl / agg.total_invested_krw) * 100
-      : 0;
+    agg.pnl_pct = agg.total_invested_krw > 0 ? (agg.total_pnl / agg.total_invested_krw) * 100 : 0;
   }
   return Array.from(map.values());
 }

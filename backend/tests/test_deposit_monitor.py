@@ -1,4 +1,5 @@
 """deposit_monitor 단위 테스트 — _notify_deposit_rebalancing 핵심 경로 검증."""
+
 from __future__ import annotations
 
 import uuid
@@ -42,24 +43,26 @@ async def test_notify_deposit_rebalancing_with_underweight(mock_db):
     deposit_increment = 500_000.0
 
     underweight_item = SimpleNamespace(
-        ticker="AAPL", name="Apple", market="NASDAQ",
-        diff_krw=-200_000, target_weight_pct=70.0,
-        weight_diff_pct=-10.0, shares_to_trade=2,
+        ticker="AAPL",
+        name="Apple",
+        market="NASDAQ",
+        diff_krw=-200_000,
+        target_weight_pct=70.0,
+        weight_diff_pct=-10.0,
+        shares_to_trade=2,
     )
     analysis = SimpleNamespace(items=[underweight_item])
     overview = {"total_assets_krw": 2_000_000, "total_stock_krw": 1_500_000, "all_positions": []}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview",
-              new=AsyncMock(return_value=overview)),
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
         patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_deposit_trigger_alert", new=AsyncMock()) as mock_email,
         patch("app.services.push_service.send_push_to_user", new=AsyncMock()) as mock_push,
     ):
         from app.jobs.deposit_monitor import _notify_deposit_rebalancing
-        await _notify_deposit_rebalancing(
-            alert, portfolio, deposit_increment, "user@example.com", None, mock_db
-        )
+
+        await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, "user@example.com", None, mock_db)
 
     mock_email.assert_called_once()
     call_kwargs = mock_email.call_args.kwargs
@@ -78,15 +81,15 @@ async def test_notify_deposit_rebalancing_fallback_on_analysis_failure(mock_db):
     deposit_increment = 300_000.0
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview",
-              new=AsyncMock(side_effect=Exception("DB 오류"))),
+        patch(
+            "app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(side_effect=Exception("DB 오류"))
+        ),
         patch("app.services.email_service.send_deposit_trigger_alert", new=AsyncMock()) as mock_email,
         patch("app.services.push_service.send_push_to_user", new=AsyncMock()),
     ):
         from app.jobs.deposit_monitor import _notify_deposit_rebalancing
-        await _notify_deposit_rebalancing(
-            alert, portfolio, deposit_increment, "user@example.com", None, mock_db
-        )
+
+        await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, "user@example.com", None, mock_db)
 
     # 폴백: 포트폴리오 items 비중 배분으로 이메일 발송
     mock_email.assert_called_once()
@@ -108,24 +111,26 @@ async def test_notify_deposit_rebalancing_no_underweight_uses_fallback(mock_db):
 
     # diff_krw > 0 이면 overweight (매수 불필요)
     overweight_item = SimpleNamespace(
-        ticker="AAPL", name="Apple", market="NASDAQ",
-        diff_krw=100_000, target_weight_pct=70.0,
-        weight_diff_pct=10.0, shares_to_trade=1,
+        ticker="AAPL",
+        name="Apple",
+        market="NASDAQ",
+        diff_krw=100_000,
+        target_weight_pct=70.0,
+        weight_diff_pct=10.0,
+        shares_to_trade=1,
     )
     analysis = SimpleNamespace(items=[overweight_item])
     overview = {"total_assets_krw": 2_000_000, "total_stock_krw": 1_500_000, "all_positions": []}
 
     with (
-        patch("app.services.portfolio_service.build_portfolio_overview",
-              new=AsyncMock(return_value=overview)),
+        patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
         patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_deposit_trigger_alert", new=AsyncMock()) as mock_email,
         patch("app.services.push_service.send_push_to_user", new=AsyncMock()),
     ):
         from app.jobs.deposit_monitor import _notify_deposit_rebalancing
-        await _notify_deposit_rebalancing(
-            alert, portfolio, deposit_increment, "user@example.com", "fcm-token", mock_db
-        )
+
+        await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, "user@example.com", "fcm-token", mock_db)
 
     mock_email.assert_called_once()
     call_kwargs = mock_email.call_args.kwargs
@@ -151,6 +156,7 @@ async def test_run_deposit_monitor_skips_when_lock_not_acquired():
         patch("app.jobs.deposit_monitor._run_deposit_monitor", new=AsyncMock()) as mock_run,
     ):
         from app.jobs.deposit_monitor import run_deposit_monitor
+
         await run_deposit_monitor()
 
     mock_run.assert_not_called()
@@ -169,11 +175,14 @@ async def test_run_deposit_monitor_no_rows_returns_early():
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
-        patch("app.services.market_signal_service.get_market_signal",
-              new=AsyncMock(return_value={"composite_level": "GREEN"})),
+        patch(
+            "app.services.market_signal_service.get_market_signal",
+            new=AsyncMock(return_value={"composite_level": "GREEN"}),
+        ),
         patch("app.jobs.deposit_monitor._process_deposit_alert", new=AsyncMock()) as mock_process,
     ):
         from app.jobs.deposit_monitor import _run_deposit_monitor
+
         await _run_deposit_monitor(mock_redis)
 
     mock_process.assert_not_called()
@@ -195,12 +204,14 @@ async def test_run_deposit_monitor_processes_rows():
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
-        patch("app.services.market_signal_service.get_market_signal",
-              new=AsyncMock(return_value={"composite_level": "GREEN"})),
-        patch("app.jobs.deposit_monitor._process_deposit_alert",
-              new=AsyncMock(return_value=True)) as mock_process,
+        patch(
+            "app.services.market_signal_service.get_market_signal",
+            new=AsyncMock(return_value={"composite_level": "GREEN"}),
+        ),
+        patch("app.jobs.deposit_monitor._process_deposit_alert", new=AsyncMock(return_value=True)) as mock_process,
     ):
         from app.jobs.deposit_monitor import _run_deposit_monitor
+
         await _run_deposit_monitor(mock_redis)
 
     mock_process.assert_called_once()
@@ -228,9 +239,8 @@ async def test_process_deposit_alert_account_not_found():
 
     with patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session):
         from app.jobs.deposit_monitor import _process_deposit_alert
-        result = await _process_deposit_alert(
-            alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock()
-        )
+
+        result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())
 
     assert result is False
 
@@ -247,6 +257,7 @@ async def test_update_deposit_baseline_updates_fields(mock_db):
     mock_db.scalar = AsyncMock(return_value=fresh_alert)
 
     from app.jobs.deposit_monitor import _update_deposit_baseline
+
     await _update_deposit_baseline(mock_db, alert_id, 750_000.0)
 
     assert float(fresh_alert.last_known_deposit_krw) == 750_000.0
@@ -271,6 +282,7 @@ async def test_run_deposit_monitor_lock_acquired_calls_inner():
         patch("app.jobs.deposit_monitor._run_deposit_monitor", new=AsyncMock()) as mock_run,
     ):
         from app.jobs.deposit_monitor import run_deposit_monitor
+
         await run_deposit_monitor()
 
     mock_run.assert_called_once_with(mock_redis)
@@ -292,12 +304,16 @@ async def test_run_deposit_monitor_alert_processing_error_continues():
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
-        patch("app.services.market_signal_service.get_market_signal",
-              new=AsyncMock(return_value={"composite_level": "GREEN"})),
-        patch("app.jobs.deposit_monitor._process_deposit_alert",
-              new=AsyncMock(side_effect=Exception("처리 오류"))) as mock_process,
+        patch(
+            "app.services.market_signal_service.get_market_signal",
+            new=AsyncMock(return_value={"composite_level": "GREEN"}),
+        ),
+        patch(
+            "app.jobs.deposit_monitor._process_deposit_alert", new=AsyncMock(side_effect=Exception("처리 오류"))
+        ) as mock_process,
     ):
         from app.jobs.deposit_monitor import _run_deposit_monitor
+
         await _run_deposit_monitor(mock_redis)  # 예외를 삼키고 정상 완료
 
     mock_process.assert_called_once()
@@ -316,11 +332,14 @@ async def test_run_deposit_monitor_market_signal_failure_uses_green():
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
-        patch("app.services.market_signal_service.get_market_signal",
-              new=AsyncMock(side_effect=Exception("Redis timeout"))),
+        patch(
+            "app.services.market_signal_service.get_market_signal",
+            new=AsyncMock(side_effect=Exception("Redis timeout")),
+        ),
         patch("app.jobs.deposit_monitor._process_deposit_alert", new=AsyncMock()) as mock_process,
     ):
         from app.jobs.deposit_monitor import _run_deposit_monitor
+
         await _run_deposit_monitor(mock_redis)
 
     # 시장 신호 실패해도 함수는 정상 완료되어야 함 (rows=[] 이므로 early return)
@@ -363,9 +382,8 @@ async def test_process_deposit_alert_notify_mode_triggers_on_sufficient_deposit(
         patch("app.services.alert_repository.save_alert_history", new=AsyncMock()),
     ):
         from app.jobs.deposit_monitor import _process_deposit_alert
-        result = await _process_deposit_alert(
-            alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock()
-        )
+
+        result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())
 
     assert result is True
     mock_notify.assert_called_once()
@@ -411,8 +429,7 @@ async def test_process_deposit_alert_below_min_amount_skips():
         patch("app.jobs.deposit_monitor._update_deposit_baseline", new=AsyncMock()),
     ):
         from app.jobs.deposit_monitor import _process_deposit_alert
-        result = await _process_deposit_alert(
-            alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock()
-        )
+
+        result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())
 
     assert result is False

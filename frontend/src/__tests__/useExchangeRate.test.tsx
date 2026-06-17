@@ -57,11 +57,8 @@ describe("useExchangeRate", () => {
     });
 
     await waitFor(
-      () => expect(vi.mocked(toast)).toHaveBeenCalledWith(
-        expect.stringContaining("환율"),
-        "error"
-      ),
-      { timeout: 3000 }
+      () => expect(vi.mocked(toast)).toHaveBeenCalledWith(expect.stringContaining("환율"), "error"),
+      { timeout: 3000 },
     );
   });
 

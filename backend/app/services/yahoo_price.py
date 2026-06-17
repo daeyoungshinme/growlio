@@ -32,6 +32,7 @@ def to_yf_symbol(ticker: str, market: str) -> str:
 def _sync_usdkrw() -> float:
     """동기 함수 — run_in_executor로 호출. 실패 시 0.0 반환."""
     import yfinance as yf
+
     try:
         hist = yf.Ticker("USDKRW=X").history(period="5d")
         if not hist.empty:
@@ -46,6 +47,7 @@ def _sync_usdkrw() -> float:
 def _sync_yahoo_price(ticker: str, market: str) -> float | None:
     """동기 함수 — run_in_executor로 호출."""
     import yfinance as yf
+
     sym = to_yf_symbol(ticker, market)
     try:
         hist = yf.Ticker(sym).history(period="5d")
@@ -60,6 +62,7 @@ def _sync_yahoo_price(ticker: str, market: str) -> float | None:
 def _sync_yahoo_batch(items: list[tuple[str, str]]) -> dict[str, float]:
     """여러 종목을 한 번의 download 호출로 조회. {ticker: price}"""
     import yfinance as yf
+
     if not items:
         return {}
 

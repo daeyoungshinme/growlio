@@ -51,26 +51,20 @@ describe("HeroSummaryCard", () => {
 
   it("cumulative_return_pct가 null이면 fmtPct가 '—'를 반환한다", () => {
     const data = { ...baseDashboard, cumulative_return_pct: null };
-    renderWithProviders(
-      <HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />);
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(1);
   });
 
   it("deposit_achievement_pct가 null이면 '목표 미설정'이 표시된다", () => {
     const data = { ...baseDashboard, deposit_achievement_pct: null, annual_deposit_goal: null };
-    renderWithProviders(
-      <HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />);
     expect(screen.getByText("목표 미설정")).toBeInTheDocument();
   });
 
   it("retirement_target_year가 null이면 '미설정'이 표시된다", () => {
     const data = { ...baseDashboard, retirement_target_year: null };
-    renderWithProviders(
-      <HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />);
     expect(screen.getByText("미설정")).toBeInTheDocument();
   });
 
@@ -84,18 +78,14 @@ describe("HeroSummaryCard", () => {
 
   it("수익률이 음수이면 text-blue-500 (한국 주식 관례) 클래스를 가진다", () => {
     const data = { ...baseDashboard, cumulative_return_pct: -5.3 };
-    renderWithProviders(
-      <HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />);
     const pnlEl = screen.getByText("-5.30%");
     expect(pnlEl).toHaveClass("text-blue-500");
   });
 
   it("asset_allocation이 비어 있으면 '자산 데이터 없음'이 표시된다", () => {
     const data = { ...baseDashboard, asset_allocation: [] };
-    renderWithProviders(
-      <HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={data} dcaData={undefined} exchangeRate={1350} />);
     expect(screen.getByText("자산 데이터 없음")).toBeInTheDocument();
   });
 

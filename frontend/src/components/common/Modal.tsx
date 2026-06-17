@@ -8,7 +8,8 @@ const SIZE_CLASSES = {
   xl: "max-w-4xl",
 };
 
-const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 interface Props {
   children: ReactNode;
@@ -18,11 +19,19 @@ interface Props {
   closeOnBackdrop?: boolean;
 }
 
-export default function Modal({ children, onClose, title, size = "md", closeOnBackdrop = false }: Props) {
+export default function Modal({
+  children,
+  onClose,
+  title,
+  size = "md",
+  closeOnBackdrop = false,
+}: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
-  useEffect(() => { onCloseRef.current = onClose; });
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null;
@@ -33,14 +42,23 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { onCloseRef.current(); return; }
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
       if (e.key !== "Tab" || !dialog) return;
       const els = Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE));
       if (els.length === 0) return;
       if (e.shiftKey) {
-        if (document.activeElement === els[0]) { e.preventDefault(); els[els.length - 1].focus(); }
+        if (document.activeElement === els[0]) {
+          e.preventDefault();
+          els[els.length - 1].focus();
+        }
       } else {
-        if (document.activeElement === els[els.length - 1]) { e.preventDefault(); els[0].focus(); }
+        if (document.activeElement === els[els.length - 1]) {
+          e.preventDefault();
+          els[0].focus();
+        }
       }
     };
 
@@ -66,7 +84,9 @@ export default function Modal({ children, onClose, title, size = "md", closeOnBa
       >
         {title != null && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 id={titleId} className="text-lg font-bold text-gray-900 dark:text-gray-50">{title}</h2>
+            <h2 id={titleId} className="text-lg font-bold text-gray-900 dark:text-gray-50">
+              {title}
+            </h2>
             <button
               onClick={onClose}
               aria-label="닫기"

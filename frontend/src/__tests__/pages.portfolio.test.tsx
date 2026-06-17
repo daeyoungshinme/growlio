@@ -15,11 +15,16 @@ vi.mock("@/api/client", () => {
   };
   return {
     api: mockApi,
-    apiGet: (url: string, ...args: unknown[]) => mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPost: (url: string, ...args: unknown[]) => mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPut: (url: string, ...args: unknown[]) => mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
-    apiPatch: (url: string, ...args: unknown[]) => mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
-    apiDelete: (url: string, ...args: unknown[]) => mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
+    apiGet: (url: string, ...args: unknown[]) =>
+      mockApi.get(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPost: (url: string, ...args: unknown[]) =>
+      mockApi.post(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPut: (url: string, ...args: unknown[]) =>
+      mockApi.put(url, ...args).then((r: { data: unknown }) => r.data),
+    apiPatch: (url: string, ...args: unknown[]) =>
+      mockApi.patch(url, ...args).then((r: { data: unknown }) => r.data),
+    apiDelete: (url: string, ...args: unknown[]) =>
+      mockApi.delete(url, ...args).then((r: { data: unknown }) => r.data),
   };
 });
 
@@ -84,8 +89,24 @@ const mockPortfolioData = {
     { id: "acc-2", asset_type: "STOCK_KIWOOM", name: "키움 계좌" },
   ],
   all_positions: [
-    { ticker: "005930", name: "삼성전자", market: "KOSPI", value_krw: 3_000_000, qty: 1, avg_price: 70000, current_price: 80000 },
-    { ticker: "AAPL", name: "Apple", market: "NASDAQ", value_krw: 2_000_000, qty: 1, avg_price: 150000, current_price: 160000 },
+    {
+      ticker: "005930",
+      name: "삼성전자",
+      market: "KOSPI",
+      value_krw: 3_000_000,
+      qty: 1,
+      avg_price: 70000,
+      current_price: 80000,
+    },
+    {
+      ticker: "AAPL",
+      name: "Apple",
+      market: "NASDAQ",
+      value_krw: 2_000_000,
+      qty: 1,
+      avg_price: 150000,
+      current_price: 160000,
+    },
   ],
   stock_allocation: [
     { ticker: "005930", name: "삼성전자", value_krw: 3_000_000, pct: 60 },
@@ -104,7 +125,7 @@ function renderPortfolio(search = "") {
           <Route path="/portfolio" element={<PortfolioPage />} />
         </Routes>
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -161,7 +182,11 @@ describe("PortfolioPage", () => {
   });
 
   it("unrealized_pnl_krw가 음수일 때 - 기호를 표시한다", async () => {
-    const negativeData = { ...mockPortfolioData, unrealized_pnl_krw: -500_000, stock_return_pct: -1.25 };
+    const negativeData = {
+      ...mockPortfolioData,
+      unrealized_pnl_krw: -500_000,
+      stock_return_pct: -1.25,
+    };
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: negativeData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -315,9 +340,7 @@ describe("PortfolioPage", () => {
   it("CASH_OTHER 타입 계좌도 동기화 대상이다", async () => {
     const dataWithCash = {
       ...mockPortfolioData,
-      accounts: [
-        { id: "acc-1", asset_type: "CASH_OTHER", name: "현금 계좌" },
-      ],
+      accounts: [{ id: "acc-1", asset_type: "CASH_OTHER", name: "현금 계좌" }],
     };
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: dataWithCash });

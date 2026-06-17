@@ -117,9 +117,7 @@ describe("TransactionHistoryTab", () => {
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
     const addBtn = screen.getByRole("button", { name: /내역 추가/ });
     fireEvent.click(addBtn);
-    await waitFor(() =>
-      expect(screen.getByTestId("mock-transaction-form")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByTestId("mock-transaction-form")).toBeInTheDocument());
   });
 
   it("'내역 추가' 버튼을 두 번 클릭하면 폼이 숨겨진다", async () => {
@@ -152,9 +150,9 @@ describe("TransactionHistoryTab", () => {
     const { fetchTransactions } = await import("../api/transactions");
     renderWithProviders(<TransactionHistoryTab accounts={mockAccounts} />);
     const yearSelects = screen.getAllByRole("combobox");
-    const yearSelect = yearSelects.find((el) =>
-      el.querySelector(`option[value="${new Date().getFullYear()}"]`),
-    ) ?? yearSelects[yearSelects.length - 1];
+    const yearSelect =
+      yearSelects.find((el) => el.querySelector(`option[value="${new Date().getFullYear()}"]`)) ??
+      yearSelects[yearSelects.length - 1];
 
     const prevYear = new Date().getFullYear() - 1;
     fireEvent.change(yearSelect, { target: { value: String(prevYear) } });

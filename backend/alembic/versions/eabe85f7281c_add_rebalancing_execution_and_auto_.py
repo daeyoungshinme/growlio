@@ -53,9 +53,7 @@ def upgrade() -> None:
         "user_settings",
         sa.Column("auto_rebalance_enabled", sa.Boolean(), nullable=False, server_default="false"),
     )
-    op.add_column(
-        "user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True)
-    )
+    op.add_column("user_settings", sa.Column("auto_rebalance_portfolio_id", sa.UUID(), nullable=True))
     op.add_column("user_settings", sa.Column("auto_rebalance_account_id", sa.UUID(), nullable=True))
     op.add_column(
         "user_settings",
@@ -77,9 +75,7 @@ def upgrade() -> None:
     )
     op.add_column(
         "user_settings",
-        sa.Column(
-            "auto_rebalance_mode", sa.String(length=20), nullable=False, server_default="NOTIFY"
-        ),
+        sa.Column("auto_rebalance_mode", sa.String(length=20), nullable=False, server_default="NOTIFY"),
     )
     op.add_column(
         "user_settings",

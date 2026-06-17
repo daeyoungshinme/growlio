@@ -25,7 +25,18 @@ export default function DashboardPage() {
     await qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
   }, [qc]);
   useRegisterRefresh(handleRefresh);
-  const { data, isLoading, error, dataUpdatedAt, overview, overviewLoading, dcaData, accounts, accountsLoading, exchangeRate } = useDashboardData();
+  const {
+    data,
+    isLoading,
+    error,
+    dataUpdatedAt,
+    overview,
+    overviewLoading,
+    dcaData,
+    accounts,
+    accountsLoading,
+    exchangeRate,
+  } = useDashboardData();
 
   const overallDividendYield = useMemo(() => {
     const estimated = data?.estimated_annual_dividends;
@@ -35,41 +46,46 @@ export default function DashboardPage() {
   }, [data?.estimated_annual_dividends, overview?.total_invested_krw]);
 
   const estimatedMonthly = useMemo(
-    () => data?.estimated_annual_dividends != null ? Math.round(data.estimated_annual_dividends / 12) : null,
-    [data]
+    () =>
+      data?.estimated_annual_dividends != null
+        ? Math.round(data.estimated_annual_dividends / 12)
+        : null,
+    [data],
   );
 
-  if (!isLoading && (error || !data)) return (
-    <div className="flex flex-col items-center justify-center h-64 gap-3">
-      <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
-      <button
-        onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard })}
-        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-      >
-        다시 시도
-      </button>
-    </div>
-  );
-
-  if (!accountsLoading && accounts.length === 0) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center max-w-xs sm:max-w-md w-full">
-        <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-        <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
-          등록된 자산이 없습니다
-        </h2>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
-          자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
-        </p>
+  if (!isLoading && (error || !data))
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
-          onClick={() => navigate("/asset-management")}
-          className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard })}
+          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
         >
-          자산관리로 이동
+          다시 시도
         </button>
       </div>
-    </div>
-  );
+    );
+
+  if (!accountsLoading && accounts.length === 0)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-8 sm:p-12 text-center max-w-xs sm:max-w-md w-full">
+          <Wallet size={48} className="mx-auto mb-4 text-gray-300 dark:text-gray-600" />
+          <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-200 mb-2">
+            등록된 자산이 없습니다
+          </h2>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">
+            자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
+          </p>
+          <button
+            onClick={() => navigate("/asset-management")}
+            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            자산관리로 이동
+          </button>
+        </div>
+      </div>
+    );
 
   return (
     <div className="space-y-6">
@@ -88,7 +104,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">주식 포트폴리오 요약</h2>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
+              주식 포트폴리오 요약
+            </h2>
             <Link
               to="/portfolio"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"

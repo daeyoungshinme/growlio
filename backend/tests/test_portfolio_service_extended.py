@@ -1,4 +1,5 @@
 """portfolio_service.py 추가 단위 테스트 — get_allocation_history."""
+
 from __future__ import annotations
 
 import json
@@ -70,9 +71,7 @@ class TestGetAllocationHistory:
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="STOCK_KIS", amount_krw=5_000_000.0)
 
-        pos_row = SimpleNamespace(
-            month="2024-01-01", asset_type="STOCK_DOMESTIC", amount_krw=3_000_000.0
-        )
+        pos_row = SimpleNamespace(month="2024-01-01", asset_type="STOCK_DOMESTIC", amount_krw=3_000_000.0)
 
         call_count = 0
 

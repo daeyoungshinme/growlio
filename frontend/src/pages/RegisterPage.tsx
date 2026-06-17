@@ -34,12 +34,21 @@ export default function RegisterPage() {
       navigate("/dashboard");
     } catch (err: unknown) {
       const msg = (err as Error)?.message ?? "";
-      if (msg.toLowerCase().includes("already registered") || msg.toLowerCase().includes("already been registered")) {
+      if (
+        msg.toLowerCase().includes("already registered") ||
+        msg.toLowerCase().includes("already been registered")
+      ) {
         setError("이미 사용 중인 이메일입니다");
       } else if (msg === "EMAIL_CONFIRMATION_REQUIRED") {
         setError("가입 확인 이메일을 발송했습니다. 이메일의 인증 링크를 클릭한 후 로그인해주세요.");
-      } else if (msg.toLowerCase().includes("should not be too common") || msg.toLowerCase().includes("data breach")) {
-        toast("유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.", "error");
+      } else if (
+        msg.toLowerCase().includes("should not be too common") ||
+        msg.toLowerCase().includes("data breach")
+      ) {
+        toast(
+          "유출된 비밀번호입니다. 데이터 유출 사례에서 발견된 비밀번호는 사용할 수 없습니다.",
+          "error",
+        );
       } else {
         setError("회원가입 중 오류가 발생했습니다");
       }
@@ -58,7 +67,12 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">이메일</label>
+            <label
+              htmlFor="register-email"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              이메일
+            </label>
             <input
               id="register-email"
               type="email"
@@ -70,7 +84,12 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label htmlFor="register-display-name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">이름 (선택)</label>
+            <label
+              htmlFor="register-display-name"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              이름 (선택)
+            </label>
             <input
               id="register-display-name"
               type="text"
@@ -81,7 +100,12 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호</label>
+            <label
+              htmlFor="register-password"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              비밀번호
+            </label>
             <input
               id="register-password"
               type="password"
@@ -93,7 +117,12 @@ export default function RegisterPage() {
             />
           </div>
           <div>
-            <label htmlFor="register-password-confirm" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">비밀번호 확인</label>
+            <label
+              htmlFor="register-password-confirm"
+              className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+            >
+              비밀번호 확인
+            </label>
             <input
               id="register-password-confirm"
               type="password"

@@ -1,7 +1,16 @@
 import { Cell, Pie, PieChart, Tooltip } from "recharts";
 import { PortfolioItem } from "@/api/portfolios";
 
-const PIE_COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
+const PIE_COLORS = [
+  "#2563EB",
+  "#16A34A",
+  "#D97706",
+  "#DC2626",
+  "#7C3AED",
+  "#0891B2",
+  "#DB2777",
+  "#059669",
+];
 
 interface Props {
   items: PortfolioItem[];
@@ -27,10 +36,26 @@ export default function PortfolioWeightChart({ items }: Props) {
         </div>
       )}
       <PieChart width={130} height={130}>
-        <Pie data={pieData} cx={60} cy={60} innerRadius={38} outerRadius={58} paddingAngle={2} dataKey="value" startAngle={90} endAngle={-270}>
+        <Pie
+          data={pieData}
+          cx={60}
+          cy={60}
+          innerRadius={38}
+          outerRadius={58}
+          paddingAngle={2}
+          dataKey="value"
+          startAngle={90}
+          endAngle={-270}
+        >
           {pieData.map((_, i) => {
             const isRemainder = remaining > 0.1 && i === pieData.length - 1;
-            return <Cell key={i} fill={isRemainder ? "#9CA3AF" : PIE_COLORS[i % PIE_COLORS.length]} opacity={isRemainder ? 0.4 : 1} />;
+            return (
+              <Cell
+                key={i}
+                fill={isRemainder ? "#9CA3AF" : PIE_COLORS[i % PIE_COLORS.length]}
+                opacity={isRemainder ? 0.4 : 1}
+              />
+            );
           })}
         </Pie>
         <Tooltip

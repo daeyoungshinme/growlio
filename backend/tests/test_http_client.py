@@ -1,4 +1,5 @@
 """providers/http_client.py 단위 테스트."""
+
 from __future__ import annotations
 
 import asyncio
@@ -43,6 +44,7 @@ class TestAsyncRateLimiter:
     async def test_first_acquire_returns_immediately(self, override_settings):
         limiter = AsyncRateLimiter(rate=100.0)
         import time
+
         start = time.monotonic()
         await limiter.acquire()
         elapsed = time.monotonic() - start
@@ -60,6 +62,7 @@ class TestCloseHttpClient:
     @pytest.mark.asyncio
     async def test_close_with_no_clients(self, override_settings):
         import app.providers.http_client as mod
+
         mod._ssl_client = None
         mod._nossl_client = None
         await close_http_client()  # should not raise
@@ -67,6 +70,7 @@ class TestCloseHttpClient:
     @pytest.mark.asyncio
     async def test_close_sets_clients_to_none(self, override_settings):
         import app.providers.http_client as mod
+
         mock_client = AsyncMock()
         mock_client.aclose = AsyncMock()
         mod._ssl_client = mock_client
@@ -95,7 +99,8 @@ class TestBrokerRequest:
 
         with patch("app.providers.http_client._get_client", return_value=mock_client):
             result = await broker_request(
-                "GET", "/test",
+                "GET",
+                "/test",
                 base_url="https://api.example.com",
                 headers={},
                 semaphore=self._make_semaphore(),
@@ -122,7 +127,8 @@ class TestBrokerRequest:
             pytest.raises(MaxRetriesExceededError),
         ):
             await broker_request(
-                "GET", "/test",
+                "GET",
+                "/test",
                 base_url="https://api.example.com",
                 headers={},
                 retries=2,
@@ -139,9 +145,9 @@ class TestBrokerRequest:
             pass
 
         mock_resp = self._make_mock_response({}, status_code=401)
-        mock_resp.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError(
-            "401", request=MagicMock(), response=mock_resp
-        ))
+        mock_resp.raise_for_status = MagicMock(
+            side_effect=httpx.HTTPStatusError("401", request=MagicMock(), response=mock_resp)
+        )
 
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=mock_resp)
@@ -151,7 +157,8 @@ class TestBrokerRequest:
             pytest.raises((MyTokenExpiredError, httpx.HTTPStatusError, Exception)),
         ):
             await broker_request(
-                "GET", "/test",
+                "GET",
+                "/test",
                 base_url="https://api.example.com",
                 headers={},
                 semaphore=self._make_semaphore(),

@@ -30,10 +30,19 @@ interface Props {
   autoAnalyzeId?: string;
 }
 
-export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAccounts, onOpenAlertModal, autoAnalyzeId }: Props) {
+export function AnalysisPanel({
+  selectedIds,
+  selectedNames,
+  portfolios,
+  activeAccounts,
+  onOpenAlertModal,
+  autoAnalyzeId,
+}: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
-  const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } = useAnalysisState({ autoAnalyzeId, selectedIdStr });
-  const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } = useBacktestDateRange();
+  const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
+    useAnalysisState({ autoAnalyzeId, selectedIdStr });
+  const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } =
+    useBacktestDateRange();
 
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const [includeSpy, setIncludeSpy] = useState(true);
@@ -86,9 +95,13 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
           }`}
         >
           {analyzing && mode === "rebalancing" ? (
-            <><Loader2 size={14} className="animate-spin" /> 분석 중...</>
+            <>
+              <Loader2 size={14} className="animate-spin" /> 분석 중...
+            </>
           ) : (
-            <><RefreshCw size={14} /> 리밸런싱 분석</>
+            <>
+              <RefreshCw size={14} /> 리밸런싱 분석
+            </>
           )}
         </button>
 
@@ -129,7 +142,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         <div className="card">
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">기간</span>
+              <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">
+                기간
+              </span>
               {([1, 3, 5, 10] as const).map((y) => (
                 <button
                   key={y}
@@ -156,7 +171,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             </div>
             <div className="flex flex-wrap gap-3">
               <div>
-                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">시작일</label>
+                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">
+                  시작일
+                </label>
                 <input
                   type="date"
                   value={startDate}
@@ -166,7 +183,9 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">종료일</label>
+                <label className="block text-xs text-gray-400 dark:text-gray-500 font-medium mb-1">
+                  종료일
+                </label>
                 <input
                   type="date"
                   value={endDate}
@@ -179,21 +198,39 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-2">
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" checked={includeSpy} onChange={(e) => setIncludeSpy(e.target.checked)} className="rounded text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={includeSpy}
+                  onChange={(e) => setIncludeSpy(e.target.checked)}
+                  className="rounded text-blue-600"
+                />
                 S&P 500 포함
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" checked={includeReal} onChange={(e) => setIncludeReal(e.target.checked)} className="rounded text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={includeReal}
+                  onChange={(e) => setIncludeReal(e.target.checked)}
+                  className="rounded text-blue-600"
+                />
                 실제 포트폴리오 포함
               </label>
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
-                <input type="checkbox" checked={reinvestDividends} onChange={(e) => setReinvestDividends(e.target.checked)} className="rounded text-blue-600" />
+                <input
+                  type="checkbox"
+                  checked={reinvestDividends}
+                  onChange={(e) => setReinvestDividends(e.target.checked)}
+                  className="rounded text-blue-600"
+                />
                 배당금 재투자
               </label>
             </div>
             <div className="flex justify-end">
               <button
-                onClick={() => { setBacktestResult(null); runMut.mutate(); }}
+                onClick={() => {
+                  setBacktestResult(null);
+                  runMut.mutate();
+                }}
                 disabled={!canRunBacktest || runMut.isPending}
                 aria-busy={runMut.isPending}
                 className="w-full md:w-auto px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
@@ -244,14 +281,18 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
             return (
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
                 {existingAlert ? (
-                  <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
+                  <span
+                    className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}
+                  >
                     <Bell size={12} />
                     {existingAlert.mode === "AUTO"
                       ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
                       : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
                   </span>
                 ) : (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">이 포트폴리오에 자동화를 설정하시겠어요?</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    이 포트폴리오에 자동화를 설정하시겠어요?
+                  </span>
                 )}
                 <button
                   onClick={() => onOpenAlertModal(portfolioIdStr)}
@@ -265,9 +306,7 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
         </div>
       )}
       {mode === "rebalancing" && error && (
-        <div className="flex items-center justify-center h-48 text-sm text-red-500">
-          {error}
-        </div>
+        <div className="flex items-center justify-center h-48 text-sm text-red-500">{error}</div>
       )}
 
       {/* 백테스팅 결과 */}
@@ -286,34 +325,39 @@ export function AnalysisPanel({ selectedIds, selectedNames, portfolios, activeAc
       )}
 
       {/* 전략 분석 결과 */}
-      {mode === "strategy" && (() => {
-        const [id] = Array.from(selectedIds);
-        const portfolio = portfolios.find((p) => p.id === id);
-        if (!id || !portfolio) return null;
-        return (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ErrorBoundary variant="section">
-                <FactorExposureChart selectedPortfolioId={id} />
-              </ErrorBoundary>
-              <ErrorBoundary variant="section">
-                <EfficientFrontierChart comparePortfolioId={id} comparePortfolioName={portfolio.name} />
-              </ErrorBoundary>
+      {mode === "strategy" &&
+        (() => {
+          const [id] = Array.from(selectedIds);
+          const portfolio = portfolios.find((p) => p.id === id);
+          if (!id || !portfolio) return null;
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ErrorBoundary variant="section">
+                  <FactorExposureChart selectedPortfolioId={id} />
+                </ErrorBoundary>
+                <ErrorBoundary variant="section">
+                  <EfficientFrontierChart
+                    comparePortfolioId={id}
+                    comparePortfolioName={portfolio.name}
+                  />
+                </ErrorBoundary>
+              </div>
+              <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
             </div>
-            <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
-          </div>
-        );
-      })()}
+          );
+        })()}
 
       {/* Empty state */}
       {!mode && (
         <div className="flex flex-col items-center justify-center h-64 text-center text-gray-400 dark:text-gray-500">
           <div className="text-4xl mb-3">📊</div>
           <div className="text-sm font-medium mb-1">포트폴리오를 1개 선택하세요</div>
-          <div className="text-xs">좌측에서 포트폴리오를 선택한 후 리밸런싱 분석 또는 백테스팅을 실행하세요</div>
+          <div className="text-xs">
+            좌측에서 포트폴리오를 선택한 후 리밸런싱 분석 또는 백테스팅을 실행하세요
+          </div>
         </div>
       )}
-
     </div>
   );
 }

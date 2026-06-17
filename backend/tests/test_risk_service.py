@@ -1,4 +1,5 @@
 """risk_service.py 단위 테스트."""
+
 from __future__ import annotations
 
 import uuid
@@ -14,6 +15,7 @@ from app.services.risk_service import (
 )
 
 # ── 순수 함수 ──────────────────────────────────────────────────
+
 
 class TestToYfSymbol:
     def test_kospi(self, override_settings):
@@ -90,7 +92,8 @@ class TestCalcDiversificationScore:
     def test_insufficient_returns_data_returns_50(self, override_settings):
         # Less than 20 data points → score defaults to 50
         result = _calc_diversification_score(
-            ["AAPL", "TSLA"], [0.5, 0.5],
+            ["AAPL", "TSLA"],
+            [0.5, 0.5],
             {"AAPL": [0.01] * 5, "TSLA": [-0.01] * 5},
         )
         assert result == 50
@@ -99,21 +102,18 @@ class TestCalcDiversificationScore:
         # Perfectly negative correlation → high diversification
         r1 = [0.01 * (i % 2 * 2 - 1) for i in range(50)]  # alternating +/-
         r2 = [-r for r in r1]
-        result = _calc_diversification_score(
-            ["A", "B"], [0.5, 0.5], {"A": r1, "B": r2}
-        )
+        result = _calc_diversification_score(["A", "B"], [0.5, 0.5], {"A": r1, "B": r2})
         assert result >= 50
 
     def test_positive_correlation_low_score(self, override_settings):
         # Perfectly positive correlation → low diversification
         r = [0.01 * (i % 5 - 2) for i in range(50)]
-        result = _calc_diversification_score(
-            ["A", "B"], [0.5, 0.5], {"A": r, "B": r}
-        )
+        result = _calc_diversification_score(["A", "B"], [0.5, 0.5], {"A": r, "B": r})
         assert result <= 50
 
 
 # ── get_portfolio_risk_metrics (DB mock) ──────────────────────
+
 
 class TestGetPortfolioRiskMetrics:
     @pytest.mark.asyncio
@@ -158,8 +158,10 @@ class TestGetPortfolioRiskMetrics:
         snap_result.all.return_value = [(snap, acc)]
 
         pos = SimpleNamespace(
-            ticker="AAPL", market="NASDAQ",
-            snapshot_id=snap.id, value_krw=1_000_000,
+            ticker="AAPL",
+            market="NASDAQ",
+            snapshot_id=snap.id,
+            value_krw=1_000_000,
         )
         pos_result = MagicMock()
         pos_result.scalars.return_value.all.return_value = [pos]
@@ -179,6 +181,7 @@ class TestGetPortfolioRiskMetrics:
 
 
 # ── get_currency_exposure ────────────────────────────────────
+
 
 class TestGetCurrencyExposure:
     @pytest.mark.asyncio
@@ -203,8 +206,11 @@ class TestGetCurrencyExposure:
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos = SimpleNamespace(
-            snapshot_id=snap.id, value_krw=5_000_000.0, currency="KRW",
-            ticker="005930", market="KOSPI",
+            snapshot_id=snap.id,
+            value_krw=5_000_000.0,
+            currency="KRW",
+            ticker="005930",
+            market="KOSPI",
         )
 
         call_count = 0
@@ -235,12 +241,18 @@ class TestGetCurrencyExposure:
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos_krw = SimpleNamespace(
-            snapshot_id=snap.id, value_krw=5_000_000.0, currency="KRW",
-            ticker="005930", market="KOSPI",
+            snapshot_id=snap.id,
+            value_krw=5_000_000.0,
+            currency="KRW",
+            ticker="005930",
+            market="KOSPI",
         )
         pos_usd = SimpleNamespace(
-            snapshot_id=snap.id, value_krw=5_000_000.0, currency="USD",
-            ticker="AAPL", market="NASDAQ",
+            snapshot_id=snap.id,
+            value_krw=5_000_000.0,
+            currency="USD",
+            ticker="AAPL",
+            market="NASDAQ",
         )
 
         call_count = 0
@@ -264,6 +276,7 @@ class TestGetCurrencyExposure:
 
 
 # ── _sync_fetch_risk_data ────────────────────────────────────
+
 
 class TestSyncFetchRiskData:
     def test_empty_symbols_returns_empty(self, override_settings):
@@ -305,5 +318,3 @@ class TestSyncFetchRiskData:
         assert "AAPL" in result
         assert len(result["AAPL"]) > 0
         assert all(isinstance(r, float) for r in result["AAPL"])
-
-

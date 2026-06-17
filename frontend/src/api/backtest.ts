@@ -16,7 +16,7 @@ export interface BacktestPortfolioConfig {
 
 export interface BacktestRunRequest {
   portfolio_ids: string[];
-  start_date: string;   // "YYYY-MM-DD"
+  start_date: string; // "YYYY-MM-DD"
   end_date: string;
   include_spy: boolean;
   include_real_portfolio: boolean;
@@ -25,7 +25,7 @@ export interface BacktestRunRequest {
 
 export interface SeriesData {
   name: string;
-  values: (number | null)[];  // null = 해당 날짜 데이터 없음 (실제 포트폴리오 시작 전 구간)
+  values: (number | null)[]; // null = 해당 날짜 데이터 없음 (실제 포트폴리오 시작 전 구간)
 }
 
 export interface PortfolioMetrics {
@@ -55,8 +55,7 @@ export const updateBacktestPortfolio = (
   body: { name?: string; holdings?: HoldingItem[] },
 ) => apiPut<BacktestPortfolioConfig>(`/backtest/portfolios/${id}`, body);
 
-export const deleteBacktestPortfolio = (id: string) =>
-  apiDelete(`/backtest/portfolios/${id}`);
+export const deleteBacktestPortfolio = (id: string) => apiDelete(`/backtest/portfolios/${id}`);
 
 export const runBacktest = (req: BacktestRunRequest) =>
   apiPost<BacktestResult>("/backtest/run", req);

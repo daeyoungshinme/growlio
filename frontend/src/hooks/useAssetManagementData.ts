@@ -6,7 +6,7 @@ import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import type { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 
-type Tab = typeof ASSET_MANAGEMENT_TABS[number];
+type Tab = (typeof ASSET_MANAGEMENT_TABS)[number];
 
 export function useAssetManagementData(tab: Tab) {
   const isStockTab = tab === "증권계좌";

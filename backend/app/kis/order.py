@@ -1,4 +1,5 @@
 """KIS OpenAPI 매수/매도 주문 실행 모듈."""
+
 from typing import Any
 
 from app.kis.client import kis_request

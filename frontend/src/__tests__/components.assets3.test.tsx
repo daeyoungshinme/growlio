@@ -12,7 +12,11 @@ vi.mock("@/context/ExchangeRateContext", () => ({
 
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
 import BankAccountCard from "@/components/assets/BankAccountCard";
-import { RealEstateAccountCard, RealEstateAccountModal, RealEstateEditModal } from "@/components/assets/RealEstateSection";
+import {
+  RealEstateAccountCard,
+  RealEstateAccountModal,
+  RealEstateEditModal,
+} from "@/components/assets/RealEstateSection";
 import { TransactionList } from "@/components/assets/TransactionList";
 
 const mockStockAccount: AssetAccount = {
@@ -111,7 +115,7 @@ describe("StockAccountSummaryCard", () => {
           { transaction_type: "DIVIDEND", amount: 200000, account_id: "acc1" },
         ]}
         usdRate={1350}
-      />
+      />,
     );
     expect(screen.getByText("증권계좌 전체 요약")).toBeDefined();
     expect(screen.getByText("평가금액")).toBeDefined();
@@ -125,7 +129,7 @@ describe("StockAccountSummaryCard", () => {
         overview={undefined}
         allTx={[]}
         usdRate={1350}
-      />
+      />,
     );
     expect(screen.getByText("증권계좌 전체 요약")).toBeDefined();
   });
@@ -143,7 +147,7 @@ describe("StockAccountSummaryCard", () => {
         overview={overview}
         allTx={[]}
         usdRate={null}
-      />
+      />,
     );
     expect(document.body).toBeDefined();
   });
@@ -161,7 +165,7 @@ describe("BankAccountCard", () => {
         onSync={vi.fn()}
         isDeleting={false}
         isSyncing={false}
-      />
+      />,
     );
     expect(screen.getByText("국민은행 입출금")).toBeDefined();
     expect(screen.getByText("국민은행")).toBeDefined();
@@ -178,7 +182,7 @@ describe("BankAccountCard", () => {
         onSync={vi.fn()}
         isDeleting={false}
         isSyncing={false}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
     expect(screen.getByDisplayValue("국민은행 입출금")).toBeDefined();
@@ -195,7 +199,7 @@ describe("BankAccountCard", () => {
         onSync={vi.fn()}
         isDeleting={false}
         isSyncing={false}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText("계좌 삭제"));
     expect(onDelete).toHaveBeenCalledWith("bank1");
@@ -211,7 +215,7 @@ describe("BankAccountCard", () => {
         onSync={vi.fn()}
         isDeleting={false}
         isSyncing={false}
-      />
+      />,
     );
     expect(screen.getByLabelText("금액 수정")).toBeDefined();
   });
@@ -227,7 +231,7 @@ describe("BankAccountCard", () => {
         onSync={vi.fn()}
         isDeleting={false}
         isSyncing={false}
-      />
+      />,
     );
     expect(screen.getByLabelText("잔액 새로고침")).toBeDefined();
   });
@@ -242,7 +246,7 @@ describe("RealEstateAccountCard", () => {
         onDelete={vi.fn()}
         onEdit={vi.fn()}
         isDeleting={false}
-      />
+      />,
     );
     expect(screen.getByText("강남 아파트")).toBeDefined();
     expect(screen.getByText("아파트")).toBeDefined();
@@ -257,7 +261,7 @@ describe("RealEstateAccountCard", () => {
         onDelete={vi.fn()}
         onEdit={onEdit}
         isDeleting={false}
-      />
+      />,
     );
     fireEvent.click(screen.getByLabelText("수정"));
     expect(onEdit).toHaveBeenCalledWith(mockRealEstate);
@@ -271,7 +275,7 @@ describe("RealEstateAccountCard", () => {
         onDelete={vi.fn()}
         onEdit={vi.fn()}
         isDeleting={false}
-      />
+      />,
     );
     expect(screen.getByText("자산 제외")).toBeDefined();
   });
@@ -281,11 +285,7 @@ describe("RealEstateAccountCard", () => {
 describe("RealEstateAccountModal", () => {
   it("renders create modal", () => {
     renderWithProviders(
-      <RealEstateAccountModal
-        onClose={vi.fn()}
-        onSubmit={vi.fn()}
-        isLoading={false}
-      />
+      <RealEstateAccountModal onClose={vi.fn()} onSubmit={vi.fn()} isLoading={false} />,
     );
     expect(screen.getByText("부동산 추가")).toBeDefined();
     expect(screen.getByLabelText(/부동산 이름/)).toBeDefined();
@@ -294,11 +294,7 @@ describe("RealEstateAccountModal", () => {
   it("calls onClose when cancel button clicked", () => {
     const onClose = vi.fn();
     renderWithProviders(
-      <RealEstateAccountModal
-        onClose={onClose}
-        onSubmit={vi.fn()}
-        isLoading={false}
-      />
+      <RealEstateAccountModal onClose={onClose} onSubmit={vi.fn()} isLoading={false} />,
     );
     fireEvent.click(screen.getByText("취소"));
     expect(onClose).toHaveBeenCalled();
@@ -306,11 +302,7 @@ describe("RealEstateAccountModal", () => {
 
   it("shows saving state", () => {
     renderWithProviders(
-      <RealEstateAccountModal
-        onClose={vi.fn()}
-        onSubmit={vi.fn()}
-        isLoading={true}
-      />
+      <RealEstateAccountModal onClose={vi.fn()} onSubmit={vi.fn()} isLoading={true} />,
     );
     expect(screen.getByText("저장 중...")).toBeDefined();
   });
@@ -325,7 +317,7 @@ describe("RealEstateEditModal", () => {
         onClose={vi.fn()}
         onSubmit={vi.fn()}
         isLoading={false}
-      />
+      />,
     );
     expect(screen.getByText("부동산 수정")).toBeDefined();
     expect(screen.getByDisplayValue("강남 아파트")).toBeDefined();
@@ -368,7 +360,7 @@ describe("TransactionList", () => {
         isDeleting={false}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("로딩 중...")).toBeDefined();
   });
@@ -382,7 +374,7 @@ describe("TransactionList", () => {
         isDeleting={false}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("등록된 내역이 없습니다")).toBeDefined();
   });
@@ -396,7 +388,7 @@ describe("TransactionList", () => {
         isDeleting={false}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("2024-01-15")).toBeDefined();
     expect(screen.getByText("월급")).toBeDefined();
@@ -412,7 +404,7 @@ describe("TransactionList", () => {
         isDeleting={false}
         onEdit={onEdit}
         onDelete={vi.fn()}
-      />
+      />,
     );
     const editBtns = document.querySelectorAll('[class*="hover:text-blue-400"]');
     if (editBtns.length > 0) fireEvent.click(editBtns[0]);
@@ -428,7 +420,7 @@ describe("TransactionList", () => {
         isDeleting={false}
         onEdit={vi.fn()}
         onDelete={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText("AAPL")).toBeDefined();
   });

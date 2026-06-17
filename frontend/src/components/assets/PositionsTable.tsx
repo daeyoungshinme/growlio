@@ -39,7 +39,9 @@ function ReadonlyMobileCard({ row }: { row: Position }) {
           <p className="font-semibold text-sm text-gray-900 dark:text-gray-50">{row.name || "—"}</p>
           {(row.ticker || row.market !== "KOSPI") && (
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              {row.ticker}{row.ticker && " · "}{row.market}
+              {row.ticker}
+              {row.ticker && " · "}
+              {row.market}
             </p>
           )}
         </div>
@@ -48,17 +50,23 @@ function ReadonlyMobileCard({ row }: { row: Position }) {
       <div className="mt-1.5 pt-1.5 border-t border-gray-100 dark:border-gray-800 grid grid-cols-3 gap-x-2">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">수량</p>
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">{row.qty.toLocaleString()}주</p>
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+            {row.qty.toLocaleString()}주
+          </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평단가</p>
           <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
-            {overseas && row.avg_price_usd ? `$${row.avg_price_usd.toFixed(2)}` : `${(row.avg_price ?? 0).toLocaleString()}원`}
+            {overseas && row.avg_price_usd
+              ? `$${row.avg_price_usd.toFixed(2)}`
+              : `${(row.avg_price ?? 0).toLocaleString()}원`}
           </p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">매입금액</p>
-          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">{fmtKrwShort(row.invested_amount ?? 0)}원</p>
+          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mt-0.5">
+            {fmtKrwShort(row.invested_amount ?? 0)}원
+          </p>
         </div>
       </div>
     </div>
@@ -73,12 +81,16 @@ function ReadonlyDesktopRow({ row }: { row: Position }) {
         <p className="font-semibold text-sm text-gray-900 dark:text-gray-50">{row.name || "—"}</p>
         {(row.ticker || row.market !== "KOSPI") && (
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            {row.ticker}{row.ticker && " · "}{row.market}
+            {row.ticker}
+            {row.ticker && " · "}
+            {row.market}
           </p>
         )}
       </td>
       <td className="py-3 pr-3 text-right">
-        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{row.qty.toLocaleString()}</span>
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+          {row.qty.toLocaleString()}
+        </span>
       </td>
       <td className="py-3 pr-3 text-right">
         <PriceCell krw={row.avg_price} usd={row.avg_price_usd} isOverseas={overseas} />
@@ -101,10 +113,23 @@ function ReadonlyDesktopRow({ row }: { row: Position }) {
 }
 
 export function PositionsTable({
-  rows, liveRows, readonly, usdRate,
-  suggestions, suggestIdx, searchLoading, priceLoadingRows,
-  setSuggestIdx, handleNameChange, handleNameBlur, handleSelectSuggestion,
-  setRow, removeRow, addRow, handleAvgPriceUsd, handleCurrentPriceUsd,
+  rows,
+  liveRows,
+  readonly,
+  usdRate,
+  suggestions,
+  suggestIdx,
+  searchLoading,
+  priceLoadingRows,
+  setSuggestIdx,
+  handleNameChange,
+  handleNameBlur,
+  handleSelectSuggestion,
+  setRow,
+  removeRow,
+  addRow,
+  handleAvgPriceUsd,
+  handleCurrentPriceUsd,
 }: Props) {
   const handleMarketChange = (i: number, newMarket: string, currentMarket: string) => {
     const wasOverseas = isOverseasMarket(currentMarket);
@@ -117,9 +142,19 @@ export function PositionsTable({
   };
 
   const sharedProps = {
-    usdRate, suggestions, suggestIdx, searchLoading, setSuggestIdx,
-    handleNameChange, handleNameBlur, handleSelectSuggestion,
-    setRow, removeRow, handleAvgPriceUsd, handleCurrentPriceUsd, handleMarketChange,
+    usdRate,
+    suggestions,
+    suggestIdx,
+    searchLoading,
+    setSuggestIdx,
+    handleNameChange,
+    handleNameBlur,
+    handleSelectSuggestion,
+    setRow,
+    removeRow,
+    handleAvgPriceUsd,
+    handleCurrentPriceUsd,
+    handleMarketChange,
   };
 
   return (
@@ -127,7 +162,9 @@ export function PositionsTable({
       {/* ── 모바일 카드 뷰 (sm 미만) ── */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {readonly
-          ? liveRows.map((row, i) => <ReadonlyMobileCard key={row._rowKey ?? String(i)} row={row} />)
+          ? liveRows.map((row, i) => (
+              <ReadonlyMobileCard key={row._rowKey ?? String(i)} row={row} />
+            ))
           : liveRows.map((row, i) => (
               <EditableMobilePositionCard
                 key={row._rowKey ?? String(i)}
@@ -137,8 +174,7 @@ export function PositionsTable({
                 priceLoading={priceLoadingRows.has(i)}
                 {...sharedProps}
               />
-            ))
-        }
+            ))}
       </div>
 
       {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
@@ -158,7 +194,9 @@ export function PositionsTable({
           </thead>
           <tbody>
             {readonly
-              ? liveRows.map((row, i) => <ReadonlyDesktopRow key={row._rowKey ?? String(i)} row={row} />)
+              ? liveRows.map((row, i) => (
+                  <ReadonlyDesktopRow key={row._rowKey ?? String(i)} row={row} />
+                ))
               : liveRows.map((row, i) => (
                   <EditableDesktopPositionRow
                     key={row._rowKey ?? String(i)}
@@ -168,15 +206,16 @@ export function PositionsTable({
                     priceLoading={priceLoadingRows.has(i)}
                     {...sharedProps}
                   />
-                ))
-            }
+                ))}
           </tbody>
         </table>
       </div>
 
       {!readonly && (
-        <button onClick={addRow}
-          className="mt-3 flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
+        <button
+          onClick={addRow}
+          className="mt-3 flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium"
+        >
           <Plus size={14} /> 종목 추가
         </button>
       )}

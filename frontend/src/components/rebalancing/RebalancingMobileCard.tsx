@@ -139,7 +139,9 @@ export function RebalancingMobileCard({
             <p className="text-[11px] text-gray-600 mt-0.5 text-right">
               ≈{" "}
               {fmtKrw(
-                overseas && globalUsdRate != null ? nativeLimitPrice * globalUsdRate : nativeLimitPrice
+                overseas && globalUsdRate != null
+                  ? nativeLimitPrice * globalUsdRate
+                  : nativeLimitPrice,
               )}{" "}
               × {qty}주 = {fmtKrw(estKrw)}
             </p>

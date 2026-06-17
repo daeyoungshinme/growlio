@@ -1,4 +1,5 @@
 """이메일 HTML 템플릿 빌더 — 순수 함수, I/O 없음."""
+
 from __future__ import annotations
 
 
@@ -7,20 +8,14 @@ def _kv_table(rows: list[tuple[str, str]]) -> str:
     td_label = "padding:8px;background:#f1f5f9;font-weight:bold;"
     td_value = "padding:8px;"
     trs = "".join(
-        f"<tr><td style='{td_label}'>{label}</td>"
-        f"<td style='{td_value}'>{value}</td></tr>"
-        for label, value in rows
+        f"<tr><td style='{td_label}'>{label}</td><td style='{td_value}'>{value}</td></tr>" for label, value in rows
     )
     return f"<table style='width:100%;border-collapse:collapse;margin-top:16px;'>{trs}</table>"
 
 
 def _email_div(heading: str, heading_color: str, body: str, footer: str = "") -> str:
     """표준 이메일 감싸기."""
-    footer_html = (
-        f"<p style='margin-top:20px;color:#64748b;font-size:13px;'>{footer}</p>"
-        if footer
-        else ""
-    )
+    footer_html = f"<p style='margin-top:20px;color:#64748b;font-size:13px;'>{footer}</p>" if footer else ""
     return (
         f"<div style='font-family:sans-serif;max-width:520px;margin:0 auto;'>"
         f"<h2 style='color:{heading_color};'>{heading}</h2>"
@@ -34,6 +29,7 @@ def _email_div(heading: str, heading_color: str, body: str, footer: str = "") ->
 # 공개 템플릿 함수 (subject, html) 반환
 # ---------------------------------------------------------------------------
 
+
 def exchange_rate_alert_template(
     target_rate: float,
     direction: str,
@@ -41,16 +37,17 @@ def exchange_rate_alert_template(
 ) -> tuple[str, str]:
     direction_label = "이하" if direction == "BELOW" else "이상"
     subject = f"[Growlio] 목표환율 도달 알림 — {target_rate:,.0f}원 {direction_label}"
-    table = _kv_table([
-        ("목표환율", f"{target_rate:,.0f} 원 ({direction_label})"),
-        ("현재환율", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_rate:,.2f} 원</span>"),
-    ])
+    table = _kv_table(
+        [
+            ("목표환율", f"{target_rate:,.0f} 원 ({direction_label})"),
+            ("현재환율", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_rate:,.2f} 원</span>"),
+        ]
+    )
     html = _email_div(
         "목표환율 도달 알림",
         "#1d4ed8",
         table,
-        "이 알림은 설정하신 목표환율 조건이 충족되어 발송되었습니다.<br>"
-        "알림은 1회 발동 후 자동으로 비활성화됩니다.",
+        "이 알림은 설정하신 목표환율 조건이 충족되어 발송되었습니다.<br>알림은 1회 발동 후 자동으로 비활성화됩니다.",
     )
     return subject, html
 
@@ -64,8 +61,12 @@ def rebalancing_alert_template(
     schedule_type: str = "DAILY",
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
-        "DAILY": "매일", "WEEKLY": "매주", "MONTHLY": "매월",
-        "QUARTERLY": "매 3개월", "SEMIANNUAL": "매 6개월", "ANNUAL": "매년",
+        "DAILY": "매일",
+        "WEEKLY": "매주",
+        "MONTHLY": "매월",
+        "QUARTERLY": "매 3개월",
+        "SEMIANNUAL": "매 6개월",
+        "ANNUAL": "매년",
     }
     schedule_label = _SCHEDULE_LABEL.get(schedule_type, "주기")
 
@@ -108,8 +109,7 @@ def rebalancing_alert_template(
         )
 
     footer = (
-        f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요."
-        f"<br>이 알림은 {schedule_label} 발송됩니다."
+        f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>이 알림은 {schedule_label} 발송됩니다."
     )
     body = (
         f"<p style='color:#374151;margin-top:8px;'>{subheading}</p>"
@@ -175,11 +175,13 @@ def stock_price_alert_template(
 ) -> tuple[str, str]:
     direction_label = "이하" if direction == "BELOW" else "이상"
     subject = f"[Growlio] 주가 목표 도달 — {name}({ticker}) {target_price:,.0f}원 {direction_label}"
-    table = _kv_table([
-        ("종목", f"{name} ({ticker})"),
-        ("목표가", f"{target_price:,.0f}원 ({direction_label})"),
-        ("현재가", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_price:,.0f}원</span>"),
-    ])
+    table = _kv_table(
+        [
+            ("종목", f"{name} ({ticker})"),
+            ("목표가", f"{target_price:,.0f}원 ({direction_label})"),
+            ("현재가", f"<span style='color:#1d4ed8;font-weight:bold;'>{current_price:,.0f}원</span>"),
+        ]
+    )
     html = _email_div(
         "주가 목표 도달 알림",
         "#1d4ed8",
@@ -190,10 +192,15 @@ def stock_price_alert_template(
 
 
 _ASSET_TYPE_LABEL: dict[str, str] = {
-    "BANK_ACCOUNT": "예금/적금", "DEPOSIT": "예치금",
-    "STOCK_KIS": "주식(KIS)", "STOCK_KIWOOM": "주식(키움)",
-    "STOCK_OTHER": "주식(기타)", "CASH_STOCK": "주식 현금",
-    "CASH_OTHER": "현금(기타)", "REAL_ESTATE": "부동산", "OTHER": "기타",
+    "BANK_ACCOUNT": "예금/적금",
+    "DEPOSIT": "예치금",
+    "STOCK_KIS": "주식(KIS)",
+    "STOCK_KIWOOM": "주식(키움)",
+    "STOCK_OTHER": "주식(기타)",
+    "CASH_STOCK": "주식 현금",
+    "CASH_OTHER": "현금(기타)",
+    "REAL_ESTATE": "부동산",
+    "OTHER": "기타",
 }
 
 
@@ -317,11 +324,13 @@ def goal_achievement_template(
         heading = "연간 입금 목표 달성"
         goal_label, current_label = "연간 입금 목표", "올해 순 입금액"
 
-    table = _kv_table([
-        (goal_label, f"{goal_amount:,.0f}원"),
-        (current_label, f"<span style='font-weight:bold;color:#16a34a;'>{current_amount:,.0f}원</span>"),
-        ("달성률", f"<span style='font-size:20px;font-weight:bold;color:#16a34a;'>{achievement_pct:.1f}%</span>"),
-    ])
+    table = _kv_table(
+        [
+            (goal_label, f"{goal_amount:,.0f}원"),
+            (current_label, f"<span style='font-weight:bold;color:#16a34a;'>{current_amount:,.0f}원</span>"),
+            ("달성률", f"<span style='font-size:20px;font-weight:bold;color:#16a34a;'>{achievement_pct:.1f}%</span>"),
+        ]
+    )
     body = "<p style='color:#374151;margin-top:8px;'>설정하신 투자 목표를 달성했습니다!</p>" + table
     html = _email_div(
         heading,

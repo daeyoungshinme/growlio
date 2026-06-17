@@ -101,9 +101,7 @@ async def fetch_prices_batch(
 
     if yahoo_circuit.is_available():
         async with _yfinance_sem:
-            price_map: dict[str, float] = await loop.run_in_executor(
-                None, partial(_sync_yahoo_batch, tickers)
-            )
+            price_map: dict[str, float] = await loop.run_in_executor(None, partial(_sync_yahoo_batch, tickers))
         if price_map:
             yahoo_circuit.record_success()
         else:
@@ -115,10 +113,7 @@ async def fetch_prices_batch(
     if missing:
         account = await _get_any_kis_account(user_id, db)
         if account:
-            fallback_tasks = [
-                _fetch_fallback(account, ticker, market, db, redis)
-                for ticker, market in missing
-            ]
+            fallback_tasks = [_fetch_fallback(account, ticker, market, db, redis) for ticker, market in missing]
             results = await asyncio.gather(*fallback_tasks, return_exceptions=True)
             for (ticker, _), result in zip(missing, results, strict=False):
                 if isinstance(result, (int, float)) and result > 0:
@@ -150,9 +145,7 @@ async def get_historical_returns(
             return None
 
         async with _yfinance_sem:
-            result = await loop.run_in_executor(
-                None, partial(_sync_calc_return, ticker, market, years)
-            )
+            result = await loop.run_in_executor(None, partial(_sync_calc_return, ticker, market, years))
         if result:
             yahoo_circuit.record_success()
 
@@ -206,15 +199,20 @@ async def _price_via_kis(
     app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
     is_mock = account.is_mock_mode
     token = await get_access_token(
-        app_key, app_secret,
-        is_mock=is_mock, redis=redis, db=db,
+        app_key,
+        app_secret,
+        is_mock=is_mock,
+        redis=redis,
+        db=db,
         user_id=str(account.user_id),
         account_id=str(account.id),
     )
     if market in DOMESTIC_MARKETS:
         from app.kis.domestic_quote import get_domestic_price
+
         return await get_domestic_price(app_key, app_secret, token, ticker, is_mock=is_mock)
     else:
         from app.kis.overseas_quote import get_overseas_price
+
         result = await get_overseas_price(app_key, app_secret, token, ticker, market, is_mock=is_mock)
         return float(result.get("price", 0)) or None

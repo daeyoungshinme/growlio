@@ -42,7 +42,9 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-750 transition-colors text-left"
       >
         <div className="flex items-center gap-3 flex-wrap">
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TRIGGER_COLOR[item.triggered_by] ?? "bg-gray-700 text-gray-300"}`}>
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${TRIGGER_COLOR[item.triggered_by] ?? "bg-gray-700 text-gray-300"}`}
+          >
             {TRIGGER_LABEL[item.triggered_by] ?? item.triggered_by}
           </span>
           <span className="text-xs text-gray-400">
@@ -57,14 +59,16 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
             {item.total_success > 0 && (
               <span className="text-emerald-400">성공 {item.total_success}</span>
             )}
-            {item.total_fail > 0 && (
-              <span className="text-red-400">실패 {item.total_fail}</span>
-            )}
+            {item.total_fail > 0 && <span className="text-red-400">실패 {item.total_fail}</span>}
             {item.total_skipped > 0 && (
               <span className="text-gray-500">건너뜀 {item.total_skipped}</span>
             )}
           </div>
-          {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+          {open ? (
+            <ChevronUp size={14} className="text-gray-400" />
+          ) : (
+            <ChevronDown size={14} className="text-gray-400" />
+          )}
         </div>
       </button>
 
@@ -80,7 +84,9 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-medium text-gray-300">{result.account_name}</span>
                   {result.is_mock && (
-                    <span className="text-xs bg-yellow-900 text-yellow-300 px-1.5 py-0.5 rounded">모의</span>
+                    <span className="text-xs bg-yellow-900 text-yellow-300 px-1.5 py-0.5 rounded">
+                      모의
+                    </span>
                   )}
                 </div>
                 <table className="w-full text-xs">
@@ -96,17 +102,27 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                   <tbody>
                     {result.orders.map((order, i) => (
                       <tr key={i} className="border-t border-gray-800">
-                        <td className="py-1.5 pr-3 text-gray-200">{order.name} <span className="text-gray-500">({order.ticker})</span></td>
-                        <td className={`py-1.5 pr-3 text-right font-medium ${order.side === "BUY" ? "text-red-400" : "text-blue-400"}`}>
+                        <td className="py-1.5 pr-3 text-gray-200">
+                          {order.name} <span className="text-gray-500">({order.ticker})</span>
+                        </td>
+                        <td
+                          className={`py-1.5 pr-3 text-right font-medium ${order.side === "BUY" ? "text-red-400" : "text-blue-400"}`}
+                        >
                           {order.side === "BUY" ? "매수" : "매도"}
                         </td>
-                        <td className="py-1.5 pr-3 text-right text-gray-300">{order.quantity.toLocaleString()}</td>
-                        <td className="py-1.5 pr-3 text-right text-gray-500 font-mono">{order.order_no ?? "—"}</td>
+                        <td className="py-1.5 pr-3 text-right text-gray-300">
+                          {order.quantity.toLocaleString()}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right text-gray-500 font-mono">
+                          {order.order_no ?? "—"}
+                        </td>
                         <td className="py-1.5 text-right">
                           {order.status === "SUCCESS" ? (
                             <span className="text-emerald-400">성공</span>
                           ) : order.status === "FAILED" ? (
-                            <span className="text-red-400" title={order.error_msg ?? ""}>실패</span>
+                            <span className="text-red-400" title={order.error_msg ?? ""}>
+                              실패
+                            </span>
                           ) : (
                             <span className="text-gray-500">건너뜀</span>
                           )}

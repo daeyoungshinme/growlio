@@ -16,7 +16,20 @@ vi.mock("@/api/dart", () => ({
 }));
 
 vi.mock("@/utils/dividendUtils", () => ({
-  MONTH_LABELS: ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"],
+  MONTH_LABELS: [
+    "1월",
+    "2월",
+    "3월",
+    "4월",
+    "5월",
+    "6월",
+    "7월",
+    "8월",
+    "9월",
+    "10월",
+    "11월",
+    "12월",
+  ],
   dividendFreqInfo: vi.fn(() => ({ label: "분기", cls: "text-blue-500" })),
   weightBarColor: vi.fn(() => "bg-blue-500"),
   yieldBadgeClass: vi.fn(() => "bg-green-100 text-green-600"),
@@ -50,7 +63,7 @@ describe("DisclosureFeedCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <DisclosureFeedCard />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("7일")).toBeDefined();
     expect(screen.getByText("30일")).toBeDefined();
@@ -61,7 +74,7 @@ describe("DisclosureFeedCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <DisclosureFeedCard />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     fireEvent.click(screen.getByText("7일"));
     // Just verify no crash
@@ -72,7 +85,7 @@ describe("DisclosureFeedCard", () => {
     renderWithProviders(
       <MemoryRouter>
         <DisclosureFeedCard />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText("보유 종목 공시")).toBeDefined();
   });
@@ -115,37 +128,29 @@ const mockItems = [
 describe("DividendByTickerTable", () => {
   it("renders loading skeleton", () => {
     const { container } = renderWithProviders(
-      <DividendByTickerTable items={[]} isLoading={true} />
+      <DividendByTickerTable items={[]} isLoading={true} />,
     );
     expect(container.firstChild).toBeDefined();
   });
 
   it("renders empty state", () => {
-    renderWithProviders(
-      <DividendByTickerTable items={[]} isLoading={false} />
-    );
+    renderWithProviders(<DividendByTickerTable items={[]} isLoading={false} />);
     expect(screen.getByText("보유 종목 없음")).toBeDefined();
   });
 
   it("renders dividend items", () => {
-    renderWithProviders(
-      <DividendByTickerTable items={mockItems} isLoading={false} />
-    );
+    renderWithProviders(<DividendByTickerTable items={mockItems} isLoading={false} />);
     expect(screen.getByText("Apple Inc.")).toBeDefined();
     expect(screen.getByText("삼성전자")).toBeDefined();
   });
 
   it("shows total row when items present", () => {
-    renderWithProviders(
-      <DividendByTickerTable items={mockItems} isLoading={false} />
-    );
+    renderWithProviders(<DividendByTickerTable items={mockItems} isLoading={false} />);
     expect(screen.getByText("합계")).toBeDefined();
   });
 
   it("opens edit modal when pencil button clicked", () => {
-    renderWithProviders(
-      <DividendByTickerTable items={mockItems} isLoading={false} />
-    );
+    renderWithProviders(<DividendByTickerTable items={mockItems} isLoading={false} />);
     const pencilBtns = document.querySelectorAll('[title="배당월 수정"]');
     if (pencilBtns.length > 0) {
       fireEvent.click(pencilBtns[0]);
@@ -170,9 +175,7 @@ describe("DividendByTickerTable", () => {
       dividend_months: [6, 12],
       dividend_months_is_manual: false,
     };
-    renderWithProviders(
-      <DividendByTickerTable items={[unclassifiedItem]} isLoading={false} />
-    );
+    renderWithProviders(<DividendByTickerTable items={[unclassifiedItem]} isLoading={false} />);
     expect(screen.getByText("미분류 배당")).toBeDefined();
   });
 });
@@ -223,7 +226,9 @@ describe("DividendMonthsModal", () => {
 
   it("calls onReset when reset button is clicked", () => {
     const onReset = vi.fn();
-    renderWithProviders(<DividendMonthsModal {...defaultProps} isManual={true} onReset={onReset} />);
+    renderWithProviders(
+      <DividendMonthsModal {...defaultProps} isManual={true} onReset={onReset} />,
+    );
     fireEvent.click(screen.getByText("자동으로 복구"));
     expect(onReset).toHaveBeenCalled();
   });
@@ -231,9 +236,9 @@ describe("DividendMonthsModal", () => {
   it("toggles month selection", () => {
     renderWithProviders(<DividendMonthsModal {...defaultProps} />);
     // Month buttons are 1월~12월
-    const monthBtns = screen.getAllByRole("button").filter(
-      (b) => b.textContent?.match(/^[0-9]+월$/)
-    );
+    const monthBtns = screen
+      .getAllByRole("button")
+      .filter((b) => b.textContent?.match(/^[0-9]+월$/));
     expect(monthBtns.length).toBe(12);
     // Click 1월 to toggle it
     fireEvent.click(monthBtns[0]);

@@ -45,15 +45,15 @@ export default function TaxOptimizationCard() {
             className={SELECT_SM}
           >
             {[currentYear, currentYear - 1, currentYear - 2].map((y) => (
-              <option key={y} value={y}>{y}년</option>
+              <option key={y} value={y}>
+                {y}년
+              </option>
             ))}
           </select>
         </div>
       </div>
 
-      {taxLoading && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>
-      )}
+      {taxLoading && <p className="text-sm text-gray-400 dark:text-gray-500">계산 중...</p>}
 
       {taxData && !taxLoading && (
         <div className="space-y-3">
@@ -63,7 +63,8 @@ export default function TaxOptimizationCard() {
                 <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <AlertTriangle size={14} className="text-orange-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-orange-700 dark:text-orange-400">
-                    국내 주식 보유액이 10억원 이상입니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다.
+                    국내 주식 보유액이 10억원 이상입니다. 대주주 요건 해당 시 양도소득세(22%)가
+                    부과될 수 있습니다.
                   </p>
                 </div>
               )}
@@ -71,7 +72,8 @@ export default function TaxOptimizationCard() {
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                   <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
-                    금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수 있습니다.
+                    금융소득(배당+해외차익)이 2,000만원 이상입니다. 금융소득 종합과세 대상이 될 수
+                    있습니다.
                   </p>
                 </div>
               )}
@@ -80,29 +82,39 @@ export default function TaxOptimizationCard() {
 
           <div className="flex divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
             <div className="flex-1 min-w-0 px-3 py-2.5">
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">배당소득세</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
+                배당소득세
+              </p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.dividend_tax_krw)}
               </p>
               <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                배당수령 {fmtKrw(taxData.dividend_income_krw)} × {taxData.rates.dividend_tax_rate_pct}%
+                배당수령 {fmtKrw(taxData.dividend_income_krw)} ×{" "}
+                {taxData.rates.dividend_tax_rate_pct}%
               </p>
             </div>
             <div className="flex-1 min-w-0 px-3 py-2.5">
-              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">해외 양도세</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
+                해외 양도세
+              </p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.overseas_tax_estimated_krw)}
               </p>
               <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} ({taxData.rates.overseas_tax_rate_pct}%)
+                미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} (
+                {taxData.rates.overseas_tax_rate_pct}%)
               </p>
             </div>
             <div className="flex-1 min-w-0 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20">
-              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">예상 납부</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">
+                예상 납부
+              </p>
               <p className="text-base font-bold text-blue-700 dark:text-blue-300 mt-0.5 truncate">
                 {fmtKrw(taxData.total_estimated_tax_krw)}
               </p>
-              <p className="hidden sm:block text-xs text-blue-500 dark:text-blue-500 mt-0.5">{taxYear}년 기준</p>
+              <p className="hidden sm:block text-xs text-blue-500 dark:text-blue-500 mt-0.5">
+                {taxYear}년 기준
+              </p>
             </div>
           </div>
 
@@ -116,15 +128,14 @@ export default function TaxOptimizationCard() {
             {plannerOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 
-          {plannerOpen && (
-            posLoading ? (
+          {plannerOpen &&
+            (posLoading ? (
               <p className="text-sm text-gray-400 dark:text-gray-500">불러오는 중...</p>
             ) : positionsData ? (
               <ErrorBoundary variant="section">
                 <TaxPlannerSection positions={positionsData} />
               </ErrorBoundary>
-            ) : null
-          )}
+            ) : null)}
 
           <button
             onClick={() => setGeumtOpen((v) => !v)}

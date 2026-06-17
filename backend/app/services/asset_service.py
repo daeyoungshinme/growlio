@@ -100,15 +100,22 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
             sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711, E501
         )
         for p in balance.positions:
-            db.add(Position(
-                account_id=account.id,
-                snapshot_id=None,
-                ticker=p.ticker, name=p.name, market=p.market,
-                qty=p.qty, avg_price=p.avg_price, avg_price_usd=p.avg_price_usd,
-                current_price=p.current_price,
-                value_krw=p.value_krw,
-                currency=p.currency, usd_rate=p.usd_rate,
-            ))
+            db.add(
+                Position(
+                    account_id=account.id,
+                    snapshot_id=None,
+                    ticker=p.ticker,
+                    name=p.name,
+                    market=p.market,
+                    qty=p.qty,
+                    avg_price=p.avg_price,
+                    avg_price_usd=p.avg_price_usd,
+                    current_price=p.current_price,
+                    value_krw=p.value_krw,
+                    currency=p.currency,
+                    usd_rate=p.usd_rate,
+                )
+            )
 
     # 현재 포지션 업데이트·스냅샷 생성·스냅샷 포지션 복사를 단일 트랜잭션으로 처리.
     # 중간 실패 시 전체 롤백되어 부분 동기화 상태를 방지한다.
@@ -125,16 +132,12 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
         amount_krw=balance.total_value_krw,
         invested_amount=balance.invested_krw or None,
         unrealized_pnl=balance.pnl_krw or None,
-        usd_krw_rate=(
-            balance.usd_krw_rate if balance.usd_krw_rate != settings.usd_krw_fallback_rate else None
-        ),
+        usd_krw_rate=(balance.usd_krw_rate if balance.usd_krw_rate != settings.usd_krw_fallback_rate else None),
         source=source,
     )
 
     if balance.positions:
-        await sync_snapshot_positions(
-            db, snapshot_id=snapshot.id, account_id=account.id, positions=balance.positions
-        )
+        await sync_snapshot_positions(db, snapshot_id=snapshot.id, account_id=account.id, positions=balance.positions)
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
@@ -155,6 +158,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
 # ---------------------------------------------------------------------------
 # 조회 헬퍼 — API 레이어에서 직접 쿼리하지 않도록 서비스 레이어에서 제공
 # ---------------------------------------------------------------------------
+
 
 async def list_accounts(
     user_id: uuid.UUID,

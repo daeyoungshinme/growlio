@@ -74,7 +74,7 @@ function renderDashboard() {
       <MemoryRouter>
         <DashboardPage />
       </MemoryRouter>
-    </QueryClientProvider>
+    </QueryClientProvider>,
   );
 }
 

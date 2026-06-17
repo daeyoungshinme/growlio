@@ -55,22 +55,24 @@ export interface AssetAccountCreate {
   include_in_total?: boolean;
 }
 
-export const fetchAccounts = () =>
-  apiGet<AssetAccount[]>("/assets");
+export const fetchAccounts = () => apiGet<AssetAccount[]>("/assets");
 
-export const createAccount = (data: AssetAccountCreate) =>
-  apiPost<AssetAccount>("/assets", data);
+export const createAccount = (data: AssetAccountCreate) => apiPost<AssetAccount>("/assets", data);
 
 export const updateAccount = (
   id: string,
-  data: Partial<AssetAccountCreate & { is_active: boolean; deposit_krw: number; real_estate_details: RealEstateDetails }>,
+  data: Partial<
+    AssetAccountCreate & {
+      is_active: boolean;
+      deposit_krw: number;
+      real_estate_details: RealEstateDetails;
+    }
+  >,
 ) => apiPut<AssetAccount>(`/assets/${id}`, data);
 
-export const deleteAccount = (id: string) =>
-  apiDelete(`/assets/${id}`);
+export const deleteAccount = (id: string) => apiDelete(`/assets/${id}`);
 
-export const syncAccount = (id: string) =>
-  apiPost(`/assets/${id}/sync`);
+export const syncAccount = (id: string) => apiPost(`/assets/${id}/sync`);
 
 export const setAccountTargetPortfolio = (accountId: string, portfolioId: string | null) =>
   apiPatch<AssetAccount>(`/assets/${accountId}/target-portfolio`, {

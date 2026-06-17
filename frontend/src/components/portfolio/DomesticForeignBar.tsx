@@ -16,7 +16,9 @@ export default function DomesticForeignBar({ items }: Props) {
 
   return (
     <div className="card">
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">국내/해외 비중</h3>
+      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
+        국내/해외 비중
+      </h3>
 
       {items.length === 0 ? (
         <div className="h-16 flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm">
@@ -54,7 +56,9 @@ export default function DomesticForeignBar({ items }: Props) {
                   <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {domestic.pct.toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-400 dark:text-gray-500">{fmtKrwShort(domestic.value)}원</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {fmtKrwShort(domestic.value)}원
+                  </div>
                 </div>
               </div>
             )}
@@ -65,7 +69,9 @@ export default function DomesticForeignBar({ items }: Props) {
                   <div className="text-sm font-semibold text-gray-800 dark:text-gray-100">
                     {foreign.pct.toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-400 dark:text-gray-500">{fmtKrwShort(foreign.value)}원</div>
+                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                    {fmtKrwShort(foreign.value)}원
+                  </div>
                 </div>
                 <span className="mt-1 w-3 h-3 rounded-sm bg-amber-400 shrink-0" />
               </div>

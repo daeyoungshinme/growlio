@@ -9,6 +9,7 @@ import pytest
 
 # ── _xirr 테스트 ────────────────────────────────────────────
 
+
 class TestXirr:
     """_xirr: Newton-Raphson XIRR 계산 로직."""
 
@@ -71,6 +72,7 @@ class TestXirr:
 
 
 # ── _calc_xirr 통합 테스트 ──────────────────────────────────
+
 
 class TestCalcXirr:
     """_calc_xirr: 트랜잭션 or 스냅샷 경로 XIRR."""
@@ -149,6 +151,7 @@ class TestCalcXirr:
 
 # ── _get_monthly_trend 캐시 테스트 ─────────────────────────
 
+
 class TestGetMonthlyTrend:
     """_get_monthly_trend: Redis 캐시 히트/미스 동작."""
 
@@ -208,6 +211,7 @@ class TestGetMonthlyTrend:
 
 
 # ── _get_no_snap_accounts SQL 필터 테스트 ─────────────────
+
 
 class TestGetNoSnapAccounts:
     """_get_no_snap_accounts: snapped_ids SQL 필터 검증."""

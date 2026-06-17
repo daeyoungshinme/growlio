@@ -33,6 +33,7 @@ def mock_redis_and_scheduler(monkeypatch):
 
 # ── 공통 헬퍼 ─────────────────────────────────────────────────
 
+
 def _make_user(user_id: uuid.UUID | None = None):
     return SimpleNamespace(
         id=user_id or uuid.uuid4(),
@@ -80,12 +81,14 @@ def _get_app_with_auth(user=None):
 
 # ── /health ──────────────────────────────────────────────────
 
+
 class TestHealth:
     """GET /health — 인증 불필요."""
 
     def test_health_returns_200_or_503(self, override_settings):
         """Redis 없이도 /health 엔드포인트 자체는 응답한다."""
         from app.main import app
+
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/health")
         # Redis 연결 불가 시 503, 가능 시 200
@@ -93,6 +96,7 @@ class TestHealth:
 
 
 # ── /api/v1/auth/me ───────────────────────────────────────────
+
 
 class TestAuthRoutes:
     """GET /api/v1/auth/me — 인증 상태 확인."""
@@ -120,6 +124,7 @@ class TestAuthRoutes:
 
 
 # ── /api/v1/assets ────────────────────────────────────────────
+
 
 class TestAssetsRoutes:
     """GET /api/v1/assets — 계좌 목록 조회."""
@@ -151,6 +156,7 @@ class TestAssetsRoutes:
 
 # ── /api/v1/portfolio/current ─────────────────────────────────
 
+
 class TestPortfolioRoutes:
     """GET /api/v1/portfolio/current — 포트폴리오 통합 조회."""
 
@@ -168,16 +174,21 @@ class TestPortfolioRoutes:
 
         app, user, db = _get_app_with_auth()
         mock_overview = {
-            "total_value_krw": 0, "total_invested_krw": 0,
-            "total_pnl_krw": 0, "total_pnl_pct": 0,
-            "positions": [], "accounts": [], "allocations": [],
+            "total_value_krw": 0,
+            "total_invested_krw": 0,
+            "total_pnl_krw": 0,
+            "total_pnl_pct": 0,
+            "positions": [],
+            "accounts": [],
+            "allocations": [],
         }
         try:
             with (
                 patch("app.api.v1.portfolio.get_redis", new_callable=AsyncMock),
                 patch(
                     "app.api.v1.portfolio.build_portfolio_overview",
-                    new_callable=AsyncMock, return_value=mock_overview,
+                    new_callable=AsyncMock,
+                    return_value=mock_overview,
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -188,6 +199,7 @@ class TestPortfolioRoutes:
 
 
 # ── /api/v1/dividends/summary ─────────────────────────────────
+
 
 class TestDividendsRoutes:
     """GET /api/v1/dividends/summary — 배당금 요약."""
@@ -215,7 +227,8 @@ class TestDividendsRoutes:
             with (
                 patch(
                     "app.api.v1.dividends.get_dividend_summary",
-                    new_callable=AsyncMock, return_value=mock_summary,
+                    new_callable=AsyncMock,
+                    return_value=mock_summary,
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -226,6 +239,7 @@ class TestDividendsRoutes:
 
 
 # ── /api/v1/tax ───────────────────────────────────────────────
+
 
 class TestTaxRoutes:
     """GET /api/v1/tax — 세금 추정."""
@@ -244,14 +258,19 @@ class TestTaxRoutes:
 
         app, user, db = _get_app_with_auth()
         mock_tax = {
-            "year": 2026, "dividend_income": 0.0, "dividend_tax": 0.0,
-            "overseas_gain": 0.0, "overseas_tax": 0.0, "total_tax": 0.0,
+            "year": 2026,
+            "dividend_income": 0.0,
+            "dividend_tax": 0.0,
+            "overseas_gain": 0.0,
+            "overseas_tax": 0.0,
+            "total_tax": 0.0,
         }
         try:
             with (
                 patch(
                     "app.api.v1.tax.get_tax_summary",
-                    new_callable=AsyncMock, return_value=mock_tax,
+                    new_callable=AsyncMock,
+                    return_value=mock_tax,
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -262,6 +281,7 @@ class TestTaxRoutes:
 
 
 # ── /api/v1/alerts/exchange-rate ─────────────────────────────
+
 
 class TestAlertsRoutes:
     """GET /api/v1/alerts/exchange-rate — 환율 알림 목록."""

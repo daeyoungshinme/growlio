@@ -1,4 +1,5 @@
 """알림 발동 조건 계산 — 순수 함수 (DB 접근 없음)."""
+
 from __future__ import annotations
 
 import calendar
@@ -61,9 +62,8 @@ def already_fired_today(alert: RebalancingAlert) -> bool:
 def should_trigger_exchange_rate(alert: ExchangeRateAlert, current_rate: float) -> bool:
     """환율 알림 발동 조건 충족 여부."""
     target = float(alert.target_rate)
-    triggered = (
-        (alert.direction == "BELOW" and current_rate <= target)
-        or (alert.direction == "ABOVE" and current_rate >= target)
+    triggered = (alert.direction == "BELOW" and current_rate <= target) or (
+        alert.direction == "ABOVE" and current_rate >= target
     )
     if not triggered:
         return False
@@ -77,10 +77,7 @@ def should_trigger_exchange_rate(alert: ExchangeRateAlert, current_rate: float) 
 def should_trigger_stock_price(alert: StockPriceAlert, price: float) -> bool:
     """주가 알림 발동 조건 충족 여부."""
     target = float(alert.target_price)
-    triggered = (
-        (alert.direction == "BELOW" and price <= target)
-        or (alert.direction == "ABOVE" and price >= target)
-    )
+    triggered = (alert.direction == "BELOW" and price <= target) or (alert.direction == "ABOVE" and price >= target)
     if not triggered:
         return False
     if alert.max_trigger_count > 1 and alert.triggered_at:

@@ -1,4 +1,5 @@
 """시장 위험 신호 API — VIX, 장단기 금리차, Fear & Greed Index 복합 조회."""
+
 from __future__ import annotations
 
 import structlog

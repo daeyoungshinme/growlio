@@ -33,14 +33,17 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
   const [notificationEmail, setNotificationEmail] = useState(userEmail ?? "");
   const [saving, setSaving] = useState<string | null>(null);
 
-  const { items: alerts, reactivateMutation: reactivateAlertMutation, deleteMutation: deleteAlertMutation } =
-    useAlertCrud<ExchangeRateAlert>({
-      queryKey: QUERY_KEYS.exchangeRateAlerts,
-      queryFn: fetchExchangeRateAlerts,
-      reactivateFn: reactivateExchangeRateAlert,
-      deleteFn: deleteExchangeRateAlert,
-      invalidateFn: invalidateAlertData,
-    });
+  const {
+    items: alerts,
+    reactivateMutation: reactivateAlertMutation,
+    deleteMutation: deleteAlertMutation,
+  } = useAlertCrud<ExchangeRateAlert>({
+    queryKey: QUERY_KEYS.exchangeRateAlerts,
+    queryFn: fetchExchangeRateAlerts,
+    reactivateFn: reactivateExchangeRateAlert,
+    deleteFn: deleteExchangeRateAlert,
+    invalidateFn: invalidateAlertData,
+  });
 
   const createAlertMutation = useMutation({
     mutationFn: () =>
@@ -60,7 +63,9 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
   const saveNotificationEmail = async () => {
     setSaving("notification-email");
     try {
-      await api.put("/settings/notification-email", { notification_email: notificationEmail || null });
+      await api.put("/settings/notification-email", {
+        notification_email: notificationEmail || null,
+      });
       toast("알림 이메일이 저장되었습니다", "success");
       onSettingsChange();
     } catch {
@@ -122,7 +127,8 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
         </button>
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        목표환율 도달 시 이메일로 알림을 보내드립니다. 다회 발동 알림은 발동 간 최소 1시간 간격이 적용됩니다.
+        목표환율 도달 시 이메일로 알림을 보내드립니다. 다회 발동 알림은 발동 간 최소 1시간 간격이
+        적용됩니다.
       </p>
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-[120px]">
@@ -142,7 +148,9 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
           <select
             className={inputClass}
             value={alertForm.direction}
-            onChange={(e) => setAlertForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))}
+            onChange={(e) =>
+              setAlertForm((f) => ({ ...f, direction: e.target.value as "BELOW" | "ABOVE" }))
+            }
           >
             <option value="BELOW">이하 (↓)</option>
             <option value="ABOVE">이상 (↑)</option>

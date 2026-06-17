@@ -1,4 +1,5 @@
 """공용 Pydantic 검증 함수."""
+
 from typing import Any
 
 

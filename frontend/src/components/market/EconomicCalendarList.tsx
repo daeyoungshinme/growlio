@@ -128,7 +128,10 @@ export default function EconomicCalendarList({ events }: Props) {
                           <span className="text-xs text-gray-500 dark:text-gray-400">
                             {hasResult ? "실제" : "예측"}{" "}
                             <span className="font-semibold text-gray-700 dark:text-gray-200">
-                              {formatValue(hasResult ? event.actual : event.estimate, event.currency)}
+                              {formatValue(
+                                hasResult ? event.actual : event.estimate,
+                                event.currency,
+                              )}
                             </span>
                           </span>
                         )}

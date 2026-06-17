@@ -112,9 +112,9 @@ describe("useAuthStore", () => {
     } as any);
 
     const { useAuthStore } = await import("@/stores/authStore");
-    await expect(
-      useAuthStore.getState().login("test@example.com", "wrong")
-    ).rejects.toThrow("Invalid credentials");
+    await expect(useAuthStore.getState().login("test@example.com", "wrong")).rejects.toThrow(
+      "Invalid credentials",
+    );
   });
 
   it("logout이 상태를 초기화한다", async () => {
@@ -170,10 +170,15 @@ describe("useAuthStore", () => {
 
   it("forgotPassword가 이메일을 전송한다", async () => {
     const { supabase } = await import("@/lib/supabase");
-    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ data: {}, error: null } as never);
+    vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
+      data: {},
+      error: null,
+    } as never);
 
     const { useAuthStore } = await import("@/stores/authStore");
-    await expect(useAuthStore.getState().forgotPassword("test@example.com")).resolves.toBeUndefined();
+    await expect(
+      useAuthStore.getState().forgotPassword("test@example.com"),
+    ).resolves.toBeUndefined();
   });
 
   it("forgotPassword가 실패하면 에러를 throw한다", async () => {

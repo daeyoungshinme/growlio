@@ -1,4 +1,5 @@
 """이메일 발송 서비스 (aiosmtplib SMTP)."""
+
 from __future__ import annotations
 
 import ssl
@@ -100,8 +101,11 @@ async def send_rebalancing_alert(
         await _send_html_email(to_email, subject, html)
         logger.info(
             "rebalancing_alert_email_sent",
-            to=to_email, portfolio=portfolio_name,
-            items=len(items_to_show), drifting=drifting_count, is_scheduled=is_scheduled_report,
+            to=to_email,
+            portfolio=portfolio_name,
+            items=len(items_to_show),
+            drifting=drifting_count,
+            is_scheduled=is_scheduled_report,
         )
     except Exception as e:
         logger.error("rebalancing_alert_email_failed", to=to_email, error=str(e))
@@ -122,7 +126,10 @@ async def send_deposit_trigger_alert(
     try:
         await _send_html_email(to_email, subject, html)
         logger.info(
-            "deposit_trigger_alert_email_sent", to=to_email, portfolio=portfolio_name, increment=deposit_increment,
+            "deposit_trigger_alert_email_sent",
+            to=to_email,
+            portfolio=portfolio_name,
+            increment=deposit_increment,
         )
     except Exception as exc:
         logger.error("deposit_trigger_alert_email_failed", to=to_email, error=str(exc))
@@ -170,9 +177,18 @@ async def send_monthly_report_email(
         logger.warning("smtp_not_configured_skip_email", to=to_email)
         return
     subject, html = monthly_report_template(
-        report_month, total_assets_krw, mom_change_krw, mom_change_pct,
-        annual_return_pct, xirr_pct, goal_amount, goal_achievement_pct,
-        annual_deposit_goal, deposit_achievement_pct, annual_dividends_received, asset_allocation,
+        report_month,
+        total_assets_krw,
+        mom_change_krw,
+        mom_change_pct,
+        annual_return_pct,
+        xirr_pct,
+        goal_amount,
+        goal_achievement_pct,
+        annual_deposit_goal,
+        deposit_achievement_pct,
+        annual_dividends_received,
+        asset_allocation,
     )
     try:
         await _send_html_email(to_email, subject, html)

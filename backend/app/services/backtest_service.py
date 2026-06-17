@@ -7,6 +7,7 @@ Buy & Hold 전략으로 가상 포트폴리오의 과거 수익률을 시뮬레�
 
 순수 계산 함수는 backtest_metrics.py 참고.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -45,6 +46,7 @@ _compute_portfolio_series = compute_portfolio_series
 
 
 # ── yfinance 히스토리컬 다운로드 (동기) ──────────────────────
+
 
 def _sync_download_history(
     symbols: list[str],
@@ -93,6 +95,7 @@ def _sync_download_history(
 
 # ── 실제 보유 포트폴리오 holdings 조회 ──────────────────────────
 
+
 async def _get_real_portfolio_holdings(
     user_id: uuid.UUID,
     db: AsyncSession,
@@ -119,8 +122,7 @@ async def _get_real_portfolio_holdings(
     )
 
     snap_rows = await db.execute(
-        select(AssetSnapshot.id)
-        .join(
+        select(AssetSnapshot.id).join(
             latest_sub,
             (AssetSnapshot.account_id == latest_sub.c.account_id)
             & (AssetSnapshot.snapshot_date == latest_sub.c.max_date),
@@ -131,9 +133,7 @@ async def _get_real_portfolio_holdings(
     if not snap_ids:
         return None
 
-    pos_rows = await db.execute(
-        select(Position).where(Position.snapshot_id.in_(snap_ids))
-    )
+    pos_rows = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
     all_positions = pos_rows.scalars().all()
 
     if not all_positions:
@@ -166,6 +166,7 @@ async def _get_real_portfolio_holdings(
 
 
 # ── 메인 백테스팅 실행 ─────────────────────────────────────
+
 
 async def _download_price_data(
     portfolios: list[Portfolio],
@@ -208,6 +209,7 @@ def _build_date_axis(
         return [d for d, _ in price_data[ref_sym]]
 
     from datetime import timedelta
+
     cur = req.start_date
     dates: list[str] = []
     while cur <= req.end_date:
@@ -233,8 +235,7 @@ def _compute_performance_metrics(
         investable = [
             {"ticker": h.ticker, "market": h.market, "weight": float(h.weight), "name": h.name}
             for h in p.items
-            if h.ticker not in _BACKTEST_SKIP_TICKERS
-            and h.market not in _BACKTEST_SKIP_MARKETS
+            if h.ticker not in _BACKTEST_SKIP_TICKERS and h.market not in _BACKTEST_SKIP_MARKETS
         ]
         s, m = compute_portfolio_series(p.name, investable, price_data, dates)
         all_series.append(s)
@@ -302,14 +303,13 @@ async def run_backtest(
         return BacktestResult(dates=[], series=[], metrics=[])
 
     # 5–7. 시리즈 및 성능 메트릭 계산
-    all_series, all_metrics = _compute_performance_metrics(
-        portfolios, price_data, dates, req, real_holdings
-    )
+    all_series, all_metrics = _compute_performance_metrics(portfolios, price_data, dates, req, real_holdings)
 
     return BacktestResult(dates=dates, series=all_series, metrics=all_metrics)
 
 
 # ── 상관관계 분석 ───────────────────────────────────────────────
+
 
 def _sync_compute_correlation(
     symbols: list[str],
@@ -394,7 +394,7 @@ async def compute_correlation(
     labels: list[str] = []
 
     for port in portfolios:
-        for item in (port.items or []):
+        for item in port.items or []:
             if not item.ticker or not item.market:
                 continue
             if item.ticker in _BACKTEST_SKIP_TICKERS or item.market in _BACKTEST_SKIP_MARKETS:

@@ -37,8 +37,7 @@ export interface DashboardData {
   retirement_target_year: number | null;
 }
 
-export const fetchDashboard = () =>
-  apiGet<DashboardData>("/dashboard");
+export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");
 
 export interface TickerDividendItem {
   ticker: string | null;
@@ -56,8 +55,7 @@ export interface TickerDividendItem {
   estimated_monthly_usd: number | null;
 }
 
-export const fetchDividendByTicker = () =>
-  apiGet<TickerDividendItem[]>("/dividends/by-ticker");
+export const fetchDividendByTicker = () => apiGet<TickerDividendItem[]>("/dividends/by-ticker");
 
 export const updateTickerDividendMonths = (
   ticker: string,

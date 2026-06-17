@@ -39,16 +39,13 @@ STOCK_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_OT
 DOMESTIC_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "KRX"})
 
 
-async def _fetch_latest_snapshots(
-    acc_ids: list[uuid.UUID], db: AsyncSession
-) -> dict[str, AssetSnapshot]:
+async def _fetch_latest_snapshots(acc_ids: list[uuid.UUID], db: AsyncSession) -> dict[str, AssetSnapshot]:
     """계좌 ID 목록의 최신 스냅샷을 {account_id_str: snapshot} 딕셔너리로 반환한다."""
     subq = latest_snapshot_subquery(account_ids=acc_ids)
     result = await db.execute(
         select(AssetSnapshot).join(
             subq,
-            (AssetSnapshot.account_id == subq.c.account_id)
-            & (AssetSnapshot.snapshot_date == subq.c.max_date),
+            (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
     )
     return {str(s.account_id): s for s in result.scalars().all()}
@@ -87,9 +84,7 @@ def _calc_account_amounts(
     return 0.0, 0.0, 0.0, []
 
 
-def _build_position_details(
-    acc: AssetAccount, raw_positions: list[Position], snap: AssetSnapshot | None
-) -> list[dict]:
+def _build_position_details(acc: AssetAccount, raw_positions: list[Position], snap: AssetSnapshot | None) -> list[dict]:
     """주식 계좌의 종목 상세 목록을 계산해 반환한다."""
     if acc.asset_type not in STOCK_TYPES or not raw_positions:
         return []
@@ -100,21 +95,23 @@ def _build_position_details(
         cur_out = float(p.current_price or p.avg_price or 0)
         val_amt = float(p.value_krw or cur_out * qty)
         inv_amt, _, pnl_p, rate = calc_position_pnl(qty, avg_out, cur_out)
-        result.append({
-            "ticker": p.ticker,
-            "name": p.name or "",
-            "market": p.market,
-            "qty": qty,
-            "avg_price": avg_out,
-            "current_price": cur_out,
-            "value_krw": val_amt,
-            "invested_krw": inv_amt,
-            "pnl": pnl_p,
-            "pnl_pct": round(rate, 2),
-            "currency": p.currency or "KRW",
-            "account_id": str(acc.id),
-            "account_name": acc.name,
-        })
+        result.append(
+            {
+                "ticker": p.ticker,
+                "name": p.name or "",
+                "market": p.market,
+                "qty": qty,
+                "avg_price": avg_out,
+                "current_price": cur_out,
+                "value_krw": val_amt,
+                "invested_krw": inv_amt,
+                "pnl": pnl_p,
+                "pnl_pct": round(rate, 2),
+                "currency": p.currency or "KRW",
+                "account_id": str(acc.id),
+                "account_name": acc.name,
+            }
+        )
     return result
 
 
@@ -140,12 +137,14 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
     ]
     if rest:
         rest_value = sum(p["value_krw"] for p in rest)
-        allocation.append({
-            "ticker": "ETC",
-            "name": f"기타 {len(rest)}종목",
-            "value_krw": rest_value,
-            "pct": round(rest_value / stock_total_krw * 100, 2) if stock_total_krw else 0,
-        })
+        allocation.append(
+            {
+                "ticker": "ETC",
+                "name": f"기타 {len(rest)}종목",
+                "value_krw": rest_value,
+                "pct": round(rest_value / stock_total_krw * 100, 2) if stock_total_krw else 0,
+            }
+        )
     return allocation
 
 
@@ -254,9 +253,7 @@ async def build_portfolio_overview(
     cur_pos_map: dict[uuid.UUID, list[Position]] = {}
 
     if snap_ids:
-        sp_result = await db.execute(
-            select(Position).where(Position.snapshot_id.in_(snap_ids))
-        )
+        sp_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
         for pos in sp_result.scalars().all():
             if pos.snapshot_id is not None:
                 snap_pos_map.setdefault(pos.snapshot_id, []).append(pos)
@@ -282,20 +279,30 @@ async def build_portfolio_overview(
 
     for acc in accounts:
         snap = snap_by_acc.get(str(acc.id))
-        pos_list_db: list[Position] = (
-            snap_pos_map.get(snap.id, []) if snap else []
-        ) or cur_pos_map.get(acc.id, [])
+        pos_list_db: list[Position] = (snap_pos_map.get(snap.id, []) if snap else []) or cur_pos_map.get(acc.id, [])
         amount_krw, invested, pnl, raw_positions = _calc_account_amounts(acc, snap, pos_list_db)
 
         total_assets_krw, total_invested_krw, unrealized_pnl_krw = _accumulate_account_totals(
-            acc, amount_krw, invested, pnl,
-            total_assets_krw, total_invested_krw, unrealized_pnl_krw,
+            acc,
+            amount_krw,
+            invested,
+            pnl,
+            total_assets_krw,
+            total_invested_krw,
+            unrealized_pnl_krw,
             asset_type_totals,
         )
 
         account_row = _build_account_row(
-            acc, snap, raw_positions, amount_krw, invested, pnl,
-            lite, all_positions, lite_stock_items,
+            acc,
+            snap,
+            raw_positions,
+            amount_krw,
+            invested,
+            pnl,
+            lite,
+            all_positions,
+            lite_stock_items,
         )
         account_rows.append(account_row)
 
@@ -335,9 +342,7 @@ async def build_portfolio_overview(
 
     if redis and not account_ids:
         with contextlib.suppress(RedisError):
-            await redis.setex(
-                cache_key_fn(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview)
-            )
+            await redis.setex(cache_key_fn(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview))
 
     return overview
 
@@ -377,9 +382,7 @@ _EXTENDED_ASSET_TYPE_LABELS: dict[str, str] = {
 _STOCK_ASSET_TYPES = ("STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER")
 
 
-async def get_allocation_history(
-    user_id: uuid.UUID, db: AsyncSession, months: int = 12, redis=None
-) -> list[dict]:
+async def get_allocation_history(user_id: uuid.UUID, db: AsyncSession, months: int = 12, redis=None) -> list[dict]:
     """월별 자산 유형별 배분 이력 조회.
 
     각 월의 마지막 스냅샷 기준으로 asset_type별 금액/비중을 반환한다.
@@ -496,18 +499,22 @@ async def get_allocation_history(
 
         allocations = []
         for asset_type, amount_krw in sorted(type_amounts.items()):
-            allocations.append({
-                "asset_type": asset_type,
-                "label": _EXTENDED_ASSET_TYPE_LABELS.get(asset_type, asset_type),
-                "amount_krw": round(amount_krw, 2),
-                "weight_pct": round(amount_krw / total_krw * 100, 2),
-            })
+            allocations.append(
+                {
+                    "asset_type": asset_type,
+                    "label": _EXTENDED_ASSET_TYPE_LABELS.get(asset_type, asset_type),
+                    "amount_krw": round(amount_krw, 2),
+                    "weight_pct": round(amount_krw / total_krw * 100, 2),
+                }
+            )
 
-        output.append({
-            "month": month_str,
-            "total_krw": round(total_krw, 2),
-            "allocations": allocations,
-        })
+        output.append(
+            {
+                "month": month_str,
+                "total_krw": round(total_krw, 2),
+                "allocations": allocations,
+            }
+        )
 
     if redis is not None:
         await redis.set(cache_key, json.dumps(output), ex=TTL_ALLOC_HISTORY)

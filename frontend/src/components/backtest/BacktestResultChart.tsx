@@ -18,7 +18,16 @@ import { SeriesData } from "@/api/backtest";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 
-const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2", "#DB2777", "#059669"];
+const COLORS = [
+  "#2563EB",
+  "#16A34A",
+  "#D97706",
+  "#DC2626",
+  "#7C3AED",
+  "#0891B2",
+  "#DB2777",
+  "#059669",
+];
 
 type ChartView = "cumulative" | "annual" | "drawdown";
 
@@ -68,24 +77,29 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
       const firstValMap: Map<string, number> = new Map();
       series.forEach((s) => {
         for (let i = firstIdx; i < dates.length && dates[i].startsWith(year); i++) {
-          if (s.values[i] != null) { firstValMap.set(s.name, s.values[i]!); break; }
+          if (s.values[i] != null) {
+            firstValMap.set(s.name, s.values[i]!);
+            break;
+          }
         }
       });
       series.forEach((s) => {
         const start = firstValMap.get(s.name);
         const end = curMap.get(s.name);
-        row[s.name] = start != null && end != null && start !== 0
-          ? parseFloat(((end / start - 1) * 100).toFixed(2))
-          : null;
+        row[s.name] =
+          start != null && end != null && start !== 0
+            ? parseFloat(((end / start - 1) * 100).toFixed(2))
+            : null;
       });
     } else {
       const prevMap = yearLastVal.get(years[idx - 1])!;
       series.forEach((s) => {
         const start = prevMap.get(s.name);
         const end = curMap.get(s.name);
-        row[s.name] = start != null && end != null && start !== 0
-          ? parseFloat(((end / start - 1) * 100).toFixed(2))
-          : null;
+        row[s.name] =
+          start != null && end != null && start !== 0
+            ? parseFloat(((end / start - 1) * 100).toFixed(2))
+            : null;
       });
     }
 
@@ -109,7 +123,9 @@ export default function BacktestResultChart({ dates, series }: Props) {
   };
   const gridProps = { strokeDasharray: "3 3", stroke: isDark ? "#374151" : "#F3F4F6" };
   const tickInterval = Math.max(1, Math.floor(dates.length / 12));
-  const legendStyle = { wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined } };
+  const legendStyle = {
+    wrapperStyle: { fontSize: 12, paddingTop: 12, color: isDark ? "#d1d5db" : undefined },
+  };
 
   // cumulative line chart data
   const cumulativeData = dates.map((d, i) => {
@@ -148,9 +164,24 @@ export default function BacktestResultChart({ dates, series }: Props) {
           {view === "drawdown" && "드로다운 (최고점 대비 하락률)"}
         </p>
         <div className="flex gap-1">
-          <button className={view === "cumulative" ? btnActive : btnInactive} onClick={() => setView("cumulative")}>누적</button>
-          <button className={view === "annual" ? btnActive : btnInactive} onClick={() => setView("annual")}>연도별</button>
-          <button className={view === "drawdown" ? btnActive : btnInactive} onClick={() => setView("drawdown")}>드로다운</button>
+          <button
+            className={view === "cumulative" ? btnActive : btnInactive}
+            onClick={() => setView("cumulative")}
+          >
+            누적
+          </button>
+          <button
+            className={view === "annual" ? btnActive : btnInactive}
+            onClick={() => setView("annual")}
+          >
+            연도별
+          </button>
+          <button
+            className={view === "drawdown" ? btnActive : btnInactive}
+            onClick={() => setView("drawdown")}
+          >
+            드로다운
+          </button>
         </div>
       </div>
 
@@ -164,13 +195,24 @@ export default function BacktestResultChart({ dates, series }: Props) {
               {...tooltipStyle}
               formatter={(value: unknown, name: string) => {
                 if (value == null || typeof value !== "number") return ["-", name];
-                return [`${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`, name];
+                return [
+                  `${value >= 100 ? "+" : ""}${(value - 100).toFixed(2)}% (${value.toFixed(1)})`,
+                  name,
+                ];
               }}
             />
             <Legend {...legendStyle} iconType="plainline" />
             {series.map((s, i) => (
-              <Line key={s.name} type="monotone" dataKey={s.name} stroke={COLORS[i % COLORS.length]}
-                strokeWidth={2} dot={false} activeDot={{ r: 4 }} connectNulls={false} />
+              <Line
+                key={s.name}
+                type="monotone"
+                dataKey={s.name}
+                stroke={COLORS[i % COLORS.length]}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+                connectNulls={false}
+              />
             ))}
           </LineChart>
         </ResponsiveContainer>
@@ -181,7 +223,11 @@ export default function BacktestResultChart({ dates, series }: Props) {
           <BarChart data={annualData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid {...gridProps} />
             <XAxis dataKey="year" {...axisProps} />
-            <YAxis {...axisProps} tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`} width={50} />
+            <YAxis
+              {...axisProps}
+              tickFormatter={(v) => `${v > 0 ? "+" : ""}${v.toFixed(0)}%`}
+              width={50}
+            />
             <ReferenceLine y={0} stroke={isDark ? "#6B7280" : "#D1D5DB"} />
             <Tooltip
               {...tooltipStyle}
@@ -192,8 +238,13 @@ export default function BacktestResultChart({ dates, series }: Props) {
             />
             <Legend {...legendStyle} />
             {series.map((s, i) => (
-              <Bar key={s.name} dataKey={s.name} fill={COLORS[i % COLORS.length]}
-                radius={[2, 2, 0, 0]} maxBarSize={28} />
+              <Bar
+                key={s.name}
+                dataKey={s.name}
+                fill={COLORS[i % COLORS.length]}
+                radius={[2, 2, 0, 0]}
+                maxBarSize={28}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>
@@ -215,9 +266,16 @@ export default function BacktestResultChart({ dates, series }: Props) {
             />
             <Legend {...legendStyle} iconType="plainline" />
             {series.map((s, i) => (
-              <Area key={s.name} type="monotone" dataKey={s.name}
-                stroke={COLORS[i % COLORS.length]} fill={`${COLORS[i % COLORS.length]}33`}
-                strokeWidth={1.5} dot={false} connectNulls={false} />
+              <Area
+                key={s.name}
+                type="monotone"
+                dataKey={s.name}
+                stroke={COLORS[i % COLORS.length]}
+                fill={`${COLORS[i % COLORS.length]}33`}
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls={false}
+              />
             ))}
           </AreaChart>
         </ResponsiveContainer>
