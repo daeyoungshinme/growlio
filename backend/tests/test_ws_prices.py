@@ -25,6 +25,7 @@ def mock_redis_scheduler(monkeypatch):
 
 
 class TestWsPrices:
+    @pytest.mark.timeout(10)
     def test_ws_closes_without_auth(self, override_settings):
         from app.main import app
 
@@ -37,6 +38,7 @@ class TestWsPrices:
             with contextlib.suppress(Exception):
                 ws.receive_json()
 
+    @pytest.mark.timeout(10)
     def test_ws_closes_with_invalid_token(self, override_settings):
         from app.main import app
 
@@ -55,6 +57,7 @@ class TestWsPrices:
             except Exception:
                 pass  # WebSocket closed as expected
 
+    @pytest.mark.timeout(10)
     def test_ws_connects_with_valid_token(self, override_settings):
         from app.main import app
         from app.ws.connection_manager import manager
@@ -76,6 +79,7 @@ class TestWsPrices:
             data = ws.receive_json()
             assert data["type"] == "connected"
 
+    @pytest.mark.timeout(10)
     def test_ws_closes_with_wrong_message_type(self, override_settings):
         from app.main import app
 
@@ -87,6 +91,7 @@ class TestWsPrices:
             except Exception:
                 pass  # connection closed with wrong message type
 
+    @pytest.mark.timeout(10)
     def test_ws_subscribe_action(self, override_settings):
         from app.main import app
         from app.ws.connection_manager import manager
@@ -115,6 +120,7 @@ class TestWsPrices:
             data = ws.receive_json()
             assert data["type"] == "pong"
 
+    @pytest.mark.timeout(10)
     def test_ws_invalid_json_after_connect(self, override_settings):
         from app.main import app
         from app.ws.connection_manager import manager
@@ -138,6 +144,7 @@ class TestWsPrices:
             data = ws.receive_json()
             assert data["type"] == "error"
 
+    @pytest.mark.timeout(10)
     def test_ws_responds_to_ping(self, override_settings):
         from app.main import app
         from app.ws.connection_manager import manager

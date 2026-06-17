@@ -28,6 +28,7 @@ logger = structlog.get_logger()
 router = APIRouter(tags=["websocket"])
 
 _AUTH_TIMEOUT_SECONDS = 3.0
+_RECEIVE_TIMEOUT_SECONDS = 60.0
 
 
 @router.websocket("/ws/prices")
@@ -57,7 +58,13 @@ async def ws_prices(websocket: WebSocket) -> None:
         await websocket.send_text(json.dumps({"type": "connected"}))
 
         while True:
-            raw = await websocket.receive_text()
+            try:
+                raw = await asyncio.wait_for(
+                    websocket.receive_text(), timeout=_RECEIVE_TIMEOUT_SECONDS
+                )
+            except asyncio.TimeoutError:
+                await websocket.close(code=1000, reason="idle timeout")
+                break
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:

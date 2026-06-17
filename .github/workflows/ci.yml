@@ -13,6 +13,7 @@ jobs:
   backend:
     name: Backend — lint, typecheck, test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -79,7 +80,7 @@ jobs:
         run: .venv/bin/alembic downgrade -1
 
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -q --tb=short --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=65
+        run: .venv/bin/pytest -x -q --tb=short --timeout=30 --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=65
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'
