@@ -173,9 +173,10 @@ class TestExchangeRate:
         assert resp.status_code == 200
         assert "usd_krw" in resp.json()
 
-    def test_returns_200_with_yfinance_fallback(self, override_settings):
+    async def test_returns_200_with_yfinance_fallback(self, override_settings):
         """캐시 미스 시 yfinance 폴백."""
         from app.main import app
+        from httpx import AsyncClient, ASGITransport
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
@@ -183,10 +184,10 @@ class TestExchangeRate:
             patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
             patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
             patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
-            TestClient(app, raise_server_exceptions=False) as client,
         ):
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=0.0)
-            resp = client.get("/api/v1/stocks/exchange-rate")
+            async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+                resp = await client.get("/api/v1/stocks/exchange-rate")
         assert resp.status_code in (200, 500)
 
 
