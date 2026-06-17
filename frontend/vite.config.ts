@@ -111,6 +111,10 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts", "./src/test/setup.tsx"],
+    env: {
+      VITE_SUPABASE_URL: "https://placeholder.supabase.co",
+      VITE_SUPABASE_ANON_KEY: "placeholder-anon-key-for-tests",
+    },
     exclude: ["**/node_modules/**", "**/e2e/**"],
     coverage: {
       provider: "v8",

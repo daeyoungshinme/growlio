@@ -25,9 +25,12 @@ vi.mock("../components/dashboard/DisclosureFeedCard", () => ({
   default: () => <div data-testid="disclosure-feed">DisclosureFeedCard</div>,
 }));
 vi.mock("@/components/dashboard/HeroSummaryCard", () => ({
-  default: ({ data }: { data?: { total_asset_krw?: number } }) => (
-    <div data-testid="hero-summary">{data?.total_asset_krw ?? ""}</div>
-  ),
+  default: ({ data, isLoading }: { data?: { total_asset_krw?: number }; isLoading?: boolean }) =>
+    isLoading ? (
+      <div data-testid="skeleton-stat-box" />
+    ) : (
+      <div data-testid="hero-summary">{data?.total_asset_krw ?? ""}</div>
+    ),
 }));
 vi.mock("@/components/dashboard/PortfolioSummaryCard", () => ({
   default: () => <div data-testid="portfolio-summary">PortfolioSummaryCard</div>,
