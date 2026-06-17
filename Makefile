@@ -45,7 +45,7 @@ clean:
 	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache
 
 format:
-	cd backend && uv run ruff check . --fix
+	cd backend && uv run ruff format . && uv run ruff check . --fix
 	cd frontend && npm run format
 
 db-reset:

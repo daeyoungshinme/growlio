@@ -59,9 +59,7 @@ async def ws_prices(websocket: WebSocket) -> None:
 
         while True:
             try:
-                raw = await asyncio.wait_for(
-                    websocket.receive_text(), timeout=_RECEIVE_TIMEOUT_SECONDS
-                )
+                raw = await asyncio.wait_for(websocket.receive_text(), timeout=_RECEIVE_TIMEOUT_SECONDS)
             except TimeoutError:
                 await websocket.close(code=1000, reason="idle timeout")
                 break
