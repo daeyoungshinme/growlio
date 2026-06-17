@@ -129,7 +129,9 @@ async def save_positions(
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=date.today(),
-            amount_krw=float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate,
+            amount_krw=(
+                float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate
+            ),
             invested_amount=float(total_invested_dec),
             unrealized_pnl=float(total_value_dec - total_invested_dec),
             source="MANUAL",
@@ -204,7 +206,11 @@ async def sync_position_prices(
             account_id=account.id,
             user_id=account.user_id,
             snapshot_date=date.today(),
-            amount_krw=float(total_value_dec) + float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * (usd_rate or 1),
+            amount_krw=(
+                float(total_value_dec)
+                + float(account.deposit_krw or 0)
+                + float(account.deposit_usd or 0) * (usd_rate or 1)
+            ),
             invested_amount=float(total_invested_dec),
             unrealized_pnl=float(total_value_dec - total_invested_dec),
             source="MANUAL",

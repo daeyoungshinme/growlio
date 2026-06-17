@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ── _check_concentration ──────────────────────────────────────
 
 class TestCheckConcentration:
@@ -146,6 +145,7 @@ class TestGenerateInsights:
     @pytest.mark.asyncio
     async def test_redis_cache_hit(self, mock_db, override_settings):
         import json
+
         from app.services.insight_service import generate_insights
 
         cached = [{"type": "CONCENTRATION", "severity": "WARNING", "title": "테스트", "detail": "d"}]
@@ -177,6 +177,7 @@ class TestGenerateInsights:
     @pytest.mark.asyncio
     async def test_force_refresh_bypasses_cache(self, mock_db, override_settings):
         import json
+
         from app.services.insight_service import generate_insights
 
         cached = [{"type": "OLD", "severity": "INFO", "title": "old", "detail": "old"}]
@@ -192,7 +193,7 @@ class TestGenerateInsights:
             patch("app.services.insight_service._check_tax_loss_harvest",
                   new=AsyncMock(return_value=[])),
         ):
-            result = await generate_insights(uuid.uuid4(), mock_db, redis=redis, force_refresh=True)
+            await generate_insights(uuid.uuid4(), mock_db, redis=redis, force_refresh=True)
 
         # Should not use cached value since force_refresh=True
         redis.get.assert_not_called()

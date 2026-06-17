@@ -1,13 +1,11 @@
 """공통 테스트 픽스처."""
 
 import uuid
-from datetime import date, datetime, timezone
-from typing import AsyncGenerator
+from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
-
 
 # ── 테스트용 설정 오버라이드 ─────────────────────────────────
 
@@ -32,7 +30,7 @@ def reset_rate_limiter():
     """
     from app.limiter import limiter
     limiter._storage.reset()
-    yield
+    return
 
 
 # ── DB 세션 Mock ────────────────────────────────────────────
@@ -138,8 +136,8 @@ def make_account(make_user_id):
             goal_portfolio_id=None,
             notes=None,
             manual_updated_at=None,
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
             **kwargs,
         )
 
@@ -160,7 +158,7 @@ def make_snapshot(make_user_id):
         unrealized_pnl=1_000_000.0,
         positions=[],
         source="MANUAL",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 

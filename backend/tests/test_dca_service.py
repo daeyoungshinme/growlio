@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -17,7 +17,6 @@ from app.services.dca_service import (
     _month_key,
     get_dca_analysis,
 )
-
 
 # ── _elapsed_months ──────────────────────────────────────────
 
@@ -214,6 +213,7 @@ class TestGetDcaAnalysis:
     async def test_returns_not_configured_when_missing_goal(self, mock_db, override_settings):
         """goal_amount 없으면 is_configured=False."""
         from types import SimpleNamespace
+
         from app.services.dca_service import get_dca_analysis
 
         settings = SimpleNamespace(

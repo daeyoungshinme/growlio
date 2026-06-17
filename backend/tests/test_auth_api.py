@@ -2,11 +2,10 @@
 
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ── 공통 헬퍼 ────────────────────────────────────────────────
 
@@ -48,9 +47,8 @@ class TestMe:
 
     def test_me_returns_user_info(self):
         """유효한 JWT로 요청하면 유저 정보를 반환한다."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_current_user
+        from app.main import app
 
         user = _make_user()
 
@@ -84,9 +82,9 @@ class TestSyncProfile:
 
     def test_sync_profile_creates_new_user(self):
         """신규 유저 JWT로 요청하면 users + user_settings 행을 생성한다."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_token_payload
+        from app.database import get_db
+        from app.main import app
 
         user_id = str(uuid.uuid4())
         db = _make_mock_db(existing_user=None)
@@ -113,9 +111,8 @@ class TestSyncProfile:
 
     def test_sync_profile_invalid_payload_returns_401(self):
         """sub 또는 email 없는 페이로드로 요청하면 401을 반환한다 (line 36)."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_token_payload
+        from app.main import app
 
         async def override_payload():
             return {"sub": None, "email": None}
@@ -134,9 +131,9 @@ class TestSyncProfile:
 
     def test_sync_profile_idempotent(self):
         """이미 존재하는 유저 JWT로 요청하면 기존 유저를 반환한다 (200)."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_token_payload
+        from app.database import get_db
+        from app.main import app
 
         user_id = str(uuid.uuid4())
         existing = _make_user()
@@ -171,9 +168,10 @@ class TestFindAccount:
     @pytest.mark.asyncio
     async def test_find_account_returns_fixed_message(self, override_settings):
         """display_name 검색 시 사용자 열거 방지를 위해 항상 고정 메시지를 반환한다."""
+        from starlette.requests import Request
+
         from app.api.v1.auth import find_account
         from app.schemas.auth import FindAccountRequest
-        from starlette.requests import Request
 
         scope = {
             "type": "http", "method": "POST", "path": "/api/v1/auth/find-account",

@@ -116,20 +116,22 @@ class TestBrokerRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(side_effect=exc)
 
-        with patch("app.providers.http_client._get_client", return_value=mock_client):
-            with patch("asyncio.sleep", AsyncMock()):
-                with pytest.raises(MaxRetriesExceededError):
-                    await broker_request(
-                        "GET", "/test",
-                        base_url="https://api.example.com",
-                        headers={},
-                        retries=2,
-                        semaphore=self._make_semaphore(),
-                        log_prefix="test",
-                        check_token_expired=lambda data, status: False,
-                        check_api_error=lambda data, path: None,
-                        token_expired_exc=RuntimeError,
-                    )
+        with (
+            patch("app.providers.http_client._get_client", return_value=mock_client),
+            patch("asyncio.sleep", AsyncMock()),
+            pytest.raises(MaxRetriesExceededError),
+        ):
+            await broker_request(
+                "GET", "/test",
+                base_url="https://api.example.com",
+                headers={},
+                retries=2,
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: False,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=RuntimeError,
+            )
 
     @pytest.mark.asyncio
     async def test_raises_token_expired(self, override_settings):
@@ -144,15 +146,17 @@ class TestBrokerRequest:
         mock_client = AsyncMock()
         mock_client.request = AsyncMock(return_value=mock_resp)
 
-        with patch("app.providers.http_client._get_client", return_value=mock_client):
-            with pytest.raises((MyTokenExpiredError, httpx.HTTPStatusError, Exception)):
-                await broker_request(
-                    "GET", "/test",
-                    base_url="https://api.example.com",
-                    headers={},
-                    semaphore=self._make_semaphore(),
-                    log_prefix="test",
-                    check_token_expired=lambda data, status: True,
-                    check_api_error=lambda data, path: None,
-                    token_expired_exc=MyTokenExpiredError,
-                )
+        with (
+            patch("app.providers.http_client._get_client", return_value=mock_client),
+            pytest.raises((MyTokenExpiredError, httpx.HTTPStatusError, Exception)),
+        ):
+            await broker_request(
+                "GET", "/test",
+                base_url="https://api.example.com",
+                headers={},
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: True,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=MyTokenExpiredError,
+            )

@@ -46,9 +46,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -76,8 +76,8 @@ _MOCK_OVERSEAS_POSITIONS: list = []
 
 class TestTaxSummary:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/tax/summary")
@@ -90,9 +90,8 @@ class TestTaxSummary:
         with patch(
             "app.api.v1.tax.get_tax_summary",
             AsyncMock(return_value=_MOCK_TAX_SUMMARY),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/tax/summary")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/summary")
         assert resp.status_code == 200
 
     def test_returns_200_with_year_param(self, override_settings):
@@ -102,9 +101,8 @@ class TestTaxSummary:
         with patch(
             "app.api.v1.tax.get_tax_summary",
             AsyncMock(return_value=_MOCK_TAX_SUMMARY),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/tax/summary?year=2023")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/summary?year=2023")
         assert resp.status_code == 200
 
     def test_returns_400_for_invalid_year(self, override_settings):
@@ -118,8 +116,8 @@ class TestTaxSummary:
 
 class TestOverseasPositionsTax:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/tax/overseas-positions")
@@ -132,8 +130,7 @@ class TestOverseasPositionsTax:
         with patch(
             "app.api.v1.tax.get_overseas_positions_detail",
             AsyncMock(return_value=_MOCK_OVERSEAS_POSITIONS),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/tax/overseas-positions")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/overseas-positions")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)

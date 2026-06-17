@@ -5,8 +5,6 @@ import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
-import pytest
-
 from app.services.alert_calculator import (
     already_fired_today,
     should_fire_today,

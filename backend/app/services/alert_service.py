@@ -89,10 +89,150 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
         logger.info("exchange_rate_alerts_triggered", count=triggered_count, current_rate=current_rate)
 
 
+def _select_items_to_show(
+    trigger_condition: str,
+    is_schedule_day: bool,
+    drifting: list,
+    all_items: list,
+) -> tuple[list, bool] | None:
+    """trigger_condition에 따라 (items_to_show, is_scheduled_report)를 반환.
+
+    발송하지 않아야 하는 경우 None 반환.
+    """
+    if trigger_condition == "SCHEDULE_ONLY":
+        if not is_schedule_day:
+            return None
+        return all_items, True
+    if trigger_condition == "DRIFT_ONLY":
+        if not drifting:
+            return None
+        return drifting, False
+    # BOTH
+    if is_schedule_day:
+        return all_items, True
+    if drifting:
+        return drifting, False
+    return None
+
+
+async def _process_rebalancing_alert(
+    alert,
+    portfolio: Portfolio,
+    drifting: list,
+    items_to_show: list,
+    is_scheduled_report: bool,
+    threshold: float,
+    email: str,
+    composite_level: str,
+    db: AsyncSession,
+) -> bool:
+    """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일 발송).
+
+    성공 시 True, continue 필요(건너뜀) 시 False 반환.
+    """
+    from app.services.email_service import send_rebalancing_alert
+
+    mode = getattr(alert, "mode", "NOTIFY")
+
+    # 시장 신호 기반 자동 실행 게이트
+    if mode == "AUTO":
+        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+        _blocked = (
+            market_mode == "CAUTIOUS" and composite_level == "RED"
+        ) or (
+            market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
+        )
+        if _blocked:
+            logger.info(
+                "rebalancing_auto_skipped_market_signal",
+                alert_id=str(alert.id),
+                composite_level=composite_level,
+                market_condition_mode=market_mode,
+            )
+            mode = "NOTIFY"
+
+    if mode == "AUTO" and alert.account_id and drifting:
+        return await _execute_auto_rebalancing(alert, portfolio, drifting, db)
+
+    try:
+        await send_rebalancing_alert(
+            to_email=email,
+            portfolio_name=portfolio.name,
+            threshold_pct=threshold,
+            items_to_show=items_to_show,
+            drifting_count=len(drifting),
+            is_scheduled_report=is_scheduled_report,
+            schedule_type=getattr(alert, "schedule_type", "DAILY"),
+        )
+    except Exception as exc:
+        logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+        return False
+
+    return True
+
+
+async def _execute_auto_rebalancing(
+    alert,
+    portfolio: Portfolio,
+    drifting: list,
+    db: AsyncSession,
+) -> bool:
+    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다.
+
+    성공 시 True, 오류 시 False 반환.
+    """
+    from app.redis_client import get_redis
+    from app.schemas.rebalancing import ExecutionOrderItem
+    from app.services.rebalancing_execution_service import execute_rebalancing
+
+    strategy = getattr(alert, "strategy", "BUY_ONLY")
+    order_type = getattr(alert, "order_type", "MARKET")
+
+    orders: list[ExecutionOrderItem] = []
+    for item in drifting:
+        if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
+            continue
+        qty = abs(int(item.shares_to_trade))
+        if qty <= 0:
+            continue
+        side = "BUY" if item.diff_krw > 0 else "SELL"
+        if strategy == "BUY_ONLY" and side == "SELL":
+            continue
+        orders.append(
+            ExecutionOrderItem(
+                ticker=item.ticker,
+                name=item.name,
+                market=item.market,
+                side=side,
+                quantity=qty,
+                account_id=str(alert.account_id),
+                order_type=order_type,
+            )
+        )
+
+    if orders:
+        try:
+            redis = await get_redis()
+            await execute_rebalancing(
+                user_id=alert.user_id,
+                account_id=alert.account_id,
+                orders=orders,
+                db=db,
+                redis=redis,
+                portfolio_id=portfolio.id,
+                triggered_by="AUTO",
+                strategy=strategy,
+            )
+        except Exception as exc:
+            logger.error("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
+            return False
+
+    return True
+
+
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
     from app.redis_client import get_redis
-    from app.services.email_service import send_rebalancing_alert
     from app.services.market_signal_service import get_market_signal
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing_service import analyze_rebalancing
@@ -148,108 +288,25 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         threshold = float(alert.threshold_pct)
         drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
 
-        if trigger_condition == "SCHEDULE_ONLY":
-            if not is_schedule_day:
-                continue
-            items_to_show = analysis.items
-            is_scheduled_report = True
-        elif trigger_condition == "DRIFT_ONLY":
-            if not drifting:
-                continue
-            items_to_show = drifting
-            is_scheduled_report = False
-        else:  # BOTH
-            if is_schedule_day:
-                # 스케줄 날: 드리프트 무관 전체 리포트
-                items_to_show = analysis.items
-                is_scheduled_report = True
-            elif drifting:
-                # 비스케줄 날: 드리프트 감지 시만 발송
-                items_to_show = drifting
-                is_scheduled_report = False
-            else:
-                continue
+        selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items)
+        if selected is None:
+            continue
+        items_to_show, is_scheduled_report = selected
 
-        mode = getattr(alert, "mode", "NOTIFY")
         email = notification_email or user_email
-
-        # 시장 신호 기반 자동 실행 게이트
-        if mode == "AUTO":
-            market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-            _blocked = (
-                market_mode == "CAUTIOUS" and composite_level == "RED"
-            ) or (
-                market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
-            )
-            if _blocked:
-                logger.info(
-                    "rebalancing_auto_skipped_market_signal",
-                    alert_id=str(alert.id),
-                    composite_level=composite_level,
-                    market_condition_mode=market_mode,
-                )
-                mode = "NOTIFY"
-
-        if mode == "AUTO" and alert.account_id and drifting:
-            from app.redis_client import get_redis
-            from app.schemas.rebalancing import ExecutionOrderItem
-            from app.services.rebalancing_execution_service import execute_rebalancing
-
-            strategy = getattr(alert, "strategy", "BUY_ONLY")
-            order_type = getattr(alert, "order_type", "MARKET")
-
-            orders: list[ExecutionOrderItem] = []
-            for item in drifting:
-                if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
-                    continue
-                qty = abs(int(item.shares_to_trade))
-                if qty <= 0:
-                    continue
-                side = "BUY" if item.diff_krw > 0 else "SELL"
-                if strategy == "BUY_ONLY" and side == "SELL":
-                    continue
-                orders.append(
-                    ExecutionOrderItem(
-                        ticker=item.ticker,
-                        name=item.name,
-                        market=item.market,
-                        side=side,
-                        quantity=qty,
-                        account_id=str(alert.account_id),
-                        order_type=order_type,
-                    )
-                )
-
-            if orders:
-                try:
-                    redis = await get_redis()
-                    await execute_rebalancing(
-                        user_id=alert.user_id,
-                        account_id=alert.account_id,
-                        orders=orders,
-                        db=db,
-                        redis=redis,
-                        portfolio_id=portfolio.id,
-                        triggered_by="AUTO",
-                        strategy=strategy,
-                    )
-                except Exception as exc:
-                    logger.error("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
-                    continue
-        else:
-            try:
-                await send_rebalancing_alert(
-                    to_email=email,
-                    portfolio_name=portfolio.name,
-                    threshold_pct=threshold,
-                    items_to_show=items_to_show,
-                    drifting_count=len(drifting),
-                    is_scheduled_report=is_scheduled_report,
-                    schedule_type=getattr(alert, "schedule_type", "DAILY"),
-                )
-            except Exception as exc:
-                logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
-                continue
+        triggered = await _process_rebalancing_alert(
+            alert=alert,
+            portfolio=portfolio,
+            drifting=drifting,
+            items_to_show=items_to_show,
+            is_scheduled_report=is_scheduled_report,
+            threshold=threshold,
+            email=email,
+            composite_level=composite_level,
+            db=db,
+        )
+        if not triggered:
+            continue
 
         drift_desc = f"{len(drifting)}개 종목 드리프트" if drifting else "정기 보고"
         await save_alert_history(

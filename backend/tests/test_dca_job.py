@@ -1,6 +1,5 @@
 """DCA 자동매매 Job 테스트."""
 import uuid
-from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 

@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 
 def _make_user():
-    from types import SimpleNamespace
     import uuid
+    from types import SimpleNamespace
     return SimpleNamespace(
         id=uuid.uuid4(),
         email="test@example.com",
@@ -19,6 +19,7 @@ def _make_user():
 
 def _make_mock_db():
     from unittest.mock import AsyncMock, MagicMock
+
     from sqlalchemy.ext.asyncio import AsyncSession
     db = AsyncMock(spec=AsyncSession)
     db.scalar = AsyncMock(return_value=None)
@@ -68,17 +69,17 @@ def mock_redis_scheduler(monkeypatch):
 
 class TestDashboardApi:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/dashboard")
         assert resp.status_code == 401
 
     def test_returns_200_with_mocked_service(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
         from app.database import get_db
+        from app.main import app
 
         user = _make_user()
         db = _make_mock_db()
@@ -111,9 +112,10 @@ class TestDashboardApi:
     def test_returns_200_when_cache_hit(self, override_settings):
         """Redis 캐시 히트 시에도 200 응답."""
         import json
-        from app.main import app
+
         from app.api.deps import get_current_user
         from app.database import get_db
+        from app.main import app
 
         user = _make_user()
         db = _make_mock_db()

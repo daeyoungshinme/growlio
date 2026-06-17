@@ -60,9 +60,9 @@ def _make_mock_db():
 
 def _get_app_with_auth(user=None):
     """인증 + DB 의존성이 오버라이드된 app을 반환한다."""
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     _user = user or _make_user()
     db = _make_mock_db()
@@ -98,8 +98,8 @@ class TestAuthRoutes:
     """GET /api/v1/auth/me — 인증 상태 확인."""
 
     def test_me_returns_401_without_token(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -125,8 +125,8 @@ class TestAssetsRoutes:
     """GET /api/v1/assets — 계좌 목록 조회."""
 
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -155,8 +155,8 @@ class TestPortfolioRoutes:
     """GET /api/v1/portfolio/current — 포트폴리오 통합 조회."""
 
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -193,8 +193,8 @@ class TestDividendsRoutes:
     """GET /api/v1/dividends/summary — 배당금 요약."""
 
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -231,8 +231,8 @@ class TestTaxRoutes:
     """GET /api/v1/tax — 세금 추정."""
 
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -267,8 +267,8 @@ class TestAlertsRoutes:
     """GET /api/v1/alerts/exchange-rate — 환율 알림 목록."""
 
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
 
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:

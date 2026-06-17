@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from functools import partial
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -124,7 +123,7 @@ class TestFetchTickerDividendInfo:
 
         with (
             patch("app.services.dividend_fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[]) as mock_months,
+            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
             result = await _call_fetcher(known_ticker, known_market, mock_redis)

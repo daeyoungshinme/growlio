@@ -65,7 +65,10 @@ def _calc_account_amounts(
         if snap.invested_amount is not None:
             return amount_krw, float(snap.invested_amount), float(snap.unrealized_pnl or 0), positions
         invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in positions)
-        value = sum((float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0) for p in positions)
+        value = sum(
+            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
+            for p in positions
+        )
         return amount_krw, invested, (value - invested if positions else 0.0), positions
 
     if acc.manual_amount is not None:
@@ -75,7 +78,10 @@ def _calc_account_amounts(
         else:
             amount_krw = float(acc.manual_amount)
         invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in positions)
-        value = sum((float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0) for p in positions)
+        value = sum(
+            (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)
+            for p in positions
+        )
         return amount_krw, invested, (value - invested if positions else 0.0), positions
 
     return 0.0, 0.0, 0.0, []
@@ -141,6 +147,71 @@ def _build_stock_allocation(all_positions: list[dict], stock_total_krw: float) -
             "pct": round(rest_value / stock_total_krw * 100, 2) if stock_total_krw else 0,
         })
     return allocation
+
+
+def _accumulate_account_totals(
+    acc: AssetAccount,
+    amount_krw: float,
+    invested: float,
+    pnl: float,
+    total_assets_krw: float,
+    total_invested_krw: float,
+    unrealized_pnl_krw: float,
+    asset_type_totals: dict[str, float],
+) -> tuple[float, float, float]:
+    """계좌 금액을 전체 합계에 누적하고 갱신된 (total_assets, total_invested, unrealized_pnl)을 반환한다."""
+    if acc.include_in_total:
+        total_assets_krw += amount_krw
+        asset_type_totals[acc.asset_type] = asset_type_totals.get(acc.asset_type, 0) + amount_krw
+    if acc.asset_type in STOCK_TYPES:
+        total_invested_krw += invested
+        unrealized_pnl_krw += pnl
+    return total_assets_krw, total_invested_krw, unrealized_pnl_krw
+
+
+def _build_account_row(
+    acc: AssetAccount,
+    snap: AssetSnapshot | None,
+    raw_positions: list[Position],
+    amount_krw: float,
+    invested: float,
+    pnl: float,
+    lite: bool,
+    all_positions: list[dict],
+    lite_stock_items: list[dict],
+) -> dict:
+    """계좌 row 딕셔너리를 구성하고 all_positions / lite_stock_items 를 갱신한다."""
+    if lite:
+        pos_list: list[dict] = []
+        if acc.asset_type in STOCK_TYPES:
+            for p in raw_positions:
+                cur_p = float(p.current_price or p.avg_price or 0)
+                val = float(p.value_krw or cur_p * float(p.qty or 0))
+                lite_stock_items.append(
+                    {"ticker": p.ticker, "name": p.name or "", "market": p.market, "value_krw": val}
+                )
+    else:
+        pos_list = _build_position_details(acc, raw_positions, snap)
+        all_positions.extend(pos_list)
+
+    account_row: dict = {
+        "id": str(acc.id),
+        "name": acc.name,
+        "asset_type": acc.asset_type,
+        "asset_type_label": ASSET_TYPE_LABELS.get(acc.asset_type, acc.asset_type),
+        "data_source": acc.data_source,
+        "institution": acc.institution,
+        "amount_krw": amount_krw,
+        "invested_krw": invested,
+        "unrealized_pnl": pnl,
+        "position_count": len(raw_positions),
+        "positions": pos_list,
+        "include_in_total": acc.include_in_total,
+    }
+    if acc.asset_type == "REAL_ESTATE":
+        account_row["real_estate_details"] = acc.real_estate_details
+        account_row["market_value_krw"] = float(acc.manual_amount or 0)
+    return account_row
 
 
 async def build_portfolio_overview(
@@ -216,43 +287,16 @@ async def build_portfolio_overview(
         ) or cur_pos_map.get(acc.id, [])
         amount_krw, invested, pnl, raw_positions = _calc_account_amounts(acc, snap, pos_list_db)
 
-        if acc.include_in_total:
-            total_assets_krw += amount_krw
-            asset_type_totals[acc.asset_type] = asset_type_totals.get(acc.asset_type, 0) + amount_krw
-        if acc.asset_type in STOCK_TYPES:
-            total_invested_krw += invested
-            unrealized_pnl_krw += pnl
+        total_assets_krw, total_invested_krw, unrealized_pnl_krw = _accumulate_account_totals(
+            acc, amount_krw, invested, pnl,
+            total_assets_krw, total_invested_krw, unrealized_pnl_krw,
+            asset_type_totals,
+        )
 
-        if lite:
-            pos_list: list[dict] = []
-            if acc.asset_type in STOCK_TYPES:
-                for p in raw_positions:
-                    cur_p = float(p.current_price or p.avg_price or 0)
-                    val = float(p.value_krw or cur_p * float(p.qty or 0))
-                    lite_stock_items.append(
-                        {"ticker": p.ticker, "name": p.name or "", "market": p.market, "value_krw": val}
-                    )
-        else:
-            pos_list = _build_position_details(acc, raw_positions, snap)
-            all_positions.extend(pos_list)
-
-        account_row: dict = {
-            "id": str(acc.id),
-            "name": acc.name,
-            "asset_type": acc.asset_type,
-            "asset_type_label": ASSET_TYPE_LABELS.get(acc.asset_type, acc.asset_type),
-            "data_source": acc.data_source,
-            "institution": acc.institution,
-            "amount_krw": amount_krw,
-            "invested_krw": invested,
-            "unrealized_pnl": pnl,
-            "position_count": len(raw_positions),
-            "positions": pos_list,
-            "include_in_total": acc.include_in_total,
-        }
-        if acc.asset_type == "REAL_ESTATE":
-            account_row["real_estate_details"] = acc.real_estate_details
-            account_row["market_value_krw"] = float(acc.manual_amount or 0)
+        account_row = _build_account_row(
+            acc, snap, raw_positions, amount_krw, invested, pnl,
+            lite, all_positions, lite_stock_items,
+        )
         account_rows.append(account_row)
 
     stock_total_krw = total_invested_krw + unrealized_pnl_krw

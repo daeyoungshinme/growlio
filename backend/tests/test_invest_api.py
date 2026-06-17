@@ -44,9 +44,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -83,8 +83,8 @@ _MOCK_DCA = {
 
 class TestDcaAnalysis:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/invest/dca-analysis")
@@ -97,9 +97,8 @@ class TestDcaAnalysis:
         with patch(
             "app.api.v1.invest.dca_service.get_dca_analysis",
             AsyncMock(return_value=_MOCK_DCA),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/invest/dca-analysis")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/invest/dca-analysis")
         assert resp.status_code == 200
 
     def test_returns_dca_data_structure(self, override_settings):
@@ -109,8 +108,7 @@ class TestDcaAnalysis:
         with patch(
             "app.api.v1.invest.dca_service.get_dca_analysis",
             AsyncMock(return_value=_MOCK_DCA),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/invest/dca-analysis")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/invest/dca-analysis")
         data = resp.json()
         assert "projection_months" in data

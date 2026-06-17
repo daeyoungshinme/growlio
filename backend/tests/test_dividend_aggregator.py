@@ -12,6 +12,7 @@ class TestGetDividendSummary:
     @pytest.mark.asyncio
     async def test_redis_cache_hit(self, mock_db, override_settings):
         import json
+
         from app.services.dividend_aggregator import get_dividend_summary
 
         cached = {

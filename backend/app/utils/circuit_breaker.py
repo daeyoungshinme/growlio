@@ -99,7 +99,7 @@ def _is_bypass(exc: BaseException) -> bool:
 
 # ── 서비스별 사전 설정 인스턴스 ──────────────────────────────────────────────────
 # 임계값은 config.py의 cb_* 필드로 조정 가능
-def _cfg() -> "Settings":
+def _cfg() -> Settings:
     from app.config import settings
     return settings
 

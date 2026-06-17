@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 from datetime import date
 from typing import TYPE_CHECKING
-import uuid
 
 import httpx
 import structlog
@@ -85,7 +85,7 @@ class KISProvider(BrokerProvider):
                 )
         except KisApiError as e:
             raise ProviderApiError(
-                f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형이 지원되지 않거나 API 권한이 없을 수 있습니다."
+                f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형 또는 API 권한 오류."
             ) from e
         except MaxRetriesExceededError as e:
             raise ProviderApiError(

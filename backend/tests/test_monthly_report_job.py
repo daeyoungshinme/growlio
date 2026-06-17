@@ -181,12 +181,14 @@ class TestRunMonthlyReport:
 class TestPrevMonthLabel:
     def test_january_returns_december_of_prev_year(self):
         from datetime import date
+
         from app.jobs.monthly_report import _prev_month_label
         result = _prev_month_label(date(2026, 1, 15))
         assert result == "2025년 12월"
 
     def test_other_month_returns_prev_month(self):
         from datetime import date
+
         from app.jobs.monthly_report import _prev_month_label
         result = _prev_month_label(date(2026, 6, 1))
         assert result == "2026년 5월"

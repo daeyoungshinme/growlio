@@ -47,7 +47,10 @@ async def _load_credentials(account: AssetAccount) -> tuple[str, str]:
     """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
     if account.kis_app_key and account.kis_app_secret:
         return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
-    raise HTTPException(status_code=400, detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
+    raise HTTPException(
+        status_code=400,
+        detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.",
+    )
 
 
 async def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:

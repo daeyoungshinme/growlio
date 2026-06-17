@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -31,8 +31,8 @@ def _make_account(user_id, account_id=None):
         is_active=True,
         is_mock_mode=False,
         sort_order=0,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         manual_amount=None,
         manual_positions=None,
         manual_currency="KRW",
@@ -65,7 +65,7 @@ def _make_snapshot(user_id, account_id):
         unrealized_pnl=1_000_000.0,
         positions=[],
         source="MANUAL",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
@@ -103,9 +103,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user

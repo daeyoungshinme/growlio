@@ -2,9 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 
 class TestFetchPricesSync:
@@ -24,6 +22,7 @@ class TestFetchPricesSync:
 
     def test_returns_empty_on_empty_dataframe(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_download_history
 
         empty_df = pd.DataFrame()
@@ -34,6 +33,7 @@ class TestFetchPricesSync:
 
     def test_single_symbol_returns_price_series(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_download_history
 
         idx = pd.date_range("2020-01-01", periods=5)
@@ -49,6 +49,7 @@ class TestFetchPricesSync:
 
     def test_multi_symbol_returns_multiindex_df(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_download_history
 
         idx = pd.date_range("2020-01-01", periods=3)
@@ -84,6 +85,7 @@ class TestComputeCorrelationSync:
 
     def test_empty_dataframe_returns_empty(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_compute_correlation
 
         with patch("yfinance.download", return_value=pd.DataFrame()):
@@ -96,6 +98,7 @@ class TestComputeCorrelationSync:
 
     def test_insufficient_data_returns_empty(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_compute_correlation
 
         # Only 3 months of data (< 6 required)
@@ -112,6 +115,7 @@ class TestComputeCorrelationSync:
 
     def test_sufficient_data_returns_correlation_matrix(self, override_settings):
         import pandas as pd
+
         from app.services.backtest_service import _sync_compute_correlation
 
         # 12 months of data
@@ -121,7 +125,7 @@ class TestComputeCorrelationSync:
 
         columns = pd.MultiIndex.from_tuples([("Close", "AAPL"), ("Close", "TSLA")])
         df = pd.DataFrame(
-            list(zip(aapl, tsla)),
+            list(zip(aapl, tsla, strict=False)),
             columns=columns,
             index=idx,
         )

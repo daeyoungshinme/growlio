@@ -93,17 +93,19 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-            with patch("app.providers.manual_provider.ManualProvider.sync") as mock_sync:
-                from app.providers.base import BalanceResult
-                mock_sync.return_value = BalanceResult(
-                    positions=[],
-                    total_value_krw=750000.0,
-                    deposit_krw=0.0,
-                    invested_krw=700000.0,
-                    pnl_krw=50000.0,
-                )
-                result = await provider.sync(account, db, redis)
+        with (
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+            patch("app.providers.manual_provider.ManualProvider.sync") as mock_sync,
+        ):
+            from app.providers.base import BalanceResult
+            mock_sync.return_value = BalanceResult(
+                positions=[],
+                total_value_krw=750000.0,
+                deposit_krw=0.0,
+                invested_krw=700000.0,
+                pnl_krw=50000.0,
+            )
+            result = await provider.sync(account, db, redis)
         assert result.total_value_krw == pytest.approx(750000.0)
 
     @pytest.mark.asyncio
@@ -114,9 +116,11 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-            with pytest.raises(BadRequestError):
-                await provider.sync(account, db, redis)
+        with (
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+            pytest.raises(BadRequestError),
+        ):
+            await provider.sync(account, db, redis)
 
     @pytest.mark.asyncio
     async def test_sync_real_estate_subtracts_mortgage(self, override_settings, make_account):
@@ -145,10 +149,12 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.services.price_service.fetch_prices_batch",
-                   AsyncMock(return_value={"005930": 75000.0})):
-            with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-                result = await provider.sync(account, db, redis)
+        with (
+            patch("app.services.price_service.fetch_prices_batch",
+                  AsyncMock(return_value={"005930": 75000.0})),
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+        ):
+            result = await provider.sync(account, db, redis)
 
         assert pos.current_price == pytest.approx(75000.0)
         assert result.total_value_krw == pytest.approx(750000.0)
@@ -164,10 +170,12 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.services.price_service.fetch_prices_batch",
-                   AsyncMock(return_value={"AAPL": 210.0})):
-            with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-                result = await provider.sync(account, db, redis)
+        with (
+            patch("app.services.price_service.fetch_prices_batch",
+                  AsyncMock(return_value={"AAPL": 210.0})),
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+        ):
+            await provider.sync(account, db, redis)
 
         assert pos.current_price == pytest.approx(210.0 * 1350.0)
 
@@ -184,9 +192,11 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-            with pytest.raises(BadRequestError, match="부동산 시세"):
-                await provider.sync(account, db, redis)
+        with (
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+            pytest.raises(BadRequestError, match="부동산 시세"),
+        ):
+            await provider.sync(account, db, redis)
 
     @pytest.mark.asyncio
     async def test_sync_with_deposit_krw_only(self, override_settings, make_account):
@@ -215,9 +225,11 @@ class TestManualProviderSync:
         redis = AsyncMock()
 
         provider = ManualProvider()
-        with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
-            with patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-                result = await provider.sync(account, db, redis)
+        with (
+            patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})),
+            patch("app.providers.manual_provider.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+        ):
+            result = await provider.sync(account, db, redis)
 
         assert pos.current_price == pytest.approx(50000.0)  # Unchanged — fallback used
         assert result.total_value_krw == pytest.approx(500000.0)

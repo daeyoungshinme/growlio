@@ -23,10 +23,16 @@ from app.schemas.asset import (
     AssetSnapshotResponse,
 )
 from app.services.asset_service import (
-    sync_account as _sync_account_service,
     list_accounts as _list_accounts,
-    list_snapshots_in_range as _list_snapshots_in_range,
+)
+from app.services.asset_service import (
     list_accounts_by_ids as _list_accounts_by_ids,
+)
+from app.services.asset_service import (
+    list_snapshots_in_range as _list_snapshots_in_range,
+)
+from app.services.asset_service import (
+    sync_account as _sync_account_service,
 )
 from app.services.credential_service import encrypt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
@@ -181,7 +187,10 @@ async def get_snapshots(
     db: AsyncSession = Depends(get_db),
 ):
     if start_date and end_date and start_date > end_date:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="start_date는 end_date보다 이전이어야 합니다")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="start_date는 end_date보다 이전이어야 합니다",
+        )
     limit = min(limit, _MAX_SNAPSHOTS_LIMIT)
     return await _list_snapshots_in_range(
         current_user.id, db,
@@ -420,7 +429,11 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
         portfolio_overview_lite_key(current_user.id),
         dividend_summary_key(current_user.id),
     )
-    return {"detail": "동기화 완료", "snapshot_date": str(snapshot.snapshot_date), "amount_krw": float(snapshot.amount_krw)}
+    return {
+        "detail": "동기화 완료",
+        "snapshot_date": str(snapshot.snapshot_date),
+        "amount_krw": float(snapshot.amount_krw),
+    }
 
 
 class BatchSetTargetPortfolioRequest(BaseModel):

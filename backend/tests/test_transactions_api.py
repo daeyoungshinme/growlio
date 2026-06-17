@@ -68,9 +68,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -84,17 +84,17 @@ def _setup_app(user, db):
 
 
 def _cleanup_app():
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_db, None)
 
 
 class TestListTransactions:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/transactions")
@@ -148,7 +148,7 @@ class TestCreateTransaction:
     def test_returns_201_on_create(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
-        tx = _make_tx(user_id=user.id)
+        _make_tx(user_id=user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
 
         app = _setup_app(user, db)

@@ -1,11 +1,9 @@
 """dividend_providers.py 단위 테스트 — 동기 배당 데이터 수집 함수."""
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 # ── sync_yahoo_dividend_info ──────────────────────────────────
 
@@ -124,6 +122,7 @@ class TestSyncFdrEtfDividendInfo:
 
         with patch.dict("sys.modules", {"FinanceDataReader": mock_fdr}):
             from importlib import reload
+
             import app.services.dividend_providers as dp_mod
             reload(dp_mod)
             result = dp_mod.sync_fdr_etf_dividend_info("069500")
@@ -269,8 +268,9 @@ class TestSyncFetchDividendMonths:
 
     def test_calendar_with_dates_adjusts_offset(self, override_settings):
         """calendar에 ex/pay date 있으면 offset 계산."""
-        import pandas as pd
         from datetime import date
+
+        import pandas as pd
 
         mock_ticker = MagicMock()
         # ex-date in March, pay-date in April → offset = 1

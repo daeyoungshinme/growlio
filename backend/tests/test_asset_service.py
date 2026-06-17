@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ── _upsert_snapshot 테스트 ─────────────────────────────────
 
 class TestUpsertSnapshot:
@@ -20,7 +19,6 @@ class TestUpsertSnapshot:
     @pytest.mark.asyncio
     async def test_executes_upsert_without_committing(self, mock_db):
         """pg_insert upsert를 실행하되 commit은 호출자가 처리한다."""
-        from types import SimpleNamespace
         from app.services.snapshot_service import _upsert_snapshot
 
         account_id = uuid.uuid4()
@@ -51,7 +49,6 @@ class TestUpsertSnapshot:
     @pytest.mark.asyncio
     async def test_upsert_passes_correct_amount(self, mock_db):
         """upsert 호출 시 amount_krw가 올바르게 전달된다."""
-        from types import SimpleNamespace
         from app.services.snapshot_service import _upsert_snapshot
 
         account_id = uuid.uuid4()
@@ -84,10 +81,16 @@ class TestManualProvider:
     def _mock_position(self, ticker="005930", name="삼성전자", market="KOSPI",
                        qty=10, avg_price=70000, current_price=80000):
         p = MagicMock()
-        p.ticker = ticker; p.name = name; p.market = market
-        p.qty = qty; p.avg_price = avg_price; p.current_price = current_price
-        p.currency = "KRW"; p.value_krw = current_price * qty
-        p.avg_price_usd = None; p.usd_rate = None
+        p.ticker = ticker
+        p.name = name
+        p.market = market
+        p.qty = qty
+        p.avg_price = avg_price
+        p.current_price = current_price
+        p.currency = "KRW"
+        p.value_krw = current_price * qty
+        p.avg_price_usd = None
+        p.usd_rate = None
         return p
 
     @pytest.mark.asyncio
@@ -119,8 +122,9 @@ class TestManualProvider:
     @pytest.mark.asyncio
     async def test_calculates_pnl_from_positions(self, mock_db, make_account):
         """포지션 있을 때 pnl = 평가금액 - 매입금액 계산."""
-        from app.providers.manual_provider import ManualProvider
         from unittest.mock import AsyncMock
+
+        from app.providers.manual_provider import ManualProvider
 
         mock_pos = self._mock_position(qty=10, avg_price=70000, current_price=80000)
         execute_result = MagicMock()
@@ -173,9 +177,21 @@ class TestKISProvider:
         with (
             patch("app.providers.kis_provider.decrypt", return_value="plain_value"),
             patch("app.providers.kis_provider.get_access_token", new_callable=AsyncMock, return_value="token"),
-            patch("app.providers.kis_provider.get_domestic_balance", new_callable=AsyncMock, return_value=domestic_result),
-            patch("app.providers.kis_provider.get_overseas_balance", new_callable=AsyncMock, return_value=overseas_result),
-            patch("app.providers.kis_provider.get_overseas_price", new_callable=AsyncMock, return_value={"usd_krw_rate": 1300.0}),
+            patch(
+                "app.providers.kis_provider.get_domestic_balance",
+                new_callable=AsyncMock,
+                return_value=domestic_result,
+            ),
+            patch(
+                "app.providers.kis_provider.get_overseas_balance",
+                new_callable=AsyncMock,
+                return_value=overseas_result,
+            ),
+            patch(
+                "app.providers.kis_provider.get_overseas_price",
+                new_callable=AsyncMock,
+                return_value={"usd_krw_rate": 1300.0},
+            ),
             patch("app.providers.kis_provider.cache_usd_krw_rate", new_callable=AsyncMock),
         ):
             redis = AsyncMock()

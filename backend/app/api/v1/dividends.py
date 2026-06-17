@@ -15,7 +15,6 @@ from app.services.dividend.drip_service import (
     calc_monthly_optimization,
     simulate_drip,
 )
-from app.services.dividend_aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import (
     delete_ticker_settings,
     get_position_dividend_yields,
@@ -23,6 +22,7 @@ from app.services.dividend.orchestrator import (
     get_ticker_settings,
     upsert_ticker_settings,
 )
+from app.services.dividend_aggregator import get_dividend_summary
 
 router = APIRouter(prefix="/dividends", tags=["dividends"])
 logger = structlog.get_logger()

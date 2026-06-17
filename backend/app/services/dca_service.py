@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from typing import Any
-
-_DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
 
 from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select, text
@@ -15,16 +13,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
 
+_DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
+
 
 async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
     """DCA 복리 이론 곡선과 실제 자산을 비교한 분석 결과 반환."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
     pmt = float(settings_row.monthly_deposit_amount) if settings_row and settings_row.monthly_deposit_amount else None
-    annual_return_pct = float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
+    annual_return_pct = (
+        float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
+    )
     goal_amount = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None
     start_dt = settings_row.goal_start_date if settings_row else None
-    manual_initial = float(settings_row.goal_initial_amount) if settings_row and settings_row.goal_initial_amount else None
+    manual_initial = (
+        float(settings_row.goal_initial_amount) if settings_row and settings_row.goal_initial_amount else None
+    )
 
     is_configured = bool(pmt and annual_return_pct and goal_amount and start_dt)
 
@@ -61,7 +65,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
         start_date: date = start_dt.date()
     else:
         start_date = start_dt
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     r = annual_return_pct / 12 / 100
 
     if manual_initial is not None:
@@ -257,7 +261,7 @@ def _calc_goal_timeline(
     start_date: date,
     months_to_goal: int | None,
 ) -> dict[str, Any]:
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     elapsed = _elapsed_months(start_date, today)
 
     # 이론 곡선에서 현재 월의 이론값

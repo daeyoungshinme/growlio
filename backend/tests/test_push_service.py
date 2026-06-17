@@ -17,8 +17,8 @@ class TestSendPush:
 
     @pytest.mark.asyncio
     async def test_returns_false_when_firebase_not_configured(self, override_settings):
-        from app.services import push_service
         import app.services.push_service as ps
+        from app.services import push_service
 
         original_initialized = ps._firebase_initialized
         original_app = ps._firebase_app
@@ -96,8 +96,8 @@ class TestSendPushToUser:
 
 class TestGetFirebaseApp:
     def test_firebase_init_failure_returns_none(self, override_settings):
-        import app.services.push_service as ps
         import app.config as cfg
+        import app.services.push_service as ps
 
         original_initialized = ps._firebase_initialized
         original_app = ps._firebase_app
@@ -146,12 +146,11 @@ class TestSendPushException:
                     send=MagicMock(side_effect=Exception("registration-token-not-registered")),
                 ),
                 "firebase_admin": MagicMock(),
-            }):
-                with patch("asyncio.get_running_loop") as mock_loop:
-                    mock_loop.return_value.run_in_executor = AsyncMock(
-                        side_effect=Exception("registration-token-not-registered")
-                    )
-                    result = await ps.send_push("invalid-token", "제목", "내용")
+            }), patch("asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.run_in_executor = AsyncMock(
+                    side_effect=Exception("registration-token-not-registered")
+                )
+                result = await ps.send_push("invalid-token", "제목", "내용")
 
             assert result is False
         finally:

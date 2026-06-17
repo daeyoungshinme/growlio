@@ -1,8 +1,9 @@
 """백테스트 API 테스트 (GET/POST /api/v1/backtest/...)."""
 from __future__ import annotations
 
+import contextlib
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -51,9 +52,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -70,8 +71,8 @@ _MOCK_BACKTEST_PORTFOLIO = {
     "id": str(uuid.uuid4()),
     "name": "테스트 포트폴리오",
     "holdings": [],
-    "created_at": datetime.now(timezone.utc).isoformat(),
-    "updated_at": datetime.now(timezone.utc).isoformat(),
+    "created_at": datetime.now(UTC).isoformat(),
+    "updated_at": datetime.now(UTC).isoformat(),
 }
 
 def _make_backtest_result():
@@ -81,8 +82,8 @@ def _make_backtest_result():
 
 class TestBacktestPortfolios:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/backtest/portfolios")
@@ -106,17 +107,15 @@ class TestBacktestPortfolios:
             user_id=user.id,
             name="새 포트폴리오",
             holdings=[{"ticker": "005930", "market": "KOSPI", "weight": 100.0}],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
         async def mock_refresh(obj):
             for k, v in vars(portfolio_orm).items():
                 if not k.startswith("_"):
-                    try:
+                    with contextlib.suppress(Exception):
                         setattr(obj, k, v)
-                    except Exception:
-                        pass
 
         db.refresh = AsyncMock(side_effect=mock_refresh)
         app = _setup_app(user, db)
@@ -147,8 +146,8 @@ class TestUpdateBacktestPortfolio:
             user_id=user.id,
             name="원래 이름",
             holdings=[],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         db.scalar = AsyncMock(return_value=portfolio_orm)
         app = _setup_app(user, db)
@@ -179,8 +178,8 @@ class TestUpdateBacktestPortfolio:
             user_id=user.id,
             name="삭제 포트폴리오",
             holdings=[],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         db.scalar = AsyncMock(return_value=portfolio_orm)
         db.delete = AsyncMock()
@@ -206,9 +205,8 @@ class TestRunCorrelation:
         with patch(
             "app.api.v1.backtest.compute_correlation",
             AsyncMock(return_value=mock_result),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.post("/api/v1/backtest/correlation", json=payload)
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post("/api/v1/backtest/correlation", json=payload)
         assert resp.status_code == 200
 
     def test_run_correlation_returns_400_without_portfolios(self, override_settings):
@@ -241,7 +239,6 @@ class TestRunBacktest:
         with patch(
             "app.api.v1.backtest.run_backtest",
             AsyncMock(return_value=_make_backtest_result()),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.post("/api/v1/backtest/run", json=payload)
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post("/api/v1/backtest/run", json=payload)
         assert resp.status_code == 200

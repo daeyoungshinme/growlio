@@ -7,6 +7,7 @@ import json
 import uuid
 from dataclasses import asdict, dataclass
 from enum import StrEnum
+
 import structlog
 from redis.exceptions import RedisError
 from sqlalchemy import select

@@ -46,9 +46,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -69,8 +69,8 @@ _MOCK_SUMMARY = {"total": 1, "warning": 1, "info": 0}
 
 class TestInsights:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/insights")
@@ -83,9 +83,8 @@ class TestInsights:
         with patch(
             "app.api.v1.insights.generate_insights",
             AsyncMock(return_value=_MOCK_INSIGHTS),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/insights")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/insights")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
@@ -96,7 +95,6 @@ class TestInsights:
         with patch(
             "app.api.v1.insights.get_insights_summary",
             AsyncMock(return_value=_MOCK_SUMMARY),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/insights/summary")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/insights/summary")
         assert resp.status_code == 200

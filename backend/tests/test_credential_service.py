@@ -50,7 +50,7 @@ def test_decrypt_invalid_ciphertext_raises():
     """손상된 암호문 복호화 시 예외 발생."""
     from app.services.credential_service import decrypt
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError, match="Decryption failed"):
         decrypt("invalid_hex_data_that_cannot_be_decrypted_0000")
 
 
@@ -68,9 +68,10 @@ class TestGetKisUserCredentials:
     @pytest.mark.asyncio
     async def test_returns_none_when_no_account(self):
         """KIS 계좌 없으면 None 반환."""
-        from unittest.mock import AsyncMock
-        from app.services.credential_service import get_kis_user_credentials
         import uuid
+        from unittest.mock import AsyncMock
+
+        from app.services.credential_service import get_kis_user_credentials
 
         db = AsyncMock()
         db.scalar = AsyncMock(return_value=None)
@@ -80,10 +81,11 @@ class TestGetKisUserCredentials:
     @pytest.mark.asyncio
     async def test_returns_credentials_on_success(self):
         """계좌 있고 토큰 발급 성공 시 자격증명 반환 (lines 71-91)."""
+        import uuid
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
+
         from app.services.credential_service import encrypt, get_kis_user_credentials
-        import uuid
 
         raw_key = "test-app-key"
         raw_secret = "test-app-secret"
@@ -97,9 +99,11 @@ class TestGetKisUserCredentials:
         db = AsyncMock()
         db.scalar = AsyncMock(return_value=account)
 
-        with patch("app.kis.auth.get_access_token", AsyncMock(return_value="fake-token")):
-            with patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())):
-                result = await get_kis_user_credentials(uuid.uuid4(), db)
+        with (
+            patch("app.kis.auth.get_access_token", AsyncMock(return_value="fake-token")),
+            patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+        ):
+            result = await get_kis_user_credentials(uuid.uuid4(), db)
 
         assert result is not None
         assert result["app_key"] == raw_key
@@ -108,10 +112,11 @@ class TestGetKisUserCredentials:
     @pytest.mark.asyncio
     async def test_returns_none_on_token_error(self):
         """토큰 발급 실패 시 None 반환 및 경고 로그 (lines 92-94)."""
+        import uuid
         from types import SimpleNamespace
         from unittest.mock import AsyncMock, patch
+
         from app.services.credential_service import encrypt, get_kis_user_credentials
-        import uuid
 
         account = SimpleNamespace(
             id=uuid.uuid4(),
@@ -123,9 +128,10 @@ class TestGetKisUserCredentials:
         db = AsyncMock()
         db.scalar = AsyncMock(return_value=account)
 
-        with patch("app.kis.auth.get_access_token",
-                   AsyncMock(side_effect=Exception("token error"))):
-            with patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())):
-                result = await get_kis_user_credentials(uuid.uuid4(), db)
+        with (
+            patch("app.kis.auth.get_access_token", AsyncMock(side_effect=Exception("token error"))),
+            patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+        ):
+            result = await get_kis_user_credentials(uuid.uuid4(), db)
 
         assert result is None

@@ -4,13 +4,12 @@ import pytest
 
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
-
 # ── Yahoo 심볼 변환 테스트 ──────────────────────────────────
 
 class TestToYahooSymbol:
     """_to_yahoo_symbol: 시장별 티커 변환 로직."""
 
-    @pytest.mark.parametrize("ticker,market,expected", [
+    @pytest.mark.parametrize(("ticker", "market", "expected"), [
         ("005930", "KOSPI", "005930.KS"),
         ("5930", "KOSPI", "005930.KS"),   # zero-padding
         ("5930", "KRX", "005930.KS"),
@@ -32,24 +31,25 @@ class TestFetchCurrentPrice:
     @pytest.mark.asyncio
     async def test_returns_yahoo_price_when_available(self, mock_db, mock_redis, override_settings):
         """Yahoo Finance 가격 조회 성공 시 바로 반환."""
-        from unittest.mock import AsyncMock, patch
-
         import uuid
+        from unittest.mock import AsyncMock, patch
         user_id = uuid.uuid4()
 
-        with patch("app.services.price_service._sync_yahoo_price", return_value=75000.0):
-            with patch("asyncio.get_event_loop") as mock_loop:
-                mock_executor = AsyncMock(return_value=75000.0)
-                mock_loop.return_value.run_in_executor = mock_executor
+        with (
+            patch("app.services.price_service._sync_yahoo_price", return_value=75000.0),
+            patch("asyncio.get_event_loop") as mock_loop,
+        ):
+            mock_executor = AsyncMock(return_value=75000.0)
+            mock_loop.return_value.run_in_executor = mock_executor
 
-                from app.services.price_service import fetch_current_price
-                # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
-                # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
-                mock_db.scalar.return_value = None  # UserSettings 없음 → KIS/LS skip
+            from app.services.price_service import fetch_current_price
+            # DB 조회 없이 Yahoo가 성공하면 DB 없어도 됨
+            # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
+            mock_db.scalar.return_value = None  # UserSettings 없음 → KIS/LS skip
 
-                price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_redis)
-                # Yahoo가 성공했으므로 75000 반환
-                assert price == 75000.0
+            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_redis)
+            # Yahoo가 성공했으므로 75000 반환
+            assert price == 75000.0
 
     @pytest.mark.asyncio
     async def test_returns_none_when_all_providers_fail(self, mock_db, mock_redis, override_settings):
@@ -77,6 +77,7 @@ class TestFetchPricesBatch:
     async def test_empty_tickers_returns_empty(self, mock_db, mock_redis, override_settings):
         """빈 목록 입력 시 빈 딕셔너리 반환."""
         import uuid
+
         from app.services.price_service import fetch_prices_batch
 
         result = await fetch_prices_batch(uuid.uuid4(), [], mock_db, mock_redis)
@@ -86,7 +87,7 @@ class TestFetchPricesBatch:
     async def test_yahoo_circuit_open_returns_empty(self, mock_db, mock_redis, override_settings):
         """Yahoo 서킷 OPEN 상태이면 price_map이 빈 dict로 시작."""
         import uuid
-        from unittest.mock import patch, AsyncMock, MagicMock
+        from unittest.mock import AsyncMock, patch
 
         user_id = uuid.uuid4()
         mock_db.scalar = AsyncMock(return_value=None)
@@ -103,7 +104,7 @@ class TestFetchPricesBatch:
     async def test_yahoo_returns_prices(self, mock_db, mock_redis, override_settings):
         """Yahoo 배치 조회 성공 시 price_map 반환."""
         import uuid
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         user_id = uuid.uuid4()
         mock_db.scalar = AsyncMock(return_value=None)
@@ -138,7 +139,7 @@ class TestGetHistoricalReturns:
     @pytest.mark.asyncio
     async def test_cache_hit_returns_cached(self, override_settings):
         import json
-        from unittest.mock import AsyncMock, patch
+        from unittest.mock import AsyncMock
 
         redis = AsyncMock()
         cached_data = {"cumulative_pct": 120.0, "annual_pct": 8.5}
@@ -152,7 +153,7 @@ class TestGetHistoricalReturns:
 
     @pytest.mark.asyncio
     async def test_circuit_open_returns_empty(self, override_settings):
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import patch
 
         with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
             mock_circuit.is_available.return_value = False
@@ -165,7 +166,7 @@ class TestGetHistoricalReturns:
     @pytest.mark.asyncio
     async def test_yahoo_returns_result(self, override_settings):
         """Yahoo Finance 결과 반환 시 return_map에 저장."""
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         ret_data = {"cumulative_pct": 200.0, "annual_pct": 10.0}
 

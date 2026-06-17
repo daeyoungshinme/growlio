@@ -190,7 +190,11 @@ class TestExecuteRebalancing:
 
         with (
             patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
-            patch("app.services.rebalancing_execution_service.get_access_token", new_callable=AsyncMock, return_value="token"),
+            patch(
+                "app.services.rebalancing_execution_service.get_access_token",
+                new_callable=AsyncMock,
+                return_value="token",
+            ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
             await execute_rebalancing(user_id, account.id, [buy_order, sell_order], mock_db, mock_redis)
@@ -232,7 +236,11 @@ class TestExecuteRebalancing:
 
         with (
             patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
-            patch("app.services.rebalancing_execution_service.get_access_token", new_callable=AsyncMock, return_value="token"),
+            patch(
+                "app.services.rebalancing_execution_service.get_access_token",
+                new_callable=AsyncMock,
+                return_value="token",
+            ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
             results = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_redis)
@@ -258,6 +266,7 @@ class TestRebalancingSchemaValidators:
     def test_execution_request_empty_orders_raises(self):
         """orders 빈 리스트로 ExecutionRequest 생성 시 ValidationError (lines 92-93)."""
         from pydantic import ValidationError
+
         from app.schemas.rebalancing import ExecutionRequest
         with pytest.raises(ValidationError, match="최소 1개"):
             ExecutionRequest(orders=[])

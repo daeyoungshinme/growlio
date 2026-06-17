@@ -81,7 +81,7 @@ class AssetAccount(Base):
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
 
-    user: Mapped["User"] = relationship(back_populates="asset_accounts")  # type: ignore[name-defined]
+    user: Mapped["User"] = relationship(back_populates="asset_accounts")  # type: ignore[name-defined]  # noqa: F821
     snapshots: Mapped[list["AssetSnapshot"]] = relationship(back_populates="account")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account")
     current_positions: Mapped[list["Position"]] = relationship(

@@ -13,7 +13,6 @@ from app.services.risk_service import (
     _to_yf_symbol,
 )
 
-
 # ── 순수 함수 ──────────────────────────────────────────────────
 
 class TestToYfSymbol:
@@ -134,6 +133,7 @@ class TestGetPortfolioRiskMetrics:
     @pytest.mark.asyncio
     async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
         import json
+
         from app.services.risk_service import get_portfolio_risk_metrics
 
         cached = {"var_95_pct": 1.5, "data_available": True, "position_count": 5}
@@ -148,6 +148,7 @@ class TestGetPortfolioRiskMetrics:
     @pytest.mark.asyncio
     async def test_with_positions_and_mocked_executor(self, mock_db, override_settings):
         from types import SimpleNamespace
+
         from app.services.risk_service import get_portfolio_risk_metrics
 
         snap = SimpleNamespace(id=uuid.uuid4())
@@ -196,6 +197,7 @@ class TestGetCurrencyExposure:
     @pytest.mark.asyncio
     async def test_krw_position_returns_100_krw(self, mock_db, override_settings):
         from types import SimpleNamespace
+
         from app.services.risk_service import get_currency_exposure
 
         snap = SimpleNamespace(id=uuid.uuid4())
@@ -227,6 +229,7 @@ class TestGetCurrencyExposure:
     @pytest.mark.asyncio
     async def test_mixed_currencies(self, mock_db, override_settings):
         from types import SimpleNamespace
+
         from app.services.risk_service import get_currency_exposure
 
         snap = SimpleNamespace(id=uuid.uuid4())
@@ -279,6 +282,7 @@ class TestSyncFetchRiskData:
 
     def test_empty_dataframe_returns_empty(self, override_settings):
         import pandas as pd
+
         from app.services.risk_service import _sync_fetch_risk_data
 
         with patch("yfinance.download", return_value=pd.DataFrame()):
@@ -288,6 +292,7 @@ class TestSyncFetchRiskData:
 
     def test_returns_returns_data(self, override_settings):
         import pandas as pd
+
         from app.services.risk_service import _sync_fetch_risk_data
 
         idx = pd.date_range("2023-01-01", periods=100)

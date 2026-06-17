@@ -31,7 +31,6 @@ from app.utils.cache_keys import (
 )
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
-
 # ── cache_keys ───────────────────────────────────────────────────────────────
 
 
@@ -249,6 +248,7 @@ class TestRedisLock:
     async def test_lock_acquired_yields_true_and_releases(self, override_settings):
         """락 획득 성공 시 True yield 후 해제."""
         import uuid as _uuid_mod
+
         from app.utils.redis_lock import redis_lock
 
         fixed_id = _uuid_mod.UUID("12345678-1234-5678-1234-567812345678")

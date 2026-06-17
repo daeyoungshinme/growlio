@@ -7,6 +7,7 @@
 
 import time
 import uuid
+from datetime import UTC
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -32,9 +33,9 @@ class TestCrossUserAccess:
 
     def test_get_other_users_account_returns_404(self):
         """User A가 User B 소유 account_id로 GET 요청 → 404."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_current_user
+        from app.database import get_db
+        from app.main import app
 
         user_a = _make_user()
 
@@ -63,14 +64,14 @@ class TestCrossUserAccess:
 
     def test_get_own_account_returns_200_or_404_based_on_db(self):
         """User A가 본인 계좌를 DB에서 찾으면 200, 없으면 404 — 소유 여부 분기 확인."""
-        from app.main import app
-        from app.database import get_db
         from app.api.deps import get_current_user
+        from app.database import get_db
+        from app.main import app
 
         user_a = _make_user()
         account_id = uuid.uuid4()
 
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         own_account = SimpleNamespace(
             id=account_id,
@@ -92,7 +93,7 @@ class TestCrossUserAccess:
             include_in_total=True,
             sort_order=0,
             notes=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
             ob_fintech_use_no=None,
             kis_app_key=None,
             kis_app_secret=None,
@@ -140,12 +141,14 @@ class TestTokenValidation:
         """잘못된 JWT 토큰으로 요청 → verify_supabase_token이 ValueError → 401."""
         from app.main import app
 
-        with patch("app.api.deps.verify_supabase_token", side_effect=ValueError("Invalid token")):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get(
-                    "/api/v1/assets",
-                    headers={"Authorization": "Bearer totally.invalid.token"},
-                )
+        with (
+            patch("app.api.deps.verify_supabase_token", side_effect=ValueError("Invalid token")),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get(
+                "/api/v1/assets",
+                headers={"Authorization": "Bearer totally.invalid.token"},
+            )
         assert resp.status_code == 401
 
     def test_malformed_bearer_header_returns_401(self):
@@ -168,6 +171,7 @@ class TestVerifySupabaseToken:
     def test_expired_token_raises_value_error(self):
         """만료된 토큰(leeway 5s 초과)은 ValueError('Token expired')를 발생시킨다."""
         import jwt as pyjwt
+
         from app.services.auth_service import verify_supabase_token
 
         secret = "test-hmac-secret"
@@ -186,13 +190,16 @@ class TestVerifySupabaseToken:
         mock_jwks = MagicMock()
         mock_jwks.get_signing_key_from_jwt.return_value = mock_signing_key
 
-        with patch("app.services.auth_service._get_jwks_client", return_value=mock_jwks):
-            with pytest.raises(ValueError, match="Token expired"):
-                verify_supabase_token(token)
+        with (
+            patch("app.services.auth_service._get_jwks_client", return_value=mock_jwks),
+            pytest.raises(ValueError, match="Token expired"),
+        ):
+            verify_supabase_token(token)
 
     def test_valid_token_returns_payload(self):
         """유효한 토큰은 payload dict를 반환한다."""
         import jwt as pyjwt
+
         from app.services.auth_service import verify_supabase_token
 
         secret = "test-hmac-secret"
@@ -221,6 +228,7 @@ class TestVerifySupabaseToken:
     def test_token_with_invalid_signature_raises_value_error(self):
         """서명이 다른 토큰은 ValueError를 발생시킨다."""
         import jwt as pyjwt
+
         from app.services.auth_service import verify_supabase_token
 
         token = pyjwt.encode(
@@ -236,6 +244,8 @@ class TestVerifySupabaseToken:
         mock_jwks = MagicMock()
         mock_jwks.get_signing_key_from_jwt.return_value = mock_signing_key
 
-        with patch("app.services.auth_service._get_jwks_client", return_value=mock_jwks):
-            with pytest.raises(ValueError):
-                verify_supabase_token(token)
+        with (
+            patch("app.services.auth_service._get_jwks_client", return_value=mock_jwks),
+            pytest.raises(ValueError, match="Invalid token|Token"),
+        ):
+            verify_supabase_token(token)

@@ -1,5 +1,4 @@
 from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
-from app.models.indicator_subscription import IndicatorSubscription
 from app.models.asset import (
     AssetAccount,
     AssetSnapshot,
@@ -10,6 +9,7 @@ from app.models.asset import (
     UserTickerSettings,
 )
 from app.models.backtest import BacktestPortfolio
+from app.models.indicator_subscription import IndicatorSubscription
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.security import Security
 from app.models.token import KisToken

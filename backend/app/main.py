@@ -27,11 +27,11 @@ from app.exceptions import (
     ProviderTokenError,
 )
 from app.kis.client import KisApiError
-from app.utils.circuit_breaker import CircuitOpenError
 from app.limiter import limiter
 from app.providers.http_client import close_http_client
 from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
+from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.metrics import http_request_duration
 
 logger = structlog.get_logger()

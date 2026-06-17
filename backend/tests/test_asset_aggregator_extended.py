@@ -9,37 +9,36 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ── _calc_returns (순수 함수) ─────────────────────────────────
 
 class TestCalcReturns:
     def test_no_base_returns_none(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         ann, cum = _calc_returns(1_000_000, 0.0, date(2024, 1, 1))
         assert ann is None
         assert cum is None
 
     def test_no_first_date_returns_none(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         ann, cum = _calc_returns(1_100_000, 1_000_000, None)
         assert ann is None
         assert cum is None
 
     def test_first_date_in_future_returns_none(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         future = date.today() + timedelta(days=30)
         ann, cum = _calc_returns(1_100_000, 1_000_000, future)
         assert ann is None
         assert cum is None
 
     def test_first_date_today_returns_none(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         ann, cum = _calc_returns(1_100_000, 1_000_000, date.today())
         assert ann is None
         assert cum is None
 
     def test_positive_return(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         one_year_ago = date.today().replace(year=date.today().year - 1)
         ann, cum = _calc_returns(1_100_000, 1_000_000, one_year_ago)
         assert ann is not None
@@ -47,7 +46,7 @@ class TestCalcReturns:
         assert cum > 0
 
     def test_negative_return(self, override_settings):
-        from app.services.asset_aggregator import _calc_returns
+        from app.services.returns_calculator import calc_returns as _calc_returns
         one_year_ago = date.today().replace(year=date.today().year - 1)
         ann, cum = _calc_returns(900_000, 1_000_000, one_year_ago)
         assert ann is not None
@@ -240,6 +239,7 @@ class TestGetMonthlyTrend:
     @pytest.mark.asyncio
     async def test_redis_cache_hit(self, mock_db, override_settings):
         import json
+
         from app.services.asset_aggregator import _get_monthly_trend
 
         cached = [{"month": "2024-01-01", "total_krw": 10_000_000.0}]
@@ -310,6 +310,7 @@ class TestGetDashboardSummary:
     @pytest.mark.asyncio
     async def test_redis_cache_hit(self, mock_db, override_settings):
         import json
+
         from app.services.asset_aggregator import get_dashboard_summary
 
         cached = {"total_assets_krw": 99_000_000}
@@ -395,7 +396,10 @@ class TestBuildAssetTotals:
 
         with (
             patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
+            patch(
+                "app.services.composition_calculator.get_latest_snapshot_rows",
+                new=AsyncMock(return_value=([], set())),
+            ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
             patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
@@ -418,7 +422,10 @@ class TestBuildAssetTotals:
 
         with (
             patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
+            patch(
+                "app.services.composition_calculator.get_latest_snapshot_rows",
+                new=AsyncMock(return_value=([(snap, acc)], {acc.id})),
+            ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
             patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
@@ -440,7 +447,10 @@ class TestBuildAssetTotals:
 
         with (
             patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([(snap, acc)], {acc.id}))),
+            patch(
+                "app.services.composition_calculator.get_latest_snapshot_rows",
+                new=AsyncMock(return_value=([(snap, acc)], {acc.id})),
+            ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
             patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):
@@ -461,7 +471,10 @@ class TestBuildAssetTotals:
 
         with (
             patch("app.services.composition_calculator.fetch_usd_krw", new=AsyncMock(return_value=1350.0)),
-            patch("app.services.composition_calculator.get_latest_snapshot_rows", new=AsyncMock(return_value=([], set()))),
+            patch(
+                "app.services.composition_calculator.get_latest_snapshot_rows",
+                new=AsyncMock(return_value=([], set())),
+            ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[acc])),
             patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
         ):

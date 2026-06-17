@@ -7,7 +7,6 @@ from pydantic import BaseModel, field_validator, model_validator
 from app.enums import PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
-
 # ---------------------------------------------------------------------------
 # KIS 실시간 포트폴리오 서머리 (/portfolio/summary) 응답 스키마
 # ---------------------------------------------------------------------------

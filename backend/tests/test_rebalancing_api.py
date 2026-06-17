@@ -49,9 +49,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -76,8 +76,8 @@ _MOCK_ANALYSIS = {
 
 class TestRebalancingAnalyze:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         pid = uuid.uuid4()
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -110,8 +110,8 @@ class TestRebalancingAnalyze:
 
 class TestRebalancingHistory:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/rebalancing/history")
@@ -140,8 +140,8 @@ class TestRebalancingHistory:
 
 class TestBrokerBalance:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get(f"/api/v1/rebalancing/broker-balance/{uuid.uuid4()}")
@@ -173,6 +173,7 @@ class TestBrokerBalance:
     def test_returns_502_on_kis_api_error(self, override_settings):
         """KisApiError 발생 시 HTTP 502를 반환한다."""
         from types import SimpleNamespace
+
         from app.kis.client import KisApiError
 
         user = _make_user()

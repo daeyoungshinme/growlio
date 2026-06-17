@@ -1,6 +1,7 @@
 """포트폴리오 CRUD API 테스트 (GET/POST/PUT/DELETE /api/v1/portfolios)."""
 import json
 import uuid
+from datetime import UTC
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -67,9 +68,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -83,7 +84,7 @@ def _setup_app(user, db):
 
 
 def _make_full_portfolio(user_id, portfolio_id=None):
-    from datetime import datetime, timezone
+    from datetime import datetime
     _id = portfolio_id or uuid.uuid4()
     return SimpleNamespace(
         id=_id,
@@ -94,8 +95,8 @@ def _make_full_portfolio(user_id, portfolio_id=None):
         account_ids=None,
         base_type="STOCK_ONLY",
         sort_order=0,
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -151,8 +152,8 @@ class TestUpdatePortfolio:
 
 class TestListPortfolios:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/portfolios")

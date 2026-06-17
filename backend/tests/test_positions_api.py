@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -72,9 +72,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -118,24 +118,25 @@ class TestSavePositions:
             mock_redis.delete = AsyncMock()
             mock_get_redis.return_value = mock_redis
             with patch("app.utils.redis_lock.redis_lock") as mock_lock:
-                import contextlib
                 mock_cm = MagicMock()
                 mock_cm.__aenter__ = AsyncMock(return_value=True)
                 mock_cm.__aexit__ = AsyncMock(return_value=None)
                 mock_lock.return_value = mock_cm
-                with patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)):
-                    with TestClient(app, raise_server_exceptions=False) as client:
-                        resp = client.put(
-                            f"/api/v1/assets/{account.id}/positions",
-                            json=[],
-                        )
+                with (
+                    patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                    TestClient(app, raise_server_exceptions=False) as client,
+                ):
+                    resp = client.put(
+                        f"/api/v1/assets/{account.id}/positions",
+                        json=[],
+                    )
         assert resp.status_code == 200
 
 
 class TestGetPositions:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         account_id = uuid.uuid4()
         with TestClient(app, raise_server_exceptions=False) as client:
@@ -206,16 +207,18 @@ class TestSavePositionsExtended:
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
-            with patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)):
-                with patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)):
-                    with TestClient(app, raise_server_exceptions=False) as client:
-                        resp = client.put(
-                            f"/api/v1/assets/{account.id}/positions",
-                            json=[{
-                                "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                                "qty": 10.0, "avg_price": 70000.0,
-                            }],
-                        )
+            with (
+                patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
+                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/assets/{account.id}/positions",
+                    json=[{
+                        "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
+                        "qty": 10.0, "avg_price": 70000.0,
+                    }],
+                )
         assert resp.status_code == 200
         data = resp.json()
         assert "positions" in data
@@ -238,17 +241,19 @@ class TestSavePositionsExtended:
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
-            with patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)):
-                with patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)):
-                    with patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-                        with TestClient(app, raise_server_exceptions=False) as client:
-                            resp = client.put(
-                                f"/api/v1/assets/{account.id}/positions",
-                                json=[{
-                                    "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
-                                    "qty": 5.0, "avg_price": 70000.0,
-                                }],
-                            )
+            with (
+                patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
+                patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    f"/api/v1/assets/{account.id}/positions",
+                    json=[{
+                        "ticker": "005930", "name": "삼성전자", "market": "KOSPI",
+                        "qty": 5.0, "avg_price": 70000.0,
+                    }],
+                )
         assert resp.status_code == 200
 
     def test_save_positions_lock_conflict_returns_409(self, override_settings):
@@ -344,16 +349,18 @@ class TestSyncPositionPrices:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
-            with patch("app.api.v1.positions.fetch_prices_batch",
-                       AsyncMock(return_value={"005930": 76000.0})):
-                with patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)):
-                    with patch("app.api.v1.positions._upsert_snapshot",
-                               AsyncMock(return_value=mock_snap)):
-                        with patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()):
-                            with TestClient(app, raise_server_exceptions=False) as client:
-                                resp = client.post(
-                                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                                )
+            with (
+                patch("app.api.v1.positions.fetch_prices_batch",
+                      AsyncMock(return_value={"005930": 76000.0})),
+                patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
+                patch("app.api.v1.positions._upsert_snapshot",
+                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    f"/api/v1/assets/{account.id}/positions/sync-prices"
+                )
         assert resp.status_code == 200
         data = resp.json()
         assert "positions" in data
@@ -387,16 +394,18 @@ class TestSyncPositionPrices:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
-            with patch("app.api.v1.positions.fetch_prices_batch",
-                       AsyncMock(return_value={"AAPL": 210.0})):
-                with patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)):
-                    with patch("app.api.v1.positions._upsert_snapshot",
-                               AsyncMock(return_value=mock_snap)):
-                        with patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()):
-                            with TestClient(app, raise_server_exceptions=False) as client:
-                                resp = client.post(
-                                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                                )
+            with (
+                patch("app.api.v1.positions.fetch_prices_batch",
+                      AsyncMock(return_value={"AAPL": 210.0})),
+                patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
+                patch("app.api.v1.positions._upsert_snapshot",
+                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    f"/api/v1/assets/{account.id}/positions/sync-prices"
+                )
         assert resp.status_code == 200
         assert mock_pos.current_price == pytest.approx(210.0 * 1350.0)
 
@@ -429,15 +438,17 @@ class TestSyncPositionPrices:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
             mock_gr.return_value = mock_redis
-            with patch("app.api.v1.positions.fetch_prices_batch",
-                       AsyncMock(return_value={})):  # Empty → ticker not found
-                with patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)):
-                    with patch("app.api.v1.positions._upsert_snapshot",
-                               AsyncMock(return_value=mock_snap)):
-                        with patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()):
-                            with TestClient(app, raise_server_exceptions=False) as client:
-                                resp = client.post(
-                                    f"/api/v1/assets/{account.id}/positions/sync-prices"
-                                )
+            with (
+                patch("app.api.v1.positions.fetch_prices_batch",
+                      AsyncMock(return_value={})),  # Empty → ticker not found
+                patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
+                patch("app.api.v1.positions._upsert_snapshot",
+                      AsyncMock(return_value=mock_snap)),
+                patch("app.api.v1.positions.sync_snapshot_positions", AsyncMock()),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.post(
+                    f"/api/v1/assets/{account.id}/positions/sync-prices"
+                )
         assert resp.status_code == 200
         assert mock_pos.current_price == pytest.approx(71000.0)  # Unchanged

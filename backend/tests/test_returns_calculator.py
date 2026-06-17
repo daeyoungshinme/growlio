@@ -72,10 +72,10 @@ class TestXirr:
 class TestCalcReturns:
     def test_positive_annualized_return(self):
         today = date.today()
-        from datetime import timedelta
         first_date = date(today.year - 2, today.month, 1)
         annualized, cumulative = calc_returns(12000.0, 10000.0, first_date)
-        assert annualized is not None and annualized > 0
+        assert annualized is not None
+        assert annualized > 0
         assert cumulative is not None
         assert cumulative == pytest.approx(20.0, abs=0.1)
 

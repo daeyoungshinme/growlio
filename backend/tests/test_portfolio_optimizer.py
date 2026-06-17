@@ -10,7 +10,6 @@ import pytest
 
 from app.services.portfolio_optimizer import get_efficient_frontier
 
-
 # ── get_efficient_frontier (DB mock) ──────────────────────
 
 class TestGetEfficientFrontier:

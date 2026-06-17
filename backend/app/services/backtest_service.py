@@ -167,23 +167,12 @@ async def _get_real_portfolio_holdings(
 
 # ── 메인 백테스팅 실행 ─────────────────────────────────────
 
-async def run_backtest(
-    user_id: uuid.UUID,
+async def _download_price_data(
+    portfolios: list[Portfolio],
     req: BacktestRunRequest,
-    db: AsyncSession,
-) -> BacktestResult:
-    # 1. 포트폴리오 설정 로드
-    port_rows = await db.execute(
-        select(Portfolio)
-        .options(selectinload(Portfolio.items))
-        .where(
-            Portfolio.user_id == user_id,
-            Portfolio.id.in_(req.portfolio_ids),
-        )
-    )
-    portfolios: list[Portfolio] = list(port_rows.scalars().all())
-
-    # 2. 모든 티커 수집 (CASH·REAL_ESTATE 제외 — yfinance 조회 불가)
+    real_holdings: list[dict] | None,
+) -> dict[str, list[tuple[str, float]]]:
+    """모든 포트폴리오 심볼과 실제 보유 종목의 가격 데이터를 yfinance로 다운로드한다."""
     all_symbols: list[str] = []
     for p in portfolios:
         for h in p.items:
@@ -195,46 +184,51 @@ async def run_backtest(
     if req.include_spy and "SPY" not in all_symbols:
         all_symbols.append("SPY")
 
-    real_asset_types: list[str] | None = None
-    if portfolios and all(p.base_type == "STOCK_ONLY" for p in portfolios):
-        real_asset_types = ["STOCK_KIS", "STOCK_OTHER", "STOCK_KIWOOM"]
+    if real_holdings:
+        for rh in real_holdings:
+            sym = _to_yf_symbol(rh["ticker"], rh["market"])
+            if sym not in all_symbols:
+                all_symbols.append(sym)
 
-    real_holdings: list[dict] | None = None
-    if req.include_real_portfolio:
-        real_holdings = await _get_real_portfolio_holdings(user_id, db, asset_types=real_asset_types)
-        if real_holdings:
-            for rh in real_holdings:
-                sym = _to_yf_symbol(rh["ticker"], rh["market"])
-                if sym not in all_symbols:
-                    all_symbols.append(sym)
-
-    # 3. yfinance 히스토리컬 일괄 다운로드
     loop = asyncio.get_running_loop()
-    price_data: dict[str, list[tuple[str, float]]] = await loop.run_in_executor(
+    return await loop.run_in_executor(
         None,
         partial(_sync_download_history, all_symbols, req.start_date, req.end_date, req.reinvest_dividends),
     )
 
-    # 4. 공통 날짜 축 구성 (SPY 또는 첫 번째 심볼의 거래일 기준)
+
+def _build_date_axis(
+    price_data: dict[str, list[tuple[str, float]]],
+    all_symbols: list[str],
+    req: BacktestRunRequest,
+) -> list[str]:
+    """공통 날짜 축을 구성한다. SPY 또는 첫 번째 심볼의 거래일 기준."""
     ref_sym = "SPY" if "SPY" in price_data else (all_symbols[0] if all_symbols else None)
     if ref_sym and ref_sym in price_data:
-        dates = [d for d, _ in price_data[ref_sym]]
-    else:
-        from datetime import timedelta
-        cur = req.start_date
-        dates = []
-        while cur <= req.end_date:
-            if cur.weekday() < 5:
-                dates.append(cur.isoformat())
-            cur += timedelta(days=1)
+        return [d for d, _ in price_data[ref_sym]]
 
-    if not dates:
-        return BacktestResult(dates=[], series=[], metrics=[])
+    from datetime import timedelta
+    cur = req.start_date
+    dates: list[str] = []
+    while cur <= req.end_date:
+        if cur.weekday() < 5:
+            dates.append(cur.isoformat())
+        cur += timedelta(days=1)
+    return dates
 
-    # 5. 각 포트폴리오 시리즈 계산
+
+def _compute_performance_metrics(
+    portfolios: list[Portfolio],
+    price_data: dict[str, list[tuple[str, float]]],
+    dates: list[str],
+    req: BacktestRunRequest,
+    real_holdings: list[dict] | None,
+) -> tuple[list[SeriesData], list[PortfolioMetrics]]:
+    """포트폴리오별 시리즈·메트릭, SPY 벤치마크, 실제 포트폴리오 시리즈를 계산한다."""
     all_series: list[SeriesData] = []
     all_metrics: list[PortfolioMetrics] = []
 
+    # 각 포트폴리오 시리즈
     for p in portfolios:
         investable = [
             {"ticker": h.ticker, "market": h.market, "weight": float(h.weight), "name": h.name}
@@ -246,7 +240,7 @@ async def run_backtest(
         all_series.append(s)
         all_metrics.append(m)
 
-    # 6. S&P500 시리즈
+    # S&P500 시리즈
     if req.include_spy and "SPY" in price_data:
         spy_prices = dict(price_data["SPY"])
         spy_vals: list[float] = []
@@ -263,11 +257,54 @@ async def run_backtest(
         all_series.append(spy_series)
         all_metrics.append(compute_metrics("S&P 500", spy_vals))
 
-    # 7. 실제 포트폴리오 시리즈 — 최신 스냅샷 positions 비중 기반 yfinance 백테스팅
+    # 실제 포트폴리오 시리즈 — 최신 스냅샷 positions 비중 기반 yfinance 백테스팅
     if req.include_real_portfolio and real_holdings:
         s, m = compute_portfolio_series("실제 포트폴리오", real_holdings, price_data, dates)
         all_series.append(s)
         all_metrics.append(m)
+
+    return all_series, all_metrics
+
+
+async def run_backtest(
+    user_id: uuid.UUID,
+    req: BacktestRunRequest,
+    db: AsyncSession,
+) -> BacktestResult:
+    # 1. 포트폴리오 설정 로드
+    port_rows = await db.execute(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(
+            Portfolio.user_id == user_id,
+            Portfolio.id.in_(req.portfolio_ids),
+        )
+    )
+    portfolios: list[Portfolio] = list(port_rows.scalars().all())
+
+    # 2. 실제 포트폴리오 보유 종목 조회
+    real_asset_types: list[str] | None = None
+    if portfolios and all(p.base_type == "STOCK_ONLY" for p in portfolios):
+        real_asset_types = ["STOCK_KIS", "STOCK_OTHER", "STOCK_KIWOOM"]
+
+    real_holdings: list[dict] | None = None
+    if req.include_real_portfolio:
+        real_holdings = await _get_real_portfolio_holdings(user_id, db, asset_types=real_asset_types)
+
+    # 3. yfinance 히스토리컬 일괄 다운로드
+    price_data = await _download_price_data(portfolios, req, real_holdings)
+
+    # 4. 공통 날짜 축 구성
+    all_symbols = list(price_data.keys())
+    dates = _build_date_axis(price_data, all_symbols, req)
+
+    if not dates:
+        return BacktestResult(dates=[], series=[], metrics=[])
+
+    # 5–7. 시리즈 및 성능 메트릭 계산
+    all_series, all_metrics = _compute_performance_metrics(
+        portfolios, price_data, dates, req, real_holdings
+    )
 
     return BacktestResult(dates=dates, series=all_series, metrics=all_metrics)
 

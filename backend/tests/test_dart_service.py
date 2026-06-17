@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import io
-import zipfile
 import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -170,9 +170,11 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="00126380")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_dart_dividend("005930", "key")
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="00126380")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_dart_dividend("005930", "key")
 
         assert result is not None
         assert abs(result["dividend_yield"] - 0.0215) < 0.0001
@@ -192,9 +194,11 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_dart_dividend("005930", "key")
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_dart_dividend("005930", "key")
 
         assert result is None
 
@@ -221,11 +225,13 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                # First call (year=None) returns 013, which triggers a recursive call
-                # The second call will also return 013 but year is set so no more retries
-                result = await ds.fetch_dart_dividend("005930", "key")
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            # First call (year=None) returns 013, which triggers a recursive call
+            # The second call will also return 013 but year is set so no more retries
+            result = await ds.fetch_dart_dividend("005930", "key")
 
         # Result is None since second call with explicit year also gets 013
         assert result is None
@@ -239,9 +245,11 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(side_effect=Exception("network error"))
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_dart_dividend("005930", "key")
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_dart_dividend("005930", "key")
 
         assert result is None
 
@@ -264,9 +272,11 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_dart_dividend("005930", "key")
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_dart_dividend("005930", "key")
 
         assert result is None
 
@@ -290,9 +300,11 @@ class TestFetchDartDividend:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_dart_dividend("005935", "key")  # ends in 5 → preferred
+        with (
+            patch.object(ds, "_lookup_corp_code", new=AsyncMock(return_value="abc")),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_dart_dividend("005935", "key")  # ends in 5 → preferred
 
         assert result is not None
         assert abs(result["dividend_yield"] - 0.015) < 0.0001
@@ -343,9 +355,11 @@ class TestFetchDisclosuresForTickers:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
+        with (
+            patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
 
         assert len(result) == 1
         assert result[0]["ticker"] == "005930"
@@ -362,9 +376,11 @@ class TestFetchDisclosuresForTickers:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(side_effect=Exception("network error"))
 
-        with patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
+        with (
+            patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
 
         assert result == []
 
@@ -384,8 +400,10 @@ class TestFetchDisclosuresForTickers:
         mock_client.__aexit__ = AsyncMock(return_value=False)
         mock_client.get = AsyncMock(return_value=mock_resp)
 
-        with patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)):
-            with patch("httpx.AsyncClient", return_value=mock_client):
-                result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
+        with (
+            patch.object(ds, "_ensure_corp_code_map", new=AsyncMock(return_value=corp_map)),
+            patch("httpx.AsyncClient", return_value=mock_client),
+        ):
+            result = await ds.fetch_disclosures_for_tickers(["005930"], "key")
 
         assert result == []

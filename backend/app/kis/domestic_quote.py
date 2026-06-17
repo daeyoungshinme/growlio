@@ -86,7 +86,10 @@ async def get_domestic_dividend_info(
     raw_divi_rate = output.get("stck_divi_rate")
     raw_divi_amt = output.get("per_divi_amt")
 
-    logger.info("kis_dividend_raw_output", ticker=ticker, is_mock=is_mock, stck_divi_rate=raw_divi_rate, per_divi_amt=raw_divi_amt)
+    logger.info(
+        "kis_dividend_raw_output", ticker=ticker, is_mock=is_mock,
+        stck_divi_rate=raw_divi_rate, per_divi_amt=raw_divi_amt,
+    )
 
     try:
         stck_divi_rate_pct = float(raw_divi_rate or 0)
@@ -154,7 +157,10 @@ async def get_domestic_etf_dividend_info(
     raw_divi_rt = output.get("etf_divi_rt") or output.get("stck_divi_rate")
     raw_divi_amt = output.get("etf_divi_amt") or output.get("per_divi_amt")
 
-    logger.info("kis_etf_dividend_raw_output", ticker=ticker, is_mock=is_mock, etf_divi_rt=raw_divi_rt, etf_divi_amt=raw_divi_amt)
+    logger.info(
+        "kis_etf_dividend_raw_output", ticker=ticker, is_mock=is_mock,
+        etf_divi_rt=raw_divi_rt, etf_divi_amt=raw_divi_amt,
+    )
 
     try:
         divi_rt_pct = float(raw_divi_rt or 0)

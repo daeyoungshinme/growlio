@@ -1,7 +1,7 @@
 """설정 API 테스트 (GET/PUT /api/v1/settings)."""
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
 import uuid
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -45,9 +45,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -62,8 +62,8 @@ def _setup_app(user, db):
 
 class TestGetSettings:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/settings")

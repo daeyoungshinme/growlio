@@ -3,10 +3,9 @@
 import uuid
 from datetime import date, timedelta
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 
 # ── _xirr 테스트 ────────────────────────────────────────────
 
@@ -15,7 +14,7 @@ class TestXirr:
 
     def test_simple_annual_return(self):
         """1년 후 10% 수익 → XIRR ≈ 10%."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         today = date.today()
         start = today.replace(year=today.year - 1)
@@ -26,14 +25,14 @@ class TestXirr:
 
     def test_returns_none_for_single_cashflow(self):
         """단일 캐시플로는 None 반환."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         cashflows = [(date.today(), -1_000_000.0)]
         assert _xirr(cashflows) is None
 
     def test_returns_none_for_all_positive(self):
         """모두 양수인 경우 None 반환 (입금만 있는 경우)."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         today = date.today()
         cashflows = [(today - timedelta(days=365), 500_000.0), (today, 500_000.0)]
@@ -41,7 +40,7 @@ class TestXirr:
 
     def test_returns_none_for_all_negative(self):
         """모두 음수인 경우 None 반환 (출금만 있는 경우)."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         today = date.today()
         cashflows = [(today - timedelta(days=365), -500_000.0), (today, -500_000.0)]
@@ -49,7 +48,7 @@ class TestXirr:
 
     def test_reasonable_range_enforced(self):
         """비현실적인 수익률(-99% 초과 또는 1000% 초과)은 None 반환."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         today = date.today()
         # 극단적인 손실: -99.9% → 반환 불가 범위
@@ -60,7 +59,7 @@ class TestXirr:
 
     def test_estimated_path_two_points(self):
         """스냅샷 기반 추정(2개 포인트)도 수렴해야 한다."""
-        from app.services.asset_aggregator import _xirr
+        from app.services.returns_calculator import xirr as _xirr
 
         start = date(2024, 1, 1)
         end = date(2025, 1, 1)
@@ -157,6 +156,7 @@ class TestGetMonthlyTrend:
     async def test_cache_hit_skips_db(self, mock_db, mock_redis):
         """Redis 캐시 히트 시 DB 쿼리 없이 반환."""
         import json
+
         from app.services.asset_aggregator import _get_monthly_trend
 
         user_id = uuid.uuid4()

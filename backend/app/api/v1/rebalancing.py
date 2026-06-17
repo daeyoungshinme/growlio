@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
-from app.config import settings
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_orderable_cash
@@ -19,7 +18,7 @@ from app.kis.client import KisApiError
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
-from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
+from app.models.asset import AssetAccount, RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
@@ -34,13 +33,13 @@ from app.schemas.rebalancing import (
 )
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services.credential_service import decrypt
+from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.dividend_constants import is_korean_etf
 from app.services.dividend_providers import (
     sync_naver_etf_dividend_info,
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
 from app.services.rebalancing_service import analyze_rebalancing
@@ -224,7 +223,7 @@ async def quick_execute_rebalancing(
     if not alert_row or not alert_row.account_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="이 포트폴리오에 자동 실행 계좌가 설정되지 않았습니다. 리밸런싱 자동화 설정에서 계좌를 선택해주세요.",
+            detail="이 포트폴리오에 자동 실행 계좌가 설정되지 않았습니다. 자동화 설정에서 계좌를 선택해주세요.",
         )
 
     account_id = alert_row.account_id
@@ -327,7 +326,9 @@ async def get_rebalancing_execution_detail(
 
         from app.schemas.rebalancing import OrderResult
 
-        by_account: dict[str, dict] = defaultdict(lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""})
+        by_account: dict[str, dict] = defaultdict(
+            lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""}
+        )
         for ri in execution.result_items:
             key = ri.account_id or ""
             by_account[key]["account_name"] = ri.account_name or ""
@@ -461,7 +462,10 @@ async def get_broker_account_balance(
         )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="계좌를 찾을 수 없습니다")
     if account.asset_type not in ("STOCK_KIS", "STOCK_KIWOOM"):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다",
+        )
 
     usd_rate = await get_usd_krw_rate(redis)
     try:
@@ -510,5 +514,5 @@ async def get_all_broker_balances(
             deposit_krw=0.0,
             error=str(r),
         )
-        for acc, r in zip(accounts, results)
+        for acc, r in zip(accounts, results, strict=False)
     ]

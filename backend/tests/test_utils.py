@@ -6,7 +6,6 @@ import pytest
 
 from app.utils.pnl import calc_position_pnl, eval_value, invested_value, pnl_pct
 
-
 # ── eval_value ──────────────────────────────────────────────
 
 class TestEvalValue:

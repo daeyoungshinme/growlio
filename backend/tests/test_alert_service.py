@@ -8,7 +8,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ── _should_fire_today 테스트 ────────────────────────────────
 
 class TestShouldFireToday:
@@ -27,8 +26,9 @@ class TestShouldFireToday:
         assert should_fire_today(alert) is True
 
     def test_weekly_fires_on_correct_day(self):
-        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
+
+        from app.services.alert_calculator import should_fire_today
 
         # today의 요일을 구해 schedule_day_of_week로 설정
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
@@ -36,8 +36,9 @@ class TestShouldFireToday:
         assert should_fire_today(alert) is True
 
     def test_weekly_does_not_fire_on_wrong_day(self):
-        from app.services.alert_calculator import should_fire_today
         from datetime import timezone
+
+        from app.services.alert_calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         wrong_day = (today.weekday() + 1) % 7
@@ -48,9 +49,10 @@ class TestShouldFireToday:
             assert result is False
 
     def test_quarterly_fires_first_time(self):
-        from app.services.alert_calculator import should_fire_today
-        from datetime import timezone
         import calendar
+        from datetime import timezone
+
+        from app.services.alert_calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         last_day = calendar.monthrange(today.year, today.month)[1]
@@ -64,9 +66,10 @@ class TestShouldFireToday:
         assert should_fire_today(alert) is True
 
     def test_quarterly_does_not_fire_before_cooldown(self):
-        from app.services.alert_calculator import should_fire_today
-        from datetime import timezone
         import calendar
+        from datetime import timezone
+
+        from app.services.alert_calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         last_day = calendar.monthrange(today.year, today.month)[1]

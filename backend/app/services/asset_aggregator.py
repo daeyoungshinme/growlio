@@ -23,10 +23,8 @@ from app.services.composition_calculator import (
     get_no_snap_accounts,
 )
 from app.services.dividend_aggregator import get_dividend_summary
-from app.services.returns_calculator import calc_returns, calc_xirr
-from app.services.returns_calculator import calc_returns as _calc_returns
+from app.services.returns_calculator import calc_returns
 from app.services.returns_calculator import calc_xirr as _calc_xirr
-from app.services.returns_calculator import xirr as _xirr
 from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     TTL_DASHBOARD_SUMMARY,
@@ -111,9 +109,13 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
 
     goal = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None
     goal_pct = (total_assets_krw / goal * 100) if goal else None
-    annual_deposit_goal = float(settings_row.annual_deposit_goal) if settings_row and settings_row.annual_deposit_goal else None
+    annual_deposit_goal = (
+        float(settings_row.annual_deposit_goal) if settings_row and settings_row.annual_deposit_goal else None
+    )
     deposit_achievement_pct = (net_deposits_ytd / annual_deposit_goal * 100) if annual_deposit_goal else None
-    goal_annual_return_pct = float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
+    goal_annual_return_pct = (
+        float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
+    )
     retirement_target_year = settings_row.retirement_target_year if settings_row else None
 
     result: dict[str, Any] = {

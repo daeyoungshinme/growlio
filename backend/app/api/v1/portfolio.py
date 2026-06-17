@@ -91,7 +91,9 @@ async def portfolio_summary(
 
     results = await asyncio.gather(*[_fetch(acc.kis_account_no) for acc in kis_accounts])  # type: ignore[arg-type]
 
-    merged_domestic: dict = {"total_value_krw": 0.0, "invested_krw": 0.0, "pnl_krw": 0.0, "deposit_krw": 0.0, "positions": []}
+    merged_domestic: dict = {
+        "total_value_krw": 0.0, "invested_krw": 0.0, "pnl_krw": 0.0, "deposit_krw": 0.0, "positions": [],
+    }
     merged_overseas: dict = {"total_value_usd": 0.0, "deposit_usd": 0.0, "positions": []}
     account_details = []
     for account_no, d, o in results:
@@ -183,7 +185,7 @@ async def portfolio_efficient_frontier(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """효율적 프론티어 — Mean-Variance Optimization (scipy SLSQP). compare_portfolio_id 지정 시 목표 포트폴리오 위치도 반환."""
+    """효율적 프론티어 — MVO (scipy SLSQP). compare_portfolio_id 지정 시 목표 포트폴리오 위치도 반환."""
     redis = await get_redis()
     return await get_efficient_frontier(current_user.id, db, redis, compare_portfolio_id=compare_portfolio_id)
 

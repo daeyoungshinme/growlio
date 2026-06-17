@@ -121,7 +121,9 @@ async def send_deposit_trigger_alert(
     subject, html = deposit_trigger_alert_template(portfolio_name, deposit_increment, items)
     try:
         await _send_html_email(to_email, subject, html)
-        logger.info("deposit_trigger_alert_email_sent", to=to_email, portfolio=portfolio_name, increment=deposit_increment)
+        logger.info(
+            "deposit_trigger_alert_email_sent", to=to_email, portfolio=portfolio_name, increment=deposit_increment,
+        )
     except Exception as exc:
         logger.error("deposit_trigger_alert_email_failed", to=to_email, error=str(exc))
         raise

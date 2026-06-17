@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -54,9 +54,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -79,14 +79,14 @@ def _make_alert_orm(user_id):
         max_trigger_count=1,
         trigger_count=0,
         triggered_at=None,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
     )
 
 
 class TestExchangeRateAlerts:
     def test_list_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/alerts/exchange-rate")
@@ -108,27 +108,27 @@ class TestExchangeRateAlerts:
         alert_orm = _make_alert_orm(user.id)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
 
-        from app.models.alert import ExchangeRateAlert
-        original_init = ExchangeRateAlert.__init__
 
         app = _setup_app(user, db)
         payload = {"target_rate": 1300.0, "direction": "BELOW", "max_trigger_count": 1}
 
         from unittest.mock import patch
-        with TestClient(app, raise_server_exceptions=False) as client:
-            with patch("app.api.v1.exchange_rate_alerts.ExchangeRateAlert") as MockAlert:
-                instance = MagicMock()
-                instance.id = alert_orm.id
-                instance.user_id = user.id
-                instance.target_rate = 1300.0
-                instance.direction = "BELOW"
-                instance.is_active = True
-                instance.max_trigger_count = 1
-                instance.trigger_count = 0
-                instance.triggered_at = None
-                instance.created_at = datetime.now(timezone.utc)
-                MockAlert.return_value = instance
-                resp = client.post("/api/v1/alerts/exchange-rate", json=payload)
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch("app.api.v1.exchange_rate_alerts.ExchangeRateAlert") as MockAlert,
+        ):
+            instance = MagicMock()
+            instance.id = alert_orm.id
+            instance.user_id = user.id
+            instance.target_rate = 1300.0
+            instance.direction = "BELOW"
+            instance.is_active = True
+            instance.max_trigger_count = 1
+            instance.trigger_count = 0
+            instance.triggered_at = None
+            instance.created_at = datetime.now(UTC)
+            MockAlert.return_value = instance
+            resp = client.post("/api/v1/alerts/exchange-rate", json=payload)
         assert resp.status_code in (200, 201)
 
     def test_create_validates_target_rate(self, override_settings):
@@ -223,7 +223,7 @@ class TestExchangeRateAlertExtended:
             max_trigger_count=1,
             trigger_count=3,
             triggered_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.scalar = AsyncMock(return_value=alert_orm)
         db.refresh = AsyncMock(side_effect=lambda obj: None)
@@ -246,7 +246,7 @@ class TestExchangeRateAlertExtended:
             max_trigger_count=1,
             trigger_count=0,
             triggered_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
         db.scalar = AsyncMock(return_value=alert_orm)
         app = _setup_app(user, db)
@@ -257,7 +257,7 @@ class TestExchangeRateAlertExtended:
 
 class TestRebalancingAlertExtended:
     def _make_rebalancing_alert_orm(self, user_id, portfolio_id):
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return SimpleNamespace(
             id=uuid.uuid4(),
             user_id=user_id,
@@ -299,7 +299,7 @@ class TestRebalancingAlertExtended:
         db = _make_mock_db()
         portfolio_id = uuid.uuid4()
         portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # First scalar returns portfolio, second returns None (no existing alert)
         db.scalar = AsyncMock(side_effect=[portfolio_orm, None])
 
@@ -398,7 +398,7 @@ class TestStockPriceAlertExtended:
             max_trigger_count=1,
             trigger_count=0,
             triggered_at=None,
-            created_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
         )
 
     def test_create_stock_price_alert_success(self, override_settings):
@@ -415,10 +415,12 @@ class TestStockPriceAlertExtended:
             "direction": "ABOVE",
         }
         from unittest.mock import patch
-        with TestClient(app, raise_server_exceptions=False) as client:
-            with patch("app.api.v1.stock_price_alerts.StockPriceAlert") as MockAlert:
-                MockAlert.return_value = alert_orm
-                resp = client.post("/api/v1/alerts/stock-price", json=payload)
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch("app.api.v1.stock_price_alerts.StockPriceAlert") as MockAlert,
+        ):
+            MockAlert.return_value = alert_orm
+            resp = client.post("/api/v1/alerts/stock-price", json=payload)
         assert resp.status_code in (200, 201)
 
     def test_create_stock_price_alert_invalid_price(self, override_settings):

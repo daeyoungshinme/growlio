@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
-from app.services.position_aggregator import query_latest_position_map
 from app.services.portfolio_optimizer import get_efficient_frontier
-from app.utils.cache_keys import RedisType, TTL_REBALANCING_STRATEGY
+from app.services.position_aggregator import query_latest_position_map
+from app.utils.cache_keys import TTL_REBALANCING_STRATEGY, RedisType
 
 logger = structlog.get_logger()
 _RISK_FREE_RATE = 3.0       # Sharpe 계산 기준 무위험 수익률 (%)

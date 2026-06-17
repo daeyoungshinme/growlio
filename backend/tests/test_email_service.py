@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-
 # ── _send_html_email 래퍼 테스트 ─────────────────────────────
 
 @pytest.mark.asyncio
@@ -63,6 +62,7 @@ async def test_send_exchange_rate_alert_success(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -93,6 +93,7 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -144,6 +145,7 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -206,6 +208,7 @@ async def test_send_monthly_report_email_includes_month(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -256,6 +259,7 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -302,6 +306,7 @@ async def test_send_goal_achievement_email_asset_type(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -332,6 +337,7 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -371,6 +377,7 @@ async def test_send_test_email_success(monkeypatch):
 
     with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -411,6 +418,7 @@ async def test_send_password_reset_email_includes_link(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -472,6 +480,7 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -511,6 +520,7 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -544,6 +554,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
 
     with patch("aiosmtplib.send", side_effect=fake_send):
         from importlib import reload
+
         import app.services.email_service as em
         reload(em)
 
@@ -578,16 +589,19 @@ async def test_send_exchange_rate_alert_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_exchange_rate_alert(
-                to_email="user@example.com",
-                target_rate=1300.0,
-                direction="BELOW",
-                current_rate=1295.0,
-            )
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_exchange_rate_alert(
+            to_email="user@example.com",
+            target_rate=1300.0,
+            direction="BELOW",
+            current_rate=1295.0,
+        )
 
 
 @pytest.mark.asyncio
@@ -597,17 +611,20 @@ async def test_send_rebalancing_alert_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_rebalancing_alert(
-                to_email="user@example.com",
-                portfolio_name="포트폴리오",
-                threshold_pct=5.0,
-                items_to_show=[],
-                drifting_count=0,
-            )
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_rebalancing_alert(
+            to_email="user@example.com",
+            portfolio_name="포트폴리오",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=0,
+        )
 
 
 @pytest.mark.asyncio
@@ -617,21 +634,24 @@ async def test_send_monthly_report_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_monthly_report_email(
-                to_email="user@example.com",
-                report_month="2026년 5월",
-                total_assets_krw=100_000_000.0,
-                mom_change_krw=None, mom_change_pct=None,
-                annual_return_pct=None, xirr_pct=None,
-                goal_amount=None, goal_achievement_pct=None,
-                annual_deposit_goal=None, deposit_achievement_pct=None,
-                annual_dividends_received=0.0,
-                asset_allocation=[],
-            )
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_monthly_report_email(
+            to_email="user@example.com",
+            report_month="2026년 5월",
+            total_assets_krw=100_000_000.0,
+            mom_change_krw=None, mom_change_pct=None,
+            annual_return_pct=None, xirr_pct=None,
+            goal_amount=None, goal_achievement_pct=None,
+            annual_deposit_goal=None, deposit_achievement_pct=None,
+            annual_dividends_received=0.0,
+            asset_allocation=[],
+        )
 
 
 @pytest.mark.asyncio
@@ -641,18 +661,21 @@ async def test_send_stock_price_alert_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_stock_price_alert(
-                to_email="user@example.com",
-                ticker="005930",
-                name="삼성전자",
-                target_price=80000.0,
-                current_price=79500.0,
-                direction="BELOW",
-            )
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_stock_price_alert(
+            to_email="user@example.com",
+            ticker="005930",
+            name="삼성전자",
+            target_price=80000.0,
+            current_price=79500.0,
+            direction="BELOW",
+        )
 
 
 @pytest.mark.asyncio
@@ -662,17 +685,20 @@ async def test_send_goal_achievement_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_goal_achievement_email(
-                to_email="user@example.com",
-                goal_type="ASSET",
-                goal_amount=1_000_000_000.0,
-                current_amount=1_050_000_000.0,
-                achievement_pct=105.0,
-            )
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_goal_achievement_email(
+            to_email="user@example.com",
+            goal_type="ASSET",
+            goal_amount=1_000_000_000.0,
+            current_amount=1_050_000_000.0,
+            achievement_pct=105.0,
+        )
 
 
 @pytest.mark.asyncio
@@ -682,11 +708,14 @@ async def test_send_test_email_exception_raised(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
-        with pytest.raises(Exception, match="smtp error"):
-            await em.send_test_email("user@example.com")
+    with (
+        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
+        pytest.raises(Exception, match="smtp error"),
+    ):
+        await em.send_test_email("user@example.com")
 
 
 @pytest.mark.asyncio
@@ -696,6 +725,7 @@ async def test_send_password_reset_exception_silenced(monkeypatch):
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
     from unittest.mock import AsyncMock
+
     import app.services.email_service as em
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):

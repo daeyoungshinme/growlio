@@ -1,7 +1,5 @@
 """종목 검색 및 환율 API 테스트 (GET /api/v1/stocks)."""
-import json
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -34,7 +32,10 @@ _USD_KRW_CACHED = 1350.0
 class TestSearchNaverUnit:
     @pytest.mark.asyncio
     async def test_search_naver_returns_results(self, override_settings):
-        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import MagicMock as MM
+        from unittest.mock import patch as p
+
         from app.api.v1.stocks import _search_naver
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -53,7 +54,10 @@ class TestSearchNaverUnit:
 
     @pytest.mark.asyncio
     async def test_search_naver_http_error_returns_empty(self, override_settings):
-        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import MagicMock as MM
+        from unittest.mock import patch as p
+
         from app.api.v1.stocks import _search_naver
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -66,7 +70,10 @@ class TestSearchNaverUnit:
 
     @pytest.mark.asyncio
     async def test_search_naver_limit_enforced(self, override_settings):
-        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import MagicMock as MM
+        from unittest.mock import patch as p
+
         from app.api.v1.stocks import _search_naver
         many_items = [{"code": f"00593{i}", "name": f"종목{i}", "typeCode": "KOSPI"} for i in range(10)]
         mock_resp = MM()
@@ -85,7 +92,10 @@ class TestSearchNaverUnit:
 class TestSearchYahooUnit:
     @pytest.mark.asyncio
     async def test_search_yahoo_returns_results(self, override_settings):
-        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import MagicMock as MM
+        from unittest.mock import patch as p
+
         from app.api.v1.stocks import _search_yahoo
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -104,7 +114,10 @@ class TestSearchYahooUnit:
 
     @pytest.mark.asyncio
     async def test_search_yahoo_http_error_returns_empty(self, override_settings):
-        from unittest.mock import AsyncMock as AM, MagicMock as MM, patch as p
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import MagicMock as MM
+        from unittest.mock import patch as p
+
         from app.api.v1.stocks import _search_yahoo
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()

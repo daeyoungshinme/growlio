@@ -25,12 +25,13 @@ def mock_redis_scheduler(monkeypatch):
 class TestWsPrices:
     def test_ws_closes_without_auth(self, override_settings):
         from app.main import app
-        with TestClient(app, raise_server_exceptions=False) as client:
-            with client.websocket_connect("/api/v1/ws/prices") as ws:
-                try:
-                    data = ws.receive_json()
-                except Exception:
-                    pass  # 연결이 닫힐 수 있음
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            client.websocket_connect("/api/v1/ws/prices") as ws,
+        ):
+            import contextlib
+            with contextlib.suppress(Exception):
+                ws.receive_json()
 
     def test_ws_closes_with_invalid_token(self, override_settings):
         from app.main import app
@@ -38,14 +39,13 @@ class TestWsPrices:
         with patch(
             "app.api.v1.ws_prices.verify_supabase_token",
             side_effect=ValueError("invalid token"),
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                try:
-                    with client.websocket_connect("/api/v1/ws/prices") as ws:
-                        ws.send_text(json.dumps({"type": "auth", "token": "bad_token"}))
-                        ws.receive_json()
-                except Exception:
-                    pass  # WebSocket closed as expected
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            try:
+                with client.websocket_connect("/api/v1/ws/prices") as ws:
+                    ws.send_text(json.dumps({"type": "auth", "token": "bad_token"}))
+                    ws.receive_json()
+            except Exception:
+                pass  # WebSocket closed as expected
 
     def test_ws_connects_with_valid_token(self, override_settings):
         from app.main import app
@@ -57,14 +57,15 @@ class TestWsPrices:
         async def mock_disconnect(ws_id):
             pass
 
-        with patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True):
-            with patch.object(manager, "connect", side_effect=mock_connect):
-                with patch.object(manager, "disconnect", side_effect=mock_disconnect):
-                    with TestClient(app, raise_server_exceptions=False) as client:
-                        with client.websocket_connect("/api/v1/ws/prices") as ws:
-                            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
-                            data = ws.receive_json()
-                            assert data["type"] == "connected"
+        with (
+            patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True),
+            patch.object(manager, "connect", side_effect=mock_connect),
+            patch.object(manager, "disconnect", side_effect=mock_disconnect),
+            TestClient(app, raise_server_exceptions=False) as client,client.websocket_connect("/api/v1/ws/prices") as ws
+        ):
+            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
+            data = ws.receive_json()
+            assert data["type"] == "connected"
 
     def test_ws_closes_with_wrong_message_type(self, override_settings):
         from app.main import app
@@ -89,18 +90,19 @@ class TestWsPrices:
         async def mock_disconnect(ws_id):
             pass
 
-        with patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True):
-            with patch.object(manager, "connect", side_effect=mock_connect):
-                with patch.object(manager, "subscribe", side_effect=mock_subscribe):
-                    with patch.object(manager, "disconnect", side_effect=mock_disconnect):
-                        with TestClient(app, raise_server_exceptions=False) as client:
-                            with client.websocket_connect("/api/v1/ws/prices") as ws:
-                                ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
-                                ws.receive_json()  # "connected"
-                                ws.send_text(json.dumps({"action": "subscribe", "tickers": ["005930", "AAPL"]}))
-                                ws.send_text(json.dumps({"action": "ping"}))
-                                data = ws.receive_json()
-                                assert data["type"] == "pong"
+        with (
+            patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True),
+            patch.object(manager, "connect", side_effect=mock_connect),
+            patch.object(manager, "subscribe", side_effect=mock_subscribe),
+            patch.object(manager, "disconnect", side_effect=mock_disconnect),
+            TestClient(app, raise_server_exceptions=False) as client,client.websocket_connect("/api/v1/ws/prices") as ws
+        ):
+            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
+            ws.receive_json()  # "connected"
+            ws.send_text(json.dumps({"action": "subscribe", "tickers": ["005930", "AAPL"]}))
+            ws.send_text(json.dumps({"action": "ping"}))
+            data = ws.receive_json()
+            assert data["type"] == "pong"
 
     def test_ws_invalid_json_after_connect(self, override_settings):
         from app.main import app
@@ -112,16 +114,17 @@ class TestWsPrices:
         async def mock_disconnect(ws_id):
             pass
 
-        with patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True):
-            with patch.object(manager, "connect", side_effect=mock_connect):
-                with patch.object(manager, "disconnect", side_effect=mock_disconnect):
-                    with TestClient(app, raise_server_exceptions=False) as client:
-                        with client.websocket_connect("/api/v1/ws/prices") as ws:
-                            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
-                            ws.receive_json()  # "connected"
-                            ws.send_text("this is not valid json {{{")
-                            data = ws.receive_json()
-                            assert data["type"] == "error"
+        with (
+            patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True),
+            patch.object(manager, "connect", side_effect=mock_connect),
+            patch.object(manager, "disconnect", side_effect=mock_disconnect),
+            TestClient(app, raise_server_exceptions=False) as client,client.websocket_connect("/api/v1/ws/prices") as ws
+        ):
+            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
+            ws.receive_json()  # "connected"
+            ws.send_text("this is not valid json {{{")
+            data = ws.receive_json()
+            assert data["type"] == "error"
 
     def test_ws_responds_to_ping(self, override_settings):
         from app.main import app
@@ -136,14 +139,15 @@ class TestWsPrices:
         async def mock_disconnect(ws_id):
             pass
 
-        with patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True):
-            with patch.object(manager, "connect", side_effect=mock_connect):
-                with patch.object(manager, "subscribe", side_effect=mock_subscribe):
-                    with patch.object(manager, "disconnect", side_effect=mock_disconnect):
-                        with TestClient(app, raise_server_exceptions=False) as client:
-                            with client.websocket_connect("/api/v1/ws/prices") as ws:
-                                ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
-                                ws.receive_json()  # "connected"
-                                ws.send_text(json.dumps({"action": "ping"}))
-                                data = ws.receive_json()
-                                assert data["type"] == "pong"
+        with (
+            patch("app.api.v1.ws_prices.verify_supabase_token", return_value=True),
+            patch.object(manager, "connect", side_effect=mock_connect),
+            patch.object(manager, "subscribe", side_effect=mock_subscribe),
+            patch.object(manager, "disconnect", side_effect=mock_disconnect),
+            TestClient(app, raise_server_exceptions=False) as client,client.websocket_connect("/api/v1/ws/prices") as ws
+        ):
+            ws.send_text(json.dumps({"type": "auth", "token": "valid_token"}))
+            ws.receive_json()  # "connected"
+            ws.send_text(json.dumps({"action": "ping"}))
+            data = ws.receive_json()
+            assert data["type"] == "pong"

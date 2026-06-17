@@ -49,9 +49,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -66,8 +66,8 @@ def _setup_app(user, db):
 
 class TestDartDisclosures:
     def test_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/dart/disclosures")
@@ -104,9 +104,11 @@ class TestDartDisclosures:
         db.execute = AsyncMock(return_value=result_stub)
 
         app = _setup_app(user, db)
-        with patch("app.api.v1.dart.decrypt", return_value="real-dart-key"):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/dart/disclosures")
+        with (
+            patch("app.api.v1.dart.decrypt", return_value="real-dart-key"),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/dart/disclosures")
         assert resp.status_code == 200
         assert resp.json() == []
 
@@ -124,12 +126,10 @@ class TestDartDisclosures:
         mock_disclosures = [{"title": "삼성전자 공시", "ticker": "005930"}]
 
         app = _setup_app(user, db)
-        with patch("app.api.v1.dart.decrypt", return_value="real-dart-key"):
-            with patch(
-                "app.api.v1.dart.fetch_disclosures_for_tickers",
-                AsyncMock(return_value=mock_disclosures),
-            ):
-                with TestClient(app, raise_server_exceptions=False) as client:
-                    resp = client.get("/api/v1/dart/disclosures")
+        with patch("app.api.v1.dart.decrypt", return_value="real-dart-key"), patch(
+            "app.api.v1.dart.fetch_disclosures_for_tickers",
+            AsyncMock(return_value=mock_disclosures),
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/dart/disclosures")
         assert resp.status_code == 200
         assert len(resp.json()) == 1

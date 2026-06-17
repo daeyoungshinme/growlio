@@ -22,7 +22,7 @@ class User(Base):
     )
 
     settings: Mapped["UserSettings"] = relationship(back_populates="user", uselist=False)
-    asset_accounts: Mapped[list["AssetAccount"]] = relationship(back_populates="user")  # type: ignore[name-defined]
+    asset_accounts: Mapped[list["AssetAccount"]] = relationship(back_populates="user")  # type: ignore[name-defined]  # noqa: F821
 
 
 class UserSettings(Base):

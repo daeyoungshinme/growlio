@@ -72,7 +72,7 @@ def fetch_yf_close_series(
     symbols: list[str],
     start: date,
     end: date,
-) -> dict[str, "pd.Series"]:
+) -> dict[str, pd.Series]:
     """지정 기간의 종목별 종가 Series를 반환한다.
 
     factor_service 모멘텀 계산(12-1M)에서 사용.

@@ -1,8 +1,6 @@
 """market_signal_service.py 순수 함수 단위 테스트."""
 from __future__ import annotations
 
-import pytest
-
 from app.services.market_signal_service import compute_composite_signal
 
 

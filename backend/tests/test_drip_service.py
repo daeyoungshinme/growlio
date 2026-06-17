@@ -1,8 +1,6 @@
 """dividend/drip_service.py 단위 테스트 — 순수 함수."""
 from __future__ import annotations
 
-import pytest
-
 from app.services.dividend.drip_service import (
     calc_monthly_optimization,
     simulate_drip,

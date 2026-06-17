@@ -21,7 +21,6 @@ from app.services.factor_service import (
     get_factor_analysis_for_portfolio,
 )
 
-
 # ── 팩터 점수 순수 함수 ──────────────────────────────────────
 
 class TestScoreValue:

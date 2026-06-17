@@ -51,9 +51,9 @@ def mock_redis_scheduler(monkeypatch):
 
 
 def _setup_app(user, db):
-    from app.main import app
     from app.api.deps import get_current_user
     from app.database import get_db
+    from app.main import app
 
     async def override_auth():
         return user
@@ -68,8 +68,8 @@ def _setup_app(user, db):
 
 class TestOpenBankingConnect:
     def test_connect_returns_401_without_auth(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
+        from app.main import app
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/open-banking/connect")
@@ -82,18 +82,17 @@ class TestOpenBankingConnect:
         with patch(
             "app.api.v1.open_banking.get_authorize_url",
             return_value="https://openbanking.example.com/oauth",
-        ):
-            with TestClient(app, raise_server_exceptions=False) as client:
-                resp = client.get("/api/v1/open-banking/connect")
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/open-banking/connect")
         assert resp.status_code == 200
         assert "authorize_url" in resp.json()
 
 
 class TestOpenBankingCallback:
     def test_callback_returns_400_for_invalid_state(self, override_settings):
-        from app.main import app
         from app.api.deps import get_current_user
         from app.database import get_db
+        from app.main import app
         db = _make_mock_db()
 
         async def override_db():

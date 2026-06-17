@@ -18,7 +18,7 @@ from sqlalchemy.orm import selectinload
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import RedisType, TTL_PORTFOLIO_OPTIMIZER
+from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, RedisType
 
 logger = structlog.get_logger()
 _MIN_POSITIONS = 2           # 최적화에 필요한 최소 종목 수

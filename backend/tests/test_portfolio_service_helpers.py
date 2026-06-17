@@ -12,7 +12,6 @@ from app.services.portfolio_service import (
     _calc_account_amounts,
 )
 
-
 # ── _calc_account_amounts ────────────────────────────────────────────────────
 
 

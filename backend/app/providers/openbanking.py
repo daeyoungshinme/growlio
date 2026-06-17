@@ -13,7 +13,7 @@ API 문서: https://developers.openbanking.or.kr
 from __future__ import annotations
 
 import urllib.parse
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -99,7 +99,7 @@ async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
     return await openbanking_circuit.call(_call)
 
 
-async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession") -> str:
+async def ensure_ob_token_fresh(settings_row: UserSettings, db: AsyncSession) -> str:
     """오픈뱅킹 토큰 만료 1시간 전에 자동 갱신 후 유효한 액세스 토큰 반환.
 
     DB에는 AES-256 암호화된 값이 저장되므로 읽기 시 decrypt, 쓰기 시 encrypt 적용.
@@ -112,9 +112,9 @@ async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession"
 
     expires_at = settings_row.ob_token_expires_at
     if expires_at and expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        expires_at = expires_at.replace(tzinfo=UTC)
 
-    needs_refresh = not expires_at or expires_at < datetime.now(timezone.utc) + timedelta(hours=1)
+    needs_refresh = not expires_at or expires_at < datetime.now(UTC) + timedelta(hours=1)
     if needs_refresh:
         try:
             token_data = await refresh_access_token(current_refresh)
@@ -122,7 +122,7 @@ async def ensure_ob_token_fresh(settings_row: "UserSettings", db: "AsyncSession"
             if "refresh_token" in token_data:
                 settings_row.ob_refresh_token = encrypt(token_data["refresh_token"])
             if "expires_in" in token_data:
-                settings_row.ob_token_expires_at = datetime.now(timezone.utc) + timedelta(
+                settings_row.ob_token_expires_at = datetime.now(UTC) + timedelta(
                     seconds=int(token_data["expires_in"])
                 )
             await db.commit()
@@ -144,7 +144,7 @@ async def get_account_balance(
 
     bank_tran_id: 이용기관코드(8자리) + 거래고유번호(9자리)
     """
-    tran_dtime = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    tran_dtime = datetime.now(UTC).strftime("%Y%m%d%H%M%S")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
     async def _call() -> dict[str, Any]:

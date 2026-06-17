@@ -1,10 +1,9 @@
 """yahoo_price.py 단위 테스트 (yfinance mocked)."""
 from __future__ import annotations
 
-import pandas as pd
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pandas as pd
 
 # ── _to_yahoo_symbol (순수 함수) ──────────────────────────────
 
@@ -146,9 +145,11 @@ class TestSyncYahooBatch:
         download_data = MagicMock()
         download_data.get.return_value = None  # close is None → triggers retry path
 
-        with patch("yfinance.download", return_value=download_data):
-            with patch("time.sleep"):  # suppress actual sleeps
-                result = _sync_yahoo_batch([("AAPL", "NASDAQ")])
+        with (
+            patch("yfinance.download", return_value=download_data),
+            patch("time.sleep"),  # suppress actual sleeps
+        ):
+            result = _sync_yahoo_batch([("AAPL", "NASDAQ")])
 
         assert result == {}
 
@@ -183,9 +184,9 @@ class TestSyncCalcReturn:
         assert result is None
 
     def test_returns_dict_on_valid_hist(self, override_settings):
+        from datetime import date
+
         from app.services.yahoo_price import _sync_calc_return
-        import numpy as np
-        from datetime import date, timedelta
 
         dates = pd.date_range(
             end=date.today().isoformat(), periods=300, freq="B", tz="UTC"

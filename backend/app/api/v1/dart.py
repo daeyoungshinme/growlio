@@ -6,8 +6,8 @@ import contextlib
 import json
 
 import structlog
-from redis.exceptions import RedisError
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

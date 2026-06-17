@@ -120,7 +120,7 @@ async def fetch_prices_batch(
                 for ticker, market in missing
             ]
             results = await asyncio.gather(*fallback_tasks, return_exceptions=True)
-            for (ticker, _), result in zip(missing, results):
+            for (ticker, _), result in zip(missing, results, strict=False):
                 if isinstance(result, (int, float)) and result > 0:
                     price_map[ticker] = float(result)
 
@@ -166,7 +166,7 @@ async def get_historical_returns(
     raw = await asyncio.gather(*tasks, return_exceptions=True)
 
     return_map: dict[tuple[str, str], dict] = {}
-    for (ticker, market), res in zip(tickers, raw):
+    for (ticker, market), res in zip(tickers, raw, strict=False):
         if isinstance(res, dict):
             return_map[(ticker, market)] = res
 
@@ -185,7 +185,9 @@ async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAcc
     )
 
 
-async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType) -> float | None:
+async def _fetch_fallback(
+    account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType
+) -> float | None:
     try:
         price = await _price_via_kis(account, ticker, market, db, redis)
         if price:
@@ -195,7 +197,9 @@ async def _fetch_fallback(account: AssetAccount, ticker: str, market: str, db: A
     return None
 
 
-async def _price_via_kis(account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType) -> float | None:
+async def _price_via_kis(
+    account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType
+) -> float | None:
     from app.kis.auth import get_access_token
 
     app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]

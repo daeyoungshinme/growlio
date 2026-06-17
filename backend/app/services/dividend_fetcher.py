@@ -39,6 +39,176 @@ from app.utils.circuit_breaker import fdr_circuit, naver_circuit
 logger = structlog.get_logger()
 
 
+# ── 개별 소스 fetcher (try/except 캡슐화) ────────────────────────
+
+
+async def _try_naver(ticker: str, is_etf: bool, loop: asyncio.AbstractEventLoop) -> dict:
+    """Naver Finance 조회. 실패 시 빈 결과 반환."""
+    fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
+    try:
+        return await naver_circuit.call(loop.run_in_executor, None, partial(fn, ticker))
+    except Exception as e:
+        logger.warning("naver_dividend_circuit_skipped", ticker=ticker, error=str(e))
+        return {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+
+
+async def _try_kis_etf(ticker: str, kis_creds: dict) -> dict:
+    """KIS ETF 전용 배당 조회. 실패 시 빈 결과 반환."""
+    try:
+        return await get_domestic_etf_dividend_info(
+            app_key=kis_creds["app_key"],
+            app_secret=kis_creds["app_secret"],
+            access_token=kis_creds["access_token"],
+            ticker=ticker,
+            is_mock=kis_creds["is_mock"],
+        )
+    except Exception as e:
+        logger.warning("kis_etf_dividend_fallback_failed", ticker=ticker, error=str(e))
+        return {"dps": 0, "dividend_yield": 0}
+
+
+async def _try_fdr(ticker: str, loop: asyncio.AbstractEventLoop) -> dict:
+    """FinanceDataReader ETF 배당 조회. 실패 시 빈 결과 반환."""
+    try:
+        return await fdr_circuit.call(
+            loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)
+        )
+    except Exception as e:
+        logger.warning("fdr_dividend_circuit_skipped", ticker=ticker, error=str(e))
+        return {"dps": 0, "dividend_yield": 0}
+
+
+async def _try_kis_general(ticker: str, kis_creds: dict) -> dict:
+    """KIS 일반주식 배당 조회. 실패 시 빈 결과 반환."""
+    try:
+        return await get_domestic_dividend_info(
+            app_key=kis_creds["app_key"],
+            app_secret=kis_creds["app_secret"],
+            access_token=kis_creds["access_token"],
+            ticker=ticker,
+            is_mock=kis_creds["is_mock"],
+        )
+    except Exception as e:
+        logger.warning("kis_dividend_fallback_failed", ticker=ticker, error=str(e))
+        return {"dps": 0, "dividend_yield": 0}
+
+
+def _merge_source(src: dict, dps: float, yield_decimal: float) -> tuple[float, float]:
+    """소스 결과를 현재값에 병합. 기존값이 0일 때만 덮어쓴다."""
+    new_dps = src["dps"] if src.get("dps", 0) > 0 and dps == 0.0 else dps
+    new_yield = src["dividend_yield"] if src.get("dividend_yield", 0) > 0 and yield_decimal == 0.0 else yield_decimal
+    return new_dps, new_yield
+
+
+# ── 국내 종목 fallback 체인 ──────────────────────────────────────
+
+
+async def _fetch_dart_and_static(
+    ticker: str,
+    market: str,
+    dart_key: str,
+    dps: float,
+    yield_decimal: float,
+) -> tuple[float, float]:
+    """DART 조회 및 정적 폴백 — 마지막 수단."""
+    if yield_decimal == 0.0:
+        dart = await fetch_dart_dividend(ticker, api_key=dart_key)
+        if dart:
+            yield_decimal = dart["dividend_yield"]
+            if dps == 0.0:
+                dps = dart["dps"]
+    if dps == 0.0 and yield_decimal == 0.0:
+        known_info = KNOWN_DIVIDEND_INFO.get((ticker, market.upper()))
+        if known_info:
+            dps, yield_decimal = known_info
+            logger.info("known_dividend_info_used", ticker=ticker, market=market)
+    return dps, yield_decimal
+
+
+async def _fetch_korean_fallbacks(
+    ticker: str,
+    market: str,
+    is_etf: bool,
+    loop: asyncio.AbstractEventLoop,
+    dps: float,
+    yield_decimal: float,
+    kis_creds: dict | None,
+    dart_key: str,
+) -> tuple[float, float]:
+    """국내 종목 fallback 체인: KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적."""
+    if is_etf and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
+        prev_dps = dps
+        dps, yield_decimal = _merge_source(await _try_kis_etf(ticker, kis_creds), dps, yield_decimal)
+        if dps != prev_dps:
+            logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
+
+    if dps == 0.0 or yield_decimal == 0.0:
+        pykrx = await loop.run_in_executor(None, partial(sync_pykrx_etf_dividend_info, ticker))
+        dps, yield_decimal = _merge_source(pykrx, dps, yield_decimal)
+
+    if is_etf and (dps == 0.0 or yield_decimal == 0.0):
+        dps, yield_decimal = _merge_source(await _try_fdr(ticker, loop), dps, yield_decimal)
+
+    if (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
+        prev_dps = dps
+        dps, yield_decimal = _merge_source(await _try_kis_general(ticker, kis_creds), dps, yield_decimal)
+        if dps != prev_dps:
+            logger.info("kis_dividend_fallback_used", ticker=ticker)
+
+    return await _fetch_dart_and_static(ticker, market, dart_key, dps, yield_decimal)
+
+
+# ── 네트워크 소스 체인 (sem 내부) ──────────────────────────────────
+
+
+async def _fetch_from_network(
+    ticker: str,
+    market: str,
+    is_korean: bool,
+    is_etf: bool,
+    yahoo_sym: str,
+    loop: asyncio.AbstractEventLoop,
+    dps: float,
+    yield_decimal: float,
+    months: list[int],
+    need_months_fetch: bool,
+    kis_creds: dict | None,
+    dart_key: str,
+) -> tuple[float, float, str | None, list[int], bool]:
+    """네트워크 소스 전체 체인. (yield_decimal, dps, ex_div_date, months, need_months_fetch) 반환."""
+    ex_dividend_date = None
+
+    if is_korean:
+        naver_info = await _try_naver(ticker, is_etf, loop)
+        dps, yield_decimal = _merge_source(naver_info, dps, yield_decimal)
+        if need_months_fetch and naver_info["dividend_months"]:
+            months = naver_info["dividend_months"]
+            need_months_fetch = False
+        if naver_info.get("dps", 0) > 0 or naver_info.get("dividend_yield", 0) > 0:
+            logger.debug("naver_dividend_used", ticker=ticker)
+
+    if dps == 0.0 or yield_decimal == 0.0:
+        info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+        prev_dps, prev_yield = dps, yield_decimal
+        dps, yield_decimal = _merge_source(info, dps, yield_decimal)
+        if dps != prev_dps or yield_decimal != prev_yield:
+            logger.debug("yahoo_dividend_used", ticker=ticker)
+        ex_dividend_date = info.get("ex_dividend_date")
+
+        if is_korean:
+            dps, yield_decimal = await _fetch_korean_fallbacks(
+                ticker, market, is_etf, loop, dps, yield_decimal, kis_creds, dart_key
+            )
+
+        if need_months_fetch:
+            months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
+
+    return yield_decimal, dps, ex_dividend_date, months, need_months_fetch
+
+
+# ── 공개 API ────────────────────────────────────────────────────
+
+
 async def fetch_ticker_dividend_info(
     ticker: str,
     market: str,
@@ -68,12 +238,8 @@ async def fetch_ticker_dividend_info(
         need_months_fetch = False
     else:
         known = KNOWN_DIVIDEND_SCHEDULES.get((ticker, market.upper()))
-        if known is not None:
-            months = known
-            need_months_fetch = False
-        else:
-            months = []
-            need_months_fetch = True
+        months = known if known is not None else []
+        need_months_fetch = known is None
 
     months_cache_key = dividend_months_key(ticker, market)
     info_cache_key = dividend_info_key(ticker, market)
@@ -91,133 +257,27 @@ async def fetch_ticker_dividend_info(
     if cached_info:
         try:
             cached = json.loads(cached_info)
-            if dps == 0.0:
-                dps = cached["dps"]
-            if yield_decimal == 0.0:
-                yield_decimal = cached["yield_decimal"]
+            dps = cached["dps"] if dps == 0.0 else dps
+            yield_decimal = cached["yield_decimal"] if yield_decimal == 0.0 else yield_decimal
         except (json.JSONDecodeError, TypeError, KeyError):
             await redis.delete(info_cache_key)
 
-    # 캐시에서 모든 필요한 데이터를 확보한 경우 네트워크 소스 체인 생략
     if dps > 0 and yield_decimal > 0 and not need_months_fetch:
         return yield_decimal, dps, months, ex_dividend_date
 
     async with sem:
-        # 0순위: Naver Finance (국내 종목 전용, 인증 불필요)
-        if is_korean:
-            fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-            try:
-                naver_info = await naver_circuit.call(
-                    loop.run_in_executor, None, partial(fn, ticker)
-                )
-            except Exception as _naver_exc:
-                logger.warning("naver_dividend_circuit_skipped", ticker=ticker, error=str(_naver_exc))
-                naver_info = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
-            if naver_info["dps"] > 0 and dps == 0.0:
-                dps = naver_info["dps"]
-            if naver_info["dividend_yield"] > 0 and yield_decimal == 0.0:
-                yield_decimal = naver_info["dividend_yield"]
-            if need_months_fetch and naver_info["dividend_months"]:
-                months = naver_info["dividend_months"]
-                need_months_fetch = False
-            if naver_info["dps"] > 0 or naver_info["dividend_yield"] > 0:
-                logger.debug("naver_dividend_used", ticker=ticker)
-
-        if dps == 0.0 or yield_decimal == 0.0:
-            # 1순위: yfinance (국내/해외 공통)
-            info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
-            yahoo_contributed = False
-            if info["dividend_yield"] > 0 and yield_decimal == 0.0:
-                yield_decimal = info["dividend_yield"]
-                yahoo_contributed = True
-            if info["dps"] > 0 and dps == 0.0:
-                dps = info["dps"]
-                yahoo_contributed = True
-            if yahoo_contributed:
-                logger.debug("yahoo_dividend_used", ticker=ticker)
-            ex_dividend_date = info.get("ex_dividend_date")
-
-            # 2순위 (ETF): KIS ETF 전용 API (FHPET01010000) — 실시간 분배율
-            if is_korean and is_etf and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
-                try:
-                    kis_etf = await get_domestic_etf_dividend_info(
-                        app_key=kis_creds["app_key"],
-                        app_secret=kis_creds["app_secret"],
-                        access_token=kis_creds["access_token"],
-                        ticker=ticker,
-                        is_mock=kis_creds["is_mock"],
-                    )
-                    if kis_etf["dps"] > 0 and dps == 0.0:
-                        dps = kis_etf["dps"]
-                        logger.info("kis_etf_dividend_fallback_used", ticker=ticker)
-                    if kis_etf["dividend_yield"] > 0 and yield_decimal == 0.0:
-                        yield_decimal = kis_etf["dividend_yield"]
-                except Exception as e:
-                    logger.warning("kis_etf_dividend_fallback_failed", ticker=ticker, error=str(e))
-
-            # 3순위: pykrx (국내 — 연간 DPS 합산 방식)
-            if is_korean and (dps == 0.0 or yield_decimal == 0.0):
-                pykrx = await loop.run_in_executor(None, partial(sync_pykrx_etf_dividend_info, ticker))
-                if pykrx["dps"] > 0 and dps == 0.0:
-                    dps = pykrx["dps"]
-                if pykrx["dividend_yield"] > 0 and yield_decimal == 0.0:
-                    yield_decimal = pykrx["dividend_yield"]
-
-            # 3.5순위: FinanceDataReader ETF (국내 ETF — pykrx 실패 시 fallback)
-            if is_korean and is_etf and (dps == 0.0 or yield_decimal == 0.0):
-                try:
-                    fdr = await fdr_circuit.call(
-                        loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)
-                    )
-                except Exception as _fdr_exc:
-                    logger.warning("fdr_dividend_circuit_skipped", ticker=ticker, error=str(_fdr_exc))
-                    fdr = {"dps": 0, "dividend_yield": 0}
-                if fdr["dps"] > 0 and dps == 0.0:
-                    dps = fdr["dps"]
-                if fdr["dividend_yield"] > 0 and yield_decimal == 0.0:
-                    yield_decimal = fdr["dividend_yield"]
-
-            # 4순위: KIS API 일반주식 (ETF 아닌 종목 또는 위 소스 모두 실패 시)
-            if is_korean and (dps == 0.0 or yield_decimal == 0.0) and kis_creds:
-                try:
-                    kis_info = await get_domestic_dividend_info(
-                        app_key=kis_creds["app_key"],
-                        app_secret=kis_creds["app_secret"],
-                        access_token=kis_creds["access_token"],
-                        ticker=ticker,
-                        is_mock=kis_creds["is_mock"],
-                    )
-                    if kis_info["dps"] > 0 and dps == 0.0:
-                        dps = kis_info["dps"]
-                        logger.info("kis_dividend_fallback_used", ticker=ticker)
-                    if kis_info["dividend_yield"] > 0 and yield_decimal == 0.0:
-                        yield_decimal = kis_info["dividend_yield"]
-                except Exception as e:
-                    logger.warning("kis_dividend_fallback_failed", ticker=ticker, error=str(e))
-
-            # 5순위: DART (국내 종목이고 여전히 데이터 없을 때)
-            if is_korean and yield_decimal == 0.0:
-                dart = await fetch_dart_dividend(ticker, api_key=dart_key)
-                if dart:
-                    yield_decimal = dart["dividend_yield"]
-                    if dps == 0.0:
-                        dps = dart["dps"]
-
-            # 6순위: 정적 폴백 (위 소스 모두 실패 시)
-            if is_korean and dps == 0.0 and yield_decimal == 0.0:
-                known_info = KNOWN_DIVIDEND_INFO.get((ticker, market.upper()))
-                if known_info:
-                    dps, yield_decimal = known_info
-                    logger.info("known_dividend_info_used", ticker=ticker, market=market)
-
-            if need_months_fetch:
-                months = await loop.run_in_executor(None, partial(sync_fetch_dividend_months, yahoo_sym))
+        yield_decimal, dps, ex_dividend_date, months, need_months_fetch = await _fetch_from_network(
+            ticker, market, is_korean, is_etf, yahoo_sym, loop,
+            dps, yield_decimal, months, need_months_fetch, kis_creds, dart_key,
+        )
 
     if need_months_fetch:
         await redis.setex(months_cache_key, TTL_DIVIDEND_MONTHS, json.dumps(months))
 
     if dps > 0 or yield_decimal > 0:
-        await redis.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
+        await redis.setex(
+            info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal})
+        )
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 
