@@ -120,7 +120,7 @@ export const useAuthStore = create<AuthState>((set) => {
         email,
         password,
         options: {
-          emailRedirectTo: import.meta.env.VITE_REDIRECT_URL ?? "https://growlio-lovat.vercel.app",
+          emailRedirectTo: import.meta.env.VITE_REDIRECT_URL,
         },
       });
       if (error || !data.user) throw new Error(error?.message ?? "Registration failed");

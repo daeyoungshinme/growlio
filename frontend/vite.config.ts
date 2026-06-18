@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-const apiDomain = process.env.VITE_API_DOMAIN ?? "growlio-api.onrender.com";
+const apiDomain = process.env.VITE_API_DOMAIN ?? "localhost:8000";
 const apiBase = `^https://${apiDomain.replace(/\./g, "\\.")}`;
 const apiPattern = new RegExp(`${apiBase}/.*`);
 const dashboardPattern = new RegExp(`${apiBase}/api/v1/dashboard(\\?.*)?$`);

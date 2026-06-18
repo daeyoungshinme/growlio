@@ -1,3 +1,4 @@
+import hmac
 import re
 import time
 import uuid
@@ -250,7 +251,8 @@ async def health():
 async def metrics_endpoint(request: Request) -> Response:
     if settings.metrics_token:
         auth = request.headers.get("Authorization", "")
-        if auth != f"Bearer {settings.metrics_token}":
+        provided = auth.removeprefix("Bearer ").strip() if auth else ""
+        if not hmac.compare_digest(provided, settings.metrics_token):
             return JSONResponse(status_code=403, content={"detail": "Forbidden"})
     elif settings.app_env == "production":
         # 프로덕션에서 metrics_token 미설정 시 항상 차단
