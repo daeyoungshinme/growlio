@@ -87,7 +87,8 @@ async def list_exchange_rate_alerts(
     alerts_list = [AlertResponse.model_validate(a) for a in result.scalars().all()]
 
     if skip == 0 and limit == 50:
-        await set_cached_json(redis, cache_key, [a.model_dump(mode="json") for a in alerts_list], TTL_EXCHANGE_RATE_ALERTS)
+        payload = [a.model_dump(mode="json") for a in alerts_list]
+        await set_cached_json(redis, cache_key, payload, TTL_EXCHANGE_RATE_ALERTS)
     return alerts_list
 
 

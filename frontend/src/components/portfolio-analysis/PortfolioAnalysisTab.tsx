@@ -95,7 +95,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     const newIndex = currentIds.indexOf(over.id as string);
     const newOrder = arrayMove(currentIds, oldIndex, newIndex);
     setLocalOrder(newOrder);
-    reorderPortfolios(newOrder.map((id, i) => ({ id, sort_order: i }))).catch(() => {
+    void reorderPortfolios(newOrder.map((id, i) => ({ id, sort_order: i }))).catch(() => {
       setLocalOrder(currentIds);
       toast("순서 변경에 실패했습니다");
     });

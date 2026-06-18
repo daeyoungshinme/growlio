@@ -99,6 +99,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   );
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
     count: filtered.length,
     getScrollElement: () => tableContainerRef.current,

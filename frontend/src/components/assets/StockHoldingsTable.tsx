@@ -112,6 +112,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
   const mobileContainerRef = useRef<HTMLDivElement>(null);
   const useVirtualMobile = sorted.length >= MOBILE_CARD_VIRTUALIZE_THRESHOLD;
   const getMobileScrollElement = useCallback(() => mobileContainerRef.current, []);
+  // eslint-disable-next-line react-hooks/incompatible-library
   const mobileVirtualizer = useVirtualizer({
     count: sorted.length,
     getScrollElement: getMobileScrollElement,

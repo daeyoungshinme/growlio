@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
@@ -48,11 +48,13 @@ export function AnalysisPanel({
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
+  const [prevAnalysis, setPrevAnalysis] = useState(analysis);
   const [includeCash, setIncludeCash] = useState(false);
 
-  useEffect(() => {
+  if (prevAnalysis !== analysis) {
+    setPrevAnalysis(analysis);
     setIncludeCash(false);
-  }, [analysis]);
+  }
 
   const adjustedAnalysis = useMemo(() => {
     if (!analysis || !includeCash) return analysis;
