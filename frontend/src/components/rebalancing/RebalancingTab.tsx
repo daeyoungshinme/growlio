@@ -80,6 +80,10 @@ export default function RebalancingTab() {
         item.current_price_krw && item.current_price_krw > 0
           ? Math.round(newDiff / item.current_price_krw)
           : item.shares_to_trade;
+      const newTargetQty =
+        item.current_price_krw && item.current_price_krw > 0
+          ? Math.floor(newTarget / item.current_price_krw)
+          : item.target_qty;
       return {
         ...item,
         target_value_krw: newTarget,
@@ -87,6 +91,7 @@ export default function RebalancingTab() {
         weight_diff_pct: item.target_weight_pct - newCurrentPct,
         diff_krw: newDiff,
         shares_to_trade: newShares,
+        target_qty: newTargetQty,
       };
     });
     return { ...analysis, base_value_krw: cashBase, items };
@@ -169,10 +174,10 @@ export default function RebalancingTab() {
     setAnalyzing(true);
     setAnalysisError(null);
     setAnalysis(null);
-    setIncludeCash(false);
     try {
       const result = await analyzePortfolio(portfolioId);
       setAnalysis(result);
+      setIncludeCash(result.base_type === "STOCK_ONLY" && (result.available_cash_krw ?? 0) > 0);
     } catch {
       setAnalysisError("분석 중 오류가 발생했습니다.");
     } finally {

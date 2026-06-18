@@ -319,12 +319,18 @@ export default function RebalancingTable({
 
       {/* 요약 카드 */}
       {(() => {
+        function itemActualKrw(item: RebalancingItem): number {
+          if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
+            return Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw;
+          }
+          return Math.abs(item.diff_krw);
+        }
         const totalBuySummary = analysis.items
           .filter((i) => i.diff_krw > 0)
-          .reduce((s, i) => s + i.diff_krw, 0);
-        const totalSellSummary = Math.abs(
-          analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
-        );
+          .reduce((s, i) => s + itemActualKrw(i), 0);
+        const totalSellSummary = analysis.items
+          .filter((i) => i.diff_krw < 0)
+          .reduce((s, i) => s + itemActualKrw(i), 0);
         const cashAvailable = analysis.available_cash_krw ?? 0;
         const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
         const cashAfterCls =
@@ -360,6 +366,11 @@ export default function RebalancingTable({
                 기준 자산 = 주식 {fmtKrw(analysis.base_value_krw - cashAvailable)} + 예수금{" "}
                 {fmtKrw(cashAvailable)} = {fmtKrw(analysis.base_value_krw)} 기준으로 매수/매도 수량이
                 계산됩니다.
+              </div>
+            )}
+            {analysis.base_type === "TOTAL_ASSETS" && cashAvailable > 0 && (
+              <div className="text-xs text-gray-500 px-1">
+                전체 자산 기준 — 예수금 {fmtKrw(cashAvailable)}이 목표 비중 배분에 포함됨
               </div>
             )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
