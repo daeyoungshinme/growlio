@@ -189,14 +189,14 @@ class TestExchangeRate:
         mock_redis = AsyncMock()
         mock_redis.get = AsyncMock(return_value=None)
         mock_redis.set = AsyncMock()
-        with (
-            patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
-            patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
-            patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0.0)
-            resp = client.get("/api/v1/stocks/exchange-rate")
+        with TestClient(app, raise_server_exceptions=False) as client:
+            with (
+                patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
+                patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
+                patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
+            ):
+                mock_loop.return_value.run_in_executor = AsyncMock(return_value=0.0)
+                resp = client.get("/api/v1/stocks/exchange-rate")
         assert resp.status_code in (200, 500)
 
 
@@ -204,12 +204,10 @@ class TestStockPrice:
     def test_returns_200_for_domestic_ticker(self, override_settings):
         from app.main import app
 
-        with (
-            patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=75000.0)
-            resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
+        with TestClient(app, raise_server_exceptions=False) as client:
+            with patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop:
+                mock_loop.return_value.run_in_executor = AsyncMock(return_value=75000.0)
+                resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
         assert resp.status_code == 200
         data = resp.json()
         assert "price_krw" in data
