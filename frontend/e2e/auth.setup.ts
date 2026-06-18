@@ -5,10 +5,11 @@
  * playwright.config.ts의 setup project에서 실행됩니다.
  */
 import { test as setup, expect } from "@playwright/test";
+import { fileURLToPath } from "url";
 import path from "path";
 import fs from "fs";
 
-export const AUTH_FILE = path.join(__dirname, ".auth/user.json");
+export const AUTH_FILE = fileURLToPath(new URL(".auth/user.json", import.meta.url));
 
 setup("인증 상태 저장", async ({ page }) => {
   const email = process.env.TEST_USER_EMAIL;
