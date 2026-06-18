@@ -298,7 +298,8 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
         if isinstance(item, Exception):
             logger.warning("dividend_estimate_fetch_failed", error=str(item))
             continue
-        assert isinstance(item, dict)
+        if not isinstance(item, dict):
+            continue
         em_key: tuple[str, str] = (item["ticker"], item.get("market", ""))
         if em_key not in estimated_map:
             estimated_map[em_key] = item
@@ -402,7 +403,8 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
         if isinstance(item, Exception):
             logger.warning("position_yield_fetch_failed", error=str(item))
             continue
-        assert isinstance(item, dict)
+        if not isinstance(item, dict):
+            continue
         results.append(item)
     return results
 

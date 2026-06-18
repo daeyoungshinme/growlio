@@ -338,7 +338,7 @@ async def delete_account_kis_credentials(
         current_user.id,
         db,
         app_key_attr="kis_app_key",
-        app_secret_attr="kis_app_secret",
+        app_secret_attr="kis_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
         token_model=KisToken,
         redis_key=f"kis_token:account:{account_id}",
     )
@@ -358,7 +358,7 @@ async def delete_account_kiwoom_credentials(
         current_user.id,
         db,
         app_key_attr="kiwoom_app_key",
-        app_secret_attr="kiwoom_app_secret",
+        app_secret_attr="kiwoom_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
         token_model=KiwoomToken,
         redis_key=f"kiwoom_token:account:{account_id}",
     )

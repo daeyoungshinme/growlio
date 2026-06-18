@@ -152,8 +152,8 @@ async def get_overseas_balance(
                     "CTX_AREA_NK200": "",
                 },
             )
-        except Exception:
-            continue  # 한 거래소 실패해도 나머지 거래소 조회 계속
+        except Exception:  # nosec B112 — 한 거래소 실패해도 나머지 거래소 조회 계속
+            continue
 
         for item in data.get("output1", []):
             qty = int(item.get("ovrs_cblc_qty", 0))

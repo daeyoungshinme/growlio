@@ -56,10 +56,8 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
             "is_configured": False,
         }
 
-    assert pmt is not None
-    assert annual_return_pct is not None
-    assert goal_amount is not None
-    assert start_dt is not None
+    if pmt is None or annual_return_pct is None or goal_amount is None or start_dt is None:
+        raise ValueError("DCA 목표 설정값이 누락되었습니다.")
 
     if isinstance(start_dt, datetime):
         start_date: date = start_dt.date()

@@ -119,8 +119,8 @@ async def get_portfolio_risk_metrics(
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:
-            pass  # Redis 오류 무시 — DB에서 재계산
+        except Exception:  # nosec B110 — Redis 오류 무시, DB에서 재계산
+            pass
 
     # 최신 스냅샷 포지션 조회
     pos_map = await query_latest_position_map(user_id, db)
@@ -223,8 +223,8 @@ async def get_currency_exposure(
             cached = await redis.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except Exception:
-            pass  # Redis 오류 무시 — DB에서 재계산
+        except Exception:  # nosec B110 — Redis 오류 무시, DB에서 재계산
+            pass
 
     subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(

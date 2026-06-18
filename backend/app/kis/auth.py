@@ -12,7 +12,7 @@ from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
 
-REDIS_ACCOUNT_TOKEN_KEY = "kis_token:account:{account_id}"
+REDIS_ACCOUNT_TOKEN_KEY = "kis_token:account:{account_id}"  # nosec B105 — Redis 키 템플릿
 
 
 async def get_access_token(

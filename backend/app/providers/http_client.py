@@ -27,7 +27,7 @@ def _get_client(ssl_verify: bool) -> httpx.AsyncClient:
         return _ssl_client
     else:
         if _nossl_client is None:
-            _nossl_client = httpx.AsyncClient(timeout=30.0, verify=False, limits=_LIMITS)
+            _nossl_client = httpx.AsyncClient(timeout=30.0, verify=False, limits=_LIMITS)  # nosec B501 — 특정 증권사 API SSL 미지원
         return _nossl_client
 
 
@@ -153,14 +153,14 @@ async def broker_request(
                     if attempt >= retries - 1:
                         raise MaxRetriesExceededError(f"{log_prefix} API 속도 제한 초과 (재시도 {retries}회)") from e
                     # 기저 2s 추가 — KIS rate limit 윈도우 확실히 벗어나도록
-                    wait = 2.0 + (2**attempt) + (random.uniform(0, 1) if is_api_rate_limit else 0)
+                    wait = 2.0 + (2**attempt) + (random.uniform(0, 1) if is_api_rate_limit else 0)  # nosec B311 — jitter용, 보안 목적 아님
                     label = "api_rate_limit" if is_api_rate_limit else "rate_limit"
                     logger.warning(f"{log_prefix}_{label}", attempt=attempt, wait=round(wait, 2), path=path)
                     await asyncio.sleep(wait)
                 elif 400 <= e.response.status_code < 500:
                     raise
                 elif attempt < retries - 1:
-                    await asyncio.sleep(1 + random.uniform(0, 0.5))
+                    await asyncio.sleep(1 + random.uniform(0, 0.5))  # nosec B311 — jitter용, 보안 목적 아님
                 else:
                     raise
             except httpx.RequestError as e:

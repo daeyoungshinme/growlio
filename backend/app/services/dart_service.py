@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 import zipfile
 from datetime import datetime
 
