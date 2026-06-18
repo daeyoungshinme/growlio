@@ -5,7 +5,20 @@ from datetime import UTC, date, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
+
+# GitHub Actions는 TTY가 감지되어 structlog가 Rich 렌더러를 기본 활성화함.
+# 복잡한 traceback(JWT 오류 체인 등)을 Rich가 렌더링하면 30초+ hang → timeout.
+# plain_traceback으로 교체해 모든 테스트에서 이 hang을 방지.
+structlog.configure(
+    processors=[
+        structlog.dev.ConsoleRenderer(
+            exception_formatter=structlog.dev.plain_traceback,
+        )
+    ],
+    logger_factory=structlog.PrintLoggerFactory(),
+)
 
 # ── 테스트용 설정 오버라이드 ─────────────────────────────────
 
