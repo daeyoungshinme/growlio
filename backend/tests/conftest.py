@@ -238,6 +238,7 @@ def _mock_scheduler(monkeypatch):
 
     monkeypatch.setattr(sched.scheduler, "start", lambda: None)
     monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
+    monkeypatch.setattr("app.main.init_scheduler", lambda: None)
 
 
 @pytest.fixture
