@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 import uuid
 from dataclasses import asdict, dataclass
 from enum import StrEnum
 
 import structlog
-from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,7 +17,7 @@ from app.services.tax_service import (
     _get_rates,
     get_overseas_positions_detail,
 )
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import RedisType, get_cached_json, invalidate_user_caches, set_cached_json
 
 logger = structlog.get_logger()
 
@@ -71,11 +68,10 @@ async def generate_insights(
     force_refresh: bool = False,
 ) -> list[dict]:
     """모든 체커를 병렬 실행하고 인사이트 목록을 반환한다 (Redis 1h 캐시)."""
-    if redis and not force_refresh:
-        with contextlib.suppress(RedisError):
-            cached = await redis.get(insights_key(user_id))
-            if cached:
-                return json.loads(cached)
+    if not force_refresh:
+        cached = await get_cached_json(redis, insights_key(user_id))
+        if cached is not None:
+            return cached
 
     try:
         dashboard = await get_dashboard_summary(user_id, db, redis)
@@ -102,10 +98,7 @@ async def generate_insights(
 
     data = [asdict(i) for i in insights]
 
-    if redis:
-        with contextlib.suppress(RedisError):
-            await redis.setex(insights_key(user_id), TTL_INSIGHTS, json.dumps(data))
-
+    await set_cached_json(redis, insights_key(user_id), data, TTL_INSIGHTS)
     return data
 
 
@@ -328,7 +321,4 @@ async def _check_tax_loss_harvest(
 
 
 async def invalidate_insights_cache(user_id: uuid.UUID, redis: RedisType) -> None:
-    if redis is None:
-        return
-    with contextlib.suppress(RedisError):
-        await redis.delete(insights_key(user_id))
+    await invalidate_user_caches(redis, insights_key(user_id))

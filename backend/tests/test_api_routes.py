@@ -21,6 +21,7 @@ def mock_redis_and_scheduler(monkeypatch):
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
+    mock_redis.get = AsyncMock(return_value=None)
 
     # redis_client 전역 변수를 mock으로 사전 교체 → get_redis()가 바로 반환
     monkeypatch.setattr(redis_mod, "redis_client", mock_redis)

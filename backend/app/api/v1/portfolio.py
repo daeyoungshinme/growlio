@@ -26,6 +26,7 @@ from app.services.risk_service import (
     get_currency_exposure,
     get_portfolio_risk_metrics,
 )
+from app.utils.cache_keys import TTL_PORTFOLIO_SUMMARY, get_cached_json, portfolio_summary_key, set_cached_json
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -64,6 +65,12 @@ async def portfolio_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """KIS 등록 계좌 전체 실시간 포트폴리오 집계."""
+    redis = await get_redis()
+    cache_key = portfolio_summary_key(current_user.id)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
+
     kis_creds = await get_kis_user_credentials(current_user.id, db)
     if not kis_creds:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="KIS 설정이 필요합니다")
@@ -115,7 +122,7 @@ async def portfolio_summary(
     if merged_domestic["invested_krw"] > 0:
         stock_return_pct = (merged_domestic["total_value_krw"] / merged_domestic["invested_krw"] - 1) * 100
 
-    return {
+    result = {
         "domestic": merged_domestic,
         "overseas": merged_overseas,
         "total_value_krw": merged_domestic["total_value_krw"],
@@ -125,6 +132,8 @@ async def portfolio_summary(
         "is_mock": is_mock,
         "accounts": account_details,
     }
+    await set_cached_json(redis, cache_key, result, TTL_PORTFOLIO_SUMMARY)
+    return result
 
 
 # ---------------------------------------------------------------------------

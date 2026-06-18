@@ -41,6 +41,7 @@ def mock_redis_scheduler(monkeypatch):
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
     mock_redis.aclose = AsyncMock()
+    mock_redis.get = AsyncMock(return_value=None)
     monkeypatch.setattr(rc, "redis_client", mock_redis)
     monkeypatch.setattr(sched.scheduler, "start", lambda: None)
     monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)

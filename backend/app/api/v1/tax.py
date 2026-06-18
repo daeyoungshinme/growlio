@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.user import User
+from app.redis_client import get_redis
 from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
+from app.utils.cache_keys import TTL_TAX_OVERSEAS, get_cached_json, set_cached_json, tax_overseas_key
 
 router = APIRouter(prefix="/tax", tags=["tax"])
 
@@ -20,7 +22,14 @@ async def overseas_positions_tax(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
-    return await get_overseas_positions_detail(current_user.id, db)
+    redis = await get_redis()
+    cache_key = tax_overseas_key(current_user.id)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
+    result = await get_overseas_positions_detail(current_user.id, db)
+    await set_cached_json(redis, cache_key, result, TTL_TAX_OVERSEAS)
+    return result
 
 
 @router.get("/summary")

@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
 import uuid
 
-from redis.exceptions import RedisError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.utils.cache_keys import TTL_MONTHLY_TREND, RedisType, monthly_trend_key
+from app.utils.cache_keys import TTL_MONTHLY_TREND, RedisType, get_cached_json, monthly_trend_key, set_cached_json
 
 
 async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> list[dict]:
     """최근 12개월 월별 총자산 추이. is_active/include_in_total 계좌만 집계."""
     cache_key = monthly_trend_key(user_id)
-    if redis:
-        with contextlib.suppress(RedisError):
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     result = await db.execute(
         text("""
@@ -49,8 +44,5 @@ async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis: RedisTy
     )
     data = [{"month": str(row.month), "total_krw": float(row.total_krw)} for row in result]
 
-    if redis:
-        with contextlib.suppress(RedisError):
-            await redis.set(cache_key, json.dumps(data), ex=TTL_MONTHLY_TREND)
-
+    await set_cached_json(redis, cache_key, data, TTL_MONTHLY_TREND)
     return data

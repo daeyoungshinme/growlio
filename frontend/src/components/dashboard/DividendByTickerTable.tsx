@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Pencil } from "lucide-react";
 import {
@@ -46,7 +46,7 @@ interface EditTarget {
   isManual: boolean;
 }
 
-export default function DividendByTickerTable({ items, isLoading }: Props) {
+const DividendByTickerTable = memo(function DividendByTickerTable({ items, isLoading }: Props) {
   const qc = useQueryClient();
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const totalEstimated = items.reduce((s, d) => s + d.estimated_annual_krw, 0);
@@ -219,4 +219,6 @@ export default function DividendByTickerTable({ items, isLoading }: Props) {
       )}
     </div>
   );
-}
+});
+
+export default DividendByTickerTable;

@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { X, CheckCircle, XCircle, Lock } from "lucide-react";
+import { CheckCircle, XCircle, Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import Modal from "@/components/common/Modal";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import { verifyKisCredentials } from "@/api/assets";
@@ -150,26 +151,13 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
 
   return (
     <ErrorBoundary variant="section">
-      <div
-        className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4"
-        onClick={onClose}
+      <Modal
+        onClose={onClose}
+        title={isEdit ? "증권계좌 수정" : "증권사 계좌 등록"}
+        size="md"
+        closeOnBackdrop
       >
-        <div
-          className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-gray-50">
-              {isEdit ? "증권계좌 수정" : "증권사 계좌 등록"}
-            </h2>
-            <button
-              onClick={onClose}
-              aria-label="닫기"
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X size={18} aria-hidden="true" />
-            </button>
-          </div>
+        <div className="overflow-y-auto flex-1 px-6 py-4">
           <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">
             {isEdit
               ? "계좌 정보를 수정합니다. 계좌번호·유형·데이터 소스는 변경할 수 없습니다."
@@ -594,23 +582,23 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 mt-5">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isEdit ? editDisabled : createDisabled}
-              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {isLoading ? "저장 중..." : isEdit ? "저장" : "등록"}
-            </button>
-          </div>
         </div>
-      </div>
+        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            취소
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isEdit ? editDisabled : createDisabled}
+            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          >
+            {isLoading ? "저장 중..." : isEdit ? "저장" : "등록"}
+          </button>
+        </div>
+      </Modal>
     </ErrorBoundary>
   );
 }

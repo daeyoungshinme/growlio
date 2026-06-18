@@ -178,6 +178,7 @@ class TestGetMonthlyTrend:
 
         user_id = uuid.uuid4()
         mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.setex = AsyncMock()
 
         # DB 결과 mock
         row = SimpleNamespace(month=date(2025, 1, 1), total_krw=10_000_000.0)
@@ -188,7 +189,7 @@ class TestGetMonthlyTrend:
         result = await _get_monthly_trend(user_id, mock_db, mock_redis)
 
         mock_db.execute.assert_called_once()
-        mock_redis.set.assert_called_once()
+        mock_redis.setex.assert_called_once()
         assert len(result) == 1
         assert result[0]["total_krw"] == 10_000_000.0
 

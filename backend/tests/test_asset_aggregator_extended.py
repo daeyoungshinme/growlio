@@ -276,13 +276,13 @@ class TestGetMonthlyTrend:
 
         redis = AsyncMock()
         redis.get = AsyncMock(return_value=None)
-        redis.set = AsyncMock()
+        redis.setex = AsyncMock()
 
         trend = await _get_monthly_trend(uuid.uuid4(), mock_db, redis=redis)
 
         assert len(trend) == 1
         assert trend[0]["total_krw"] == 5_000_000.0
-        redis.set.assert_called_once()
+        redis.setex.assert_called_once()
 
 
 # ── get_dashboard_summary (all sub-functions mocked) ─────────

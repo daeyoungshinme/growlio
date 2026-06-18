@@ -250,8 +250,10 @@ class TestGetFactorAnalysisForPortfolio:
 
     @pytest.mark.asyncio
     async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
+        from redis.exceptions import RedisError
+
         redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=Exception("redis unavailable"))
+        redis.get = AsyncMock(side_effect=RedisError("redis unavailable"))
 
         item = SimpleNamespace(ticker="005930", market="KOSPI", name="삼성전자", weight=100)
         portfolio = MagicMock()
@@ -335,8 +337,10 @@ class TestGetFactorAnalysis:
 
     @pytest.mark.asyncio
     async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
+        from redis.exceptions import RedisError
+
         redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=Exception("redis error"))
+        redis.get = AsyncMock(side_effect=RedisError("redis error"))
 
         exec_result = MagicMock()
         exec_result.all.return_value = []

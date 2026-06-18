@@ -7,8 +7,6 @@ Redis 1시간 캐시를 사용한다.
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 import math
 import uuid
 
@@ -21,7 +19,7 @@ from app.schemas.service_dtypes import FactorData
 from app.services.market_data_fetcher import fetch_yf_close_series, fetch_yf_info
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_FACTOR_ANALYSIS, RedisType
+from app.utils.cache_keys import TTL_FACTOR_ANALYSIS, RedisType, get_cached_json, set_cached_json
 
 logger = structlog.get_logger()
 
@@ -170,13 +168,9 @@ async def get_factor_analysis_for_portfolio(
 
     cache_key = f"factor_analysis:portfolio:{portfolio_id}"
 
-    if redis:
-        try:
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
-        except Exception as e:
-            logger.debug("factor_cache_read_error", cache_key=cache_key, error=str(e))
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     portfolio = await db.scalar(
         select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
@@ -206,10 +200,7 @@ async def get_factor_analysis_for_portfolio(
         "note": "yfinance 기반 팩터 점수 (0-100, 높을수록 해당 팩터 노출도 높음)",
     }
 
-    if redis:
-        with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_FACTOR_ANALYSIS, json.dumps(result_data))
-
+    await set_cached_json(redis, cache_key, result_data, TTL_FACTOR_ANALYSIS)
     return result_data
 
 
@@ -221,13 +212,9 @@ async def get_factor_analysis(
     """포트폴리오 팩터 노출도 분석 반환."""
     cache_key = f"factor_analysis:{user_id}"
 
-    if redis:
-        try:
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
-        except Exception as e:
-            logger.debug("factor_cache_read_error", cache_key=cache_key, error=str(e))
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     pos_map = await query_latest_position_map(user_id, db, include_name=True)
 
@@ -253,10 +240,7 @@ async def get_factor_analysis(
         "note": "yfinance 기반 팩터 점수 (0-100, 높을수록 해당 팩터 노출도 높음)",
     }
 
-    if redis:
-        with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_FACTOR_ANALYSIS, json.dumps(result_data))
-
+    await set_cached_json(redis, cache_key, result_data, TTL_FACTOR_ANALYSIS)
     return result_data
 
 

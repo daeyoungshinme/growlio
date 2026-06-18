@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import uuid
 from datetime import date
@@ -14,7 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key
+from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key, set_cached_json
 
 logger = structlog.get_logger()
 
@@ -46,10 +45,7 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redi
         "estimated_annual": estimated_annual,
     }
 
-    if redis:
-        with contextlib.suppress(RedisError):
-            await redis.setex(dividend_summary_key(user_id), TTL_DIVIDEND_SUMMARY, json.dumps(result))
-
+    await set_cached_json(redis, dividend_summary_key(user_id), result, TTL_DIVIDEND_SUMMARY)
     return result
 
 

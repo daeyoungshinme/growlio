@@ -48,6 +48,9 @@ TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_DCA = 3600          # DCA 자동매수 분산 락
 TTL_JOB_LOCK_DEPOSIT = 600       # 입금 모니터 분산 락
 TTL_OB_TOKEN = 90 * 24 * 3600    # 금융결제원 기본 토큰 유효기간 90일
+TTL_PORTFOLIO_SUMMARY = 300      # KIS 실시간 포트폴리오 집계 5분
+TTL_DIVIDENDS_POSITIONS = 3600   # 종목별 배당수익률 1시간
+TTL_TAX_OVERSEAS = 86400         # 해외 미실현 손익 24시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -135,6 +138,18 @@ def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}alerts:exchange_rate:{user_id}"
 
 
+def portfolio_summary_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}portfolio_summary:{user_id}"
+
+
+def dividends_positions_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}dividends:positions:{user_id}"
+
+
+def tax_overseas_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}tax:overseas:{user_id}"
+
+
 def economic_indicator_latest_key(code: str) -> str:
     return f"{_env_prefix()}economic:latest:{code}"
 
@@ -160,7 +175,7 @@ async def get_cached_json(redis: RedisType, key: str) -> Any:
 
     from redis.exceptions import RedisError
 
-    with contextlib.suppress(RedisError, json.JSONDecodeError):
+    with contextlib.suppress(RedisError, json.JSONDecodeError, TypeError):
         cached = await redis.get(key)
         if cached:
             return json.loads(cached)
@@ -211,4 +226,7 @@ async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: 
         alloc_history_key(user_id, 12),
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
+        portfolio_summary_key(user_id),
+        dividends_positions_key(user_id),
+        tax_overseas_key(user_id),
     )

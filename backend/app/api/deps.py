@@ -1,8 +1,9 @@
 import uuid
-from typing import Any, TypeVar
+from typing import Annotated, Any, TypeVar
 
 import structlog
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Query, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -50,6 +51,14 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     return user
+
+
+class PaginationParams(BaseModel):
+    skip: int = Query(default=0, ge=0)
+    limit: int = Query(default=100, ge=1, le=500)
+
+
+PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 
 
 async def get_owned_resource(  # noqa: E501

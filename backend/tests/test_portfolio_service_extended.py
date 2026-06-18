@@ -117,11 +117,11 @@ class TestGetAllocationHistory:
 
         redis = AsyncMock()
         redis.get = AsyncMock(return_value=None)
-        redis.set = AsyncMock()
+        redis.setex = AsyncMock()
 
         await get_allocation_history(uuid.uuid4(), mock_db, redis=redis, months=3)
 
-        redis.set.assert_called_once()
+        redis.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_zero_total_months_excluded(self, mock_db, override_settings):

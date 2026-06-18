@@ -76,14 +76,14 @@ export default function RebalancingTab() {
       const newTarget = cashBase * (item.target_weight_pct / 100);
       const newCurrentPct = cashBase > 0 ? (item.current_value_krw / cashBase) * 100 : 0;
       const newDiff = newTarget - item.current_value_krw;
-      const newShares =
+      const estPrice =
         item.current_price_krw && item.current_price_krw > 0
-          ? Math.round(newDiff / item.current_price_krw)
-          : item.shares_to_trade;
-      const newTargetQty =
-        item.current_price_krw && item.current_price_krw > 0
-          ? Math.floor(newTarget / item.current_price_krw)
-          : item.target_qty;
+          ? item.current_price_krw
+          : item.current_qty && item.current_qty > 0 && item.current_value_krw > 0
+            ? item.current_value_krw / item.current_qty
+            : null;
+      const newShares = estPrice ? Math.round(newDiff / estPrice) : item.shares_to_trade;
+      const newTargetQty = estPrice ? Math.floor(newTarget / estPrice) : item.target_qty;
       return {
         ...item,
         target_value_krw: newTarget,

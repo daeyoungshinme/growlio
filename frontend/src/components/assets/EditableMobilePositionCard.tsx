@@ -84,7 +84,7 @@ export function EditableMobilePositionCard({
         </div>
         <button
           onClick={() => removeRow(i)}
-          className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
+          className="p-2 min-h-10 min-w-10 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
         >
           <Trash2 size={16} />
         </button>

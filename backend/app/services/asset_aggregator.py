@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 import uuid
 from datetime import date
 from typing import Any
 
 import structlog
-from redis.exceptions import RedisError
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +27,8 @@ from app.utils.cache_keys import (
     TTL_DASHBOARD_SUMMARY,
     RedisType,
     dashboard_summary_key,
+    get_cached_json,
+    set_cached_json,
 )
 
 # 기존 테스트 임포트 호환 별칭
@@ -74,10 +73,9 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
-    if redis:
-        cached = await redis.get(dashboard_summary_key(user_id))
-        if cached:
-            return json.loads(cached)
+    cached = await get_cached_json(redis, dashboard_summary_key(user_id))
+    if cached is not None:
+        return cached
 
     # 1단계: 서로 독립적인 쿼리들을 병렬 실행
     (
@@ -136,9 +134,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         "estimated_annual_dividends": div_summary["estimated_annual"],
         "dividend_monthly_breakdown": div_summary["monthly_breakdown"],
     }
-    if redis:
-        with contextlib.suppress(RedisError):
-            await redis.setex(dashboard_summary_key(user_id), TTL_DASHBOARD_SUMMARY, json.dumps(result))
+    await set_cached_json(redis, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     return result
 
 

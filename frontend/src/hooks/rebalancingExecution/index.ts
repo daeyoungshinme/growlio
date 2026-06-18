@@ -194,11 +194,7 @@ export function useRebalancingExecution({
         (sum, acc) => sum + getAccountQuantity(item.ticker, acc.id),
         0,
       );
-      const livePrice = livePricesKrw[item.ticker] ?? null;
-      const totalSuggested =
-        livePrice && livePrice > 0
-          ? Math.round(Math.abs(item.diff_krw) / livePrice)
-          : Math.abs(Math.round(item.shares_to_trade!));
+      const totalSuggested = Math.abs(Math.round(item.shares_to_trade!));
       const suggested =
         allKisQty > 0
           ? Math.round((totalSuggested * currentQty) / allKisQty)
@@ -216,11 +212,7 @@ export function useRebalancingExecution({
         (i) => (i.shares_to_trade ?? 0) > 0 && (buyAccounts[i.ticker] ?? []).includes(accountId),
       )
       .map((i) => {
-        const livePrice = livePricesKrw[i.ticker] ?? null;
-        const suggestedQty =
-          livePrice && livePrice > 0
-            ? Math.round(Math.abs(i.diff_krw) / livePrice)
-            : Math.abs(Math.round(i.shares_to_trade!));
+        const suggestedQty = Math.abs(Math.round(i.shares_to_trade!));
         return { item: i, suggestedQty, currentQty: getAccountQuantity(i.ticker, accountId) };
       });
   }
@@ -230,14 +222,14 @@ export function useRebalancingExecution({
     for (const acc of kisAccounts) map[acc.id] = getSellRows(acc.id);
     return map;
     // getSellRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, kisAccounts, livePricesKrw]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionableItems, liveBalances, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const buyRowsByAccount = useMemo(() => {
     const map: Record<string, ReturnType<typeof getBuyRows>> = {};
     for (const acc of kisAccounts) map[acc.id] = getBuyRows(acc.id);
     return map;
     // getBuyRows는 컴포넌트 스코프 함수 — dep 추가 시 무한 재계산. 실제 의존값은 이미 포함됨.
-  }, [actionableItems, liveBalances, buyAccounts, kisAccounts, livePricesKrw]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [actionableItems, liveBalances, buyAccounts, kisAccounts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function getBuyTotalInfo(ticker: string): { allocated: number; needed: number } {
     const item = actionableItems.find((i) => i.ticker === ticker);

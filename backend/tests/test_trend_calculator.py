@@ -101,7 +101,7 @@ class TestGetMonthlyTrend:
         user_id = uuid.uuid4()
         redis = AsyncMock()
         redis.get = AsyncMock(return_value=None)
-        redis.set = AsyncMock()
+        redis.setex = AsyncMock()
 
         execute_result = MagicMock()
         execute_result.__iter__ = MagicMock(return_value=iter([]))
@@ -110,4 +110,4 @@ class TestGetMonthlyTrend:
 
         await get_monthly_trend(user_id, db, redis)
 
-        redis.set.assert_called_once()
+        redis.setex.assert_called_once()

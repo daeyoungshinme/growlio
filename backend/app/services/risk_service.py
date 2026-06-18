@@ -7,8 +7,6 @@ yfinance 1년 일별 수익률 데이터를 기반으로 하며 Redis 1시간 �
 from __future__ import annotations
 
 import asyncio
-import contextlib
-import json
 import math
 import uuid
 
@@ -21,7 +19,7 @@ from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType
+from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, set_cached_json
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
@@ -114,13 +112,9 @@ async def get_portfolio_risk_metrics(
 ) -> dict:
     cache_key = f"risk:{user_id}:{portfolio_id or 'all'}"
 
-    if redis:
-        try:
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
-        except Exception:  # nosec B110 — Redis 오류 무시, DB에서 재계산
-            pass
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     # 최신 스냅샷 포지션 조회
     pos_map = await query_latest_position_map(user_id, db)
@@ -189,10 +183,7 @@ async def get_portfolio_risk_metrics(
         "note": "1년 일별 수익률 기반 추정값 (yfinance)" if len(portfolio_rets) >= 10 else "데이터 불충분",
     }
 
-    if redis:
-        with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_RISK_ANALYSIS, json.dumps(result_data))
-
+    await set_cached_json(redis, cache_key, result_data, TTL_RISK_ANALYSIS)
     return result_data
 
 
@@ -218,13 +209,9 @@ async def get_currency_exposure(
     """국내/해외/통화 비중 분석."""
     cache_key = f"currency_exposure:{user_id}"
 
-    if redis:
-        try:
-            cached = await redis.get(cache_key)
-            if cached:
-                return json.loads(cached)
-        except Exception:  # nosec B110 — Redis 오류 무시, DB에서 재계산
-            pass
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
@@ -266,10 +253,5 @@ async def get_currency_exposure(
         "other_pct": round(other_total / grand_total * 100, 2),
     }
 
-    if redis:
-        import contextlib
-
-        with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_RISK_ANALYSIS, json.dumps(data))
-
+    await set_cached_json(redis, cache_key, data, TTL_RISK_ANALYSIS)
     return data

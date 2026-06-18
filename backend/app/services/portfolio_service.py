@@ -2,26 +2,27 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
 import uuid
 from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from redis.exceptions import RedisError
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
+from app.services.composition_calculator import fetch_position_maps
 from app.utils.cache_keys import (
     TTL_ALLOC_HISTORY,
     TTL_PORTFOLIO_OVERVIEW,
+    RedisType,
     alloc_history_key,
+    get_cached_json,
     portfolio_overview_key,
     portfolio_overview_lite_key,
+    set_cached_json,
 )
 from app.utils.pnl import calc_position_pnl
 
@@ -217,7 +218,7 @@ async def build_portfolio_overview(
     user_id: uuid.UUID,
     db: AsyncSession,
     account_ids: list[uuid.UUID] | None = None,
-    redis=None,
+    redis: RedisType = None,
     lite: bool = False,
 ) -> dict[str, Any]:
     """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용).
@@ -226,11 +227,10 @@ async def build_portfolio_overview(
     대시보드에서 사용하며, 전체 종목 목록이 필요한 포트폴리오 페이지는 lite=False(기본값) 사용.
     """
     cache_key_fn = portfolio_overview_lite_key if lite else portfolio_overview_key
-    if redis and not account_ids:
-        with contextlib.suppress(RedisError):
-            cached = await redis.get(cache_key_fn(user_id))
-            if cached:
-                return json.loads(cached)
+    if not account_ids:
+        cached = await get_cached_json(redis, cache_key_fn(user_id))
+        if cached is not None:
+            return cached
 
     query = (
         select(AssetAccount)
@@ -246,27 +246,9 @@ async def build_portfolio_overview(
 
     snap_by_acc = await _fetch_latest_snapshots([a.id for a in accounts], db)
 
-    # 스냅샷 포지션 미리 로드 (snapshot_id → [Position])
     snap_ids = [s.id for s in snap_by_acc.values()]
     acc_ids = [a.id for a in accounts if a.asset_type in STOCK_TYPES]
-    snap_pos_map: dict[uuid.UUID, list[Position]] = {}
-    cur_pos_map: dict[uuid.UUID, list[Position]] = {}
-
-    if snap_ids:
-        sp_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
-        for pos in sp_result.scalars().all():
-            if pos.snapshot_id is not None:
-                snap_pos_map.setdefault(pos.snapshot_id, []).append(pos)
-
-    if acc_ids:
-        cp_result = await db.execute(
-            select(Position).where(
-                Position.account_id.in_(acc_ids),
-                Position.snapshot_id == None,  # noqa: E711
-            )
-        )
-        for pos in cp_result.scalars().all():
-            cur_pos_map.setdefault(pos.account_id, []).append(pos)
+    snap_pos_map, cur_pos_map = await fetch_position_maps(snap_ids, acc_ids, db)
 
     total_assets_krw = 0.0
     total_invested_krw = 0.0
@@ -340,10 +322,8 @@ async def build_portfolio_overview(
         "accounts": account_rows,
     }
 
-    if redis and not account_ids:
-        with contextlib.suppress(RedisError):
-            await redis.setex(cache_key_fn(user_id), TTL_PORTFOLIO_OVERVIEW, json.dumps(overview))
-
+    if not account_ids:
+        await set_cached_json(redis, cache_key_fn(user_id), overview, TTL_PORTFOLIO_OVERVIEW)
     return overview
 
 
@@ -391,10 +371,9 @@ async def get_allocation_history(user_id: uuid.UUID, db: AsyncSession, months: i
     is_active = TRUE 필터 필수 — 비활성 계좌 스냅샷 합산 방지.
     """
     cache_key = alloc_history_key(user_id, months)
-    if redis is not None:
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     today = date.today()
     start_month = today.month - (months - 1)
@@ -516,7 +495,5 @@ async def get_allocation_history(user_id: uuid.UUID, db: AsyncSession, months: i
             }
         )
 
-    if redis is not None:
-        await redis.set(cache_key, json.dumps(output), ex=TTL_ALLOC_HISTORY)
-
+    await set_cached_json(redis, cache_key, output, TTL_ALLOC_HISTORY)
     return output

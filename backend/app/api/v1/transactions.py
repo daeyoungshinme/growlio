@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_owned_resource
+from app.api.deps import PaginationDep, get_current_user, get_owned_resource
 from app.database import get_db
 from app.limiter import limiter
 from app.models.asset import Transaction
@@ -24,11 +24,10 @@ router = APIRouter(prefix="/transactions", tags=["transactions"])
 @limiter.limit("60/minute")
 async def list_transactions(
     request: Request,
+    pagination: PaginationDep,
     account_id: UUID | None = None,
     year: int | None = Query(None, ge=1900, le=2100),
     transaction_type: str | None = None,
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -39,7 +38,7 @@ async def list_transactions(
         stmt = stmt.where(extract("year", Transaction.transaction_date) == year)
     if transaction_type:
         stmt = stmt.where(Transaction.transaction_type == transaction_type)
-    stmt = stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc()).offset(skip).limit(limit)
+    stmt = stmt.order_by(Transaction.transaction_date.desc(), Transaction.created_at.desc()).offset(pagination.skip).limit(pagination.limit)
     result = await db.execute(stmt)
     return result.scalars().all()
 

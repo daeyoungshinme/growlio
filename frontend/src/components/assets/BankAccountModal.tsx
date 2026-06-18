@@ -1,5 +1,5 @@
-import { X } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
+import Modal from "@/components/common/Modal";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { fmtKrw } from "@/utils/format";
@@ -53,26 +53,13 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onClick={onClose}
+    <Modal
+      onClose={onClose}
+      title={isEdit ? "은행계좌 수정" : "은행계좌 추가"}
+      size="md"
+      closeOnBackdrop
     >
-      <div
-        className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-md p-6 mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
-            {isEdit ? "은행계좌 수정" : "은행계좌 추가"}
-          </h2>
-          <button
-            onClick={onClose}
-            aria-label="닫기"
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-          >
-            <X size={18} aria-hidden="true" />
-          </button>
-        </div>
+      <div className="overflow-y-auto flex-1 px-6 py-5">
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label
@@ -222,6 +209,6 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

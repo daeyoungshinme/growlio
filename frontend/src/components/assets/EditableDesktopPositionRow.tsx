@@ -191,7 +191,7 @@ export function EditableDesktopPositionRow({
       <td className="py-2">
         <button
           onClick={() => removeRow(i)}
-          className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded"
+          className="p-1.5 min-h-10 min-w-10 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 rounded"
         >
           <Trash2 size={16} />
         </button>

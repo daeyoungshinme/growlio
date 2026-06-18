@@ -2,15 +2,12 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
 import uuid
 from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from pydantic import BaseModel, field_validator
-from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,7 +21,9 @@ from app.redis_client import get_redis
 from app.utils.cache_keys import (
     TTL_EXCHANGE_RATE_ALERTS,
     exchange_rate_alerts_key,
+    get_cached_json,
     invalidate_exchange_rate_alert_caches,
+    set_cached_json,
 )
 
 router = APIRouter()
@@ -71,13 +70,12 @@ async def list_exchange_rate_alerts(
     db: AsyncSession = Depends(get_db),
 ):
     """내 목표환율 알림 목록 조회 (활성 + 발동 이력)."""
+    redis = await get_redis()
+    cache_key = exchange_rate_alerts_key(current_user.id)
     if skip == 0 and limit == 50:
-        redis = await get_redis()
-        cache_key = exchange_rate_alerts_key(current_user.id)
-        with contextlib.suppress(RedisError):
-            cached = await redis.get(cache_key)
-            if isinstance(cached, (str, bytes, bytearray)):
-                return json.loads(cached)
+        cached = await get_cached_json(redis, cache_key)
+        if cached is not None:
+            return cached
 
     result = await db.execute(
         select(ExchangeRateAlert)
@@ -89,12 +87,7 @@ async def list_exchange_rate_alerts(
     alerts_list = [AlertResponse.model_validate(a) for a in result.scalars().all()]
 
     if skip == 0 and limit == 50:
-        with contextlib.suppress(RedisError):
-            await redis.setex(
-                cache_key,
-                TTL_EXCHANGE_RATE_ALERTS,
-                json.dumps([a.model_dump(mode="json") for a in alerts_list]),
-            )
+        await set_cached_json(redis, cache_key, [a.model_dump(mode="json") for a in alerts_list], TTL_EXCHANGE_RATE_ALERTS)
     return alerts_list
 
 

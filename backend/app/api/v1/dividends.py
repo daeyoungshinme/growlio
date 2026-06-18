@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import PaginationDep, get_current_user
 from app.database import get_db
 from app.limiter import limiter
 from app.models.user import User
@@ -23,6 +23,12 @@ from app.services.dividend.orchestrator import (
     upsert_ticker_settings,
 )
 from app.services.dividend_aggregator import get_dividend_summary
+from app.utils.cache_keys import (
+    TTL_DIVIDENDS_POSITIONS,
+    dividends_positions_key,
+    get_cached_json,
+    set_cached_json,
+)
 
 router = APIRouter(prefix="/dividends", tags=["dividends"])
 logger = structlog.get_logger()
@@ -49,7 +55,15 @@ async def position_dividend_yields(
     db: AsyncSession = Depends(get_db),
 ):
     """보유 종목별 배당수익률 및 예상 배당금 (yfinance, 비실시간)."""
+    redis = await get_redis()
+    cache_key = dividends_positions_key(current_user.id)
+    if skip == 0:
+        cached = await get_cached_json(redis, cache_key)
+        if cached is not None:
+            return cached[:limit]
     result = await get_position_dividend_yields(current_user.id, db)
+    if skip == 0:
+        await set_cached_json(redis, cache_key, result, TTL_DIVIDENDS_POSITIONS)
     return result[skip : skip + limit]
 
 
@@ -57,14 +71,13 @@ async def position_dividend_yields(
 @limiter.limit("10/minute")
 async def ticker_dividend_summary(
     request: Request,
-    skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=200, ge=1, le=500),
+    pagination: PaginationDep,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """종목별 실수령(올해) + 예상 배당금 통합 (Redis 24h 캐시)."""
     result = await get_ticker_dividend_summary(current_user.id, db)
-    return result[skip : skip + limit]
+    return result[pagination.skip : pagination.skip + pagination.limit]
 
 
 class TickerSettingsRequest(BaseModel):

@@ -72,7 +72,7 @@ export default function EditableNameField({
         }}
         title="계좌명 수정"
         aria-label="계좌명 수정"
-        className="p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0"
+        className="p-2.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0"
       >
         <Pencil size={pencilSize} />
       </button>

@@ -1,16 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
-import StockPositionsModal from "@/components/assets/StockPositionsModal";
-import TransactionModal from "@/components/assets/TransactionModal";
-import BankAccountModal from "@/components/assets/BankAccountModal";
-import StockAccountModal from "@/components/assets/StockAccountModal";
 import {
   RealEstateAccountModal,
   RealEstateEditModal,
   RealEstateAccountCard,
 } from "@/components/assets/RealEstateSection";
 import BankAccountCard from "@/components/assets/BankAccountCard";
+
+const StockPositionsModal = lazy(() => import("@/components/assets/StockPositionsModal"));
+const TransactionModal = lazy(() => import("@/components/assets/TransactionModal"));
+const BankAccountModal = lazy(() => import("@/components/assets/BankAccountModal"));
+const StockAccountModal = lazy(() => import("@/components/assets/StockAccountModal"));
 import StockAccountCard, { type AccountStats } from "@/components/assets/StockAccountCard";
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
@@ -273,36 +274,66 @@ export default function AssetManagementPage() {
         </>
       )}
 
-      {showBankModal && (
-        <BankAccountModal
-          onClose={() => setShowBankModal(false)}
-          onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending}
-        />
-      )}
-      {editingBankAccount && (
-        <BankAccountModal
-          initialAccount={editingBankAccount}
-          onClose={() => setEditingBankAccount(null)}
-          onSubmit={(data) => updateBankMutation.mutate({ id: editingBankAccount.id, data })}
-          isLoading={updateBankMutation.isPending}
-        />
-      )}
-      {showStockModal && (
-        <StockAccountModal
-          onClose={() => setShowStockModal(false)}
-          onSubmit={(data) => createMutation.mutate(data)}
-          isLoading={createMutation.isPending}
-        />
-      )}
-      {editingStockAccount && (
-        <StockAccountModal
-          initialAccount={editingStockAccount}
-          onClose={() => setEditingStockAccount(null)}
-          onSubmit={(data) => updateStockMutation.mutate({ id: editingStockAccount.id, data })}
-          isLoading={updateStockMutation.isPending}
-        />
-      )}
+      <Suspense fallback={null}>
+        {showBankModal && (
+          <BankAccountModal
+            onClose={() => setShowBankModal(false)}
+            onSubmit={(data) => createMutation.mutate(data)}
+            isLoading={createMutation.isPending}
+          />
+        )}
+        {editingBankAccount && (
+          <BankAccountModal
+            initialAccount={editingBankAccount}
+            onClose={() => setEditingBankAccount(null)}
+            onSubmit={(data) => updateBankMutation.mutate({ id: editingBankAccount.id, data })}
+            isLoading={updateBankMutation.isPending}
+          />
+        )}
+        {showStockModal && (
+          <StockAccountModal
+            onClose={() => setShowStockModal(false)}
+            onSubmit={(data) => createMutation.mutate(data)}
+            isLoading={createMutation.isPending}
+          />
+        )}
+        {editingStockAccount && (
+          <StockAccountModal
+            initialAccount={editingStockAccount}
+            onClose={() => setEditingStockAccount(null)}
+            onSubmit={(data) => updateStockMutation.mutate({ id: editingStockAccount.id, data })}
+            isLoading={updateStockMutation.isPending}
+          />
+        )}
+        {positionsAccount && (
+          <StockPositionsModal
+            accountId={positionsAccount.id}
+            accountName={positionsAccount.name}
+            readonly={
+              positionsAccount.dataSource === "KIS_API" ||
+              positionsAccount.dataSource === "KIWOOM_API"
+            }
+            onClose={() => {
+              setPositionsAccount(null);
+              void invalidateAccountData(queryClient);
+            }}
+          />
+        )}
+        {txAccount && (
+          <TransactionModal
+            accountId={txAccount.id}
+            accountName={txAccount.name}
+            depositKrw={txAccount.depositKrw}
+            onDepositUpdate={(newDeposit) =>
+              updateDepositMutation.mutate({ id: txAccount.id, deposit_krw: newDeposit })
+            }
+            onClose={() => {
+              setTxAccount(null);
+              void invalidateAccountData(queryClient);
+            }}
+          />
+        )}
+      </Suspense>
       {showRealEstateModal && (
         <RealEstateAccountModal
           onClose={() => setShowRealEstateModal(false)}
@@ -316,34 +347,6 @@ export default function AssetManagementPage() {
           onClose={() => setEditingRealEstate(null)}
           onSubmit={(id, data) => updateRealEstateMutation.mutate({ id, data })}
           isLoading={updateRealEstateMutation.isPending}
-        />
-      )}
-      {positionsAccount && (
-        <StockPositionsModal
-          accountId={positionsAccount.id}
-          accountName={positionsAccount.name}
-          readonly={
-            positionsAccount.dataSource === "KIS_API" ||
-            positionsAccount.dataSource === "KIWOOM_API"
-          }
-          onClose={() => {
-            setPositionsAccount(null);
-            void invalidateAccountData(queryClient);
-          }}
-        />
-      )}
-      {txAccount && (
-        <TransactionModal
-          accountId={txAccount.id}
-          accountName={txAccount.name}
-          depositKrw={txAccount.depositKrw}
-          onDepositUpdate={(newDeposit) =>
-            updateDepositMutation.mutate({ id: txAccount.id, deposit_krw: newDeposit })
-          }
-          onClose={() => {
-            setTxAccount(null);
-            void invalidateAccountData(queryClient);
-          }}
         />
       )}
       {confirmDeleteId && (
