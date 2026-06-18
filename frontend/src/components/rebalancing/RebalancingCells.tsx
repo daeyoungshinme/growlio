@@ -57,6 +57,30 @@ export function SharesCell({ item }: { item: RebalancingItem }) {
   );
 }
 
+export function QuantityCell({ item }: { item: RebalancingItem }) {
+  if (item.ticker === CASH_TICKER || item.shares_to_trade === null)
+    return <span className="text-gray-400">-</span>;
+
+  const shares = item.shares_to_trade;
+  const isBuy = shares > 0;
+  const colorClass = shares === 0 ? "text-gray-400" : isBuy ? PROFIT_COLOR : LOSS_COLOR;
+
+  const hasQty = item.current_qty != null && item.target_qty != null;
+
+  return (
+    <div className="text-right">
+      {hasQty && (
+        <div className="text-xs text-gray-400">
+          {item.current_qty!.toFixed(0)}주 → {item.target_qty!.toFixed(0)}주
+        </div>
+      )}
+      <div className={`font-medium text-xs ${colorClass}`}>
+        {shares === 0 ? "0" : `${isBuy ? "+" : ""}${shares.toFixed(0)}주`}
+      </div>
+    </div>
+  );
+}
+
 export function DividendDiffCell({ diff }: { diff: number }) {
   if (diff === 0) return <span className="text-gray-400">-</span>;
   const isIncrease = diff > 0;

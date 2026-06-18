@@ -11,6 +11,7 @@ class PositionMapEntry(TypedDict):
     value_krw: float
     current_price: float | None
     name: str
+    qty: float
 
 
 class TickerPositionEntry(TypedDict):

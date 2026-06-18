@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import uuid
 from datetime import UTC, datetime
 
@@ -20,8 +21,10 @@ def _build_current_map(overview: dict) -> dict[tuple[str, str], PositionMapEntry
                 value_krw=0.0,
                 current_price=p.get("current_price"),
                 name=p.get("name", ""),
+                qty=0.0,
             )
         current_map[key]["value_krw"] += float(p.get("value_krw", 0))
+        current_map[key]["qty"] += float(p.get("qty", 0))
     return current_map
 
 
@@ -65,6 +68,9 @@ def _build_target_items(
         target_keys.add(key)
         target_value = base_krw * (weight / 100.0)
 
+        current_qty: float | None = None
+        target_qty: float | None = None
+
         if ticker == "CASH":
             current_value = float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0))
             current_price = None
@@ -78,11 +84,14 @@ def _build_target_items(
             current_price = None
             shares = None
         else:
-            pos = current_map.get(key, {"value_krw": 0.0, "current_price": None, "name": name})
+            pos = current_map.get(key, {"value_krw": 0.0, "current_price": None, "name": name, "qty": 0.0})
             current_value = pos["value_krw"]
             current_price = pos.get("current_price")
             diff_krw = target_value - current_value
             shares = round(diff_krw / float(current_price), 0) if current_price and float(current_price) > 0 else None
+            current_qty = pos.get("qty", 0.0)
+            if current_price and float(current_price) > 0:
+                target_qty = float(math.floor(target_value / float(current_price)))
 
         current_weight_pct = (current_value / base_krw * 100) if base_krw > 0 else 0.0
         diff_krw = target_value - current_value
@@ -112,6 +121,8 @@ def _build_target_items(
                 diff_krw=round(diff_krw, 0),
                 shares_to_trade=shares,
                 current_price_krw=float(current_price) if current_price is not None else None,
+                current_qty=current_qty,
+                target_qty=target_qty,
                 dividend_yield=div_yield,
                 annual_dividend_current_krw=round(annual_div_current, 0),
                 annual_dividend_target_krw=round(annual_div_target, 0),
@@ -145,6 +156,7 @@ def _build_untracked_items(
         shares_u: float | None = (
             round(diff_u / float(current_price_u), 0) if current_price_u and float(current_price_u) > 0 else None
         )
+        current_qty_u: float = data.get("qty", 0.0)
 
         div_yield_u, annual_div_current_u = _div_info(ticker_u, market_u, dividend_map)
         ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None
@@ -162,6 +174,8 @@ def _build_untracked_items(
                 diff_krw=round(diff_u, 0),
                 shares_to_trade=shares_u,
                 current_price_krw=float(current_price_u) if current_price_u is not None else None,
+                current_qty=current_qty_u,
+                target_qty=0.0,
                 dividend_yield=div_yield_u,
                 annual_dividend_current_krw=round(annual_div_current_u, 0),
                 annual_dividend_target_krw=0.0,

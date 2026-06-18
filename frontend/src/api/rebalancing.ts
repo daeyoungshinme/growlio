@@ -12,6 +12,8 @@ export interface RebalancingItem {
   diff_krw: number;
   shares_to_trade: number | null;
   current_price_krw: number | null;
+  current_qty?: number | null;
+  target_qty?: number | null;
   dividend_yield?: number | null;
   annual_dividend_current_krw?: number;
   annual_dividend_target_krw?: number;

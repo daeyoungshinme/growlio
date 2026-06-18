@@ -11,8 +11,8 @@ import {
   CagrCard,
   DiffCell,
   DividendDiffCell,
+  QuantityCell,
   Return10yCell,
-  SharesCell,
   WeightBar,
   WeightDiffBadge,
 } from "./RebalancingCells";
@@ -36,7 +36,7 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
         <div className="text-right shrink-0">
           <DiffCell diff={item.diff_krw} />
           <p className="text-xs text-gray-400 mt-0.5">
-            <SharesCell item={item} />
+            <QuantityCell item={item} />
           </p>
         </div>
       </div>
@@ -78,7 +78,7 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
         <DiffCell diff={item.diff_krw} />
       </td>
       <td className="py-3.5 px-3 text-right">
-        <SharesCell item={item} />
+        <QuantityCell item={item} />
       </td>
       <td className="py-3.5 px-3">
         <Return10yCell item={item} />

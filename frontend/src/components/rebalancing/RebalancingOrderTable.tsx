@@ -102,6 +102,7 @@ export function RebalancingOrderTable({
                   item={item}
                   qty={qty}
                   isBuy={false}
+                  maxQty={currentQty}
                   extra={
                     <p className="text-[11px] text-gray-500 mt-0.5 text-right">
                       현재 {currentQty.toLocaleString()}주 보유
@@ -160,9 +161,16 @@ export function RebalancingOrderTable({
                       </div>
                     ) : (
                       <p className="text-[11px] text-gray-500 mt-0.5 text-right">
-                        {currentQty > 0
-                          ? `현재 ${currentQty.toLocaleString()}주 보유`
-                          : "현재 미보유"}
+                        {item.target_qty != null ? (
+                          <>
+                            {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} → 목표{" "}
+                            {item.target_qty.toFixed(0)}주
+                          </>
+                        ) : currentQty > 0 ? (
+                          `현재 ${currentQty.toLocaleString()}주 보유`
+                        ) : (
+                          "현재 미보유"
+                        )}
                       </p>
                     )
                   }
@@ -280,6 +288,7 @@ export function RebalancingOrderTable({
                           <input
                             type="number"
                             min={0}
+                            max={currentQty}
                             value={qty || ""}
                             onFocus={(e) => e.target.select()}
                             onChange={(e) =>
@@ -362,9 +371,18 @@ export function RebalancingOrderTable({
                         <div className="text-white font-medium truncate">{item.name}</div>
                         <div className="text-gray-400 text-[11px]">{item.ticker}</div>
                         <div className="text-gray-500 text-[11px]">
-                          {currentQty > 0
-                            ? `현재 ${currentQty.toLocaleString()}주 보유`
-                            : "현재 미보유"}
+                          {item.target_qty != null ? (
+                            <>
+                              {currentQty > 0
+                                ? `${currentQty.toLocaleString()}주`
+                                : "미보유"}{" "}
+                              → 목표 {item.target_qty.toFixed(0)}주
+                            </>
+                          ) : currentQty > 0 ? (
+                            `현재 ${currentQty.toLocaleString()}주 보유`
+                          ) : (
+                            "현재 미보유"
+                          )}
                         </div>
                       </td>
                       <td className="px-3 py-2 text-center">

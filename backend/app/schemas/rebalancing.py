@@ -31,6 +31,8 @@ class RebalancingItem(BaseModel):
     diff_krw: float  # 양수=매수, 음수=매도
     shares_to_trade: float | None  # CASH는 None
     current_price_krw: float | None
+    current_qty: float | None = None  # 현재 보유 수량
+    target_qty: float | None = None  # 목표 수량 (현재가 기준)
     dividend_yield: float | None = None  # % (2.5 = 2.5%)
     annual_dividend_current_krw: float = 0.0  # 현재 보유 기준 연간 배당금
     annual_dividend_target_krw: float = 0.0  # 목표 비중 기준 연간 배당금

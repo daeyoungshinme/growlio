@@ -11,6 +11,7 @@ export interface RebalancingMobileCardProps {
   item: RebalancingItem;
   qty: number;
   isBuy: boolean;
+  maxQty?: number;
   extra?: React.ReactNode;
   selected: Set<string>;
   orderType: OrderType;
@@ -30,6 +31,7 @@ export function RebalancingMobileCard({
   item,
   qty,
   isBuy,
+  maxQty,
   extra,
   selected,
   orderType,
@@ -67,6 +69,7 @@ export function RebalancingMobileCard({
             <input
               type="number"
               min={0}
+              max={maxQty}
               value={qty || ""}
               onFocus={(e) => e.target.select()}
               onChange={(e) =>
