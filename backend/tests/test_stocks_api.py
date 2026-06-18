@@ -192,10 +192,9 @@ class TestExchangeRate:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
-            patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
+            patch("app.services.yahoo_price._sync_usdkrw", return_value=0.0),
             patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
         ):
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=0.0)
             resp = client.get("/api/v1/stocks/exchange-rate")
         assert resp.status_code in (200, 500)
 
