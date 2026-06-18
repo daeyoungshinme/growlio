@@ -64,23 +64,14 @@ export default function DividendTab({
     return map;
   }, [dividendData]);
 
-  const totalEstimated = useMemo(
-    () => dividendByTicker.reduce((s, d) => s + d.estimated_annual_krw, 0),
-    [dividendByTicker],
-  );
-  const estimatedMonthly = useMemo(
-    () => dividendByTicker.reduce((s, d) => s + d.estimated_monthly_krw, 0),
-    [dividendByTicker],
-  );
+  const totalEstimated = dividendByTicker.reduce((s, d) => s + d.estimated_annual_krw, 0);
+  const estimatedMonthly = dividendByTicker.reduce((s, d) => s + d.estimated_monthly_krw, 0);
   const received = divSummary?.annual_received ?? 0;
 
-  const overallDividendYield = useMemo(
-    () =>
-      totalInvestedKrw && totalInvestedKrw > 0 && totalEstimated > 0
-        ? (totalEstimated / totalInvestedKrw) * 100
-        : null,
-    [totalEstimated, totalInvestedKrw],
-  );
+  const overallDividendYield =
+    totalInvestedKrw && totalInvestedKrw > 0 && totalEstimated > 0
+      ? (totalEstimated / totalInvestedKrw) * 100
+      : null;
 
   const dividendChartData = useMemo(
     () =>

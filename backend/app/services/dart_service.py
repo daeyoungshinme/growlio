@@ -11,6 +11,8 @@ import defusedxml.ElementTree as ET
 import httpx
 import structlog
 
+from app.config import settings
+
 logger = structlog.get_logger()
 
 DART_BASE = "https://opendart.fss.or.kr/api"
@@ -173,7 +175,7 @@ async def fetch_dart_dividend(ticker: str, api_key: str, year: int | None = None
 
 
 # ── 공시 목록 조회 ─────────────────────────────────────────────
-_DART_DISCLOSURE_SEM = asyncio.Semaphore(5)
+_DART_DISCLOSURE_SEM = asyncio.Semaphore(settings.api_semaphore_limit)
 
 
 async def fetch_disclosures_for_tickers(

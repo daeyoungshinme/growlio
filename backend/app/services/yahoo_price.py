@@ -13,9 +13,11 @@ import time
 
 import structlog
 
+from app.config import settings
+
 logger = structlog.get_logger()
 
-_yfinance_sem = asyncio.Semaphore(5)
+_yfinance_sem = asyncio.Semaphore(settings.api_semaphore_limit)
 
 
 def to_yf_symbol(ticker: str, market: str) -> str:

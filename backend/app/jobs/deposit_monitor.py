@@ -26,6 +26,7 @@ from app.redis_client import get_redis
 from app.services.alert_repository import save_alert_history
 from app.services.credential_service import decrypt
 from app.services.price_service import fetch_prices_batch
+from app.utils.cache_keys import TTL_JOB_LOCK_DEPOSIT
 from app.utils.redis_lock import redis_lock
 
 logger = structlog.get_logger()
@@ -34,7 +35,7 @@ logger = structlog.get_logger()
 async def run_deposit_monitor() -> None:
     """15:35·18:05 KST — 예수금 증가 감지 후 비중 배분 매수/알림."""
     redis = await get_redis()
-    async with redis_lock(redis, "deposit_monitor_lock", ttl=600) as acquired:
+    async with redis_lock(redis, "deposit_monitor_lock", ttl=TTL_JOB_LOCK_DEPOSIT) as acquired:
         if not acquired:
             logger.info("deposit_monitor_skipped_lock_held")
             return

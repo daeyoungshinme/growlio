@@ -34,12 +34,12 @@ test-frontend:
 	cd frontend && npm run test
 
 lint:
-	cd backend && uv run ruff check .
-	cd frontend && npm run lint
+	cd backend && uv run ruff check . && \
+	cd ../frontend && npm run lint
 
 typecheck:
-	cd backend && uv run mypy app/
-	cd frontend && npx tsc --noEmit
+	cd backend && uv run mypy app/ && \
+	cd ../frontend && npx tsc --noEmit
 
 clean:
 	rm -rf frontend/dist backend/.pytest_cache backend/.ruff_cache

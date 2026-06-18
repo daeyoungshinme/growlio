@@ -265,7 +265,7 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 
     overrides = await _load_user_overrides(user_id, db)
     dart_key = await _get_dart_key(user_id, db)
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(settings.api_semaphore_limit)
     kis_creds = await _get_kis_credentials(user_id, db)
     usd_krw_rate: float = await get_usd_krw_rate(redis)
 
@@ -372,7 +372,7 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
     dart_key = await _get_dart_key(user_id, db)
     kis_creds = await _get_kis_credentials(user_id, db)
 
-    sem = asyncio.Semaphore(5)
+    sem = asyncio.Semaphore(settings.api_semaphore_limit)
     redis = await get_redis()
 
     async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:

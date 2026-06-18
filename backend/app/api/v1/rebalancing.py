@@ -1,7 +1,9 @@
 """리밸런싱 API."""
 
 import asyncio
+import math
 import uuid
+from collections import defaultdict
 from functools import partial
 from typing import Literal, cast
 
@@ -19,15 +21,20 @@ from app.kis.client import KisApiError
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
+from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount, RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
+    ExecutionOrderItem as ExecItem,
+)
+from app.schemas.rebalancing import (
     ExecutionRequest,
     ExecutionResult,
     KisBalancePosition,
     KisBalanceResponse,
+    OrderResult,
     RebalancingAnalysis,
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
@@ -43,6 +50,7 @@ from app.services.dividend_providers import (
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import get_historical_returns
+from app.services.rebalancing_execution_service import execute_rebalancing
 from app.services.rebalancing_service import analyze_rebalancing
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
@@ -172,8 +180,6 @@ async def execute_portfolio_rebalancing(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
-    from app.services.rebalancing_execution_service import execute_rebalancing
-
     return await execute_rebalancing(
         user_id=current_user.id,
         account_id=body.account_id,
@@ -196,10 +202,6 @@ async def quick_execute_rebalancing(
     redis=Depends(get_redis),
 ):
     """포트폴리오 리밸런싱 알림 설정에 기반해 분석 후 즉시 실행한다 (원클릭 실행)."""
-    import math
-
-    from app.models.alert import RebalancingAlert
-
     portfolio = await db.scalar(
         select(Portfolio).where(
             Portfolio.id == portfolio_id,
@@ -227,18 +229,12 @@ async def quick_execute_rebalancing(
     order_type = cast(Literal["MARKET", "LIMIT"], alert_row.order_type or "MARKET")
 
     # 포트폴리오 분석
-    from app.services.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing_service import analyze_rebalancing
-
     saved_ids = getattr(portfolio, "account_ids", None)
     effective_account_ids = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
     overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_account_ids)
     analysis = analyze_rebalancing(portfolio, overview)
 
     # 주문 생성
-    from app.schemas.rebalancing import ExecutionOrderItem as ExecItem
-    from app.services.rebalancing_execution_service import execute_rebalancing
-
     orders: list[ExecItem] = []
     for item in analysis.items:
         if item.ticker == "CASH" or item.market == "KR_PROPERTY":
@@ -320,10 +316,6 @@ async def get_rebalancing_execution_detail(
     detail = RebalancingExecutionDetail.model_validate(execution)
     # result_items를 계좌별 ExecutionResult로 재구성
     if execution.result_items:
-        from collections import defaultdict
-
-        from app.schemas.rebalancing import OrderResult
-
         by_account: dict[str, dict] = defaultdict(
             lambda: {"orders": [], "is_mock": False, "account_name": "", "executed_at": ""}
         )

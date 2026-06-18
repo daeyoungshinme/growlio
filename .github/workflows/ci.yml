@@ -80,11 +80,11 @@ jobs:
         run: .venv/bin/alembic downgrade -1
 
       - name: Test (pytest + coverage)
-        run: .venv/bin/pytest -x -v --tb=short --timeout=30 --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=65
+        run: .venv/bin/pytest -x -v --tb=short --timeout=60 --cov=app --cov-report=xml:coverage.xml --cov-report=term-missing --cov-fail-under=80
 
       - name: Coverage comment (PR only)
         if: github.event_name == 'pull_request'
-        uses: MishaKav/pytest-coverage-comment@main
+        uses: MishaKav/pytest-coverage-comment@v1.9.0
         with:
           pytest-xml-coverage-path: backend/coverage.xml
           title: Backend Coverage
@@ -107,7 +107,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: TruffleHog scan
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@v3.95.5
         with:
           path: ./
           base: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}

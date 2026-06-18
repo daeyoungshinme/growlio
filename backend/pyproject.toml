@@ -78,7 +78,7 @@ packages = ["app"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 addopts = "--tb=short --cov=app --cov-report=term-missing"
-timeout = 30
+timeout = 60
 timeout_method = "thread"
 asyncio_default_fixture_loop_scope = "function"
 

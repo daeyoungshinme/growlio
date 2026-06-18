@@ -228,6 +228,7 @@ export default function RebalancingTab() {
               <h3 className="text-sm font-semibold text-gray-300">목표 포트폴리오</h3>
               <button
                 onClick={openCreate}
+                aria-label="새 포트폴리오 만들기"
                 className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-gray-700 transition-colors"
               >
                 <Plus size={13} /> 새로 만들기
@@ -241,7 +242,7 @@ export default function RebalancingTab() {
             ) : portfolios.length === 0 ? (
               <div className="text-center py-10 text-sm text-gray-500">
                 <div className="mb-2">포트폴리오가 없습니다.</div>
-                <button onClick={openCreate} className="text-blue-400 hover:underline">
+                <button onClick={openCreate} aria-label="새 포트폴리오 만들기" className="text-blue-400 hover:underline">
                   + 새로 만들기
                 </button>
               </div>

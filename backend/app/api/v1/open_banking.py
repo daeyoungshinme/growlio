@@ -22,13 +22,13 @@ from app.models.user import User, UserSettings
 from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt, encrypt
-from app.utils.cache_keys import TTL_OB_STATE, ob_state_key
+from app.utils.cache_keys import TTL_OB_STATE, TTL_OB_TOKEN, ob_state_key
 
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/open-banking", tags=["open-banking"])
 
-_OB_TOKEN_DEFAULT_TTL = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
+_OB_TOKEN_DEFAULT_TTL = TTL_OB_TOKEN
 
 
 @router.get("/connect")
