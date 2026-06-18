@@ -205,9 +205,8 @@ class TestStockPrice:
 
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.api.v1.stocks.asyncio.get_running_loop") as mock_loop,
+            patch("app.services.yahoo_price._sync_yahoo_price", return_value=75000.0),
         ):
-            mock_loop.return_value.run_in_executor = AsyncMock(return_value=75000.0)
             resp = client.get("/api/v1/stocks/price?ticker=005930&market=KOSPI")
         assert resp.status_code == 200
         data = resp.json()
