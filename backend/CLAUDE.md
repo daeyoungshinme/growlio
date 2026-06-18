@@ -114,7 +114,8 @@ API Request
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
         ├── stocks.py         # 종목 검색
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
-        └── transactions.py   # 입출금/배당 내역 CRUD
+        ├── transactions.py   # 입출금/배당 내역 CRUD
+        └── ws.py             # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (클라이언트당 개별 연결)
 
 services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
