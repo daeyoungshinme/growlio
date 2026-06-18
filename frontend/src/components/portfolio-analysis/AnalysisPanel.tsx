@@ -83,12 +83,12 @@ export function AnalysisPanel({
   return (
     <div className="flex-1 min-w-0 space-y-4">
       {/* 분석 버튼 행 */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5 [&::-webkit-scrollbar]:hidden">
         <button
           onClick={handleRebalancingAnalysis}
           disabled={!canRebalance || analyzing}
           title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
+          className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
             mode === "rebalancing"
               ? "bg-blue-600 text-white hover:bg-blue-700"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -107,7 +107,7 @@ export function AnalysisPanel({
 
         <button
           onClick={() => setMode("backtest")}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             mode === "backtest"
               ? "bg-blue-600 text-white hover:bg-blue-700"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -120,7 +120,7 @@ export function AnalysisPanel({
           onClick={() => setMode("strategy")}
           disabled={!canRebalance}
           title={!canRebalance ? "포트폴리오를 1개만 선택하세요" : undefined}
-          className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
+          className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-40 ${
             mode === "strategy"
               ? "bg-amber-500 text-white hover:bg-amber-600"
               : "bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -130,7 +130,7 @@ export function AnalysisPanel({
         </button>
 
         {selectedIds.size > 0 && (
-          <span className="w-full md:w-auto text-xs text-gray-400 dark:text-gray-500">
+          <span className="flex-none whitespace-nowrap text-xs text-gray-400 dark:text-gray-500">
             {selectedNames}
             {selectedIds.size > 1 && ` 외 ${selectedIds.size - 1}개`} 선택됨
           </span>

@@ -41,9 +41,9 @@ class Settings(BaseSettings):
 
     migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
 
-    # DB 커넥션 풀 설정
-    database_pool_size: int = 10
-    database_max_overflow: int = 5
+    # DB 커넥션 풀 설정 (PgBouncer session mode 한도 15 기준 — 총합 7로 여유 확보)
+    database_pool_size: int = 5
+    database_max_overflow: int = 2
     database_pool_timeout: int = 30
     slow_query_ms: int = 200  # 이 임계값(ms) 초과 쿼리는 경고 로그 출력
 
