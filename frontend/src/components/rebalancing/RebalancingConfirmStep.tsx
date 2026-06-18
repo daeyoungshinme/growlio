@@ -1,6 +1,7 @@
 import type { OrderType } from "@/hooks/useRebalancingExecution";
 import { useRebalancingExecutionContext } from "@/hooks/useRebalancingExecution";
-import { fmtKrwPrice } from "@/utils/format";
+import { fmtKrw, fmtKrwPrice } from "@/utils/format";
+import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { CashSummaryBar } from "./CashSummaryBar";
 import { RebalancingOrderTable } from "./RebalancingOrderTable";
 
@@ -23,6 +24,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     getEstimateKrw,
     loadLiveBalance,
     hasRealAccount,
+    globalCashSummary,
+    autoAdjustForCash,
   } = exec;
   const {
     balanceState,
@@ -107,6 +110,78 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
 
       {confirmed && (
         <p className="text-xs text-red-400 text-right">아래 버튼으로 즉시 주문이 실행됩니다.</p>
+      )}
+
+      {/* 전체 예수금 요약 배너 */}
+      {globalCashSummary.balancesLoaded && (
+        <div
+          className={`rounded-xl p-3 space-y-2 ${
+            globalCashSummary.isInsufficient
+              ? "bg-red-900/20 border border-red-800/40"
+              : "bg-gray-800/60 border border-gray-700/50"
+          }`}
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
+            <span>
+              전체 예수금{" "}
+              <span className="text-gray-200 font-medium">
+                {fmtKrw(globalCashSummary.totalDeposit ?? 0)}
+              </span>
+            </span>
+            {(globalCashSummary.totalSellProceeds ?? 0) > 0 && (
+              <span>
+                + 매도예상{" "}
+                <span className={`font-medium ${LOSS_COLOR}`}>
+                  +{fmtKrw(globalCashSummary.totalSellProceeds ?? 0)}
+                </span>
+              </span>
+            )}
+            <span>
+              사용가능{" "}
+              <span className="text-gray-200 font-medium">
+                {globalCashSummary.totalAvailable !== null
+                  ? fmtKrw(globalCashSummary.totalAvailable)
+                  : "—"}
+              </span>
+            </span>
+            <span>
+              매수필요{" "}
+              <span className={`font-medium ${PROFIT_COLOR}`}>
+                {globalCashSummary.totalBuyCost !== null
+                  ? fmtKrw(globalCashSummary.totalBuyCost)
+                  : "—"}
+              </span>
+            </span>
+            <span
+              className={`font-semibold ${
+                globalCashSummary.surplus === null
+                  ? "text-gray-400"
+                  : globalCashSummary.surplus >= 0
+                    ? "text-green-400"
+                    : "text-red-400"
+              }`}
+            >
+              {globalCashSummary.surplus === null
+                ? "여유/부족 계산 불가"
+                : globalCashSummary.surplus >= 0
+                  ? `여유 +${fmtKrw(globalCashSummary.surplus)}`
+                  : `부족 ${fmtKrw(globalCashSummary.surplus)}`}
+            </span>
+          </div>
+          {globalCashSummary.isInsufficient && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-amber-300">
+                예수금이 부족합니다. 매도 후 매수하거나 수량을 자동으로 조정할 수 있습니다.
+              </span>
+              <button
+                onClick={autoAdjustForCash}
+                className="shrink-0 text-xs bg-amber-700/60 hover:bg-amber-700 text-amber-200 px-3 py-1.5 rounded-lg transition-colors font-medium border border-amber-600/40"
+              >
+                예수금에 맞춰 자동 조정
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {kisAccounts.length === 0 ? (

@@ -244,6 +244,8 @@ interface Props {
   onExecuted?: (results: ExecutionResult[]) => void;
   existingAlert?: RebalancingAlert;
   onAlertClick?: () => void;
+  includeCash?: boolean;
+  onToggleCash?: (v: boolean) => void;
 }
 
 export default function RebalancingTable({
@@ -253,6 +255,8 @@ export default function RebalancingTable({
   onExecuted,
   existingAlert,
   onAlertClick,
+  includeCash = false,
+  onToggleCash,
 }: Props) {
   const kisAccounts = accounts.filter((a) => a.asset_type === "STOCK_KIS");
   const [executionOpen, setExecutionOpen] = useState(false);
@@ -314,34 +318,118 @@ export default function RebalancingTable({
       </div>
 
       {/* 요약 카드 */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-gray-700 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">
-            {analysis.base_type === "STOCK_ONLY" ? "기준 자산(주식)" : "기준 자산(전체)"}
-          </div>
-          <div className="text-sm font-semibold text-gray-100">
-            {fmtKrw(analysis.base_value_krw)}
-          </div>
-        </div>
-        <div className="bg-red-900/30 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
-          <div className={`text-sm font-semibold ${PROFIT_COLOR}`}>
-            {fmtKrw(
-              analysis.items.filter((i) => i.diff_krw > 0).reduce((s, i) => s + i.diff_krw, 0),
+      {(() => {
+        const totalBuySummary = analysis.items
+          .filter((i) => i.diff_krw > 0)
+          .reduce((s, i) => s + i.diff_krw, 0);
+        const totalSellSummary = Math.abs(
+          analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
+        );
+        const cashAvailable = analysis.available_cash_krw ?? 0;
+        const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
+        const cashAfterCls =
+          cashAfter >= 0
+            ? cashAfter < totalBuySummary * 0.05
+              ? "text-amber-400"
+              : "text-green-400"
+            : "text-red-400";
+        const showCashToggle = cashAvailable > 0 && analysis.base_type === "STOCK_ONLY";
+        return (
+          <div className="space-y-2">
+            {showCashToggle && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => onToggleCash?.(!includeCash)}
+                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
+                    includeCash
+                      ? "bg-indigo-700/40 border-indigo-600/50 text-indigo-300"
+                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
+                  }`}
+                >
+                  {includeCash ? "✓ 예수금 포함 분석 중" : "+ 예수금 포함 분석"}
+                </button>
+                {includeCash && (
+                  <span className="text-xs text-indigo-400">
+                    예수금 {fmtKrw(cashAvailable)} 포함 · 목표 비중대로 매수 수량 산정
+                  </span>
+                )}
+              </div>
             )}
-          </div>
-        </div>
-        <div className="bg-blue-900/30 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">총 매도 필요</div>
-          <div className={`text-sm font-semibold ${LOSS_COLOR}`}>
-            {fmtKrw(
-              Math.abs(
-                analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
-              ),
+            {includeCash && (
+              <div className="rounded-xl px-3 py-2 bg-indigo-900/20 border border-indigo-700/40 text-xs text-indigo-300">
+                기준 자산 = 주식 {fmtKrw(analysis.base_value_krw - cashAvailable)} + 예수금{" "}
+                {fmtKrw(cashAvailable)} = {fmtKrw(analysis.base_value_krw)} 기준으로 매수/매도 수량이
+                계산됩니다.
+              </div>
             )}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-gray-700 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-400 mb-1">
+                  {analysis.base_type === "STOCK_ONLY"
+                    ? includeCash
+                      ? "기준 자산(주식+예수금)"
+                      : "기준 자산(주식)"
+                    : "기준 자산(전체)"}
+                </div>
+                <div className="text-sm font-semibold text-gray-100">
+                  {fmtKrw(analysis.base_value_krw)}
+                </div>
+              </div>
+              <div className="bg-gray-700 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-400 mb-1">현재 예수금</div>
+                <div className="text-sm font-semibold text-gray-100">
+                  {fmtKrw(cashAvailable)}
+                </div>
+              </div>
+              <div className="bg-red-900/30 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
+                <div className={`text-sm font-semibold ${PROFIT_COLOR}`}>
+                  {fmtKrw(totalBuySummary)}
+                </div>
+              </div>
+              <div className="bg-blue-900/30 rounded-xl p-3 text-center">
+                <div className="text-xs text-gray-400 mb-1">총 매도 필요</div>
+                <div className={`text-sm font-semibold ${LOSS_COLOR}`}>
+                  {fmtKrw(totalSellSummary)}
+                </div>
+              </div>
+            </div>
+            <div
+              className={`rounded-xl p-3 flex items-center justify-between gap-2 ${cashAfter < 0 ? "bg-red-900/20 border border-red-800/40" : "bg-gray-700/60"}`}
+            >
+              <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
+                <span>
+                  예수금 <span className="text-gray-200 font-medium">{fmtKrw(cashAvailable)}</span>
+                </span>
+                {totalSellSummary > 0 && (
+                  <span>
+                    + 매도예상{" "}
+                    <span className={`font-medium ${LOSS_COLOR}`}>
+                      +{fmtKrw(totalSellSummary)}
+                    </span>
+                  </span>
+                )}
+                <span>
+                  − 매수필요{" "}
+                  <span className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(totalBuySummary)}</span>
+                </span>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-xs text-gray-400 mb-0.5">리밸런싱 후 예수금</div>
+                <div className={`text-sm font-semibold ${cashAfterCls}`}>
+                  {cashAfter >= 0 ? "+" : ""}
+                  {fmtKrw(cashAfter)}
+                </div>
+                {cashAfter < 0 && (
+                  <div className="text-xs text-red-400 mt-0.5">
+                    예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* 집중도 지표 (HHI) + 거래 비용 */}
       {(() => {

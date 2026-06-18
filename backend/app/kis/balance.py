@@ -79,7 +79,7 @@ async def get_domestic_balance(
     summary = data.get("output2", [{}])[0] if data.get("output2") else {}
     return {
         "positions": positions,
-        "total_value_krw": float(summary.get("tot_evlu_amt", 0)),
+        "total_value_krw": float(summary.get("evlu_amt_smtl_amt", 0)),
         "deposit_krw": float(summary.get("dnca_tot_amt", 0)),
         "invested_krw": float(summary.get("pchs_amt_smtl_amt", 0)),
         "pnl_krw": float(summary.get("evlu_pfls_smtl_amt", 0)),

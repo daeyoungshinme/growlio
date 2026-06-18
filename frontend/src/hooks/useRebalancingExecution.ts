@@ -14,6 +14,7 @@ export type {
   OrderType,
   PriceLoadState,
   CashAnalysis,
+  GlobalCashSummary,
   ExecutionState,
   ExecutionAction,
   RebalancingExecutionHook,

@@ -52,6 +52,7 @@ export interface RebalancingAnalysis {
   target_weighted_cagr_10y_pct?: number | null;
   current_weighted_cagr_10y_pct?: number | null;
   ticker_account_map: Record<string, TickerAccountInfo[]>;
+  available_cash_krw?: number;
 }
 
 export const analyzePortfolio = (id: string, accountIds?: string[]) => {

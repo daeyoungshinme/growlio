@@ -14,6 +14,16 @@ export interface CashAnalysis {
   surplus: number | null;
 }
 
+export interface GlobalCashSummary {
+  totalDeposit: number | null;
+  totalSellProceeds: number | null;
+  totalBuyCost: number | null;
+  totalAvailable: number | null;
+  surplus: number | null;
+  isInsufficient: boolean;
+  balancesLoaded: boolean;
+}
+
 export interface ExecutionState {
   liveBalances: Record<string, KisBalancePosition[]>;
   balanceState: Record<string, BalanceLoadState>;
@@ -72,4 +82,5 @@ export type ExecutionAction =
   | { type: "EXECUTE_START" }
   | { type: "EXECUTE_SUCCESS"; results: ExecutionResult[] }
   | { type: "EXECUTE_ERROR"; msg: string }
-  | { type: "CONFIRM_CLICK" };
+  | { type: "CONFIRM_CLICK" }
+  | { type: "BULK_SET_QTY"; entries: Array<{ key: string; qty: number }> };

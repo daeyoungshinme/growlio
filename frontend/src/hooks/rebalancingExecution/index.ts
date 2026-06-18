@@ -15,7 +15,7 @@ import {
 } from "@/api/rebalancing";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
-import type { CashAnalysis, OrderType, Phase, PriceLoadState } from "./types";
+import type { CashAnalysis, GlobalCashSummary, OrderType, Phase, PriceLoadState } from "./types";
 import { executionReducer } from "./reducer";
 
 export type {
@@ -24,6 +24,7 @@ export type {
   OrderType,
   PriceLoadState,
   CashAnalysis,
+  GlobalCashSummary,
   ExecutionState,
   ExecutionAction,
 } from "./types";
@@ -321,6 +322,95 @@ export function useRebalancingExecution({
     return { deposit, isOrderableKnown, sellProceeds, totalAvailable, buyCost, surplus };
   }
 
+  const globalCashSummary = useMemo((): GlobalCashSummary => {
+    const balancesLoaded = kisAccounts.some((acc) => state.balanceState[acc.id] === "loaded");
+    if (!balancesLoaded) {
+      return {
+        totalDeposit: null,
+        totalSellProceeds: null,
+        totalBuyCost: null,
+        totalAvailable: null,
+        surplus: null,
+        isInsufficient: false,
+        balancesLoaded: false,
+      };
+    }
+
+    let totalDeposit = 0;
+    for (const acc of kisAccounts) {
+      const useOrderable = acc.id in state.orderableKrw;
+      totalDeposit += useOrderable
+        ? (state.orderableKrw[acc.id] ?? 0)
+        : (state.depositKrw[acc.id] ?? 0);
+    }
+
+    let totalSellProceeds: number | null = 0;
+    loop: for (const acc of kisAccounts) {
+      for (const { item, suggestedQty } of sellRowsByAccount[acc.id] ?? []) {
+        const key = `sell_${item.ticker}_${acc.id}`;
+        if (!selected.has(key)) continue;
+        const qty = qtyOverrides[key] ?? suggestedQty;
+        const est = getEstimateKrw(key, item.ticker, item.market, qty);
+        if (est === null) {
+          totalSellProceeds = null;
+          break loop;
+        }
+        totalSellProceeds = (totalSellProceeds ?? 0) + est;
+      }
+    }
+
+    let totalBuyCost: number | null = 0;
+    loop2: for (const acc of kisAccounts) {
+      for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
+        const key = `buy_${item.ticker}_${acc.id}`;
+        if (!selected.has(key)) continue;
+        const qty = qtyOverrides[key] ?? suggestedQty;
+        const est = getEstimateKrw(key, item.ticker, item.market, qty);
+        if (est === null) {
+          totalBuyCost = null;
+          break loop2;
+        }
+        totalBuyCost = (totalBuyCost ?? 0) + est;
+      }
+    }
+
+    const totalAvailable =
+      totalSellProceeds !== null ? totalDeposit + totalSellProceeds : null;
+    const surplus =
+      totalAvailable !== null && totalBuyCost !== null ? totalAvailable - totalBuyCost : null;
+    return {
+      totalDeposit,
+      totalSellProceeds,
+      totalBuyCost,
+      totalAvailable,
+      surplus,
+      isInsufficient: surplus !== null && surplus < 0,
+      balancesLoaded: true,
+    };
+    // getEstimateKrw는 훅 스코프 함수 — 실제 의존값(orderType, prices, limitPriceOverrides)은 아래에 포함됨.
+  }, [kisAccounts, state.balanceState, state.depositKrw, state.orderableKrw, sellRowsByAccount, buyRowsByAccount, selected, qtyOverrides, livePricesKrw, livePricesUsd, globalUsdRate, orderType, limitPriceOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function autoAdjustForCash() {
+    if (!globalCashSummary.balancesLoaded || !globalCashSummary.isInsufficient) return;
+    if (globalCashSummary.totalBuyCost === null || globalCashSummary.totalBuyCost <= 0) return;
+    if (globalCashSummary.totalAvailable === null || globalCashSummary.totalAvailable <= 0) return;
+
+    const ratio = globalCashSummary.totalAvailable / globalCashSummary.totalBuyCost;
+    const entries: Array<{ key: string; qty: number }> = [];
+
+    for (const acc of kisAccounts) {
+      for (const { item, suggestedQty } of buyRowsByAccount[acc.id] ?? []) {
+        const key = `buy_${item.ticker}_${acc.id}`;
+        if (!selected.has(key)) continue;
+        const originalQty = qtyOverrides[key] ?? suggestedQty;
+        const newQty = Math.floor(originalQty * ratio);
+        entries.push({ key, qty: newQty });
+      }
+    }
+
+    dispatch({ type: "BULK_SET_QTY", entries });
+  }
+
   function getAccountSummary(accountId: string) {
     const sells = (sellRowsByAccount[accountId] ?? []).filter((r) =>
       selected.has(`sell_${r.item.ticker}_${accountId}`),
@@ -380,6 +470,8 @@ export function useRebalancingExecution({
     getBuyTotalInfo,
     getAccountSummary,
     getCashAnalysis,
+    globalCashSummary,
+    autoAdjustForCash,
     getLimitPriceNative,
     getEstimateKrw,
     loadLiveBalance,

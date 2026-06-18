@@ -327,6 +327,10 @@ def analyze_rebalancing(
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
     target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(result_items, current_map, returns_map)
     ticker_account_map = _build_ticker_account_map(overview)
+    available_cash_krw = max(
+        0.0,
+        float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)),
+    )
 
     return RebalancingAnalysis(
         portfolio_id=uuid.UUID(str(portfolio.id)),
@@ -342,4 +346,5 @@ def analyze_rebalancing(
         target_weighted_cagr_10y_pct=target_weighted_cagr,
         current_weighted_cagr_10y_pct=current_weighted_cagr,
         ticker_account_map=ticker_account_map,
+        available_cash_krw=round(available_cash_krw, 0),
     )

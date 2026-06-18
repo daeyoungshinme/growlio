@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Edit2, History, Loader2, Plus, RefreshCw, Trash2 } from "lucide-react";
 import { analyzePortfolio, ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
@@ -65,6 +65,32 @@ export default function RebalancingTab() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [includeCash, setIncludeCash] = useState(false);
+
+  const adjustedAnalysis = useMemo(() => {
+    if (!analysis || !includeCash) return analysis;
+    const cash = analysis.available_cash_krw ?? 0;
+    if (cash <= 0) return analysis;
+    const cashBase = analysis.base_value_krw + cash;
+    const items = analysis.items.map((item) => {
+      const newTarget = cashBase * (item.target_weight_pct / 100);
+      const newCurrentPct = cashBase > 0 ? (item.current_value_krw / cashBase) * 100 : 0;
+      const newDiff = newTarget - item.current_value_krw;
+      const newShares =
+        item.current_price_krw && item.current_price_krw > 0
+          ? Math.round(newDiff / item.current_price_krw)
+          : item.shares_to_trade;
+      return {
+        ...item,
+        target_value_krw: newTarget,
+        current_weight_pct: newCurrentPct,
+        weight_diff_pct: item.target_weight_pct - newCurrentPct,
+        diff_krw: newDiff,
+        shares_to_trade: newShares,
+      };
+    });
+    return { ...analysis, base_value_krw: cashBase, items };
+  }, [analysis, includeCash]);
 
   const { data: portfolios = [], isLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -143,6 +169,7 @@ export default function RebalancingTab() {
     setAnalyzing(true);
     setAnalysisError(null);
     setAnalysis(null);
+    setIncludeCash(false);
     try {
       const result = await analyzePortfolio(portfolioId);
       setAnalysis(result);
@@ -303,10 +330,12 @@ export default function RebalancingTab() {
                 </div>
                 {marketSignal && <MarketSignalBanner signal={marketSignal} />}
                 <RebalancingTable
-                  analysis={analysis}
+                  analysis={adjustedAnalysis ?? analysis}
                   portfolioId={analysis.portfolio_id}
                   accounts={allAccounts}
                   onExecuted={handleExecuted}
+                  includeCash={includeCash}
+                  onToggleCash={setIncludeCash}
                 />
               </div>
             ) : analysisError ? (

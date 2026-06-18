@@ -567,3 +567,44 @@ class TestImplicitCash:
         result = analyze_rebalancing(portfolio, overview)
         tickers = [i.ticker for i in result.items]
         assert "CASH" not in tickers
+
+
+class TestAvailableCashKrw:
+    """available_cash_krw 필드 테스트."""
+
+    def test_available_cash_is_assets_minus_stock(self):
+        """예수금 = total_assets - total_stock."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
+        )
+        overview = _make_overview(total_assets_krw=1_500_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.available_cash_krw == pytest.approx(500_000)
+
+    def test_available_cash_zero_when_no_cash(self):
+        """주식만 있을 때(예수금 없음) 0이어야 한다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
+        )
+        overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.available_cash_krw == pytest.approx(0)
+
+    def test_available_cash_clamped_to_zero(self):
+        """total_stock이 total_assets를 초과할 경우 0 이하로 내려가지 않는다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
+        )
+        overview = _make_overview(total_assets_krw=900_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.available_cash_krw == pytest.approx(0)
+
+    def test_available_cash_present_in_total_assets_base_type(self):
+        """TOTAL_ASSETS base_type에서도 예수금이 올바르게 반환된다."""
+        portfolio = _make_portfolio(
+            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 80}],
+            base_type="TOTAL_ASSETS",
+        )
+        overview = _make_overview(total_assets_krw=2_000_000, total_stock_krw=1_500_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.available_cash_krw == pytest.approx(500_000)

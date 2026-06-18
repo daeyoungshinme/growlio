@@ -127,6 +127,15 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
       return { ...state, phase: "confirm", errorMsg: action.msg };
     case "CONFIRM_CLICK":
       return { ...state, confirmed: true };
+    case "BULK_SET_QTY": {
+      const nextQtyOverrides = { ...state.qtyOverrides };
+      const nextSelected = new Set(state.selected);
+      for (const { key, qty } of action.entries) {
+        nextQtyOverrides[key] = Math.max(0, qty);
+        if (qty <= 0) nextSelected.delete(key);
+      }
+      return { ...state, qtyOverrides: nextQtyOverrides, selected: nextSelected };
+    }
     default:
       return state;
   }
