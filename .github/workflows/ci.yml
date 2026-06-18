@@ -97,7 +97,7 @@ jobs:
         run: .venv/bin/bandit -r app/ -l -q
 
       - name: Dependency vulnerability check (pip-audit)
-        run: .venv/bin/pip-audit --skip-editable -q
+        run: .venv/bin/pip-audit --skip-editable
 
   secret-scan:
     name: Secret scan (TruffleHog)
