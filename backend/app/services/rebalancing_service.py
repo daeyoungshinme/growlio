@@ -87,11 +87,12 @@ def _build_target_items(
             pos = current_map.get(key, {"value_krw": 0.0, "current_price": None, "name": name, "qty": 0.0})
             current_value = pos["value_krw"]
             current_price = pos.get("current_price")
-            diff_krw = target_value - current_value
-            shares = round(diff_krw / float(current_price), 0) if current_price and float(current_price) > 0 else None
             current_qty = pos.get("qty", 0.0)
             if current_price and float(current_price) > 0:
                 target_qty = float(math.floor(target_value / float(current_price)))
+                shares = target_qty - current_qty
+            else:
+                shares = None
 
         current_weight_pct = (current_value / base_krw * 100) if base_krw > 0 else 0.0
         diff_krw = target_value - current_value
@@ -151,12 +152,12 @@ def _build_untracked_items(
         ticker_u, market_u = key
         current_value_u = data["value_krw"]
         current_price_u = data.get("current_price")
+        current_qty_u: float = data.get("qty", 0.0)
         weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
         diff_u = -current_value_u
         shares_u: float | None = (
-            round(diff_u / float(current_price_u), 0) if current_price_u and float(current_price_u) > 0 else None
+            -current_qty_u if current_price_u and float(current_price_u) > 0 else None
         )
-        current_qty_u: float = data.get("qty", 0.0)
 
         div_yield_u, annual_div_current_u = _div_info(ticker_u, market_u, dividend_map)
         ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None
@@ -321,11 +322,12 @@ def analyze_rebalancing(
     include_implicit_cash: bool = False,
 ) -> RebalancingAnalysis:
     """현재 자산(overview)과 목표 포트폴리오를 비교해 리밸런싱 분석 결과를 반환한다."""
-    base_krw = float(
-        overview.get("total_assets_krw", 0)
-        if portfolio.base_type == "TOTAL_ASSETS"
-        else overview.get("total_stock_krw", 0)
-    )
+    if portfolio.base_type == "TOTAL_ASSETS":
+        base_krw = float(overview.get("total_assets_krw", 0))
+    else:  # STOCK_ONLY: 예수금을 항상 기준 자산에 포함
+        total_stock = float(overview.get("total_stock_krw", 0))
+        available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+        base_krw = total_stock + available_cash
 
     current_map = _build_current_map(overview)
     result_items, target_keys = _build_target_items(

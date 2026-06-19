@@ -96,8 +96,6 @@ interface Props {
   onExecuted?: (results: ExecutionResult[]) => void;
   existingAlert?: RebalancingAlert;
   onAlertClick?: () => void;
-  includeCash?: boolean;
-  onToggleCash?: (v: boolean) => void;
 }
 
 export default function RebalancingTable({
@@ -107,8 +105,6 @@ export default function RebalancingTable({
   onExecuted,
   existingAlert,
   onAlertClick,
-  includeCash = false,
-  onToggleCash,
 }: Props) {
   const kisAccounts = accounts.filter(
     (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
@@ -193,35 +189,170 @@ export default function RebalancingTable({
               ? "text-amber-400"
               : "text-green-400"
             : "text-red-400";
-        const showCashToggle = cashAvailable > 0 && analysis.base_type === "STOCK_ONLY";
+
+        const buyItems = analysis.items.filter(
+          (i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw,
+        );
+        const sellItems = analysis.items.filter(
+          (i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw,
+        );
+
         return (
           <div className="space-y-2">
-            {showCashToggle && (
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => onToggleCash?.(!includeCash)}
-                  className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${
-                    includeCash
-                      ? "bg-indigo-700/40 border-indigo-600/50 text-indigo-300"
-                      : "bg-gray-800 border-gray-700 text-gray-400 hover:text-white"
-                  }`}
-                >
-                  {includeCash ? "✓ 예수금 포함 분석 중" : "+ 예수금 포함 분석"}
-                </button>
-                {includeCash && (
-                  <span className="text-xs text-indigo-400">
-                    예수금 {fmtKrw(cashAvailable)} 포함 · 목표 비중대로 매수 수량 산정
-                  </span>
-                )}
-              </div>
-            )}
-            {includeCash && (
+            {cashAvailable > 0 && analysis.base_type === "STOCK_ONLY" && (
               <div className="rounded-xl px-3 py-2 bg-indigo-900/20 border border-indigo-700/40 text-xs text-indigo-300">
                 기준 자산 = 주식 {fmtKrw(analysis.base_value_krw - cashAvailable)} + 예수금{" "}
                 {fmtKrw(cashAvailable)} = {fmtKrw(analysis.base_value_krw)} 기준으로 매수/매도 수량이
                 계산됩니다.
               </div>
             )}
+
+            {/* 종목별 실제 거래 계획 패널 */}
+            {(buyItems.length > 0 || sellItems.length > 0) && (
+              <div className="rounded-xl bg-gray-800/60 border border-gray-700/50 p-3 space-y-3">
+                <div className="text-xs font-medium text-gray-300">종목별 거래 계획</div>
+
+                {/* 모바일: 카드 뷰 */}
+                <div className="sm:hidden space-y-2">
+                  {buyItems.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-green-400 font-medium">매수</div>
+                      {buyItems.map((item, idx) => {
+                        const actual = item.shares_to_trade! * item.current_price_krw!;
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <div className="min-w-0">
+                              <span className="text-gray-200 font-medium truncate">{item.name}</span>
+                              <span className="text-gray-500 ml-1">
+                                {item.shares_to_trade}주 × {fmtKrw(item.current_price_krw!)}
+                              </span>
+                            </div>
+                            <span className={`shrink-0 ml-2 font-medium ${PROFIT_COLOR}`}>
+                              {fmtKrw(actual)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {sellItems.length > 0 && (
+                    <div className="space-y-1.5">
+                      <div className="text-xs text-blue-400 font-medium">매도</div>
+                      {sellItems.map((item, idx) => {
+                        const actual = Math.abs(item.shares_to_trade!) * item.current_price_krw!;
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs">
+                            <div className="min-w-0">
+                              <span className="text-gray-200 font-medium truncate">{item.name}</span>
+                              <span className="text-gray-500 ml-1">
+                                {Math.abs(item.shares_to_trade!)}주 × {fmtKrw(item.current_price_krw!)}
+                              </span>
+                            </div>
+                            <span className={`shrink-0 ml-2 font-medium ${LOSS_COLOR}`}>
+                              {fmtKrw(actual)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <div className="border-t border-gray-700/50 pt-2 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">리밸런싱 후 예수금</span>
+                    <span className={`font-semibold ${cashAfterCls}`}>
+                      {cashAfter >= 0 ? "+" : ""}{fmtKrw(cashAfter)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 데스크탑: 테이블 뷰 */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-700/50 text-gray-500">
+                        <th className="text-left py-1.5 pr-3 font-medium">종목</th>
+                        <th className="text-right py-1.5 px-3 font-medium">배분 예산</th>
+                        <th className="text-right py-1.5 px-3 font-medium">현재가</th>
+                        <th className="text-right py-1.5 px-3 font-medium">수량</th>
+                        <th className="text-right py-1.5 pl-3 font-medium">실제금액</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {buyItems.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={5} className="pt-2 pb-1 text-green-400 font-medium">
+                              매수
+                            </td>
+                          </tr>
+                          {buyItems.map((item, idx) => {
+                            const actual = item.shares_to_trade! * item.current_price_krw!;
+                            return (
+                              <tr key={idx} className="border-b border-gray-700/30">
+                                <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                                  {item.name}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-400">
+                                  {fmtKrw(item.target_value_krw)}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-400">
+                                  {fmtKrw(item.current_price_krw!)}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-200">
+                                  {item.shares_to_trade}주
+                                </td>
+                                <td className={`py-1.5 pl-3 text-right font-medium ${PROFIT_COLOR}`}>
+                                  {fmtKrw(actual)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      )}
+                      {sellItems.length > 0 && (
+                        <>
+                          <tr>
+                            <td colSpan={5} className="pt-2 pb-1 text-blue-400 font-medium">
+                              매도
+                            </td>
+                          </tr>
+                          {sellItems.map((item, idx) => {
+                            const actual = Math.abs(item.shares_to_trade!) * item.current_price_krw!;
+                            return (
+                              <tr key={idx} className="border-b border-gray-700/30">
+                                <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                                  {item.name}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-400">
+                                  {fmtKrw(item.target_value_krw)}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-400">
+                                  {fmtKrw(item.current_price_krw!)}
+                                </td>
+                                <td className="py-1.5 px-3 text-right text-gray-200">
+                                  {Math.abs(item.shares_to_trade!)}주
+                                </td>
+                                <td className={`py-1.5 pl-3 text-right font-medium ${LOSS_COLOR}`}>
+                                  {fmtKrw(actual)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      )}
+                      <tr className="border-t border-gray-600/60 font-medium">
+                        <td colSpan={4} className="pt-2 text-gray-400">
+                          리밸런싱 후 예수금
+                        </td>
+                        <td className={`pt-2 pl-3 text-right ${cashAfterCls}`}>
+                          {cashAfter >= 0 ? "+" : ""}{fmtKrw(cashAfter)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {analysis.base_type === "TOTAL_ASSETS" && cashAvailable > 0 && (
               <div className="text-xs text-gray-500 px-1">
                 전체 자산 기준 — 예수금 {fmtKrw(cashAvailable)}이 목표 비중 배분에 포함됨
@@ -231,7 +362,7 @@ export default function RebalancingTable({
               <div className="bg-gray-700 rounded-xl p-3 text-center">
                 <div className="text-xs text-gray-400 mb-1">
                   {analysis.base_type === "STOCK_ONLY"
-                    ? includeCash
+                    ? cashAvailable > 0
                       ? "기준 자산(주식+예수금)"
                       : "기준 자산(주식)"
                     : "기준 자산(전체)"}

@@ -49,7 +49,7 @@ from app.services.dividend_providers import (
     sync_yahoo_dividend_info,
 )
 from app.services.portfolio_service import build_portfolio_overview
-from app.services.price_service import get_historical_returns
+from app.services.price_service import fetch_prices_batch, get_historical_returns
 from app.services.rebalancing_execution_service import execute_rebalancing
 from app.services.rebalancing_service import analyze_rebalancing
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
@@ -151,6 +151,49 @@ async def analyze_portfolio(
     ]
     all_return_tickers = list(set(target_tickers) | set(current_tickers))
     returns_map = await get_historical_returns(all_return_tickers, redis=redis)
+
+    # 미보유 목표 종목 현재가 보완: all_positions에 없는 종목은 current_price=None → shares=None
+    existing_price_keys: set[tuple[str, str]] = {
+        (pos["ticker"], pos["market"])
+        for pos in overview.get("all_positions", [])
+        if pos.get("current_price")
+    }
+    unpriced: list[tuple[str, str]] = [
+        (
+            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
+            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
+        )
+        for raw_item in portfolio.items
+        if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) != "CASH"
+        and (raw_item["market"] if isinstance(raw_item, dict) else raw_item.market) != "KR_PROPERTY"
+        and (
+            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
+            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
+        ) not in existing_price_keys
+    ]
+    if unpriced:
+        fetched_prices = await fetch_prices_batch(current_user.id, unpriced, db, redis)
+        extra_positions = [
+            {
+                "ticker": ticker,
+                "market": market,
+                "name": next(
+                    (
+                        raw_item["name"] if isinstance(raw_item, dict) else raw_item.name
+                        for raw_item in portfolio.items
+                        if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) == ticker
+                    ),
+                    ticker,
+                ),
+                "value_krw": 0.0,
+                "current_price": fetched_prices[ticker],
+                "qty": 0.0,
+            }
+            for ticker, market in unpriced
+            if ticker in fetched_prices and fetched_prices[ticker] > 0
+        ]
+        if extra_positions:
+            overview = {**overview, "all_positions": list(overview.get("all_positions", [])) + extra_positions}
 
     return analyze_rebalancing(
         portfolio,
