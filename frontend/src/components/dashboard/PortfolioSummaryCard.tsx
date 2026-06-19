@@ -6,7 +6,7 @@ import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import HoverTooltip from "@/components/common/Tooltip";
 
-const PortfolioTreemapChart = lazy(() => import("./PortfolioTreemapChart"));
+const TreemapChart = lazy(() => import("../portfolio/TreemapChart"));
 
 interface Overview {
   total_stock_krw: number;
@@ -106,7 +106,7 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
       {/* 종목별 비중 트리차트 */}
       {chartData ? (
         <Suspense fallback={<SkeletonCard rows={4} />}>
-          <PortfolioTreemapChart data={chartData} />
+          <TreemapChart data={chartData} title="종목별 비중" bare height={180} />
         </Suspense>
       ) : null}
     </div>

@@ -3,7 +3,7 @@ import { screen } from "@testing-library/react";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
-vi.mock("../components/dashboard/PortfolioTreemapChart", () => ({
+vi.mock("../components/portfolio/TreemapChart", () => ({
   default: () => <div data-testid="mock-treemap" />,
 }));
 

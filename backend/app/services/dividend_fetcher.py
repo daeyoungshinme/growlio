@@ -108,18 +108,36 @@ async def _fetch_dart_and_static(
     dps: float,
     yield_decimal: float,
 ) -> tuple[float, float]:
-    """DART 조회 및 정적 폴백 — 마지막 수단."""
-    if yield_decimal == 0.0:
+    """DART 조회 및 정적 폴백 — 마지막 수단.
+
+    DPS가 0이면 yield 유무와 무관하게 DART를 시도한다.
+    Naver는 yield만 반환하고 DPS를 주지 않으므로, DPS가 0인 채로
+    DART를 건너뛰면 수량 기반 배당금 계산이 불가능해진다.
+    """
+    if dps == 0.0:
         dart = await fetch_dart_dividend(ticker, api_key=dart_key)
         if dart:
-            yield_decimal = dart["dividend_yield"]
             if dps == 0.0:
                 dps = dart["dps"]
+            if yield_decimal == 0.0:
+                yield_decimal = dart["dividend_yield"]
     if dps == 0.0 and yield_decimal == 0.0:
         known_info = KNOWN_DIVIDEND_INFO.get((ticker, market.upper()))
         if known_info:
             dps, yield_decimal = known_info
             logger.info("known_dividend_info_used", ticker=ticker, market=market)
+        elif len(ticker) == 6 and ticker[-1] == "5":
+            # 우선주(마지막 자리 5)에 대한 데이터가 없으면 보통주(마지막 자리 0) 폴백
+            common_ticker = ticker[:-1] + "0"
+            common_info = KNOWN_DIVIDEND_INFO.get((common_ticker, market.upper()))
+            if common_info:
+                dps, yield_decimal = common_info
+                logger.info(
+                    "preferred_stock_fallback_to_common",
+                    preferred=ticker,
+                    common=common_ticker,
+                    market=market,
+                )
     return dps, yield_decimal
 
 

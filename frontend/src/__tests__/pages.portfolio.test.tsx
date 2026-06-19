@@ -51,8 +51,8 @@ vi.mock("../components/portfolio/TreemapChart", () => ({
 vi.mock("../components/portfolio/DomesticForeignBar", () => ({
   default: () => <div data-testid="domestic-foreign-bar">DomesticForeignBar</div>,
 }));
-vi.mock("../components/portfolio-analysis/PortfolioAnalysisTab", () => ({
-  default: () => <div data-testid="portfolio-analysis-tab">PortfolioAnalysisTab</div>,
+vi.mock("../components/portfolio-analysis/PortfolioDiagnosisCard", () => ({
+  default: () => <div data-testid="portfolio-diagnosis-card">PortfolioDiagnosisCard</div>,
 }));
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
@@ -199,7 +199,7 @@ describe("PortfolioPage", () => {
     expect(screen.getByText(/-1.25%\)/)).toBeInTheDocument();
   });
 
-  it("'배당 현황' 탭을 선택하면 DividendTab이 렌더링된다", async () => {
+  it("'배당' 탭을 선택하면 DividendTab이 렌더링된다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -207,33 +207,33 @@ describe("PortfolioPage", () => {
       if (url === "/dividends/by-ticker") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=배당 현황");
+    renderPortfolio("?tab=배당");
     await waitFor(() => {
       expect(screen.getByTestId("dividend-tab")).toBeInTheDocument();
     });
   });
 
-  it("'세금 추정' 탭을 선택하면 TaxOptimizationCard가 렌더링된다", async () => {
+  it("'세금' 탭을 선택하면 TaxOptimizationCard가 렌더링된다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=세금 추정");
+    renderPortfolio("?tab=세금");
     await waitFor(() => {
       expect(screen.getByTestId("tax-optimization")).toBeInTheDocument();
     });
   });
 
-  it("'포트폴리오 분석' 탭을 선택하면 PortfolioAnalysisTab이 렌더링된다", async () => {
+  it("'진단' 탭을 선택하면 PortfolioDiagnosisCard가 렌더링된다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=포트폴리오 분석");
+    renderPortfolio("?tab=진단");
     await waitFor(() => {
-      expect(screen.getByTestId("portfolio-analysis-tab")).toBeInTheDocument();
+      expect(screen.getByTestId("portfolio-diagnosis-card")).toBeInTheDocument();
     });
   });
 

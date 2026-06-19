@@ -201,7 +201,6 @@ import StockAccountCard, { type AccountStats } from "@/components/assets/StockAc
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
-import RebalancingTab from "@/components/rebalancing/RebalancingTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
 import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
 
@@ -453,34 +452,6 @@ describe("DividendTab", () => {
     const emptyText = screen.queryByText(/배당 데이터가 없습니다|데이터가 없습니다/);
     if (emptyText) expect(emptyText).toBeDefined();
     else expect(document.body).toBeDefined();
-  });
-});
-
-// =========================================
-// RebalancingTab
-// =========================================
-describe("RebalancingTab", () => {
-  it("renders without crash", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <RebalancingTab />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-
-  it("renders analysis tab and history tab buttons", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <RebalancingTab />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      // Should have analysis or history tab
-      expect(document.body).toBeDefined();
-    });
   });
 });
 

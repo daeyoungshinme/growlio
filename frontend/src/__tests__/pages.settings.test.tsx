@@ -88,6 +88,7 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/settings") return Promise.resolve({ data: mockSettings });
+      if (url === "/assets") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
     vi.mocked(fetchAlertHistory).mockResolvedValue([]);

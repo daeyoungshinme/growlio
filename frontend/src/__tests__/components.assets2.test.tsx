@@ -144,7 +144,7 @@ describe("RebalancingMobileCard", () => {
         selected={new Set(["005930-KOSPI"])}
       />,
     );
-    expect(container.firstChild?.className).toContain("bg-indigo-950/20");
+    expect((container.firstChild as HTMLElement)?.className).toContain("bg-indigo-950/20");
   });
 
   it("해외 종목일 때 USD 표시를 보여준다", () => {

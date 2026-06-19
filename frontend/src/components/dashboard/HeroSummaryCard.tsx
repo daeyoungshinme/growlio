@@ -1,5 +1,6 @@
 import { lazy, memo, Suspense, useMemo } from "react";
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, TrendingDown, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
 import { fmtKrw, fmtMonth, fmtPct } from "@/utils/format";
 import { pnlColor, PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
@@ -262,7 +263,7 @@ export default memo(function HeroSummaryCard({
             )}
           </div>
         </div>
-        {currentProgressPct != null && (
+        {currentProgressPct != null ? (
           <div>
             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500 mb-1">
               <span>0%</span>
@@ -275,6 +276,13 @@ export default memo(function HeroSummaryCard({
               />
             </div>
           </div>
+        ) : (
+          <Link
+            to="/invest-plan"
+            className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            투자 목표 설정하기 <ArrowRight size={12} />
+          </Link>
         )}
       </div>
     </div>

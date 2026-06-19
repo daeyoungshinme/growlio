@@ -154,12 +154,6 @@ export default function InvestPlanPage() {
         )}
       </div>
 
-      <DCASettingsSection
-        key={settingsData ? "dca-loaded" : "dca-loading"}
-        current={settingsData ?? null}
-        onSettingsChange={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings })}
-      />
-
       {isConfigured && data && (
         <ErrorBoundary variant="section">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
@@ -174,6 +168,18 @@ export default function InvestPlanPage() {
           </div>
         </ErrorBoundary>
       )}
+
+      {/* 자동 정기매수 실행 설정 (선택사항) */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+          자동 정기매수 실행 설정 (선택사항)
+        </h2>
+        <DCASettingsSection
+          key={settingsData ? "dca-loaded" : "dca-loading"}
+          current={settingsData ?? null}
+          onSettingsChange={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings })}
+        />
+      </div>
 
       {/* 설정 편집 모달 */}
       {editing && (

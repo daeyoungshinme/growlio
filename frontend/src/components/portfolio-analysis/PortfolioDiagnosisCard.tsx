@@ -90,10 +90,11 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 interface Props {
   portfolioName?: string;
+  defaultExpanded?: boolean;
 }
 
-export default function PortfolioDiagnosisCard({ portfolioName }: Props) {
-  const [isOpen, setIsOpen] = useState(false);
+export default function PortfolioDiagnosisCard({ portfolioName, defaultExpanded = false }: Props) {
+  const [isOpen, setIsOpen] = useState(defaultExpanded);
   const { data: allInsights, isLoading } = useInsights();
 
   if (isLoading) {

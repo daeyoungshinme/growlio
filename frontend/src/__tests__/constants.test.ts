@@ -173,8 +173,8 @@ describe("tabs constants", () => {
   it("PORTFOLIO_TABS는 4개 탭을 포함한다", () => {
     expect(PORTFOLIO_TABS).toHaveLength(4);
     expect(PORTFOLIO_TABS).toContain("종목 현황");
-    expect(PORTFOLIO_TABS).toContain("배당 현황");
-    expect(PORTFOLIO_TABS).toContain("세금 추정");
-    expect(PORTFOLIO_TABS).toContain("포트폴리오 분석");
+    expect(PORTFOLIO_TABS).toContain("배당");
+    expect(PORTFOLIO_TABS).toContain("세금");
+    expect(PORTFOLIO_TABS).toContain("진단");
   });
 });

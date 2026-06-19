@@ -29,6 +29,7 @@ const AssetManagementPage = lazy(() => import("./pages/AssetManagementPage"));
 const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
 const MarketPage = lazy(() => import("./pages/MarketPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const RebalancingPage = lazy(() => import("./pages/RebalancingPage"));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -77,6 +78,7 @@ function AppRoutes() {
           <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
           <Route path="market" element={<LazyRoute Component={MarketPage} />} />
           <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
+          <Route path="rebalancing" element={<LazyRoute Component={RebalancingPage} />} />
           {/* 구 URL 리다이렉트 */}
           <Route path="assets" element={<Navigate to="/portfolio" replace />} />
           <Route path="trend" element={<Navigate to="/dashboard" replace />} />

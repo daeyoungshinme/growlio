@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Wallet } from "lucide-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { AlertTriangle, ArrowRight, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
@@ -11,10 +11,16 @@ import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { PORTFOLIO_TABS } from "@/constants/tabs";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { fetchMarketSignal } from "@/api/marketSignals";
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 const DisclosureFeedCard = lazy(() => import("../components/dashboard/DisclosureFeedCard"));
+
+const SIGNAL_BG = {
+  YELLOW: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300",
+  RED: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
+};
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -25,6 +31,12 @@ export default function DashboardPage() {
     await qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
   }, [qc]);
   useRegisterRefresh(handleRefresh);
+
+  const { data: marketSignal } = useQuery({
+    queryKey: QUERY_KEYS.marketSignal,
+    queryFn: fetchMarketSignal,
+    staleTime: STALE_TIME.LONG,
+  });
   const {
     data,
     isLoading,
@@ -100,6 +112,24 @@ export default function DashboardPage() {
         />
       </ErrorBoundary>
 
+      {/* 시장 위험 신호 (YELLOW/RED만 표시) */}
+      {marketSignal && marketSignal.composite_level !== "GREEN" && (
+        <Link
+          to="/rebalancing"
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
+        >
+          <AlertTriangle size={15} className="flex-shrink-0" />
+          <span>
+            시장 위험 신호:{" "}
+            <span className="font-bold">
+              {marketSignal.composite_level === "RED" ? "위험" : "주의"}
+            </span>{" "}
+            — 리밸런싱 전략을 확인하세요
+          </span>
+          <ArrowRight size={14} className="ml-auto flex-shrink-0" />
+        </Link>
+      )}
+
       {/* Row 2: 포트폴리오 요약 + 배당 현황 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
@@ -126,7 +156,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
             <Link
-              to={`/portfolio?tab=${encodeURIComponent(PORTFOLIO_TABS[1])}`}
+              to="/portfolio?tab=배당"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               자세히 보기 <ArrowRight size={14} />
@@ -144,17 +174,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Row 3: 보유 종목 DART 공시 피드 (시의성 있는 콘텐츠 우선) */}
+      <ErrorBoundary variant="section">
+        <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
+          <DisclosureFeedCard />
+        </Suspense>
+      </ErrorBoundary>
+
       {/* Row 4: 자산 추이 */}
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
           <AllocationHistoryChart />
-        </Suspense>
-      </ErrorBoundary>
-
-      {/* Row 5: 보유 종목 DART 공시 피드 */}
-      <ErrorBoundary variant="section">
-        <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
-          <DisclosureFeedCard />
         </Suspense>
       </ErrorBoundary>
     </div>

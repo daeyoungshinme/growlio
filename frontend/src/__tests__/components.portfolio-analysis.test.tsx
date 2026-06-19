@@ -3,7 +3,6 @@ import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
 import type { AssetAccount } from "@/api/assets";
-import type { RebalancingAnalysis } from "@/api/rebalancing";
 
 vi.mock("@/hooks/useInsights", () => ({
   useInsights: vi.fn(() => ({ data: [], isLoading: false })),
@@ -12,8 +11,6 @@ vi.mock("@/hooks/useInsights", () => ({
 import PortfolioDiagnosisCard from "@/components/portfolio-analysis/PortfolioDiagnosisCard";
 import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 import PortfolioAccountSelector from "@/components/portfolio-analysis/PortfolioAccountSelector";
-import PortfolioComparisonPanel from "@/components/portfolio-analysis/PortfolioComparisonPanel";
-
 // ------- PortfolioDiagnosisCard -------
 describe("PortfolioDiagnosisCard", () => {
   it("renders no issues state", () => {
@@ -201,64 +198,3 @@ describe("PortfolioAccountSelector", () => {
   });
 });
 
-// ------- PortfolioComparisonPanel -------
-const mockAnalysis: RebalancingAnalysis = {
-  portfolio_id: "p1",
-  portfolio_name: "포트폴리오 A",
-  base_type: "STOCK_ONLY",
-  base_value_krw: 10000000,
-  analyzed_at: "2024-01-01",
-  current_portfolio_annual_dividend: 0,
-  target_portfolio_annual_dividend: 300000,
-  target_weighted_cagr_10y_pct: 8.5,
-  ticker_account_map: {},
-  items: [
-    {
-      ticker: "AAPL",
-      name: "Apple Inc.",
-      market: "NASDAQ",
-      current_weight_pct: 20,
-      target_weight_pct: 25,
-      weight_diff_pct: 5,
-      current_value_krw: 2000000,
-      target_value_krw: 2500000,
-      diff_krw: 500000,
-      shares_to_trade: 3,
-      current_price_krw: 170000,
-      cagr_10y_pct: 12.5,
-      return_10y_pct: 224.0,
-      actual_years_10y: 10,
-    },
-  ],
-  untracked_holdings: [],
-};
-
-describe("PortfolioComparisonPanel", () => {
-  it("renders comparison panel", () => {
-    renderWithProviders(
-      <PortfolioComparisonPanel
-        accountName="테스트 계좌"
-        currentAnalysis={mockAnalysis}
-        proposedAnalysis={mockAnalysis}
-        onReplace={vi.fn()}
-        onCancel={vi.fn()}
-      />,
-    );
-    expect(document.body).toBeDefined();
-  });
-
-  it("renders action buttons", () => {
-    renderWithProviders(
-      <PortfolioComparisonPanel
-        accountName="테스트 계좌"
-        currentAnalysis={mockAnalysis}
-        proposedAnalysis={mockAnalysis}
-        onReplace={vi.fn()}
-        onCancel={vi.fn()}
-      />,
-    );
-    // Find buttons
-    const buttons = screen.getAllByRole("button");
-    expect(buttons.length).toBeGreaterThan(0);
-  });
-});

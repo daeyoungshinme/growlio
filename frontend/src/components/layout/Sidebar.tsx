@@ -5,7 +5,7 @@ import {
   PieChart,
   Settings,
   Home,
-  Wallet,
+  Shuffle,
   TrendingUp,
   Moon,
   Sun,
@@ -17,7 +17,7 @@ import { useLogout } from "@/hooks/useLogout";
 const nav = [
   { to: "/dashboard", icon: Home, label: "대시보드" },
   { to: "/portfolio", icon: PieChart, label: "포트폴리오" },
-  { to: "/asset-management", icon: Wallet, label: "자산관리" },
+  { to: "/rebalancing", icon: Shuffle, label: "리밸런싱" },
   { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
   { to: "/market", icon: BarChart2, label: "시장" },
   { to: "/settings", icon: Settings, label: "설정" },

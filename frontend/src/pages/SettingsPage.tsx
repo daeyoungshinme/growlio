@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint, Wallet, ArrowRight } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useBiometric } from "@/hooks/useBiometric";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { type SettingsData } from "@/api/settings";
+import { fetchAccounts } from "@/api/assets";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
@@ -88,6 +90,17 @@ export default function SettingsPage() {
     staleTime: STALE_TIME.LONG,
   });
 
+  const { data: accounts = [] } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.MEDIUM,
+    select: (data) => (Array.isArray(data) ? data : []),
+  });
+
+  const bankCount = accounts.filter((a) => a.asset_type === "BANK_ACCOUNT").length;
+  const stockCount = accounts.filter((a) => a.asset_type.startsWith("STOCK_")).length;
+  const realEstateCount = accounts.filter((a) => a.asset_type === "REAL_ESTATE").length;
+
   const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 
   const saveDart = async () => {
@@ -122,6 +135,24 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
+      {/* 계좌 및 자산 관리 */}
+      <Link
+        to="/asset-management"
+        className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+      >
+        <div className="p-2.5 bg-blue-50 dark:bg-blue-950 rounded-xl">
+          <Wallet size={20} className="text-blue-600 dark:text-blue-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">계좌 및 자산 관리</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            은행 {bankCount}개 · 증권 {stockCount}개
+            {realEstateCount > 0 ? ` · 부동산 ${realEstateCount}개` : ""}
+          </p>
+        </div>
+        <ArrowRight size={16} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+      </Link>
+
       {/* DART OpenAPI */}
       <SectionCard
         title="DART OpenAPI (금융감독원)"

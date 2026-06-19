@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
 import { api } from "@/api/client";
@@ -20,11 +20,11 @@ import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
-const PortfolioAnalysisTab = lazy(
-  () => import("../components/portfolio-analysis/PortfolioAnalysisTab"),
-);
 const TaxOptimizationCard = lazy(
   () => import("../components/portfolio-analysis/TaxOptimizationCard"),
+);
+const PortfolioDiagnosisCard = lazy(
+  () => import("../components/portfolio-analysis/PortfolioDiagnosisCard"),
 );
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
@@ -37,12 +37,14 @@ interface DividendSummary {
   monthly_ticker_breakdown: { month: string; ticker: string | null; amount: number }[];
 }
 
+const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
 const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const handleRefresh = useCallback(async () => {
     await invalidateSyncData(qc);
@@ -50,9 +52,18 @@ export default function PortfolioPage() {
   useRegisterRefresh(handleRefresh);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const urlTab = searchParams.get("tab") as Tab;
-  const tab: Tab = TABS.includes(urlTab) ? urlTab : "종목 현황";
-  const portfolioId = searchParams.get("portfolioId") ?? undefined;
+  const rawTab = searchParams.get("tab");
+
+  // 구 "포트폴리오 분석" 탭 URL → /rebalancing 리다이렉트
+  useEffect(() => {
+    if (rawTab === "포트폴리오 분석") {
+      const portfolioId = searchParams.get("portfolioId");
+      const target = portfolioId ? `/rebalancing?portfolioId=${portfolioId}` : "/rebalancing";
+      navigate(target, { replace: true });
+    }
+  }, [rawTab, searchParams, navigate]);
+
+  const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : "종목 현황";
 
   const handleTabChange = useCallback(
     (next: Tab) => {
@@ -62,7 +73,17 @@ export default function PortfolioPage() {
   );
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
-  const [chartsOpen, setChartsOpen] = useState(true);
+  const [chartsOpen, setChartsOpen] = useState(
+    () => localStorage.getItem(CHARTS_OPEN_KEY) !== "false",
+  );
+
+  const handleChartsToggle = useCallback(() => {
+    setChartsOpen((v) => {
+      const next = !v;
+      localStorage.setItem(CHARTS_OPEN_KEY, String(next));
+      return next;
+    });
+  }, []);
 
   const { data, isLoading, error } = useQuery({
     queryKey: QUERY_KEYS.portfolioOverview,
@@ -85,14 +106,14 @@ export default function PortfolioPage() {
   const { data: divSummary } = useQuery({
     queryKey: QUERY_KEYS.dividendSummary,
     queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
-    enabled: tab === "배당 현황",
+    enabled: tab === "배당",
     staleTime: STALE_TIME.LONG,
   });
 
   const { data: dividendByTicker = [] } = useQuery({
     queryKey: QUERY_KEYS.dividendByTicker,
     queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
-    enabled: tab === "배당 현황",
+    enabled: tab === "배당",
     staleTime: STALE_TIME.LONG,
   });
 
@@ -247,7 +268,7 @@ export default function PortfolioPage() {
             </Suspense>
           )}
           <button
-            onClick={() => setChartsOpen((v) => !v)}
+            onClick={handleChartsToggle}
             className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
           >
             {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -270,7 +291,7 @@ export default function PortfolioPage() {
         </ErrorBoundary>
       )}
 
-      {tab === "배당 현황" && (
+      {tab === "배당" && (
         <ErrorBoundary variant="section">
           <DividendTab
             dividendData={dividendData}
@@ -282,7 +303,7 @@ export default function PortfolioPage() {
         </ErrorBoundary>
       )}
 
-      {tab === "세금 추정" && (
+      {tab === "세금" && (
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
             <TaxOptimizationCard />
@@ -290,10 +311,10 @@ export default function PortfolioPage() {
         </ErrorBoundary>
       )}
 
-      {tab === "포트폴리오 분석" && (
+      {tab === "진단" && (
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-            <PortfolioAnalysisTab portfolioId={portfolioId} />
+            <PortfolioDiagnosisCard defaultExpanded />
           </Suspense>
         </ErrorBoundary>
       )}

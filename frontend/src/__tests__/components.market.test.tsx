@@ -4,7 +4,6 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import type { EconomicCalendarEvent, IndicatorLatest } from "@/api/economicIndicators";
 
 import EconomicCalendar from "@/components/market/EconomicCalendar";
-import EconomicCalendarList from "@/components/market/EconomicCalendarList";
 import IndicatorCard from "@/components/market/IndicatorCard";
 import IndicatorHistoryChart from "@/components/market/IndicatorHistoryChart";
 import IndicatorCalendarList from "@/components/market/IndicatorCalendarList";
@@ -20,41 +19,6 @@ const mockCalendarEvent: EconomicCalendarEvent = {
   previous: 3.0,
   currency: "%",
 };
-
-// ------- EconomicCalendarList -------
-describe("EconomicCalendarList", () => {
-  it("renders empty state", () => {
-    renderWithProviders(<EconomicCalendarList events={[]} />);
-    expect(screen.getByText(/향후 90일 내 예정된 이벤트가 없습니다/)).toBeDefined();
-  });
-
-  it("renders event list", () => {
-    renderWithProviders(<EconomicCalendarList events={[mockCalendarEvent]} />);
-    expect(screen.getByText("CPI 발표")).toBeDefined();
-  });
-
-  it("shows impact badge", () => {
-    renderWithProviders(<EconomicCalendarList events={[mockCalendarEvent]} />);
-    expect(screen.getByText("고")).toBeDefined();
-  });
-
-  it("shows estimate value", () => {
-    renderWithProviders(<EconomicCalendarList events={[mockCalendarEvent]} />);
-    expect(screen.getByText("예측")).toBeDefined();
-  });
-
-  it("renders with actual value", () => {
-    const actualEvent = { ...mockCalendarEvent, actual: 3.1 };
-    renderWithProviders(<EconomicCalendarList events={[actualEvent]} />);
-    expect(screen.getByText("실제")).toBeDefined();
-  });
-
-  it("renders with Medium impact", () => {
-    const mediumEvent = { ...mockCalendarEvent, impact: "Medium" as const };
-    renderWithProviders(<EconomicCalendarList events={[mediumEvent]} />);
-    expect(screen.getByText("중")).toBeDefined();
-  });
-});
 
 // ------- IndicatorCard -------
 const mockIndicator: IndicatorLatest = {

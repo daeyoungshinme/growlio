@@ -39,7 +39,6 @@ import AllocationHistoryChart from "@/components/dashboard/AllocationHistoryChar
 import DisclosureFeedCard from "@/components/dashboard/DisclosureFeedCard";
 import DividendByTickerTable from "@/components/dashboard/DividendByTickerTable";
 import DividendMonthsModal from "@/components/dashboard/DividendMonthsModal";
-import PortfolioTreemapChart from "@/components/dashboard/PortfolioTreemapChart";
 
 // ------- AllocationHistoryChart -------
 describe("AllocationHistoryChart", () => {
@@ -252,19 +251,3 @@ describe("DividendMonthsModal", () => {
   });
 });
 
-// ------- PortfolioTreemapChart -------
-describe("PortfolioTreemapChart", () => {
-  it("renders without crash with empty data", () => {
-    renderWithProviders(<PortfolioTreemapChart data={[]} />);
-    expect(document.body).toBeDefined();
-  });
-
-  it("renders with data", () => {
-    const data = [
-      { name: "삼성전자", ticker: "005930", value: 1000000, pct: 50 },
-      { name: "Apple", ticker: "AAPL", value: 500000, pct: 25 },
-    ];
-    renderWithProviders(<PortfolioTreemapChart data={data} />);
-    expect(screen.getByText("종목별 비중")).toBeDefined();
-  });
-});
