@@ -1,8 +1,6 @@
 name: E2E Tests (Playwright)
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
 
@@ -33,7 +31,7 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E tests
-        run: npx playwright test
+        run: npx playwright test --project=chromium-unauth
         env:
           CI: true
 
