@@ -197,7 +197,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   return (
     <div className="space-y-5">
       <ErrorBoundary variant="section">
-        <PortfolioDiagnosisCard />
+        <PortfolioDiagnosisCard defaultExpanded={true} />
       </ErrorBoundary>
 
       <hr className="border-gray-200 dark:border-gray-700" />

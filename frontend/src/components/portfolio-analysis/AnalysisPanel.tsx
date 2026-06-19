@@ -9,6 +9,7 @@ import type { AssetAccount } from "@/api/assets";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
+import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/portfolio-analysis/RebalancingStrategyCard";
 import FactorExposureChart from "@/components/portfolio-analysis/FactorExposureChart";
 import EfficientFrontierChart from "@/components/portfolio-analysis/EfficientFrontierChart";
@@ -250,31 +251,30 @@ export function AnalysisPanel({
       {/* 리밸런싱 결과 */}
       {mode === "rebalancing" && analysis && (
         <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100">
-              {analysis.portfolio_name} — 리밸런싱 분석
-            </h3>
-            <button
-              onClick={handleRebalancingAnalysis}
-              disabled={analyzing}
-              className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <RefreshCw size={12} /> 다시 분석
-            </button>
-          </div>
-          <RebalancingTable
-            analysis={analysis}
-            portfolioId={analysis.portfolio_id}
-            accounts={(() => {
-              const p = portfolios.find((p) => p.id === analysis.portfolio_id);
-              if (!p) return [];
-              return p.account_ids?.length
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-4">
+            {analysis.portfolio_name} — 리밸런싱 분석
+          </h3>
+          {(() => {
+            const p = portfolios.find((p) => p.id === analysis.portfolio_id);
+            const analysisAccounts = p
+              ? p.account_ids?.length
                 ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
-                : activeAccounts;
-            })()}
-            existingAlert={alertByPortfolioId[analysis.portfolio_id.toString()]}
-            onAlertClick={() => onOpenAlertModal(analysis.portfolio_id.toString())}
-          />
+                : activeAccounts
+              : [];
+            return (
+              <>
+                <RebalancingTable
+                  analysis={analysis}
+                  portfolioId={analysis.portfolio_id}
+                  accounts={analysisAccounts}
+                />
+                <RebalancingAccountSyncSection
+                  accounts={analysisAccounts}
+                  onReanalyze={() => triggerRebalancingAnalysis(analysis.portfolio_id)}
+                />
+              </>
+            );
+          })()}
           {(() => {
             const portfolioIdStr = analysis.portfolio_id.toString();
             const existingAlert = alertByPortfolioId[portfolioIdStr];
@@ -349,13 +349,36 @@ export function AnalysisPanel({
         })()}
 
       {/* Empty state */}
-      {!mode && (
-        <div className="flex flex-col items-center justify-center h-64 text-center text-gray-400 dark:text-gray-500">
-          <div className="text-4xl mb-3">📊</div>
-          <div className="text-sm font-medium mb-1">포트폴리오를 1개 선택하세요</div>
-          <div className="text-xs">
-            좌측에서 포트폴리오를 선택한 후 리밸런싱 분석 또는 백테스팅을 실행하세요
-          </div>
+      {!mode && selectedIds.size === 0 && (
+        <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 dark:text-gray-500">
+          <div className="text-3xl mb-3">📊</div>
+          <div className="text-sm font-medium mb-1">포트폴리오를 선택하세요</div>
+          <div className="text-xs">좌측 목록에서 포트폴리오를 클릭하면 분석을 시작할 수 있습니다</div>
+        </div>
+      )}
+      {!mode && selectedIds.size > 0 && (
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleRebalancingAnalysis}
+            disabled={!canRebalance || analyzing}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-40"
+          >
+            <div className="text-left">
+              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">리밸런싱 분석</div>
+              <div className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">비중 이탈 확인 및 매수/매도 수량 계산</div>
+            </div>
+            <span className="text-blue-400 text-lg">→</span>
+          </button>
+          <button
+            onClick={() => setMode("backtest")}
+            className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors"
+          >
+            <div className="text-left">
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">백테스팅</div>
+              <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">목표 포트폴리오의 과거 수익률 시뮬레이션</div>
+            </div>
+            <span className="text-gray-400 text-lg">→</span>
+          </button>
         </div>
       )}
     </div>

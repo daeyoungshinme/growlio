@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { ExecutionResult, RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
 import { AssetAccount } from "@/api/assets";
-import { RebalancingAlert } from "@/api/alerts";
 import { fmtKrw } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
-import { Bell } from "lucide-react";
 import { RebalancingExecutionModal } from "./RebalancingExecutionModal";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import {
@@ -94,8 +92,6 @@ interface Props {
   portfolioId: string;
   accounts: AssetAccount[];
   onExecuted?: (results: ExecutionResult[]) => void;
-  existingAlert?: RebalancingAlert;
-  onAlertClick?: () => void;
 }
 
 export default function RebalancingTable({
@@ -103,13 +99,12 @@ export default function RebalancingTable({
   portfolioId,
   accounts,
   onExecuted,
-  existingAlert,
-  onAlertClick,
 }: Props) {
   const kisAccounts = accounts.filter(
     (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
   );
   const [executionOpen, setExecutionOpen] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
 
   const hasDividendData =
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
@@ -121,34 +116,6 @@ export default function RebalancingTable({
     <div className="space-y-4">
       {/* 실행 버튼 행 */}
       <div className="flex items-center gap-2">
-        {/* 모바일 전용: 알림설정 버튼 */}
-        <div className="sm:hidden flex items-center gap-1.5">
-          {existingAlert && (
-            <span
-              className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                existingAlert.mode === "AUTO"
-                  ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
-                  : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
-              }`}
-            >
-              {existingAlert.mode === "AUTO" ? "자동" : "알림"}
-            </span>
-          )}
-          {onAlertClick && (
-            <button
-              onClick={onAlertClick}
-              className={`flex items-center gap-1 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
-                existingAlert
-                  ? "border-amber-300 dark:border-amber-700 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950"
-                  : "border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
-              }`}
-            >
-              <Bell size={11} />
-              {existingAlert ? "설정 변경" : "알림설정"}
-            </button>
-          )}
-        </div>
-
         {/* 리밸런싱 실행 버튼 (우측 정렬) */}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
@@ -199,13 +166,49 @@ export default function RebalancingTable({
 
         return (
           <div className="space-y-2">
-            {cashAvailable > 0 && analysis.base_type === "STOCK_ONLY" && (
-              <div className="rounded-xl px-3 py-2 bg-indigo-900/20 border border-indigo-700/40 text-xs text-indigo-300">
-                기준 자산 = 주식 {fmtKrw(analysis.base_value_krw - cashAvailable)} + 예수금{" "}
-                {fmtKrw(cashAvailable)} = {fmtKrw(analysis.base_value_krw)} 기준으로 매수/매도 수량이
-                계산됩니다.
+            {/* 핵심 요약 행 */}
+            <div
+              className={`rounded-xl p-3 flex items-center justify-between gap-2 ${cashAfter < 0 ? "bg-red-900/20 border border-red-800/40" : "bg-gray-700/60"}`}
+            >
+              <div className="space-y-0.5">
+                <div className="text-xs text-gray-500">
+                  {analysis.base_type === "STOCK_ONLY"
+                    ? cashAvailable > 0
+                      ? `기준 자산 ${fmtKrw(analysis.base_value_krw)} (주식+예수금)`
+                      : `기준 자산 ${fmtKrw(analysis.base_value_krw)}`
+                    : `기준 자산 ${fmtKrw(analysis.base_value_krw)} (전체)`}
+                </div>
+                <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
+                  <span>
+                    예수금 <span className="text-gray-200 font-medium">{fmtKrw(cashAvailable)}</span>
+                  </span>
+                  {totalSellSummary > 0 && (
+                    <span>
+                      + 매도예상{" "}
+                      <span className={`font-medium ${LOSS_COLOR}`}>
+                        +{fmtKrw(totalSellSummary)}
+                      </span>
+                    </span>
+                  )}
+                  <span>
+                    − 매수필요{" "}
+                    <span className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(totalBuySummary)}</span>
+                  </span>
+                </div>
               </div>
-            )}
+              <div className="text-right shrink-0">
+                <div className="text-xs text-gray-400 mb-0.5">리밸런싱 후 예수금</div>
+                <div className={`text-sm font-semibold ${cashAfterCls}`}>
+                  {cashAfter >= 0 ? "+" : ""}
+                  {fmtKrw(cashAfter)}
+                </div>
+                {cashAfter < 0 && (
+                  <div className="text-xs text-red-400 mt-0.5">
+                    예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* 종목별 실제 거래 계획 패널 */}
             {(buyItems.length > 0 || sellItems.length > 0) && (
@@ -256,12 +259,6 @@ export default function RebalancingTable({
                       })}
                     </div>
                   )}
-                  <div className="border-t border-gray-700/50 pt-2 flex items-center justify-between text-xs">
-                    <span className="text-gray-400">리밸런싱 후 예수금</span>
-                    <span className={`font-semibold ${cashAfterCls}`}>
-                      {cashAfter >= 0 ? "+" : ""}{fmtKrw(cashAfter)}
-                    </span>
-                  </div>
                 </div>
 
                 {/* 데스크탑: 테이블 뷰 */}
@@ -339,95 +336,49 @@ export default function RebalancingTable({
                           })}
                         </>
                       )}
-                      <tr className="border-t border-gray-600/60 font-medium">
-                        <td colSpan={4} className="pt-2 text-gray-400">
-                          리밸런싱 후 예수금
-                        </td>
-                        <td className={`pt-2 pl-3 text-right ${cashAfterCls}`}>
-                          {cashAfter >= 0 ? "+" : ""}{fmtKrw(cashAfter)}
-                        </td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
               </div>
             )}
 
-            {analysis.base_type === "TOTAL_ASSETS" && cashAvailable > 0 && (
-              <div className="text-xs text-gray-500 px-1">
-                전체 자산 기준 — 예수금 {fmtKrw(cashAvailable)}이 목표 비중 배분에 포함됨
-              </div>
-            )}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-gray-700 rounded-xl p-3 text-center">
-                <div className="text-xs text-gray-400 mb-1">
-                  {analysis.base_type === "STOCK_ONLY"
-                    ? cashAvailable > 0
-                      ? "기준 자산(주식+예수금)"
-                      : "기준 자산(주식)"
-                    : "기준 자산(전체)"}
-                </div>
-                <div className="text-sm font-semibold text-gray-100">
-                  {fmtKrw(analysis.base_value_krw)}
-                </div>
-              </div>
-              <div className="bg-gray-700 rounded-xl p-3 text-center">
-                <div className="text-xs text-gray-400 mb-1">현재 예수금</div>
-                <div className="text-sm font-semibold text-gray-100">
-                  {fmtKrw(cashAvailable)}
-                </div>
-              </div>
-              <div className="bg-red-900/30 rounded-xl p-3 text-center">
-                <div className="text-xs text-gray-400 mb-1">총 매수 필요</div>
-                <div className={`text-sm font-semibold ${PROFIT_COLOR}`}>
-                  {fmtKrw(totalBuySummary)}
-                </div>
-              </div>
-              <div className="bg-blue-900/30 rounded-xl p-3 text-center">
-                <div className="text-xs text-gray-400 mb-1">총 매도 필요</div>
-                <div className={`text-sm font-semibold ${LOSS_COLOR}`}>
-                  {fmtKrw(totalSellSummary)}
-                </div>
-              </div>
-            </div>
-            <div
-              className={`rounded-xl p-3 flex items-center justify-between gap-2 ${cashAfter < 0 ? "bg-red-900/20 border border-red-800/40" : "bg-gray-700/60"}`}
-            >
-              <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
-                <span>
-                  예수금 <span className="text-gray-200 font-medium">{fmtKrw(cashAvailable)}</span>
-                </span>
-                {totalSellSummary > 0 && (
-                  <span>
-                    + 매도예상{" "}
-                    <span className={`font-medium ${LOSS_COLOR}`}>
-                      +{fmtKrw(totalSellSummary)}
-                    </span>
-                  </span>
-                )}
-                <span>
-                  − 매수필요{" "}
-                  <span className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(totalBuySummary)}</span>
-                </span>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-xs text-gray-400 mb-0.5">리밸런싱 후 예수금</div>
-                <div className={`text-sm font-semibold ${cashAfterCls}`}>
-                  {cashAfter >= 0 ? "+" : ""}
-                  {fmtKrw(cashAfter)}
-                </div>
-                {cashAfter < 0 && (
-                  <div className="text-xs text-red-400 mt-0.5">
-                    예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
-                  </div>
-                )}
-              </div>
-            </div>
           </div>
         );
       })()}
 
-      {/* 집중도 지표 (HHI) + 거래 비용 */}
+      {/* 리밸런싱 비중 테이블 — 모바일 카드 뷰 */}
+      <div className="sm:hidden divide-y divide-gray-700">
+        {analysis.items.map((item, idx) => (
+          <RebalancingItemMobileCard key={idx} item={item} />
+        ))}
+      </div>
+
+      {/* 리밸런싱 비중 테이블 — 데스크탑 테이블 */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-700 text-xs text-gray-400">
+              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">
+                종목
+              </th>
+              <th className="text-right py-2 px-3 font-medium">현재 비중</th>
+              <th className="text-left py-2 px-3 font-medium">목표 비중</th>
+              <th className="text-right py-2 px-3 font-medium">차이</th>
+              <th className="text-right py-2 px-3 font-medium">현재/목표</th>
+              <th className="text-right py-2 px-3 font-medium">매수/매도</th>
+              <th className="text-right py-2 px-3 font-medium">주수</th>
+              <th className="text-right py-2 px-3 font-medium">10년 수익률</th>
+            </tr>
+          </thead>
+          <tbody>
+            {analysis.items.map((item, idx) => (
+              <RebalancingItemRow key={idx} item={item} />
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 상세 지표 (집중도 · CAGR · 거래비용) — 접기/펼치기 */}
       {(() => {
         const TRADING_FEE_RATE = 0.00014;
         const currentHHI = analysis.items.reduce((s, i) => s + i.current_weight_pct ** 2, 0);
@@ -452,76 +403,53 @@ export default function RebalancingTable({
         const tgtLabel = hhiLabel(targetHHI);
 
         return (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-3">
-              <div
-                className="bg-gray-700 rounded-xl p-3 text-center"
-                title="집중도 지수(HHI): 낮을수록 종목이 고르게 분산된 포트폴리오입니다"
-              >
-                <div className="text-xs text-gray-400 mb-1">현재 집중도</div>
-                <div className={`text-sm font-semibold ${curLabel.cls}`}>{curLabel.text}</div>
-                <div className="text-xs text-gray-500 mt-0.5">HHI {currentHHI.toFixed(0)}</div>
-              </div>
-              <div
-                className="bg-gray-700 rounded-xl p-3 text-center"
-                title="리밸런싱 후 목표 집중도"
-              >
-                <div className="text-xs text-gray-400 mb-1">목표 집중도</div>
-                <div className={`text-sm font-semibold ${tgtLabel.cls}`}>{tgtLabel.text}</div>
-                <div className="text-xs text-gray-500 mt-0.5">HHI {targetHHI.toFixed(0)}</div>
-              </div>
-            </div>
-            {estFee > 0 && (
-              <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
-                <span className="text-gray-400">
-                  예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span>
-                </span>
-                <span className="text-gray-200 font-medium">{fmtKrw(estFee)}</span>
+          <div className="border border-gray-700/50 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowDetails((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-400 hover:bg-gray-700/40 transition-colors"
+            >
+              <span className="font-medium">상세 지표</span>
+              <span>{showDetails ? "▲" : "▼"}</span>
+            </button>
+            {showDetails && (
+              <div className="px-4 pb-4 pt-2 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div
+                    className="bg-gray-700 rounded-xl p-3 text-center"
+                    title="집중도 지수(HHI): 낮을수록 종목이 고르게 분산된 포트폴리오입니다"
+                  >
+                    <div className="text-xs text-gray-400 mb-1">현재 집중도</div>
+                    <div className={`text-sm font-semibold ${curLabel.cls}`}>{curLabel.text}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">HHI {currentHHI.toFixed(0)}</div>
+                  </div>
+                  <div
+                    className="bg-gray-700 rounded-xl p-3 text-center"
+                    title="리밸런싱 후 목표 집중도"
+                  >
+                    <div className="text-xs text-gray-400 mb-1">목표 집중도</div>
+                    <div className={`text-sm font-semibold ${tgtLabel.cls}`}>{tgtLabel.text}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">HHI {targetHHI.toFixed(0)}</div>
+                  </div>
+                </div>
+                {hasCagrData && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <CagrCard label="현재 포트폴리오 CAGR" cagr={analysis.current_weighted_cagr_10y_pct} />
+                    <CagrCard label="목표 포트폴리오 CAGR" cagr={analysis.target_weighted_cagr_10y_pct} />
+                  </div>
+                )}
+                {estFee > 0 && (
+                  <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span className="text-gray-400">
+                      예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span>
+                    </span>
+                    <span className="text-gray-200 font-medium">{fmtKrw(estFee)}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
         );
       })()}
-
-      {/* 포트폴리오 10년 수익률 요약 */}
-      {hasCagrData && (
-        <div className="grid grid-cols-2 gap-3">
-          <CagrCard label="현재 포트폴리오 CAGR" cagr={analysis.current_weighted_cagr_10y_pct} />
-          <CagrCard label="목표 포트폴리오 CAGR" cagr={analysis.target_weighted_cagr_10y_pct} />
-        </div>
-      )}
-
-      {/* 리밸런싱 테이블 — 모바일 카드 뷰 */}
-      <div className="sm:hidden divide-y divide-gray-700">
-        {analysis.items.map((item, idx) => (
-          <RebalancingItemMobileCard key={idx} item={item} />
-        ))}
-      </div>
-
-      {/* 리밸런싱 테이블 — 데스크탑 테이블 */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-gray-700 text-xs text-gray-400">
-              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">
-                종목
-              </th>
-              <th className="text-right py-2 px-3 font-medium">현재 비중</th>
-              <th className="text-left py-2 px-3 font-medium">목표 비중</th>
-              <th className="text-right py-2 px-3 font-medium">차이</th>
-              <th className="text-right py-2 px-3 font-medium">현재/목표</th>
-              <th className="text-right py-2 px-3 font-medium">매수/매도</th>
-              <th className="text-right py-2 px-3 font-medium">주수</th>
-              <th className="text-right py-2 px-3 font-medium">10년 수익률</th>
-            </tr>
-          </thead>
-          <tbody>
-            {analysis.items.map((item, idx) => (
-              <RebalancingItemRow key={idx} item={item} />
-            ))}
-          </tbody>
-        </table>
-      </div>
 
       {/* 배당 분석 섹션 */}
       {hasDividendData && <RebalancingDividendSection analysis={analysis} />}

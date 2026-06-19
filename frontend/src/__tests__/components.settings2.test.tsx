@@ -342,14 +342,13 @@ describe("RebalancingTable", () => {
     expect(screen.getAllByText("Apple Inc.").length).toBeGreaterThan(0);
   });
 
-  it("shows alert button when onAlertClick provided", () => {
+  it("renders with account provided", () => {
     renderWithProviders(
       <RebalancingTable
         analysis={mockAnalysis}
         portfolioId="p1"
         accounts={[mockAccount]}
         onExecuted={vi.fn()}
-        onAlertClick={vi.fn()}
       />,
     );
     expect(document.body).toBeDefined();
@@ -368,37 +367,13 @@ describe("RebalancingTable", () => {
     expect(document.body).toBeDefined();
   });
 
-  it("renders with existing alert badge", () => {
-    const mockAlert = {
-      id: "al1",
-      portfolio_id: "p1",
-      mode: "AUTO" as const,
-      threshold_pct: 5,
-      is_active: true,
-      schedule_type: "DAILY" as const,
-      schedule_day_of_week: null,
-      schedule_day_of_month: null,
-      trigger_condition: "DRIFT_ONLY" as const,
-      strategy: "BUY_ONLY" as const,
-      account_id: null,
-      order_type: "MARKET" as const,
-      market_condition_mode: "DISABLED" as const,
-      last_triggered_at: null,
-      created_at: "2024-01-01",
-      updated_at: "2024-01-01",
-      deposit_trigger_enabled: false,
-      deposit_trigger_account_id: null,
-      deposit_trigger_min_amount_krw: null,
-      last_known_deposit_krw: null,
-      last_deposit_checked_at: null,
-    };
+  it("renders with no accounts", () => {
     renderWithProviders(
       <RebalancingTable
         analysis={mockAnalysis}
         portfolioId="p1"
         accounts={[]}
         onExecuted={vi.fn()}
-        existingAlert={mockAlert}
       />,
     );
     expect(document.body).toBeDefined();
