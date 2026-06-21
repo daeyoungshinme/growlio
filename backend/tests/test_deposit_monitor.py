@@ -386,7 +386,6 @@ async def test_process_deposit_alert_notify_mode_triggers_on_sufficient_deposit(
     # 계좌 1: 500K → 700K (증분 +200K)
     da1, acc1 = _make_deposit_row(alert_id, last_known=500_000, current_deposit=700_000)
     da1_fresh = SimpleNamespace(id=da1.id, last_known_deposit_krw=da1.last_known_deposit_krw)
-    acc1_fresh = SimpleNamespace(id=acc1.id, last_deposit_checked_at=None)
 
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)

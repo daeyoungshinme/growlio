@@ -66,7 +66,8 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     if not account:
         return None
 
-    assert account.kis_app_key and account.kis_app_secret
+    assert account.kis_app_key
+    assert account.kis_app_secret
     app_key = decrypt(account.kis_app_key)
     app_secret = decrypt(account.kis_app_secret)
     is_mock = account.is_mock_mode

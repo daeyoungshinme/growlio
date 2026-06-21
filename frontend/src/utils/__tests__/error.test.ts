@@ -28,4 +28,16 @@ describe("extractErrorMessage", () => {
     const axiosErrNoDetail = { response: { data: {} } };
     expect(extractErrorMessage(axiosErrNoDetail, "기본 오류")).toBe("기본 오류");
   });
+
+  it("axios detail이 배열 형식일 때 메시지를 join하여 반환한다", () => {
+    const err = {
+      response: { data: { detail: [{ msg: "필수 항목 누락" }, "잘못된 값"] } },
+    };
+    expect(extractErrorMessage(err)).toBe("필수 항목 누락, 잘못된 값");
+  });
+
+  it("axios detail이 배열도 문자열도 아닌 경우 기본 메시지를 반환한다", () => {
+    const err = { response: { data: { detail: 42 as unknown as string } } };
+    expect(extractErrorMessage(err)).toBe("오류가 발생했습니다");
+  });
 });
