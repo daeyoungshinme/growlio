@@ -17,7 +17,7 @@ interface Props {
   isLoading: boolean;
 }
 
-function SkeletonCard() {
+function DividendRowSkeleton() {
   return (
     <div className="px-4 py-3 animate-pulse">
       <div className="flex justify-between mb-1.5">
@@ -96,7 +96,7 @@ const DividendByTickerTable = memo(function DividendByTickerTable({ items, isLoa
     <div>
       <div className="divide-y divide-gray-100 dark:divide-gray-700">
         {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
+          Array.from({ length: 4 }).map((_, i) => <DividendRowSkeleton key={i} />)
         ) : items.length === 0 ? (
           <div className="py-6 text-center text-xs text-gray-300 dark:text-gray-600">
             보유 종목 없음

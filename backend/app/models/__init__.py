@@ -1,4 +1,10 @@
-from app.models.alert import AlertHistory, ExchangeRateAlert, RebalancingAlert, StockPriceAlert
+from app.models.alert import (
+    AlertHistory,
+    ExchangeRateAlert,
+    RebalancingAlert,
+    RebalancingAlertDepositAccount,
+    StockPriceAlert,
+)
 from app.models.asset import (
     AssetAccount,
     AssetSnapshot,
@@ -33,6 +39,7 @@ __all__ = [
     "PortfolioAccount",
     "ExchangeRateAlert",
     "RebalancingAlert",
+    "RebalancingAlertDepositAccount",
     "StockPriceAlert",
     "AlertHistory",
     "IndicatorSubscription",

@@ -16,6 +16,8 @@ import {
 import RebalancingDividendSection from "./RebalancingDividendSection";
 import { CASH_TICKER } from "@/constants/assets";
 
+const TRADING_FEE_RATE = 0.00014; // 0.014% 수수료 (한국투자증권 기준)
+
 // 반올림된 주수 기준 실제 거래금액 — 요약·거래계획·거래비용 전체에서 동일하게 사용
 function calcTradeKrw(item: RebalancingItem): number {
   if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
@@ -142,6 +144,7 @@ export default function RebalancingTable({
     .reduce((s, i) => s + calcTradeKrw(i), 0);
   const cashAvailable = analysis.available_cash_krw ?? 0;
   const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
+  const estFee = (totalBuySummary + totalSellSummary) * TRADING_FEE_RATE;
   const cashAfterCls =
     cashAfter >= 0
       ? cashAfter < totalBuySummary * 0.05
@@ -253,9 +256,10 @@ export default function RebalancingTable({
                           {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
                         </div>
                       </div>
-                      <span className={`shrink-0 font-medium ${LOSS_COLOR}`}>
-                        {fmtKrw(calcTradeKrw(item))}
-                      </span>
+                      <div className="shrink-0 text-right">
+                        <div className={`font-medium ${LOSS_COLOR}`}>{fmtKrw(calcTradeKrw(item))}</div>
+                        <div className="text-gray-500 mt-0.5">수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -271,9 +275,10 @@ export default function RebalancingTable({
                           {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
                         </div>
                       </div>
-                      <span className={`shrink-0 font-medium ${PROFIT_COLOR}`}>
-                        {fmtKrw(calcTradeKrw(item))}
-                      </span>
+                      <div className="shrink-0 text-right">
+                        <div className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(calcTradeKrw(item))}</div>
+                        <div className="text-gray-500 mt-0.5">수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -288,14 +293,15 @@ export default function RebalancingTable({
                     <th className="text-left py-1.5 pr-3 font-medium">종목</th>
                     <th className="text-right py-1.5 px-3 font-medium">현재가</th>
                     <th className="text-right py-1.5 px-3 font-medium">수량</th>
-                    <th className="text-right py-1.5 pl-3 font-medium">실제금액</th>
+                    <th className="text-right py-1.5 px-3 font-medium">실제금액</th>
+                    <th className="text-right py-1.5 pl-3 font-medium">수수료</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sellItems.length > 0 && (
                     <>
                       <tr>
-                        <td colSpan={4} className="pt-2 pb-1 text-blue-400 font-medium">
+                        <td colSpan={5} className="pt-2 pb-1 text-blue-400 font-medium">
                           매도
                         </td>
                       </tr>
@@ -310,8 +316,11 @@ export default function RebalancingTable({
                           <td className="py-1.5 px-3 text-right text-gray-200">
                             {Math.abs(Math.round(item.shares_to_trade!))}주
                           </td>
-                          <td className={`py-1.5 pl-3 text-right font-medium ${LOSS_COLOR}`}>
+                          <td className={`py-1.5 px-3 text-right font-medium ${LOSS_COLOR}`}>
                             {fmtKrw(calcTradeKrw(item))}
+                          </td>
+                          <td className="py-1.5 pl-3 text-right text-gray-500">
+                            {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}
                           </td>
                         </tr>
                       ))}
@@ -320,7 +329,7 @@ export default function RebalancingTable({
                   {buyItems.length > 0 && (
                     <>
                       <tr>
-                        <td colSpan={4} className="pt-2 pb-1 text-green-400 font-medium">
+                        <td colSpan={5} className="pt-2 pb-1 text-green-400 font-medium">
                           매수
                         </td>
                       </tr>
@@ -335,8 +344,11 @@ export default function RebalancingTable({
                           <td className="py-1.5 px-3 text-right text-gray-200">
                             {Math.abs(Math.round(item.shares_to_trade!))}주
                           </td>
-                          <td className={`py-1.5 pl-3 text-right font-medium ${PROFIT_COLOR}`}>
+                          <td className={`py-1.5 px-3 text-right font-medium ${PROFIT_COLOR}`}>
                             {fmtKrw(calcTradeKrw(item))}
+                          </td>
+                          <td className="py-1.5 pl-3 text-right text-gray-500">
+                            {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}
                           </td>
                         </tr>
                       ))}
@@ -345,6 +357,16 @@ export default function RebalancingTable({
                 </tbody>
               </table>
             </div>
+
+            {/* 예상 거래 비용 합계 */}
+            {estFee > 0 && (
+              <div className="flex items-center justify-between text-xs border-t border-gray-700/40 pt-2.5">
+                <span className="text-gray-400">
+                  예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span>
+                </span>
+                <span className="text-gray-300 font-medium">{fmtKrw(estFee)}</span>
+              </div>
+            )}
 
             {/* 현재가 미조회로 거래 계획에서 제외된 종목 안내 */}
             {unpricedItems.length > 0 && (
@@ -389,9 +411,8 @@ export default function RebalancingTable({
         </table>
       </div>
 
-      {/* 상세 지표 (집중도 · CAGR · 거래비용) — 접기/펼치기 */}
+      {/* 상세 지표 (집중도 · CAGR) — 접기/펼치기 */}
       {(() => {
-        const TRADING_FEE_RATE = 0.00014;
         const currentHHI = analysis.items.reduce((s, i) => s + i.current_weight_pct ** 2, 0);
         const targetHHI = analysis.items
           .filter((i) => i.target_weight_pct > 0)
@@ -403,15 +424,6 @@ export default function RebalancingTable({
           return { text: "집중형", cls: "text-red-400" };
         }
 
-        // 거래비용도 calcTradeKrw 기준으로 계산 (요약 카드와 동일한 기준)
-        const feeBase =
-          analysis.items
-            .filter((i) => i.diff_krw > 0)
-            .reduce((s, i) => s + calcTradeKrw(i), 0) +
-          analysis.items
-            .filter((i) => i.diff_krw < 0)
-            .reduce((s, i) => s + calcTradeKrw(i), 0);
-        const estFee = feeBase * TRADING_FEE_RATE;
         const curLabel = hhiLabel(currentHHI);
         const tgtLabel = hhiLabel(targetHHI);
 
@@ -448,14 +460,6 @@ export default function RebalancingTable({
                   <div className="grid grid-cols-2 gap-3">
                     <CagrCard label="현재 포트폴리오 CAGR" cagr={analysis.current_weighted_cagr_10y_pct} />
                     <CagrCard label="목표 포트폴리오 CAGR" cagr={analysis.target_weighted_cagr_10y_pct} />
-                  </div>
-                )}
-                {estFee > 0 && (
-                  <div className="bg-gray-700/50 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
-                    <span className="text-gray-400">
-                      예상 거래 비용 <span className="text-gray-500">(수수료 0.014%)</span>
-                    </span>
-                    <span className="text-gray-200 font-medium">{fmtKrw(estFee)}</span>
                   </div>
                 )}
               </div>

@@ -53,9 +53,8 @@ export interface RebalancingAlert {
   created_at: string;
   updated_at: string;
   deposit_trigger_enabled: boolean;
-  deposit_trigger_account_id: string | null;
+  deposit_trigger_account_ids: string[];
   deposit_trigger_min_amount_krw: number | null;
-  last_known_deposit_krw: number | null;
   last_deposit_checked_at: string | null;
 }
 
@@ -72,7 +71,7 @@ export interface RebalancingAlertUpsert {
   order_type: "MARKET" | "LIMIT";
   market_condition_mode: MarketConditionMode;
   deposit_trigger_enabled: boolean;
-  deposit_trigger_account_id: string | null;
+  deposit_trigger_account_ids: string[];
   deposit_trigger_min_amount_krw: number | null;
 }
 

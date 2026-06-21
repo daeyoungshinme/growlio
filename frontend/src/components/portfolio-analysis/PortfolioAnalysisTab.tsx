@@ -263,6 +263,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
               activeAccounts={activeAccounts}
               onOpenAlertModal={setAlertModalPortfolioId}
               autoAnalyzeId={portfolioId}
+              alertByPortfolioId={alertByPortfolioId}
             />
           </ErrorBoundary>
         </div>

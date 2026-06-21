@@ -205,35 +205,6 @@ class TestGetScalarInitData:
         assert net_deposits == 5_000_000.0
 
 
-# ── _get_first_snap_date (DB mock) ───────────────────────────
-
-
-class TestGetFirstSnapDate:
-    @pytest.mark.asyncio
-    async def test_returns_none_when_no_snapshots(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _get_first_snap_date
-
-        result = MagicMock()
-        result.scalar.return_value = None
-        mock_db.execute = AsyncMock(return_value=result)
-
-        snap_date = await _get_first_snap_date(uuid.uuid4(), mock_db)
-
-        assert snap_date is None
-
-    @pytest.mark.asyncio
-    async def test_returns_date_when_snapshots_exist(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _get_first_snap_date
-
-        result = MagicMock()
-        result.scalar.return_value = date(2023, 6, 1)
-        mock_db.execute = AsyncMock(return_value=result)
-
-        snap_date = await _get_first_snap_date(uuid.uuid4(), mock_db)
-
-        assert snap_date == date(2023, 6, 1)
-
-
 # ── _get_monthly_trend (DB mock) ─────────────────────────────
 
 
@@ -525,45 +496,3 @@ class TestBuildAssetTotals:
         assert total == pytest.approx(3_000_000.0)
 
 
-# ── _calc_net_deposits_this_year ────────────────────────────────
-
-
-class TestCalcNetDepositsThisYear:
-    @pytest.mark.asyncio
-    async def test_no_transactions_returns_zero(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _calc_net_deposits_this_year
-
-        exec_result = MagicMock()
-        exec_result.__iter__ = MagicMock(return_value=iter([]))
-        exec_result.all = MagicMock(return_value=[])
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await _calc_net_deposits_this_year(uuid.uuid4(), mock_db)
-        assert result == 0.0
-
-    @pytest.mark.asyncio
-    async def test_deposit_minus_withdrawal(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _calc_net_deposits_this_year
-
-        deposit_row = SimpleNamespace(transaction_type="DEPOSIT", total=5_000_000.0)
-        withdrawal_row = SimpleNamespace(transaction_type="WITHDRAWAL", total=1_000_000.0)
-
-        exec_result = MagicMock()
-        exec_result.__iter__ = MagicMock(return_value=iter([deposit_row, withdrawal_row]))
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await _calc_net_deposits_this_year(uuid.uuid4(), mock_db)
-        assert result == pytest.approx(4_000_000.0)
-
-    @pytest.mark.asyncio
-    async def test_only_deposits(self, mock_db, override_settings):
-        from app.services.asset_aggregator import _calc_net_deposits_this_year
-
-        deposit_row = SimpleNamespace(transaction_type="DEPOSIT", total=3_000_000.0)
-
-        exec_result = MagicMock()
-        exec_result.__iter__ = MagicMock(return_value=iter([deposit_row]))
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await _calc_net_deposits_this_year(uuid.uuid4(), mock_db)
-        assert result == pytest.approx(3_000_000.0)

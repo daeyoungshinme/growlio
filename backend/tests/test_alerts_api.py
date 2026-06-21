@@ -279,9 +279,8 @@ class TestRebalancingAlertExtended:
             is_active=True,
             last_triggered_at=None,
             deposit_trigger_enabled=False,
-            deposit_trigger_account_id=None,
+            deposit_accounts=[],
             deposit_trigger_min_amount_krw=None,
-            last_known_deposit_krw=None,
             last_deposit_checked_at=None,
             created_at=now,
             updated_at=now,
@@ -312,6 +311,7 @@ class TestRebalancingAlertExtended:
             obj.id = uuid.uuid4()
             obj.is_active = True
             obj.last_triggered_at = None
+            obj.deposit_accounts = []
             obj.created_at = now
             obj.updated_at = now
 

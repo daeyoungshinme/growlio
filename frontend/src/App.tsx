@@ -16,6 +16,7 @@ import { fetchDashboard } from "./api/dashboard";
 import { fetchAccounts, fetchExchangeRate } from "./api/assets";
 import { fetchPortfolioOverviewLite } from "./api/portfolios";
 import { fetchDCAAnalysis } from "./api/invest";
+import { fetchSettings } from "./api/settings";
 import { QUERY_KEYS } from "./constants/queryKeys";
 const LoginPage = lazy(() => import("./pages/LoginPage"));
 const RegisterPage = lazy(() => import("./pages/RegisterPage"));
@@ -110,6 +111,7 @@ export default function App() {
     });
     void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
     void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.settings, queryFn: fetchSettings });
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);
 

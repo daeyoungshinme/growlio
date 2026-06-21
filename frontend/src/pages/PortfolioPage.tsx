@@ -1,10 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
-import { api } from "@/api/client";
 import { syncAccount } from "@/api/assets";
+import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrwPrice } from "@/utils/format";
@@ -19,7 +19,9 @@ import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
-import type { PortfolioOverview, DividendByTicker, DividendYield } from "@/types";
+import type { PortfolioOverview } from "@/types";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/api/client";
 const TaxOptimizationCard = lazy(
   () => import("../components/portfolio-analysis/TaxOptimizationCard"),
 );
@@ -29,13 +31,6 @@ const PortfolioDiagnosisCard = lazy(
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
-
-interface DividendSummary {
-  annual_received: number;
-  estimated_annual: number;
-  monthly_breakdown: { month: string; amount: number }[];
-  monthly_ticker_breakdown: { month: string; ticker: string | null; amount: number }[];
-}
 
 const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
 const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
@@ -93,43 +88,12 @@ export default function PortfolioPage() {
   });
 
   const {
-    data: dividendData = [],
+    dividendPositions: dividendData,
+    dividendSummary: divSummary,
+    dividendByTicker,
     isLoading: divLoading,
     isError: divError,
-  } = useQuery({
-    queryKey: QUERY_KEYS.dividendPositions,
-    queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
-    staleTime: STALE_TIME.LONG,
-    enabled: !isLoading && !!data,
-  });
-
-  const { data: divSummary } = useQuery({
-    queryKey: QUERY_KEYS.dividendSummary,
-    queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
-    enabled: tab === "배당",
-    staleTime: STALE_TIME.LONG,
-  });
-
-  const { data: dividendByTicker = [] } = useQuery({
-    queryKey: QUERY_KEYS.dividendByTicker,
-    queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
-    enabled: tab === "배당",
-    staleTime: STALE_TIME.LONG,
-  });
-
-  useEffect(() => {
-    if (isLoading || !data) return;
-    void qc.prefetchQuery({
-      queryKey: QUERY_KEYS.dividendSummary,
-      queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
-      staleTime: STALE_TIME.LONG,
-    });
-    void qc.prefetchQuery({
-      queryKey: QUERY_KEYS.dividendByTicker,
-      queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
-      staleTime: STALE_TIME.LONG,
-    });
-  }, [isLoading, data, qc]);
+  } = useDividendData(!isLoading && !!data);
 
   const handleSyncAll = async () => {
     if (!data) return;

@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     ARRAY,
@@ -20,6 +21,9 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 VALID_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "NYSE", "NASDAQ", "AMEX", "OTHER"})
 
@@ -78,7 +82,7 @@ class AssetAccount(Base):
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
 
-    user: Mapped["User"] = relationship(back_populates="asset_accounts")  # type: ignore[name-defined]  # noqa: F821
+    user: Mapped["User"] = relationship(back_populates="asset_accounts")
     snapshots: Mapped[list["AssetSnapshot"]] = relationship(back_populates="account")
     transactions: Mapped[list["Transaction"]] = relationship(back_populates="account")
     current_positions: Mapped[list["Position"]] = relationship(

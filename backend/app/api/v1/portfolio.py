@@ -96,7 +96,10 @@ async def portfolio_summary(
         o = await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
         return account_no, d, o
 
-    results = await asyncio.gather(*[_fetch(acc.kis_account_no) for acc in kis_accounts])  # type: ignore[arg-type]
+    raw_results = await asyncio.gather(
+        *[_fetch(acc.kis_account_no) for acc in kis_accounts if acc.kis_account_no],
+        return_exceptions=True,
+    )
 
     merged_domestic: dict = {
         "total_value_krw": 0.0,
@@ -107,6 +110,11 @@ async def portfolio_summary(
     }
     merged_overseas: dict = {"total_value_usd": 0.0, "deposit_usd": 0.0, "positions": []}
     account_details = []
+    results = [r for r in raw_results if not isinstance(r, BaseException)]
+    failed_count = len(raw_results) - len(results)
+    if failed_count:
+        import structlog as _sl
+        _sl.get_logger().warning("kis_account_fetch_partial_failure", failed=failed_count)
     for account_no, d, o in results:
         merged_domestic["total_value_krw"] += d.get("total_value_krw", 0.0)
         merged_domestic["invested_krw"] += d.get("invested_krw", 0.0)

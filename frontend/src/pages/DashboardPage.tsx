@@ -28,7 +28,6 @@ export default function DashboardPage() {
 
   const handleRefresh = useCallback(async () => {
     await invalidateSyncData(qc);
-    await qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
   }, [qc]);
   useRegisterRefresh(handleRefresh);
 

@@ -9,13 +9,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-def _make_alert(user_id, account_id=None):
+def _make_alert(user_id):
     return SimpleNamespace(
         id=uuid.uuid4(),
         user_id=user_id,
-        deposit_trigger_account_id=account_id or uuid.uuid4(),
+        account_id=uuid.uuid4(),  # AUTO 모드 실행 계좌
         deposit_trigger_min_amount_krw=10_000,
-        last_known_deposit_krw=None,
         mode="NOTIFY",
         market_condition_mode="DISABLED",
     )
@@ -32,6 +31,26 @@ def _make_portfolio(items=None):
         account_ids=None,
         items=port_items,
     )
+
+
+def _make_deposit_row(alert_id, account_id=None, last_known=None, current_deposit=700_000):
+    """(RebalancingAlertDepositAccount, AssetAccount) 튜플 반환."""
+    da = SimpleNamespace(
+        id=uuid.uuid4(),
+        alert_id=alert_id,
+        account_id=account_id or uuid.uuid4(),
+        last_known_deposit_krw=last_known,
+    )
+    account = SimpleNamespace(
+        id=da.account_id,
+        deposit_krw=current_deposit,
+        is_active=True,
+        asset_type="STOCK_KIS",
+        kis_app_key=None,
+        kis_app_secret=None,
+        is_mock_mode=False,
+    )
+    return da, account
 
 
 @pytest.mark.asyncio
@@ -91,7 +110,6 @@ async def test_notify_deposit_rebalancing_fallback_on_analysis_failure(mock_db):
 
         await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, "user@example.com", None, mock_db)
 
-    # 폴백: 포트폴리오 items 비중 배분으로 이메일 발송
     mock_email.assert_called_once()
     call_kwargs = mock_email.call_args.kwargs
     items = call_kwargs["items"]
@@ -109,7 +127,6 @@ async def test_notify_deposit_rebalancing_no_underweight_uses_fallback(mock_db):
     portfolio = _make_portfolio()
     deposit_increment = 200_000.0
 
-    # diff_krw > 0 이면 overweight (매수 불필요)
     overweight_item = SimpleNamespace(
         ticker="AAPL",
         name="Apple",
@@ -218,24 +235,25 @@ async def test_run_deposit_monitor_processes_rows():
 
 
 @pytest.mark.asyncio
-async def test_process_deposit_alert_account_not_found():
-    """`_process_deposit_alert`가 계좌를 찾지 못하면 False를 반환한다."""
+async def test_process_deposit_alert_no_accounts_returns_false():
+    """`_process_deposit_alert`가 감시 계좌를 찾지 못하면 False를 반환한다."""
     user_id = uuid.uuid4()
-    account_id = uuid.uuid4()
     alert = SimpleNamespace(
         id=uuid.uuid4(),
         user_id=user_id,
-        deposit_trigger_account_id=account_id,
+        account_id=uuid.uuid4(),
         deposit_trigger_min_amount_krw=10_000,
-        last_known_deposit_krw=None,
         mode="NOTIFY",
+        market_condition_mode="DISABLED",
     )
     portfolio = _make_portfolio()
 
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=False)
-    mock_session.scalar = AsyncMock(return_value=None)  # 계좌 없음
+    execute_result = MagicMock()
+    execute_result.all.return_value = []  # 감시 계좌 없음
+    mock_session.execute = AsyncMock(return_value=execute_result)
 
     with patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session):
         from app.jobs.deposit_monitor import _process_deposit_alert
@@ -246,21 +264,26 @@ async def test_process_deposit_alert_account_not_found():
 
 
 @pytest.mark.asyncio
-async def test_update_deposit_baseline_updates_fields(mock_db):
-    """`_update_deposit_baseline`가 last_known_deposit_krw를 갱신한다."""
+async def test_update_deposit_baselines_updates_fields(mock_db):
+    """`_update_deposit_baselines`가 계좌별 last_known_deposit_krw를 갱신한다."""
+    from app.jobs.deposit_monitor import _update_deposit_baselines
+
     alert_id = uuid.uuid4()
-    fresh_alert = SimpleNamespace(
-        id=alert_id,
-        last_known_deposit_krw=None,
-        last_deposit_checked_at=None,
-    )
-    mock_db.scalar = AsyncMock(return_value=fresh_alert)
+    da1 = SimpleNamespace(id=uuid.uuid4(), last_known_deposit_krw=None)
+    da2 = SimpleNamespace(id=uuid.uuid4(), last_known_deposit_krw=None)
+    fresh_alert = SimpleNamespace(id=alert_id, last_deposit_checked_at=None)
 
-    from app.jobs.deposit_monitor import _update_deposit_baseline
+    fresh_da1 = SimpleNamespace(id=da1.id, last_known_deposit_krw=None)
+    fresh_da2 = SimpleNamespace(id=da2.id, last_known_deposit_krw=None)
 
-    await _update_deposit_baseline(mock_db, alert_id, 750_000.0)
+    # scalar: [da1, da2, alert] 순서로 반환
+    mock_db.scalar = AsyncMock(side_effect=[fresh_da1, fresh_da2, fresh_alert])
 
-    assert float(fresh_alert.last_known_deposit_krw) == 750_000.0
+    updates = [(da1, 500_000.0), (da2, 1_200_000.0)]
+    await _update_deposit_baselines(mock_db, alert_id, updates)
+
+    assert float(fresh_da1.last_known_deposit_krw) == 500_000.0
+    assert float(fresh_da2.last_known_deposit_krw) == 1_200_000.0
     assert fresh_alert.last_deposit_checked_at is not None
 
 
@@ -342,43 +365,45 @@ async def test_run_deposit_monitor_market_signal_failure_uses_green():
 
         await _run_deposit_monitor(mock_redis)
 
-    # 시장 신호 실패해도 함수는 정상 완료되어야 함 (rows=[] 이므로 early return)
     mock_process.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_process_deposit_alert_notify_mode_triggers_on_sufficient_deposit():
-    """NOTIFY 모드 + 충분한 입금 증분 → _notify_deposit_rebalancing 호출 후 True 반환."""
+    """NOTIFY 모드 + 충분한 합산 입금 증분 → _notify_deposit_rebalancing 호출 후 True 반환."""
     user_id = uuid.uuid4()
-    account_id = uuid.uuid4()
+    alert_id = uuid.uuid4()
     alert = SimpleNamespace(
-        id=uuid.uuid4(),
+        id=alert_id,
         user_id=user_id,
-        deposit_trigger_account_id=account_id,
+        account_id=uuid.uuid4(),
         deposit_trigger_min_amount_krw=50_000,
-        last_known_deposit_krw=500_000,
         mode="NOTIFY",
         market_condition_mode="DISABLED",
     )
     portfolio = _make_portfolio()
 
-    account = SimpleNamespace(
-        id=account_id,
-        deposit_krw=700_000,  # 증분 = 200K > min 50K
-        is_active=True,
-        asset_type="STOCK_KIS",
-    )
+    # 계좌 1: 500K → 700K (증분 +200K)
+    da1, acc1 = _make_deposit_row(alert_id, last_known=500_000, current_deposit=700_000)
+    da1_fresh = SimpleNamespace(id=da1.id, last_known_deposit_krw=da1.last_known_deposit_krw)
+    acc1_fresh = SimpleNamespace(id=acc1.id, last_deposit_checked_at=None)
 
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=False)
-    mock_session.scalar = AsyncMock(return_value=account)
+
+    # 첫 번째 execute: 감시 계좌 JOIN 결과
+    deposit_result = MagicMock()
+    deposit_result.all.return_value = [(da1, acc1)]
+    # 이후 scalar 호출: da1_fresh, alert_fresh (베이스라인 업데이트용)
+    fresh_alert = SimpleNamespace(id=alert_id, last_deposit_checked_at=None)
+    mock_session.execute = AsyncMock(return_value=deposit_result)
+    mock_session.scalar = AsyncMock(side_effect=[da1_fresh, fresh_alert])
     mock_session.commit = AsyncMock()
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
         patch("app.jobs.deposit_monitor._notify_deposit_rebalancing", new=AsyncMock()) as mock_notify,
-        patch("app.jobs.deposit_monitor._update_deposit_baseline", new=AsyncMock()),
         patch("app.services.alert_repository.save_alert_history", new=AsyncMock()),
     ):
         from app.jobs.deposit_monitor import _process_deposit_alert
@@ -387,47 +412,127 @@ async def test_process_deposit_alert_notify_mode_triggers_on_sufficient_deposit(
 
     assert result is True
     mock_notify.assert_called_once()
-    # _notify_deposit_rebalancing(alert, portfolio, deposit_increment, email, fcm_token, db)
     call_args = mock_notify.call_args.args
-    assert call_args[2] == 200_000.0  # deposit_increment
+    assert call_args[2] == 200_000.0  # total_increment
 
 
 @pytest.mark.asyncio
 async def test_process_deposit_alert_below_min_amount_skips():
-    """입금 증분이 최소 금액 미만이면 알림을 발동하지 않는다."""
+    """합산 입금 증분이 최소 금액 미만이면 알림을 발동하지 않는다."""
     user_id = uuid.uuid4()
-    account_id = uuid.uuid4()
+    alert_id = uuid.uuid4()
     alert = SimpleNamespace(
-        id=uuid.uuid4(),
+        id=alert_id,
         user_id=user_id,
-        deposit_trigger_account_id=account_id,
+        account_id=uuid.uuid4(),
         deposit_trigger_min_amount_krw=100_000,
-        last_known_deposit_krw=500_000,
         mode="NOTIFY",
         market_condition_mode="DISABLED",
     )
     portfolio = _make_portfolio()
 
-    account = SimpleNamespace(
-        id=account_id,
-        deposit_krw=550_000,  # 증분 = 50K < min 100K
-        is_active=True,
-        asset_type="STOCK_KIS",
-        kis_app_key=None,
-        kis_app_secret=None,
-        is_mock_mode=False,
-    )
+    # 계좌 1: 500K → 550K (증분 +50K < min 100K)
+    da1, acc1 = _make_deposit_row(alert_id, last_known=500_000, current_deposit=550_000)
+    da1_fresh = SimpleNamespace(id=da1.id, last_known_deposit_krw=da1.last_known_deposit_krw)
+    fresh_alert = SimpleNamespace(id=alert_id, last_deposit_checked_at=None)
 
     mock_session = MagicMock()
     mock_session.__aenter__ = AsyncMock(return_value=mock_session)
     mock_session.__aexit__ = AsyncMock(return_value=False)
-    mock_session.scalar = AsyncMock(return_value=account)
+
+    deposit_result = MagicMock()
+    deposit_result.all.return_value = [(da1, acc1)]
+    mock_session.execute = AsyncMock(return_value=deposit_result)
+    mock_session.scalar = AsyncMock(side_effect=[da1_fresh, fresh_alert])
+    mock_session.commit = AsyncMock()
+
+    with patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session):
+        from app.jobs.deposit_monitor import _process_deposit_alert
+
+        result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())
+
+    assert result is False
+
+
+@pytest.mark.asyncio
+async def test_process_deposit_alert_multi_account_sum_triggers():
+    """복수 계좌의 증분 합산이 min_amount 이상이면 트리거된다."""
+    user_id = uuid.uuid4()
+    alert_id = uuid.uuid4()
+    alert = SimpleNamespace(
+        id=alert_id,
+        user_id=user_id,
+        account_id=uuid.uuid4(),
+        deposit_trigger_min_amount_krw=150_000,
+        mode="NOTIFY",
+        market_condition_mode="DISABLED",
+    )
+    portfolio = _make_portfolio()
+
+    # 계좌 1: 증분 +80K, 계좌 2: 증분 +90K → 합 170K > min 150K
+    da1, acc1 = _make_deposit_row(alert_id, last_known=200_000, current_deposit=280_000)
+    da2, acc2 = _make_deposit_row(alert_id, last_known=300_000, current_deposit=390_000)
+    fresh_alert = SimpleNamespace(id=alert_id, last_deposit_checked_at=None)
+    da1_fresh = SimpleNamespace(id=da1.id, last_known_deposit_krw=da1.last_known_deposit_krw)
+    da2_fresh = SimpleNamespace(id=da2.id, last_known_deposit_krw=da2.last_known_deposit_krw)
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    deposit_result = MagicMock()
+    deposit_result.all.return_value = [(da1, acc1), (da2, acc2)]
+    mock_session.execute = AsyncMock(return_value=deposit_result)
+    mock_session.scalar = AsyncMock(side_effect=[da1_fresh, da2_fresh, fresh_alert])
     mock_session.commit = AsyncMock()
 
     with (
         patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session),
-        patch("app.jobs.deposit_monitor._update_deposit_baseline", new=AsyncMock()),
+        patch("app.jobs.deposit_monitor._notify_deposit_rebalancing", new=AsyncMock()) as mock_notify,
+        patch("app.services.alert_repository.save_alert_history", new=AsyncMock()),
     ):
+        from app.jobs.deposit_monitor import _process_deposit_alert
+
+        result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())
+
+    assert result is True
+    call_args = mock_notify.call_args.args
+    assert call_args[2] == 170_000.0  # 80K + 90K
+
+
+@pytest.mark.asyncio
+async def test_process_deposit_alert_multi_account_below_min_skips():
+    """복수 계좌의 증분 합산이 min_amount 미만이면 스킵된다."""
+    user_id = uuid.uuid4()
+    alert_id = uuid.uuid4()
+    alert = SimpleNamespace(
+        id=alert_id,
+        user_id=user_id,
+        account_id=uuid.uuid4(),
+        deposit_trigger_min_amount_krw=200_000,
+        mode="NOTIFY",
+        market_condition_mode="DISABLED",
+    )
+    portfolio = _make_portfolio()
+
+    # 계좌 1: 증분 +50K, 계좌 2: 증분 +60K → 합 110K < min 200K
+    da1, acc1 = _make_deposit_row(alert_id, last_known=200_000, current_deposit=250_000)
+    da2, acc2 = _make_deposit_row(alert_id, last_known=300_000, current_deposit=360_000)
+    fresh_alert = SimpleNamespace(id=alert_id, last_deposit_checked_at=None)
+    da1_fresh = SimpleNamespace(id=da1.id, last_known_deposit_krw=da1.last_known_deposit_krw)
+    da2_fresh = SimpleNamespace(id=da2.id, last_known_deposit_krw=da2.last_known_deposit_krw)
+
+    mock_session = MagicMock()
+    mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+    mock_session.__aexit__ = AsyncMock(return_value=False)
+
+    deposit_result = MagicMock()
+    deposit_result.all.return_value = [(da1, acc1), (da2, acc2)]
+    mock_session.execute = AsyncMock(return_value=deposit_result)
+    mock_session.scalar = AsyncMock(side_effect=[da1_fresh, da2_fresh, fresh_alert])
+    mock_session.commit = AsyncMock()
+
+    with patch("app.jobs.deposit_monitor.AsyncSessionLocal", return_value=mock_session):
         from app.jobs.deposit_monitor import _process_deposit_alert
 
         result = await _process_deposit_alert(alert, portfolio, "user@example.com", None, None, "GREEN", MagicMock())

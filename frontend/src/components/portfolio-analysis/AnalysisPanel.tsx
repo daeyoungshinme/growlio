@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
-import { fetchRebalancingAlerts } from "@/api/alerts";
+import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
 
@@ -16,8 +16,6 @@ import EfficientFrontierChart from "@/components/portfolio-analysis/EfficientFro
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
@@ -29,6 +27,7 @@ interface Props {
   activeAccounts: AssetAccount[];
   onOpenAlertModal: (portfolioId: string) => void;
   autoAnalyzeId?: string;
+  alertByPortfolioId: Record<string, RebalancingAlert>;
 }
 
 export function AnalysisPanel({
@@ -38,6 +37,7 @@ export function AnalysisPanel({
   activeAccounts,
   onOpenAlertModal,
   autoAnalyzeId,
+  alertByPortfolioId,
 }: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
   const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
@@ -49,14 +49,6 @@ export function AnalysisPanel({
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
-
-  const { data: rebalancingAlertsRaw } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlerts,
-    queryFn: fetchRebalancingAlerts,
-    staleTime: STALE_TIME.MEDIUM,
-  });
-  const rebalancingAlerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
-  const alertByPortfolioId = Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a]));
 
   const runMut = useMutation({
     mutationFn: () =>

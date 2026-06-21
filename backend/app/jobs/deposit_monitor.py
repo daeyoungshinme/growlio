@@ -1,7 +1,8 @@
 """예수금 입금 감지 Job — 매일 15:35, 18:05 KST 실행 (asset_sync 완료 후).
 
 감지 로직: RebalancingAlert.deposit_trigger_enabled=TRUE 인 알림에 대해
-  current deposit_krw - last_known_deposit_krw >= deposit_trigger_min_amount_krw 이면
+  감시 계좌별 (current deposit_krw - last_known_deposit_krw) 양수 합산이
+  deposit_trigger_min_amount_krw 이상이면
   포트폴리오 비중대로 입금 증분을 즉시 배분 매수(AUTO) 또는 알림(NOTIFY) 발송.
 """
 
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.kis.auth import get_access_token
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
-from app.models.alert import RebalancingAlert
+from app.models.alert import RebalancingAlert, RebalancingAlertDepositAccount
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -53,6 +54,7 @@ async def _run_deposit_monitor(redis) -> None:
         composite_level = "GREEN"
 
     async with AsyncSessionLocal() as db:
+        # deposit_accounts 관계가 있는 알림만 조회 (association table에 row 있는 것)
         result = await db.execute(
             select(
                 RebalancingAlert,
@@ -67,7 +69,9 @@ async def _run_deposit_monitor(redis) -> None:
             .where(
                 RebalancingAlert.is_active == True,  # noqa: E712
                 RebalancingAlert.deposit_trigger_enabled == True,  # noqa: E712
-                RebalancingAlert.deposit_trigger_account_id.isnot(None),
+                RebalancingAlert.id.in_(
+                    select(RebalancingAlertDepositAccount.alert_id).distinct()
+                ),
             )
         )
         rows = result.all()
@@ -110,32 +114,50 @@ async def _process_deposit_alert(
 ) -> bool:
     """단일 알림에 대한 예수금 변화 감지 및 처리. True=발동, False=스킵."""
     async with AsyncSessionLocal() as db:
-        account = await db.scalar(
-            select(AssetAccount).where(
-                AssetAccount.id == alert.deposit_trigger_account_id,
+        # 감시 계좌 목록 + 현재 예수금 조회
+        deposit_rows_result = await db.execute(
+            select(RebalancingAlertDepositAccount, AssetAccount)
+            .join(AssetAccount, AssetAccount.id == RebalancingAlertDepositAccount.account_id)
+            .where(
+                RebalancingAlertDepositAccount.alert_id == alert.id,
                 AssetAccount.is_active == True,  # noqa: E712
             )
         )
-        if not account:
-            logger.warning(
-                "deposit_monitor_account_not_found",
-                alert_id=str(alert.id),
-                account_id=str(alert.deposit_trigger_account_id),
-            )
+        deposit_rows = deposit_rows_result.all()
+
+        if not deposit_rows:
+            logger.warning("deposit_monitor_no_accounts", alert_id=str(alert.id))
             return False
 
-        current_deposit = float(account.deposit_krw or 0)
-        last_known = float(alert.last_known_deposit_krw or 0)
         min_amount = int(alert.deposit_trigger_min_amount_krw or 0)
-        deposit_increment = current_deposit - last_known
+        total_increment = 0.0
+        updates: list[tuple[RebalancingAlertDepositAccount, float]] = []
 
-        if deposit_increment < min_amount:
-            await _update_deposit_baseline(db, alert.id, current_deposit)
+        for da, account in deposit_rows:
+            current = float(account.deposit_krw or 0)
+            last = float(da.last_known_deposit_krw or 0)
+            inc = current - last
+            if inc > 0:
+                total_increment += inc
+            updates.append((da, current))
+
+        if total_increment < min_amount:
+            for da, baseline in updates:
+                fresh_da = await db.scalar(
+                    select(RebalancingAlertDepositAccount).where(
+                        RebalancingAlertDepositAccount.id == da.id
+                    )
+                )
+                if fresh_da:
+                    fresh_da.last_known_deposit_krw = baseline
+            fresh_alert = await db.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert.id))
+            if fresh_alert:
+                fresh_alert.last_deposit_checked_at = datetime.now(UTC)
             await db.commit()
             logger.debug(
                 "deposit_monitor_no_trigger",
                 alert_id=str(alert.id),
-                increment=deposit_increment,
+                total_increment=total_increment,
                 min_required=min_amount,
             )
             return False
@@ -158,17 +180,17 @@ async def _process_deposit_alert(
         email = notification_email or user_email
 
         if effective_mode == "AUTO":
-            await _execute_dca_by_deposit_increment(alert, portfolio, deposit_increment, db, redis)
+            await _execute_dca_by_deposit_increment(alert, portfolio, total_increment, db, redis)
         else:
-            await _notify_deposit_rebalancing(alert, portfolio, deposit_increment, email, fcm_token, db)
+            await _notify_deposit_rebalancing(alert, portfolio, total_increment, email, fcm_token, db)
 
-        await _update_deposit_baseline(db, alert.id, current_deposit)
+        await _update_deposit_baselines(db, alert.id, updates)
         await save_alert_history(
             db,
             alert.user_id,
             "REBALANCING",
             (
-                f"예수금 입금 감지: +{deposit_increment:,.0f}원 → "
+                f"예수금 입금 감지: +{total_increment:,.0f}원 → "
                 f"{portfolio.name} {'자동매수' if effective_mode == 'AUTO' else '알림'} "
                 f"[시장신호: {composite_level}]"
             ),
@@ -177,17 +199,27 @@ async def _process_deposit_alert(
         logger.info(
             "deposit_monitor_triggered",
             alert_id=str(alert.id),
-            increment=deposit_increment,
+            total_increment=total_increment,
             mode=effective_mode,
         )
         return True
 
 
-async def _update_deposit_baseline(db: AsyncSession, alert_id: uuid.UUID, current_deposit: float) -> None:
-    fresh = await db.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert_id))
-    if fresh:
-        fresh.last_known_deposit_krw = current_deposit
-        fresh.last_deposit_checked_at = datetime.now(UTC)
+async def _update_deposit_baselines(
+    db: AsyncSession,
+    alert_id: uuid.UUID,
+    updates: list[tuple[RebalancingAlertDepositAccount, float]],
+) -> None:
+    for da, baseline in updates:
+        fresh_da = await db.scalar(
+            select(RebalancingAlertDepositAccount).where(RebalancingAlertDepositAccount.id == da.id)
+        )
+        if fresh_da:
+            fresh_da.last_known_deposit_krw = baseline
+
+    fresh_alert = await db.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert_id))
+    if fresh_alert:
+        fresh_alert.last_deposit_checked_at = datetime.now(UTC)
 
 
 async def _execute_dca_by_deposit_increment(
@@ -197,15 +229,22 @@ async def _execute_dca_by_deposit_increment(
     db: AsyncSession,
     redis,
 ) -> None:
-    """AUTO 모드: 입금 증분을 포트폴리오 비중대로 분배하여 즉시 매수 (DCA 방식)."""
+    """AUTO 모드: 입금 증분을 포트폴리오 비중대로 분배하여 즉시 매수 (DCA 방식).
+
+    실행 계좌는 alert.account_id (AUTO 모드 지정 KIS 계좌) 사용.
+    """
     items = portfolio.items
     if not items:
         logger.warning("deposit_monitor_no_portfolio_items", portfolio_id=str(portfolio.id))
         return
 
+    if not alert.account_id:
+        logger.warning("deposit_monitor_no_execution_account", alert_id=str(alert.id))
+        return
+
     account = await db.scalar(
         select(AssetAccount).where(
-            AssetAccount.id == alert.deposit_trigger_account_id,
+            AssetAccount.id == alert.account_id,
             AssetAccount.is_active == True,  # noqa: E712
         )
     )
@@ -213,7 +252,7 @@ async def _execute_dca_by_deposit_increment(
         logger.warning(
             "deposit_monitor_invalid_account",
             alert_id=str(alert.id),
-            account_id=str(alert.deposit_trigger_account_id),
+            account_id=str(alert.account_id),
         )
         return
     if not account.kis_app_key or not account.kis_app_secret:
@@ -321,13 +360,12 @@ async def _notify_deposit_rebalancing(
         analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
 
         # 부족한(underweight) 종목만 추출: diff_krw < 0이면 현재 < 목표 (매수 필요)
-        # CASH는 매수 대상에서 제외 (예수금이 부족하면 현금 보유를 늘려야 하므로 투자 불필요)
+        # CASH는 매수 대상에서 제외
         underweight = [
             i for i in analysis.items if i.diff_krw < 0 and i.ticker != "CASH" and i.shares_to_trade is not None
         ]
 
         if underweight:
-            # 부족금액 크기 비율로 deposit_increment 배분
             total_deficit = sum(abs(i.diff_krw) for i in underweight)
             for item in underweight:
                 alloc_ratio = abs(item.diff_krw) / total_deficit if total_deficit > 0 else 0

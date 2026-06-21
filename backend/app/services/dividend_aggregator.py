@@ -24,7 +24,7 @@ async def get_dividend_summary(user_id: uuid.UUID, db: AsyncSession, redis: Redi
             cached = await redis.get(dividend_summary_key(user_id))
             if cached:
                 return json.loads(cached)
-        except RedisError:
+        except (RedisError, json.JSONDecodeError):
             logger.warning("dividend_cache_read_error", user_id=str(user_id))
 
     current_year = date.today().year

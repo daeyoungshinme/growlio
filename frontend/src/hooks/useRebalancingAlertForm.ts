@@ -95,21 +95,23 @@ export function useRebalancingAlertFormState({
   const [depositTriggerEnabled, setDepositTriggerEnabled] = useState(
     alert?.deposit_trigger_enabled ?? false,
   );
-  const [depositTriggerAccountId, setDepositTriggerAccountId] = useState<string>(
-    alert?.deposit_trigger_account_id ?? "",
+  const [depositTriggerAccountIds, setDepositTriggerAccountIds] = useState<string[]>(
+    alert?.deposit_trigger_account_ids ?? [],
   );
   const [depositTriggerMinAmount, setDepositTriggerMinAmount] = useState<number>(
     alert?.deposit_trigger_min_amount_krw ?? 100_000,
   );
 
   useEffect(() => {
-    if (depositTriggerAccountId && kisAccounts.length > 0) {
-      if (!kisAccounts.some((a) => a.id === depositTriggerAccountId)) {
+    if (depositTriggerAccountIds.length > 0 && kisAccounts.length > 0) {
+      const validIds = kisAccounts.map((a) => a.id);
+      const filtered = depositTriggerAccountIds.filter((id) => validIds.includes(id));
+      if (filtered.length !== depositTriggerAccountIds.length) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setDepositTriggerAccountId("");
+        setDepositTriggerAccountIds(filtered);
       }
     }
-  }, [kisAccounts, depositTriggerAccountId]);
+  }, [kisAccounts, depositTriggerAccountIds]);
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -125,8 +127,7 @@ export function useRebalancingAlertFormState({
         order_type: orderType,
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
         deposit_trigger_enabled: depositTriggerEnabled,
-        deposit_trigger_account_id:
-          depositTriggerEnabled && depositTriggerAccountId ? depositTriggerAccountId : null,
+        deposit_trigger_account_ids: depositTriggerEnabled ? depositTriggerAccountIds : [],
         deposit_trigger_min_amount_krw: depositTriggerEnabled ? depositTriggerMinAmount : null,
       }),
     onSuccess: () => {
@@ -171,8 +172,8 @@ export function useRebalancingAlertFormState({
     setMarketConditionMode,
     depositTriggerEnabled,
     setDepositTriggerEnabled,
-    depositTriggerAccountId,
-    setDepositTriggerAccountId,
+    depositTriggerAccountIds,
+    setDepositTriggerAccountIds,
     depositTriggerMinAmount,
     setDepositTriggerMinAmount,
     // mutations

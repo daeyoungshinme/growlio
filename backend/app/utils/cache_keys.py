@@ -223,7 +223,7 @@ async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: 
         dashboard_summary_key(user_id),
         portfolio_overview_key(user_id),
         portfolio_overview_lite_key(user_id),
-        alloc_history_key(user_id, 12),
+        *[alloc_history_key(user_id, m) for m in range(3, 37)],
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
         portfolio_summary_key(user_id),

@@ -8,14 +8,14 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.api.v1._account_deps import get_owned_or_404
 from app.database import get_db
 from app.limiter import limiter
-from app.models.alert import RebalancingAlert
+from app.models.alert import RebalancingAlert, RebalancingAlertDepositAccount
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -36,7 +36,7 @@ class RebalancingAlertCreate(BaseModel):
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
     deposit_trigger_enabled: bool = False
-    deposit_trigger_account_id: uuid.UUID | None = None
+    deposit_trigger_account_ids: list[uuid.UUID] = []
     deposit_trigger_min_amount_krw: int | None = None
 
     @field_validator("threshold_pct")
@@ -69,8 +69,6 @@ class RebalancingAlertCreate(BaseModel):
 
 
 class RebalancingAlertResponse(BaseModel):
-    model_config = {"from_attributes": True}
-
     id: uuid.UUID
     portfolio_id: uuid.UUID
     is_active: bool
@@ -88,10 +86,34 @@ class RebalancingAlertResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     deposit_trigger_enabled: bool
-    deposit_trigger_account_id: uuid.UUID | None
+    deposit_trigger_account_ids: list[uuid.UUID]
     deposit_trigger_min_amount_krw: int | None
-    last_known_deposit_krw: float | None
     last_deposit_checked_at: datetime | None
+
+
+def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
+    return RebalancingAlertResponse(
+        id=alert.id,
+        portfolio_id=alert.portfolio_id,
+        is_active=alert.is_active,
+        threshold_pct=float(alert.threshold_pct),
+        schedule_type=alert.schedule_type,
+        schedule_day_of_week=alert.schedule_day_of_week,
+        schedule_day_of_month=alert.schedule_day_of_month,
+        trigger_condition=alert.trigger_condition,
+        mode=alert.mode,
+        strategy=alert.strategy,
+        account_id=alert.account_id,
+        order_type=alert.order_type,
+        market_condition_mode=alert.market_condition_mode,
+        last_triggered_at=alert.last_triggered_at,
+        created_at=alert.created_at,
+        updated_at=alert.updated_at,
+        deposit_trigger_enabled=alert.deposit_trigger_enabled,
+        deposit_trigger_account_ids=[da.account_id for da in (alert.deposit_accounts or [])],
+        deposit_trigger_min_amount_krw=alert.deposit_trigger_min_amount_krw,
+        last_deposit_checked_at=alert.last_deposit_checked_at,
+    )
 
 
 @router.get("/rebalancing", response_model=list[RebalancingAlertResponse])
@@ -105,7 +127,8 @@ async def list_rebalancing_alerts(
         .where(RebalancingAlert.user_id == current_user.id)
         .order_by(RebalancingAlert.created_at)
     )
-    return result.scalars().all()
+    alerts = result.scalars().all()
+    return [_build_response(a) for a in alerts]
 
 
 @router.get("/rebalancing/{portfolio_id}", response_model=RebalancingAlertResponse)
@@ -123,7 +146,7 @@ async def get_rebalancing_alert(
     )
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림이 설정되지 않았습니다")
-    return alert
+    return _build_response(alert)
 
 
 @router.put("/rebalancing/{portfolio_id}", response_model=RebalancingAlertResponse)
@@ -157,7 +180,6 @@ async def upsert_rebalancing_alert(
         alert.market_condition_mode = body.market_condition_mode
         alert.is_active = True
         alert.deposit_trigger_enabled = body.deposit_trigger_enabled
-        alert.deposit_trigger_account_id = body.deposit_trigger_account_id
         alert.deposit_trigger_min_amount_krw = body.deposit_trigger_min_amount_krw
     else:
         alert = RebalancingAlert(
@@ -175,25 +197,37 @@ async def upsert_rebalancing_alert(
             market_condition_mode=body.market_condition_mode,
             is_active=True,
             deposit_trigger_enabled=body.deposit_trigger_enabled,
-            deposit_trigger_account_id=body.deposit_trigger_account_id,
             deposit_trigger_min_amount_krw=body.deposit_trigger_min_amount_krw,
         )
         db.add(alert)
+        await db.flush()  # alert.id 확보
 
-    # 예수금 입금 감지 활성화 시 기준 예수금 초기화 (첫 발동 즉시 트리거 방지)
-    if body.deposit_trigger_enabled and body.deposit_trigger_account_id:
-        trigger_account = await db.scalar(
-            select(AssetAccount).where(
-                AssetAccount.id == body.deposit_trigger_account_id,
-                AssetAccount.user_id == current_user.id,
-            )
+    # 기존 deposit account 연결 전부 교체
+    await db.execute(
+        delete(RebalancingAlertDepositAccount).where(
+            RebalancingAlertDepositAccount.alert_id == alert.id
         )
-        if trigger_account and trigger_account.deposit_krw is not None:
-            alert.last_known_deposit_krw = trigger_account.deposit_krw
+    )
+
+    if body.deposit_trigger_enabled and body.deposit_trigger_account_ids:
+        for acc_id in body.deposit_trigger_account_ids:
+            acc = await db.scalar(
+                select(AssetAccount).where(
+                    AssetAccount.id == acc_id,
+                    AssetAccount.user_id == current_user.id,
+                )
+            )
+            db.add(
+                RebalancingAlertDepositAccount(
+                    alert_id=alert.id,
+                    account_id=acc_id,
+                    last_known_deposit_krw=float(acc.deposit_krw) if acc and acc.deposit_krw is not None else None,
+                )
+            )
 
     await db.commit()
     await db.refresh(alert)
-    return alert
+    return _build_response(alert)
 
 
 @router.delete("/rebalancing/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)

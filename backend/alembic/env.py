@@ -36,7 +36,10 @@ async def run_async_migrations() -> None:
     extra: dict = {}
     if settings.supabase_project_url or settings.app_env == "production":
         # statement_cache_size=0: Transaction Pooler(port 6543)는 prepared statement 캐시 비호환
-        extra["connect_args"] = {"ssl": "require", "server_settings": {"statement_cache_size": "0"}}
+        extra["connect_args"] = {"ssl": "require", "statement_cache_size": 0}
+    else:
+        # 로컬/개발 환경도 pooler 경유 시 prepared statement 충돌 방지
+        extra["connect_args"] = {"statement_cache_size": 0}
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

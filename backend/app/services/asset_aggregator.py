@@ -8,10 +8,9 @@ from datetime import date
 from typing import Any
 
 import structlog
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import AssetSnapshot, Transaction
 from app.models.user import UserSettings
 from app.services.composition_calculator import (
     build_asset_totals,
@@ -136,27 +135,3 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     }
     await set_cached_json(redis, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     return result
-
-
-async def _get_first_snap_date(user_id: uuid.UUID, db: AsyncSession) -> date | None:
-    result = await db.execute(select(func.min(AssetSnapshot.snapshot_date)).where(AssetSnapshot.user_id == user_id))
-    return result.scalar()
-
-
-async def _calc_net_deposits_this_year(user_id: uuid.UUID, db: AsyncSession) -> float:
-    """올해 순입금액 = DEPOSIT 합계 - WITHDRAWAL 합계."""
-    year = date.today().year
-    result = await db.execute(
-        select(
-            Transaction.transaction_type,
-            func.sum(Transaction.amount).label("total"),
-        )
-        .where(
-            Transaction.user_id == user_id,
-            func.extract("year", Transaction.transaction_date) == year,
-            Transaction.transaction_type.in_(["DEPOSIT", "WITHDRAWAL"]),
-        )
-        .group_by(Transaction.transaction_type)
-    )
-    rows = {r.transaction_type: float(r.total) for r in result}
-    return rows.get("DEPOSIT", 0.0) - rows.get("WITHDRAWAL", 0.0)

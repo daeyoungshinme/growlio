@@ -28,9 +28,12 @@ function SortTh({
   return (
     <th
       scope="col"
+      role="columnheader"
+      tabIndex={0}
       onClick={() => onSort(k)}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onSort(k)}
       aria-sort={sort === k ? "descending" : "none"}
-      className={`py-2.5 px-4 text-right text-xs font-medium cursor-pointer select-none uppercase ${
+      className={`py-2.5 px-4 text-right text-xs font-medium cursor-pointer select-none uppercase focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 ${
         sort === k
           ? "text-blue-600 dark:text-blue-400"
           : "text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400"

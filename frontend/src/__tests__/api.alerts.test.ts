@@ -144,7 +144,7 @@ describe("api/alerts — rebalancing alerts", () => {
       order_type: "MARKET",
       market_condition_mode: "DISABLED",
       deposit_trigger_enabled: false,
-      deposit_trigger_account_id: null,
+      deposit_trigger_account_ids: [],
       deposit_trigger_min_amount_krw: null,
     });
     expect(api.put).toHaveBeenCalledWith(

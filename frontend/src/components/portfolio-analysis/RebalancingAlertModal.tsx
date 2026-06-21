@@ -412,29 +412,50 @@ function AlertFormBody({
             <div className="overflow-hidden">
               <div className="space-y-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    감시 계좌 (KIS)
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    감시 계좌 (복수 선택 가능)
                   </label>
-                  <select
-                    className={inputClass}
-                    value={form.depositTriggerAccountId}
-                    onChange={(e) => form.setDepositTriggerAccountId(e.target.value)}
-                  >
-                    <option value="">계좌 선택</option>
-                    {kisAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                        {a.deposit_krw != null
-                          ? ` — 예수금 ${a.deposit_krw.toLocaleString("ko-KR")}원`
-                          : ""}
-                      </option>
-                    ))}
-                  </select>
-                  {kisAccounts.length === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  {kisAccounts.length === 0 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
                       {accountIds != null
                         ? "이 포트폴리오에 연결된 KIS 계좌가 없습니다. 포트폴리오 설정에서 KIS 계좌를 연결해주세요."
                         : "KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요."}
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {kisAccounts.map((a) => {
+                        const checked = form.depositTriggerAccountIds.includes(a.id);
+                        const toggle = () =>
+                          form.setDepositTriggerAccountIds((prev) =>
+                            checked ? prev.filter((id) => id !== a.id) : [...prev, a.id],
+                          );
+                        return (
+                          <label
+                            key={a.id}
+                            className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2.5 py-2 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={toggle}
+                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
+                              {a.name}
+                            </span>
+                            {a.deposit_krw != null && (
+                              <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
+                                {a.deposit_krw.toLocaleString("ko-KR")}원
+                              </span>
+                            )}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {form.depositTriggerAccountIds.length > 1 && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">
+                      선택된 계좌들의 입금 합산액이 최소 금액 이상이면 동작합니다
                     </p>
                   )}
                 </div>
@@ -460,11 +481,6 @@ function AlertFormBody({
                 {alert?.last_deposit_checked_at && (
                   <p className="text-xs text-blue-600 dark:text-blue-400">
                     마지막 확인: {new Date(alert.last_deposit_checked_at).toLocaleString("ko-KR")}
-                    {alert.last_known_deposit_krw != null && (
-                      <span className="block">
-                        기준 예수금: {alert.last_known_deposit_krw.toLocaleString("ko-KR")}원
-                      </span>
-                    )}
                   </p>
                 )}
               </div>
