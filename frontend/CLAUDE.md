@@ -72,6 +72,8 @@ make build-android-release         # APK Release 빌드
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
 - `/find-account` — 계정 찾기 (FindAccountPage)
+- `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
+- `/market` — 시장 신호 대시보드. VIX·장단기 금리차·경제지표·인사이트 (MarketPage)
 - `/trend` — `/dashboard`로 리다이렉트 (TrendPage 제거됨)
 
 > 구 URL 리다이렉트: `/assets` → `/portfolio`
@@ -82,7 +84,7 @@ make build-android-release         # APK Release 빌드
 - `Toaster.tsx` — `growlio:toast` 이벤트 구독 전역 토스트 UI
 
 **컴포넌트 디렉토리 (`src/components/`):**
-assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, trend
+assets, backtest, common, dashboard, invest, layout, market, portfolio, portfolio-analysis, rebalancing, settings, trend
 
 `components/common/` 주요 파일: `ConfirmModal.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `TreemapCell.tsx`
 
@@ -108,6 +110,20 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 뮤테이션
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
+- `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
+- `useAlertCrud.ts` / `useExchangeRateAlerts.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
+- `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
+- `useBiometric.ts` — 생체 인증 (Capacitor Android)
+- `useDartDisclosures.ts` — DART 공시 조회
+- `useDRIPSimulation.ts` — 배당 재투자(DRIP) 시뮬레이션
+- `useEconomicIndicators.ts` / `useInsights.ts` — 경제지표·인사이트 조회
+- `useGoalSettings.ts` — 투자 목표 설정 폼 상태
+- `useHaptic.ts` / `usePullToRefresh.ts` / `useSwipeNavigation.ts` — 모바일 UX
+- `useLogout.ts` — 로그아웃 로직, `useOnlineStatus.ts` — 온라인/오프라인 감지
+- `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
+- `usePushNotifications.ts` / `useRegisterRefresh.ts` / `useWidget.ts` — FCM 푸시·홈 위젯 (Android)
+- `useTransactionFormState.ts` — 거래내역 입력 폼 상태
 
 새 커스텀 훅은 이 디렉토리에 추가.
 
@@ -121,6 +137,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `index.ts` — 상수 re-export
 
 **타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
+
+**Zod 스키마 (`src/schemas/`):**
+- `assets.ts`, `auth.ts`, `portfolios.ts`, `settings.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
 
 **테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트: `format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`.
 

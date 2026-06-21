@@ -115,7 +115,14 @@ API Request
         ├── stocks.py         # 종목 검색
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
         ├── transactions.py   # 입출금/배당 내역 CRUD
-        └── ws.py             # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (클라이언트당 개별 연결)
+        ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (클라이언트당 개별 연결)
+        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators)
+        ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
+        ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
+        ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
+        ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
+        ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
+        └── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
 
 services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
@@ -142,7 +149,25 @@ services/
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions)
   ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼
-  └── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
+  ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
+  ├── alert_calculator.py           # 알림 조건 판단 로직 (alert_service.py에서 분리)
+  ├── alert_repository.py           # 알림 DB 쿼리 레이어 (alert_service.py에서 분리)
+  ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
+  ├── composition_calculator.py     # 자산 구성 비중 계산
+  ├── trend_calculator.py           # 월별 자산 추이 계산
+  ├── returns_calculator.py         # 수익률 계산 (XIRR 등)
+  ├── economic_calendar_service.py  # FRED 경제 캘린더 이벤트 조회
+  ├── economic_indicator_service.py # 미국 주요 경제지표 조회·캐싱
+  ├── email_templates.py            # 이메일 HTML 템플릿 모듈 (email_service.py에서 분리)
+  ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
+  ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
+  ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
+  ├── market_signal_service.py      # 복합 시장 위험 신호 평가
+  ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
+  ├── position_aggregator.py        # 복수 계좌 포지션 집계
+  ├── push_service.py               # FCM 푸시 알림 발송
+  ├── rebalancing_strategy_service.py # 리밸런싱 전략 로직 (rebalancing_service.py에서 분리)
+  └── risk_service.py               # 포트폴리오 리스크 지표 계산 (VaR, 변동성 등)
 
 kis/                          # KIS OpenAPI 클라이언트
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)

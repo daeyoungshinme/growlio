@@ -76,6 +76,7 @@ growlio/
 ├── frontend/         # React 18 + Vite (TypeScript)
 │   └── android/      # Capacitor Android 프로젝트
 ├── nginx/            # nginx 리버스 프록시 (프로덕션/Docker 전용 — 로컬 개발에서는 미사용; Vite dev server가 /api/* 프록시 처리)
+├── monitoring/       # Prometheus 설정(prometheus.yml) + Grafana 대시보드
 ├── .github/          # GitHub Actions (CI: lint/test/build, Android APK)
 ├── render.yaml       # Render 백엔드 배포 설정
 ├── docker-compose.yml
