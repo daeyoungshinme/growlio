@@ -119,12 +119,12 @@ export default function PortfolioPage() {
 
   useEffect(() => {
     if (isLoading || !data) return;
-    qc.prefetchQuery({
+    void qc.prefetchQuery({
       queryKey: QUERY_KEYS.dividendSummary,
       queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
       staleTime: STALE_TIME.LONG,
     });
-    qc.prefetchQuery({
+    void qc.prefetchQuery({
       queryKey: QUERY_KEYS.dividendByTicker,
       queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
       staleTime: STALE_TIME.LONG,

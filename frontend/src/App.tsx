@@ -8,7 +8,6 @@ import TopLoadingBar from "./components/common/TopLoadingBar";
 import Toaster from "./components/Toaster";
 import { useAuthStore, AUTH_ME_CACHE_KEY } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
-import { PERSIST_CACHE_KEY } from "./constants/queryConfig";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWidget } from "./hooks/useWidget";
 import { useMainPageFetching } from "./hooks/usePortfolioTabFetching";
@@ -103,28 +102,29 @@ export default function App() {
   }, [isDark]);
 
   const prefetchDashboardData = useCallback(() => {
-    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
-    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-    queryClient.prefetchQuery({
+    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
+    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
+    void queryClient.prefetchQuery({
       queryKey: QUERY_KEYS.portfolioOverviewLite,
       queryFn: fetchPortfolioOverviewLite,
     });
-    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
-    queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
+    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);
 
   useEffect(() => {
     // 세션이 감지되는 순간(localStorage, 네트워크 전) prefetch를 /auth/me와 병렬 실행
-    checkAuth(prefetchDashboardData);
+    void checkAuth(prefetchDashboardData);
   }, [checkAuth, prefetchDashboardData]);
 
   useEffect(() => {
     const handleSessionExpired = () => {
       queryClient.clear();
-      window.localStorage.removeItem(PERSIST_CACHE_KEY);
+      // persist 캐시는 세션 만료 시 보존 — 재로그인 후 이전 데이터를 즉시 표시하고 백그라운드에서 갱신됨
+      // 명시적 로그아웃 시에만 삭제 (useLogout.ts 참고)
       window.localStorage.removeItem(AUTH_ME_CACHE_KEY);
-      logout();
+      void logout();
     };
     window.addEventListener("growlio:session-expired", handleSessionExpired);
     return () => window.removeEventListener("growlio:session-expired", handleSessionExpired);

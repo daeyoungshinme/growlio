@@ -49,16 +49,16 @@ export function useSubscribeMutation() {
   const subscribe = useMutation({
     mutationFn: subscribeIndicator,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicatorSubscriptions });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicators });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicatorSubscriptions });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicators });
     },
   });
 
   const unsubscribe = useMutation({
     mutationFn: unsubscribeIndicator,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicatorSubscriptions });
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicators });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicatorSubscriptions });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.economicIndicators });
     },
   });
 

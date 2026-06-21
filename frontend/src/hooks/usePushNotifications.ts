@@ -52,7 +52,7 @@ export function usePushNotifications() {
       }
     }
 
-    setup();
+    void setup();
 
     return () => {
       cancelled = true;

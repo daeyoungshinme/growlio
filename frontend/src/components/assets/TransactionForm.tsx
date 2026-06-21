@@ -81,7 +81,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   const createMut = useMutation({
     mutationFn: createTransaction,
     onSuccess: (_, vars) => {
-      invalidateTransactionData(qc);
+      void invalidateTransactionData(qc);
       toast("추가되었습니다", "success");
       onSuccess(vars.account_id ?? "", vars.amount ?? 0, vars.transaction_type);
     },
@@ -92,7 +92,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
     mutationFn: ({ id, data }: { id: string; data: Partial<TransactionCreate> }) =>
       updateTransaction(id, data),
     onSuccess: (_, vars) => {
-      invalidateTransactionData(qc);
+      void invalidateTransactionData(qc);
       toast("수정되었습니다", "success");
       onSuccess(
         vars.data?.account_id ?? "",

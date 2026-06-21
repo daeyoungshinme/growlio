@@ -330,7 +330,6 @@ describe("useGoalSettings", () => {
 
   it("데이터 로드 후 data가 설정된다", async () => {
     const { fetchDCAAnalysis } = await import("@/api/invest");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const mockData: any = {
       settings: {
         monthly_deposit_amount: 500000,

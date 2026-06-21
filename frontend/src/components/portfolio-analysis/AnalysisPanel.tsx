@@ -75,7 +75,7 @@ export function AnalysisPanel({
   function handleRebalancingAnalysis() {
     const [id] = Array.from(selectedIds);
     if (!id) return;
-    triggerRebalancingAnalysis(id);
+    void triggerRebalancingAnalysis(id);
   }
 
   const canRunBacktest = startDate < endDate && (selectedIds.size > 0 || includeSpy || includeReal);

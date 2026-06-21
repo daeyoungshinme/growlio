@@ -18,6 +18,7 @@ const RefreshContext = createContext<RefreshContextValue>({
   registerRefresh: () => {},
 });
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useRegisterRefresh(fn: (() => Promise<void>) | null) {
   const ctx = useContext(RefreshContext);
   ctx.registerRefresh(fn);

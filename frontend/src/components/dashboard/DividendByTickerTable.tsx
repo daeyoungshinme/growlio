@@ -62,8 +62,8 @@ const DividendByTickerTable = memo(function DividendByTickerTable({ items, isLoa
       months: number[];
     }) => updateTickerDividendMonths(ticker, market, months),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
       setEditTarget(null);
     },
     onError: () => toast("배당월 저장에 실패했습니다"),
@@ -73,8 +73,8 @@ const DividendByTickerTable = memo(function DividendByTickerTable({ items, isLoa
     mutationFn: ({ ticker, market }: { ticker: string; market: string }) =>
       deleteTickerDividendMonths(ticker, market),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
-      qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker });
+      void qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard });
       setEditTarget(null);
     },
     onError: () => toast("배당월 초기화에 실패했습니다"),

@@ -33,7 +33,10 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
-  const portfolios = Array.isArray(portfoliosRaw) ? portfoliosRaw : [];
+  const portfolios = useMemo(
+    () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),
+    [portfoliosRaw],
+  );
 
   const [localOrder, setLocalOrder] = useState<string[]>([]);
   const sortedPortfolios = useMemo(() => {
@@ -59,7 +62,10 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     queryFn: fetchRebalancingAlerts,
     staleTime: STALE_TIME.MEDIUM,
   });
-  const rebalancingAlerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
+  const rebalancingAlerts = useMemo(
+    () => (Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : []),
+    [rebalancingAlertsRaw],
+  );
   const alertPortfolioIds = useMemo(
     () => new Set(rebalancingAlerts.map((a) => a.portfolio_id)),
     [rebalancingAlerts],
@@ -110,7 +116,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
       account_ids: string[] | null;
     }) => createPortfolio(args),
     onSuccess: () => {
-      invalidatePortfolioData(qc);
+      void invalidatePortfolioData(qc);
       setEditorOpen(false);
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
@@ -131,7 +137,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
         account_ids: args.account_ids,
       }),
     onSuccess: () => {
-      invalidatePortfolioData(qc);
+      void invalidatePortfolioData(qc);
       setEditingPortfolio(null);
       setEditorOpen(false);
     },
@@ -141,7 +147,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   const deleteMut = useMutation({
     mutationFn: deletePortfolio,
     onSuccess: (_, id) => {
-      invalidatePortfolioData(qc);
+      void invalidatePortfolioData(qc);
       setSelectedIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -160,7 +166,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
       accountIds: string[];
     }) => batchSetTargetPortfolio(pid, accountIds),
     onSuccess: (_, { portfolioId: pid, accountIds }) => {
-      invalidateAccountData(qc);
+      void invalidateAccountData(qc);
       if (pid === null) {
         toast("목표 포트폴리오 지정이 해제되었습니다");
       } else {

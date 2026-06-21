@@ -31,14 +31,14 @@ export function useAccountMutations({
   const createMutation = useMutation({
     mutationFn: createAccount,
     onSuccess: async (data) => {
-      invalidateAll();
+      void invalidateAll();
       onBankModalClose();
       onStockModalClose();
       if (data.data_source === "KIS_API" || data.data_source === "KIWOOM_API") {
         setSyncingStockIds((prev) => new Set(prev).add(data.id));
         try {
           await syncAccount(data.id);
-          invalidateAll();
+          void invalidateAll();
           toast("계좌가 추가되었습니다", "success");
         } catch {
           toast("초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.");
@@ -59,7 +59,7 @@ export function useAccountMutations({
   const deleteMutation = useMutation({
     mutationFn: deleteAccount,
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       setDeletingId(null);
       toast("계좌가 삭제되었습니다", "success");
     },
@@ -70,7 +70,7 @@ export function useAccountMutations({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       onEditBankClose();
       toast("저장되었습니다", "success");
     },
@@ -88,7 +88,7 @@ export function useAccountMutations({
       deposit_usd?: number;
     }) => updateAccount(id, { deposit_krw, ...(deposit_usd !== undefined ? { deposit_usd } : {}) }),
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       toast("예수금이 업데이트되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "예수금 수정에 실패했습니다"), "error"),
@@ -97,7 +97,7 @@ export function useAccountMutations({
   const updateNameMutation = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => updateAccount(id, { name }),
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       toast("계좌명이 저장되었습니다", "success");
     },
     onError: (e) => toast(extractErrorMessage(e, "계좌명 수정에 실패했습니다"), "error"),
@@ -107,7 +107,7 @@ export function useAccountMutations({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       onEditStockClose();
       toast("저장되었습니다", "success");
     },
@@ -118,7 +118,7 @@ export function useAccountMutations({
     mutationFn: ({ id, data }: { id: string; data: Parameters<typeof updateAccount>[1] }) =>
       updateAccount(id, data),
     onSuccess: () => {
-      invalidateAll();
+      void invalidateAll();
       onEditRealEstateClose();
       toast("저장되었습니다", "success");
     },
@@ -130,7 +130,7 @@ export function useAccountMutations({
       setSyncingBankId(id);
       try {
         await syncAccount(id);
-        invalidateAll();
+        void invalidateAll();
         toast("동기화 완료", "success");
       } catch {
         toast("동기화에 실패했습니다");

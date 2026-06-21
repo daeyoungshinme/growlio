@@ -122,7 +122,8 @@ class TestBuildAssetTotals:
             patch("app.services.composition_calculator.fetch_usd_krw", AsyncMock(return_value=1300.0)),
             patch("app.services.composition_calculator.get_latest_snapshot_rows", AsyncMock(return_value=([], set()))),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -143,7 +144,8 @@ class TestBuildAssetTotals:
                 AsyncMock(return_value=([(snap, acc)], {acc.id})),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -162,7 +164,8 @@ class TestBuildAssetTotals:
                 AsyncMock(return_value=([(snap, acc)], {acc.id})),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, _, _, _ = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -188,9 +191,10 @@ class TestBuildAssetTotals:
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[])),
             patch(
-                "app.services.composition_calculator.fetch_position_maps",
-                AsyncMock(return_value=({snap_id: [pos]}, {})),
+                "app.services.composition_calculator._fetch_snapshot_positions",
+                AsyncMock(return_value={snap_id: [pos]}),
             ),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -217,9 +221,10 @@ class TestBuildAssetTotals:
             patch("app.services.composition_calculator.fetch_usd_krw", AsyncMock(return_value=1300.0)),
             patch("app.services.composition_calculator.get_latest_snapshot_rows", AsyncMock(return_value=([], set()))),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[acc])),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
             patch(
-                "app.services.composition_calculator.fetch_position_maps",
-                AsyncMock(return_value=({}, {acc_id: [pos]})),
+                "app.services.composition_calculator._fetch_current_positions",
+                AsyncMock(return_value={acc_id: [pos]}),
             ),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
@@ -240,7 +245,8 @@ class TestBuildAssetTotals:
             patch("app.services.composition_calculator.fetch_usd_krw", AsyncMock(return_value=1300.0)),
             patch("app.services.composition_calculator.get_latest_snapshot_rows", AsyncMock(return_value=([], set()))),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[acc])),
-            patch("app.services.composition_calculator.fetch_position_maps", AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, _, _, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -259,7 +265,8 @@ class TestBuildAssetTotals:
             patch("app.services.composition_calculator.fetch_usd_krw", AsyncMock(return_value=1300.0)),
             patch("app.services.composition_calculator.get_latest_snapshot_rows", AsyncMock(return_value=([], set()))),
             patch("app.services.composition_calculator.get_no_snap_accounts", AsyncMock(return_value=[acc])),
-            patch("app.services.composition_calculator.fetch_position_maps", AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", AsyncMock(return_value={})),
         ):
             total, _, _, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 

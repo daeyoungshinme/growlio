@@ -479,7 +479,7 @@ describe("PortfolioPage", () => {
 
   it("로딩 중에 스켈레톤을 표시한다", () => {
     // Override to never resolve
-    (async () => {
+    void (async () => {
       const { api } = await import("@/api/client");
       vi.mocked(api.get).mockReturnValue(new Promise(() => {}));
     })();

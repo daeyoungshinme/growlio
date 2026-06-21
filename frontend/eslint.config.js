@@ -42,5 +42,11 @@ export default [
       "no-undef": "off",
     },
   },
+  {
+    files: ["src/**/__tests__/**/*.{ts,tsx}", "src/**/*.test.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
   prettier,
 ];

@@ -130,7 +130,7 @@ export function useRebalancingAlertFormState({
         deposit_trigger_min_amount_krw: depositTriggerEnabled ? depositTriggerMinAmount : null,
       }),
     onSuccess: () => {
-      invalidateRebalancingAlertData(qc, portfolioId);
+      void invalidateRebalancingAlertData(qc, portfolioId);
       toast("설정이 저장되었습니다", "success");
       onClose();
     },
@@ -140,7 +140,7 @@ export function useRebalancingAlertFormState({
   const deleteMut = useMutation({
     mutationFn: () => deleteRebalancingAlert(portfolioId),
     onSuccess: () => {
-      invalidateRebalancingAlertData(qc, portfolioId);
+      void invalidateRebalancingAlertData(qc, portfolioId);
       toast("설정이 해제되었습니다", "success");
       onClose();
     },

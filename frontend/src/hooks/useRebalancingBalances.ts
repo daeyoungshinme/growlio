@@ -27,7 +27,7 @@ export function useRebalancingBalances(
       const is404 = getHttpStatus(err) === 404;
       dispatch({ type: "BALANCE_ERROR", accountId, is404 });
       if (is404) {
-        queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts });
       } else {
         toast(extractErrorMessage(err, "잔고 조회에 실패했습니다"), "error");
       }

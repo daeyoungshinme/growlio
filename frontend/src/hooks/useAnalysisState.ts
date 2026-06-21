@@ -64,7 +64,7 @@ export function useAnalysisState({
     const ids = new Set(selectedIdStr ? selectedIdStr.split(",") : []);
     if (!ids.has(autoAnalyzeId) || ids.size !== 1) return;
     autoAnalyzedRef.current = autoAnalyzeId;
-    triggerRebalancingAnalysis(autoAnalyzeId);
+    void triggerRebalancingAnalysis(autoAnalyzeId);
     // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnalyzeId, selectedIdStr]);

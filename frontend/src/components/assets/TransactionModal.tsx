@@ -85,7 +85,7 @@ export default function TransactionModal({
   });
   const accountPositions = positionsData?.positions ?? [];
 
-  const invalidate = () => invalidateTransactionData(qc);
+  const invalidate = () => void invalidateTransactionData(qc);
 
   const createMut = useMutation({
     mutationFn: createTransaction,

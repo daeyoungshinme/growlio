@@ -52,7 +52,7 @@ export function StockPriceAlertSection() {
       });
     },
     onSuccess: () => {
-      invalidateStockPriceAlertData(qc);
+      void invalidateStockPriceAlertData(qc);
       setForm({ query: "", target_price: "", direction: "BELOW", max_trigger_count: "1" });
       setSelectedStock(null);
       clearSuggestions();

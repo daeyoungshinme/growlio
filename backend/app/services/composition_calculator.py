@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 
 from sqlalchemy import and_, or_, select
@@ -49,15 +50,19 @@ async def get_no_snap_accounts(user_id: uuid.UUID, db: AsyncSession, snapped_ids
     return list(result.scalars().all())
 
 
-async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSession) -> tuple[dict, dict]:
-    """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
+async def _fetch_snapshot_positions(snap_ids: list, db: AsyncSession) -> dict[uuid.UUID, list[Position]]:
+    """스냅샷 포지션만 조회 (snapshot_id IN snap_ids)."""
     snap_positions: dict[uuid.UUID, list[Position]] = {}
     if snap_ids:
         pos_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
         for pos in pos_result.scalars().all():
             if pos.snapshot_id is not None:
                 snap_positions.setdefault(pos.snapshot_id, []).append(pos)
+    return snap_positions
 
+
+async def _fetch_current_positions(stock_acc_ids: list, db: AsyncSession) -> dict[uuid.UUID, list[Position]]:
+    """현재 포지션만 조회 (snapshot_id IS NULL, account_id IN stock_acc_ids)."""
     current_positions: dict[uuid.UUID, list[Position]] = {}
     if stock_acc_ids:
         cur_result = await db.execute(
@@ -68,7 +73,13 @@ async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSess
         )
         for pos in cur_result.scalars().all():
             current_positions.setdefault(pos.account_id, []).append(pos)
+    return current_positions
 
+
+async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSession) -> tuple[dict, dict]:
+    """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
+    snap_positions = await _fetch_snapshot_positions(snap_ids, db)
+    current_positions = await _fetch_current_positions(stock_acc_ids, db)
     return snap_positions, current_positions
 
 
@@ -81,13 +92,22 @@ async def build_asset_totals(
     Returns: (total_assets_krw, total_invested, stock_value, by_type)
     """
     usd_rate = await fetch_usd_krw(redis)
-    rows, snapped_ids = await get_latest_snapshot_rows(user_id, db)
-    no_snap_accounts = await get_no_snap_accounts(user_id, db, snapped_ids)
+    rows, snapped_ids = await get_latest_snapshot_rows(user_id, db)  # Q1
 
     snap_ids = [snap.id for snap, acc in rows if acc.asset_type in _STOCK_TYPES]
-    stock_acc_ids = [acc.id for _, acc in rows if acc.asset_type in _STOCK_TYPES]
-    stock_acc_ids += [acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES]
-    snap_positions, current_positions = await fetch_position_maps(snap_ids, stock_acc_ids, db)
+    stock_acc_ids_from_rows = [acc.id for _, acc in rows if acc.asset_type in _STOCK_TYPES]
+
+    # Q2(no_snap 계좌 조회)와 Q3(스냅샷 포지션 조회)를 병렬 실행 — 두 쿼리는 서로 독립적
+    no_snap_accounts, snap_positions = await asyncio.gather(
+        get_no_snap_accounts(user_id, db, snapped_ids),
+        _fetch_snapshot_positions(snap_ids, db),
+    )
+
+    # Q4: 현재 포지션 (no_snap 계좌 포함 전체 stock 계좌 대상)
+    all_stock_acc_ids = stock_acc_ids_from_rows + [
+        acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES
+    ]
+    current_positions = await _fetch_current_positions(all_stock_acc_ids, db)
 
     total_assets_krw = 0.0
     total_invested = 0.0

@@ -123,7 +123,8 @@ export default function RebalancingTable({
   const [executionOpen, setExecutionOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  const minutesOld = (Date.now() - new Date(analysis.analyzed_at).getTime()) / 60000;
+  const [now] = useState(() => Date.now());
+  const minutesOld = (now - new Date(analysis.analyzed_at).getTime()) / 60000;
   const isStale = minutesOld > 10;
 
   const hasDividendData =

@@ -53,7 +53,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
         Math.max(1, Number(alertForm.max_trigger_count) || 1),
       ),
     onSuccess: () => {
-      invalidateAlertData(queryClient);
+      void invalidateAlertData(queryClient);
       setAlertForm({ target_rate: "", direction: "BELOW", max_trigger_count: "1" });
       toast("알림이 등록되었습니다", "success");
     },

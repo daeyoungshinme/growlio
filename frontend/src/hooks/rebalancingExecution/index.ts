@@ -421,10 +421,12 @@ export function useRebalancingExecution({
     return { sells, buys };
   }
 
+  /* eslint-disable react-hooks/exhaustive-deps -- 마운트 시 1회만 실행 (loadAll* 포함 시 렌더마다 재조회) */
   useEffect(() => {
-    loadAllLiveBalances();
-    loadAllPrices();
-  }, []); // 마운트 시 1회만 실행 — loadAll* 함수를 dep에 추가하면 렌더마다 재조회됨. eslint-disable-line react-hooks/exhaustive-deps
+    void loadAllLiveBalances();
+    void loadAllPrices();
+  }, []);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const orders = buildOrders();
   const hasRealAccount = orders.some((o) => {

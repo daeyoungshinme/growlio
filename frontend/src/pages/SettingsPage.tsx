@@ -108,7 +108,7 @@ export default function SettingsPage() {
     try {
       await api.put("/settings/dart", { api_key: dart.api_key });
       toast("DART API 키가 저장되었습니다", "success");
-      invalidateSettings();
+      void invalidateSettings();
     } catch {
       toast("저장에 실패했습니다", "error");
     } finally {
@@ -119,7 +119,7 @@ export default function SettingsPage() {
   const deleteDart = async () => {
     await api.delete("/settings/dart");
     toast("DART API 키가 삭제되었습니다", "success");
-    invalidateSettings();
+    void invalidateSettings();
   };
 
   const connectOpenBanking = async () => {
@@ -130,7 +130,7 @@ export default function SettingsPage() {
   const disconnectOpenBanking = async () => {
     await api.delete("/open-banking/disconnect");
     toast("오픈뱅킹 연결이 해제되었습니다", "success");
-    invalidateSettings();
+    void invalidateSettings();
   };
 
   return (

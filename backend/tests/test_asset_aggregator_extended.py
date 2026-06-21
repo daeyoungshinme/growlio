@@ -431,7 +431,8 @@ class TestBuildAssetTotals:
                 new=AsyncMock(return_value=([], set())),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", new=AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", new=AsyncMock(return_value={})),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -460,7 +461,8 @@ class TestBuildAssetTotals:
                 new=AsyncMock(return_value=([(snap, acc)], {acc.id})),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", new=AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", new=AsyncMock(return_value={})),
         ):
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -487,7 +489,8 @@ class TestBuildAssetTotals:
                 new=AsyncMock(return_value=([(snap, acc)], {acc.id})),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[])),
-            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", new=AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", new=AsyncMock(return_value={})),
         ):
             total, _, _, _ = await build_asset_totals(uuid.uuid4(), mock_db)
 
@@ -514,7 +517,8 @@ class TestBuildAssetTotals:
                 new=AsyncMock(return_value=([], set())),
             ),
             patch("app.services.composition_calculator.get_no_snap_accounts", new=AsyncMock(return_value=[acc])),
-            patch("app.services.composition_calculator.fetch_position_maps", new=AsyncMock(return_value=({}, {}))),
+            patch("app.services.composition_calculator._fetch_snapshot_positions", new=AsyncMock(return_value={})),
+            patch("app.services.composition_calculator._fetch_current_positions", new=AsyncMock(return_value={})),
         ):
             total, _, _, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 

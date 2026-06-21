@@ -252,7 +252,6 @@ describe("ResetPasswordPage", () => {
     onAuthStateChangeMock = vi.fn(() => ({
       data: { subscription: { unsubscribe: vi.fn() } },
     }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
   });
 
@@ -275,7 +274,6 @@ describe("ResetPasswordPage", () => {
       callback("PASSWORD_RECOVERY");
       return { data: { subscription: { unsubscribe: vi.fn() } } };
     });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
     renderWithRouter(<ResetPasswordPage />);
     await waitFor(() => {
@@ -290,7 +288,6 @@ describe("ResetPasswordPage", () => {
         callback("PASSWORD_RECOVERY");
         return { data: { subscription: { unsubscribe: vi.fn() } } };
       });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(onAuthStateChangeMock as any);
     });
 

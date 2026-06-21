@@ -27,14 +27,14 @@ export default function LoginPage() {
       await login(email, password);
       // 로그인 직후 대시보드 데이터를 백그라운드에서 미리 가져온다.
       // await 없이 실행하므로 navigate와 병렬 진행 — 청크 로드 완료 시점에 캐시가 채워짐.
-      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
-      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
-      queryClient.prefetchQuery({
+      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dashboard, queryFn: fetchDashboard });
+      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.accounts, queryFn: fetchAccounts });
+      void queryClient.prefetchQuery({
         queryKey: QUERY_KEYS.portfolioOverviewLite,
         queryFn: fetchPortfolioOverviewLite,
       });
-      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
-      queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
+      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
       navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");
