@@ -201,7 +201,7 @@ async def _check_rebalancing_opportunity(
 
         try:
             overview = await build_portfolio_overview(user_id, db, account_ids=account_ids)
-        except Exception as e:  # nosec B112 — 포트폴리오 단위 실패 무시, 나머지 계속
+        except Exception as e:  # 포트폴리오 단위 실패 무시, 나머지 계속
             logger.warning("portfolio_overview_failed", portfolio_id=str(pf.id), error=str(e))
             continue
 

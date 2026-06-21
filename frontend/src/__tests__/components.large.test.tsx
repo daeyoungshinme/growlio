@@ -478,6 +478,7 @@ describe("AnalysisPanel", () => {
           portfolios={[mockPortfolio]}
           activeAccounts={[mockStockAccount]}
           onOpenAlertModal={vi.fn()}
+          alertByPortfolioId={{}}
         />
       </MemoryRouter>,
     );
@@ -495,6 +496,7 @@ describe("AnalysisPanel", () => {
           portfolios={[]}
           activeAccounts={[]}
           onOpenAlertModal={vi.fn()}
+          alertByPortfolioId={{}}
         />
       </MemoryRouter>,
     );

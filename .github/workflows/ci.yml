@@ -141,6 +141,9 @@ jobs:
       - name: Lint (eslint)
         run: npm run lint -- --max-warnings 0
 
+      - name: Typecheck (tsc --noEmit)
+        run: npm run typecheck
+
       - name: Test (vitest + coverage)
         run: npm run test -- --run --coverage
 

@@ -133,7 +133,7 @@ async def run_backtest_endpoint(
 
     redis = await get_redis()
     payload = json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
-    param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()  # nosec B324
+    param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()
     cache_key = backtest_key(current_user.id, param_hash)
 
     cached = await redis.get(cache_key)
@@ -162,7 +162,7 @@ async def run_correlation_endpoint(
 
     redis = await get_redis()
     payload = json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
-    param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()  # nosec B324
+    param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()
     cache_key = correlation_key(current_user.id, param_hash)
 
     cached = await redis.get(cache_key)
