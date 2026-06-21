@@ -114,6 +114,7 @@ async def portfolio_summary(
     failed_count = len(raw_results) - len(results)
     if failed_count:
         import structlog as _sl
+
         _sl.get_logger().warning("kis_account_fetch_partial_failure", failed=failed_count)
     for account_no, d, o in results:
         merged_domestic["total_value_krw"] += d.get("total_value_krw", 0.0)

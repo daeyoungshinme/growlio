@@ -69,9 +69,7 @@ async def _run_deposit_monitor(redis) -> None:
             .where(
                 RebalancingAlert.is_active == True,  # noqa: E712
                 RebalancingAlert.deposit_trigger_enabled == True,  # noqa: E712
-                RebalancingAlert.id.in_(
-                    select(RebalancingAlertDepositAccount.alert_id).distinct()
-                ),
+                RebalancingAlert.id.in_(select(RebalancingAlertDepositAccount.alert_id).distinct()),
             )
         )
         rows = result.all()
@@ -144,9 +142,7 @@ async def _process_deposit_alert(
         if total_increment < min_amount:
             for da, baseline in updates:
                 fresh_da = await db.scalar(
-                    select(RebalancingAlertDepositAccount).where(
-                        RebalancingAlertDepositAccount.id == da.id
-                    )
+                    select(RebalancingAlertDepositAccount).where(RebalancingAlertDepositAccount.id == da.id)
                 )
                 if fresh_da:
                     fresh_da.last_known_deposit_krw = baseline

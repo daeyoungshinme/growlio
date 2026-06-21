@@ -203,11 +203,7 @@ async def upsert_rebalancing_alert(
         await db.flush()  # alert.id 확보
 
     # 기존 deposit account 연결 전부 교체
-    await db.execute(
-        delete(RebalancingAlertDepositAccount).where(
-            RebalancingAlertDepositAccount.alert_id == alert.id
-        )
-    )
+    await db.execute(delete(RebalancingAlertDepositAccount).where(RebalancingAlertDepositAccount.alert_id == alert.id))
 
     if body.deposit_trigger_enabled and body.deposit_trigger_account_ids:
         for acc_id in body.deposit_trigger_account_ids:

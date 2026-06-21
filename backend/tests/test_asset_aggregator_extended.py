@@ -494,5 +494,3 @@ class TestBuildAssetTotals:
             total, _, _, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == pytest.approx(3_000_000.0)
-
-
