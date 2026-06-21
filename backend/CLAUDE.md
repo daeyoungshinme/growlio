@@ -188,9 +188,6 @@ jobs/                         # APScheduler 정기 작업
 **인증:** JWT Bearer 토큰. `api/deps.py`의 `get_current_user` 의존성 주입. Access 30분, Refresh 7일.
 
 **미들웨어 스택 (`main.py` lifespan):** Request ID 주입 → 보안 헤더(X-Content-Type-Options, X-Frame-Options, X-XSS-Protection) → HTTP 요청 로깅 → slowapi 레이트 리미팅 → 예외 핸들러(자격증명 정보 자동 redact).
-
-**LS증권 통합:** 구현 시도 후 완전 제거됨. DB 컬럼은 `migration g1h2i3j4k5l6_remove_ls_securities.py`로 삭제, 잔여 주석도 정리 완료. 재구현 시 migration downgrade 필요.
-
 ---
 
 ## Absolute Rules

@@ -131,7 +131,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
 
 **WebSocket 패턴**
-- 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결. 새 WebSocket 훅은 `useRealtimePrice.ts` 패턴 참고.
+- 새 WebSocket 훅은 `useRealtimePrice.ts` 패턴 참고.
 
 > **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
 
