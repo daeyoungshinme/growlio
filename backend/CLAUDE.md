@@ -137,7 +137,6 @@ services/
   ├── dividend/               # 배당 서비스 패키지 (리팩토링됨)
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
   │   └── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
-  ├── dividend_service.py     # 하위 호환 re-export (실제 구현은 dividend/ 패키지)
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)

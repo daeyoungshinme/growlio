@@ -86,6 +86,9 @@ make build-android-release         # APK Release 빌드
 **컴포넌트 디렉토리 (`src/components/`):**
 assets, backtest, common, dashboard, invest, layout, market, portfolio, portfolio-analysis, rebalancing, settings, trend
 
+**컨텍스트 (`src/context/`):**
+- `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
+
 `components/common/` 주요 파일: `ConfirmModal.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `TreemapCell.tsx`
 
 **데이터 흐름:**
@@ -107,11 +110,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
-- `useRebalancingExecution.ts` — 리밸런싱 주문 실행 뮤테이션
+- `rebalancingExecution/` — 리밸런싱 주문 실행 훅 패키지 (`index.ts`: `useRebalancingExecution` + `RebalancingExecutionContext`/`useRebalancingExecutionContext`, `reducer.ts`, `types.ts`)
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
-- `useAlertCrud.ts` / `useExchangeRateAlerts.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)
@@ -134,6 +137,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `tabs.ts` — 자산관리·포트폴리오 탭 배열 + 타입 (`ASSET_MANAGEMENT_TABS`, `PORTFOLIO_TABS`)
 - `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
+- `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`)
+- `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `index.ts` — 상수 re-export
 
 **타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
