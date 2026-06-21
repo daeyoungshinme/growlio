@@ -126,7 +126,7 @@ export default function RebalancingTable({
           <button
             onClick={() => setExecutionOpen(true)}
             disabled={kisAccounts.length === 0}
-            className="bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            className="bg-indigo-600 text-white px-4 py-2.5 sm:py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
           >
             ⚡ 리밸런싱 실행
@@ -223,14 +223,14 @@ export default function RebalancingTable({
                       {buyItems.map((item, idx) => {
                         const actual = item.shares_to_trade! * item.current_price_krw!;
                         return (
-                          <div key={idx} className="flex items-center justify-between text-xs">
-                            <div className="min-w-0">
-                              <span className="text-gray-200 font-medium truncate">{item.name}</span>
-                              <span className="text-gray-500 ml-1">
+                          <div key={idx} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-gray-200 font-medium truncate">{item.name}</div>
+                              <div className="text-gray-500 mt-0.5">
                                 {item.shares_to_trade}주 × {fmtKrw(item.current_price_krw!)}
-                              </span>
+                              </div>
                             </div>
-                            <span className={`shrink-0 ml-2 font-medium ${PROFIT_COLOR}`}>
+                            <span className={`shrink-0 font-medium ${PROFIT_COLOR}`}>
                               {fmtKrw(actual)}
                             </span>
                           </div>
@@ -244,14 +244,14 @@ export default function RebalancingTable({
                       {sellItems.map((item, idx) => {
                         const actual = Math.abs(item.shares_to_trade!) * item.current_price_krw!;
                         return (
-                          <div key={idx} className="flex items-center justify-between text-xs">
-                            <div className="min-w-0">
-                              <span className="text-gray-200 font-medium truncate">{item.name}</span>
-                              <span className="text-gray-500 ml-1">
+                          <div key={idx} className="flex items-start justify-between gap-2 text-xs">
+                            <div className="min-w-0 flex-1">
+                              <div className="text-gray-200 font-medium truncate">{item.name}</div>
+                              <div className="text-gray-500 mt-0.5">
                                 {Math.abs(item.shares_to_trade!)}주 × {fmtKrw(item.current_price_krw!)}
-                              </span>
+                              </div>
                             </div>
-                            <span className={`shrink-0 ml-2 font-medium ${LOSS_COLOR}`}>
+                            <span className={`shrink-0 font-medium ${LOSS_COLOR}`}>
                               {fmtKrw(actual)}
                             </span>
                           </div>
@@ -483,6 +483,23 @@ export default function RebalancingTable({
           hour: "2-digit",
           minute: "2-digit",
         })}
+      </div>
+
+      {/* 모바일: 결과 하단 실행 버튼 */}
+      <div className="sm:hidden">
+        <button
+          onClick={() => setExecutionOpen(true)}
+          disabled={kisAccounts.length === 0}
+          className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
+        >
+          ⚡ 리밸런싱 실행
+        </button>
+        {kisAccounts.length === 0 && (
+          <p className="text-center text-xs text-gray-500 mt-1.5">
+            KIS 증권계좌 연동 시 자동 주문 가능
+          </p>
+        )}
       </div>
 
       {executionOpen && (

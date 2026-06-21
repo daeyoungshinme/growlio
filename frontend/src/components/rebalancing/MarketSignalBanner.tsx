@@ -56,7 +56,7 @@ const FG_CLS: Record<FearGreedClassification, string> = {
 };
 
 export default function MarketSignalBanner({ signal }: Props) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const { composite_level, signals, fear_greed_contrarian_buy, data_freshness } = signal;
   const { vix, yield_curve, fear_greed } = signals;
 

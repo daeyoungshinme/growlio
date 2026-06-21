@@ -69,6 +69,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
     [rebalancingAlerts],
   );
 
+  const [mobileListOpen, setMobileListOpen] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -203,36 +204,49 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
       <hr className="border-gray-200 dark:border-gray-700" />
 
       <div className="flex flex-col md:flex-row gap-4 md:gap-6">
-        <PortfolioListSection
-          portfolios={sortedPortfolios}
-          isLoading={isLoading}
-          selectedIds={selectedIds}
-          stockAccounts={stockAccounts}
-          alertPortfolioIds={alertPortfolioIds}
-          alertByPortfolioId={alertByPortfolioId}
-          isTargetPending={batchTargetMut.isPending}
-          onDragEnd={handleDragEnd}
-          onToggleSelect={(id) =>
-            setSelectedIds((prev) => {
-              const next = new Set(prev);
-              if (next.has(id)) next.delete(id);
-              else next.add(id);
-              return next;
-            })
-          }
-          onOpenEditor={(p) => {
-            setEditingPortfolio(p);
-            setEditorOpen(true);
-          }}
-          onOpenAlertModal={setAlertModalPortfolioId}
-          onConfirmDelete={setConfirmDeleteId}
-          onBatchSetTarget={(pid, accountIds) =>
-            batchTargetMut.mutate({ portfolioId: pid, accountIds })
-          }
-          onRefresh={async () => {
-            await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
-          }}
-        />
+        <div>
+          <button
+            className="md:hidden w-full flex items-center justify-between px-3 py-2 mb-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300"
+            onClick={() => setMobileListOpen((v) => !v)}
+          >
+            <span>
+              {selectedIds.size > 0 ? `선택: ${selectedNames}` : "포트폴리오 선택"}
+            </span>
+            <span>{mobileListOpen ? "▲" : "▼"}</span>
+          </button>
+          <div className={mobileListOpen ? "block" : "hidden md:block"}>
+            <PortfolioListSection
+              portfolios={sortedPortfolios}
+              isLoading={isLoading}
+              selectedIds={selectedIds}
+              stockAccounts={stockAccounts}
+              alertPortfolioIds={alertPortfolioIds}
+              alertByPortfolioId={alertByPortfolioId}
+              isTargetPending={batchTargetMut.isPending}
+              onDragEnd={handleDragEnd}
+              onToggleSelect={(id) =>
+                setSelectedIds((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                })
+              }
+              onOpenEditor={(p) => {
+                setEditingPortfolio(p);
+                setEditorOpen(true);
+              }}
+              onOpenAlertModal={setAlertModalPortfolioId}
+              onConfirmDelete={setConfirmDeleteId}
+              onBatchSetTarget={(pid, accountIds) =>
+                batchTargetMut.mutate({ portfolioId: pid, accountIds })
+              }
+              onRefresh={async () => {
+                await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
+              }}
+            />
+          </div>
+        </div>
 
         <div ref={analysisSectionRef}>
           <ErrorBoundary variant="section">
