@@ -154,9 +154,7 @@ async def analyze_portfolio(
 
     # 미보유 목표 종목 현재가 보완: all_positions에 없는 종목은 current_price=None → shares=None
     existing_price_keys: set[tuple[str, str]] = {
-        (pos["ticker"], pos["market"])
-        for pos in overview.get("all_positions", [])
-        if pos.get("current_price")
+        (pos["ticker"], pos["market"]) for pos in overview.get("all_positions", []) if pos.get("current_price")
     }
     unpriced: list[tuple[str, str]] = [
         (
@@ -169,7 +167,8 @@ async def analyze_portfolio(
         and (
             raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
             raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
-        ) not in existing_price_keys
+        )
+        not in existing_price_keys
     ]
     if unpriced:
         fetched_prices = await fetch_prices_batch(current_user.id, unpriced, db, redis)

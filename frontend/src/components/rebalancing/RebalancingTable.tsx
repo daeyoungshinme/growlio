@@ -14,6 +14,23 @@ import {
   WeightDiffBadge,
 } from "./RebalancingCells";
 import RebalancingDividendSection from "./RebalancingDividendSection";
+import { CASH_TICKER } from "@/constants/assets";
+
+// 반올림된 주수 기준 실제 거래금액 — 요약·거래계획·거래비용 전체에서 동일하게 사용
+function calcTradeKrw(item: RebalancingItem): number {
+  if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
+    return Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw;
+  }
+  return Math.abs(item.diff_krw);
+}
+
+// 부호 포함 실제 거래금액 — 상세내역 DiffCell과 거래 계획 금액을 일치시키기 위해 사용
+function calcSignedTradeKrw(item: RebalancingItem): number {
+  if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
+    return Math.sign(item.diff_krw) * Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw;
+  }
+  return item.diff_krw;
+}
 
 // ─── 테이블 행 컴포넌트 ────────────────────────────────────────────────────────
 
@@ -32,7 +49,7 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
           </p>
         </div>
         <div className="text-right shrink-0">
-          <DiffCell diff={item.diff_krw} />
+          <DiffCell diff={calcSignedTradeKrw(item)} />
           <p className="text-xs text-gray-400 mt-0.5">
             <QuantityCell item={item} />
           </p>
@@ -73,7 +90,7 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
         <div className="text-xs text-gray-500">→ {fmtKrw(item.target_value_krw)}</div>
       </td>
       <td className="py-3.5 px-3 text-right">
-        <DiffCell diff={item.diff_krw} />
+        <DiffCell diff={calcSignedTradeKrw(item)} />
       </td>
       <td className="py-3.5 px-3 text-right">
         <QuantityCell item={item} />
@@ -106,17 +123,55 @@ export default function RebalancingTable({
   const [executionOpen, setExecutionOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
+  const minutesOld = (Date.now() - new Date(analysis.analyzed_at).getTime()) / 60000;
+  const isStale = minutesOld > 10;
+
   const hasDividendData =
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
     (analysis.total_current_annual_dividend ?? analysis.current_portfolio_annual_dividend ?? 0) > 0;
   const hasCagrData =
     analysis.target_weighted_cagr_10y_pct != null || analysis.current_weighted_cagr_10y_pct != null;
 
+  // 요약·거래계획·거래비용 모두 calcTradeKrw 기준으로 통일
+  const totalBuySummary = analysis.items
+    .filter((i) => i.diff_krw > 0)
+    .reduce((s, i) => s + calcTradeKrw(i), 0);
+  const totalSellSummary = analysis.items
+    .filter((i) => i.diff_krw < 0)
+    .reduce((s, i) => s + calcTradeKrw(i), 0);
+  const cashAvailable = analysis.available_cash_krw ?? 0;
+  const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
+  const cashAfterCls =
+    cashAfter >= 0
+      ? cashAfter < totalBuySummary * 0.05
+        ? "text-amber-400"
+        : "text-green-400"
+      : "text-red-400";
+
+  // 거래 계획 목록: 현재가 있는 종목만
+  const buyItems = analysis.items.filter(
+    (i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw,
+  );
+  const sellItems = analysis.items.filter(
+    (i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw,
+  );
+  // 현재가 미조회로 거래 계획에서 제외된 종목
+  const unpricedItems = analysis.items.filter(
+    (i) =>
+      i.diff_krw !== 0 &&
+      (i.shares_to_trade === null || !i.current_price_krw) &&
+      i.ticker !== CASH_TICKER,
+  );
+
   return (
     <div className="space-y-4">
       {/* 실행 버튼 행 */}
       <div className="flex items-center gap-2">
-        {/* 리밸런싱 실행 버튼 (우측 정렬) */}
+        {isStale && (
+          <span className="text-xs text-amber-400 bg-amber-900/30 border border-amber-700/40 rounded-lg px-2.5 py-1">
+            분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
+          </span>
+        )}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
             <span className="text-xs text-gray-500 hidden sm:inline">
@@ -126,7 +181,7 @@ export default function RebalancingTable({
           <button
             onClick={() => setExecutionOpen(true)}
             disabled={kisAccounts.length === 0}
-            className="bg-indigo-600 text-white px-4 py-2.5 sm:py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            className="hidden sm:inline-flex bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
           >
             ⚡ 리밸런싱 실행
@@ -135,216 +190,171 @@ export default function RebalancingTable({
       </div>
 
       {/* 요약 카드 */}
-      {(() => {
-        function itemActualKrw(item: RebalancingItem): number {
-          if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
-            return Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw;
-          }
-          return Math.abs(item.diff_krw);
-        }
-        const totalBuySummary = analysis.items
-          .filter((i) => i.diff_krw > 0)
-          .reduce((s, i) => s + itemActualKrw(i), 0);
-        const totalSellSummary = analysis.items
-          .filter((i) => i.diff_krw < 0)
-          .reduce((s, i) => s + itemActualKrw(i), 0);
-        const cashAvailable = analysis.available_cash_krw ?? 0;
-        const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
-        const cashAfterCls =
-          cashAfter >= 0
-            ? cashAfter < totalBuySummary * 0.05
-              ? "text-amber-400"
-              : "text-green-400"
-            : "text-red-400";
-
-        const buyItems = analysis.items.filter(
-          (i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw,
-        );
-        const sellItems = analysis.items.filter(
-          (i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw,
-        );
-
-        return (
-          <div className="space-y-2">
-            {/* 핵심 요약 행 */}
-            <div
-              className={`rounded-xl p-3 flex items-center justify-between gap-2 ${cashAfter < 0 ? "bg-red-900/20 border border-red-800/40" : "bg-gray-700/60"}`}
-            >
-              <div className="space-y-0.5">
-                <div className="text-xs text-gray-500">
-                  {analysis.base_type === "STOCK_ONLY"
-                    ? cashAvailable > 0
-                      ? `기준 자산 ${fmtKrw(analysis.base_value_krw)} (주식+예수금)`
-                      : `기준 자산 ${fmtKrw(analysis.base_value_krw)}`
-                    : `기준 자산 ${fmtKrw(analysis.base_value_krw)} (전체)`}
-                </div>
-                <div className="flex items-center gap-3 flex-wrap text-xs text-gray-400">
-                  <span>
-                    예수금 <span className="text-gray-200 font-medium">{fmtKrw(cashAvailable)}</span>
-                  </span>
-                  {totalSellSummary > 0 && (
-                    <span>
-                      + 매도예상{" "}
-                      <span className={`font-medium ${LOSS_COLOR}`}>
-                        +{fmtKrw(totalSellSummary)}
-                      </span>
-                    </span>
-                  )}
-                  <span>
-                    − 매수필요{" "}
-                    <span className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(totalBuySummary)}</span>
-                  </span>
-                </div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-xs text-gray-400 mb-0.5">리밸런싱 후 예수금</div>
-                <div className={`text-sm font-semibold ${cashAfterCls}`}>
-                  {cashAfter >= 0 ? "+" : ""}
-                  {fmtKrw(cashAfter)}
-                </div>
-                {cashAfter < 0 && (
-                  <div className="text-xs text-red-400 mt-0.5">
-                    예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
-                  </div>
-                )}
+      <div className="space-y-2">
+        {/* 핵심 요약 — 2×2 그리드 */}
+        <div
+          className={`rounded-xl p-3 ${cashAfter < 0 ? "bg-red-900/20 border border-red-800/40" : "bg-gray-700/60"}`}
+        >
+          <div className="text-xs text-gray-500 mb-2">
+            {analysis.base_type === "STOCK_ONLY"
+              ? cashAvailable > 0
+                ? `기준 자산 ${fmtKrw(analysis.base_value_krw)} (주식+예수금)`
+                : `기준 자산 ${fmtKrw(analysis.base_value_krw)}`
+              : `기준 자산 ${fmtKrw(analysis.base_value_krw)} (전체)`}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-gray-800/60 rounded-lg p-2">
+              <div className="text-xs text-gray-500 mb-0.5">예수금</div>
+              <div className="text-sm font-semibold text-gray-200">{fmtKrw(cashAvailable)}</div>
+            </div>
+            <div className="bg-gray-800/60 rounded-lg p-2">
+              <div className="text-xs text-gray-500 mb-0.5">매도 예상</div>
+              <div className={`text-sm font-semibold ${totalSellSummary > 0 ? LOSS_COLOR : "text-gray-400"}`}>
+                {totalSellSummary > 0 ? `+${fmtKrw(totalSellSummary)}` : "—"}
               </div>
             </div>
+            <div className="bg-gray-800/60 rounded-lg p-2">
+              <div className="text-xs text-gray-500 mb-0.5">매수 필요</div>
+              <div className={`text-sm font-semibold ${totalBuySummary > 0 ? PROFIT_COLOR : "text-gray-400"}`}>
+                {totalBuySummary > 0 ? fmtKrw(totalBuySummary) : "—"}
+              </div>
+            </div>
+            <div className="bg-gray-800/60 rounded-lg p-2">
+              <div className="text-xs text-gray-500 mb-0.5">리밸런싱 후 예수금</div>
+              <div className={`text-sm font-semibold ${cashAfterCls}`}>
+                {cashAfter >= 0 ? "+" : ""}
+                {fmtKrw(cashAfter)}
+              </div>
+            </div>
+          </div>
+          {cashAfter < 0 && (
+            <div className="text-xs text-red-400 mt-2">
+              예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
+            </div>
+          )}
+        </div>
 
-            {/* 종목별 실제 거래 계획 패널 */}
-            {(buyItems.length > 0 || sellItems.length > 0) && (
-              <div className="rounded-xl bg-gray-800/60 border border-gray-700/50 p-3 space-y-3">
-                <div className="text-xs font-medium text-gray-300">종목별 거래 계획</div>
+        {/* 종목별 실제 거래 계획 패널 — 매도 먼저, 매수 나중 */}
+        {(buyItems.length > 0 || sellItems.length > 0) && (
+          <div className="rounded-xl bg-gray-800/60 border border-gray-700/50 p-3 space-y-3">
+            <div className="text-xs font-medium text-gray-300">종목별 거래 계획</div>
 
-                {/* 모바일: 카드 뷰 */}
-                <div className="sm:hidden space-y-2">
-                  {buyItems.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs text-green-400 font-medium">매수</div>
-                      {buyItems.map((item, idx) => {
-                        const actual = item.shares_to_trade! * item.current_price_krw!;
-                        return (
-                          <div key={idx} className="flex items-start justify-between gap-2 text-xs">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-gray-200 font-medium truncate">{item.name}</div>
-                              <div className="text-gray-500 mt-0.5">
-                                {item.shares_to_trade}주 × {fmtKrw(item.current_price_krw!)}
-                              </div>
-                            </div>
-                            <span className={`shrink-0 font-medium ${PROFIT_COLOR}`}>
-                              {fmtKrw(actual)}
-                            </span>
-                          </div>
-                        );
-                      })}
+            {/* 모바일: 카드 뷰 */}
+            <div className="sm:hidden space-y-2">
+              {sellItems.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs text-blue-400 font-medium">매도</div>
+                  {sellItems.map((item, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-gray-200 font-medium truncate">{item.name}</div>
+                        <div className="text-gray-500 mt-0.5">
+                          {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 font-medium ${LOSS_COLOR}`}>
+                        {fmtKrw(calcTradeKrw(item))}
+                      </span>
                     </div>
-                  )}
+                  ))}
+                </div>
+              )}
+              {buyItems.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs text-green-400 font-medium">매수</div>
+                  {buyItems.map((item, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-gray-200 font-medium truncate">{item.name}</div>
+                        <div className="text-gray-500 mt-0.5">
+                          {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
+                        </div>
+                      </div>
+                      <span className={`shrink-0 font-medium ${PROFIT_COLOR}`}>
+                        {fmtKrw(calcTradeKrw(item))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 데스크탑: 테이블 뷰 (배분 예산 컬럼 제거 → 4열) */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-gray-700/50 text-gray-500">
+                    <th className="text-left py-1.5 pr-3 font-medium">종목</th>
+                    <th className="text-right py-1.5 px-3 font-medium">현재가</th>
+                    <th className="text-right py-1.5 px-3 font-medium">수량</th>
+                    <th className="text-right py-1.5 pl-3 font-medium">실제금액</th>
+                  </tr>
+                </thead>
+                <tbody>
                   {sellItems.length > 0 && (
-                    <div className="space-y-1.5">
-                      <div className="text-xs text-blue-400 font-medium">매도</div>
-                      {sellItems.map((item, idx) => {
-                        const actual = Math.abs(item.shares_to_trade!) * item.current_price_krw!;
-                        return (
-                          <div key={idx} className="flex items-start justify-between gap-2 text-xs">
-                            <div className="min-w-0 flex-1">
-                              <div className="text-gray-200 font-medium truncate">{item.name}</div>
-                              <div className="text-gray-500 mt-0.5">
-                                {Math.abs(item.shares_to_trade!)}주 × {fmtKrw(item.current_price_krw!)}
-                              </div>
-                            </div>
-                            <span className={`shrink-0 font-medium ${LOSS_COLOR}`}>
-                              {fmtKrw(actual)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* 데스크탑: 테이블 뷰 */}
-                <div className="hidden sm:block overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-gray-700/50 text-gray-500">
-                        <th className="text-left py-1.5 pr-3 font-medium">종목</th>
-                        <th className="text-right py-1.5 px-3 font-medium">배분 예산</th>
-                        <th className="text-right py-1.5 px-3 font-medium">현재가</th>
-                        <th className="text-right py-1.5 px-3 font-medium">수량</th>
-                        <th className="text-right py-1.5 pl-3 font-medium">실제금액</th>
+                    <>
+                      <tr>
+                        <td colSpan={4} className="pt-2 pb-1 text-blue-400 font-medium">
+                          매도
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {buyItems.length > 0 && (
-                        <>
-                          <tr>
-                            <td colSpan={5} className="pt-2 pb-1 text-green-400 font-medium">
-                              매수
-                            </td>
-                          </tr>
-                          {buyItems.map((item, idx) => {
-                            const actual = item.shares_to_trade! * item.current_price_krw!;
-                            return (
-                              <tr key={idx} className="border-b border-gray-700/30">
-                                <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
-                                  {item.name}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-400">
-                                  {fmtKrw(item.target_value_krw)}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-400">
-                                  {fmtKrw(item.current_price_krw!)}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-200">
-                                  {item.shares_to_trade}주
-                                </td>
-                                <td className={`py-1.5 pl-3 text-right font-medium ${PROFIT_COLOR}`}>
-                                  {fmtKrw(actual)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </>
-                      )}
-                      {sellItems.length > 0 && (
-                        <>
-                          <tr>
-                            <td colSpan={5} className="pt-2 pb-1 text-blue-400 font-medium">
-                              매도
-                            </td>
-                          </tr>
-                          {sellItems.map((item, idx) => {
-                            const actual = Math.abs(item.shares_to_trade!) * item.current_price_krw!;
-                            return (
-                              <tr key={idx} className="border-b border-gray-700/30">
-                                <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
-                                  {item.name}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-400">
-                                  {fmtKrw(item.target_value_krw)}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-400">
-                                  {fmtKrw(item.current_price_krw!)}
-                                </td>
-                                <td className="py-1.5 px-3 text-right text-gray-200">
-                                  {Math.abs(item.shares_to_trade!)}주
-                                </td>
-                                <td className={`py-1.5 pl-3 text-right font-medium ${LOSS_COLOR}`}>
-                                  {fmtKrw(actual)}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      {sellItems.map((item, idx) => (
+                        <tr key={idx} className="border-b border-gray-700/30">
+                          <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                            {item.name}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-gray-400">
+                            {fmtKrw(item.current_price_krw!)}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-gray-200">
+                            {Math.abs(Math.round(item.shares_to_trade!))}주
+                          </td>
+                          <td className={`py-1.5 pl-3 text-right font-medium ${LOSS_COLOR}`}>
+                            {fmtKrw(calcTradeKrw(item))}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                  {buyItems.length > 0 && (
+                    <>
+                      <tr>
+                        <td colSpan={4} className="pt-2 pb-1 text-green-400 font-medium">
+                          매수
+                        </td>
+                      </tr>
+                      {buyItems.map((item, idx) => (
+                        <tr key={idx} className="border-b border-gray-700/30">
+                          <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                            {item.name}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-gray-400">
+                            {fmtKrw(item.current_price_krw!)}
+                          </td>
+                          <td className="py-1.5 px-3 text-right text-gray-200">
+                            {Math.abs(Math.round(item.shares_to_trade!))}주
+                          </td>
+                          <td className={`py-1.5 pl-3 text-right font-medium ${PROFIT_COLOR}`}>
+                            {fmtKrw(calcTradeKrw(item))}
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 현재가 미조회로 거래 계획에서 제외된 종목 안내 */}
+            {unpricedItems.length > 0 && (
+              <div className="text-xs text-amber-500/80 pt-1">
+                {unpricedItems.map((i) => i.name).join(", ")} 등 {unpricedItems.length}개 종목은
+                현재가 미조회로 거래 계획에서 제외됨
               </div>
             )}
-
           </div>
-        );
-      })()}
+        )}
+      </div>
 
       {/* 리밸런싱 비중 테이블 — 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-700">
@@ -392,13 +402,15 @@ export default function RebalancingTable({
           return { text: "집중형", cls: "text-red-400" };
         }
 
-        const totalBuy = analysis.items
-          .filter((i) => i.diff_krw > 0)
-          .reduce((s, i) => s + i.diff_krw, 0);
-        const totalSell = Math.abs(
-          analysis.items.filter((i) => i.diff_krw < 0).reduce((s, i) => s + i.diff_krw, 0),
-        );
-        const estFee = (totalBuy + totalSell) * TRADING_FEE_RATE;
+        // 거래비용도 calcTradeKrw 기준으로 계산 (요약 카드와 동일한 기준)
+        const feeBase =
+          analysis.items
+            .filter((i) => i.diff_krw > 0)
+            .reduce((s, i) => s + calcTradeKrw(i), 0) +
+          analysis.items
+            .filter((i) => i.diff_krw < 0)
+            .reduce((s, i) => s + calcTradeKrw(i), 0);
+        const estFee = feeBase * TRADING_FEE_RATE;
         const curLabel = hhiLabel(currentHHI);
         const tgtLabel = hhiLabel(targetHHI);
 

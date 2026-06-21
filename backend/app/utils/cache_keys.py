@@ -45,12 +45,12 @@ TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
 TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
 TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
-TTL_JOB_LOCK_DCA = 3600          # DCA 자동매수 분산 락
-TTL_JOB_LOCK_DEPOSIT = 600       # 입금 모니터 분산 락
-TTL_OB_TOKEN = 90 * 24 * 3600    # 금융결제원 기본 토큰 유효기간 90일
-TTL_PORTFOLIO_SUMMARY = 300      # KIS 실시간 포트폴리오 집계 5분
-TTL_DIVIDENDS_POSITIONS = 3600   # 종목별 배당수익률 1시간
-TTL_TAX_OVERSEAS = 86400         # 해외 미실현 손익 24시간
+TTL_JOB_LOCK_DCA = 3600  # DCA 자동매수 분산 락
+TTL_JOB_LOCK_DEPOSIT = 600  # 입금 모니터 분산 락
+TTL_OB_TOKEN = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
+TTL_PORTFOLIO_SUMMARY = 300  # KIS 실시간 포트폴리오 집계 5분
+TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
+TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키

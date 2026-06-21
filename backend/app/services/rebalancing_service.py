@@ -155,9 +155,7 @@ def _build_untracked_items(
         current_qty_u: float = data.get("qty", 0.0)
         weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
         diff_u = -current_value_u
-        shares_u: float | None = (
-            -current_qty_u if current_price_u and float(current_price_u) > 0 else None
-        )
+        shares_u: float | None = -current_qty_u if current_price_u and float(current_price_u) > 0 else None
 
         div_yield_u, annual_div_current_u = _div_info(ticker_u, market_u, dividend_map)
         ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None

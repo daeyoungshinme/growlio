@@ -42,7 +42,14 @@ class TestAnalyzeRebalancingBuyCase:
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 300_000, "current_price": 250_000, "qty": 1},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 300_000,
+                    "current_price": 250_000,
+                    "qty": 1,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -79,8 +86,22 @@ class TestAnalyzeRebalancingSellCase:
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 800_000, "current_price": 200_000, "qty": 4},
-                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla", "value_krw": 200_000, "current_price": 100_000, "qty": 2},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 800_000,
+                    "current_price": 200_000,
+                    "qty": 4,
+                },
+                {
+                    "ticker": "TSLA",
+                    "market": "NASDAQ",
+                    "name": "Tesla",
+                    "value_krw": 200_000,
+                    "current_price": 100_000,
+                    "qty": 2,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -162,8 +183,22 @@ class TestUntrackedHoldings:
         overview = _make_overview(
             total_stock_krw=1_000_000,
             all_positions=[
-                {"ticker": "AAPL", "market": "NASDAQ", "name": "Apple", "value_krw": 600_000, "current_price": 200_000, "qty": 3},
-                {"ticker": "TSLA", "market": "NASDAQ", "name": "Tesla", "value_krw": 400_000, "current_price": 100_000, "qty": 4},
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 600_000,
+                    "current_price": 200_000,
+                    "qty": 3,
+                },
+                {
+                    "ticker": "TSLA",
+                    "market": "NASDAQ",
+                    "name": "Tesla",
+                    "value_krw": 400_000,
+                    "current_price": 100_000,
+                    "qty": 4,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -211,8 +246,22 @@ class TestShareCalculationEdgeCases:
         overview = _make_overview(
             total_stock_krw=600_000,
             all_positions=[
-                {"ticker": "ACE", "market": "KR", "name": "ACE 나스닥", "value_krw": 0, "current_price": 35_000, "qty": 0},
-                {"ticker": "SAMSUNGE", "market": "KR", "name": "삼성전자우", "value_krw": 0, "current_price": 230_000, "qty": 0},
+                {
+                    "ticker": "ACE",
+                    "market": "KR",
+                    "name": "ACE 나스닥",
+                    "value_krw": 0,
+                    "current_price": 35_000,
+                    "qty": 0,
+                },
+                {
+                    "ticker": "SAMSUNGE",
+                    "market": "KR",
+                    "name": "삼성전자우",
+                    "value_krw": 0,
+                    "current_price": 230_000,
+                    "qty": 0,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
@@ -253,23 +302,39 @@ class TestShareCalculationEdgeCases:
 
     def test_new_portfolio_cash_only(self):
         """신규 포트폴리오: 주식 미보유, 예수금 600,000원 → 비중별 수량 정상 계산."""
-        portfolio = _make_portfolio([
-            {"ticker": "ACE", "name": "ACE 나스닥", "market": "KR", "weight": 50},
-            {"ticker": "SAMSUNGE", "name": "삼성전자우", "market": "KR", "weight": 50},
-        ])
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "ACE", "name": "ACE 나스닥", "market": "KR", "weight": 50},
+                {"ticker": "SAMSUNGE", "name": "삼성전자우", "market": "KR", "weight": 50},
+            ]
+        )
         overview = _make_overview(
             total_stock_krw=0,
             total_assets_krw=600_000,
             all_positions=[
-                {"ticker": "ACE", "market": "KR", "name": "ACE 나스닥", "value_krw": 0, "current_price": 35_000, "qty": 0},
-                {"ticker": "SAMSUNGE", "market": "KR", "name": "삼성전자우", "value_krw": 0, "current_price": 230_000, "qty": 0},
+                {
+                    "ticker": "ACE",
+                    "market": "KR",
+                    "name": "ACE 나스닥",
+                    "value_krw": 0,
+                    "current_price": 35_000,
+                    "qty": 0,
+                },
+                {
+                    "ticker": "SAMSUNGE",
+                    "market": "KR",
+                    "name": "삼성전자우",
+                    "value_krw": 0,
+                    "current_price": 230_000,
+                    "qty": 0,
+                },
             ],
         )
         result = analyze_rebalancing(portfolio, overview)
         ace = next(i for i in result.items if i.ticker == "ACE")
         samsung = next(i for i in result.items if i.ticker == "SAMSUNGE")
         assert result.base_value_krw == 600_000
-        assert ace.shares_to_trade == 8      # floor(300_000/35_000)=8
+        assert ace.shares_to_trade == 8  # floor(300_000/35_000)=8
         assert samsung.shares_to_trade == 1  # floor(300_000/230_000)=1
         assert ace.shares_to_trade * ace.current_price_krw <= ace.target_value_krw
         assert samsung.shares_to_trade * samsung.current_price_krw <= samsung.target_value_krw
@@ -620,27 +685,21 @@ class TestAvailableCashKrw:
 
     def test_available_cash_is_assets_minus_stock(self):
         """예수금 = total_assets - total_stock."""
-        portfolio = _make_portfolio(
-            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
-        )
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
         overview = _make_overview(total_assets_krw=1_500_000, total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview)
         assert result.available_cash_krw == pytest.approx(500_000)
 
     def test_available_cash_zero_when_no_cash(self):
         """주식만 있을 때(예수금 없음) 0이어야 한다."""
-        portfolio = _make_portfolio(
-            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
-        )
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
         overview = _make_overview(total_assets_krw=1_000_000, total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview)
         assert result.available_cash_krw == pytest.approx(0)
 
     def test_available_cash_clamped_to_zero(self):
         """total_stock이 total_assets를 초과할 경우 0 이하로 내려가지 않는다."""
-        portfolio = _make_portfolio(
-            [{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}]
-        )
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
         overview = _make_overview(total_assets_krw=900_000, total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview)
         assert result.available_cash_krw == pytest.approx(0)
