@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { render } from "@testing-library/react";
+import { renderWithProviders } from "@/test/renderWithProviders";
 
 vi.mock("@/utils/format", () => ({
   fmtKrwPrice: vi.fn((n: number) => `${n.toLocaleString()}원`),
@@ -112,30 +113,30 @@ describe("RebalancingResultSection", () => {
   };
 
   it("results가 빈 배열이면 아무것도 렌더링하지 않는다", () => {
-    const { container } = render(<RebalancingResultSection results={[]} />);
+    const { container } = renderWithProviders(<RebalancingResultSection results={[]} />);
     expect(container.firstChild).toBeNull();
   });
 
   it("계좌명과 성공 건수를 표시한다", () => {
-    render(<RebalancingResultSection results={[mockResult]} />);
+    renderWithProviders(<RebalancingResultSection results={[mockResult]} />);
     expect(screen.getByText("테스트 계좌")).toBeDefined();
     expect(screen.getByText(/1건 성공/)).toBeDefined();
   });
 
   it("is_mock=true이면 '모의투자' 뱃지를 표시한다", () => {
-    render(<RebalancingResultSection results={[{ ...mockResult, is_mock: true }]} />);
+    renderWithProviders(<RebalancingResultSection results={[{ ...mockResult, is_mock: true }]} />);
     expect(screen.getByText("모의투자")).toBeDefined();
   });
 
   it("fail_count > 0이면 실패 건수를 표시한다", () => {
-    render(
+    renderWithProviders(
       <RebalancingResultSection results={[{ ...mockResult, success_count: 0, fail_count: 2 }]} />,
     );
     expect(screen.getByText(/2건 실패/)).toBeDefined();
   });
 
   it("주문 종목명과 티커를 표시한다", () => {
-    render(<RebalancingResultSection results={[mockResult]} />);
+    renderWithProviders(<RebalancingResultSection results={[mockResult]} />);
     expect(screen.getAllByText("삼성전자").length).toBeGreaterThan(0);
     expect(screen.getAllByText("005930").length).toBeGreaterThan(0);
   });
@@ -145,7 +146,7 @@ describe("RebalancingResultSection", () => {
       ...mockResult,
       orders: [{ ...mockOrder, order_type: "LIMIT" }],
     };
-    render(<RebalancingResultSection results={[mockResult, limitResult]} />);
+    renderWithProviders(<RebalancingResultSection results={[mockResult, limitResult]} />);
     expect(screen.getAllByText("시장가").length).toBeGreaterThan(0);
     expect(screen.getAllByText("지정가").length).toBeGreaterThan(0);
   });
@@ -156,7 +157,7 @@ describe("RebalancingResultSection", () => {
       account_id: "acc-2",
       account_name: "두번째 계좌",
     };
-    render(<RebalancingResultSection results={[mockResult, result2]} />);
+    renderWithProviders(<RebalancingResultSection results={[mockResult, result2]} />);
     expect(screen.getByText("테스트 계좌")).toBeDefined();
     expect(screen.getByText("두번째 계좌")).toBeDefined();
   });
@@ -174,7 +175,7 @@ describe("RebalancingResultSection", () => {
         },
       ],
     };
-    render(<RebalancingResultSection results={[failedResult]} />);
+    renderWithProviders(<RebalancingResultSection results={[failedResult]} />);
     expect(screen.getAllByText("잔고 부족").length).toBeGreaterThan(0);
   });
 });
