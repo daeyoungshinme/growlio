@@ -104,9 +104,7 @@ async def build_asset_totals(
     )
 
     # Q4: 현재 포지션 (no_snap 계좌 포함 전체 stock 계좌 대상)
-    all_stock_acc_ids = stock_acc_ids_from_rows + [
-        acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES
-    ]
+    all_stock_acc_ids = stock_acc_ids_from_rows + [acc.id for acc in no_snap_accounts if acc.asset_type in _STOCK_TYPES]
     current_positions = await _fetch_current_positions(all_stock_acc_ids, db)
 
     total_assets_krw = 0.0
