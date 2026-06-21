@@ -26,7 +26,7 @@ cd frontend && npx tsc --noEmit
 ```bash
 # 백엔드 서버(localhost:8000) 실행 중인 상태에서 실행
 cd frontend && npm run generate:api-types
-# → src/types/api.generated.ts 생성 (gitignore 대상 — 빌드 시 재생성)
+# → src/types/api.generated.ts 생성 (gitignore 대상 — CI 빌드에서 자동 생성 안 됨. 백엔드 실행 중일 때 수동 실행 필요)
 # 생성된 타입 사용법: import type { paths, components } from "../types/api.generated";
 # 예: components["schemas"]["DashboardSummary"]
 ```

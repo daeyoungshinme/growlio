@@ -47,6 +47,9 @@ cd backend && uv run pytest tests/test_asset_service.py -v
 # 특정 테스트 필터
 cd backend && uv run pytest -k "test_name" -x  # -x: 첫 실패 시 중단
 cd backend && uv run pytest --tb=short         # 짧은 트레이스백 (출력 줄이기)
+
+# 커버리지 리포트
+cd backend && uv run pytest --cov=app --cov-report=term-missing
 ```
 
 > 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
