@@ -1,4 +1,4 @@
-.PHONY: up down migrate install-backend install-frontend dev dev-backend dev-frontend \
+.PHONY: up down migrate migrate-down install-backend install-frontend dev dev-backend dev-frontend \
         test-backend test-frontend lint typecheck \
         clean format db-reset \
         build-android-debug build-android-release
@@ -11,6 +11,9 @@ down:
 
 migrate:
 	cd backend && uv run alembic upgrade head
+
+migrate-down:
+	cd backend && uv run alembic downgrade -1
 
 install-backend:
 	cd backend && uv venv && uv pip install -e ".[dev]"

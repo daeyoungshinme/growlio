@@ -48,6 +48,7 @@ bash dev.sh         # (또는 make dev)
 make up               # docker compose up -d db redis
 make down             # docker compose down
 make migrate          # cd backend && alembic upgrade head
+make migrate-down     # cd backend && alembic downgrade -1 (1단계 롤백)
 make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]"
 make install-frontend # cd frontend && npm install
 make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용

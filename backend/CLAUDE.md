@@ -29,6 +29,9 @@ cd backend && uv run alembic revision --autogenerate -m "description"
 > **주의:** autogenerate는 `alembic/env.py`에 모델 import 필요. 새 모델 추가 시 env.py 확인.
 
 ```bash
+# 마이그레이션 롤백 (1단계)
+cd backend && uv run alembic downgrade -1
+
 # 현재 마이그레이션 상태 확인
 cd backend && uv run alembic current
 
