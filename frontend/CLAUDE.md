@@ -150,7 +150,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 > 테스트 대상: 순수 유틸 함수 (`utils/`, `constants/`) — React 컴포넌트·React Query 훅은 테스트하지 않음. 새 유틸 추가 시 동일 디렉토리에 `*.test.ts` 작성.
 
-**asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시.
+**asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
 
@@ -161,7 +161,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
-**상태 관리:** Zustand — `authStore.ts`(인증), `themeStore.ts`(다크모드). 서버 상태는 React Query 전담.
+**상태 관리 원칙:** 서버에서 오는 데이터 → React Query. 순수 클라이언트 전역 상태 → Zustand.
+- Zustand: `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글)
+- 새 전역 상태 추가 시: 서버 fetch가 필요하면 React Query 훅, 그렇지 않으면 Zustand store.
 
 **포트폴리오와 대시보드의 관계:** `DashboardPage`가 `/portfolio/overview`를 추가 조회해 `PortfolioSummaryCard`에 전달. 양쪽이 같은 queryKey(`"portfolio-overview"`)를 공유하므로 포트폴리오 sync 후 대시보드도 자동 갱신됨.
 

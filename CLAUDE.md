@@ -94,7 +94,8 @@ growlio/
 ## 배포 & CI
 
 - `render.yaml` — 백엔드 Render 배포 설정. 프론트엔드는 별도 호스팅.
-- `nginx/` — 포트 80 리버스 프록시. `/api/*` → backend:8000, 그 외 → frontend 정적파일. 새 API prefix 추가 시 수정 필요.
+- `nginx/` — 포트 80 리버스 프록시. `/api/*` → backend:8000, 그 외 → frontend 정적파일. 새 API prefix 추가 시 `nginx/nginx.conf`의 `location` 블록 수정 필요.
+- `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. Docker Compose로 실행 시 Prometheus `:9090`, Grafana `:3000` 접근 가능.
 - `.github/` — CI: lint/test/build (push/PR마다 실행). Android APK 빌드 workflow 포함.
 
 ---
