@@ -41,7 +41,7 @@ export default function Button({
     <button
       disabled={disabled || loading}
       className={[
-        "inline-flex items-center gap-1.5 rounded-lg transition-colors",
+        "inline-flex items-center gap-1.5 rounded-lg transition-all active:scale-[0.97] active:opacity-80",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],

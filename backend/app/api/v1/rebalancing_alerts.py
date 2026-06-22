@@ -161,6 +161,19 @@ async def upsert_rebalancing_alert(
     """포트폴리오 리밸런싱 알림 생성 또는 수정 (upsert)."""
     await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
 
+    if body.mode == "AUTO" and body.account_id is not None:
+        exec_account = await db.scalar(
+            select(AssetAccount).where(
+                AssetAccount.id == body.account_id,
+                AssetAccount.user_id == current_user.id,
+            )
+        )
+        if not exec_account or exec_account.asset_type != "STOCK_KIS":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="자동 실행 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
+            )
+
     alert = await db.scalar(
         select(RebalancingAlert).where(
             RebalancingAlert.portfolio_id == portfolio_id,
@@ -213,11 +226,16 @@ async def upsert_rebalancing_alert(
                     AssetAccount.user_id == current_user.id,
                 )
             )
+            if not acc or acc.asset_type != "STOCK_KIS":
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="예수금 감지 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
+                )
             db.add(
                 RebalancingAlertDepositAccount(
                     alert_id=alert.id,
                     account_id=acc_id,
-                    last_known_deposit_krw=float(acc.deposit_krw) if acc and acc.deposit_krw is not None else None,
+                    last_known_deposit_krw=float(acc.deposit_krw) if acc.deposit_krw is not None else None,
                 )
             )
 

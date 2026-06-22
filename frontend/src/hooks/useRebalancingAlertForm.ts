@@ -58,7 +58,11 @@ export function useRebalancingAlertQueries({
     (a) => a.asset_type === "STOCK_KIS" && (accountIds == null || accountIds.includes(a.id)),
   );
 
-  return { alert: alert ?? null, isLoading, brokerAccounts, kisAccounts, marketSignal };
+  const kisExecutionAccounts = accounts.filter(
+    (a) => a.asset_type === "STOCK_KIS" && a.is_active,
+  );
+
+  return { alert: alert ?? null, isLoading, brokerAccounts, kisAccounts, kisExecutionAccounts, marketSignal };
 }
 
 interface UseRebalancingAlertFormStateOpts {

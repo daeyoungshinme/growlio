@@ -65,7 +65,7 @@ export default function RebalancingAlertModal({
   accountIds,
   onClose,
 }: Props) {
-  const { alert, isLoading, brokerAccounts, kisAccounts, marketSignal } =
+  const { alert, isLoading, kisAccounts, kisExecutionAccounts, marketSignal } =
     useRebalancingAlertQueries({ portfolioId, accountIds });
 
   return (
@@ -79,8 +79,8 @@ export default function RebalancingAlertModal({
           <AlertFormBody
             key={alert?.id ?? "new"}
             alert={alert}
-            brokerAccounts={brokerAccounts}
             kisAccounts={kisAccounts}
+            kisExecutionAccounts={kisExecutionAccounts}
             portfolioId={portfolioId}
             accountIds={accountIds}
             onClose={onClose}
@@ -98,16 +98,16 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 
 function AlertFormBody({
   alert,
-  brokerAccounts,
   kisAccounts,
+  kisExecutionAccounts,
   portfolioId,
   accountIds,
   onClose,
   marketSignal,
 }: {
   alert: RebalancingAlert | null;
-  brokerAccounts: AssetAccount[];
   kisAccounts: AssetAccount[];
+  kisExecutionAccounts: AssetAccount[];
   portfolioId: string;
   accountIds?: string[] | null;
   onClose: () => void;
@@ -278,20 +278,26 @@ function AlertFormBody({
 
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                실행 계좌 (KIS/키움)
+                실행 계좌 (KIS)
               </label>
-              <select
-                className={inputClass}
-                value={form.accountId}
-                onChange={(e) => form.setAccountId(e.target.value)}
-              >
-                <option value="">계좌 선택</option>
-                {brokerAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+              {kisExecutionAccounts.length === 0 ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  KIS 연동 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
+                </p>
+              ) : (
+                <select
+                  className={inputClass}
+                  value={form.accountId}
+                  onChange={(e) => form.setAccountId(e.target.value)}
+                >
+                  <option value="">계좌 선택</option>
+                  {kisExecutionAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -33,3 +33,12 @@ body {
 .dark body {
   @apply bg-gray-950 text-gray-50;
 }
+
+/* iOS Safari 자동 줌 방지: font-size < 16px인 input 포커스 시 확대되는 문제 */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 1rem !important;
+  }
+}

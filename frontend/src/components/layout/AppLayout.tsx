@@ -1,5 +1,6 @@
-import { createContext, useCallback, useContext, useRef } from "react";
-import { Outlet } from "react-router-dom";
+import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { App } from "@capacitor/app";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import OfflineBanner from "@/components/common/OfflineBanner";
@@ -8,6 +9,7 @@ import { toast } from "@/utils/toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { useSwipeNavigation } from "@/hooks/useSwipeNavigation";
 import { ExchangeRateProvider } from "@/context/ExchangeRateContext";
+import { isNativePlatform } from "@/utils/platform";
 
 // 페이지 컴포넌트가 새로고침 콜백을 AppLayout에 등록하기 위한 컨텍스트
 interface RefreshContextValue {
@@ -28,6 +30,7 @@ export default function AppLayout() {
   const needsPasswordReset = useAuthStore((s) => s.needsPasswordReset);
   const email = useAuthStore((s) => s.email);
   const forgotPassword = useAuthStore((s) => s.forgotPassword);
+  const navigate = useNavigate();
 
   const mainRef = useRef<HTMLElement>(null);
   const refreshFnRef = useRef<(() => Promise<void>) | null>(null);
@@ -45,6 +48,26 @@ export default function AppLayout() {
 
   // 모바일에서만 스와이프 탭 전환 (lg 이상은 Sidebar 사용)
   useSwipeNavigation(mainRef);
+
+  // Android 물리 뒤로가기 버튼 처리
+  useEffect(() => {
+    if (!isNativePlatform()) return;
+    const handle = App.addListener("backButton", ({ canGoBack }) => {
+      // 모달이 열려 있으면 Escape 이벤트로 닫기
+      if (document.body.style.overflow === "hidden") {
+        document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+        return;
+      }
+      if (canGoBack) {
+        navigate(-1);
+      } else {
+        void App.exitApp();
+      }
+    });
+    return () => {
+      void handle.then((h) => h.remove());
+    };
+  }, [navigate]);
 
   const handleSendResetEmail = async () => {
     if (!email) return;
