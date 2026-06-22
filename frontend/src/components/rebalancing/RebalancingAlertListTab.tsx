@@ -9,6 +9,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SCHEDULE_LABEL } from "@/constants/rebalancingConfig";
+import { relativeTime } from "@/utils/format";
 
 export default function RebalancingAlertListTab() {
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
@@ -98,19 +99,26 @@ export default function RebalancingAlertListTab() {
                   </div>
 
                   {hasAlert && (
-                    <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                      <p>
-                        주기: {SCHEDULE_LABEL[alert.schedule_type]}
-                        {alert.threshold_pct > 0 && ` · 임계값 ±${alert.threshold_pct}%`}
-                      </p>
+                    <div className="mt-1.5 space-y-1.5">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full text-xs">
+                          {SCHEDULE_LABEL[alert.schedule_type]}
+                        </span>
+                        {alert.threshold_pct > 0 && (
+                          <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-full text-xs">
+                            ±{alert.threshold_pct}% 이탈
+                          </span>
+                        )}
+                        {alert.deposit_trigger_enabled && (
+                          <span className="px-2 py-0.5 bg-blue-50 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 rounded-full text-xs">
+                            입금 감지
+                          </span>
+                        )}
+                      </div>
                       {alert.last_triggered_at && (
-                        <p>
-                          마지막 실행:{" "}
-                          {new Date(alert.last_triggered_at).toLocaleDateString("ko-KR")}
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          최근 실행: {relativeTime(alert.last_triggered_at)}
                         </p>
-                      )}
-                      {alert.deposit_trigger_enabled && (
-                        <p className="text-blue-500 dark:text-blue-400">예수금 입금 감지 활성</p>
                       )}
                     </div>
                   )}

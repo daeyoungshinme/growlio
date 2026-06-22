@@ -120,16 +120,6 @@ vi.mock("@/api/transactions", () => ({
 
 vi.mock("@/api/dividends", () => ({
   fetchMonthlyOptimization: vi.fn().mockResolvedValue([]),
-  fetchDRIPSimulation: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock("@/api/economicIndicators", () => ({
-  fetchIndicators: vi.fn().mockResolvedValue([]),
-  fetchIndicatorCalendar: vi.fn().mockResolvedValue([]),
-  fetchIndicatorHistory: vi.fn().mockResolvedValue([]),
-  fetchIndicatorSubscriptions: vi.fn().mockResolvedValue([]),
-  subscribeIndicator: vi.fn().mockResolvedValue({}),
-  unsubscribeIndicator: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("@/api/marketSignals", () => ({
@@ -198,7 +188,6 @@ vi.mock("@/components/settings/DCASettingsSection", () => ({
 
 // ---- Page imports (after mocks) ----
 import DashboardPage from "@/pages/DashboardPage";
-import MarketPage from "@/pages/MarketPage";
 import SettingsPage from "@/pages/SettingsPage";
 import InvestPlanPage from "@/pages/InvestPlanPage";
 import PortfolioPage from "@/pages/PortfolioPage";
@@ -227,68 +216,6 @@ describe("DashboardPage", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-});
-
-// =========================================
-// MarketPage
-// =========================================
-describe("MarketPage", () => {
-  it("renders market page header", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("시장 지표")).toBeDefined();
-    });
-  });
-
-  it("renders 증시 캘린더 section", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("증시 캘린더")).toBeDefined();
-    });
-  });
-
-  it("renders 주요 지표 현황 section", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("주요 지표 현황")).toBeDefined();
-    });
-  });
-
-  it("has refresh button", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByLabelText("새로고침")).toBeDefined();
-    });
-  });
-
-  it("can click refresh button", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <MarketPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      const btn = screen.getByLabelText("새로고침");
-      fireEvent.click(btn);
       expect(document.body).toBeDefined();
     });
   });

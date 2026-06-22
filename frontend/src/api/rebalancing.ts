@@ -168,3 +168,24 @@ export const fetchRebalancingHistory = (limit = 20): Promise<RebalancingExecutio
 
 export const fetchRebalancingExecutionDetail = (id: string): Promise<RebalancingExecutionDetail> =>
   apiGet<RebalancingExecutionDetail>(`/rebalancing/history/${id}`);
+
+// ── 드리프트 요약 (대시보드용 경량 조회) ────────────────────────
+
+export interface DriftedItem {
+  ticker: string;
+  name: string;
+  weight_diff_pct: number;
+}
+
+export interface PortfolioDriftSummary {
+  portfolio_id: string;
+  portfolio_name: string;
+  needs_rebalancing: boolean;
+  threshold_pct: number;
+  max_drift_pct: number;
+  drifted_items_count: number;
+  top_drifted_items: DriftedItem[];
+}
+
+export const fetchDriftSummary = (): Promise<PortfolioDriftSummary[]> =>
+  apiGet<PortfolioDriftSummary[]>(`/rebalancing/drift-summary`);

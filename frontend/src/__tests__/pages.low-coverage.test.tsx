@@ -241,6 +241,8 @@ vi.mock("@/api/assets", () => ({
 
 vi.mock("@/api/portfolios", () => ({
   fetchPortfolioOverview: vi.fn(),
+  fetchPortfolios: vi.fn().mockResolvedValue([]),
+  fetchPortfolioOverviewLite: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/api/transactions", () => ({

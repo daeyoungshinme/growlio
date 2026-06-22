@@ -1,5 +1,6 @@
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import Modal from "@/components/common/Modal";
+import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { fmtKrw } from "@/utils/format";
@@ -132,6 +133,10 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
                 className={`flex-1 ${INPUT_SM}`}
               />
             </div>
+            <AmountUnitButtons
+              onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
+              className="pl-10"
+            />
             <div className="flex items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400 w-8 shrink-0">$</span>
               <input

@@ -28,14 +28,6 @@ vi.mock("@/api/client", () => {
 // ── imports ───────────────────────────────────────────────────────────────────
 
 import { api } from "@/api/client";
-import {
-  fetchIndicators,
-  fetchIndicatorCalendar,
-  fetchIndicatorHistory,
-  fetchIndicatorSubscriptions,
-  subscribeIndicator,
-  unsubscribeIndicator,
-} from "@/api/economicIndicators";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
@@ -48,63 +40,6 @@ import {
   runCorrelation,
 } from "@/api/backtest";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
-
-// ── api/economicIndicators ────────────────────────────────────────────────────
-
-describe("api/economicIndicators", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchIndicators calls GET /economic-indicators", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    const result = await fetchIndicators();
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators");
-    expect(result).toEqual([]);
-  });
-
-  it("fetchIndicatorCalendar calls GET /economic-indicators/calendar", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    const result = await fetchIndicatorCalendar();
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/calendar");
-    expect(result).toEqual([]);
-  });
-
-  it("fetchIndicatorHistory calls GET /economic-indicators/:code/history", async () => {
-    const mockHistory = [{ date: "2024-01", value: 3.2 }];
-    vi.mocked(api.get).mockResolvedValue({ data: mockHistory });
-    const result = await fetchIndicatorHistory("CPI", 12);
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/CPI/history", {
-      params: { months: 12 },
-    });
-    expect(result).toEqual(mockHistory);
-  });
-
-  it("fetchIndicatorHistory uses default months=24", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    await fetchIndicatorHistory("FEDFUNDS");
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/FEDFUNDS/history", {
-      params: { months: 24 },
-    });
-  });
-
-  it("fetchIndicatorSubscriptions calls GET /economic-indicators/subscriptions", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: ["CPI"] });
-    const result = await fetchIndicatorSubscriptions();
-    expect(api.get).toHaveBeenCalledWith("/economic-indicators/subscriptions");
-    expect(result).toEqual(["CPI"]);
-  });
-
-  it("subscribeIndicator calls POST /economic-indicators/:code/subscribe", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: undefined });
-    await subscribeIndicator("CPI");
-    expect(api.post).toHaveBeenCalledWith("/economic-indicators/CPI/subscribe");
-  });
-
-  it("unsubscribeIndicator calls DELETE /economic-indicators/:code/subscribe", async () => {
-    vi.mocked(api.delete).mockResolvedValue({ data: undefined });
-    await unsubscribeIndicator("CPI");
-    expect(api.delete).toHaveBeenCalledWith("/economic-indicators/CPI/subscribe");
-  });
-});
 
 // ── api/marketSignals ─────────────────────────────────────────────────────────
 

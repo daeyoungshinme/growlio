@@ -85,13 +85,24 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
   const analysisSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!portfolioId || portfolios.length === 0) return;
-    if (!portfolios.some((p) => p.id === portfolioId)) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedIds(new Set([portfolioId]));
-    setTimeout(() => {
-      analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 150);
+    if (portfolios.length === 0) return;
+    // URL 파라미터 포트폴리오 선택 우선
+    if (portfolioId && portfolios.some((p) => p.id === portfolioId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelectedIds(new Set([portfolioId]));
+      setMobileListOpen(false);
+      setTimeout(() => {
+        analysisSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 150);
+      return;
+    }
+    // 포트폴리오가 1개면 자동 선택
+    if (portfolios.length === 1 && selectedIds.size === 0) {
+      setSelectedIds(new Set([portfolios[0].id]));
+      setMobileListOpen(false);
+    }
+  // selectedIds.size를 의존성에서 제거해 두 경로 간 경쟁 상태 방지
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [portfolioId, portfolios]);
 
   function handleDragEnd(event: DragEndEvent) {
@@ -211,15 +222,16 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
 
       <div className="flex flex-col md:flex-row gap-4 md:gap-6">
         <div>
-          <button
-            className="md:hidden w-full flex items-center justify-between px-3 py-2 mb-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-300"
-            onClick={() => setMobileListOpen((v) => !v)}
-          >
-            <span>
-              {selectedIds.size > 0 ? `선택: ${selectedNames}` : "포트폴리오 선택"}
-            </span>
-            <span>{mobileListOpen ? "▲" : "▼"}</span>
-          </button>
+          {/* 모바일: 포트폴리오 2개 이상일 때만 토글 버튼 표시 */}
+          {sortedPortfolios.length > 1 && (
+            <button
+              className="md:hidden w-full flex items-center justify-between px-3 py-2 mb-2 rounded-lg bg-gray-800 border border-gray-700 text-xs text-gray-400"
+              onClick={() => setMobileListOpen((v) => !v)}
+            >
+              <span>{mobileListOpen ? "목록 접기" : "전체 목록 보기"}</span>
+              <span>{mobileListOpen ? "▲" : "▼"}</span>
+            </button>
+          )}
           <div className={mobileListOpen ? "block" : "hidden md:block"}>
             <PortfolioListSection
               portfolios={sortedPortfolios}
@@ -262,7 +274,7 @@ export default function PortfolioAnalysisTab({ portfolioId }: { portfolioId?: st
               portfolios={sortedPortfolios}
               activeAccounts={activeAccounts}
               onOpenAlertModal={setAlertModalPortfolioId}
-              autoAnalyzeId={portfolioId}
+              autoAnalyzeId={portfolioId ?? (selectedIds.size === 1 ? [...selectedIds][0] : undefined)}
               alertByPortfolioId={alertByPortfolioId}
             />
           </ErrorBoundary>

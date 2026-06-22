@@ -60,6 +60,7 @@ vi.mock("@/api/rebalancing", () => ({
   }),
   fetchRebalancingHistory: vi.fn().mockResolvedValue([]),
   fetchRebalancingExecutionDetail: vi.fn().mockResolvedValue(null),
+  fetchDriftSummary: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/api/transactions", () => ({
@@ -88,7 +89,6 @@ vi.mock("@/api/marketSignals", () => ({
 
 vi.mock("@/api/dividends", () => ({
   fetchMonthlyOptimization: vi.fn().mockResolvedValue([]),
-  fetchDRIPSimulation: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/api/insights", () => ({
@@ -442,18 +442,11 @@ describe("DividendTab", () => {
     renderWithProviders(<DividendTab {...defaultProps} />);
     expect(screen.getByText("종목별 배당")).toBeDefined();
     expect(screen.getByText("월별 배당")).toBeDefined();
-    expect(screen.getByText("DRIP 분석")).toBeDefined();
   });
 
   it("switches to monthly dividend tab", () => {
     renderWithProviders(<DividendTab {...defaultProps} />);
     fireEvent.click(screen.getByText("월별 배당"));
-    expect(document.body).toBeDefined();
-  });
-
-  it("switches to DRIP analysis tab", () => {
-    renderWithProviders(<DividendTab {...defaultProps} />);
-    fireEvent.click(screen.getByText("DRIP 분석"));
     expect(document.body).toBeDefined();
   });
 
@@ -548,13 +541,13 @@ describe("PortfolioAnalysisTab", () => {
 // =========================================
 describe("RebalancingStatusCard", () => {
   it("포트폴리오 없을 때 아무것도 렌더링하지 않음", async () => {
-    renderWithProviders(
+    const { container } = renderWithProviders(
       <MemoryRouter>
         <RebalancingStatusCard />
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.queryByText("리밸런싱 자동화")).not.toBeInTheDocument();
+      expect(container.firstChild).toBeNull();
     });
   });
 
@@ -566,14 +559,12 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText("리밸런싱 자동화")).toBeInTheDocument();
+      expect(screen.getByText("리밸런싱 현황")).toBeInTheDocument();
     });
-    expect(screen.getByText("포트폴리오")).toBeInTheDocument();
-    expect(screen.getByText("알림 설정")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /실행하기/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /분석하기/ })).toBeInTheDocument();
   });
 
-  it("알림 없을 때 알림 설정 안내 링크 표시", async () => {
+  it("드리프트 데이터 없을 때 안내 메시지 표시", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     renderWithProviders(
       <MemoryRouter>
@@ -581,7 +572,7 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/비중 이탈 알림 설정하기/)).toBeInTheDocument();
+      expect(screen.getByText(/포트폴리오 분석 데이터가 없습니다/)).toBeInTheDocument();
     });
   });
 });

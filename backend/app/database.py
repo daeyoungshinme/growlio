@@ -26,7 +26,10 @@ if settings.app_env == "production" or settings.supabase_project_url:
         "ssl": "require",
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
+        "command_timeout": 60,
     }
+else:
+    _engine_kwargs["connect_args"] = {"command_timeout": 60}
 
 engine = create_async_engine(settings.database_url, **_engine_kwargs)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DividendByTicker } from "@/types";
 
@@ -29,7 +29,6 @@ vi.mock("@/utils/dividendUtils", () => ({
 
 vi.mock("@/api/dividends", () => ({
   fetchMonthlyOptimization: vi.fn().mockResolvedValue([]),
-  fetchDRIPSimulation: vi.fn().mockResolvedValue(null),
 }));
 
 import DomesticForeignBar from "@/components/portfolio/DomesticForeignBar";
@@ -37,7 +36,6 @@ import TreemapChart from "@/components/portfolio/TreemapChart";
 import MonthlyTickerDetail from "@/components/portfolio/MonthlyTickerDetail";
 import MonthlyDividendChart from "@/components/portfolio/MonthlyDividendChart";
 import MonthlyOptimizationCard from "@/components/portfolio/MonthlyOptimizationCard";
-import DRIPSimulationChart from "@/components/portfolio/DRIPSimulationChart";
 
 // ------- DomesticForeignBar -------
 describe("DomesticForeignBar", () => {
@@ -181,25 +179,3 @@ describe("MonthlyOptimizationCard", () => {
   });
 });
 
-// ------- DRIPSimulationChart -------
-describe("DRIPSimulationChart", () => {
-  it("renders simulation controls", () => {
-    renderWithProviders(<DRIPSimulationChart />);
-    expect(screen.getByText("5년")).toBeDefined();
-    expect(screen.getByText("10년")).toBeDefined();
-    expect(screen.getByText("20년")).toBeDefined();
-    expect(screen.getByText("30년")).toBeDefined();
-  });
-
-  it("renders run button", () => {
-    renderWithProviders(<DRIPSimulationChart />);
-    expect(screen.getByText("시뮬레이션 실행")).toBeDefined();
-  });
-
-  it("changes year selection on button click", () => {
-    renderWithProviders(<DRIPSimulationChart />);
-    fireEvent.click(screen.getByText("20년"));
-    // Clicking 20년 triggers handleRun which calls mutate
-    expect(document.body).toBeDefined();
-  });
-});

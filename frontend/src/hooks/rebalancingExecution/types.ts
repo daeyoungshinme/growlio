@@ -83,4 +83,5 @@ export type ExecutionAction =
   | { type: "EXECUTE_SUCCESS"; results: ExecutionResult[] }
   | { type: "EXECUTE_ERROR"; msg: string }
   | { type: "CONFIRM_CLICK" }
+  | { type: "UNCONFIRM" }
   | { type: "BULK_SET_QTY"; entries: Array<{ key: string; qty: number }> };

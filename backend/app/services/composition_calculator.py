@@ -13,6 +13,7 @@ from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.utils.cache_keys import RedisType
 from app.utils.currency import fetch_usd_krw
+from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 from app.utils.pnl import eval_value as _eval_value
 from app.utils.pnl import invested_value as _invested_value
 
@@ -147,9 +148,7 @@ async def build_asset_totals(
             else:
                 by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         elif acc.asset_type == "REAL_ESTATE":
-            gross = float(acc.manual_amount or 0)
-            mortgage = float((acc.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-            amount = gross - mortgage
+            amount = _calc_net_asset_amount(acc.manual_amount, acc.asset_type, acc.real_estate_details)
             by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + amount
         else:
             amount = float(acc.manual_amount or 0)

@@ -12,6 +12,7 @@ from app.models.asset import Position as DBPosition
 from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.base import Position as ProviderPosition
 from app.utils.currency import fetch_usd_krw
+from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -71,11 +72,9 @@ class ManualProvider(BrokerProvider):
             amount_krw = (value if value else invested) + deposit
             account.manual_amount = amount_krw
         elif account.asset_type == "REAL_ESTATE":
-            gross = float(account.manual_amount or 0)
-            mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-            amount_krw = gross - mortgage
-            if gross == 0:
+            if not account.manual_amount:
                 raise BadRequestError("부동산 시세(manual_amount)가 설정되지 않았습니다")
+            amount_krw = _calc_net_asset_amount(account.manual_amount, account.asset_type, account.real_estate_details)
         elif account.deposit_krw is not None or account.deposit_usd is not None:
             usd_rate2 = await fetch_usd_krw(redis)
             amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate2

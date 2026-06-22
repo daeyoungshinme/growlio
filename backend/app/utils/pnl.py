@@ -27,3 +27,16 @@ def calc_position_pnl(qty: float, avg_price: float, current_price: float) -> tup
     pnl = value - invested
     rate = (pnl / invested * 100) if invested else 0.0
     return invested, value, pnl, rate
+
+
+def calc_net_asset_amount(
+    manual_amount: float | None,
+    asset_type: str,
+    real_estate_details: dict | None,
+) -> float:
+    """manual_amount에서 부동산 모기지를 차감한 순자산 금액을 반환한다."""
+    amount = float(manual_amount or 0)
+    if asset_type == "REAL_ESTATE":
+        mortgage = float((real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
+        amount -= mortgage
+    return amount

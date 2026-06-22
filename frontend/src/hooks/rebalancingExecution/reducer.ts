@@ -127,6 +127,8 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
       return { ...state, phase: "confirm", errorMsg: action.msg };
     case "CONFIRM_CLICK":
       return { ...state, confirmed: true };
+    case "UNCONFIRM":
+      return { ...state, confirmed: false };
     case "BULK_SET_QTY": {
       const nextQtyOverrides = { ...state.qtyOverrides };
       const nextSelected = new Set(state.selected);

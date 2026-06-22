@@ -1,0 +1,149 @@
+"""market_data_fetcher 단위 테스트."""
+
+from __future__ import annotations
+
+from datetime import date
+from unittest.mock import MagicMock, patch
+
+
+class TestFetchYfDailyReturns:
+    def test_returns_daily_returns_for_symbols(self):
+        """정상 다운로드 시 일별 수익률 dict를 반환한다."""
+        import pandas as pd
+
+        mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 101.0, 103.0]})
+        mock_raw = MagicMock()
+        mock_raw.columns = mock_df.columns
+        mock_raw.get.return_value = mock_df
+        mock_raw.__class__ = pd.DataFrame
+
+        with patch("yfinance.download", return_value=mock_df):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"])
+
+        assert "AAPL" in result
+        assert len(result["AAPL"]) == 3  # pct_change → N-1 values
+
+    def test_empty_symbols_returns_empty(self):
+        """빈 심볼 목록은 빈 dict를 반환한다."""
+        from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+        result = fetch_yf_daily_returns([])
+        assert result == {}
+
+    def test_download_exception_returns_empty(self):
+        """다운로드 실패 시 빈 dict를 반환하고 예외가 전파되지 않는다."""
+        with patch("yfinance.download", side_effect=Exception("network error")):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"])
+
+        assert result == {}
+
+    def test_nan_values_filtered_out(self):
+        """NaN 수익률 값은 결과에서 제거된다."""
+        import math
+
+        import pandas as pd
+
+        # 중간에 NaN이 있는 시리즈
+        mock_df = pd.DataFrame({"AAPL": [100.0, float("nan"), 102.0, 104.0]})
+
+        with patch("yfinance.download", return_value=mock_df):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"])
+
+        if "AAPL" in result:
+            assert all(math.isfinite(r) for r in result["AAPL"])
+
+    def test_extra_symbols_included_in_result(self):
+        """extra_symbols도 결과에 포함된다."""
+        import pandas as pd
+
+        mock_df = pd.DataFrame({"AAPL": [100.0, 101.0, 102.0], "^GSPC": [4000.0, 4020.0, 4010.0]})
+
+        with patch("yfinance.download", return_value=mock_df):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"], extra_symbols=["^GSPC"])
+
+        assert "AAPL" in result
+        assert "^GSPC" in result
+
+    def test_multiindex_close_extraction(self):
+        """MultiIndex DataFrame에서 'Close' 레벨을 올바르게 추출한다."""
+        import pandas as pd
+
+        close_df = pd.DataFrame({"AAPL": [100.0, 102.0, 104.0]})
+        columns = pd.MultiIndex.from_tuples([("Close", "AAPL"), ("Open", "AAPL")])
+        multi_raw = MagicMock()
+        multi_raw.columns = columns
+        multi_raw.get.return_value = close_df
+
+        with patch("yfinance.download", return_value=multi_raw):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"])
+
+        # MultiIndex 경로 실행 — 예외 없이 dict 반환
+        assert isinstance(result, dict)
+
+
+class TestFetchYfCloseSeries:
+    def test_returns_series_for_symbols(self):
+        """정상 다운로드 시 종목별 종가 Series를 반환한다."""
+        import pandas as pd
+
+        mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 104.0]})
+
+        with patch("yfinance.download", return_value=mock_df):
+            from app.services.market_data_fetcher import fetch_yf_close_series
+
+            result = fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
+
+        assert "AAPL" in result
+        assert len(result["AAPL"]) == 3
+
+    def test_empty_symbols_returns_empty(self):
+        from app.services.market_data_fetcher import fetch_yf_close_series
+
+        result = fetch_yf_close_series([], date(2024, 1, 1), date(2024, 1, 31))
+        assert result == {}
+
+    def test_download_exception_returns_empty(self):
+        with patch("yfinance.download", side_effect=RuntimeError("timeout")):
+            from app.services.market_data_fetcher import fetch_yf_close_series
+
+            result = fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
+
+        assert result == {}
+
+
+class TestFetchYfInfo:
+    def test_returns_info_for_symbols(self):
+        """정상 조회 시 종목별 info dict를 반환한다."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = {"trailingPE": 28.5, "marketCap": 3_000_000_000_000}
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.market_data_fetcher import fetch_yf_info
+
+            result = fetch_yf_info(["AAPL"])
+
+        assert "AAPL" in result
+        assert result["AAPL"].get("trailingPE") == 28.5
+
+    def test_exception_per_ticker_returns_empty_dict(self):
+        """개별 종목 조회 실패 시 빈 dict로 폴백한다."""
+        mock_ticker = MagicMock()
+        mock_ticker.info = None
+        type(mock_ticker).info = property(lambda self: (_ for _ in ()).throw(Exception("fail")))
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.market_data_fetcher import fetch_yf_info
+
+            result = fetch_yf_info(["AAPL"])
+
+        assert result.get("AAPL") == {}

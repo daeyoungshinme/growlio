@@ -22,15 +22,6 @@ vi.mock("@/api/client", () => {
   };
 });
 
-vi.mock("@/api/economicIndicators", () => ({
-  fetchIndicators: vi.fn(),
-  fetchIndicatorCalendar: vi.fn(),
-  fetchIndicatorHistory: vi.fn(),
-  fetchIndicatorSubscriptions: vi.fn(),
-  subscribeIndicator: vi.fn(),
-  unsubscribeIndicator: vi.fn(),
-}));
-
 vi.mock("@/api/insights", () => ({
   fetchInsights: vi.fn(),
   fetchInsightsSummary: vi.fn(),
@@ -66,13 +57,6 @@ vi.mock("react-router-dom", () => ({
 
 // ── imports ───────────────────────────────────────────────────────────────────
 
-import {
-  useEconomicIndicators,
-  useIndicatorCalendar,
-  useIndicatorHistory,
-  useIndicatorSubscriptions,
-  useSubscribeMutation,
-} from "@/hooks/useEconomicIndicators";
 import { useInsights, useInsightsSummary } from "@/hooks/useInsights";
 import { useLogout } from "@/hooks/useLogout";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -87,133 +71,6 @@ function createWrapper() {
   return ({ children }: { children: React.ReactNode }) =>
     React.createElement(QueryClientProvider, { client: qc }, children);
 }
-
-// ── useEconomicIndicators ─────────────────────────────────────────────────────
-
-describe("useEconomicIndicators", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchIndicators를 호출하고 데이터를 반환한다", async () => {
-    const mockData = [
-      {
-        code: "CPI",
-        name: "소비자물가지수",
-        name_en: "Consumer Price Index",
-        unit: "%",
-        frequency: "MONTHLY",
-        description: "CPI",
-        latest_value: 3.2,
-        latest_date: "2024-01",
-        previous_value: 3.1,
-        previous_date: "2023-12",
-        change: 0.1,
-        change_pct: 3.2,
-        subscribed: false,
-      },
-    ];
-    const { fetchIndicators } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicators).mockResolvedValue(mockData);
-
-    const { result } = renderHook(() => useEconomicIndicators(), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockData);
-    expect(fetchIndicators).toHaveBeenCalled();
-  });
-
-  it("로딩 중에 isLoading이 true다", async () => {
-    const { fetchIndicators } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicators).mockReturnValue(new Promise(() => {})); // never resolves
-
-    const { result } = renderHook(() => useEconomicIndicators(), { wrapper: createWrapper() });
-    expect(result.current.isLoading).toBe(true);
-  });
-
-  it("에러 발생 시 isError가 true다", async () => {
-    const { fetchIndicators } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicators).mockRejectedValue(new Error("API Error"));
-
-    const { result } = renderHook(() => useEconomicIndicators(), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-  });
-});
-
-describe("useIndicatorCalendar", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchIndicatorCalendar를 호출한다", async () => {
-    const { fetchIndicatorCalendar } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicatorCalendar).mockResolvedValue([]);
-
-    const { result } = renderHook(() => useIndicatorCalendar(), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(fetchIndicatorCalendar).toHaveBeenCalled();
-    expect(result.current.data).toEqual([]);
-  });
-});
-
-describe("useIndicatorHistory", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("code가 있으면 fetchIndicatorHistory를 호출한다", async () => {
-    const mockHistory = [{ date: "2024-01", value: 3.2 }];
-    const { fetchIndicatorHistory } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicatorHistory).mockResolvedValue(mockHistory);
-
-    const { result } = renderHook(() => useIndicatorHistory("CPI", 12), {
-      wrapper: createWrapper(),
-    });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(fetchIndicatorHistory).toHaveBeenCalledWith("CPI", 12);
-    expect(result.current.data).toEqual(mockHistory);
-  });
-
-  it("code가 빈 문자열이면 쿼리가 비활성화된다", async () => {
-    const { fetchIndicatorHistory } = await import("@/api/economicIndicators");
-
-    const { result } = renderHook(() => useIndicatorHistory("", 12), { wrapper: createWrapper() });
-
-    expect(result.current.fetchStatus).toBe("idle");
-    expect(fetchIndicatorHistory).not.toHaveBeenCalled();
-  });
-});
-
-describe("useIndicatorSubscriptions", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("구독 목록을 반환한다", async () => {
-    const { fetchIndicatorSubscriptions } = await import("@/api/economicIndicators");
-    vi.mocked(fetchIndicatorSubscriptions).mockResolvedValue(["CPI", "FEDFUNDS"]);
-
-    const { result } = renderHook(() => useIndicatorSubscriptions(), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(["CPI", "FEDFUNDS"]);
-  });
-});
-
-describe("useSubscribeMutation", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("subscribe와 unsubscribe 뮤테이션을 반환한다", () => {
-    const { result } = renderHook(() => useSubscribeMutation(), { wrapper: createWrapper() });
-    expect(result.current.subscribe).toBeDefined();
-    expect(result.current.unsubscribe).toBeDefined();
-  });
-
-  it("subscribe 뮤테이션이 idle 상태로 시작된다", () => {
-    const { result } = renderHook(() => useSubscribeMutation(), { wrapper: createWrapper() });
-    expect(result.current.subscribe.status).toBe("idle");
-  });
-
-  it("unsubscribe 뮤테이션이 idle 상태로 시작된다", () => {
-    const { result } = renderHook(() => useSubscribeMutation(), { wrapper: createWrapper() });
-    expect(result.current.unsubscribe.status).toBe("idle");
-  });
-});
 
 // ── useInsights ───────────────────────────────────────────────────────────────
 

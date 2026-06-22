@@ -5,10 +5,22 @@ from __future__ import annotations
 import math
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 from app.models.portfolio import Portfolio
-from app.schemas.rebalancing import RebalancingAnalysis, RebalancingItem, TickerAccountInfo
+from app.schemas.rebalancing import (
+    DriftedItem,
+    PortfolioDriftSummary,
+    RebalancingAnalysis,
+    RebalancingItem,
+    TickerAccountInfo,
+)
 from app.schemas.service_dtypes import DividendMapEntry, PositionMapEntry, ReturnsMapEntry
+
+
+def _item_attr(item: object, field: str) -> Any:
+    """PortfolioItem ORM 객체 또는 레거시 dict에서 필드를 통합 조회한다."""
+    return item[field] if isinstance(item, dict) else getattr(item, field)
 
 
 def _build_current_map(overview: dict) -> dict[tuple[str, str], PositionMapEntry]:
@@ -59,10 +71,10 @@ def _build_target_items(
     target_keys: set[tuple[str, str]] = set()
 
     for item in portfolio.items:
-        ticker = item["ticker"] if isinstance(item, dict) else item.ticker
-        name = item["name"] if isinstance(item, dict) else item.name
-        market = item["market"] if isinstance(item, dict) else item.market
-        weight = float(item["weight"] if isinstance(item, dict) else item.weight)
+        ticker = str(_item_attr(item, "ticker"))
+        name = str(_item_attr(item, "name"))
+        market = str(_item_attr(item, "market"))
+        weight = float(_item_attr(item, "weight"))
 
         key = (ticker, market)
         target_keys.add(key)
@@ -361,4 +373,72 @@ def analyze_rebalancing(
         current_weighted_cagr_10y_pct=current_weighted_cagr,
         ticker_account_map=ticker_account_map,
         available_cash_krw=round(available_cash_krw, 0),
+    )
+
+
+_DEFAULT_DRIFT_THRESHOLD = 5.0
+_TOP_DRIFTED_LIMIT = 3
+
+
+def compute_portfolio_drift_summary(
+    portfolio: Portfolio,
+    overview: dict,
+    threshold_pct: float = _DEFAULT_DRIFT_THRESHOLD,
+) -> PortfolioDriftSummary:
+    """DB 포지션 데이터만으로 포트폴리오 비중 이탈 현황을 계산한다.
+
+    배당·수익률 외부 API를 호출하지 않으므로 빠르게 실행된다.
+    대시보드 RebalancingStatusCard 용도로 설계됨.
+    """
+    if portfolio.base_type == "TOTAL_ASSETS":
+        base_krw = float(overview.get("total_assets_krw", 0))
+    else:
+        total_stock = float(overview.get("total_stock_krw", 0))
+        available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+        base_krw = total_stock + available_cash
+
+    if base_krw <= 0:
+        return PortfolioDriftSummary(
+            portfolio_id=uuid.UUID(str(portfolio.id)),
+            portfolio_name=portfolio.name,
+            needs_rebalancing=False,
+            threshold_pct=threshold_pct,
+            max_drift_pct=0.0,
+            drifted_items_count=0,
+            top_drifted_items=[],
+        )
+
+    current_map = _build_current_map(overview)
+    # dividend/returns는 None으로 생략 — 빠른 계산용
+    result_items, _ = _build_target_items(portfolio, base_krw, overview, current_map, None, None)
+
+    # CASH·KR_PROPERTY 제외한 주식 종목만 드리프트 계산
+    tradeable = [i for i in result_items if i.ticker != "CASH" and i.market != "KR_PROPERTY"]
+    if not tradeable:
+        return PortfolioDriftSummary(
+            portfolio_id=uuid.UUID(str(portfolio.id)),
+            portfolio_name=portfolio.name,
+            needs_rebalancing=False,
+            threshold_pct=threshold_pct,
+            max_drift_pct=0.0,
+            drifted_items_count=0,
+            top_drifted_items=[],
+        )
+
+    sorted_by_drift = sorted(tradeable, key=lambda i: abs(i.weight_diff_pct), reverse=True)
+    max_drift = abs(sorted_by_drift[0].weight_diff_pct)
+    drifted_count = sum(1 for i in tradeable if abs(i.weight_diff_pct) >= threshold_pct)
+    top_items = [
+        DriftedItem(ticker=i.ticker, name=i.name, weight_diff_pct=round(i.weight_diff_pct, 2))
+        for i in sorted_by_drift[:_TOP_DRIFTED_LIMIT]
+    ]
+
+    return PortfolioDriftSummary(
+        portfolio_id=uuid.UUID(str(portfolio.id)),
+        portfolio_name=portfolio.name,
+        needs_rebalancing=max_drift >= threshold_pct,
+        threshold_pct=threshold_pct,
+        max_drift_pct=round(max_drift, 2),
+        drifted_items_count=drifted_count,
+        top_drifted_items=top_items,
     )

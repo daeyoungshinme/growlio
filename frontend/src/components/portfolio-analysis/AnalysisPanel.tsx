@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Bell, Loader2, RefreshCw } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
@@ -19,6 +19,76 @@ import { extractErrorMessage } from "@/utils/error";
 import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
+
+function StrategyAnalysisSection({
+  id,
+  portfolio,
+  alertByPortfolioId,
+  onOpenAlertModal,
+}: {
+  id: string;
+  portfolio: Portfolio;
+  alertByPortfolioId: Record<string, RebalancingAlert>;
+  onOpenAlertModal: (portfolioId: string) => void;
+}) {
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const existingAlert = alertByPortfolioId[id];
+
+  return (
+    <div className="space-y-4">
+      <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
+
+      {/* 알림 설정 바 */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
+        {existingAlert ? (
+          <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
+            <Bell size={12} />
+            {existingAlert.mode === "AUTO"
+              ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
+              : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            이 포트폴리오에 자동화를 설정하시겠어요?
+          </span>
+        )}
+        <button
+          onClick={() => onOpenAlertModal(id)}
+          className="self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3"
+        >
+          {existingAlert ? "설정 변경" : "자동화 설정"}
+        </button>
+      </div>
+
+      {/* 고급 분석 접이식 */}
+      <div className="border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setAdvancedOpen((v) => !v)}
+          aria-expanded={advancedOpen}
+          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors min-h-[44px]"
+        >
+          <span>고급 분석</span>
+          {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </button>
+        {advancedOpen && (
+          <div className="p-4 space-y-4 bg-white dark:bg-gray-900">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <ErrorBoundary variant="section">
+                <FactorExposureChart selectedPortfolioId={id} />
+              </ErrorBoundary>
+              <ErrorBoundary variant="section">
+                <EfficientFrontierChart
+                  comparePortfolioId={id}
+                  comparePortfolioName={portfolio.name}
+                />
+              </ErrorBoundary>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 interface Props {
   selectedIds: Set<string>;
@@ -242,7 +312,7 @@ export function AnalysisPanel({
 
       {/* 리밸런싱 결과 */}
       {mode === "rebalancing" && analysis && (
-        <div className="card">
+        <div className="card pb-20 sm:pb-0">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-4">
             {analysis.portfolio_name} — 리밸런싱 분석
           </h3>
@@ -259,6 +329,7 @@ export function AnalysisPanel({
                   analysis={analysis}
                   portfolioId={analysis.portfolio_id}
                   accounts={analysisAccounts}
+                  alertThreshold={alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct}
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}
@@ -322,22 +393,7 @@ export function AnalysisPanel({
           const [id] = Array.from(selectedIds);
           const portfolio = portfolios.find((p) => p.id === id);
           if (!id || !portfolio) return null;
-          return (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <ErrorBoundary variant="section">
-                  <FactorExposureChart selectedPortfolioId={id} />
-                </ErrorBoundary>
-                <ErrorBoundary variant="section">
-                  <EfficientFrontierChart
-                    comparePortfolioId={id}
-                    comparePortfolioName={portfolio.name}
-                  />
-                </ErrorBoundary>
-              </div>
-              <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
-            </div>
-          );
+          return <StrategyAnalysisSection id={id} portfolio={portfolio} alertByPortfolioId={alertByPortfolioId} onOpenAlertModal={onOpenAlertModal} />;
         })()}
 
       {/* Empty state */}

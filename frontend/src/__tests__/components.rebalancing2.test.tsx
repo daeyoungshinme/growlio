@@ -115,36 +115,45 @@ describe("MarketSignalBanner", () => {
     expect(screen.getByText("시장 위험 신호")).toBeDefined();
   });
 
-  it("shows VIX data", () => {
+  it("starts collapsed and shows expand button", () => {
     render(<MarketSignalBanner signal={mockSignal} />);
+    expect(screen.getByLabelText("펼치기")).toBeDefined();
+  });
+
+  it("shows VIX data after expanding", () => {
+    render(<MarketSignalBanner signal={mockSignal} />);
+    fireEvent.click(screen.getByLabelText("펼치기"));
     expect(screen.getByText("VIX")).toBeDefined();
     expect(screen.getByText("20.5")).toBeDefined();
   });
 
-  it("shows yield curve data", () => {
+  it("shows yield curve data after expanding", () => {
     render(<MarketSignalBanner signal={mockSignal} />);
+    fireEvent.click(screen.getByLabelText("펼치기"));
     expect(screen.getByText("10Y-2Y")).toBeDefined();
   });
 
-  it("shows fear greed data", () => {
+  it("shows fear greed data after expanding", () => {
     render(<MarketSignalBanner signal={mockSignal} />);
+    fireEvent.click(screen.getByLabelText("펼치기"));
     expect(screen.getByText("F&G")).toBeDefined();
   });
 
-  it("collapses on click", () => {
+  it("collapses on click after expand", () => {
     render(<MarketSignalBanner signal={mockSignal} />);
-    const toggleBtn = screen.getByLabelText("접기");
-    fireEvent.click(toggleBtn);
+    fireEvent.click(screen.getByLabelText("펼치기"));
+    fireEvent.click(screen.getByLabelText("접기"));
     expect(screen.getByLabelText("펼치기")).toBeDefined();
   });
 
-  it("shows contrarian buy message when true", () => {
+  it("shows contrarian buy message when expanded", () => {
     const contrarian = {
       ...mockSignal,
       fear_greed_contrarian_buy: true,
       composite_level: "GREEN" as const,
     };
     render(<MarketSignalBanner signal={contrarian} />);
+    fireEvent.click(screen.getByLabelText("펼치기"));
     expect(screen.getByText(/역발상 매수 기회/)).toBeDefined();
   });
 

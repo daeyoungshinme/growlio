@@ -35,7 +35,7 @@ import {
   runBacktest,
   runCorrelation,
 } from "@/api/backtest";
-import { fetchDRIPSimulation, fetchMonthlyOptimization } from "@/api/dividends";
+import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchDartDisclosures } from "@/api/dart";
 import { fetchInsights, fetchInsightsSummary } from "@/api/insights";
 import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
@@ -159,12 +159,6 @@ describe("api/backtest", () => {
 
 describe("api/dividends", () => {
   beforeEach(() => vi.clearAllMocks());
-
-  it("fetchDRIPSimulation calls POST /dividends/drip-simulation", async () => {
-    vi.mocked(api.post).mockResolvedValue({ data: {} });
-    await fetchDRIPSimulation({ n_years: 10 });
-    expect(api.post).toHaveBeenCalledWith("/dividends/drip-simulation", { n_years: 10 });
-  });
 
   it("fetchMonthlyOptimization calls GET /dividends/monthly-optimization", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });

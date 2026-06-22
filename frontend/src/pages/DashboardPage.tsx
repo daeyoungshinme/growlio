@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, RefreshCw, Wallet } from "lucide-react";
+import { ArrowRight, RefreshCw, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
@@ -9,6 +9,7 @@ import DividendSection from "@/components/dashboard/DividendSection";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
+import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -16,12 +17,6 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { fetchMarketSignal } from "@/api/marketSignals";
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
-const DisclosureFeedCard = lazy(() => import("../components/dashboard/DisclosureFeedCard"));
-
-const SIGNAL_BG = {
-  YELLOW: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300",
-  RED: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
-};
 
 export default function DashboardPage() {
   const qc = useQueryClient();
@@ -123,89 +118,62 @@ export default function DashboardPage() {
         </button>
       </div>
 
-      {/* Row 1: Hero Card — 자산 현황 + 목표 달성 전망 */}
+      {/* Row 1: Hero Card — 자산 현황 */}
       <ErrorBoundary variant="section">
         <HeroSummaryCard
           data={data}
-          dcaData={dcaData}
           exchangeRate={exchangeRate}
           dataUpdatedAt={dataUpdatedAt}
           isLoading={isLoading}
         />
       </ErrorBoundary>
 
-      {/* 시장 위험 신호 (YELLOW/RED만 표시) */}
-      {marketSignal && marketSignal.composite_level !== "GREEN" && (
-        <Link
-          to="/rebalancing"
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
-        >
-          <AlertTriangle size={15} className="flex-shrink-0" />
-          <span>
-            시장 위험 신호:{" "}
-            <span className="font-bold">
-              {marketSignal.composite_level === "RED" ? "위험" : "주의"}
-            </span>{" "}
-            — 리밸런싱 전략을 확인하세요
-          </span>
-          <ArrowRight size={14} className="ml-auto flex-shrink-0" />
-        </Link>
-      )}
-
-      {/* Row 2: 포트폴리오 요약 + 배당 현황 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-              투자 현황
-            </h2>
-            <Link
-              to="/assets?section=portfolio"
-              className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              전체 보기 <ArrowRight size={14} />
-            </Link>
-          </div>
-          <ErrorBoundary variant="section">
-            <PortfolioSummaryCard
-              overview={overview}
-              isLoading={overviewLoading}
-              stockAllocation={overview?.stock_allocation}
-            />
-          </ErrorBoundary>
-        </div>
-        <div className="card-overflow">
-          <div className="flex items-center justify-between px-5 pt-4 pb-2">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
-            <Link
-              to="/assets?section=portfolio&tab=배당"
-              className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              자세히 보기 <ArrowRight size={14} />
-            </Link>
-          </div>
-          <ErrorBoundary variant="section">
-            <DividendSection
-              annualReceived={data?.annual_dividends_received ?? null}
-              estimatedAnnual={data?.estimated_annual_dividends ?? null}
-              estimatedMonthly={estimatedMonthly}
-              overallDividendYield={overallDividendYield}
-              isLoading={isLoading}
-            />
-          </ErrorBoundary>
-        </div>
-      </div>
-
-      {/* Row 3: 리밸런싱 자동화 현황 */}
+      {/* Row 2: 투자 목표 달성 현황 + 달성 전망 */}
       <ErrorBoundary variant="section">
-        <RebalancingStatusCard />
+        <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
       </ErrorBoundary>
 
-      {/* Row 4: 보유 종목 DART 공시 피드 (시의성 있는 콘텐츠 우선) */}
+      {/* Row 3: 투자 현황 + 배당 현황 (병합) */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">투자 현황</h2>
+          <Link
+            to="/assets?section=portfolio"
+            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            전체 보기 <ArrowRight size={14} />
+          </Link>
+        </div>
+        <ErrorBoundary variant="section">
+          <PortfolioSummaryCard
+            overview={overview}
+            isLoading={overviewLoading}
+            stockAllocation={overview?.stock_allocation}
+          />
+        </ErrorBoundary>
+        <div className="flex items-center justify-between mt-5 pt-4 mb-3 border-t border-gray-100 dark:border-gray-700">
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">배당 현황</h3>
+          <Link
+            to="/assets?section=portfolio&tab=배당"
+            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            자세히 보기 <ArrowRight size={14} />
+          </Link>
+        </div>
+        <ErrorBoundary variant="section">
+          <DividendSection
+            annualReceived={data?.annual_dividends_received ?? null}
+            estimatedAnnual={data?.estimated_annual_dividends ?? null}
+            estimatedMonthly={estimatedMonthly}
+            overallDividendYield={overallDividendYield}
+            isLoading={isLoading}
+          />
+        </ErrorBoundary>
+      </div>
+
+      {/* Row 4: 리밸런싱 현황 (시장 신호 포함) */}
       <ErrorBoundary variant="section">
-        <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
-          <DisclosureFeedCard />
-        </Suspense>
+        <RebalancingStatusCard marketSignal={marketSignal} />
       </ErrorBoundary>
 
       {/* Row 5: 자산 추이 */}

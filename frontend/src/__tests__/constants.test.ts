@@ -35,11 +35,7 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.alertHistory).toEqual(["alert-history"]);
     expect(QUERY_KEYS.insights).toEqual(["insights"]);
     expect(QUERY_KEYS.insightsSummary).toEqual(["insights", "summary"]);
-    expect(QUERY_KEYS.dripSimulation).toEqual(["drip-simulation"]);
     expect(QUERY_KEYS.monthlyOptimization).toEqual(["monthly-optimization"]);
-    expect(QUERY_KEYS.economicIndicators).toEqual(["economic-indicators"]);
-    expect(QUERY_KEYS.economicIndicatorCalendar).toEqual(["economic-indicator-calendar"]);
-    expect(QUERY_KEYS.economicIndicatorSubscriptions).toEqual(["economic-indicator-subscriptions"]);
     expect(QUERY_KEYS.marketSignal).toEqual(["market-signal"]);
     expect(QUERY_KEYS.factorAnalysis).toEqual(["factor-analysis"]);
     expect(QUERY_KEYS.overseasPositionsTax).toEqual(["overseas-positions-tax"]);
@@ -56,11 +52,6 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.portfolioRisk("p-1")).toEqual(["portfolio-risk", "p-1"]);
     expect(QUERY_KEYS.portfolioFactorAnalysis("p-2")).toEqual(["factor-analysis", "p-2"]);
     expect(QUERY_KEYS.rebalancingStrategy("p-3")).toEqual(["rebalancing-strategy", "p-3"]);
-    expect(QUERY_KEYS.economicIndicatorHistory("FRED_DGS10", 12)).toEqual([
-      "economic-indicator-history",
-      "FRED_DGS10",
-      12,
-    ]);
   });
 
   it("efficientFrontier는 comparePortfolioId 없으면 null을 포함한다", () => {

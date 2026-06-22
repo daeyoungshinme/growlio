@@ -39,13 +39,10 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import (
     TTL_ACCOUNT_DETAIL,
     account_detail_key,
-    dashboard_summary_key,
-    dividend_summary_key,
-    dividend_ticker_summary_key,
-    portfolio_overview_key,
-    portfolio_overview_lite_key,
+    invalidate_asset_account_caches,
 )
 from app.utils.currency import fetch_usd_krw
+from app.utils.pnl import calc_net_asset_amount
 from app.utils.redis_lock import redis_lock
 
 
@@ -63,11 +60,7 @@ router.include_router(_positions_module.router)
 
 def _calc_manual_snap_amount(account: AssetAccount) -> float:
     """manual_amount에서 부동산 모기지를 차감한 스냅샷 저장용 금액을 반환한다."""
-    amount = float(account.manual_amount or 0)
-    if account.asset_type == "REAL_ESTATE":
-        mortgage = float((account.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-        amount -= mortgage
-    return amount
+    return calc_net_asset_amount(account.manual_amount, account.asset_type, account.real_estate_details)
 
 
 @router.get("", response_model=list[AssetAccountResponse])
@@ -314,13 +307,8 @@ async def update_account(
             await sync_snapshot_positions(db, snapshot_id=new_snap.id, account_id=account.id, positions=pos_list)
         await db.commit()
 
-    import contextlib
-
-    from redis.exceptions import RedisError
-
     _redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await _redis.delete(account_detail_key(account.user_id, account.id))
+    await invalidate_asset_account_caches(_redis, account.user_id, account.id)
     return _account_response(account)
 
 
@@ -396,16 +384,10 @@ async def delete_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    import contextlib
-
-    from redis.exceptions import RedisError
-
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
     await db.commit()
-    _redis = await get_redis()
-    with contextlib.suppress(RedisError):
-        await _redis.delete(account_detail_key(current_user.id, account_id))
+    await invalidate_asset_account_caches(await get_redis(), current_user.id, account_id)
 
 
 @router.post("/{account_id}/sync")
@@ -436,13 +418,7 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
     """
     snapshot = await _sync_account_service(account, db, redis)
 
-    await redis.delete(
-        dividend_ticker_summary_key(current_user.id, date.today().year),
-        dashboard_summary_key(current_user.id),
-        portfolio_overview_key(current_user.id),
-        portfolio_overview_lite_key(current_user.id),
-        dividend_summary_key(current_user.id),
-    )
+    await invalidate_asset_account_caches(redis, current_user.id, account.id)
     return {
         "detail": "동기화 완료",
         "snapshot_date": str(snapshot.snapshot_date),

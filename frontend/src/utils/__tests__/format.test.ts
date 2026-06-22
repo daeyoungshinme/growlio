@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   convertUsdToKrw,
   formatUsdAsKrw,
@@ -7,6 +7,7 @@ import {
   fmtKrwShort,
   fmtMonth,
   fmtPct,
+  relativeTime,
 } from "@/utils/format";
 
 describe("fmtKrw", () => {
@@ -110,5 +111,32 @@ describe("formatUsdAsKrw", () => {
   it("변환 결과가 0이면 null 반환", () => {
     expect(formatUsdAsKrw(null, 1350)).toBeNull();
     expect(formatUsdAsKrw(100, null)).toBeNull();
+  });
+});
+
+describe("relativeTime", () => {
+  afterEach(() => vi.useRealTimers());
+
+  const nowIso = (offsetMs: number) =>
+    new Date(Date.now() - offsetMs).toISOString();
+
+  it("방금 전 — 1분 미만", () => {
+    expect(relativeTime(nowIso(30_000))).toBe("방금 전");
+  });
+
+  it("N분 전 — 1시간 미만", () => {
+    expect(relativeTime(nowIso(5 * 60_000))).toBe("5분 전");
+  });
+
+  it("N시간 전 — 1일 미만", () => {
+    expect(relativeTime(nowIso(3 * 3_600_000))).toBe("3시간 전");
+  });
+
+  it("N일 전 — 30일 미만", () => {
+    expect(relativeTime(nowIso(2 * 86_400_000))).toBe("2일 전");
+  });
+
+  it("N개월 전 — 30일 이상", () => {
+    expect(relativeTime(nowIso(60 * 86_400_000))).toBe("2개월 전");
   });
 });

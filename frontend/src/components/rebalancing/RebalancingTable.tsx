@@ -15,6 +15,7 @@ import {
 } from "./RebalancingCells";
 import RebalancingDividendSection from "./RebalancingDividendSection";
 import { CASH_TICKER } from "@/constants/assets";
+import RebalancingDiagnosisCard from "./RebalancingDiagnosisCard";
 
 const TRADING_FEE_RATE = 0.00014; // 0.014% 수수료 (한국투자증권 기준)
 
@@ -38,6 +39,8 @@ function calcSignedTradeKrw(item: RebalancingItem): number {
 
 function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
   const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
+  const weightDiff = item.weight_diff_pct;
+  const directionIcon = weightDiff > 0 ? "↑" : weightDiff < 0 ? "↓" : "";
   return (
     <div className="py-3 px-1">
       <div className="flex items-start justify-between gap-2">
@@ -45,12 +48,18 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
           <div className="flex items-center gap-1.5">
             <p className="font-medium text-gray-100 truncate text-sm">{item.name}</p>
             {isUntracked && <span className="text-xs text-amber-500 shrink-0">목표 외</span>}
+            {directionIcon && (
+              <span className={`text-xs shrink-0 ${weightDiff > 0 ? "text-red-400" : "text-blue-400"}`}>
+                {directionIcon}
+              </span>
+            )}
           </div>
           <p className="text-xs text-gray-400">
             {item.ticker} · 현재 {item.current_weight_pct.toFixed(1)}%
           </p>
         </div>
         <div className="text-right shrink-0">
+          <div className="text-xs text-gray-500">목표 {item.target_weight_pct.toFixed(1)}%</div>
           <DiffCell diff={calcSignedTradeKrw(item)} />
           <p className="text-xs text-gray-400 mt-0.5">
             <QuantityCell item={item} />
@@ -60,9 +69,7 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
       <div className="mt-2">
         <WeightBar current={item.current_weight_pct} target={item.target_weight_pct} />
       </div>
-      <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-400 flex-wrap">
-        <span>현재 {fmtKrw(item.current_value_krw)}</span>
-        <span>→ 목표 {fmtKrw(item.target_value_krw)}</span>
+      <div className="mt-1.5">
         <WeightDiffBadge diff={item.weight_diff_pct} />
       </div>
     </div>
@@ -110,6 +117,7 @@ interface Props {
   analysis: RebalancingAnalysis;
   portfolioId: string;
   accounts: AssetAccount[];
+  alertThreshold?: number;
   onExecuted?: (results: ExecutionResult[]) => void;
 }
 
@@ -117,6 +125,7 @@ export default function RebalancingTable({
   analysis,
   portfolioId,
   accounts,
+  alertThreshold,
   onExecuted,
 }: Props) {
   const kisAccounts = accounts.filter(
@@ -124,6 +133,7 @@ export default function RebalancingTable({
   );
   const [executionOpen, setExecutionOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showTradePlan, setShowTradePlan] = useState(false);
 
   const [now] = useState(() => Date.now());
   const minutesOld = (now - new Date(analysis.analyzed_at).getTime()) / 60000;
@@ -169,8 +179,15 @@ export default function RebalancingTable({
 
   return (
     <div className="space-y-4">
-      {/* 실행 버튼 행 */}
-      <div className="flex items-center gap-2">
+      {/* 리밸런싱 진단 요약 카드 */}
+      <RebalancingDiagnosisCard
+        analysis={analysis}
+        alertThreshold={alertThreshold}
+        onExecute={kisAccounts.length > 0 ? () => setExecutionOpen(true) : undefined}
+      />
+
+      {/* 실행 버튼 행 (데스크탑) */}
+      <div className="hidden sm:flex items-center gap-2">
         {isStale && (
           <span className="text-xs text-amber-400 bg-amber-900/30 border border-amber-700/40 rounded-lg px-2.5 py-1">
             분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
@@ -178,14 +195,14 @@ export default function RebalancingTable({
         )}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
-            <span className="text-xs text-gray-500 hidden sm:inline">
+            <span className="text-xs text-gray-500">
               KIS 증권계좌 연동 시 자동 주문 가능
             </span>
           )}
           <button
             onClick={() => setExecutionOpen(true)}
             disabled={kisAccounts.length === 0}
-            className="hidden sm:inline-flex bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            className="inline-flex bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
           >
             ⚡ 리밸런싱 실행
@@ -241,10 +258,18 @@ export default function RebalancingTable({
         {/* 종목별 실제 거래 계획 패널 — 매도 먼저, 매수 나중 */}
         {(buyItems.length > 0 || sellItems.length > 0) && (
           <div className="rounded-xl bg-gray-800/60 border border-gray-700/50 p-3 space-y-3">
-            <div className="text-xs font-medium text-gray-300">종목별 거래 계획</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-gray-300">종목별 거래 계획</div>
+              <button
+                onClick={() => setShowTradePlan((v) => !v)}
+                className="sm:hidden text-xs text-gray-500 hover:text-gray-300 transition-colors"
+              >
+                {showTradePlan ? "▲ 접기" : "▼ 상세 보기"}
+              </button>
+            </div>
 
-            {/* 모바일: 카드 뷰 */}
-            <div className="sm:hidden space-y-2">
+            {/* 모바일: 카드 뷰 (접기/펼치기) */}
+            <div className={`sm:hidden space-y-2 ${showTradePlan ? "block" : "hidden"}`}>
               {sellItems.length > 0 && (
                 <div className="space-y-1.5">
                   <div className="text-xs text-blue-400 font-medium">매도</div>
@@ -262,6 +287,12 @@ export default function RebalancingTable({
                       </div>
                     </div>
                   ))}
+                  {sellItems.length > 1 && (
+                    <div className="flex justify-between text-xs pt-1 border-t border-gray-700/40">
+                      <span className="text-gray-500">매도 합계</span>
+                      <span className={`font-medium ${LOSS_COLOR}`}>{fmtKrw(totalSellSummary)}</span>
+                    </div>
+                  )}
                 </div>
               )}
               {buyItems.length > 0 && (
@@ -281,6 +312,12 @@ export default function RebalancingTable({
                       </div>
                     </div>
                   ))}
+                  {buyItems.length > 1 && (
+                    <div className="flex justify-between text-xs pt-1 border-t border-gray-700/40">
+                      <span className="text-gray-500">매수 합계</span>
+                      <span className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(totalBuySummary)}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -502,21 +539,16 @@ export default function RebalancingTable({
         })}
       </div>
 
-      {/* 모바일: 결과 하단 실행 버튼 */}
-      <div className="sm:hidden">
+      {/* 모바일: 하단 고정 실행 버튼 */}
+      <div className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20 pb-2">
         <button
           onClick={() => setExecutionOpen(true)}
           disabled={kisAccounts.length === 0}
-          className="w-full bg-indigo-600 text-white py-3 rounded-xl text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
         >
           ⚡ 리밸런싱 실행
         </button>
-        {kisAccounts.length === 0 && (
-          <p className="text-center text-xs text-gray-500 mt-1.5">
-            KIS 증권계좌 연동 시 자동 주문 가능
-          </p>
-        )}
       </div>
 
       {executionOpen && (

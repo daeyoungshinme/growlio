@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { convertUsdToKrw, fmtKrwShort } from "@/utils/format";
 import { isOverseasMarket, POSITION_MARKETS } from "@/constants/markets";
+import { SCROLL_INTO_VIEW_DELAY } from "@/constants/timers";
 import { SuggestionDropdown } from "@/components/common/SuggestionDropdown";
 import { PnlCell } from "./PositionHelpers";
 import type { EditablePositionRowProps } from "./PositionHelpers";
@@ -39,7 +40,7 @@ export function EditableMobilePositionCard({
             setActiveInputEl(e.currentTarget);
             if (row.name && suggestions.length) setSuggestIdx(i);
             const el = e.currentTarget;
-            setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), 300);
+            setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), SCROLL_INTO_VIEW_DELAY);
           }}
           onBlur={(e) => {
             setActiveInputEl(null);
@@ -71,7 +72,7 @@ export function EditableMobilePositionCard({
             </span>
           )}
           <select
-            className="text-base border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg px-2 py-1 focus:outline-none"
+            className="text-base border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 rounded-lg px-2 py-2 focus:outline-none"
             value={row.market}
             onChange={(e) => handleMarketChange(i, e.target.value, row.market)}
           >
@@ -84,7 +85,8 @@ export function EditableMobilePositionCard({
         </div>
         <button
           onClick={() => removeRow(i)}
-          className="p-2 min-h-10 min-w-10 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
+          aria-label={`${i + 1}번 행 삭제`}
+          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
         >
           <Trash2 size={16} />
         </button>

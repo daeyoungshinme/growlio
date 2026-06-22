@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CheckCircle, XCircle, Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Modal from "@/components/common/Modal";
+import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import { verifyKisCredentials } from "@/api/assets";
@@ -290,6 +291,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                       원
                     </span>
                   </div>
+                  <AmountUnitButtons
+                    onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
+                  />
                 </div>
                 <div>
                   <label
@@ -354,6 +358,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                     원
                   </span>
                 </div>
+                <AmountUnitButtons
+                  onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
+                />
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
                     $

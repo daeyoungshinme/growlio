@@ -212,18 +212,65 @@ async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.
     await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))
 
 
+async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:
+    """alloc_history 캐시를 SCAN+UNLINK 패턴으로 일괄 삭제한다.
+
+    range(3,37) 고정 목록 대신 실제 존재하는 키만 삭제해 불필요한 DEL 명령을 줄인다.
+    """
+    if redis is None:
+        return
+    import contextlib
+
+    from redis.exceptions import RedisError
+
+    with contextlib.suppress(RedisError):
+        pattern = f"{_env_prefix()}alloc_history_v2:{user_id}:*"
+        cursor = 0
+        keys_to_delete: list[str] = []
+        while True:
+            cursor, batch = await redis.scan(cursor, match=pattern, count=100)
+            keys_to_delete.extend(batch)
+            if cursor == 0:
+                break
+        if keys_to_delete:
+            await redis.unlink(*keys_to_delete)
+
+
+async def invalidate_asset_account_caches(
+    redis: RedisType,
+    user_id: uuid.UUID,
+    account_id: uuid.UUID | None = None,
+    year: int | None = None,
+) -> None:
+    """계좌 생성/수정/삭제/동기화 후 관련 캐시 일괄 무효화."""
+    from datetime import date as _date
+
+    _year = year if year is not None else _date.today().year
+    keys = [
+        dashboard_summary_key(user_id),
+        portfolio_overview_key(user_id),
+        portfolio_overview_lite_key(user_id),
+        dividend_summary_key(user_id),
+        dividend_ticker_summary_key(user_id, _year),
+        portfolio_summary_key(user_id),
+    ]
+    if account_id is not None:
+        keys.append(account_detail_key(user_id, account_id))
+    await invalidate_user_caches(redis, *keys)
+
+
 async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: int | None = None) -> None:
     """계좌 싱크 완료 후 관련 캐시 일괄 무효화."""
     from datetime import date as _date
 
     _year = year if year is not None else _date.today().year
+    await _invalidate_alloc_history(redis, user_id)
     await invalidate_user_caches(
         redis,
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
         portfolio_overview_key(user_id),
         portfolio_overview_lite_key(user_id),
-        *[alloc_history_key(user_id, m) for m in range(3, 37)],
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
         portfolio_summary_key(user_id),

@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from functools import partial
-from typing import cast
+from typing import Any, cast
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -19,6 +19,7 @@ from app.kis.client import KisApiError
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
+from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -26,6 +27,7 @@ from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     KisBalancePosition,
     KisBalanceResponse,
+    PortfolioDriftSummary,
     RebalancingAnalysis,
 )
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
@@ -39,12 +41,114 @@ from app.services.dividend_providers import (
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import fetch_prices_batch, get_historical_returns
-from app.services.rebalancing_service import analyze_rebalancing
+from app.services.rebalancing_service import analyze_rebalancing, compute_portfolio_drift_summary
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
+
+
+def _item_attr(item: object, field: str) -> Any:
+    """PortfolioItem ORM 객체 또는 레거시 dict에서 필드를 통합 조회한다."""
+    return item[field] if isinstance(item, dict) else getattr(item, field)
+
+
+async def _collect_dividend_map(
+    portfolio: Portfolio,
+    base_dividend_map: dict,
+) -> dict:
+    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Naver/Yahoo에서 보완한다.
+
+    배당 fetcher는 yfinance 가격 조회와 별개 I/O이므로 Semaphore(8)로 더 높은 동시성을 허용한다.
+    """
+    dividend_map = dict(base_dividend_map)
+    loop = asyncio.get_running_loop()
+    sem = asyncio.Semaphore(8)
+
+    async def _fetch_one(raw_item) -> None:
+        ticker = str(_item_attr(raw_item, "ticker"))
+        market = str(_item_attr(raw_item, "market"))
+        if ticker == "CASH" or market == "KR_PROPERTY":
+            return
+        key = (ticker, market)
+        if key in dividend_map:
+            return
+        is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
+        try:
+            async with sem:
+                if is_korean:
+                    is_etf = is_korean_etf(ticker, market)
+                    fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
+                    info = await loop.run_in_executor(None, partial(fn, ticker))
+                    if info["dividend_yield"] > 0:
+                        dividend_map[key] = {
+                            "ticker": ticker,
+                            "market": market,
+                            "dividend_yield": info["dividend_yield"] * 100,
+                            "estimated_annual_krw": 0.0,
+                        }
+                else:
+                    yahoo_sym = _to_yahoo_symbol(ticker, market)
+                    info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
+                    if info["dividend_yield"] > 0:
+                        dividend_map[key] = {
+                            "ticker": ticker,
+                            "market": market,
+                            "dividend_yield": info["dividend_yield"] * 100,
+                            "estimated_annual_krw": 0.0,
+                        }
+        except Exception as e:
+            logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
+
+    await asyncio.gather(*[_fetch_one(item) for item in portfolio.items])
+    return dividend_map
+
+
+async def _enrich_overview_with_prices(
+    portfolio: Portfolio,
+    overview: dict,
+    user_id: uuid.UUID,
+    db,
+    redis,
+) -> dict:
+    """목표 포트폴리오 중 미보유 종목의 현재가를 조회해 overview에 보완한다."""
+    existing_price_keys: set[tuple[str, str]] = {
+        (pos["ticker"], pos["market"]) for pos in overview.get("all_positions", []) if pos.get("current_price")
+    }
+    unpriced: list[tuple[str, str]] = [
+        (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
+        for raw_item in portfolio.items
+        if str(_item_attr(raw_item, "ticker")) != "CASH"
+        and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
+        and (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market"))) not in existing_price_keys
+    ]
+    if not unpriced:
+        return overview
+
+    fetched_prices = await fetch_prices_batch(user_id, unpriced, db, redis)
+    extra_positions = [
+        {
+            "ticker": ticker,
+            "market": market,
+            "name": next(
+                (
+                    str(_item_attr(raw_item, "name"))
+                    for raw_item in portfolio.items
+                    if str(_item_attr(raw_item, "ticker")) == ticker
+                ),
+                ticker,
+            ),
+            "value_krw": 0.0,
+            "current_price": fetched_prices[ticker],
+            "qty": 0.0,
+        }
+        for ticker, market in unpriced
+        if ticker in fetched_prices and fetched_prices[ticker] > 0
+    ]
+    if not extra_positions:
+        return overview
+    return {**overview, "all_positions": list(overview.get("all_positions", [])) + extra_positions}
 
 
 @router.get("/portfolios/{portfolio_id}/analyze", response_model=RebalancingAnalysis)
@@ -72,115 +176,28 @@ async def analyze_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
-    # query param 우선, 없으면 portfolio에 저장된 account_ids 사용, 그것도 없으면 전체 계좌
     saved_ids = getattr(portfolio, "account_ids", None)
     effective_account_ids = account_ids or ([uuid.UUID(aid) for aid in saved_ids] if saved_ids else None)
     overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_account_ids)
 
-    dividend_items = await get_ticker_dividend_summary(current_user.id, db)
-    dividend_map = {(item["ticker"], item["market"]): item for item in dividend_items if item.get("ticker")}
+    base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
+    base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
+    dividend_map = await _collect_dividend_map(portfolio, base_dividend_map)
 
-    # 목표 포트폴리오 종목 중 현재 미보유(dividend_map에 없음)인 종목 배당수익률 보완
-    loop = asyncio.get_running_loop()
-    _sem = asyncio.Semaphore(3)
-
-    async def _fetch_dividend(raw_item) -> None:
-        ticker = raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker
-        market = raw_item["market"] if isinstance(raw_item, dict) else raw_item.market
-        if ticker == "CASH" or market == "KR_PROPERTY":
-            return
-        key = (ticker, market)
-        if key in dividend_map:
-            return
-        is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
-        try:
-            async with _sem:
-                if is_korean:
-                    is_etf = is_korean_etf(ticker, market)
-                    fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-                    naver_info = await loop.run_in_executor(None, partial(fn, ticker))
-                    if naver_info["dividend_yield"] > 0:
-                        dividend_map[key] = {
-                            "ticker": ticker,
-                            "market": market,
-                            "dividend_yield": naver_info["dividend_yield"] * 100,
-                            "estimated_annual_krw": 0.0,
-                        }
-                else:
-                    yahoo_sym = _to_yahoo_symbol(ticker, market)
-                    info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
-                    if info["dividend_yield"] > 0:
-                        dividend_map[key] = {
-                            "ticker": ticker,
-                            "market": market,
-                            "dividend_yield": info["dividend_yield"] * 100,
-                            "estimated_annual_krw": 0.0,
-                        }
-        except Exception as e:
-            logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
-
-    await asyncio.gather(*[_fetch_dividend(item) for item in portfolio.items])
-
-    # 목표 포트폴리오 종목 10년 수익률 수집 (CASH 제외)
     target_tickers = [
-        (
-            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
-            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
-        )
+        (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
         for raw_item in portfolio.items
-        if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) != "CASH"
-        and (raw_item["market"] if isinstance(raw_item, dict) else raw_item.market) != "KR_PROPERTY"
+        if str(_item_attr(raw_item, "ticker")) != "CASH"
+        and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
     ]
-    # 현재 보유 종목도 포함 (배당 포트폴리오처럼 목표와 현재 보유가 다를 경우 current CAGR 계산을 위해)
     current_tickers = [
         (p["ticker"], p["market"])
         for p in overview.get("all_positions", [])
         if p.get("ticker") and p.get("ticker") != "CASH"
     ]
-    all_return_tickers = list(set(target_tickers) | set(current_tickers))
-    returns_map = await get_historical_returns(all_return_tickers, redis=redis)
+    returns_map = await get_historical_returns(list(set(target_tickers) | set(current_tickers)), redis=redis)
 
-    # 미보유 목표 종목 현재가 보완: all_positions에 없는 종목은 current_price=None → shares=None
-    existing_price_keys: set[tuple[str, str]] = {
-        (pos["ticker"], pos["market"]) for pos in overview.get("all_positions", []) if pos.get("current_price")
-    }
-    unpriced: list[tuple[str, str]] = [
-        (
-            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
-            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
-        )
-        for raw_item in portfolio.items
-        if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) != "CASH"
-        and (raw_item["market"] if isinstance(raw_item, dict) else raw_item.market) != "KR_PROPERTY"
-        and (
-            raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker,
-            raw_item["market"] if isinstance(raw_item, dict) else raw_item.market,
-        )
-        not in existing_price_keys
-    ]
-    if unpriced:
-        fetched_prices = await fetch_prices_batch(current_user.id, unpriced, db, redis)
-        extra_positions = [
-            {
-                "ticker": ticker,
-                "market": market,
-                "name": next(
-                    (
-                        raw_item["name"] if isinstance(raw_item, dict) else raw_item.name
-                        for raw_item in portfolio.items
-                        if (raw_item["ticker"] if isinstance(raw_item, dict) else raw_item.ticker) == ticker
-                    ),
-                    ticker,
-                ),
-                "value_krw": 0.0,
-                "current_price": fetched_prices[ticker],
-                "qty": 0.0,
-            }
-            for ticker, market in unpriced
-            if ticker in fetched_prices and fetched_prices[ticker] > 0
-        ]
-        if extra_positions:
-            overview = {**overview, "all_positions": list(overview.get("all_positions", [])) + extra_positions}
+    overview = await _enrich_overview_with_prices(portfolio, overview, current_user.id, db, redis)
 
     return analyze_rebalancing(
         portfolio,
@@ -369,3 +386,57 @@ async def get_all_broker_balances(
         )
         for acc, r in zip(accounts, results, strict=False)
     ]
+
+
+@router.get("/drift-summary", response_model=list[PortfolioDriftSummary])
+@limiter.limit("10/minute")
+async def get_drift_summary(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """모든 포트폴리오의 비중 이탈 현황을 빠르게 반환한다 (배당·수익률 외부 API 미사용)."""
+    portfolios_result = await db.execute(
+        select(Portfolio)
+        .options(
+            selectinload(Portfolio.items),
+            selectinload(Portfolio.linked_accounts),
+        )
+        .where(Portfolio.user_id == current_user.id)
+    )
+    portfolios = [p for p in portfolios_result.scalars().all() if p.linked_accounts]
+
+    if not portfolios:
+        return []
+
+    alerts_result = await db.execute(
+        select(RebalancingAlert).where(
+            RebalancingAlert.user_id == current_user.id,
+            RebalancingAlert.is_active == True,  # noqa: E712
+        )
+    )
+    alert_by_portfolio: dict[str, float] = {
+        str(a.portfolio_id): float(a.threshold_pct)
+        for a in alerts_result.scalars().all()
+    }
+
+    summaries: list[PortfolioDriftSummary] = []
+    for portfolio in portfolios:
+        try:
+            portfolio_account_ids = getattr(portfolio, "account_ids", None)
+            effective_ids = (
+                [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
+            )
+            overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
+            threshold = alert_by_portfolio.get(str(portfolio.id), 5.0)
+            summary = compute_portfolio_drift_summary(portfolio, overview, threshold)
+            summaries.append(summary)
+        except Exception as e:
+            logger.error(
+                "drift_summary_failed",
+                portfolio_id=str(portfolio.id),
+                error=str(e),
+                exc_type=type(e).__name__,
+            )
+
+    return summaries

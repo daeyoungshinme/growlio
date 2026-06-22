@@ -50,4 +50,16 @@ describe("AssetAllocationChart", () => {
     renderWithProviders(<AssetAllocationChart data={threeItems} size="compact" />);
     expect(screen.getByText(/부동산/)).toBeInTheDocument();
   });
+
+  it("compact-sm 모드에서 종목명과 비중이 가로 flex-wrap으로 표시된다", () => {
+    renderWithProviders(<AssetAllocationChart data={sampleData} size="compact-sm" />);
+    expect(screen.getByText(/주식/)).toBeInTheDocument();
+    expect(screen.getByText(/현금/)).toBeInTheDocument();
+  });
+
+  it("compact-sm 모드에서 비중 퍼센트가 표시된다", () => {
+    renderWithProviders(<AssetAllocationChart data={sampleData} size="compact-sm" />);
+    expect(screen.getByText(/67%/)).toBeInTheDocument();
+    expect(screen.getByText(/33%/)).toBeInTheDocument();
+  });
 });

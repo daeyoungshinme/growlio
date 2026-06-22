@@ -6,14 +6,15 @@ import { chartTooltipStyle } from "@/utils/chart";
 const COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
 
 const CONFIG = {
+  "compact-sm": { height: 140, innerRadius: 30, outerRadius: 56 },
   compact: { height: 180, innerRadius: 38, outerRadius: 70 },
-  mobile: { height: 220, innerRadius: 60, outerRadius: 100 },
+  mobile: { height: 280, innerRadius: 80, outerRadius: 130 },
   full: { height: 400, innerRadius: 100, outerRadius: 158 },
 };
 
 interface Props {
   data: { name: string; value: number; pct: number }[];
-  size?: "compact" | "mobile" | "full";
+  size?: "compact-sm" | "compact" | "mobile" | "full";
 }
 
 const AssetAllocationChart = memo(function AssetAllocationChart({ data, size = "full" }: Props) {
@@ -22,6 +23,7 @@ const AssetAllocationChart = memo(function AssetAllocationChart({ data, size = "
 
   return (
     <div className="flex flex-col">
+      <div className="relative">
       <ResponsiveContainer width="100%" height={height}>
         <PieChart margin={size === "full" ? undefined : { top: 0, right: 0, bottom: 0, left: 0 }}>
           <Pie
@@ -46,6 +48,23 @@ const AssetAllocationChart = memo(function AssetAllocationChart({ data, size = "
           {size === "full" && <Legend />}
         </PieChart>
       </ResponsiveContainer>
+
+      </div>
+      {size === "compact-sm" && (
+        <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 mt-1">
+          {data.map((item, i) => (
+            <div key={i} className="flex items-center gap-1">
+              <span
+                className="inline-block w-2 h-2 rounded-sm shrink-0"
+                style={{ backgroundColor: COLORS[i % COLORS.length] }}
+              />
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                {item.name} {item.pct.toFixed(0)}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       {size === "compact" && (
         <div className="flex flex-col gap-0.5 mt-1">
           {data.map((item, i) => (

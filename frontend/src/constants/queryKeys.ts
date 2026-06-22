@@ -26,18 +26,13 @@ export const QUERY_KEYS = {
   alertHistory: ["alert-history"] as const,
   insights: ["insights"] as const,
   insightsSummary: ["insights", "summary"] as const,
-  dripSimulation: ["drip-simulation"] as const,
   monthlyOptimization: ["monthly-optimization"] as const,
   portfolioRisk: (id?: string) => ["portfolio-risk", id] as const,
-  economicIndicators: ["economic-indicators"] as const,
-  economicIndicatorCalendar: ["economic-indicator-calendar"] as const,
-  economicIndicatorHistory: (code: string, months: number) =>
-    ["economic-indicator-history", code, months] as const,
-  economicIndicatorSubscriptions: ["economic-indicator-subscriptions"] as const,
   marketSignal: ["market-signal"] as const,
   factorAnalysis: ["factor-analysis"] as const,
   portfolioFactorAnalysis: (portfolioId: string) => ["factor-analysis", portfolioId] as const,
   efficientFrontier: (comparePortfolioId?: string) =>
     ["efficient-frontier", comparePortfolioId ?? null] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
+  driftSummary: ["drift-summary"] as const,
 } as const;

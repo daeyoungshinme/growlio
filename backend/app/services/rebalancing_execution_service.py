@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 
 import structlog
 from fastapi import HTTPException
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.kis.auth import get_access_token

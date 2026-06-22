@@ -1,77 +1,79 @@
 import { describe, it, expect } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import DepositGoalCard from "@/components/dashboard/DepositGoalCard";
-import GoalProgressCard from "@/components/dashboard/GoalProgressCard";
+import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import DividendSection from "@/components/dashboard/DividendSection";
+import type { DashboardData } from "@/api/dashboard";
 
-describe("DepositGoalCard", () => {
-  it("goal이 없으면 설정 안내 메시지를 표시한다", () => {
-    renderWithProviders(<DepositGoalCard goal={null} achievementPct={null} />);
-    expect(screen.getByText("연간 입금 목표가 설정되지 않았습니다")).toBeInTheDocument();
+function renderGoalCard(ui: React.ReactElement) {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+    </MemoryRouter>,
+  );
+}
+
+const baseDashboard: DashboardData = {
+  total_assets_krw: 150_000_000,
+  cumulative_return_pct: 12.5,
+  asset_allocation: [],
+  deposit_achievement_pct: 75.0,
+  annual_deposit_goal: 24_000_000,
+  retirement_target_year: 2050,
+  goal_amount: 1_000_000_000,
+  goal_achievement_pct: 15.0,
+  stock_return_pct: 8.0,
+  annual_return_pct: null,
+  monthly_trend: [],
+  annual_dividends_received: 0,
+  estimated_annual_dividends: 0,
+  dividend_monthly_breakdown: [],
+  xirr_pct: null,
+  xirr_is_estimated: false,
+  benchmark_sp500_pct: null,
+  goal_annual_return_pct: null,
+};
+
+describe("InvestmentGoalCard", () => {
+  it("목표가 없으면 설정 안내 메시지를 표시한다", () => {
+    const data = {
+      ...baseDashboard,
+      annual_deposit_goal: null,
+      deposit_achievement_pct: null,
+      goal_amount: null,
+      goal_achievement_pct: null,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
   });
 
-  it("achievementPct가 null이면 설정 안내 메시지를 표시한다", () => {
-    renderWithProviders(<DepositGoalCard goal={10000000} achievementPct={null} />);
-    expect(screen.getByText("연간 입금 목표가 설정되지 않았습니다")).toBeInTheDocument();
-  });
-
-  it("goal과 achievementPct가 있으면 달성률을 표시한다", () => {
-    renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={45.6} netDeposits={4560000} />,
-    );
-    expect(screen.getByText("45.6%")).toBeInTheDocument();
-    expect(screen.getByText("달성")).toBeInTheDocument();
-  });
-
-  it("달성률이 100% 초과 시 100%로 클램핑된다", () => {
-    renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={120} netDeposits={12000000} />,
-    );
-    expect(screen.getByText("100.0%")).toBeInTheDocument();
-  });
-
-  it("netDeposits가 없으면 '—'를 표시한다", () => {
-    renderWithProviders(<DepositGoalCard goal={10000000} achievementPct={30} netDeposits={null} />);
-    expect(screen.getByText("—")).toBeInTheDocument();
-  });
-
-  it("올해 순입금액과 남은 금액 레이블을 표시한다", () => {
-    renderWithProviders(
-      <DepositGoalCard goal={10000000} achievementPct={50} netDeposits={5000000} />,
-    );
-    expect(screen.getByText("올해 순입금액")).toBeInTheDocument();
-    expect(screen.getByText(/남음/)).toBeInTheDocument();
-  });
-});
-
-describe("GoalProgressCard", () => {
-  it("goal이 없으면 설정 안내 메시지를 표시한다", () => {
-    renderWithProviders(<GoalProgressCard current={5000000} goal={null} pct={null} />);
-    expect(screen.getByText("목표 금액이 설정되지 않았습니다")).toBeInTheDocument();
-  });
-
-  it("pct가 null이면 설정 안내 메시지를 표시한다", () => {
-    renderWithProviders(<GoalProgressCard current={5000000} goal={10000000} pct={null} />);
-    expect(screen.getByText("목표 금액이 설정되지 않았습니다")).toBeInTheDocument();
-  });
-
-  it("goal과 pct가 있으면 달성률을 표시한다", () => {
-    renderWithProviders(<GoalProgressCard current={5000000} goal={10000000} pct={50} />);
-    expect(screen.getByText("50.0%")).toBeInTheDocument();
-    expect(screen.getByText("달성")).toBeInTheDocument();
+  it("연간 입금 목표가 있으면 달성률을 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    expect(screen.getByText("75.0%")).toBeInTheDocument();
   });
 
   it("달성률이 100% 초과 시 100%로 클램핑된다", () => {
-    renderWithProviders(<GoalProgressCard current={15000000} goal={10000000} pct={150} />);
+    const data = { ...baseDashboard, deposit_achievement_pct: 120 };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
     expect(screen.getByText("100.0%")).toBeInTheDocument();
   });
 
-  it("현재 자산과 목표 레이블을 표시한다", () => {
-    renderWithProviders(<GoalProgressCard current={5000000} goal={10000000} pct={50} />);
-    expect(screen.getByText("현재 자산")).toBeInTheDocument();
-    expect(screen.getByText(/목표:/)).toBeInTheDocument();
-    expect(screen.getByText(/남은 금액:/)).toBeInTheDocument();
+  it("자산 목표 달성률을 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    expect(screen.getByText("15.0%")).toBeInTheDocument();
+  });
+
+  it("data가 undefined면 목표 미설정 안내를 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={undefined} />);
+    expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
+  });
+
+  it("은퇴 목표 연도를 현재 자산 섹션에 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    expect(screen.getByText(/2050년 목표/)).toBeInTheDocument();
   });
 });
 

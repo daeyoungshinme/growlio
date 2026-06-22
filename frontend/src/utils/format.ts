@@ -78,3 +78,22 @@ export function fmtPct(n: number | null, digits = 2): string {
   if (n == null) return "—";
   return `${n >= 0 ? "+" : ""}${n.toFixed(digits)}%`;
 }
+
+/**
+ * ISO 날짜 문자열을 현재 시각 기준 상대 시간으로 변환
+ * 예: "3일 전", "오늘", "1시간 전"
+ */
+export function relativeTime(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffHr = Math.floor(diffMs / 3_600_000);
+  const diffDay = Math.floor(diffMs / 86_400_000);
+  if (diffDay >= 30) {
+    const diffMonth = Math.floor(diffDay / 30);
+    return `${diffMonth}개월 전`;
+  }
+  if (diffDay >= 1) return `${diffDay}일 전`;
+  if (diffHr >= 1) return `${diffHr}시간 전`;
+  if (diffMin >= 1) return `${diffMin}분 전`;
+  return "방금 전";
+}

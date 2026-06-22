@@ -56,17 +56,23 @@ const FG_CLS: Record<FearGreedClassification, string> = {
 };
 
 export default function MarketSignalBanner({ signal }: Props) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const { composite_level, signals, fear_greed_contrarian_buy, data_freshness } = signal;
   const { vix, yield_curve, fear_greed } = signals;
 
   return (
     <div className={`rounded-xl border px-4 py-3 mb-4 ${BANNER_BG[composite_level]}`}>
-      {/* 헤더 */}
+      {/* 헤더 — 접힌 상태에서도 핵심 수치 노출 */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-medium text-gray-300">시장 위험 신호</span>
           <MarketSignalLevelBadge level={composite_level} />
+          {!expanded && vix && (
+            <span className="text-xs text-gray-500">VIX {vix.value.toFixed(1)}</span>
+          )}
+          {!expanded && fear_greed && (
+            <span className="text-xs text-gray-500">F&G {fear_greed.value}</span>
+          )}
           {data_freshness === "STALE" && (
             <span className="text-xs text-gray-500">(데이터 조회 불가)</span>
           )}
@@ -76,18 +82,18 @@ export default function MarketSignalBanner({ signal }: Props) {
         </div>
         <button
           onClick={() => setExpanded((v) => !v)}
-          className="text-gray-500 hover:text-gray-300 transition-colors"
+          className="text-gray-500 hover:text-gray-300 transition-colors shrink-0 ml-2"
           aria-label={expanded ? "접기" : "펼치기"}
         >
           {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
 
-      {/* 상세 신호 */}
+      {/* 상세 신호 — 수평 스크롤 (줄바꿈 없음) */}
       {expanded && (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-1 scrollbar-none">
           {/* VIX */}
-          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5">
+          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5 shrink-0">
             <span className="text-xs text-gray-400">VIX</span>
             {vix ? (
               <>
@@ -103,7 +109,7 @@ export default function MarketSignalBanner({ signal }: Props) {
           </div>
 
           {/* 장단기 금리차 */}
-          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5">
+          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5 shrink-0">
             <span className="text-xs text-gray-400">10Y-2Y</span>
             {yield_curve ? (
               <>
@@ -123,7 +129,7 @@ export default function MarketSignalBanner({ signal }: Props) {
           </div>
 
           {/* Fear & Greed */}
-          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5">
+          <div className="flex items-center gap-1.5 bg-gray-900/50 rounded-lg px-3 py-1.5 shrink-0">
             <span className="text-xs text-gray-400">F&G</span>
             {fear_greed ? (
               <>

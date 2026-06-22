@@ -26,7 +26,6 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AssetsPage = lazy(() => import("./pages/AssetsPage"));
 const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
-const MarketPage = lazy(() => import("./pages/MarketPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const RebalancingPage = lazy(() => import("./pages/RebalancingPage"));
 
@@ -74,7 +73,6 @@ function AppRoutes() {
           <Route path="dashboard" element={<LazyRoute Component={DashboardPage} />} />
           <Route path="assets" element={<LazyRoute Component={AssetsPage} />} />
           <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
-          <Route path="market" element={<LazyRoute Component={MarketPage} />} />
           <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
           <Route path="rebalancing" element={<LazyRoute Component={RebalancingPage} />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

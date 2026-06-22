@@ -295,41 +295,6 @@ describe("useInsights", () => {
 });
 
 // ============================================
-// useEconomicIndicators
-// ============================================
-describe("useEconomicIndicators", () => {
-  it("returns query result for indicators", async () => {
-    const { useEconomicIndicators } = await import("@/hooks/useEconomicIndicators");
-    const wrapper = createWrapper();
-    const { result } = renderHook(() => useEconomicIndicators(), { wrapper });
-    expect(result.current).toHaveProperty("isLoading");
-  });
-
-  it("returns query result for calendar", async () => {
-    const { useIndicatorCalendar } = await import("@/hooks/useEconomicIndicators");
-    const wrapper = createWrapper();
-    const { result } = renderHook(() => useIndicatorCalendar(), { wrapper });
-    expect(result.current).toHaveProperty("isLoading");
-  });
-
-  it("returns subscribe mutation hooks", async () => {
-    const { useSubscribeMutation } = await import("@/hooks/useEconomicIndicators");
-    const wrapper = createWrapper();
-    const { result } = renderHook(() => useSubscribeMutation(), { wrapper });
-    expect(result.current).toHaveProperty("subscribe");
-    expect(result.current).toHaveProperty("unsubscribe");
-  });
-
-  it("disabled history query when no code", async () => {
-    const { useIndicatorHistory } = await import("@/hooks/useEconomicIndicators");
-    const wrapper = createWrapper();
-    const { result } = renderHook(() => useIndicatorHistory("", 24), { wrapper });
-    // enabled=false since code is empty, so isLoading will be false
-    expect(result.current.isLoading).toBe(false);
-  });
-});
-
-// ============================================
 // useAssetManagementData
 // ============================================
 describe("useAssetManagementData", () => {

@@ -10,12 +10,12 @@ import {
 } from "@/api/transactions";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
-import { useStockSearch } from "@/hooks/useStockSearch";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
-import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
+import AmountUnitButtons from "@/components/common/AmountUnitButtons";
+import { TickerSearchField } from "./TickerSearchField";
 import { extractErrorMessage } from "@/utils/error";
 
 const today = new Date().toISOString().slice(0, 10);
@@ -56,27 +56,10 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   const { form, set: setField } = useForm<TransactionCreate>(initial);
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState(0);
-  const [tickerDirect, setTickerDirect] = useState(!!editingTx?.ticker);
-  const [tickerQuery, setTickerQuery] = useState(editingTx?.ticker ?? "");
-  const {
-    suggestions: tickerSuggestions,
-    isSearching: tickerSearchLoading,
-    search: runTickerSearch,
-    clearSuggestions: clearTickerSuggestions,
-  } = useStockSearch();
-  const [showTickerSuggestions, setShowTickerSuggestions] = useState(false);
-
   const accountPositions = useAccountPositions(
     form.account_id ?? "",
     form.transaction_type === "DIVIDEND",
   );
-
-  const resetTicker = () => {
-    setTickerDirect(false);
-    setTickerQuery("");
-    clearTickerSuggestions();
-    setShowTickerSuggestions(false);
-  };
 
   const createMut = useMutation({
     mutationFn: createTransaction,
@@ -136,9 +119,9 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               type="button"
               onClick={() => {
                 setField("transaction_type", t);
+                setField("ticker", "");
                 setCurrency("KRW");
                 setAmountUsd(0);
-                resetTicker();
               }}
               className={`flex-1 py-3 text-sm font-medium rounded-lg border transition-colors ${
                 form.transaction_type === t
@@ -161,7 +144,6 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               onChange={(e) => {
                 setField("account_id", e.target.value);
                 setField("ticker", "");
-                resetTicker();
               }}
               className={inputCls}
             >
@@ -201,7 +183,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                         setCurrency(c);
                         setAmountUsd(0);
                       }}
-                      className={`px-2.5 py-1.5 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
+                      className={`px-2.5 py-2 rounded transition-colors ${currency === c ? "bg-blue-600 text-white" : "text-gray-400 hover:text-gray-600"}`}
                     >
                       {c}
                     </button>
@@ -238,130 +220,31 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                 )}
               </div>
             ) : (
-              <input
-                type="number"
-                inputMode="decimal"
-                required
-                min={1}
-                value={form.amount || ""}
-                onChange={(e) => setField("amount", Number(e.target.value))}
-                placeholder="예: 500000"
-                className={`${inputCls} mt-1`}
-              />
+              <>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  required
+                  min={1}
+                  value={form.amount || ""}
+                  onChange={(e) => setField("amount", Number(e.target.value))}
+                  placeholder="예: 500000"
+                  className={`${inputCls} mt-1`}
+                />
+                <AmountUnitButtons
+                  onAdd={(delta) => setField("amount", (form.amount ?? 0) + delta)}
+                />
+              </>
             )}
           </div>
           {form.transaction_type === "DIVIDEND" ? (
-            <div>
-              <label className={labelCls}>종목 (선택)</label>
-              {accountPositions.length > 0 && !tickerDirect ? (
-                <select
-                  value={form.ticker || ""}
-                  onChange={(e) => {
-                    if (e.target.value === "__direct__") {
-                      setTickerDirect(true);
-                      setField("ticker", "");
-                    } else {
-                      setField("ticker", e.target.value);
-                    }
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">종목 선택</option>
-                  {accountPositions.map((p) => (
-                    <option key={p.ticker} value={p.ticker}>
-                      {p.name}
-                    </option>
-                  ))}
-                  <option value="__direct__">기타 종목 직접 입력...</option>
-                </select>
-              ) : (
-                <div className="flex gap-1 mt-1">
-                  <div className="relative w-full">
-                    <input
-                      value={tickerQuery}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setTickerQuery(v);
-                        setField("ticker", v);
-                        setShowTickerSuggestions(true);
-                        if (!v.trim()) {
-                          clearTickerSuggestions();
-                          return;
-                        }
-                        runTickerSearch(v);
-                      }}
-                      onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
-                      onBlur={() =>
-                        setTimeout(
-                          () => setShowTickerSuggestions(false),
-                          SEARCH_DROPDOWN_HIDE_DELAY,
-                        )
-                      }
-                      placeholder="종목명 또는 코드 검색"
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                    {tickerSearchLoading && (
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                        검색 중...
-                      </span>
-                    )}
-                    {showTickerSuggestions && tickerSuggestions.length > 0 && (
-                      <ul
-                        role="listbox"
-                        aria-label="종목 검색 결과"
-                        className="absolute z-20 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-0.5 max-h-48 overflow-y-auto"
-                      >
-                        {tickerSuggestions.map((s) => (
-                          <li
-                            key={s.ticker}
-                            role="option"
-                            aria-selected={false}
-                            tabIndex={0}
-                            className="px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-950 cursor-pointer text-sm flex items-center gap-2 focus:bg-blue-50 dark:focus:bg-blue-950 focus:outline-none"
-                            onMouseDown={() => {
-                              setTickerQuery(s.name);
-                              setField("ticker", s.ticker);
-                              clearTickerSuggestions();
-                              setShowTickerSuggestions(false);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.preventDefault();
-                                setTickerQuery(s.name);
-                                setField("ticker", s.ticker);
-                                clearTickerSuggestions();
-                                setShowTickerSuggestions(false);
-                              }
-                            }}
-                          >
-                            <span className="font-medium text-blue-700 dark:text-blue-400">
-                              {s.ticker}
-                            </span>
-                            <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
-                            <span className="text-xs text-gray-400 ml-auto">{s.market}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  {accountPositions.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTickerDirect(false);
-                        setField("ticker", "");
-                        setTickerQuery("");
-                        clearTickerSuggestions();
-                        setShowTickerSuggestions(false);
-                      }}
-                      className="shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
-                    >
-                      ← 목록
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <TickerSearchField
+              key={`${form.account_id}-${form.transaction_type}`}
+              accountPositions={accountPositions}
+              ticker={form.ticker || ""}
+              initialQuery={editingTx?.ticker ?? ""}
+              onTickerChange={(t) => setField("ticker", t)}
+            />
           ) : (
             <div>
               <label className={labelCls}>메모 (선택)</label>

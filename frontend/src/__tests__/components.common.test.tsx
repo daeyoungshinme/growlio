@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
+import { render } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 import StatCard from "@/components/common/StatCard";
 import PriceCell from "@/components/common/PriceCell";
 import BankAccountCard from "@/components/assets/BankAccountCard";
+import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),
@@ -188,5 +190,30 @@ describe("BankAccountCard", () => {
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
     fireEvent.click(screen.getByText("취소"));
     expect(screen.queryByRole("textbox")).toBeNull();
+  });
+});
+
+// ------- AmountUnitButtons -------
+describe("AmountUnitButtons", () => {
+  it("4개 단위 버튼을 렌더링한다", () => {
+    render(<AmountUnitButtons onAdd={vi.fn()} />);
+    expect(screen.getByText("+1만")).toBeInTheDocument();
+    expect(screen.getByText("+10만")).toBeInTheDocument();
+    expect(screen.getByText("+100만")).toBeInTheDocument();
+    expect(screen.getByText("+1억")).toBeInTheDocument();
+  });
+
+  it("버튼 클릭 시 해당 금액으로 onAdd를 호출한다", () => {
+    const onAdd = vi.fn();
+    render(<AmountUnitButtons onAdd={onAdd} />);
+    fireEvent.click(screen.getByText("+1만"));
+    expect(onAdd).toHaveBeenCalledWith(10_000);
+    fireEvent.click(screen.getByText("+1억"));
+    expect(onAdd).toHaveBeenCalledWith(100_000_000);
+  });
+
+  it("className prop이 컨테이너에 적용된다", () => {
+    const { container } = render(<AmountUnitButtons onAdd={vi.fn()} className="custom-class" />);
+    expect(container.firstChild).toHaveClass("custom-class");
   });
 });

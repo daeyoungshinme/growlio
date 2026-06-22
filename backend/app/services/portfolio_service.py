@@ -25,7 +25,7 @@ from app.utils.cache_keys import (
     portfolio_overview_lite_key,
     set_cached_json,
 )
-from app.utils.pnl import calc_position_pnl
+from app.utils.pnl import calc_net_asset_amount, calc_position_pnl
 
 ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -71,11 +71,7 @@ def _calc_account_amounts(
         return amount_krw, invested, (value - invested if positions else 0.0), positions
 
     if acc.manual_amount is not None:
-        if acc.asset_type == "REAL_ESTATE":
-            mortgage = float((acc.real_estate_details or {}).get("mortgage_balance_krw", 0) or 0)
-            amount_krw = float(acc.manual_amount) - mortgage
-        else:
-            amount_krw = float(acc.manual_amount)
+        amount_krw = calc_net_asset_amount(acc.manual_amount, acc.asset_type, acc.real_estate_details)
         invested = sum(float(p.avg_price or 0) * float(p.qty or 0) for p in positions)
         value = sum(
             (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)

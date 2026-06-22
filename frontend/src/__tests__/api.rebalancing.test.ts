@@ -32,6 +32,7 @@ import {
   quickExecuteRebalancing,
   fetchRebalancingHistory,
   fetchRebalancingExecutionDetail,
+  fetchDriftSummary,
 } from "@/api/rebalancing";
 
 describe("api/rebalancing", () => {
@@ -96,5 +97,12 @@ describe("api/rebalancing", () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchRebalancingExecutionDetail("exec-1");
     expect(api.get).toHaveBeenCalledWith("/rebalancing/history/exec-1");
+  });
+
+  it("fetchDriftSummary calls GET /rebalancing/drift-summary", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    const result = await fetchDriftSummary();
+    expect(api.get).toHaveBeenCalledWith("/rebalancing/drift-summary");
+    expect(result).toEqual([]);
   });
 });

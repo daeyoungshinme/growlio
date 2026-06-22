@@ -48,8 +48,7 @@ describe("BottomNav", () => {
     expect(screen.getByText("대시보드")).toBeDefined();
     expect(screen.getByText("자산")).toBeDefined();
     expect(screen.getByText("리밸런싱")).toBeDefined();
-    expect(screen.getByText("투자 계획")).toBeDefined();
-    expect(screen.getByText("시장")).toBeDefined();
+    expect(screen.getByText("투자계획")).toBeDefined();
     expect(screen.getByText("설정")).toBeDefined();
   });
 

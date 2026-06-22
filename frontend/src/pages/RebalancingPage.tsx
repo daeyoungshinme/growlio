@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { Bell } from "lucide-react";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import MarketSignalBanner from "@/components/rebalancing/MarketSignalBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -11,11 +12,11 @@ import { STALE_TIME } from "@/constants/queryConfig";
 const PortfolioAnalysisTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioAnalysisTab"),
 );
-const RebalancingAlertListTab = lazy(
-  () => import("../components/rebalancing/RebalancingAlertListTab"),
+const RebalancingHistoryTab = lazy(
+  () => import("../components/rebalancing/RebalancingHistoryTab"),
 );
 
-const REBALANCING_PAGE_TABS = ["포트폴리오 비중", "알림 설정"] as const;
+const REBALANCING_PAGE_TABS = ["포트폴리오 비중", "실행 이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 
 export default function RebalancingPage() {
@@ -48,13 +49,20 @@ export default function RebalancingPage() {
 
   return (
     <div className="flex flex-col min-h-full gap-4">
-      <div className="px-1">
+      <div className="flex items-center justify-between px-1">
         <Tabs
           tabs={REBALANCING_PAGE_TABS}
           activeTab={localTab}
           onChange={handleTabChange}
           variant="pill"
         />
+        <Link
+          to="/settings#rebalancing-alerts"
+          aria-label="알림 설정으로 이동"
+          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:text-blue-400 dark:hover:bg-blue-950/30 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+        >
+          <Bell size={18} />
+        </Link>
       </div>
 
       {/* 시장 신호는 포트폴리오 비중 탭에서만 표시 */}
@@ -68,9 +76,9 @@ export default function RebalancingPage() {
             <PortfolioAnalysisTab portfolioId={portfolioId} />
           </Suspense>
         )}
-        {localTab === "알림 설정" && (
+        {localTab === "실행 이력" && (
           <Suspense fallback={<SkeletonCard />}>
-            <RebalancingAlertListTab />
+            <RebalancingHistoryTab />
           </Suspense>
         )}
       </div>
