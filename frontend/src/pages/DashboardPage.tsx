@@ -157,7 +157,7 @@ export default function DashboardPage() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-              주식 포트폴리오 요약
+              투자 현황
             </h2>
             <Link
               to="/assets?section=투자 현황"

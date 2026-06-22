@@ -71,22 +71,34 @@ cd backend && uv run mypy app/
 - `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
 - `APP_SECRET_KEY` — JWT 서명 키
 - `DATABASE_URL` — PostgreSQL asyncpg URL
+- `MIGRATION_DATABASE_URL` — Supabase 전용 마이그레이션 DB URL (로컬 Docker는 `DATABASE_URL`과 동일)
 - `REDIS_URL`
 - `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
+- `ALLOWED_ORIGINS` — CORS 허용 출처 (쉼표 구분, 예: `http://localhost:5173`)
+- `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `SUPABASE_JWT_SECRET` — Settings > API > JWT Settings
 
-**DART**:
+**외부 API**:
 - `DART_API_KEY` — opendart.fss.or.kr
+- `FRED_API_KEY` — fred.stlouisfed.org (미국 경제지표)
+- `FMP_API_KEY` — financialmodelingprep.com (증시 캘린더)
 
 **금융결제원 오픈뱅킹**:
 - `OPEN_BANKING_CLIENT_ID`, `OPEN_BANKING_CLIENT_SECRET`
 - `OPEN_BANKING_REDIRECT_URI`, `OPEN_BANKING_BASE_URL`
 
-**SMTP** (환율 알림 이메일):
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`
+**SMTP** (알림 이메일):
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TIMEOUT`
+
+**FCM (Android 푸시 알림)**:
+- `FIREBASE_CREDENTIALS_JSON` — Firebase 서비스 계정 JSON (한 줄 문자열)
+
+**모니터링**:
+- `METRICS_TOKEN` — Prometheus `/metrics` 엔드포인트 Bearer 토큰
+- `SENTRY_DSN`, `SENTRY_RELEASE` — Sentry 오류 추적 (선택)
 
 ---
 
@@ -194,14 +206,19 @@ utils/
 limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
                               # 예: @limiter.limit("60/minute") — request: Request 파라미터 필수
 jobs/                         # APScheduler 정기 작업
-  ├── asset_sync.py           # 매일 18:00 KST 전체 계좌 스냅샷
-  ├── dca_auto_buy.py         # DCA 자동매수 정기 작업
-  ├── exchange_rate_alert.py  # 환율 알림 정기 작업
-  ├── rebalancing_alert.py    # 매일 18:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
-  ├── stock_price_alert.py    # 주가 알림 정기 작업
+  ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
+  ├── dca_auto_buy.py         # 매일 09:00 KST DCA 자동매수
+  ├── deposit_monitor.py      # 15:35 KST + 18:05 KST 예수금 모니터링
+  ├── economic_indicator_sync.py  # 08:00 KST 경제지표 갱신 + 08:05 KST 알림 체크
+  ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
+  ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
+  ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
+  ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
+  ├── rebalancing_alert.py    # 매일 08:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
+  ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
 
-> **새 job 추가:** `jobs/` 에 파일 생성 후 `app/main.py` lifespan의 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
+> **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()`에 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
 ```
 
 **자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
