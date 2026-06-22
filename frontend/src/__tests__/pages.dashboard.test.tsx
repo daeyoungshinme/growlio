@@ -47,6 +47,12 @@ vi.mock("@/components/common/SkeletonCard", () => ({
 vi.mock("@/components/common/SkeletonStatBox", () => ({
   default: () => <div data-testid="skeleton-stat-box" />,
 }));
+vi.mock("@/api/marketSignals", () => ({
+  fetchMarketSignal: vi.fn().mockResolvedValue(null),
+}));
+vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
+  default: () => <div data-testid="rebalancing-status-card" />,
+}));
 
 import DashboardPage from "@/pages/DashboardPage";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -192,7 +198,7 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
     expect(screen.getByTestId("portfolio-summary")).toBeInTheDocument();
     expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
-    expect(screen.getByText("주식 포트폴리오 요약")).toBeInTheDocument();
+    expect(screen.getByText("투자 현황")).toBeInTheDocument();
     expect(screen.getByText("배당 현황")).toBeInTheDocument();
   });
 

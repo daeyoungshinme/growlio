@@ -195,6 +195,12 @@ vi.mock("@/components/rebalancing/RebalancingTable", () => ({
 vi.mock("@/components/portfolio-analysis/UnifiedPortfolioEditor", () => ({
   default: () => <div data-testid="portfolio-editor">Editor</div>,
 }));
+vi.mock("@/pages/AssetManagementPage", () => ({
+  default: () => <div data-testid="asset-management-page" />,
+}));
+vi.mock("@/pages/PortfolioPage", () => ({
+  default: () => <div data-testid="portfolio-page" />,
+}));
 
 // ---- Imports after mocks ----
 import StockAccountCard, { type AccountStats } from "@/components/assets/StockAccountCard";
@@ -203,6 +209,10 @@ import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
 import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
+import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
+import { fetchPortfolios } from "@/api/portfolios";
+import AssetsPage from "@/pages/AssetsPage";
+import TopLoadingBar from "@/components/common/TopLoadingBar";
 
 // ---- Test fixtures ----
 const mockStockAccount: AssetAccount = {
@@ -530,5 +540,101 @@ describe("PortfolioAnalysisTab", () => {
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
+  });
+});
+
+// =========================================
+// RebalancingStatusCard
+// =========================================
+describe("RebalancingStatusCard", () => {
+  it("포트폴리오 없을 때 아무것도 렌더링하지 않음", async () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText("리밸런싱 자동화")).not.toBeInTheDocument();
+    });
+  });
+
+  it("포트폴리오 있을 때 카드 렌더링", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("리밸런싱 자동화")).toBeInTheDocument();
+    });
+    expect(screen.getByText("포트폴리오")).toBeInTheDocument();
+    expect(screen.getByText("알림 설정")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /실행하기/ })).toBeInTheDocument();
+  });
+
+  it("알림 없을 때 알림 설정 안내 링크 표시", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/비중 이탈 알림 설정하기/)).toBeInTheDocument();
+    });
+  });
+});
+
+// =========================================
+// AssetsPage
+// =========================================
+describe("AssetsPage", () => {
+  it("기본 섹션 '투자 현황' 탭 렌더링", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/assets"]}>
+        <AssetsPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("투자 현황")).toBeInTheDocument();
+    });
+  });
+
+  it("section=계좌 관리 쿼리 파라미터로 탭 전환", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/assets?section=계좌 관리"]}>
+        <AssetsPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("계좌 관리")).toBeInTheDocument();
+    });
+  });
+
+  it("잘못된 section 값은 기본 탭으로 폴백", async () => {
+    renderWithProviders(
+      <MemoryRouter initialEntries={["/assets?section=invalid"]}>
+        <AssetsPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("투자 현황")).toBeInTheDocument();
+    });
+  });
+});
+
+// =========================================
+// TopLoadingBar
+// =========================================
+describe("TopLoadingBar", () => {
+  it("isVisible=false 초기 상태에서 null 반환", () => {
+    const { container } = renderWithProviders(<TopLoadingBar isVisible={false} />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("isVisible=true 마운트 시 effect 실행", () => {
+    renderWithProviders(<TopLoadingBar isVisible={true} />);
+    expect(document.body).toBeDefined();
   });
 });

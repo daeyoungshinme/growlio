@@ -40,6 +40,7 @@ vi.mock("@/hooks/useLogout", () => ({
 
 vi.mock("@/api/alerts", () => ({
   fetchAlertHistory: vi.fn().mockResolvedValue([]),
+  fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/utils/toast", () => ({

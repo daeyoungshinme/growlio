@@ -64,6 +64,7 @@ vi.mock("@/api/portfolios", () => ({
     accounts: [],
   }),
   fetchAllocationHistory: vi.fn().mockResolvedValue([]),
+  fetchPortfolios: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/api/assets", () => ({
@@ -106,6 +107,7 @@ vi.mock("@/api/settings", () => ({
 
 vi.mock("@/api/alerts", () => ({
   fetchAlertHistory: vi.fn().mockResolvedValue([]),
+  fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/api/dart", () => ({
