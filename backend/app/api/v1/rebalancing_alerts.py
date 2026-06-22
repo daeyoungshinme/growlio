@@ -117,7 +117,9 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
 
 
 @router.get("/rebalancing", response_model=list[RebalancingAlertResponse])
+@limiter.limit("30/minute")
 async def list_rebalancing_alerts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -132,7 +134,9 @@ async def list_rebalancing_alerts(
 
 
 @router.get("/rebalancing/{portfolio_id}", response_model=RebalancingAlertResponse)
+@limiter.limit("30/minute")
 async def get_rebalancing_alert(
+    request: Request,
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -245,7 +249,9 @@ async def upsert_rebalancing_alert(
 
 
 @router.delete("/rebalancing/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
 async def delete_rebalancing_alert(
+    request: Request,
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

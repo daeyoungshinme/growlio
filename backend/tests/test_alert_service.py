@@ -121,7 +121,7 @@ class TestAlreadyFiredToday:
 @pytest.mark.asyncio
 async def test_check_and_trigger_alerts_no_rate(mock_db):
     """환율 조회 실패(0 반환) 시 알림을 발송하지 않는다."""
-    with patch("app.services.alert_service.fetch_usd_krw", AsyncMock(return_value=0)):
+    with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=0)):
         from app.services.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
@@ -151,7 +151,7 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
 
     # send_exchange_rate_alert는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
     with (
-        patch("app.services.alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
@@ -186,7 +186,7 @@ async def test_check_and_trigger_alerts_above_not_met(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
@@ -219,7 +219,7 @@ async def test_check_and_trigger_alerts_multi_trigger_cooldown(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
         from app.services.alert_service import check_and_trigger_alerts
@@ -251,7 +251,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch(
             "app.services.email_service.send_exchange_rate_alert",
             AsyncMock(side_effect=Exception("SMTP 오류")),

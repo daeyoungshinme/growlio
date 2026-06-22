@@ -100,7 +100,7 @@ export default function DashboardPage() {
             자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
           </p>
           <button
-            onClick={() => navigate("/assets?section=계좌 관리")}
+            onClick={() => navigate("/assets?section=management")}
             className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             자산관리로 이동
@@ -160,7 +160,7 @@ export default function DashboardPage() {
               투자 현황
             </h2>
             <Link
-              to="/assets?section=투자 현황"
+              to="/assets?section=portfolio"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               전체 보기 <ArrowRight size={14} />
@@ -178,7 +178,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
             <Link
-              to="/assets?section=투자 현황&tab=배당"
+              to="/assets?section=portfolio&tab=배당"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               자세히 보기 <ArrowRight size={14} />

@@ -32,6 +32,7 @@ export function ExchangeRateProvider({ children }: { children: React.ReactNode }
   );
 }
 
+// 컴포넌트에서 직접 사용하지 말 것 — hooks/useExchangeRate.ts를 통해 소비할 것
 // eslint-disable-next-line react-refresh/only-export-components
 export function useExchangeRateContext(): ExchangeRateContextValue {
   return useContext(ExchangeRateContext);

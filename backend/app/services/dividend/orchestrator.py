@@ -23,6 +23,7 @@ from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_
 from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
 from app.models.user import UserSettings
 from app.redis_client import get_redis
+from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import decrypt, get_kis_user_credentials
 from app.services.dividend.calculator import calculate_position_dividend
@@ -57,10 +58,8 @@ async def _call_kis_dividend_api(
 ) -> dict | None:
     """KIS 계좌를 통해 배당 API를 호출하는 공통 헬퍼."""
     account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
+        active_accounts_stmt(user_id).where(
             AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
             AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )

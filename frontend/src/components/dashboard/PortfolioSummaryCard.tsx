@@ -23,7 +23,7 @@ interface Props {
 
 function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex-1 px-1 text-center">
+    <div className="flex-1 px-1 flex flex-col items-center">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{label}</p>
       <p className={`text-lg font-bold mt-0.5 ${color ?? "text-gray-900 dark:text-gray-50"}`}>
         {value}
@@ -49,7 +49,7 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+        <div className="flex items-start divide-x divide-gray-100 dark:divide-gray-700">
           <div className="flex-1 px-2">
             <SkeletonStatBox />
           </div>
@@ -79,7 +79,7 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
   return (
     <div className="space-y-4">
       {/* 요약 stat */}
-      <div className="flex divide-x divide-gray-100 dark:divide-gray-700">
+      <div className="flex items-start divide-x divide-gray-100 dark:divide-gray-700">
         <StatBox
           label="주식 총평가액"
           value={fmtKrw(
@@ -92,16 +92,15 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
           value={`${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`}
           color={pnlColorClass}
         />
-        <div className="flex-1">
+        <div className="flex-1 px-1 flex flex-col items-center">
           <HoverTooltip content="미실현 수익률 = (평가액 - 투자원금) / 투자원금 × 100">
-            <span className="block w-full">
-              <StatBox
-                label="주식 수익률"
-                value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
-                color={retColorClass}
-              />
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+              주식 수익률
             </span>
           </HoverTooltip>
+          <p className={`text-lg font-bold mt-0.5 ${retColorClass}`}>
+            {`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
+          </p>
         </div>
       </div>
 

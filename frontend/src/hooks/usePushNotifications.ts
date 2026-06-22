@@ -5,17 +5,17 @@
  * 웹/PWA 환경에서는 아무 동작 없이 종료.
  */
 import { useEffect } from "react";
-import { Capacitor } from "@capacitor/core";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
+import { isNativePlatform } from "@/utils/platform";
 import { registerPushToken } from "@/api/settings";
 
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
-    if (!Capacitor.isNativePlatform() || !isAuthenticated) return;
+    if (!isNativePlatform() || !isAuthenticated) return;
 
     const handles: PluginListenerHandle[] = [];
     let cancelled = false;

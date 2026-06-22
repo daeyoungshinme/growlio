@@ -601,9 +601,9 @@ describe("AssetsPage", () => {
     });
   });
 
-  it("section=계좌 관리 쿼리 파라미터로 탭 전환", async () => {
+  it("section=management 쿼리 파라미터로 탭 전환", async () => {
     renderWithProviders(
-      <MemoryRouter initialEntries={["/assets?section=계좌 관리"]}>
+      <MemoryRouter initialEntries={["/assets?section=management"]}>
         <AssetsPage />
       </MemoryRouter>,
     );

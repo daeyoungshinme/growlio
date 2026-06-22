@@ -19,7 +19,7 @@ import PortfolioDiagnosisCard from "./PortfolioDiagnosisCard";
 import PortfolioListSection from "./PortfolioListSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import RebalancingAlertModal from "./RebalancingAlertModal";
+import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";

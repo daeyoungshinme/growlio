@@ -3,7 +3,7 @@
 import structlog
 
 from app.database import AsyncSessionLocal
-from app.services.alert_service import check_and_trigger_alerts
+from app.services.exchange_rate_alert_service import check_and_trigger_alerts
 
 logger = structlog.get_logger()
 

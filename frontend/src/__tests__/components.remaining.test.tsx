@@ -135,7 +135,7 @@ vi.mock("@/utils/chart", () => ({
 // ---- Imports ----
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import BacktestResultChart from "@/components/backtest/BacktestResultChart";
-import RebalancingAlertModal from "@/components/portfolio-analysis/RebalancingAlertModal";
+import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
 import TransactionModal from "@/components/assets/TransactionModal";
 import UnifiedPortfolioEditor from "@/components/portfolio-analysis/UnifiedPortfolioEditor";
 

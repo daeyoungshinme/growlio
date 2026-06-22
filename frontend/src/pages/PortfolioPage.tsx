@@ -20,6 +20,7 @@ import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import type { PortfolioOverview } from "@/types";
+import { isPortfolioAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 const TaxOptimizationCard = lazy(
@@ -101,7 +102,7 @@ export default function PortfolioPage() {
   const handleSyncAll = async () => {
     if (!data) return;
     const accounts = data.accounts.filter(
-      (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER",
+      (a) => isPortfolioAccount(a.asset_type),
     );
     setSyncingAll(true);
     setSyncProgress({ done: 0, total: accounts.length });
@@ -131,7 +132,7 @@ export default function PortfolioPage() {
   const stockAccounts = useMemo(
     () =>
       data?.accounts.filter(
-        (a) => a.asset_type.startsWith("STOCK") || a.asset_type === "CASH_OTHER",
+        (a) => isPortfolioAccount(a.asset_type),
       ) ?? [],
     [data],
   );

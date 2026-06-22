@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
+import { isStockAccount } from "@/utils/accounts";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -98,7 +99,7 @@ export default function SettingsPage() {
   });
 
   const bankCount = accounts.filter((a) => a.asset_type === "BANK_ACCOUNT").length;
-  const stockCount = accounts.filter((a) => a.asset_type.startsWith("STOCK_")).length;
+  const stockCount = accounts.filter((a) => isStockAccount(a.asset_type)).length;
   const realEstateCount = accounts.filter((a) => a.asset_type === "REAL_ESTATE").length;
 
   const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
@@ -137,7 +138,7 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-xl">
       {/* 계좌 및 자산 관리 */}
       <Link
-        to="/assets?section=계좌 관리"
+        to="/assets?section=management"
         className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
       >
         <div className="p-2.5 bg-blue-50 dark:bg-blue-950 rounded-xl">

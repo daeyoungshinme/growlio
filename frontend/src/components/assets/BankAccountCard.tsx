@@ -1,7 +1,7 @@
 import { Pencil, Trash2, RefreshCw } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
-import { useExchangeRateContext } from "@/context/ExchangeRateContext";
+import { useExchangeRate } from "@/hooks/useExchangeRate";
 import EditableNameField from "@/components/common/EditableNameField";
 import { BANK_TYPE_LABELS } from "@/constants";
 
@@ -24,7 +24,7 @@ export default function BankAccountCard({
   isDeleting,
   isSyncing,
 }: Props) {
-  const { rate: usdRate } = useExchangeRateContext();
+  const usdRate = useExchangeRate();
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
 
   const hasDepositFields = account.deposit_krw != null || account.deposit_usd != null;

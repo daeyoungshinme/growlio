@@ -2,37 +2,43 @@ import { lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import Tabs from "@/components/common/Tabs";
 import PageLoader from "@/components/common/PageLoader";
-import { ASSETS_PAGE_SECTIONS, type AssetsPageSection } from "@/constants/tabs";
+import { ASSETS_PAGE_SECTIONS, type AssetsPageSectionKey } from "@/constants/tabs";
 
 const AccountManagementContent = lazy(() => import("./AssetManagementPage"));
 const PortfolioContent = lazy(() => import("./PortfolioPage"));
 
+const VALID_KEYS = ASSETS_PAGE_SECTIONS.map((s) => s.key);
+const LABELS = ASSETS_PAGE_SECTIONS.map((s) => s.label);
+
 export default function AssetsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawSection = searchParams.get("section");
-  const section: AssetsPageSection = ASSETS_PAGE_SECTIONS.includes(rawSection as AssetsPageSection)
-    ? (rawSection as AssetsPageSection)
-    : "투자 현황";
+  const sectionKey: AssetsPageSectionKey = VALID_KEYS.includes(rawSection as AssetsPageSectionKey)
+    ? (rawSection as AssetsPageSectionKey)
+    : "portfolio";
 
-  const handleSectionChange = (next: AssetsPageSection) => {
-    setSearchParams({ section: next }, { replace: true });
+  const activeLabel = ASSETS_PAGE_SECTIONS.find((s) => s.key === sectionKey)!.label;
+
+  const handleSectionChange = (label: string) => {
+    const section = ASSETS_PAGE_SECTIONS.find((s) => s.label === label);
+    if (section) setSearchParams({ section: section.key }, { replace: true });
   };
 
   return (
     <div>
       <Tabs
-        tabs={ASSETS_PAGE_SECTIONS}
-        activeTab={section}
+        tabs={LABELS}
+        activeTab={activeLabel}
         onChange={handleSectionChange}
         variant="pill"
         className="mb-6"
       />
-      {section === "계좌 관리" && (
+      {sectionKey === "management" && (
         <Suspense fallback={<PageLoader />}>
           <AccountManagementContent />
         </Suspense>
       )}
-      {section === "투자 현황" && (
+      {sectionKey === "portfolio" && (
         <Suspense fallback={<PageLoader />}>
           <PortfolioContent />
         </Suspense>

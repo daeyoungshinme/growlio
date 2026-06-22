@@ -12,7 +12,7 @@ const PortfolioAnalysisTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioAnalysisTab"),
 );
 const RebalancingAlertListTab = lazy(
-  () => import("../components/portfolio-analysis/RebalancingAlertListTab"),
+  () => import("../components/rebalancing/RebalancingAlertListTab"),
 );
 
 const REBALANCING_PAGE_TABS = ["포트폴리오 비중", "알림 설정"] as const;

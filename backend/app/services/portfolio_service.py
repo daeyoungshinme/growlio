@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
+from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.composition_calculator import fetch_position_maps
 from app.utils.cache_keys import (
@@ -232,11 +233,7 @@ async def build_portfolio_overview(
         if cached is not None:
             return cached
 
-    query = (
-        select(AssetAccount)
-        .where(AssetAccount.user_id == user_id, AssetAccount.is_active == True)  # noqa: E712
-        .order_by(AssetAccount.sort_order, AssetAccount.created_at)
-    )
+    query = active_accounts_stmt(user_id).order_by(AssetAccount.sort_order, AssetAccount.created_at)
     if account_ids:
         query = query.where(AssetAccount.id.in_(account_ids))
     acc_result = await db.execute(query)

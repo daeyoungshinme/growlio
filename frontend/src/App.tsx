@@ -77,10 +77,6 @@ function AppRoutes() {
           <Route path="market" element={<LazyRoute Component={MarketPage} />} />
           <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
           <Route path="rebalancing" element={<LazyRoute Component={RebalancingPage} />} />
-          {/* 구 URL 리다이렉트 */}
-          <Route path="portfolio" element={<Navigate to="/assets?section=투자 현황" replace />} />
-          <Route path="asset-management" element={<Navigate to="/assets?section=계좌 관리" replace />} />
-          <Route path="trend" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

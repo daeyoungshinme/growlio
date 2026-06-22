@@ -1,14 +1,5 @@
-import { BarChart2, Home, Wallet, Shuffle, Settings, TrendingUp } from "lucide-react";
 import { NavLink } from "react-router-dom";
-
-const nav = [
-  { to: "/dashboard", icon: Home, label: "대시보드" },
-  { to: "/assets", icon: Wallet, label: "자산" },
-  { to: "/rebalancing", icon: Shuffle, label: "리밸런싱" },
-  { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
-  { to: "/market", icon: BarChart2, label: "시장" },
-  { to: "/settings", icon: Settings, label: "설정" },
-];
+import { NAV_ITEMS } from "@/constants/nav";
 
 export default function BottomNav() {
   return (
@@ -16,7 +7,7 @@ export default function BottomNav() {
       aria-label="하단 내비게이션"
       className="lg:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 flex items-stretch justify-around z-50 pb-[env(safe-area-inset-bottom)]"
     >
-      {nav.map(({ to, icon: Icon, label }) => (
+      {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
         <NavLink
           key={to}
           to={to}

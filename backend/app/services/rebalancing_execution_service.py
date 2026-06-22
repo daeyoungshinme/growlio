@@ -13,6 +13,7 @@ from app.kis.auth import get_access_token
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
+from app.services._account_queries import active_accounts_stmt
 from app.services.credential_service import decrypt
 from app.utils.metrics import rebalancing_execution_count
 
@@ -27,11 +28,7 @@ async def _load_account(
     db: AsyncSession,
 ) -> AssetAccount:
     account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.id == account_id,
-            AssetAccount.user_id == user_id,
-            AssetAccount.is_active == True,  # noqa: E712
-        )
+        active_accounts_stmt(user_id).where(AssetAccount.id == account_id)
     )
     if not account:
         raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")

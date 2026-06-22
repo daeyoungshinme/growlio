@@ -54,7 +54,7 @@ class TestPortfolioSummaryMultiAccount:
     @pytest.mark.asyncio
     async def test_single_account_returns_correct_totals(self, mock_request):
         """단일 KIS 계좌일 때 집계 결과가 해당 계좌 값과 동일해야 한다."""
-        from app.api.v1.portfolio import portfolio_summary
+        from app.api.v1.portfolio_analysis import portfolio_summary
 
         user_id = uuid.uuid4()
         user = SimpleNamespace(id=user_id)
@@ -70,9 +70,9 @@ class TestPortfolioSummaryMultiAccount:
 
         mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
-            patch("app.api.v1.portfolio.get_domestic_balance", new=AsyncMock(return_value=domestic)),
-            patch("app.api.v1.portfolio.get_overseas_balance", new=AsyncMock(return_value=overseas)),
+            patch("app.api.v1.portfolio_analysis.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
+            patch("app.api.v1.portfolio_analysis.get_domestic_balance", new=AsyncMock(return_value=domestic)),
+            patch("app.api.v1.portfolio_analysis.get_overseas_balance", new=AsyncMock(return_value=overseas)),
         ):
             result = await portfolio_summary(request=mock_request, current_user=user, db=mock_db)
 
@@ -85,7 +85,7 @@ class TestPortfolioSummaryMultiAccount:
     @pytest.mark.asyncio
     async def test_two_accounts_aggregated_correctly(self, mock_request):
         """두 KIS 계좌의 domestic/overseas 잔고가 합산되어야 한다."""
-        from app.api.v1.portfolio import portfolio_summary
+        from app.api.v1.portfolio_analysis import portfolio_summary
 
         user_id = uuid.uuid4()
         user = SimpleNamespace(id=user_id)
@@ -115,9 +115,9 @@ class TestPortfolioSummaryMultiAccount:
 
         mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
-            patch("app.api.v1.portfolio.get_domestic_balance", side_effect=mock_domestic),
-            patch("app.api.v1.portfolio.get_overseas_balance", side_effect=mock_overseas),
+            patch("app.api.v1.portfolio_analysis.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
+            patch("app.api.v1.portfolio_analysis.get_domestic_balance", side_effect=mock_domestic),
+            patch("app.api.v1.portfolio_analysis.get_overseas_balance", side_effect=mock_overseas),
         ):
             result = await portfolio_summary(request=mock_request, current_user=user, db=mock_db)
 
@@ -138,7 +138,7 @@ class TestPortfolioSummaryMultiAccount:
         """KIS 설정이 없으면 400 에러를 반환해야 한다."""
         from fastapi import HTTPException
 
-        from app.api.v1.portfolio import portfolio_summary
+        from app.api.v1.portfolio_analysis import portfolio_summary
 
         user = SimpleNamespace(id=uuid.uuid4())
         mock_db = AsyncMock()
@@ -154,7 +154,7 @@ class TestPortfolioSummaryMultiAccount:
         """KIS 설정은 있지만 등록된 활성 계좌가 없으면 400 에러를 반환해야 한다."""
         from fastapi import HTTPException
 
-        from app.api.v1.portfolio import portfolio_summary
+        from app.api.v1.portfolio_analysis import portfolio_summary
 
         user_id = uuid.uuid4()
         user = SimpleNamespace(id=user_id)
@@ -167,7 +167,7 @@ class TestPortfolioSummaryMultiAccount:
 
         mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
+            patch("app.api.v1.portfolio_analysis.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
             pytest.raises(HTTPException) as exc_info,
         ):
             await portfolio_summary(request=mock_request, current_user=user, db=mock_db)
@@ -178,7 +178,7 @@ class TestPortfolioSummaryMultiAccount:
     @pytest.mark.asyncio
     async def test_stock_return_pct_calculated_from_aggregated(self, mock_request):
         """수익률은 합산된 invested_krw 기준으로 계산되어야 한다."""
-        from app.api.v1.portfolio import portfolio_summary
+        from app.api.v1.portfolio_analysis import portfolio_summary
 
         user_id = uuid.uuid4()
         user = SimpleNamespace(id=user_id)
@@ -200,9 +200,9 @@ class TestPortfolioSummaryMultiAccount:
 
         mock_creds = {"app_key": "key", "app_secret": "secret", "access_token": "token", "is_mock": True}
         with (
-            patch("app.api.v1.portfolio.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
-            patch("app.api.v1.portfolio.get_domestic_balance", side_effect=mock_domestic),
-            patch("app.api.v1.portfolio.get_overseas_balance", new=AsyncMock(return_value=overseas)),
+            patch("app.api.v1.portfolio_analysis.get_kis_user_credentials", new=AsyncMock(return_value=mock_creds)),
+            patch("app.api.v1.portfolio_analysis.get_domestic_balance", side_effect=mock_domestic),
+            patch("app.api.v1.portfolio_analysis.get_overseas_balance", new=AsyncMock(return_value=overseas)),
         ):
             result = await portfolio_summary(request=mock_request, current_user=user, db=mock_db)
 

@@ -185,9 +185,9 @@ class TestPortfolioRoutes:
         }
         try:
             with (
-                patch("app.api.v1.portfolio.get_redis", new_callable=AsyncMock),
+                patch("app.api.v1.portfolio_analysis.get_redis", new_callable=AsyncMock),
                 patch(
-                    "app.api.v1.portfolio.build_portfolio_overview",
+                    "app.api.v1.portfolio_analysis.build_portfolio_overview",
                     new_callable=AsyncMock,
                     return_value=mock_overview,
                 ),

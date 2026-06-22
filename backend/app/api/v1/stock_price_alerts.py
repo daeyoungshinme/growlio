@@ -61,7 +61,9 @@ class StockPriceAlertResponse(BaseModel):
 
 
 @router.get("/stock-price", response_model=list[StockPriceAlertResponse])
+@limiter.limit("30/minute")
 async def list_stock_price_alerts(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     skip: int = 0,
@@ -103,7 +105,9 @@ async def create_stock_price_alert(
 
 
 @router.patch("/stock-price/{alert_id}/reactivate", response_model=StockPriceAlertResponse)
+@limiter.limit("20/minute")
 async def reactivate_stock_price_alert(
+    request: Request,
     alert_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -118,7 +122,9 @@ async def reactivate_stock_price_alert(
 
 
 @router.delete("/stock-price/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
+@limiter.limit("20/minute")
 async def delete_stock_price_alert(
+    request: Request,
     alert_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

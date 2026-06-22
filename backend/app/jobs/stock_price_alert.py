@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.database import AsyncSessionLocal
 from app.redis_client import get_redis
-from app.services.alert_service import check_and_trigger_stock_price_alerts
+from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
 
 
 async def run_stock_price_alert_check() -> None:

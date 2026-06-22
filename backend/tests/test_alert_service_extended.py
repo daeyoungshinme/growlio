@@ -174,7 +174,7 @@ class TestCheckAndTriggerAlerts:
     async def test_skips_when_rate_is_zero(self, mock_db, override_settings):
         from app.services.alert_service import check_and_trigger_alerts
 
-        with patch("app.services.alert_service.fetch_usd_krw", new=AsyncMock(return_value=0.0)):
+        with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", new=AsyncMock(return_value=0.0)):
             await check_and_trigger_alerts(mock_db)
 
         mock_db.execute.assert_not_called()
@@ -187,7 +187,7 @@ class TestCheckAndTriggerAlerts:
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.alert_service.fetch_usd_krw", new=AsyncMock(return_value=1300.0)):
+        with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", new=AsyncMock(return_value=1300.0)):
             await check_and_trigger_alerts(mock_db)
 
         mock_db.commit.assert_not_called()

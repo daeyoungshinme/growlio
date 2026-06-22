@@ -10,7 +10,7 @@ import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
-import RebalancingStrategyCard from "@/components/portfolio-analysis/RebalancingStrategyCard";
+import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import FactorExposureChart from "@/components/portfolio-analysis/FactorExposureChart";
 import EfficientFrontierChart from "@/components/portfolio-analysis/EfficientFrontierChart";
 import ErrorBoundary from "@/components/ErrorBoundary";

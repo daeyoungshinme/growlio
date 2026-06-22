@@ -1,27 +1,8 @@
-import {
-  BarChart2,
-  LineChart,
-  LogOut,
-  Wallet,
-  Settings,
-  Home,
-  Shuffle,
-  TrendingUp,
-  Moon,
-  Sun,
-} from "lucide-react";
+import { LineChart, LogOut, Moon, Sun } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { NAV_ITEMS } from "@/constants/nav";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
-
-const nav = [
-  { to: "/dashboard", icon: Home, label: "대시보드" },
-  { to: "/assets", icon: Wallet, label: "자산" },
-  { to: "/rebalancing", icon: Shuffle, label: "리밸런싱" },
-  { to: "/invest-plan", icon: TrendingUp, label: "투자 계획" },
-  { to: "/market", icon: BarChart2, label: "시장" },
-  { to: "/settings", icon: Settings, label: "설정" },
-];
 
 export default function Sidebar() {
   const logout = useLogout();
@@ -40,7 +21,7 @@ export default function Sidebar() {
       </div>
 
       <nav aria-label="메인 메뉴" className="flex-1 space-y-1">
-        {nav.map(({ to, icon: Icon, label }) => (
+        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
