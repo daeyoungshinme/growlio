@@ -23,7 +23,7 @@ interface Props {
 
 function StatBox({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="flex-1 text-center">
+    <div className="flex-1 px-1 text-center">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">{label}</p>
       <p className={`text-lg font-bold mt-0.5 ${color ?? "text-gray-900 dark:text-gray-50"}`}>
         {value}
@@ -92,15 +92,17 @@ export default memo(function PortfolioSummaryCard({ overview, isLoading, stockAl
           value={`${overview.unrealized_pnl_krw >= 0 ? "+" : ""}${fmtKrw(overview.unrealized_pnl_krw)}`}
           color={pnlColorClass}
         />
-        <HoverTooltip content="미실현 수익률 = (평가액 - 투자원금) / 투자원금 × 100">
-          <span>
-            <StatBox
-              label="주식 수익률"
-              value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
-              color={retColorClass}
-            />
-          </span>
-        </HoverTooltip>
+        <div className="flex-1">
+          <HoverTooltip content="미실현 수익률 = (평가액 - 투자원금) / 투자원금 × 100">
+            <span className="block w-full">
+              <StatBox
+                label="주식 수익률"
+                value={`${overview.stock_return_pct >= 0 ? "+" : ""}${overview.stock_return_pct.toFixed(2)}%`}
+                color={retColorClass}
+              />
+            </span>
+          </HoverTooltip>
+        </div>
       </div>
 
       {/* 종목별 비중 트리차트 */}
