@@ -24,8 +24,7 @@ const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
-const PortfolioPage = lazy(() => import("./pages/PortfolioPage"));
-const AssetManagementPage = lazy(() => import("./pages/AssetManagementPage"));
+const AssetsPage = lazy(() => import("./pages/AssetsPage"));
 const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
 const MarketPage = lazy(() => import("./pages/MarketPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
@@ -73,14 +72,14 @@ function AppRoutes() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<LazyRoute Component={DashboardPage} />} />
-          <Route path="portfolio" element={<LazyRoute Component={PortfolioPage} />} />
-          <Route path="asset-management" element={<LazyRoute Component={AssetManagementPage} />} />
+          <Route path="assets" element={<LazyRoute Component={AssetsPage} />} />
           <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
           <Route path="market" element={<LazyRoute Component={MarketPage} />} />
           <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
           <Route path="rebalancing" element={<LazyRoute Component={RebalancingPage} />} />
           {/* 구 URL 리다이렉트 */}
-          <Route path="assets" element={<Navigate to="/portfolio" replace />} />
+          <Route path="portfolio" element={<Navigate to="/assets?section=투자 현황" replace />} />
+          <Route path="asset-management" element={<Navigate to="/assets?section=계좌 관리" replace />} />
           <Route path="trend" element={<Navigate to="/dashboard" replace />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>

@@ -62,7 +62,10 @@ export default function PortfolioPage() {
 
   const handleTabChange = useCallback(
     (next: Tab) => {
-      setSearchParams({ tab: next }, { replace: true });
+      setSearchParams((prev) => {
+        prev.set("tab", next);
+        return prev;
+      }, { replace: true });
     },
     [setSearchParams],
   );

@@ -1,6 +1,6 @@
-import { lazy, Suspense, useCallback, useMemo } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowRight, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowRight, RefreshCw, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
@@ -8,6 +8,7 @@ import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
 import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
+import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -25,11 +26,21 @@ const SIGNAL_BG = {
 export default function DashboardPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const [syncing, setSyncing] = useState(false);
 
   const handleRefresh = useCallback(async () => {
     await invalidateSyncData(qc);
   }, [qc]);
   useRegisterRefresh(handleRefresh);
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await invalidateSyncData(qc);
+    } finally {
+      setSyncing(false);
+    }
+  }, [qc]);
 
   const { data: marketSignal } = useQuery({
     queryKey: QUERY_KEYS.marketSignal,
@@ -89,7 +100,7 @@ export default function DashboardPage() {
             자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
           </p>
           <button
-            onClick={() => navigate("/asset-management")}
+            onClick={() => navigate("/assets?section=계좌 관리")}
             className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             자산관리로 이동
@@ -100,6 +111,18 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Row 0: 동기화 버튼 (데스크탑) */}
+      <div className="hidden lg:flex items-center justify-end">
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+        >
+          <RefreshCw size={14} className={syncing ? "animate-spin" : ""} />
+          {syncing ? "갱신 중..." : "데이터 갱신"}
+        </button>
+      </div>
+
       {/* Row 1: Hero Card — 자산 현황 + 목표 달성 전망 */}
       <ErrorBoundary variant="section">
         <HeroSummaryCard
@@ -137,7 +160,7 @@ export default function DashboardPage() {
               주식 포트폴리오 요약
             </h2>
             <Link
-              to="/portfolio"
+              to="/assets?section=투자 현황"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               전체 보기 <ArrowRight size={14} />
@@ -155,7 +178,7 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between px-5 pt-4 pb-2">
             <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
             <Link
-              to="/portfolio?tab=배당"
+              to="/assets?section=투자 현황&tab=배당"
               className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
             >
               자세히 보기 <ArrowRight size={14} />
@@ -173,14 +196,19 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Row 3: 보유 종목 DART 공시 피드 (시의성 있는 콘텐츠 우선) */}
+      {/* Row 3: 리밸런싱 자동화 현황 */}
+      <ErrorBoundary variant="section">
+        <RebalancingStatusCard />
+      </ErrorBoundary>
+
+      {/* Row 4: 보유 종목 DART 공시 피드 (시의성 있는 콘텐츠 우선) */}
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
           <DisclosureFeedCard />
         </Suspense>
       </ErrorBoundary>
 
-      {/* Row 4: 자산 추이 */}
+      {/* Row 5: 자산 추이 */}
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
           <AllocationHistoryChart />

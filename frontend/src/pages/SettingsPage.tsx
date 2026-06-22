@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint, Wallet, ArrowRight } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint, Wallet, ArrowRight, Shuffle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useBiometric } from "@/hooks/useBiometric";
 import { isNativePlatform } from "@/utils/platform";
@@ -137,7 +137,7 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-xl">
       {/* 계좌 및 자산 관리 */}
       <Link
-        to="/asset-management"
+        to="/assets?section=계좌 관리"
         className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
       >
         <div className="p-2.5 bg-blue-50 dark:bg-blue-950 rounded-xl">
@@ -148,6 +148,23 @@ export default function SettingsPage() {
           <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
             은행 {bankCount}개 · 증권 {stockCount}개
             {realEstateCount > 0 ? ` · 부동산 ${realEstateCount}개` : ""}
+          </p>
+        </div>
+        <ArrowRight size={16} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+      </Link>
+
+      {/* 리밸런싱 자동화 설정 링크 */}
+      <Link
+        to="/rebalancing?rtab=알림 설정"
+        className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+      >
+        <div className="p-2.5 bg-orange-50 dark:bg-orange-950 rounded-xl">
+          <Shuffle size={20} className="text-orange-600 dark:text-orange-400" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">리밸런싱 자동화</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+            비중 이탈 알림 · 자동 매수/매도 설정
           </p>
         </div>
         <ArrowRight size={16} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />

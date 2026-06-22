@@ -247,7 +247,7 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     const link = screen.getByRole("link", { name: /전체 보기/ });
-    expect(link).toHaveAttribute("href", "/portfolio");
+    expect(link.getAttribute("href")).toContain("/assets");
   });
 
   it("다시 시도 버튼 클릭 시 쿼리를 무효화한다", async () => {
