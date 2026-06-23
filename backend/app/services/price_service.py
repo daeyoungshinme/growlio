@@ -20,6 +20,7 @@ from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
 from app.services.credential_service import decrypt
 from app.services.yahoo_price import (
@@ -38,8 +39,6 @@ from app.utils.cache_keys import (
 from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
-
-DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 
 
 async def fetch_current_price(

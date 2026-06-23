@@ -208,7 +208,6 @@ import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
-import PortfolioAnalysisTab from "@/components/portfolio-analysis/PortfolioAnalysisTab";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import { fetchPortfolios } from "@/api/portfolios";
 import AssetsPage from "@/pages/AssetsPage";
@@ -510,33 +509,6 @@ describe("AnalysisPanel", () => {
 });
 
 // =========================================
-// PortfolioAnalysisTab
-// =========================================
-describe("PortfolioAnalysisTab", () => {
-  it("renders without crash", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioAnalysisTab />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-
-  it("renders with portfolioId prop", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioAnalysisTab portfolioId="p1" />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-});
-
-// =========================================
 // RebalancingStatusCard
 // =========================================
 describe("RebalancingStatusCard", () => {
@@ -559,20 +531,20 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText("리밸런싱 현황")).toBeInTheDocument();
+      expect(screen.getByText("투자 현황 진단")).toBeInTheDocument();
     });
     expect(screen.getByRole("link", { name: /분석하기/ })).toBeInTheDocument();
   });
 
-  it("드리프트 데이터 없을 때 안내 메시지 표시", async () => {
+  it("드리프트 데이터 없어도 카드 정상 렌더링", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
-    renderWithProviders(
+    const { container } = renderWithProviders(
       <MemoryRouter>
         <RebalancingStatusCard />
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/목표 계좌를 지정하면 현황이 표시됩니다/)).toBeInTheDocument();
+      expect(container.firstChild).not.toBeNull();
     });
   });
 });

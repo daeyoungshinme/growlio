@@ -19,8 +19,9 @@ from app.redis_client import get_redis
 from app.schemas.portfolio import PortfolioSummaryResponse
 from app.services.credential_service import get_kis_user_credentials
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
+from app.services.portfolio_history_service import get_allocation_history
 from app.services.portfolio_optimizer import get_efficient_frontier
-from app.services.portfolio_service import build_portfolio_overview, get_allocation_history
+from app.services.portfolio_service import build_portfolio_overview
 from app.services.rebalancing_strategy_service import get_rebalancing_strategy
 from app.services.risk_service import (
     get_currency_exposure,

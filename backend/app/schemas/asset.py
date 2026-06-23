@@ -87,6 +87,37 @@ class PositionItem(BaseModel):
     name: str | None = None
 
 
+class PositionResponse(BaseModel):
+    """Position.to_dict() + _enrich_positions 결과 스키마."""
+
+    ticker: str
+    name: str
+    market: str
+    qty: float
+    avg_price: float
+    avg_price_usd: float | None = None
+    current_price: float | None = None
+    value_krw: float | None = None
+    currency: str = "KRW"
+    usd_rate: float | None = None
+    invested_amount: float | None = None
+    value_amount: float | None = None
+    pnl: float | None = None
+    pnl_pct: float | None = None
+
+
+class PositionSummary(BaseModel):
+    total_invested: float
+    total_value: float
+    total_pnl: float
+    total_pnl_pct: float
+
+
+class PositionListResponse(BaseModel):
+    positions: list[PositionResponse]
+    summary: PositionSummary
+
+
 class RealEstateDetails(BaseModel):
     address: str
     property_type: str

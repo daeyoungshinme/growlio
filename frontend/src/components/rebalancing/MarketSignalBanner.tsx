@@ -1,17 +1,10 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
-import type {
-  MarketSignalResponse,
-  MarketRiskLevel,
-  VixLevel,
-  YieldCurveState,
-  FearGreedClassification,
-} from "@/api/marketSignals";
+import { ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
+import type { MarketSignalResponse, MarketRiskLevel, VixLevel, YieldCurveState, FearGreedClassification } from "@/api/marketSignals";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 
 interface Props {
   signal: MarketSignalResponse;
-  defaultExpanded?: boolean;
 }
 
 const BANNER_BG: Record<MarketRiskLevel, string> = {
@@ -26,173 +19,171 @@ const SHORT_IMPLICATION: Record<MarketRiskLevel, string> = {
   RED: "포지션 점검 필요",
 };
 
+const VIX_DOT: Record<VixLevel, string> = {
+  LOW: "bg-green-500",
+  MEDIUM: "bg-yellow-500",
+  MEDIUM_HIGH: "bg-orange-500",
+  HIGH: "bg-red-500",
+};
+
 const VIX_LABEL: Record<VixLevel, string> = {
   LOW: "낮음",
-  MEDIUM: "중간",
-  MEDIUM_HIGH: "높음",
-  HIGH: "고위험",
+  MEDIUM: "보통",
+  MEDIUM_HIGH: "주의",
+  HIGH: "위험",
 };
 
-const VIX_CLS: Record<VixLevel, string> = {
-  LOW: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  MEDIUM: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  MEDIUM_HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  HIGH: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+const VIX_HINT: Record<VixLevel, string> = {
+  LOW: "시장 안정",
+  MEDIUM: "모니터링",
+  MEDIUM_HIGH: "분할 집행 고려",
+  HIGH: "변동성 급등, 분할 매수 권고",
 };
 
-const VIX_DESC: Record<VixLevel, string> = {
-  LOW: "시장 변동성 낮음",
-  MEDIUM: "정상 시장 범위",
-  MEDIUM_HIGH: "불확실성 증가 중",
-  HIGH: "시장 공포 구간",
+const YIELD_DOT: Record<YieldCurveState, string> = {
+  POSITIVE: "bg-green-500",
+  FLAT: "bg-yellow-500",
+  INVERTED: "bg-orange-500",
+  DEEPLY_INVERTED: "bg-red-500",
 };
 
-const YC_LABEL: Record<YieldCurveState, string> = {
+const YIELD_CURVE_LABEL: Record<YieldCurveState, string> = {
   POSITIVE: "정상",
   FLAT: "평탄",
   INVERTED: "역전",
   DEEPLY_INVERTED: "심각 역전",
 };
 
-const YC_CLS: Record<YieldCurveState, string> = {
-  POSITIVE: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  FLAT: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  INVERTED: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  DEEPLY_INVERTED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+const YIELD_HINT: Record<YieldCurveState, string> = {
+  POSITIVE: "경기 확장 국면",
+  FLAT: "경기 둔화 가능성",
+  INVERTED: "경기 침체 선행 신호",
+  DEEPLY_INVERTED: "침체 위험 높음, 안전자산 비중 점검",
 };
 
-const YC_DESC: Record<YieldCurveState, string> = {
-  POSITIVE: "경기 확장 신호",
-  FLAT: "경기 전환 주시",
-  INVERTED: "경기침체 선행지표",
-  DEEPLY_INVERTED: "경기침체 고위험",
+const FEAR_DOT: Record<FearGreedClassification, string> = {
+  EXTREME_FEAR: "bg-blue-500",
+  FEAR: "bg-sky-400",
+  NEUTRAL: "bg-gray-400",
+  GREED: "bg-orange-400",
+  EXTREME_GREED: "bg-red-500",
 };
 
-const FG_CLS: Record<FearGreedClassification, string> = {
-  EXTREME_FEAR: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-  FEAR: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
-  NEUTRAL: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300",
-  GREED: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  EXTREME_GREED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+const FEAR_HINT: Record<FearGreedClassification, string> = {
+  EXTREME_FEAR: "역발상 매수 기회 검토",
+  FEAR: "저점 매수 관심 가능",
+  NEUTRAL: "중립 유지",
+  GREED: "과열 주의, 신규 비중 축소 고려",
+  EXTREME_GREED: "탐욕 과열, 차익실현 검토",
 };
 
-const FG_DESC: Record<FearGreedClassification, string> = {
-  EXTREME_FEAR: "역발상 매수 검토",
-  FEAR: "저가 매수 탐색 가능",
-  NEUTRAL: "방향성 불명확",
-  GREED: "과열 주의",
-  EXTREME_GREED: "고점 리스크",
-};
+function scoreColor(score: number): string {
+  if (score <= 2) return "text-green-600 dark:text-green-400";
+  if (score <= 5) return "text-yellow-600 dark:text-yellow-400";
+  return "text-red-600 dark:text-red-400";
+}
 
-const IMPLICATION: Record<MarketRiskLevel, string> = {
-  GREEN: "현재 시장은 전반적으로 안정적입니다. 계획된 리밸런싱을 정상 진행하세요.",
-  YELLOW: "변동성 확대 구간입니다. 리밸런싱 규모를 분할 집행하거나 현금 비중 유지를 고려하세요.",
-  RED: "고위험 구간입니다. 신규 비중 확대보다 기존 포지션 점검과 손실 제한에 집중하세요.",
-};
-
-export default function MarketSignalBanner({ signal, defaultExpanded = false }: Props) {
-  const [expanded, setExpanded] = useState(defaultExpanded);
-  const { composite_level, composite_score, signals, fear_greed_contrarian_buy, fear_greed_extreme_greed, data_freshness } = signal;
-  const { vix, yield_curve, fear_greed } = signals;
+export default function MarketSignalBanner({ signal }: Props) {
+  const { composite_level, composite_score, data_freshness, signals, fear_greed_contrarian_buy, fear_greed_extreme_greed } = signal;
+  const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
   return (
-    <div className={`rounded-xl border px-4 py-3 ${BANNER_BG[composite_level]}`}>
+    <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
       {/* 헤더 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-300">시장 위험 신호</span>
-          <MarketSignalLevelBadge level={composite_level} />
-          {expanded ? (
-            <span className="text-xs text-gray-500 dark:text-gray-500">
-              점수 {composite_score.toFixed(1)}/10
-            </span>
-          ) : (
-            <span className="text-xs text-gray-500 dark:text-gray-500">
-              {SHORT_IMPLICATION[composite_level]}
-            </span>
-          )}
-          {data_freshness === "STALE" && (
-            <span className="text-xs text-gray-500 dark:text-gray-500">(데이터 조회 불가)</span>
-          )}
-          {data_freshness === "PARTIAL" && (
-            <span className="text-xs text-gray-500 dark:text-gray-500">(일부 데이터 없음)</span>
-          )}
-        </div>
+      <div className="px-4 py-3 flex items-center gap-2">
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">시장 위험 신호</span>
+        <MarketSignalLevelBadge level={composite_level} />
+        <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
+          {SHORT_IMPLICATION[composite_level]}
+          {data_freshness === "STALE" && " · 데이터 조회 불가"}
+          {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}
+        </span>
+        <span className={`text-xs font-semibold shrink-0 ${scoreColor(composite_score)}`}>
+          위험지수 {composite_score}/10
+        </span>
         <button
-          onClick={() => setExpanded((v) => !v)}
-          className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors shrink-0 ml-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-          aria-label={expanded ? "접기" : "펼치기"}
+          onClick={() => setIsOpen((v) => !v)}
+          className="flex items-center gap-0.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 shrink-0 transition-colors ml-1"
+          aria-expanded={isOpen}
+          aria-label="시장 신호 상세 보기"
         >
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {isOpen ? "접기" : "자세히"}
+          <ChevronDown size={11} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
         </button>
       </div>
 
-      {/* 상세 신호 — 가로 스크롤 pill 레이아웃 */}
-      {expanded && (
-        <div className="mt-3 space-y-3">
-          {/* 지표 pill 가로 스크롤 행 */}
-          <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 [&::-webkit-scrollbar]:hidden">
-            {/* VIX */}
-            {vix && (
-              <div className="flex-none rounded-xl border border-gray-200/60 dark:border-gray-700/40 px-3 py-2 bg-white/60 dark:bg-gray-900/50">
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">VIX</span>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">{vix.value.toFixed(1)}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${VIX_CLS[vix.level]}`}>
-                    {VIX_LABEL[vix.level]}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{VIX_DESC[vix.level]}</p>
-              </div>
-            )}
-
-            {/* 장단기 금리차 */}
-            {yield_curve && (
-              <div className="flex-none rounded-xl border border-gray-200/60 dark:border-gray-700/40 px-3 py-2 bg-white/60 dark:bg-gray-900/50">
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">10Y-2Y</span>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">
-                    {yield_curve.value >= 0 ? "+" : ""}{yield_curve.value.toFixed(2)}%
-                  </span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${YC_CLS[yield_curve.state]}`}>
-                    {YC_LABEL[yield_curve.state]}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{YC_DESC[yield_curve.state]}</p>
-              </div>
-            )}
-
-            {/* Fear & Greed */}
-            {fear_greed && (
-              <div className="flex-none rounded-xl border border-gray-200/60 dark:border-gray-700/40 px-3 py-2 bg-white/60 dark:bg-gray-900/50">
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <span className="text-xs text-gray-500 dark:text-gray-400">공포·탐욕</span>
-                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-100">{fear_greed.value}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${FG_CLS[fear_greed.classification]}`}>
-                    {fear_greed.label}
-                  </span>
-                </div>
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">{FG_DESC[fear_greed.classification]}</p>
-              </div>
+      {/* 상세 내용 */}
+      {isOpen && (
+        <div className="px-4 pb-3 space-y-2.5 border-t border-inherit pt-2.5">
+          {/* VIX */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">VIX</span>
+            {signals.vix ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${VIX_DOT[signals.vix.level]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.vix.value.toFixed(1)} · {VIX_LABEL[signals.vix.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {VIX_HINT[signals.vix.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
             )}
           </div>
 
-          {/* 투자 시사점 */}
-          <div className="text-xs rounded-lg px-3 py-2 text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700/40">
-            💡 {IMPLICATION[composite_level]}
+          {/* 장단기 금리차 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">장단기 금리차</span>
+            {signals.yield_curve ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${YIELD_DOT[signals.yield_curve.state]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.yield_curve.value.toFixed(2)}% · {YIELD_CURVE_LABEL[signals.yield_curve.state]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {YIELD_HINT[signals.yield_curve.state]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
           </div>
 
-          {/* 역발상 매수 callout */}
+          {/* Fear & Greed */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">Fear &amp; Greed</span>
+            {signals.fear_greed ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${FEAR_DOT[signals.fear_greed.classification]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.fear_greed.value} · {signals.fear_greed.label}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {FEAR_HINT[signals.fear_greed.classification]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 특수 플래그 */}
           {fear_greed_contrarian_buy && (
-            <div className="text-xs text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/30 rounded-lg px-3 py-1.5 border border-green-200 dark:border-green-800/40">
-              극도의 공포 구간 — 역발상 매수 기회일 수 있습니다
+            <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/40">
+              <TrendingUp size={13} className="text-blue-500 shrink-0" />
+              <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
+                역발상 매수 기회 — 극도 공포 구간에서 분할 매수를 고려할 수 있습니다
+              </span>
             </div>
           )}
-
-          {/* 극도 탐욕 callout */}
           {fear_greed_extreme_greed && (
-            <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 rounded-lg px-3 py-1.5 border border-red-200 dark:border-red-800/40">
-              극도의 탐욕 구간 — 고점 리스크가 높습니다. 차익실현을 검토하세요
+            <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-800/40">
+              <TrendingDown size={13} className="text-orange-500 shrink-0" />
+              <span className="text-xs text-orange-700 dark:text-orange-300 font-medium">
+                탐욕 과열 구간 — 신규 비중 확대보다 차익실현 점검을 권장합니다
+              </span>
             </div>
           )}
         </div>

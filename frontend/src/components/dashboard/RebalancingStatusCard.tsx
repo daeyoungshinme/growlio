@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, ArrowRight, CheckCircle, ChevronDown, Shuffle } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, ChevronDown, Shuffle } from "lucide-react";
+
 import { fetchDriftSummary } from "@/api/rebalancing";
+import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { fetchPortfolios } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -20,6 +22,38 @@ const SIGNAL_BG = {
 
 const SIGNAL_LABEL = { GREEN: "안정", YELLOW: "주의", RED: "위험" };
 
+
+function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummary; onClick?: (id: string) => void }) {
+  const isAlert = summary.needs_rebalancing;
+  return (
+    <button
+      onClick={() => onClick?.(summary.portfolio_id)}
+      className="w-full flex items-center gap-2 py-2 px-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors"
+    >
+      <span className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`} />
+      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-0 flex-1 truncate">
+        {summary.portfolio_name}
+      </span>
+      <span className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
+        최대 {summary.max_drift_pct.toFixed(1)}%
+      </span>
+      {summary.top_drifted_items.slice(0, 2).map((item) => (
+        <span
+          key={item.ticker}
+          className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 shrink-0"
+        >
+          {item.ticker} {item.weight_diff_pct > 0 ? "▲" : "▼"}{Math.abs(item.weight_diff_pct).toFixed(1)}%
+        </span>
+      ))}
+      {isAlert && (
+        <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
+          필요
+        </span>
+      )}
+    </button>
+  );
+}
+
 function DiagnosticGauge({ value }: { value: number }) {
   const pct = Math.min(value, 100);
   const color = value >= 40 ? "#EF4444" : value >= 30 ? "#F59E0B" : "#22C55E";
@@ -29,7 +63,7 @@ function DiagnosticGauge({ value }: { value: number }) {
         <span>자산 집중도</span>
         <span className="font-medium">{value.toFixed(1)}%</span>
       </div>
-      <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
+      <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
         <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
       </div>
     </div>
@@ -45,14 +79,14 @@ function InsightRow({ insight }: { insight: Insight }) {
   };
   return (
     <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
-      <span className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${severityDot[insight.severity] ?? "bg-gray-400"}`} />
+      <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${severityDot[insight.severity] ?? "bg-gray-400"}`} />
       <div className="flex-1 min-w-0">
         <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{insight.title}</span>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{insight.detail}</p>
         {insight.action_label && insight.action_url && (
           <button
             onClick={() => navigate(insight.action_url!)}
-            className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            className="mt-1.5 block py-1 text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline active:opacity-70"
           >
             {insight.action_label} →
           </button>
@@ -79,7 +113,7 @@ const ALL_INSIGHT_TYPES: InsightType[] = [
 ];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
-export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect, showAllInsights = false, hideSignalBanner = false }: Props) {
+export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect: _onPortfolioSelect, showAllInsights = false, hideSignalBanner = false }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -88,7 +122,7 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
   });
   const portfolioCount = Array.isArray(portfoliosRaw) ? portfoliosRaw.length : 0;
 
-  const { data: driftSummaries, isLoading } = useQuery({
+  const { data: driftSummaries } = useQuery({
     queryKey: QUERY_KEYS.driftSummary,
     queryFn: fetchDriftSummary,
     staleTime: STALE_TIME.MEDIUM,
@@ -106,16 +140,10 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
   const otherInsights = diagInsights.filter((i) => i.type !== "CONCENTRATION");
   const hasDiagnosis = diagInsights.length > 0;
 
-  const sorted = useMemo(() => {
-    if (!driftSummaries) return [];
-    return [...driftSummaries].sort((a, b) => {
-      if (a.needs_rebalancing !== b.needs_rebalancing)
-        return a.needs_rebalancing ? -1 : 1;
-      return b.max_drift_pct - a.max_drift_pct;
-    });
+  const needsCount = useMemo(() => {
+    if (!driftSummaries) return 0;
+    return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
-
-  const needsCount = sorted.filter((s) => s.needs_rebalancing).length;
 
   if (portfolioCount === 0) return null;
 
@@ -150,7 +178,7 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
         {!showAllInsights && (
           <Link
             to="/rebalancing"
-            className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+            className="flex items-center gap-1 -my-1 py-1.5 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors"
           >
             분석하기 <ArrowRight size={12} />
           </Link>
@@ -178,9 +206,19 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
         </Link>
       )}
 
+      {/* 포트폴리오별 드리프트 현황 (진단 탭 전용) */}
+      {showAllInsights && driftSummaries && driftSummaries.length > 0 && (
+        <div className="space-y-0.5 mt-1 mb-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">포트폴리오 이탈 현황</p>
+          {driftSummaries.map((s) => (
+            <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={_onPortfolioSelect} />
+          ))}
+        </div>
+      )}
+
       {/* 진단 결과 섹션 */}
       {hasDiagnosis && (
-        <div className="mb-3 space-y-2">
+        <div className="space-y-2">
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
           {concentrationInsight?.metric_value != null && (
             <DiagnosticGauge value={concentrationInsight.metric_value} />
@@ -194,101 +232,6 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
         </div>
       )}
 
-      {/* 리밸런싱 현황 목록 */}
-      <div>
-        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 mb-2">리밸런싱 현황</p>
-        {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="h-10 bg-gray-100 dark:bg-gray-700 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        ) : sorted.length === 0 ? (
-          <div className="flex flex-col gap-2 py-2">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              리밸런싱 포트폴리오에 목표 계좌를 지정하면 현황이 표시됩니다.
-            </p>
-            <Link
-              to="/rebalancing"
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-1"
-            >
-              계좌 지정하러 가기 <ArrowRight size={11} />
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-1.5">
-            {sorted.map((s) => {
-              const isNeeded = s.needs_rebalancing;
-              const isCaution = !isNeeded && s.max_drift_pct >= s.threshold_pct / 2;
-              const itemClass =
-                "flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors w-full text-left";
-              const innerContent = (
-                <>
-                  <div className="flex items-center gap-2 min-w-0">
-                    {isNeeded ? (
-                      <AlertTriangle size={13} className="text-red-500 shrink-0" />
-                    ) : isCaution ? (
-                      <AlertTriangle size={13} className="text-amber-400 shrink-0" />
-                    ) : (
-                      <CheckCircle size={13} className="text-green-500 shrink-0" />
-                    )}
-                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
-                      {s.portfolio_name}
-                    </span>
-                    {isNeeded && s.top_drifted_items[0] && (
-                      <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                        {s.top_drifted_items[0].name}{" "}
-                        <span className={s.top_drifted_items[0].weight_diff_pct > 0 ? "text-red-500" : "text-blue-500"}>
-                          {s.top_drifted_items[0].weight_diff_pct > 0 ? "▲" : "▼"}
-                          {Math.abs(s.top_drifted_items[0].weight_diff_pct).toFixed(1)}%
-                        </span>
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {isNeeded ? (
-                      <span className="text-xs text-red-500 dark:text-red-400 font-medium">
-                        최대 {s.max_drift_pct.toFixed(1)}% 이탈
-                      </span>
-                    ) : isCaution ? (
-                      <span className="text-xs text-amber-500 dark:text-amber-400 font-medium">
-                        {s.max_drift_pct.toFixed(1)}% 이탈
-                      </span>
-                    ) : (
-                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">안정</span>
-                    )}
-                    <ArrowRight size={11} className="text-gray-400" />
-                  </div>
-                </>
-              );
-              return onPortfolioSelect ? (
-                <button
-                  key={s.portfolio_id}
-                  onClick={() => onPortfolioSelect(s.portfolio_id)}
-                  className={itemClass}
-                >
-                  {innerContent}
-                </button>
-              ) : (
-                <Link
-                  key={s.portfolio_id}
-                  to={`/rebalancing?portfolioId=${s.portfolio_id}`}
-                  className={itemClass}
-                >
-                  {innerContent}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {!isLoading && needsCount === 0 && sorted.length > 0 && (
-        <div className="flex items-center gap-1.5 mt-2 text-xs text-green-600 dark:text-green-400">
-          <CheckCircle size={13} />
-          모든 포트폴리오가 목표 비중을 유지하고 있습니다
-        </div>
-      )}
       </>}
     </div>
   );

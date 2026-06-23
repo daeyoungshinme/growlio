@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { analyzePortfolio, type RebalancingAnalysis } from "@/api/rebalancing";
 import { extractErrorMessage } from "@/utils/error";
 
-type AnalysisMode = "rebalancing" | "backtest" | "strategy";
+type AnalysisMode = "rebalancing" | "strategy";
 
 interface AnalysisState {
   mode: AnalysisMode | null;

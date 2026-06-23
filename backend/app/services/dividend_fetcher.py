@@ -12,6 +12,7 @@ from functools import partial
 import structlog
 from redis.asyncio import Redis as AioRedis
 
+from app.constants import DOMESTIC_MARKETS
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
 from app.services.dart_service import fetch_dart_dividend
 from app.services.dividend_constants import (
@@ -240,7 +241,7 @@ async def fetch_ticker_dividend_info(
     소스 우선순위: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
     """
     loop = asyncio.get_running_loop()
-    is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
+    is_korean = market.upper() in DOMESTIC_MARKETS
     is_etf = is_korean_etf(ticker, market)
     yahoo_sym = _to_yahoo_symbol(ticker, market)
     yield_decimal = 0.0

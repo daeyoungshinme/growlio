@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
@@ -15,6 +15,8 @@ interface Props {
   exchangeRate: number | null;
   dataUpdatedAt?: number;
   isLoading?: boolean;
+  onSync?: () => void;
+  syncing?: boolean;
 }
 
 export default memo(function HeroSummaryCard({
@@ -22,6 +24,8 @@ export default memo(function HeroSummaryCard({
   exchangeRate,
   dataUpdatedAt,
   isLoading,
+  onSync,
+  syncing,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
@@ -105,14 +109,26 @@ export default memo(function HeroSummaryCard({
             </div>
           )}
         </div>
-        <button
-          onClick={() => setExpanded((v) => !v)}
-          className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors shrink-0 mt-1"
-          aria-label={expanded ? "카드 접기" : "카드 펼치기"}
-          aria-expanded={expanded}
-        >
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
+        <div className="flex items-center gap-1 shrink-0 mt-1">
+          {onSync && (
+            <button
+              onClick={onSync}
+              disabled={syncing}
+              className="lg:hidden p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+              aria-label="데이터 갱신"
+            >
+              <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
+            </button>
+          )}
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+            aria-label={expanded ? "카드 접기" : "카드 펼치기"}
+            aria-expanded={expanded}
+          >
+            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </button>
+        </div>
       </div>
 
       {/* 펼침 상태: 상세 정보 */}

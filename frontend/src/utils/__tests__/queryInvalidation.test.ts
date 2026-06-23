@@ -17,7 +17,7 @@ function makeQueryClient() {
 }
 
 describe("invalidateSyncData", () => {
-  it("portfolio-overview, dashboard, dividend, insights 무효화", async () => {
+  it("portfolio-overview, dashboard, dividend, insights, drift-summary 무효화", async () => {
     const qc = makeQueryClient();
     await invalidateSyncData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
@@ -25,6 +25,7 @@ describe("invalidateSyncData", () => {
     expect(keys).toContain("dashboard");
     expect(keys).toContain("dividend-by-ticker");
     expect(keys).toContain("insights");
+    expect(keys).toContain("drift-summary");
   });
 });
 

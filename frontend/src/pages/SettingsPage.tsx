@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -13,9 +13,14 @@ import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
+
+const RebalancingAlertListTab = lazy(
+  () => import("../components/rebalancing/RebalancingAlertListTab"),
+);
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -207,12 +212,30 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      <ExchangeRateAlertSection
-        userEmail={current?.user_email}
-        onSettingsChange={invalidateSettings}
-      />
+      {/* 알림 설정 그룹 */}
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+          알림 설정
+        </h2>
+        <div className="space-y-4">
+          {/* 리밸런싱 자동화 알림 */}
+          <SectionCard title="리밸런싱 자동화">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              포트폴리오 비중 이탈 시 알림 발송 또는 자동 매수/매도를 설정합니다.
+            </p>
+            <Suspense fallback={<SkeletonCard rows={3} />}>
+              <RebalancingAlertListTab />
+            </Suspense>
+          </SectionCard>
 
-      <StockPriceAlertSection />
+          <ExchangeRateAlertSection
+            userEmail={current?.user_email}
+            onSettingsChange={invalidateSettings}
+          />
+
+          <StockPriceAlertSection />
+        </div>
+      </div>
 
       <AlertHistorySection />
 

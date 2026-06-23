@@ -26,9 +26,7 @@ async def _load_account(
     user_id: uuid.UUID,
     db: AsyncSession,
 ) -> AssetAccount:
-    account = await db.scalar(
-        active_accounts_stmt(user_id).where(AssetAccount.id == account_id)
-    )
+    account = await db.scalar(active_accounts_stmt(user_id).where(AssetAccount.id == account_id))
     if not account:
         raise HTTPException(status_code=404, detail=f"계좌를 찾을 수 없습니다. (id={account_id})")
     if account.asset_type not in _BROKER_ASSET_TYPES:
@@ -231,6 +229,13 @@ async def execute_rebalancing(
         await db.commit()
     except Exception as e:
         logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))
+
+    # 실행 후 전략 캐시 무효화 (포트폴리오 구성이 변경되었으므로)
+    if portfolio_id and redis:
+        import contextlib
+
+        with contextlib.suppress(Exception):
+            await redis.delete(f"rebalancing_strategy:{user_id}:{portfolio_id}")
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
     return results

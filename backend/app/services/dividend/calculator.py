@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import structlog
 
+from app.constants import DOMESTIC_MARKETS
 from app.services.dividend_constants import is_korean_etf
 
 logger = structlog.get_logger()
@@ -33,7 +34,7 @@ def calculate_position_dividend(
 
     usd_krw_rate가 0이면 estimated_monthly_usd는 None으로 반환된다.
     """
-    is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
+    is_korean = market.upper() in DOMESTIC_MARKETS
     is_etf = is_korean_etf(ticker, market)
 
     if is_korean and not is_etf and dps > 0 and qty > 0:

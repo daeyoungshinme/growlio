@@ -15,36 +15,46 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
 
 from app.database import Base
 
 
-class ExchangeRateAlert(Base):
+class _AlertMixin:
+    """공통 알림 컬럼 — ExchangeRateAlert, RebalancingAlert, StockPriceAlert에서 사용."""
+
+    @declared_attr
+    def id(cls) -> Mapped[uuid.UUID]:
+        return mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    @declared_attr
+    def user_id(cls) -> Mapped[uuid.UUID]:
+        return mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    @declared_attr
+    def is_active(cls) -> Mapped[bool]:
+        return mapped_column(Boolean, default=True, nullable=False)
+
+    @declared_attr
+    def created_at(cls) -> Mapped[datetime]:
+        return mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class ExchangeRateAlert(_AlertMixin, Base):
     __tablename__ = "exchange_rate_alerts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
     target_rate: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     direction: Mapped[str] = mapped_column(Enum("BELOW", "ABOVE", name="alert_direction_enum"), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (Index("idx_exchange_rate_alerts_user", "user_id"),)
 
 
-class RebalancingAlert(Base):
+class RebalancingAlert(_AlertMixin, Base):
     __tablename__ = "rebalancing_alerts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
     portfolio_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
@@ -75,7 +85,6 @@ class RebalancingAlert(Base):
     deposit_accounts: Mapped[list["RebalancingAlertDepositAccount"]] = relationship(
         "RebalancingAlertDepositAccount", cascade="all, delete-orphan", lazy="selectin"
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -86,23 +95,17 @@ class RebalancingAlert(Base):
     )
 
 
-class StockPriceAlert(Base):
+class StockPriceAlert(_AlertMixin, Base):
     __tablename__ = "stock_price_alerts"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
     ticker: Mapped[str] = mapped_column(String(20), nullable=False)
     market: Mapped[str] = mapped_column(String(20), nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False, default="")
     target_price: Mapped[float] = mapped_column(Numeric(18, 2), nullable=False)
     direction: Mapped[str] = mapped_column(Enum("BELOW", "ABOVE", name="stock_alert_direction_enum"), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     max_trigger_count: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     trigger_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
         Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),

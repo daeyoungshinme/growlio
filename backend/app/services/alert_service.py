@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import uuid
 from datetime import UTC, datetime
 from typing import Literal, cast
@@ -73,12 +74,16 @@ async def _process_rebalancing_alert(
     email: str,
     composite_level: str,
     db: AsyncSession,
+    fcm_token: str | None = None,
 ) -> bool:
-    """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일 발송).
+    """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일/FCM 발송).
 
     성공 시 True, continue 필요(건너뜀) 시 False 반환.
     """
+    import asyncio
+
     from app.services.email_service import send_rebalancing_alert
+    from app.services.push_service import send_push_to_user
 
     mode = getattr(alert, "mode", "NOTIFY")
 
@@ -100,19 +105,46 @@ async def _process_rebalancing_alert(
     if mode == "AUTO" and alert.account_id and drifting:
         return await _execute_auto_rebalancing(alert, portfolio, drifting, db)
 
-    try:
-        await send_rebalancing_alert(
+    # NOTIFY: 이메일 + FCM 병렬 전송
+    drift_count = len(drifting)
+    push_title = f"리밸런싱 알림 — {portfolio.name}"
+    push_body = (
+        f"{drift_count}개 종목이 ±{threshold:.1f}% 이상 이탈했습니다."
+        if drift_count
+        else f"{portfolio.name} 정기 리밸런싱 리포트"
+    )
+
+    email_task = asyncio.create_task(
+        send_rebalancing_alert(
             to_email=email,
             portfolio_name=portfolio.name,
             threshold_pct=threshold,
             items_to_show=items_to_show,
-            drifting_count=len(drifting),
+            drifting_count=drift_count,
             is_scheduled_report=is_scheduled_report,
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
         )
+    )
+    push_task = asyncio.create_task(
+        send_push_to_user(
+            user_id=alert.user_id,
+            title=push_title,
+            body=push_body,
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
+        )
+    )
+
+    try:
+        await email_task
     except Exception as exc:
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+        push_task.cancel()
         return False
+
+    # FCM 실패는 무시 (이메일이 성공하면 OK)
+    with contextlib.suppress(Exception):
+        await push_task
 
     return True
 
@@ -144,6 +176,17 @@ async def _execute_auto_rebalancing(
         side = "BUY" if item.diff_krw > 0 else "SELL"
         if strategy == "BUY_ONLY" and side == "SELL":
             continue
+
+        # LIMIT 주문 시 현재가를 지정가로 사용 (None이면 MARKET으로 fallback)
+        effective_order_type = order_type
+        limit_price: float | None = None
+        if order_type == "LIMIT":
+            price = getattr(item, "current_price_krw", None)
+            if price and price > 0:
+                limit_price = float(price)
+            else:
+                effective_order_type = "MARKET"
+
         orders.append(
             ExecutionOrderItem(
                 ticker=item.ticker,
@@ -152,7 +195,8 @@ async def _execute_auto_rebalancing(
                 side=side,
                 quantity=qty,
                 account_id=str(alert.account_id),
-                order_type=order_type,
+                order_type=effective_order_type,
+                limit_price=limit_price,
             )
         )
 
@@ -193,7 +237,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         composite_level = "GREEN"  # 조회 실패 시 안전 방향으로 실행 허용
 
     result = await db.execute(
-        select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email)
+        select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
         .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
         .join(User, User.id == RebalancingAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
@@ -202,7 +246,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
     rows = result.all()
 
     triggered_count = 0
-    for alert, portfolio, user_email, notification_email in rows:
+    for alert, portfolio, user_email, notification_email, fcm_token in rows:
         trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
         is_schedule_day = should_fire_today(alert)
 
@@ -246,6 +290,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             email=email,
             composite_level=composite_level,
             db=db,
+            fcm_token=fcm_token,
         )
         if not triggered:
             continue

@@ -340,6 +340,11 @@ function AlertFormBody({
                 <option value="MARKET">시장가</option>
                 <option value="LIMIT">지정가</option>
               </select>
+              {form.orderType === "LIMIT" && (
+                <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
+                  자동 실행 시 분석 시점의 현재가를 지정가로 사용합니다. 가격 변동으로 미체결될 수 있습니다.
+                </p>
+              )}
             </div>
 
             {/* ── 시장 신호 연동 ── */}

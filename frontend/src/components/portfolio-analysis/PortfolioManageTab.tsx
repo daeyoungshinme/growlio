@@ -11,6 +11,7 @@ import {
   reorderPortfolios,
   updatePortfolio,
 } from "@/api/portfolios";
+import { fetchDriftSummary, PortfolioDriftSummary } from "@/api/rebalancing";
 import { fetchAccounts, batchSetTargetPortfolio } from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
@@ -77,6 +78,17 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     () => Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a])),
     [rebalancingAlerts],
   );
+
+  const { data: driftSummaryRaw } = useQuery({
+    queryKey: QUERY_KEYS.driftSummary,
+    queryFn: fetchDriftSummary,
+    staleTime: STALE_TIME.MEDIUM,
+    enabled: portfolios.length > 0,
+  });
+  const driftByPortfolioId = useMemo<Record<string, PortfolioDriftSummary>>(() => {
+    const list = Array.isArray(driftSummaryRaw) ? driftSummaryRaw : [];
+    return Object.fromEntries(list.map((s) => [s.portfolio_id, s]));
+  }, [driftSummaryRaw]);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
@@ -201,6 +213,7 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
         stockAccounts={stockAccounts}
         alertPortfolioIds={alertPortfolioIds}
         alertByPortfolioId={alertByPortfolioId}
+        driftByPortfolioId={driftByPortfolioId}
         isTargetPending={batchTargetMut.isPending}
         onDragEnd={handleDragEnd}
         onToggleSelect={(id) => onAnalyze(id)}

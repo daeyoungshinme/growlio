@@ -23,7 +23,6 @@ from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, 
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
-DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
 _MIN_RETURN_POINTS_FOR_CORRELATION = 20  # 상관계수 계산에 필요한 최소 수익률 데이터 포인트
 
 

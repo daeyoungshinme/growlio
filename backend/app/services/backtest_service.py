@@ -35,8 +35,6 @@ from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 
 logger = structlog.get_logger()
 
-DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KRX"}
-
 _BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE"}
 _BACKTEST_SKIP_MARKETS = {"KR_PROPERTY"}
 

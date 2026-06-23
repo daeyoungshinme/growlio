@@ -11,7 +11,9 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlertCircle,
+  AlertTriangle,
   Bell,
+  CheckCircle,
   Edit2,
   GripVertical,
   Loader2,
@@ -23,6 +25,7 @@ import {
 import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
+import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 
@@ -59,6 +62,7 @@ interface PortfolioListSectionProps {
   stockAccounts: AssetAccount[];
   alertPortfolioIds: Set<string>;
   alertByPortfolioId: Record<string, RebalancingAlert>;
+  driftByPortfolioId?: Record<string, PortfolioDriftSummary>;
   isTargetPending: boolean;
   onDragEnd: (event: DragEndEvent) => void;
   onToggleSelect: (id: string) => void;
@@ -76,6 +80,7 @@ export default function PortfolioListSection({
   stockAccounts,
   alertPortfolioIds,
   alertByPortfolioId,
+  driftByPortfolioId,
   isTargetPending,
   onDragEnd,
   onToggleSelect,
@@ -333,6 +338,30 @@ export default function PortfolioListSection({
                                 })()}
                             </div>
                             <div className="flex gap-0.5 shrink-0 items-center">
+                              {(() => {
+                                const drift = driftByPortfolioId?.[p.id];
+                                if (!drift) return null;
+                                const isNeeded = drift.needs_rebalancing;
+                                const isCaution = !isNeeded && drift.max_drift_pct >= drift.threshold_pct / 2;
+                                if (isNeeded) return (
+                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
+                                    <AlertTriangle size={10} />
+                                    {drift.max_drift_pct.toFixed(1)}% 이탈
+                                  </span>
+                                );
+                                if (isCaution) return (
+                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                                    <AlertTriangle size={10} />
+                                    {drift.max_drift_pct.toFixed(1)}% 주의
+                                  </span>
+                                );
+                                return (
+                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400">
+                                    <CheckCircle size={10} />
+                                    안정
+                                  </span>
+                                );
+                              })()}
                               {tState !== "none" && (
                                 <span
                                   className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${

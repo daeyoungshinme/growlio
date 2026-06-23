@@ -122,7 +122,7 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
 
           {/* CRITICAL: 실행 CTA 버튼 */}
           {status === "critical" && onExecute && (
-            <div className="mt-3 hidden sm:flex justify-end">
+            <div className="mt-3 flex justify-end">
               <button
                 onClick={onExecute}
                 className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"

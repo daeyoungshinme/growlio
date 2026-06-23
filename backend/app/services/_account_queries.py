@@ -3,6 +3,7 @@
 is_active == True 필터 누락이 자산 수배 부풀림의 핵심 원인 (CLAUDE.md 참고).
 직접 is_active 조건을 작성하는 대신 이 헬퍼를 사용하면 누락 위험을 방지한다.
 """
+
 from __future__ import annotations
 
 import uuid

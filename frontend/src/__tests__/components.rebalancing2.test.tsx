@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { render } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
 // Mock API calls
@@ -110,57 +111,33 @@ const mockSignal: MarketSignalResponse = {
 };
 
 describe("MarketSignalBanner", () => {
-  it("renders signal banner", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
+  const renderBanner = (signal = mockSignal) =>
+    renderWithProviders(<MemoryRouter><MarketSignalBanner signal={signal} /></MemoryRouter>);
+
+  it("renders signal banner with label", () => {
+    renderBanner();
     expect(screen.getByText("시장 위험 신호")).toBeDefined();
   });
 
-  it("starts collapsed and shows expand button", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
-    expect(screen.getByLabelText("펼치기")).toBeDefined();
+  it("shows short implication text for YELLOW", () => {
+    renderBanner();
+    expect(screen.getByText(/분할 집행 권장/)).toBeDefined();
   });
 
-  it("shows VIX data after expanding", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
-    fireEvent.click(screen.getByLabelText("펼치기"));
-    expect(screen.getByText("VIX")).toBeDefined();
-    expect(screen.getByText("20.5")).toBeDefined();
+  it("shows detail link to market page", () => {
+    renderBanner();
+    const link = screen.getByLabelText("시장 신호 상세 보기");
+    expect(link).toBeDefined();
   });
 
-  it("shows yield curve data after expanding", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
-    fireEvent.click(screen.getByLabelText("펼치기"));
-    expect(screen.getByText("10Y-2Y")).toBeDefined();
-  });
-
-  it("shows fear greed data after expanding", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
-    fireEvent.click(screen.getByLabelText("펼치기"));
-    expect(screen.getByText("공포·탐욕")).toBeDefined();
-  });
-
-  it("collapses on click after expand", () => {
-    render(<MarketSignalBanner signal={mockSignal} />);
-    fireEvent.click(screen.getByLabelText("펼치기"));
-    fireEvent.click(screen.getByLabelText("접기"));
-    expect(screen.getByLabelText("펼치기")).toBeDefined();
-  });
-
-  it("shows contrarian buy message when expanded", () => {
-    const contrarian = {
-      ...mockSignal,
-      fear_greed_contrarian_buy: true,
-      composite_level: "GREEN" as const,
-    };
-    render(<MarketSignalBanner signal={contrarian} />);
-    fireEvent.click(screen.getByLabelText("펼치기"));
-    expect(screen.getByText(/역발상 매수 기회/)).toBeDefined();
-  });
-
-  it("shows stale data freshness", () => {
-    const stale = { ...mockSignal, data_freshness: "STALE" as const };
-    render(<MarketSignalBanner signal={stale} />);
+  it("shows stale data freshness inline", () => {
+    renderBanner({ ...mockSignal, data_freshness: "STALE" as const });
     expect(screen.getByText(/데이터 조회 불가/)).toBeDefined();
+  });
+
+  it("shows partial data freshness inline", () => {
+    renderBanner({ ...mockSignal, data_freshness: "PARTIAL" as const });
+    expect(screen.getByText(/일부 데이터 없음/)).toBeDefined();
   });
 });
 

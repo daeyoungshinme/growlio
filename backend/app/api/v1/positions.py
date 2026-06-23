@@ -18,7 +18,7 @@ from app.limiter import limiter
 from app.models.asset import Position
 from app.models.user import User
 from app.redis_client import get_redis
-from app.schemas.asset import ManualPosition
+from app.schemas.asset import ManualPosition, PositionListResponse
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.currency import fetch_usd_krw
@@ -65,7 +65,7 @@ def _enrich_positions(positions: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-@router.get("/{account_id}/positions")
+@router.get("/{account_id}/positions", response_model=PositionListResponse)
 async def get_positions(
     account_id: UUID,
     current_user: User = Depends(get_current_user),
@@ -83,7 +83,7 @@ async def get_positions(
     return _enrich_positions(positions)
 
 
-@router.put("/{account_id}/positions")
+@router.put("/{account_id}/positions", response_model=PositionListResponse)
 async def save_positions(
     account_id: UUID,
     positions: list[ManualPosition],
@@ -158,7 +158,7 @@ async def save_positions(
         return _enrich_positions(raw)
 
 
-@router.post("/{account_id}/positions/sync-prices")
+@router.post("/{account_id}/positions/sync-prices", response_model=PositionListResponse)
 @limiter.limit("5/minute")
 async def sync_position_prices(
     request: Request,

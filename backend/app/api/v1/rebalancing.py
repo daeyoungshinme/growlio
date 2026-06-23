@@ -3,7 +3,7 @@
 import asyncio
 import uuid
 from functools import partial
-from typing import Any, cast
+from typing import cast
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user
+from app.constants import DOMESTIC_MARKETS
 from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_orderable_cash
@@ -41,17 +42,12 @@ from app.services.dividend_providers import (
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import fetch_prices_batch, get_historical_returns
-from app.services.rebalancing_service import analyze_rebalancing, compute_portfolio_drift_summary
+from app.services.rebalancing_service import _item_attr, analyze_rebalancing, compute_portfolio_drift_summary
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
-
-
-def _item_attr(item: object, field: str) -> Any:
-    """PortfolioItem ORM 객체 또는 레거시 dict에서 필드를 통합 조회한다."""
-    return item[field] if isinstance(item, dict) else getattr(item, field)
 
 
 async def _collect_dividend_map(
@@ -74,7 +70,7 @@ async def _collect_dividend_map(
         key = (ticker, market)
         if key in dividend_map:
             return
-        is_korean = market.upper() in ("KOSPI", "KOSDAQ", "KRX")
+        is_korean = market.upper() in DOMESTIC_MARKETS
         try:
             async with sem:
                 if is_korean:
@@ -185,8 +181,7 @@ async def analyze_portfolio(
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
         for raw_item in portfolio.items
-        if str(_item_attr(raw_item, "ticker")) != "CASH"
-        and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
+        if str(_item_attr(raw_item, "ticker")) != "CASH" and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
     ]
     current_tickers = [
         (p["ticker"], p["market"])
@@ -422,17 +417,14 @@ async def get_drift_summary(
         )
     )
     alert_by_portfolio: dict[str, float] = {
-        str(a.portfolio_id): float(a.threshold_pct)
-        for a in alerts_result.scalars().all()
+        str(a.portfolio_id): float(a.threshold_pct) for a in alerts_result.scalars().all()
     }
 
     summaries: list[PortfolioDriftSummary] = []
     for portfolio in portfolios:
         try:
             portfolio_account_ids = getattr(portfolio, "account_ids", None)
-            effective_ids = (
-                [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
-            )
+            effective_ids = [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
             overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
             threshold = alert_by_portfolio.get(str(portfolio.id), 5.0)
             summary = compute_portfolio_drift_summary(portfolio, overview, threshold)

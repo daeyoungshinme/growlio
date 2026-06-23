@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, RefreshCw, Wallet } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
@@ -7,13 +7,11 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
-import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
+import DriftAlertSummary from "@/components/dashboard/DriftAlertSummary";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { fetchMarketSignal } from "@/api/marketSignals";
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 
@@ -36,11 +34,6 @@ export default function DashboardPage() {
     }
   }, [qc]);
 
-  const { data: marketSignal } = useQuery({
-    queryKey: QUERY_KEYS.marketSignal,
-    queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.LONG,
-  });
   const {
     data,
     isLoading,
@@ -123,6 +116,8 @@ export default function DashboardPage() {
           exchangeRate={exchangeRate}
           dataUpdatedAt={dataUpdatedAt}
           isLoading={isLoading}
+          onSync={handleSync}
+          syncing={syncing}
         />
       </ErrorBoundary>
 
@@ -131,9 +126,9 @@ export default function DashboardPage() {
         <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
       </ErrorBoundary>
 
-      {/* Row 3: 리밸런싱 현황 (시장 신호 포함) — 이탈 시 강조 표시 */}
+      {/* Row 3: 리밸런싱 현황 요약 */}
       <ErrorBoundary variant="section">
-        <RebalancingStatusCard marketSignal={marketSignal} />
+        <DriftAlertSummary />
       </ErrorBoundary>
 
       {/* Row 4: 배당 현황 */}
@@ -141,7 +136,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
           <Link
-            to="/assets?tab=배당"
+            to="/assets?tab=투자현황&portfolioTab=배당"
             className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
             자세히 보기 <ArrowRight size={14} />
