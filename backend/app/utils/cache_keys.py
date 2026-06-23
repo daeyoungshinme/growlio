@@ -226,7 +226,7 @@ async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> Non
     with contextlib.suppress(RedisError):
         pattern = f"{_env_prefix()}alloc_history_v2:{user_id}:*"
         cursor = 0
-        keys_to_delete: list[str] = []
+        keys_to_delete: list[bytes | str] = []
         while True:
             cursor, batch = await redis.scan(cursor, match=pattern, count=100)
             keys_to_delete.extend(batch)

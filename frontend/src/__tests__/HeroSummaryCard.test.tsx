@@ -60,15 +60,17 @@ describe("HeroSummaryCard", () => {
     renderWithProviders(
       <HeroSummaryCard data={baseDashboard} exchangeRate={1350} />,
     );
-    const pnlEl = screen.getByText("+12.50%");
-    expect(pnlEl).toHaveClass("text-red-500");
+    const pnlEls = screen.getAllByText("+12.50%");
+    expect(pnlEls.length).toBeGreaterThanOrEqual(1);
+    pnlEls.forEach((el) => expect(el).toHaveClass("text-red-500"));
   });
 
   it("수익률이 음수이면 text-blue-500 (한국 주식 관례) 클래스를 가진다", () => {
     const data = { ...baseDashboard, cumulative_return_pct: -5.3 };
     renderWithProviders(<HeroSummaryCard data={data} exchangeRate={1350} />);
-    const pnlEl = screen.getByText("-5.30%");
-    expect(pnlEl).toHaveClass("text-blue-500");
+    const pnlEls = screen.getAllByText("-5.30%");
+    expect(pnlEls.length).toBeGreaterThanOrEqual(1);
+    pnlEls.forEach((el) => expect(el).toHaveClass("text-blue-500"));
   });
 
   it("asset_allocation이 비어 있으면 '자산 데이터 없음'이 표시된다", () => {
