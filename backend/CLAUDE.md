@@ -55,7 +55,7 @@ cd backend && uv run pytest --tb=short         # 짧은 트레이스백 (출력 
 cd backend && uv run pytest --cov=app --cov-report=term-missing
 ```
 
-> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
+> 테스트는 실제 DB 없이 mocked `AsyncSession` 사용 (`tests/conftest.py`). `KIS_CRED_ENCRYPTION_KEY`, `APP_SECRET_KEY` 등 환경변수는 `tests/conftest.py`에서 자동 override됨. `.env` 파일 없어도 테스트 실행 가능.
 > **주요 fixtures:** `mock_db` (AsyncSession mock, scalars/execute/commit 포함), `mock_redis` (get/set/setex mock), `make_account` (AssetAccount stub), `make_snapshot` (AssetSnapshot stub), `make_user_settings` (UserSettings stub).
 
 **테스트 위치:** `backend/tests/` — 현재 목록은 `cd backend && uv run pytest --collect-only -q` 확인.

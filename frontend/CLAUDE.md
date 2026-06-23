@@ -163,7 +163,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리 원칙:** 서버에서 오는 데이터 → React Query. 순수 클라이언트 전역 상태 → Zustand.
-- Zustand: `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글)
+- Zustand (`src/stores/`): `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글)
 - 새 전역 상태 추가 시: 서버 fetch가 필요하면 React Query 훅, 그렇지 않으면 Zustand store.
 
 **포트폴리오와 대시보드의 관계:** `DashboardPage`가 `/portfolio/overview`를 추가 조회해 `PortfolioSummaryCard`에 전달. 양쪽이 같은 queryKey(`"portfolio-overview"`)를 공유하므로 포트폴리오 sync 후 대시보드도 자동 갱신됨.

@@ -56,6 +56,7 @@ make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && pytest
 make test-frontend    # cd frontend && npm run test
+# E2E (Makefile 없음): cd frontend && npx playwright test   # dev 서버(5173) 실행 중 필요
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
