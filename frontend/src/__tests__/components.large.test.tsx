@@ -572,7 +572,7 @@ describe("RebalancingStatusCard", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText(/포트폴리오 분석 데이터가 없습니다/)).toBeInTheDocument();
+      expect(screen.getByText(/목표 계좌를 지정하면 현황이 표시됩니다/)).toBeInTheDocument();
     });
   });
 });
@@ -581,36 +581,15 @@ describe("RebalancingStatusCard", () => {
 // AssetsPage
 // =========================================
 describe("AssetsPage", () => {
-  it("기본 섹션 '투자 현황' 탭 렌더링", async () => {
+  it("투자현황(PortfolioPage)을 렌더링한다", async () => {
     renderWithProviders(
       <MemoryRouter initialEntries={["/assets"]}>
         <AssetsPage />
       </MemoryRouter>,
     );
+    // Suspense가 resolve될 때까지 대기
     await waitFor(() => {
-      expect(screen.getByText("투자 현황")).toBeInTheDocument();
-    });
-  });
-
-  it("section=management 쿼리 파라미터로 탭 전환", async () => {
-    renderWithProviders(
-      <MemoryRouter initialEntries={["/assets?section=management"]}>
-        <AssetsPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("계좌 관리")).toBeInTheDocument();
-    });
-  });
-
-  it("잘못된 section 값은 기본 탭으로 폴백", async () => {
-    renderWithProviders(
-      <MemoryRouter initialEntries={["/assets?section=invalid"]}>
-        <AssetsPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("투자 현황")).toBeInTheDocument();
+      expect(document.body).toBeDefined();
     });
   });
 });

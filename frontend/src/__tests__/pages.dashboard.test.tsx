@@ -21,9 +21,6 @@ vi.mock("@/utils/queryInvalidation", () => ({
 vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
   default: () => <div data-testid="allocation-chart">AllocationHistoryChart</div>,
 }));
-vi.mock("../components/dashboard/DisclosureFeedCard", () => ({
-  default: () => <div data-testid="disclosure-feed">DisclosureFeedCard</div>,
-}));
 vi.mock("@/components/dashboard/HeroSummaryCard", () => ({
   default: ({ data, isLoading }: { data?: { total_asset_krw?: number }; isLoading?: boolean }) =>
     isLoading ? (
@@ -31,9 +28,6 @@ vi.mock("@/components/dashboard/HeroSummaryCard", () => ({
     ) : (
       <div data-testid="hero-summary">{data?.total_asset_krw ?? ""}</div>
     ),
-}));
-vi.mock("@/components/dashboard/PortfolioSummaryCard", () => ({
-  default: () => <div data-testid="portfolio-summary">PortfolioSummaryCard</div>,
 }));
 vi.mock("@/components/dashboard/DividendSection", () => ({
   default: () => <div data-testid="dividend-section">DividendSection</div>,
@@ -96,7 +90,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: 0,
       overview: undefined,
-      overviewLoading: true,
       dcaData: undefined,
       accounts: [],
       accountsLoading: true,
@@ -115,7 +108,6 @@ describe("DashboardPage", () => {
       error: new Error("fetch failed"),
       dataUpdatedAt: 0,
       overview: undefined,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [],
       accountsLoading: false,
@@ -133,7 +125,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: 0,
       overview: undefined,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [],
       accountsLoading: false,
@@ -150,7 +141,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: Date.now(),
       overview: mockOverview as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [],
       accountsLoading: false,
@@ -168,7 +158,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: Date.now(),
       overview: mockOverview as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [],
       accountsLoading: true,
@@ -188,7 +177,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: Date.now(),
       overview: mockOverview as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [{ id: "acc-1", name: "KB증권", asset_type: "STOCK_KIS" }] as never,
       accountsLoading: false,
@@ -196,9 +184,7 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
-    expect(screen.getByTestId("portfolio-summary")).toBeInTheDocument();
     expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
-    expect(screen.getByText("투자 현황")).toBeInTheDocument();
     expect(screen.getByText("배당 현황")).toBeInTheDocument();
   });
 
@@ -209,7 +195,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: Date.now(),
       overview: { ...mockOverview, total_invested_krw: 100_000_000 } as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [{ id: "acc-1" }] as never,
       accountsLoading: false,
@@ -227,7 +212,6 @@ describe("DashboardPage", () => {
       error: null,
       dataUpdatedAt: Date.now(),
       overview: mockOverview as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [{ id: "acc-1" }] as never,
       accountsLoading: false,
@@ -238,21 +222,20 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
   });
 
-  it("'전체 보기' 링크가 /portfolio를 가리킨다", () => {
+  it("'자세히 보기' 링크가 배당 탭을 가리킨다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: mockDashboardData as never,
       isLoading: false,
       error: null,
       dataUpdatedAt: Date.now(),
       overview: mockOverview as never,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [{ id: "acc-1" }] as never,
       accountsLoading: false,
       exchangeRate: 1350,
     });
     renderDashboard();
-    const link = screen.getByRole("link", { name: /전체 보기/ });
+    const link = screen.getByRole("link", { name: /자세히 보기/ });
     expect(link.getAttribute("href")).toContain("/assets");
   });
 
@@ -263,7 +246,6 @@ describe("DashboardPage", () => {
       error: new Error("fetch failed"),
       dataUpdatedAt: 0,
       overview: undefined,
-      overviewLoading: false,
       dcaData: undefined,
       accounts: [],
       accountsLoading: false,

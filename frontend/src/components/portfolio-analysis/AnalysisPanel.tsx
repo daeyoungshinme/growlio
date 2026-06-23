@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Bell, ChevronDown, ChevronUp, Loader2, RefreshCw } from "lucide-react";
+import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { BacktestResult, runBacktest } from "@/api/backtest";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
@@ -11,9 +11,6 @@ import BacktestMetricsTable from "@/components/backtest/BacktestMetricsTable";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
-import FactorExposureChart from "@/components/portfolio-analysis/FactorExposureChart";
-import EfficientFrontierChart from "@/components/portfolio-analysis/EfficientFrontierChart";
-import ErrorBoundary from "@/components/ErrorBoundary";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { BACKTEST_DEFAULT_END_DATE } from "@/constants/defaults";
@@ -31,7 +28,6 @@ function StrategyAnalysisSection({
   alertByPortfolioId: Record<string, RebalancingAlert>;
   onOpenAlertModal: (portfolioId: string) => void;
 }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const existingAlert = alertByPortfolioId[id];
 
   return (
@@ -60,32 +56,6 @@ function StrategyAnalysisSection({
         </button>
       </div>
 
-      {/* 고급 분석 접이식 */}
-      <div className="border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden">
-        <button
-          onClick={() => setAdvancedOpen((v) => !v)}
-          aria-expanded={advancedOpen}
-          className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors min-h-[44px]"
-        >
-          <span>고급 분석</span>
-          {advancedOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </button>
-        {advancedOpen && (
-          <div className="p-4 space-y-4 bg-white dark:bg-gray-900">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <ErrorBoundary variant="section">
-                <FactorExposureChart selectedPortfolioId={id} />
-              </ErrorBoundary>
-              <ErrorBoundary variant="section">
-                <EfficientFrontierChart
-                  comparePortfolioId={id}
-                  comparePortfolioName={portfolio.name}
-                />
-              </ErrorBoundary>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -115,15 +85,23 @@ export function AnalysisPanel({
   const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } =
     useBacktestDateRange();
 
+  const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(
+    () => new Set(selectedIds),
+  );
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
   const [reinvestDividends, setReinvestDividends] = useState(true);
 
+  function handleEnterBacktest() {
+    setBacktestSelectedIds(new Set(selectedIds));
+    setMode("backtest");
+  }
+
   const runMut = useMutation({
     mutationFn: () =>
       runBacktest({
-        portfolio_ids: Array.from(selectedIds),
+        portfolio_ids: Array.from(backtestSelectedIds),
         start_date: startDate,
         end_date: endDate,
         include_spy: includeSpy,
@@ -140,7 +118,8 @@ export function AnalysisPanel({
     void triggerRebalancingAnalysis(id);
   }
 
-  const canRunBacktest = startDate < endDate && (selectedIds.size > 0 || includeSpy || includeReal);
+  const canRunBacktest =
+    startDate < endDate && (backtestSelectedIds.size > 0 || includeSpy || includeReal);
   const canRebalance = selectedIds.size === 1;
 
   return (
@@ -169,7 +148,7 @@ export function AnalysisPanel({
         </button>
 
         <button
-          onClick={() => setMode("backtest")}
+          onClick={handleEnterBacktest}
           className={`flex-none whitespace-nowrap flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
             mode === "backtest"
               ? "bg-blue-600 text-white hover:bg-blue-700"
@@ -204,6 +183,53 @@ export function AnalysisPanel({
       {mode === "backtest" && (
         <div className="card">
           <div className="space-y-3">
+            {/* 포트폴리오 다중 선택 */}
+            {portfolios.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                    포트폴리오 선택
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        setBacktestSelectedIds(new Set(portfolios.map((p) => p.id)))
+                      }
+                      className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    >
+                      전체 선택
+                    </button>
+                    <button
+                      onClick={() => setBacktestSelectedIds(new Set())}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                    >
+                      전체 해제
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+                  {portfolios.map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={backtestSelectedIds.has(p.id)}
+                        onChange={(e) => {
+                          const next = new Set(backtestSelectedIds);
+                          if (e.target.checked) next.add(p.id);
+                          else next.delete(p.id);
+                          setBacktestSelectedIds(next);
+                        }}
+                        className="rounded text-blue-600"
+                      />
+                      {p.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">
                 기간
@@ -317,12 +343,7 @@ export function AnalysisPanel({
             {analysis.portfolio_name} — 리밸런싱 분석
           </h3>
           {(() => {
-            const p = portfolios.find((p) => p.id === analysis.portfolio_id);
-            const analysisAccounts = p
-              ? p.account_ids?.length
-                ? activeAccounts.filter((a) => p.account_ids!.includes(a.id))
-                : activeAccounts
-              : [];
+            const analysisAccounts = activeAccounts;
             return (
               <>
                 <RebalancingTable
@@ -418,7 +439,7 @@ export function AnalysisPanel({
             <span className="text-blue-400 text-lg">→</span>
           </button>
           <button
-            onClick={() => setMode("backtest")}
+            onClick={handleEnterBacktest}
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-700/60 transition-colors"
           >
             <div className="text-left">

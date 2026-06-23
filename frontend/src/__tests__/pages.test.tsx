@@ -159,8 +159,11 @@ vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
 vi.mock("../components/dashboard/DisclosureFeedCard", () => ({
   default: () => <div data-testid="disclosure-feed">Disclosure Feed</div>,
 }));
-vi.mock("../components/portfolio-analysis/PortfolioAnalysisTab", () => ({
-  default: () => <div data-testid="portfolio-analysis-tab">Portfolio Analysis</div>,
+vi.mock("../components/portfolio-analysis/PortfolioManageTab", () => ({
+  default: () => <div data-testid="portfolio-manage-tab">Portfolio Manage</div>,
+}));
+vi.mock("../components/portfolio-analysis/PortfolioExecutionTab", () => ({
+  default: () => <div data-testid="portfolio-execution-tab">Portfolio Execution</div>,
 }));
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">Tax Optimization</div>,

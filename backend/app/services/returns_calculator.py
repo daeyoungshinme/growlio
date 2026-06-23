@@ -48,16 +48,20 @@ def xirr(cashflows: list[tuple[date, float]]) -> float | None:
 
 
 def calc_returns(current_total: float, base: float, first_date: date | None) -> tuple[float | None, float | None]:
-    """연환산 수익률과 누적 수익률을 반환. (annualized, cumulative)"""
+    """연환산 수익률과 누적 수익률을 반환. (annualized, cumulative)
+    30일 미만 기간은 annualized=None, cumulative만 반환.
+    """
     if base <= 0 or not first_date:
         return None, None
 
     today = date.today()
-    if first_date >= today:
+    days = (today - first_date).days
+    if days < 1:
         return None, None
-    months = max((today.year - first_date.year) * 12 + (today.month - first_date.month), 1)
     cumulative = (current_total / base - 1) * 100
-    annualized = ((current_total / base) ** (12 / months) - 1) * 100
+    if days < 30:
+        return None, cumulative
+    annualized = ((current_total / base) ** (365.0 / days) - 1) * 100
     return annualized, cumulative
 
 

@@ -161,11 +161,10 @@ describe("tabs constants", () => {
     expect(ASSET_MANAGEMENT_TABS).toContain("입출금·배당");
   });
 
-  it("PORTFOLIO_TABS는 4개 탭을 포함한다", () => {
-    expect(PORTFOLIO_TABS).toHaveLength(4);
+  it("PORTFOLIO_TABS는 3개 탭을 포함한다", () => {
+    expect(PORTFOLIO_TABS).toHaveLength(3);
     expect(PORTFOLIO_TABS).toContain("종목 현황");
     expect(PORTFOLIO_TABS).toContain("배당");
     expect(PORTFOLIO_TABS).toContain("세금");
-    expect(PORTFOLIO_TABS).toContain("진단");
   });
 });

@@ -207,7 +207,7 @@ describe("PortfolioPage", () => {
       if (url === "/dividends/by-ticker") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=배당");
+    renderPortfolio("?portfolioTab=배당");
     await waitFor(() => {
       expect(screen.getByTestId("dividend-tab")).toBeInTheDocument();
     });
@@ -219,21 +219,9 @@ describe("PortfolioPage", () => {
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=세금");
+    renderPortfolio("?portfolioTab=세금");
     await waitFor(() => {
       expect(screen.getByTestId("tax-optimization")).toBeInTheDocument();
-    });
-  });
-
-  it("'진단' 탭을 선택하면 PortfolioDiagnosisCard가 렌더링된다", async () => {
-    vi.mocked(api.get).mockImplementation((url: string) => {
-      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
-      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: {} });
-    });
-    renderPortfolio("?tab=진단");
-    await waitFor(() => {
-      expect(screen.getByTestId("portfolio-diagnosis-card")).toBeInTheDocument();
     });
   });
 
@@ -243,7 +231,7 @@ describe("PortfolioPage", () => {
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    renderPortfolio("?tab=invalid-tab");
+    renderPortfolio("?portfolioTab=invalid-tab");
     await waitFor(() => {
       expect(screen.getByTestId("stock-holdings-table")).toBeInTheDocument();
     });

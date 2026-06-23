@@ -6,7 +6,6 @@ import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
-import PortfolioSummaryCard from "@/components/dashboard/PortfolioSummaryCard";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
@@ -48,7 +47,6 @@ export default function DashboardPage() {
     error,
     dataUpdatedAt,
     overview,
-    overviewLoading,
     dcaData,
     accounts,
     accountsLoading,
@@ -95,7 +93,7 @@ export default function DashboardPage() {
             자산관리에서 계좌를 등록하면 대시보드에서 자산 현황을 확인할 수 있습니다.
           </p>
           <button
-            onClick={() => navigate("/assets?section=management")}
+            onClick={() => navigate("/settings")}
             className="bg-blue-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
           >
             자산관리로 이동
@@ -128,33 +126,22 @@ export default function DashboardPage() {
         />
       </ErrorBoundary>
 
-      {/* Row 2: 투자 목표 달성 현황 + 달성 전망 */}
+      {/* Row 2: 투자 목표 달성 현황 */}
       <ErrorBoundary variant="section">
         <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
       </ErrorBoundary>
 
-      {/* Row 3: 투자 현황 + 배당 현황 (병합) */}
+      {/* Row 3: 리밸런싱 현황 (시장 신호 포함) — 이탈 시 강조 표시 */}
+      <ErrorBoundary variant="section">
+        <RebalancingStatusCard marketSignal={marketSignal} />
+      </ErrorBoundary>
+
+      {/* Row 4: 배당 현황 */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">투자 현황</h2>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
           <Link
-            to="/assets?section=portfolio"
-            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            전체 보기 <ArrowRight size={14} />
-          </Link>
-        </div>
-        <ErrorBoundary variant="section">
-          <PortfolioSummaryCard
-            overview={overview}
-            isLoading={overviewLoading}
-            stockAllocation={overview?.stock_allocation}
-          />
-        </ErrorBoundary>
-        <div className="flex items-center justify-between mt-5 pt-4 mb-3 border-t border-gray-100 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-400">배당 현황</h3>
-          <Link
-            to="/assets?section=portfolio&tab=배당"
+            to="/assets?tab=배당"
             className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
           >
             자세히 보기 <ArrowRight size={14} />
@@ -170,11 +157,6 @@ export default function DashboardPage() {
           />
         </ErrorBoundary>
       </div>
-
-      {/* Row 4: 리밸런싱 현황 (시장 신호 포함) */}
-      <ErrorBoundary variant="section">
-        <RebalancingStatusCard marketSignal={marketSignal} />
-      </ErrorBoundary>
 
       {/* Row 5: 자산 추이 */}
       <ErrorBoundary variant="section">

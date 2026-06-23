@@ -8,9 +8,9 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", icon: Home, label: "대시보드" },
+  { to: "/dashboard", icon: Home, label: "홈" },
   { to: "/assets", icon: Wallet, label: "자산" },
   { to: "/rebalancing", icon: Shuffle, label: "리밸런싱" },
-  { to: "/invest-plan", icon: TrendingUp, label: "투자계획" },
+  { to: "/invest-plan", icon: TrendingUp, label: "계획" },
   { to: "/settings", icon: Settings, label: "설정" },
 ];

@@ -52,18 +52,19 @@ describe("InvestmentGoalCard", () => {
 
   it("연간 입금 목표가 있으면 달성률을 표시한다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    expect(screen.getByText("75.0%")).toBeInTheDocument();
+    // 모바일+데스크탑 두 곳에 렌더링되므로 getAllByText 사용
+    expect(screen.getAllByText("75.0%")[0]).toBeInTheDocument();
   });
 
   it("달성률이 100% 초과 시 100%로 클램핑된다", () => {
     const data = { ...baseDashboard, deposit_achievement_pct: 120 };
     renderGoalCard(<InvestmentGoalCard data={data} />);
-    expect(screen.getByText("100.0%")).toBeInTheDocument();
+    expect(screen.getAllByText("100.0%")[0]).toBeInTheDocument();
   });
 
   it("자산 목표 달성률을 표시한다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    expect(screen.getByText("15.0%")).toBeInTheDocument();
+    expect(screen.getAllByText("15.0%")[0]).toBeInTheDocument();
   });
 
   it("data가 undefined면 목표 미설정 안내를 표시한다", () => {

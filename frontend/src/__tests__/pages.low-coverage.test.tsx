@@ -90,8 +90,11 @@ vi.mock("../components/portfolio/TreemapChart", () => ({
 vi.mock("../components/portfolio/DomesticForeignBar", () => ({
   default: () => <div data-testid="domestic-bar" />,
 }));
-vi.mock("../components/portfolio-analysis/PortfolioAnalysisTab", () => ({
-  default: () => <div data-testid="portfolio-analysis" />,
+vi.mock("../components/portfolio-analysis/PortfolioManageTab", () => ({
+  default: () => <div data-testid="portfolio-manage" />,
+}));
+vi.mock("../components/portfolio-analysis/PortfolioExecutionTab", () => ({
+  default: () => <div data-testid="portfolio-execution" />,
 }));
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-opt" />,

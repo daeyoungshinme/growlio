@@ -37,6 +37,7 @@ export function invalidatePortfolioData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
   ]);
 }
 

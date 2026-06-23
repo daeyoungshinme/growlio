@@ -45,10 +45,10 @@ describe("BottomNav", () => {
         <BottomNav />
       </MemoryRouter>,
     );
-    expect(screen.getByText("대시보드")).toBeDefined();
+    expect(screen.getByText("홈")).toBeDefined();
     expect(screen.getByText("자산")).toBeDefined();
     expect(screen.getByText("리밸런싱")).toBeDefined();
-    expect(screen.getByText("투자계획")).toBeDefined();
+    expect(screen.getByText("계획")).toBeDefined();
     expect(screen.getByText("설정")).toBeDefined();
   });
 
@@ -67,7 +67,7 @@ describe("BottomNav", () => {
         <BottomNav />
       </MemoryRouter>,
     );
-    const link = screen.getByText("대시보드").closest("a");
+    const link = screen.getByText("홈").closest("a");
     expect(link?.className).toContain("text-blue-600");
   });
 });
@@ -80,7 +80,7 @@ describe("Sidebar", () => {
         <Sidebar />
       </MemoryRouter>,
     );
-    expect(screen.getByText("대시보드")).toBeDefined();
+    expect(screen.getByText("홈")).toBeDefined();
     expect(screen.getByText("Growlio")).toBeDefined();
   });
 

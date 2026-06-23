@@ -48,8 +48,12 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
             text("""
                 WITH
                   fs AS (
-                    SELECT MIN(snapshot_date) AS first_date
-                    FROM asset_snapshots WHERE user_id = :uid
+                    SELECT MIN(s.snapshot_date) AS first_date
+                    FROM asset_snapshots s
+                    JOIN asset_accounts a ON a.id = s.account_id
+                    WHERE s.user_id = :uid
+                      AND a.is_active = TRUE
+                      AND a.include_in_total = TRUE
                   ),
                   nd AS (
                     SELECT COALESCE(
@@ -97,7 +101,10 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
 
     bank_total = total_assets_krw - stock_value
     base = bank_total + total_invested
-    annualized_return, cumulative_return = calc_returns(total_assets_krw, base, first_snap_date)
+    if stock_value > 0 and total_invested == 0:
+        annualized_return, cumulative_return = None, None
+    else:
+        annualized_return, cumulative_return = calc_returns(total_assets_krw, base, first_snap_date)
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0
 
     goal = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None

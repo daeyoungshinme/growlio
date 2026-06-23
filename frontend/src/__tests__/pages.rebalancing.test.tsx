@@ -10,8 +10,16 @@ vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
 }));
 
-vi.mock("@/components/portfolio-analysis/PortfolioAnalysisTab", () => ({
-  default: () => React.createElement("div", { "data-testid": "portfolio-analysis-tab" }),
+vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
+  default: () => React.createElement("div", { "data-testid": "rebalancing-status-card" }),
+}));
+
+vi.mock("@/components/portfolio-analysis/PortfolioManageTab", () => ({
+  default: () => React.createElement("div", { "data-testid": "portfolio-manage-tab" }),
+}));
+
+vi.mock("@/components/portfolio-analysis/PortfolioExecutionTab", () => ({
+  default: () => React.createElement("div", { "data-testid": "portfolio-execution-tab" }),
 }));
 
 // ── imports ───────────────────────────────────────────────────────────────────

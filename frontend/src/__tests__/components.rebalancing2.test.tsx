@@ -136,7 +136,7 @@ describe("MarketSignalBanner", () => {
   it("shows fear greed data after expanding", () => {
     render(<MarketSignalBanner signal={mockSignal} />);
     fireEvent.click(screen.getByLabelText("펼치기"));
-    expect(screen.getByText("F&G")).toBeDefined();
+    expect(screen.getByText("공포·탐욕")).toBeDefined();
   });
 
   it("collapses on click after expand", () => {

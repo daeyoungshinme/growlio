@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { MemoryRouter } from "react-router-dom";
 
 vi.mock("@/stores/themeStore", () => ({
   useThemeStore: () => ({ isDark: false, toggle: vi.fn() }),
@@ -9,10 +8,6 @@ vi.mock("@/stores/themeStore", () => ({
 
 vi.mock("@/api/portfolios", () => ({
   fetchAllocationHistory: vi.fn().mockResolvedValue([]),
-}));
-
-vi.mock("@/api/dart", () => ({
-  fetchDartDisclosures: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/utils/dividendUtils", () => ({
@@ -36,7 +31,6 @@ vi.mock("@/utils/dividendUtils", () => ({
 }));
 
 import AllocationHistoryChart from "@/components/dashboard/AllocationHistoryChart";
-import DisclosureFeedCard from "@/components/dashboard/DisclosureFeedCard";
 import DividendByTickerTable from "@/components/dashboard/DividendByTickerTable";
 import DividendMonthsModal from "@/components/dashboard/DividendMonthsModal";
 
@@ -53,40 +47,6 @@ describe("AllocationHistoryChart", () => {
     renderWithProviders(<AllocationHistoryChart />);
     // Should render without throwing
     expect(document.body).toBeDefined();
-  });
-});
-
-// ------- DisclosureFeedCard -------
-describe("DisclosureFeedCard", () => {
-  it("renders with day filter buttons", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <DisclosureFeedCard />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("7일")).toBeDefined();
-    expect(screen.getByText("30일")).toBeDefined();
-    expect(screen.getByText("90일")).toBeDefined();
-  });
-
-  it("changes days filter on button click", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <DisclosureFeedCard />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByText("7일"));
-    // Just verify no crash
-    expect(screen.getByText("7일")).toBeDefined();
-  });
-
-  it("shows disclosure card header", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <DisclosureFeedCard />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("보유 종목 공시")).toBeDefined();
   });
 });
 

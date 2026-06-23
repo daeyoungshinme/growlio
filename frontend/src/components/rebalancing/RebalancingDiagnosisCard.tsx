@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertTriangle, CheckCircle, ChevronDown, Info } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_TICKER } from "@/constants/assets";
 
@@ -42,6 +42,7 @@ interface Props {
 
 export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onExecute }: Props) {
   const threshold = alertThreshold ?? DEFAULT_THRESHOLD;
+  const [isOpen, setIsOpen] = useState(true);
 
   const { tradeable, maxDrift, driftedCount } = useMemo(() => {
     const tradeable = analysis.items.filter(
@@ -71,54 +72,66 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
 
   return (
     <div className={`rounded-xl border p-4 ${cfg.bg}`}>
-      {/* 상태 헤더 */}
-      <div className="flex items-center gap-2 mb-3 min-w-0">
+      {/* 상태 헤더 — 클릭으로 접기/펼치기 */}
+      <button
+        onClick={() => setIsOpen((v) => !v)}
+        className="flex items-center gap-2 w-full min-w-0 text-left"
+        aria-expanded={isOpen}
+      >
         {cfg.icon}
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${cfg.badge}`}>
           {cfg.label}
         </span>
-        <span className="text-xs text-gray-400 truncate">{subText}</span>
-      </div>
+        <span className="text-xs text-gray-400 truncate flex-1">{subText}</span>
+        <ChevronDown
+          size={14}
+          className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
 
-      {/* 상위 이탈 종목 */}
-      {status !== "stable" && topDrifted.length > 0 && (
-        <div className="flex flex-wrap gap-2 mb-3">
-          {topDrifted.map((item) => {
-            const diff = item.weight_diff_pct;
-            const isOver = diff > 0;
-            return (
-              <div
-                key={item.ticker}
-                className="flex items-center gap-1 bg-gray-800/60 rounded-lg px-2.5 py-1"
+      {isOpen && (
+        <>
+          {/* 상위 이탈 종목 */}
+          {status !== "stable" && topDrifted.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              {topDrifted.map((item) => {
+                const diff = item.weight_diff_pct;
+                const isOver = diff > 0;
+                return (
+                  <div
+                    key={item.ticker}
+                    className="flex items-center gap-1 bg-gray-800/60 rounded-lg px-2.5 py-1"
+                  >
+                    <span className="text-xs font-medium text-gray-200">{item.name}</span>
+                    <span className={`text-xs font-bold ${isOver ? "text-red-400" : "text-blue-400"}`}>
+                      {isOver ? "▲" : "▼"}{Math.abs(diff).toFixed(1)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 안정 상태 - 이탈 없음 메시지 */}
+          {status === "stable" && tradeable.length > 0 && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-3">
+              <CheckCircle size={12} className="text-green-500" />
+              최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
+            </div>
+          )}
+
+          {/* CRITICAL: 실행 CTA 버튼 */}
+          {status === "critical" && onExecute && (
+            <div className="mt-3 hidden sm:flex justify-end">
+              <button
+                onClick={onExecute}
+                className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
               >
-                <span className="text-xs font-medium text-gray-200">{item.name}</span>
-                <span className={`text-xs font-bold ${isOver ? "text-red-400" : "text-blue-400"}`}>
-                  {isOver ? "▲" : "▼"}{Math.abs(diff).toFixed(1)}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* 안정 상태 - 이탈 없음 메시지 */}
-      {status === "stable" && tradeable.length > 0 && (
-        <div className="flex items-center gap-1.5 text-xs text-gray-400">
-          <CheckCircle size={12} className="text-green-500" />
-          최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
-        </div>
-      )}
-
-      {/* CRITICAL: 실행 CTA 버튼 */}
-      {status === "critical" && onExecute && (
-        <div className="mt-3 hidden sm:flex justify-end">
-          <button
-            onClick={onExecute}
-            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            ⚡ 지금 실행하기
-          </button>
-        </div>
+                ⚡ 지금 실행하기
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

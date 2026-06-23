@@ -26,9 +26,6 @@ import { api } from "@/api/client";
 const TaxOptimizationCard = lazy(
   () => import("../components/portfolio-analysis/TaxOptimizationCard"),
 );
-const PortfolioDiagnosisCard = lazy(
-  () => import("../components/portfolio-analysis/PortfolioDiagnosisCard"),
-);
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -48,7 +45,7 @@ export default function PortfolioPage() {
   useRegisterRefresh(handleRefresh);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const rawTab = searchParams.get("tab");
+  const rawTab = searchParams.get("portfolioTab");
 
   // 구 "포트폴리오 분석" 탭 URL → /rebalancing 리다이렉트
   useEffect(() => {
@@ -64,7 +61,7 @@ export default function PortfolioPage() {
   const handleTabChange = useCallback(
     (next: Tab) => {
       setSearchParams((prev) => {
-        prev.set("tab", next);
+        prev.set("portfolioTab", next);
         return prev;
       }, { replace: true });
     },
@@ -279,13 +276,6 @@ export default function PortfolioPage() {
         </ErrorBoundary>
       )}
 
-      {tab === "진단" && (
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-            <PortfolioDiagnosisCard defaultExpanded />
-          </Suspense>
-        </ErrorBoundary>
-      )}
     </div>
   );
 }

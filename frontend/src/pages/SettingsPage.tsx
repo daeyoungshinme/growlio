@@ -1,21 +1,18 @@
 import { useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint, Wallet, ArrowRight } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useBiometric } from "@/hooks/useBiometric";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { type SettingsData } from "@/api/settings";
-import { fetchAccounts } from "@/api/assets";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
+import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
-import { isStockAccount } from "@/utils/accounts";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
-import RebalancingAlertListTab from "@/components/rebalancing/RebalancingAlertListTab";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
@@ -92,17 +89,6 @@ export default function SettingsPage() {
     staleTime: STALE_TIME.LONG,
   });
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: QUERY_KEYS.accounts,
-    queryFn: fetchAccounts,
-    staleTime: STALE_TIME.MEDIUM,
-    select: (data) => (Array.isArray(data) ? data : []),
-  });
-
-  const bankCount = accounts.filter((a) => a.asset_type === "BANK_ACCOUNT").length;
-  const stockCount = accounts.filter((a) => isStockAccount(a.asset_type)).length;
-  const realEstateCount = accounts.filter((a) => a.asset_type === "REAL_ESTATE").length;
-
   const invalidateSettings = () => qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 
   const saveDart = async () => {
@@ -138,22 +124,20 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-xl">
       {/* 계좌 및 자산 관리 */}
-      <Link
-        to="/assets?section=management"
-        className="flex items-center gap-4 p-4 bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
-      >
-        <div className="p-2.5 bg-blue-50 dark:bg-blue-950 rounded-xl">
-          <Wallet size={20} className="text-blue-600 dark:text-blue-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">계좌 및 자산 관리</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-            은행 {bankCount}개 · 증권 {stockCount}개
-            {realEstateCount > 0 ? ` · 부동산 ${realEstateCount}개` : ""}
-          </p>
-        </div>
-        <ArrowRight size={16} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
-      </Link>
+      <div>
+        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+          계좌 및 자산 관리
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+          은행계좌, 증권계좌, 부동산 등록 및 포트폴리오 조회는 자산 탭에서 할 수 있습니다.
+        </p>
+        <Link
+          to="/assets"
+          className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          자산 탭으로 이동 →
+        </Link>
+      </div>
 
       {/* DART OpenAPI */}
       <SectionCard
@@ -222,13 +206,6 @@ export default function SettingsPage() {
           )}
         </div>
       </SectionCard>
-
-      {/* 알림 설정 통합 섹션 */}
-      <div id="rebalancing-alerts">
-        <SectionCard title="리밸런싱 자동화">
-          <RebalancingAlertListTab />
-        </SectionCard>
-      </div>
 
       <ExchangeRateAlertSection
         userEmail={current?.user_email}

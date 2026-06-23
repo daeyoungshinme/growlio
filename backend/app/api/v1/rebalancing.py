@@ -21,7 +21,7 @@ from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balan
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
-from app.models.portfolio import Portfolio
+from app.models.portfolio import Portfolio, PortfolioAccount
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
@@ -176,9 +176,7 @@ async def analyze_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
-    saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids = account_ids or ([uuid.UUID(aid) for aid in saved_ids] if saved_ids else None)
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_account_ids)
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=account_ids)
 
     base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
@@ -396,18 +394,26 @@ async def get_drift_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """모든 포트폴리오의 비중 이탈 현황을 빠르게 반환한다 (배당·수익률 외부 API 미사용)."""
+    linked_ids_result = await db.execute(
+        select(PortfolioAccount.portfolio_id)
+        .join(Portfolio, Portfolio.id == PortfolioAccount.portfolio_id)
+        .where(Portfolio.user_id == current_user.id)
+        .distinct()
+    )
+    linked_portfolio_ids = linked_ids_result.scalars().all()
+
+    if not linked_portfolio_ids:
+        return []
+
     portfolios_result = await db.execute(
         select(Portfolio)
         .options(
             selectinload(Portfolio.items),
             selectinload(Portfolio.linked_accounts),
         )
-        .where(Portfolio.user_id == current_user.id)
+        .where(Portfolio.id.in_(linked_portfolio_ids))
     )
-    portfolios = [p for p in portfolios_result.scalars().all() if p.linked_accounts]
-
-    if not portfolios:
-        return []
+    portfolios = portfolios_result.scalars().all()
 
     alerts_result = await db.execute(
         select(RebalancingAlert).where(
