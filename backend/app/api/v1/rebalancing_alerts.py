@@ -68,7 +68,7 @@ class RebalancingAlertCreate(BaseModel):
             hh, mm = v.split(":")
             hour, minute = int(hh), int(mm)
         except (ValueError, AttributeError):
-            raise ValueError("실행 시각은 HH:MM 형식이어야 합니다 (예: 09:30)")
+            raise ValueError("실행 시각은 HH:MM 형식이어야 합니다 (예: 09:30)") from None
         if not (9 <= hour <= 15) or not (0 <= minute <= 59):
             raise ValueError("실행 시각은 09:00~15:00 KST 범위여야 합니다")
         return f"{hour:02d}:{minute:02d}"

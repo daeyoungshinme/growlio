@@ -14,12 +14,12 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
-from app.services.alert_calculator import already_fired_today, should_fire_today
+from app.services.alert_calculator import already_fired_today
 from app.services.alert_repository import save_alert_history
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
-from app.utils.redis_lock import redis_lock
 from app.utils.metrics import alert_trigger_count
+from app.utils.redis_lock import redis_lock
 
 logger = structlog.get_logger()
 
@@ -63,7 +63,7 @@ async def _run_auto_execution() -> None:
         rows = result.all()
 
     triggered_count = 0
-    for alert, portfolio, user_email, notification_email in rows:
+    for alert, portfolio, _user_email, _notification_email in rows:
         if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
             continue
         if already_fired_today(alert):

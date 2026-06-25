@@ -177,13 +177,19 @@ _IMPLICATION_TABLE: dict[tuple[str, bool], dict[str, str]] = {
     ("rising", True): {
         "label": "긴축 지속 가능성",
         "growth_bias": "bearish",
-        "message": "CPI 상승세가 이어져 금리 인하 가능성이 낮습니다. 성장주 비중 축소와 단기채·배당주 비중 확대를 고려하세요.",
+        "message": (
+            "CPI 상승세가 이어져 금리 인하 가능성이 낮습니다. "
+            "성장주 비중 축소와 단기채·배당주 비중 확대를 고려하세요."
+        ),
         "action": "성장주 비중 축소 고려",
     },
     ("flat", True): {
         "label": "금리 고점 유지",
         "growth_bias": "neutral",
-        "message": "물가 안정 초기 신호이나 금리는 당분간 현 수준 유지 가능성이 높습니다. 현 포트폴리오 비중을 유지하세요.",
+        "message": (
+            "물가 안정 초기 신호이나 금리는 당분간 현 수준 유지 가능성이 높습니다. "
+            "현 포트폴리오 비중을 유지하세요."
+        ),
         "action": "현 포지션 유지",
     },
     ("falling", True): {
