@@ -241,9 +241,7 @@ export default memo(function HeroSummaryCard({
             </Suspense>
           ) : (
             <div className="flex items-center justify-center w-full aspect-square text-gray-300 dark:text-gray-600 text-xs text-center">
-              자산
-              <br />
-              없음
+              자산 데이터 없음
             </div>
           )}
         </div>

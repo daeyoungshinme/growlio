@@ -161,3 +161,55 @@ class TestRefreshAllUserTokens:
             from app.jobs.token_refresh import refresh_all_user_tokens
 
             await refresh_all_user_tokens()
+
+    @pytest.mark.asyncio
+    async def test_ob_refresh_called_when_token_present(self):
+        """ob_refresh_token이 있는 유저는 ensure_ob_token_fresh를 호출한다."""
+        user = _make_user()
+        settings = _make_settings(ob_refresh_token="valid_refresh_token")
+        settings_fresh = _make_settings(ob_refresh_token="valid_refresh_token")
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        execute_result.scalars.return_value.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.get = AsyncMock(return_value=settings_fresh)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs.token_refresh.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.token_refresh.ensure_ob_token_fresh", new_callable=AsyncMock) as mock_ensure,
+        ):
+            from app.jobs.token_refresh import refresh_all_user_tokens
+
+            await refresh_all_user_tokens()
+
+        mock_ensure.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_ob_refresh_exception_logged_and_continues(self):
+        """ensure_ob_token_fresh 실패 시 예외 로깅 후 계속 진행한다."""
+        user = _make_user()
+        settings = _make_settings(ob_refresh_token="valid_refresh_token")
+        settings_fresh = _make_settings(ob_refresh_token="valid_refresh_token")
+
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, settings)]
+        execute_result.scalars.return_value.all.return_value = []
+        mock_session.execute = AsyncMock(return_value=execute_result)
+        mock_session.get = AsyncMock(return_value=settings_fresh)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs.token_refresh.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.token_refresh.ensure_ob_token_fresh", side_effect=Exception("token refresh failed")),
+        ):
+            from app.jobs.token_refresh import refresh_all_user_tokens
+
+            await refresh_all_user_tokens()  # 예외 전파 없어야 함

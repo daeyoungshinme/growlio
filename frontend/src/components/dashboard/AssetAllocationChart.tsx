@@ -37,8 +37,8 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={fillHeight ? "48%" : innerRadius}
-              outerRadius={fillHeight ? "85%" : outerRadius}
+              innerRadius={fillHeight ? "42%" : innerRadius}
+              outerRadius={fillHeight ? "65%" : outerRadius}
               paddingAngle={3}
               dataKey="value"
             >
