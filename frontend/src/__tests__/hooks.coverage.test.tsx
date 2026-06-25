@@ -383,7 +383,9 @@ describe("useAlertCrud", () => {
     await act(async () => {
       try {
         await result.current.reactivateMutation.mutateAsync("alert-1");
-      } catch {}
+      } catch {
+        // expected: mutation throws on error, toast assertion follows
+      }
     });
 
     expect(toast).toHaveBeenCalledWith(expect.any(String), "error");
