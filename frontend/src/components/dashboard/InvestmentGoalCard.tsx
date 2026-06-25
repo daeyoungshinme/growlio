@@ -26,14 +26,14 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             투자 목표
           </h2>
           <Link
-            to="/settings"
+            to="/invest-plan"
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
             목표 설정
           </Link>
         </div>
         <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
-          투자 목표가 설정되지 않았습니다 — 설정 페이지에서 입력해주세요
+          투자 목표가 설정되지 않았습니다 — 계획 탭에서 입력해주세요
         </p>
       </div>
     );

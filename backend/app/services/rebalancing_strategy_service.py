@@ -166,7 +166,12 @@ async def get_rebalancing_strategy(
     from app.models.portfolio import Portfolio
 
     portfolio = await db.scalar(
-        select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
+        select(Portfolio)
+        .options(
+            selectinload(Portfolio.items),
+            selectinload(Portfolio.linked_accounts),
+        )
+        .where(Portfolio.id == portfolio_id)
     )
     if not portfolio:
         return {"error": "포트폴리오를 찾을 수 없습니다"}

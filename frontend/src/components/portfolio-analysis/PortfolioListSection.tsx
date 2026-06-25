@@ -13,6 +13,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Bell,
+  BellOff,
   CheckCircle,
   Edit2,
   GripVertical,
@@ -21,6 +22,7 @@ import {
   RefreshCw,
   Target,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
@@ -216,6 +218,24 @@ export default function PortfolioListSection({
         </div>
       )}
 
+      {/* 자동화 현황 배너 */}
+      {!isLoading && portfolios.length > 0 && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/60 text-xs text-gray-500 dark:text-gray-400">
+          <Bell size={12} className="shrink-0" />
+          {alertPortfolioIds.size > 0 ? (
+            <span>
+              {portfolios.length}개 중{" "}
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                {alertPortfolioIds.size}개
+              </span>
+              에 자동화 설정됨
+            </span>
+          ) : (
+            <span>자동화 설정된 포트폴리오가 없습니다. 🔔 버튼으로 설정하세요.</span>
+          )}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex justify-center py-8">
           <Loader2 size={20} className="animate-spin text-gray-400 dark:text-gray-500" />
@@ -366,15 +386,23 @@ export default function PortfolioListSection({
                                   {tState === "full" ? "목표" : "일부"}
                                 </span>
                               )}
-                              {alertPortfolioIds.has(p.id) && (
+                              {alertPortfolioIds.has(p.id) ? (
                                 <span
-                                  className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
+                                  className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
                                     alertByPortfolioId[p.id]?.mode === "AUTO"
                                       ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
                                       : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
                                   }`}
                                 >
-                                  {alertByPortfolioId[p.id]?.mode === "AUTO" ? "자동" : "알림"}
+                                  {alertByPortfolioId[p.id]?.mode === "AUTO" ? (
+                                    <><Zap size={10} />자동</>
+                                  ) : (
+                                    <><Bell size={10} />알림</>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
+                                  <BellOff size={10} />미설정
                                 </span>
                               )}
                               <button
@@ -412,15 +440,16 @@ export default function PortfolioListSection({
                                   e.stopPropagation();
                                   onOpenAlertModal(p.id);
                                 }}
-                                className={`p-2 rounded-lg transition-colors ${
+                                className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors text-xs ${
                                   alertPortfolioIds.has(p.id)
                                     ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
-                                    : "text-gray-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                    : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-950"
                                 }`}
                                 title="리밸런싱 알림 설정"
                                 aria-label="리밸런싱 알림 설정"
                               >
-                                <Bell size={15} />
+                                <Bell size={13} />
+                                {!alertPortfolioIds.has(p.id) && <span>설정</span>}
                               </button>
                               <button
                                 onClick={(e) => {

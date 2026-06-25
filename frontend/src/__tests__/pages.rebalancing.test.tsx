@@ -8,6 +8,7 @@ import React from "react";
 
 vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
+  fetchMacroDiagnosis: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({

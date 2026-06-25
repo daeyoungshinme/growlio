@@ -1,6 +1,7 @@
 import { lazy, memo, Suspense, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
-import { fmtKrw, fmtPct } from "@/utils/format";
+import { Link } from "react-router-dom";
+import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
@@ -17,6 +18,8 @@ interface Props {
   isLoading?: boolean;
   onSync?: () => void;
   syncing?: boolean;
+  estimatedAnnualDividends?: number | null;
+  dividendYield?: number | null;
 }
 
 export default memo(function HeroSummaryCard({
@@ -26,6 +29,8 @@ export default memo(function HeroSummaryCard({
   isLoading,
   onSync,
   syncing,
+  estimatedAnnualDividends,
+  dividendYield,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
@@ -185,17 +190,22 @@ export default memo(function HeroSummaryCard({
                 </p>
               </div>
             </div>
-            {/* 자산 구성 요약 목록 */}
-            {allocationChartData.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {allocationChartData.map((item) => (
-                  <span
-                    key={item.name}
-                    className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-md px-2 py-0.5"
-                  >
-                    {item.name} {item.pct.toFixed(1)}%
-                  </span>
-                ))}
+            {/* 배당 요약 한 줄 */}
+            {estimatedAnnualDividends != null && estimatedAnnualDividends > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-700">
+                <span>연간 배당</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {fmtKrwShort(estimatedAnnualDividends)}원
+                </span>
+                {dividendYield != null && (
+                  <span>({dividendYield.toFixed(1)}%)</span>
+                )}
+                <Link
+                  to="/assets?tab=투자현황&portfolioTab=배당"
+                  className="ml-auto text-blue-500 dark:text-blue-400 hover:underline"
+                >
+                  자세히 →
+                </Link>
               </div>
             )}
             {updatedLabel && (

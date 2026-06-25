@@ -29,9 +29,6 @@ vi.mock("@/components/dashboard/HeroSummaryCard", () => ({
       <div data-testid="hero-summary">{data?.total_asset_krw ?? ""}</div>
     ),
 }));
-vi.mock("@/components/dashboard/DividendSection", () => ({
-  default: () => <div data-testid="dividend-section">DividendSection</div>,
-}));
 vi.mock("@/components/ErrorBoundary", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -43,6 +40,7 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 }));
 vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
+  fetchMacroDiagnosis: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
   default: () => <div data-testid="rebalancing-status-card" />,
@@ -184,11 +182,11 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
-    expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
-    expect(screen.getByText("배당 현황")).toBeInTheDocument();
+    expect(screen.getByTestId("rebalancing-status-card")).toBeInTheDocument();
+    expect(screen.getByTestId("allocation-chart")).toBeInTheDocument();
   });
 
-  it("estimated_annual_dividends가 있을 때 overallDividendYield를 계산한다", () => {
+  it("estimated_annual_dividends가 있을 때 페이지가 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: { ...mockDashboardData, estimated_annual_dividends: 2_000_000 } as never,
       isLoading: false,
@@ -201,11 +199,10 @@ describe("DashboardPage", () => {
       exchangeRate: 1350,
     });
     renderDashboard();
-    // DividendSection receives the computed overallDividendYield; just verify it renders
-    expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
+    expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
   });
 
-  it("estimated_annual_dividends가 null이면 estimatedMonthly는 null이다", () => {
+  it("estimated_annual_dividends가 null이면 페이지가 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: { ...mockDashboardData, estimated_annual_dividends: null } as never,
       isLoading: false,
@@ -218,25 +215,7 @@ describe("DashboardPage", () => {
       exchangeRate: 1350,
     });
     renderDashboard();
-    // Page still renders, DividendSection gets null estimatedMonthly
-    expect(screen.getByTestId("dividend-section")).toBeInTheDocument();
-  });
-
-  it("'자세히 보기' 링크가 배당 탭을 가리킨다", () => {
-    vi.mocked(useDashboardData).mockReturnValue({
-      data: mockDashboardData as never,
-      isLoading: false,
-      error: null,
-      dataUpdatedAt: Date.now(),
-      overview: mockOverview as never,
-      dcaData: undefined,
-      accounts: [{ id: "acc-1" }] as never,
-      accountsLoading: false,
-      exchangeRate: 1350,
-    });
-    renderDashboard();
-    const link = screen.getByRole("link", { name: /자세히 보기/ });
-    expect(link.getAttribute("href")).toContain("/assets");
+    expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
   });
 
   it("다시 시도 버튼 클릭 시 쿼리를 무효화한다", async () => {

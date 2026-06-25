@@ -1,11 +1,10 @@
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, RefreshCw, Wallet } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { RefreshCw, Wallet } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
-import DividendSection from "@/components/dashboard/DividendSection";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -55,14 +54,6 @@ export default function DashboardPage() {
     if (estimated && invested && invested > 0) return (estimated / invested) * 100;
     return null;
   }, [data?.estimated_annual_dividends, overview?.total_invested_krw]);
-
-  const estimatedMonthly = useMemo(
-    () =>
-      data?.estimated_annual_dividends != null
-        ? Math.round(data.estimated_annual_dividends / 12)
-        : null,
-    [data],
-  );
 
   if (!isLoading && (error || !data))
     return (
@@ -121,6 +112,8 @@ export default function DashboardPage() {
           isLoading={isLoading}
           onSync={handleSync}
           syncing={syncing}
+          estimatedAnnualDividends={data?.estimated_annual_dividends ?? null}
+          dividendYield={overallDividendYield}
         />
       </ErrorBoundary>
 
@@ -144,29 +137,7 @@ export default function DashboardPage() {
         </Suspense>
       </ErrorBoundary>
 
-      {/* Row 4: 배당 현황 */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">배당 현황</h2>
-          <Link
-            to="/assets?tab=투자현황&portfolioTab=배당"
-            className="flex items-center gap-1 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            자세히 보기 <ArrowRight size={14} />
-          </Link>
-        </div>
-        <ErrorBoundary variant="section">
-          <DividendSection
-            annualReceived={data?.annual_dividends_received ?? null}
-            estimatedAnnual={data?.estimated_annual_dividends ?? null}
-            estimatedMonthly={estimatedMonthly}
-            overallDividendYield={overallDividendYield}
-            isLoading={isLoading}
-          />
-        </ErrorBoundary>
-      </div>
-
-      {/* Row 5: 자산 추이 */}
+      {/* Row 4: 자산 추이 */}
       <ErrorBoundary variant="section">
         <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
           <AllocationHistoryChart />

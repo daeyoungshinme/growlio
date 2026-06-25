@@ -1,13 +1,9 @@
 import { lazy, Suspense } from "react";
 import { Settings2 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
-import { api } from "@/api/client";
-import { type SettingsData } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -21,12 +17,6 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
-
-  const { data: settingsData } = useQuery({
-    queryKey: QUERY_KEYS.settings,
-    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
-    staleTime: STALE_TIME.LONG,
-  });
 
   const {
     data,
@@ -142,7 +132,12 @@ export default function InvestPlanPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-          연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다.
+          연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다.{" "}
+          자동 정기매수 실행 설정은{" "}
+          <Link to="/settings" className="text-blue-600 dark:text-blue-400 hover:underline">
+            설정 탭
+          </Link>
+          에서 변경할 수 있습니다.
         </p>
         {data && !isConfigured && (
           <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
@@ -168,18 +163,6 @@ export default function InvestPlanPage() {
           </div>
         </ErrorBoundary>
       )}
-
-      {/* 자동 정기매수 실행 설정 (선택사항) */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          자동 정기매수 실행 설정 (선택사항)
-        </h2>
-        <DCASettingsSection
-          key={settingsData ? "dca-loaded" : "dca-loading"}
-          current={settingsData ?? null}
-          onSettingsChange={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings })}
-        />
-      </div>
 
       {/* 설정 편집 모달 */}
       {editing && (

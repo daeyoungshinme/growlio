@@ -58,7 +58,6 @@ import { executionReducer } from "@/hooks/rebalancingExecution/reducer";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
 import type { ExecutionState } from "@/hooks/rebalancingExecution/types";
 import { useAccountPositions } from "@/hooks/useAccountPositions";
-import { useDartDisclosures } from "@/hooks/useDartDisclosures";
 import { useOptimizationSuggestions } from "@/hooks/useOptimizationSuggestions";
 import { useBacktestDateRange } from "@/hooks/useBacktestDateRange";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
@@ -119,62 +118,6 @@ describe("useAccountPositions", () => {
 
     await waitFor(() => expect(vi.mocked(api.get)).toHaveBeenCalled());
     expect(result.current).toEqual([]);
-  });
-});
-
-// ─── useDartDisclosures ───────────────────────────────────────────────────────
-
-describe("useDartDisclosures", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("로딩 중 isLoading이 true다", () => {
-    vi.mocked(api.get).mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(() => useDartDisclosures(7), { wrapper: createWrapper() });
-    expect(result.current.isLoading).toBe(true);
-    expect(result.current.isDartKeyMissing).toBe(false);
-  });
-
-  it("데이터를 로드하면 data를 반환한다", async () => {
-    const mockData = [
-      {
-        rcept_no: "1",
-        corp_name: "삼성전자",
-        ticker: "005930",
-        report_nm: "분기보고서",
-        rcept_dt: "20240101",
-        rm: "",
-        dart_url: "https://dart.fss.or.kr",
-      },
-    ];
-    vi.mocked(api.get).mockResolvedValue({ data: mockData });
-
-    const { result } = renderHook(() => useDartDisclosures(7), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.data).toEqual(mockData);
-    expect(result.current.isError).toBe(false);
-  });
-
-  it("422 에러 시 isDartKeyMissing이 true다", async () => {
-    const { getHttpStatus } = await import("@/utils/error");
-    vi.mocked(getHttpStatus).mockReturnValue(422);
-    vi.mocked(api.get).mockRejectedValue({ status: 422 });
-
-    const { result } = renderHook(() => useDartDisclosures(7), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.isDartKeyMissing).toBe(true);
-  });
-
-  it("비-422 에러 시 isDartKeyMissing이 false다", async () => {
-    const { getHttpStatus } = await import("@/utils/error");
-    vi.mocked(getHttpStatus).mockReturnValue(500);
-    vi.mocked(api.get).mockRejectedValue({ status: 500 });
-
-    const { result } = renderHook(() => useDartDisclosures(7), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.isDartKeyMissing).toBe(false);
   });
 });
 
@@ -539,7 +482,7 @@ describe("useAnalysisState — additional coverage", () => {
     );
 
     await waitFor(() => expect(result.current.analyzing).toBe(false));
-    expect(analyzePortfolio).toHaveBeenCalledWith("5");
+    expect(analyzePortfolio).toHaveBeenCalledWith("5", undefined, undefined);
     expect(result.current.analysis).toBeDefined();
   });
 
@@ -688,7 +631,7 @@ describe("executionReducer — missing actions", () => {
   });
 
   it("unknown action — 상태를 그대로 반환한다 (default case)", () => {
-    const result = executionReducer(baseReducerState, { type: "CONFIRM_CLICK" });
+    executionReducer(baseReducerState, { type: "CONFIRM_CLICK" });
     // CONFIRM_CLICK IS a valid action, just use a trick to test default:
     // Pass a genuinely unknown action type via type assertion
     const unknownResult = executionReducer(baseReducerState, { type: "UNKNOWN" } as never);

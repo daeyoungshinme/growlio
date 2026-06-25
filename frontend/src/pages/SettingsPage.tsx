@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { useState } from "react";
 import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
 import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -12,15 +12,11 @@ import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
+import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
-import SkeletonCard from "@/components/common/SkeletonCard";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
-
-const RebalancingAlertListTab = lazy(
-  () => import("../components/rebalancing/RebalancingAlertListTab"),
-);
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -212,21 +208,36 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
+      {/* 자동 정기매수 (DCA) */}
+      <SectionCard title="자동 정기매수 (DCA)">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          포트폴리오 비중에 맞춰 설정한 날짜에 자동으로 매수합니다.
+        </p>
+        <DCASettingsSection
+          key={current ? "dca-loaded" : "dca-loading"}
+          current={current ?? null}
+          onSettingsChange={invalidateSettings}
+        />
+      </SectionCard>
+
       {/* 알림 설정 그룹 */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
           알림 설정
         </h2>
         <div className="space-y-4">
-          {/* 리밸런싱 자동화 알림 */}
-          <SectionCard title="리밸런싱 자동화">
+          <div className="px-1">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              포트폴리오 비중 이탈 시 알림 발송 또는 자동 매수/매도를 설정합니다.
+              리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
+              <Link
+                to="/rebalancing?rtab=포트폴리오"
+                className="text-blue-600 dark:text-blue-400 underline"
+              >
+                리밸런싱 탭
+              </Link>
+              에서 포트폴리오별로 설정합니다.
             </p>
-            <Suspense fallback={<SkeletonCard rows={3} />}>
-              <RebalancingAlertListTab />
-            </Suspense>
-          </SectionCard>
+          </div>
 
           <ExchangeRateAlertSection
             userEmail={current?.user_email}
