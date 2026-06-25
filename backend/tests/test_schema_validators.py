@@ -6,7 +6,6 @@ import uuid
 
 import pytest
 
-
 # ── _account_queries 헬퍼 ────────────────────────────────────
 
 
@@ -40,9 +39,11 @@ def test_validate_dom_valid_value():
 
 
 def test_validate_dom_out_of_range_raises():
+    from pydantic import ValidationError
+
     from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match="schedule_day_of_month"):
         RebalancingAlertCreate(**_make_base(), schedule_day_of_month=29)
 
 
@@ -61,16 +62,20 @@ def test_validate_auto_execution_time_valid_format():
 
 
 def test_validate_auto_execution_time_invalid_format_raises():
+    from pydantic import ValidationError
+
     from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match="auto_execution_time"):
         RebalancingAlertCreate(**_make_base(), auto_execution_time="invalid")
 
 
 def test_validate_auto_execution_time_out_of_range_raises():
+    from pydantic import ValidationError
+
     from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match="auto_execution_time"):
         RebalancingAlertCreate(**_make_base(), auto_execution_time="08:00")
 
 
@@ -78,9 +83,11 @@ def test_validate_auto_execution_time_out_of_range_raises():
 
 
 def test_exchange_rate_alert_validate_count_raise_when_zero():
+    from pydantic import ValidationError
+
     from app.api.v1.exchange_rate_alerts import AlertCreate
 
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError, match="max_trigger_count"):
         AlertCreate(target_rate=1300.0, direction="BELOW", max_trigger_count=0)
 
 

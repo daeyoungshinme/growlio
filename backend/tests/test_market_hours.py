@@ -5,8 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import pytest
-
 _KST = ZoneInfo("Asia/Seoul")
 _EST = ZoneInfo("America/New_York")
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -78,7 +77,6 @@ class TestDividendsPositionsCacheHit:
         app = _setup_app(user, db)
 
         cached_data = [{"ticker": "005930", "dividend_yield": 1.5}]
-        encoded = json.dumps(cached_data).encode()
 
         with (
             patch("app.api.v1.dividends.get_cached_json", new=AsyncMock(return_value=cached_data)),
@@ -170,7 +168,7 @@ class TestRebalancingAlertGetSuccess:
     """rebalancing_alerts.py line 153: 알림 조회 성공 시 _build_response 반환."""
 
     def test_returns_200_when_alert_found(self, override_settings):
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
 
         user = _make_user()
         db = _make_mock_db()
