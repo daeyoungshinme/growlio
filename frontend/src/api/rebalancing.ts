@@ -86,6 +86,7 @@ export interface ExecutionOrderItem {
 export interface ExecutionRequest {
   account_id?: string | null;
   orders: ExecutionOrderItem[];
+  strategy?: "FULL" | "BUY_ONLY" | "TWO_PHASE";
 }
 
 export interface OrderResult {
@@ -155,7 +156,7 @@ export interface RebalancingExecutionSummary {
   id: string;
   portfolio_id: string | null;
   triggered_by: "MANUAL" | "AUTO" | "ONE_CLICK";
-  strategy: "FULL" | "BUY_ONLY";
+  strategy: "FULL" | "BUY_ONLY" | "TWO_PHASE";
   total_success: number;
   total_fail: number;
   total_skipped: number;

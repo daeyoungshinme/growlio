@@ -168,7 +168,14 @@ class TestAnalyzeFomcSchedule:
 
 class TestDeriveImplication:
     def test_rising_cpi_high_rate_bearish(self):
-        cpi = {"direction": "rising", "latest_value": 312.0, "latest_date": "2024-12-01", "yoy_pct": 4.2, "change_3m": 0.8, "month_count": 6}
+        cpi = {
+            "direction": "rising",
+            "latest_value": 312.0,
+            "latest_date": "2024-12-01",
+            "yoy_pct": 4.2,
+            "change_3m": 0.8,
+            "month_count": 6,
+        }
         fed = {"latest_value": 5.5, "latest_date": "2024-12-01", "direction": "stable", "is_high": True}
         result = _derive_implication(cpi, fed)
         assert result is not None
@@ -176,21 +183,42 @@ class TestDeriveImplication:
         assert "긴축" in result["label"]
 
     def test_falling_cpi_high_rate_bullish(self):
-        cpi = {"direction": "falling", "latest_value": 308.0, "latest_date": "2024-12-01", "yoy_pct": 2.1, "change_3m": -0.5, "month_count": 6}
+        cpi = {
+            "direction": "falling",
+            "latest_value": 308.0,
+            "latest_date": "2024-12-01",
+            "yoy_pct": 2.1,
+            "change_3m": -0.5,
+            "month_count": 6,
+        }
         fed = {"latest_value": 5.25, "latest_date": "2024-12-01", "direction": "falling", "is_high": True}
         result = _derive_implication(cpi, fed)
         assert result is not None
         assert result["growth_bias"] == "bullish"
 
     def test_flat_cpi_high_rate_neutral(self):
-        cpi = {"direction": "flat", "latest_value": 310.0, "latest_date": "2024-12-01", "yoy_pct": 3.0, "change_3m": 0.05, "month_count": 6}
+        cpi = {
+            "direction": "flat",
+            "latest_value": 310.0,
+            "latest_date": "2024-12-01",
+            "yoy_pct": 3.0,
+            "change_3m": 0.05,
+            "month_count": 6,
+        }
         fed = {"latest_value": 5.0, "latest_date": "2024-12-01", "direction": "stable", "is_high": True}
         result = _derive_implication(cpi, fed)
         assert result is not None
         assert result["growth_bias"] == "neutral"
 
     def test_rising_cpi_low_rate_bearish(self):
-        cpi = {"direction": "rising", "latest_value": 312.0, "latest_date": "2024-12-01", "yoy_pct": 4.5, "change_3m": 0.9, "month_count": 6}
+        cpi = {
+            "direction": "rising",
+            "latest_value": 312.0,
+            "latest_date": "2024-12-01",
+            "yoy_pct": 4.5,
+            "change_3m": 0.9,
+            "month_count": 6,
+        }
         fed = {"latest_value": 2.0, "latest_date": "2024-12-01", "direction": "rising", "is_high": False}
         result = _derive_implication(cpi, fed)
         assert result is not None
@@ -201,5 +229,12 @@ class TestDeriveImplication:
         assert _derive_implication(None, fed) is None
 
     def test_none_fed_returns_none(self):
-        cpi = {"direction": "rising", "latest_value": 312.0, "latest_date": "2024-12-01", "yoy_pct": 4.0, "change_3m": 0.5, "month_count": 6}
+        cpi = {
+            "direction": "rising",
+            "latest_value": 312.0,
+            "latest_date": "2024-12-01",
+            "yoy_pct": 4.0,
+            "change_3m": 0.5,
+            "month_count": 6,
+        }
         assert _derive_implication(cpi, None) is None

@@ -66,6 +66,8 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
       };
     case "SET_ORDER_TYPE":
       return { ...state, orderType: action.orderType };
+    case "SET_STRATEGY":
+      return { ...state, strategy: action.strategy };
     case "SET_LIMIT_PRICE":
       return {
         ...state,

@@ -1,5 +1,5 @@
 import { Bell, BellOff, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
 import { type ScheduleType, type TriggerCondition } from "@/api/alerts";
@@ -33,19 +33,21 @@ function buildDescription(
   triggerCondition: TriggerCondition,
   threshold: number,
   mode: "NOTIFY" | "AUTO",
+  autoExecutionTime?: string,
 ): string {
+  const timeLabel = mode === "AUTO" && autoExecutionTime ? autoExecutionTime : "08:30";
   const when =
     scheduleType === "DAILY"
-      ? "매일 08:30에"
+      ? `매일 ${timeLabel}에`
       : scheduleType === "WEEKLY"
-        ? `매주 ${DAYS_KO[dayOfWeek]}요일 08:30에`
+        ? `매주 ${DAYS_KO[dayOfWeek]}요일 ${timeLabel}에`
         : scheduleType === "MONTHLY"
-          ? `매월 ${dayOfMonth}일 08:30에`
+          ? `매월 ${dayOfMonth}일 ${timeLabel}에`
           : scheduleType === "QUARTERLY"
-            ? `매 3개월 ${dayOfMonth}일 08:30에`
+            ? `매 3개월 ${dayOfMonth}일 ${timeLabel}에`
             : scheduleType === "SEMIANNUAL"
-              ? `매 6개월 ${dayOfMonth}일 08:30에`
-              : `매년 ${dayOfMonth}일 08:30에`;
+              ? `매 6개월 ${dayOfMonth}일 ${timeLabel}에`
+              : `매년 ${dayOfMonth}일 ${timeLabel}에`;
 
   const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
 
@@ -113,6 +115,12 @@ function AlertFormBody({
     portfolioId,
     onClose,
   });
+
+  const { mode, setAccountId } = form;
+  useEffect(() => {
+    if (mode !== "AUTO" || kisExecutionAccounts.length !== 1) return;
+    setAccountId(kisExecutionAccounts[0].id);
+  }, [mode, setAccountId, kisExecutionAccounts]);
 
   const hasAlert = !!alert;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -297,6 +305,11 @@ function AlertFormBody({
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   KIS 연동 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
                 </p>
+              ) : kisExecutionAccounts.length === 1 ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
+                  <span>{kisExecutionAccounts[0].name}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">(자동 선택)</span>
+                </div>
               ) : (
                 <select
                   className={inputClass}
@@ -313,7 +326,7 @@ function AlertFormBody({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
               {STRATEGY_OPTIONS.map(({ value: s, label, desc }) => (
                 <label
                   key={s}
@@ -339,6 +352,24 @@ function AlertFormBody({
                   </div>
                 </label>
               ))}
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                자동 실행 시각 (KST)
+              </label>
+              <input
+                type="time"
+                min="09:00"
+                max="15:00"
+                step={300}
+                value={form.autoExecutionTime}
+                onChange={(e) => form.setAutoExecutionTime(e.target.value)}
+                className={inputClass}
+              />
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                장 중(09:00~15:00 KST) 지정 시각에 자동 실행됩니다.
+              </p>
             </div>
 
             <div>
@@ -400,6 +431,7 @@ function AlertFormBody({
             form.triggerCondition,
             form.threshold,
             form.mode,
+            form.autoExecutionTime,
           )}
         </p>
 

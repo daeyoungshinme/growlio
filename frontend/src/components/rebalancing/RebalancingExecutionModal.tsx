@@ -24,12 +24,12 @@ export function RebalancingExecutionModal({
 }: Props) {
   const exec = useRebalancingExecution({ portfolioId, analysis, accounts, onExecuted });
   const { state, orders, dispatch } = exec;
-  const { phase, results, confirmed, orderType } = state;
+  const { phase, results, confirmed, orderType, priceState, priceLoadProgress } = state;
 
   return (
     <RebalancingExecutionContext.Provider value={exec}>
-      <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
-        <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-[85dvh] flex flex-col">
+      <div className="fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] sm:inset-0 bg-black/60 flex items-end sm:items-center justify-center z-40 sm:z-[60] sm:p-4">
+        <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-full sm:max-h-[85dvh] flex flex-col">
           <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-700">
             <h2 className="text-base font-semibold text-white">리밸런싱 실행</h2>
             <button
@@ -39,6 +39,50 @@ export function RebalancingExecutionModal({
               ×
             </button>
           </div>
+
+          {phase === "confirm" && (
+            <div className="shrink-0 px-4 sm:px-6 py-2.5 bg-gray-900 border-b border-gray-800 flex flex-wrap items-center gap-3">
+              <span className="text-xs text-gray-400">주문 유형</span>
+              <div className="flex rounded-lg border border-gray-700 overflow-hidden">
+                {(["MARKET", "LIMIT"] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => dispatch({ type: "SET_ORDER_TYPE", orderType: type })}
+                    className={`px-4 py-2 text-sm font-medium transition-colors ${
+                      orderType === type
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-800 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    {type === "MARKET" ? "시장가" : "지정가"}
+                  </button>
+                ))}
+              </div>
+              {priceState === "loading" && (
+                <div className="w-full sm:w-48 space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500">
+                    <span>현재가 조회 중...</span>
+                    <span>{priceLoadProgress.loaded}/{priceLoadProgress.total}</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-500 rounded-full transition-all duration-300"
+                      style={{
+                        width: priceLoadProgress.total > 0
+                          ? `${(priceLoadProgress.loaded / priceLoadProgress.total) * 100}%`
+                          : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {priceState === "error" && (
+                <span className="text-xs text-amber-400 w-full sm:w-auto">
+                  현재가 조회 실패 — 지정가 직접 입력 가능
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
             {phase === "confirm" && <RebalancingConfirmStep ordersCount={orders.length} />}
@@ -58,24 +102,21 @@ export function RebalancingExecutionModal({
             {phase === "result" && <RebalancingResultSection results={results} />}
           </div>
 
-          <div
-            className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-700 flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3"
-            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
-          >
+          <div className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-700 flex flex-row gap-2">
             {phase === "confirm" && (
               <>
                 {!confirmed ? (
                   <>
                     <button
                       onClick={onClose}
-                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
+                      className="shrink-0 px-4 py-2.5 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
                     >
                       취소
                     </button>
                     <button
                       onClick={() => dispatch({ type: "CONFIRM_CLICK" })}
                       disabled={orders.length === 0}
-                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+                      className="flex-1 px-4 py-2.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
                     >
                       {orderType === "LIMIT" ? "지정가" : "시장가"} 주문 확인 ({orders.length}건) →
                     </button>
@@ -84,16 +125,16 @@ export function RebalancingExecutionModal({
                   <>
                     <button
                       onClick={() => dispatch({ type: "UNCONFIRM" })}
-                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
+                      className="shrink-0 px-4 py-2.5 text-sm text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-800 transition-colors"
                     >
                       ← 수정
                     </button>
                     <button
                       onClick={exec.handleExecute}
                       disabled={orders.length === 0}
-                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
+                      className="flex-1 px-4 py-2.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold"
                     >
-                      최종 실행 ({orders.length}건)
+                      {orderType === "LIMIT" ? "지정가" : "시장가"} 최종 실행 ({orders.length}건)
                     </button>
                   </>
                 )}

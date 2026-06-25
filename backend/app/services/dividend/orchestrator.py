@@ -43,8 +43,6 @@ logger = structlog.get_logger()
 _DIVIDEND_FETCH_SEM = asyncio.Semaphore(settings.api_semaphore_limit)
 
 
-
-
 async def _call_kis_dividend_api(
     ticker: str,
     user_id: uuid.UUID,
@@ -111,7 +109,6 @@ async def _get_kis_etf_dividend_fallback(
     )
 
 
-
 async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
     """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → 포지션 정보 맵 수집."""
     subq = latest_snapshot_subquery(user_id=user_id)
@@ -158,8 +155,6 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
                 positions_map[key]["qty"] += float(p.qty or 0)
 
     return positions_map
-
-
 
 
 def _build_ticker_output_entry(

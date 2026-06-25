@@ -15,13 +15,14 @@ import {
 } from "@/api/rebalancing";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
-import type { CashAnalysis, GlobalCashSummary, OrderType, Phase, PriceLoadState } from "./types";
+import type { CashAnalysis, GlobalCashSummary, OrderType, Phase, PriceLoadState, Strategy } from "./types";
 import { executionReducer } from "./reducer";
 
 export type {
   Phase,
   BalanceLoadState,
   OrderType,
+  Strategy,
   PriceLoadState,
   CashAnalysis,
   GlobalCashSummary,
@@ -115,6 +116,7 @@ export function useRebalancingExecution({
         livePricesUsd: {},
         globalUsdRate: null,
         orderType: "MARKET" as OrderType,
+        strategy: "FULL" as Strategy,
         limitPriceOverrides: {},
         qtyOverrides: {},
         buyAccounts,
@@ -438,7 +440,7 @@ export function useRebalancingExecution({
     if (orders.length === 0) return;
     dispatch({ type: "EXECUTE_START" });
     try {
-      const res = await executeRebalancing(portfolioId, { account_id: null, orders });
+      const res = await executeRebalancing(portfolioId, { account_id: null, orders, strategy: state.strategy });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
       void triggerHaptic("success");
       await invalidateSyncData(queryClient);

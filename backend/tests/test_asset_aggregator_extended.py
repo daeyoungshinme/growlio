@@ -185,7 +185,9 @@ class TestGetScalarInitData:
         result.first.return_value = None
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(uuid.uuid4(), mock_db)
+        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(
+            uuid.uuid4(), mock_db
+        )
 
         assert first_snap is None
         assert net_deposits == 0.0
@@ -208,7 +210,9 @@ class TestGetScalarInitData:
         result.first.return_value = row
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(uuid.uuid4(), mock_db)
+        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(
+            uuid.uuid4(), mock_db
+        )
 
         assert first_snap == date(2023, 1, 1)
         assert net_deposits == 5_000_000.0
@@ -279,7 +283,10 @@ class TestGetDashboardSummary:
         mock_db.scalar = AsyncMock(return_value=None)  # no settings
 
         with (
-            patch("app.services.asset_aggregator._get_scalar_init_data", new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0))),
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0)),
+            ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
             patch(
@@ -380,7 +387,10 @@ class TestGetDashboardSummary:
         redis.setex = AsyncMock()
 
         with (
-            patch("app.services.asset_aggregator._get_scalar_init_data", new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0))),
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0)),
+            ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
             patch(
@@ -541,8 +551,8 @@ class TestBuildAssetTotals:
             total, invested, stock, by_type = await build_asset_totals(uuid.uuid4(), mock_db)
 
         assert total == pytest.approx(10_000_000.0)  # 총자산에는 포함
-        assert stock == pytest.approx(0.0)            # 주식 평가액 0 (종목 없음)
-        assert invested == pytest.approx(0.0)         # 투자원가 0
+        assert stock == pytest.approx(0.0)  # 주식 평가액 0 (종목 없음)
+        assert invested == pytest.approx(0.0)  # 투자원가 0
         # CASH_STOCK 버킷에 예수금이 포함되어야 함
         assert by_type.get("CASH_STOCK", 0.0) == pytest.approx(10_000_000.0)
 

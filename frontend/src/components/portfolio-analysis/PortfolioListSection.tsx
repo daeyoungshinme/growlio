@@ -13,7 +13,6 @@ import {
   AlertCircle,
   AlertTriangle,
   Bell,
-  BellOff,
   CheckCircle,
   Edit2,
   GripVertical,
@@ -294,176 +293,157 @@ export default function PortfolioListSection({
                       }`}
                       onClick={() => onToggleSelect(p.id)}
                     >
+                      {/* 행1: 드래그 핸들 + 이름/부제/미니바 + 수정/삭제 */}
                       <div className="flex items-start gap-2">
                         <button
                           {...dragHandleListeners}
                           onClick={(e) => e.stopPropagation()}
-                          className="mt-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+                          className="mt-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
                         >
                           <GripVertical size={14} />
                         </button>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">
-                                {p.name}
-                              </p>
-                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
-                                {p.base_type === "STOCK_ONLY" ? "주식 기준" : "전체 자산"} ·{" "}
-                                {p.items.length}개 항목
-                                {stockAccounts.length > 1 && ` · ${getAccountLabel(p)}`}
-                              </p>
-                              {p.items.length > 0 &&
-                                (() => {
-                                  const MINI_COLORS = [
-                                    "#2563EB",
-                                    "#16A34A",
-                                    "#D97706",
-                                    "#DC2626",
-                                    "#7C3AED",
-                                    "#0891B2",
-                                    "#DB2777",
-                                    "#059669",
-                                  ];
-                                  const sorted = [...p.items].sort((a, b) => b.weight - a.weight);
-                                  const top = sorted.slice(0, 5);
-                                  const rest = sorted.slice(5).reduce((s, i) => s + i.weight, 0);
-                                  return (
-                                    <div className="mt-1.5 flex h-2 rounded-full overflow-hidden gap-px">
-                                      {top.map((item, ci) => (
-                                        <div
-                                          key={item.ticker}
-                                          title={`${item.name ?? item.ticker}: ${item.weight.toFixed(1)}%`}
-                                          style={{
-                                            width: `${item.weight}%`,
-                                            backgroundColor: MINI_COLORS[ci],
-                                          }}
-                                        />
-                                      ))}
-                                      {rest > 0 && (
-                                        <div
-                                          title={`기타: ${rest.toFixed(1)}%`}
-                                          style={{ width: `${rest}%`, backgroundColor: "#9CA3AF" }}
-                                        />
-                                      )}
-                                    </div>
-                                  );
-                                })()}
-                            </div>
-                            <div className="flex gap-0.5 shrink-0 items-center">
-                              {(() => {
-                                const drift = driftByPortfolioId?.[p.id];
-                                if (!drift) return null;
-                                const isNeeded = drift.needs_rebalancing;
-                                const isCaution = !isNeeded && drift.max_drift_pct >= drift.threshold_pct / 2;
-                                if (isNeeded) return (
-                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
-                                    <AlertTriangle size={10} />
-                                    {drift.max_drift_pct.toFixed(1)}% 이탈
-                                  </span>
-                                );
-                                if (isCaution) return (
-                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
-                                    <AlertTriangle size={10} />
-                                    {drift.max_drift_pct.toFixed(1)}% 주의
-                                  </span>
-                                );
-                                return (
-                                  <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400">
-                                    <CheckCircle size={10} />
-                                    안정
-                                  </span>
-                                );
-                              })()}
-                              {tState !== "none" && (
-                                <span
-                                  className={`text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
-                                    tState === "full"
-                                      ? "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
-                                      : "bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400"
-                                  }`}
-                                >
-                                  {tState === "full" ? "목표" : "일부"}
-                                </span>
-                              )}
-                              {alertPortfolioIds.has(p.id) ? (
-                                <span
-                                  className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 ${
-                                    alertByPortfolioId[p.id]?.mode === "AUTO"
-                                      ? "bg-orange-100 dark:bg-orange-950 text-orange-700 dark:text-orange-400"
-                                      : "bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-400"
-                                  }`}
-                                >
-                                  {alertByPortfolioId[p.id]?.mode === "AUTO" ? (
-                                    <><Zap size={10} />자동</>
-                                  ) : (
-                                    <><Bell size={10} />알림</>
+                          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 line-clamp-2 leading-snug">
+                            {p.name}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+                            {p.base_type === "STOCK_ONLY" ? "주식 기준" : "전체 자산"} ·{" "}
+                            {p.items.length}개 항목
+                            {stockAccounts.length > 1 && ` · ${getAccountLabel(p)}`}
+                          </p>
+                          {p.items.length > 0 &&
+                            (() => {
+                              const MINI_COLORS = [
+                                "#2563EB",
+                                "#16A34A",
+                                "#D97706",
+                                "#DC2626",
+                                "#7C3AED",
+                                "#0891B2",
+                                "#DB2777",
+                                "#059669",
+                              ];
+                              const sorted = [...p.items].sort((a, b) => b.weight - a.weight);
+                              const top = sorted.slice(0, 5);
+                              const rest = sorted.slice(5).reduce((s, i) => s + i.weight, 0);
+                              return (
+                                <div className="mt-1.5 flex h-2 rounded-full overflow-hidden gap-px">
+                                  {top.map((item, ci) => (
+                                    <div
+                                      key={item.ticker}
+                                      title={`${item.name ?? item.ticker}: ${item.weight.toFixed(1)}%`}
+                                      style={{
+                                        width: `${item.weight}%`,
+                                        backgroundColor: MINI_COLORS[ci],
+                                      }}
+                                    />
+                                  ))}
+                                  {rest > 0 && (
+                                    <div
+                                      title={`기타: ${rest.toFixed(1)}%`}
+                                      style={{ width: `${rest}%`, backgroundColor: "#9CA3AF" }}
+                                    />
                                   )}
-                                </span>
-                              ) : (
-                                <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium mr-0.5 bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
-                                  <BellOff size={10} />미설정
-                                </span>
-                              )}
-                              <button
-                                onClick={(e) => handleToggleTarget(e, p)}
-                                disabled={isTargetPending}
-                                aria-label="목표 포트폴리오 지정"
-                                title={
-                                  tState === "full"
-                                    ? "목표 지정 해제"
-                                    : "이 포트폴리오를 목표로 지정"
-                                }
-                                className={`flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors text-xs ${
-                                  tState === "full"
-                                    ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
-                                    : tState === "partial"
-                                      ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
-                                      : "text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
-                                }`}
-                              >
-                                <Target size={14} />
-                                {tState === "none" && <span>목표 지정</span>}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenEditor(p);
-                                }}
-                                aria-label="포트폴리오 수정"
-                                className="p-2 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
-                              >
-                                <Edit2 size={15} />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenAlertModal(p.id);
-                                }}
-                                className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-colors text-xs ${
-                                  alertPortfolioIds.has(p.id)
-                                    ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
-                                    : "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-950"
-                                }`}
-                                title="리밸런싱 알림 설정"
-                                aria-label="리밸런싱 알림 설정"
-                              >
-                                <Bell size={13} />
-                                {!alertPortfolioIds.has(p.id) && <span>설정</span>}
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onConfirmDelete(p.id);
-                                }}
-                                aria-label="포트폴리오 삭제"
-                                className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </div>
+                                </div>
+                              );
+                            })()}
                         </div>
+                        <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenEditor(p);
+                            }}
+                            aria-label="포트폴리오 수정"
+                            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onConfirmDelete(p.id);
+                            }}
+                            aria-label="포트폴리오 삭제"
+                            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      {/* 행2: 드리프트 배지(좌) + 목표/알림 버튼(우) */}
+                      <div className="mt-2 flex items-center gap-1.5">
+                        {(() => {
+                          const drift = driftByPortfolioId?.[p.id];
+                          if (!drift) return null;
+                          const isNeeded = drift.needs_rebalancing;
+                          const isCaution = !isNeeded && drift.max_drift_pct >= drift.threshold_pct / 2;
+                          if (isNeeded) return (
+                            <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-400">
+                              <AlertTriangle size={10} />
+                              {drift.max_drift_pct.toFixed(1)}% 이탈
+                            </span>
+                          );
+                          if (isCaution) return (
+                            <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400">
+                              <AlertTriangle size={10} />
+                              {drift.max_drift_pct.toFixed(1)}% 주의
+                            </span>
+                          );
+                          return (
+                            <span className="flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 dark:bg-green-950/60 text-green-700 dark:text-green-400">
+                              <CheckCircle size={10} />
+                              안정
+                            </span>
+                          );
+                        })()}
+                        <div className="flex-1" />
+                        <button
+                          onClick={(e) => handleToggleTarget(e, p)}
+                          disabled={isTargetPending}
+                          aria-label="목표 포트폴리오 지정"
+                          title={tState === "full" ? "목표 지정 해제" : "이 포트폴리오를 목표로 지정"}
+                          className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
+                            tState === "full"
+                              ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"
+                              : tState === "partial"
+                                ? "bg-amber-100 dark:bg-amber-950 text-amber-600 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-900"
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          <Target size={11} />
+                          <span>
+                            {tState === "full" ? "목표" : tState === "partial" ? "일부" : "목표 지정"}
+                          </span>
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenAlertModal(p.id);
+                          }}
+                          title="리밸런싱 알림 설정"
+                          aria-label="리밸런싱 알림 설정"
+                          className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
+                            alertByPortfolioId[p.id]?.mode === "AUTO"
+                              ? "bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900"
+                              : alertPortfolioIds.has(p.id)
+                                ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"
+                                : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          {alertByPortfolioId[p.id]?.mode === "AUTO" ? (
+                            <Zap size={11} />
+                          ) : (
+                            <Bell size={11} />
+                          )}
+                          <span>
+                            {alertByPortfolioId[p.id]?.mode === "AUTO"
+                              ? "자동"
+                              : alertPortfolioIds.has(p.id)
+                                ? "알림"
+                                : "알림 설정"}
+                          </span>
+                        </button>
                       </div>
                     </div>
                   )}

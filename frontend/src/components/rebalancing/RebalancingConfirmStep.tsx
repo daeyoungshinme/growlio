@@ -1,7 +1,7 @@
-import type { OrderType } from "@/hooks/useRebalancingExecution";
 import { useRebalancingExecutionContext } from "@/hooks/useRebalancingExecution";
 import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
+import { STRATEGY_OPTIONS } from "@/constants/rebalancingConfig";
 import { CashSummaryBar } from "./CashSummaryBar";
 import { RebalancingOrderTable } from "./RebalancingOrderTable";
 
@@ -31,7 +31,6 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     balanceState,
     depositKrw,
     priceState,
-    priceLoadProgress,
     livePricesKrw,
     livePricesUsd,
     globalUsdRate,
@@ -49,6 +48,27 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
         주문이 즉시 체결됩니다. 내용을 신중히 확인하세요.
       </div>
 
+      {/* 실행 전략 선택 */}
+      <div className="rounded-lg bg-gray-800/60 border border-gray-700/50 px-4 py-3 space-y-2">
+        <p className="text-xs font-medium text-gray-300">실행 전략</p>
+        <div className="space-y-1.5">
+          {STRATEGY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => dispatch({ type: "SET_STRATEGY", strategy: opt.value })}
+              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors border ${
+                state.strategy === opt.value
+                  ? "bg-indigo-600/30 border-indigo-500/60 text-indigo-200"
+                  : "bg-gray-700/40 border-gray-600/40 text-gray-400 hover:bg-gray-700/60"
+              }`}
+            >
+              <span className="font-medium">{opt.label}</span>
+              <span className="ml-2 text-gray-500">{opt.desc}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {hasRealAccount && (
         <div className="rounded-lg bg-red-900/30 border border-red-700/50 px-4 py-3 text-xs text-red-300 font-medium">
           실계좌 주문입니다. 실제 자금이 사용됩니다.
@@ -56,51 +76,6 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
       )}
 
       <div className="text-xs text-gray-500">시장이 닫혀 있을 경우 주문이 예약될 수 있습니다.</div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs text-gray-400">주문 유형</span>
-        <div className="flex rounded-lg border border-gray-700 overflow-hidden">
-          {(["MARKET", "LIMIT"] as OrderType[]).map((type) => (
-            <button
-              key={type}
-              onClick={() => dispatch({ type: "SET_ORDER_TYPE", orderType: type })}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                orderType === type
-                  ? "bg-indigo-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:text-white"
-              }`}
-            >
-              {type === "MARKET" ? "시장가" : "지정가"}
-            </button>
-          ))}
-        </div>
-        {priceState === "loading" && (
-          <div className="w-full sm:w-48 space-y-1">
-            <div className="flex justify-between text-xs text-gray-500">
-              <span>현재가 조회 중...</span>
-              <span>
-                {priceLoadProgress.loaded}/{priceLoadProgress.total}
-              </span>
-            </div>
-            <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-indigo-500 rounded-full transition-all duration-300"
-                style={{
-                  width:
-                    priceLoadProgress.total > 0
-                      ? `${(priceLoadProgress.loaded / priceLoadProgress.total) * 100}%`
-                      : "0%",
-                }}
-              />
-            </div>
-          </div>
-        )}
-        {priceState === "error" && (
-          <span className="text-xs text-amber-400 w-full sm:w-auto">
-            현재가 조회 실패 — 지정가 직접 입력 가능
-          </span>
-        )}
-      </div>
 
       {errorMsg && (
         <div className="rounded-lg bg-red-900/30 border border-red-700/50 px-4 py-3 text-xs text-red-300">

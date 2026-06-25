@@ -92,6 +92,7 @@ class ExecutionOrderItem(BaseModel):
 class ExecutionRequest(BaseModel):
     account_id: uuid.UUID | None = None  # 기본 KIS 계좌 (order에 account_id 없을 때 폴백)
     orders: list[ExecutionOrderItem]
+    strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "FULL"
 
     @field_validator("orders")
     @classmethod
@@ -173,7 +174,7 @@ class RebalancingExecutionSummary(BaseModel):
     id: uuid.UUID
     portfolio_id: uuid.UUID | None
     triggered_by: str  # "MANUAL" | "AUTO" | "ONE_CLICK"
-    strategy: str  # "FULL" | "BUY_ONLY"
+    strategy: str  # "FULL" | "BUY_ONLY" | "TWO_PHASE"
     total_success: int
     total_fail: int
     total_skipped: int

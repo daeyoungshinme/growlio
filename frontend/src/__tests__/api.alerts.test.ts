@@ -143,6 +143,7 @@ describe("api/alerts — rebalancing alerts", () => {
       account_id: null,
       order_type: "MARKET",
       market_condition_mode: "DISABLED",
+      auto_execution_time: null,
     });
     expect(api.put).toHaveBeenCalledWith(
       "/alerts/rebalancing/port-1",

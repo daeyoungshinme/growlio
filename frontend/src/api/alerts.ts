@@ -45,10 +45,11 @@ export interface RebalancingAlert {
   schedule_day_of_month: number | null;
   trigger_condition: TriggerCondition;
   mode: "NOTIFY" | "AUTO";
-  strategy: "FULL" | "BUY_ONLY";
+  strategy: "FULL" | "BUY_ONLY" | "TWO_PHASE";
   account_id: string | null;
   order_type: "MARKET" | "LIMIT";
   market_condition_mode: MarketConditionMode;
+  auto_execution_time: string | null;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -62,10 +63,11 @@ export interface RebalancingAlertUpsert {
   schedule_day_of_month: number | null;
   trigger_condition: TriggerCondition;
   mode: "NOTIFY" | "AUTO";
-  strategy: "FULL" | "BUY_ONLY";
+  strategy: "FULL" | "BUY_ONLY" | "TWO_PHASE";
   account_id: string | null;
   order_type: "MARKET" | "LIMIT";
   market_condition_mode: MarketConditionMode;
+  auto_execution_time: string | null;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");

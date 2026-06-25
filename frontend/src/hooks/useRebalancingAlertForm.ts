@@ -59,7 +59,10 @@ export function useRebalancingAlertQueries({
   );
 
   const kisExecutionAccounts = accounts.filter(
-    (a) => a.asset_type === "STOCK_KIS" && a.is_active,
+    (a) =>
+      a.asset_type === "STOCK_KIS" &&
+      a.is_active &&
+      (accountIds == null || accountIds.includes(a.id)),
   );
 
   return { alert: alert ?? null, isLoading, brokerAccounts, kisAccounts, kisExecutionAccounts, marketSignal };
@@ -86,11 +89,16 @@ export function useRebalancingAlertFormState({
   );
   const [threshold, setThreshold] = useState(alert?.threshold_pct ?? 5);
   const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
-  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY">(alert?.strategy ?? "BUY_ONLY");
+  const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY" | "TWO_PHASE">(
+    alert?.strategy ?? "BUY_ONLY",
+  );
   const [accountId, setAccountId] = useState<string>(alert?.account_id ?? "");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">(alert?.order_type ?? "MARKET");
   const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
     alert?.market_condition_mode ?? "DISABLED",
+  );
+  const [autoExecutionTime, setAutoExecutionTime] = useState<string>(
+    alert?.auto_execution_time ?? "09:05",
   );
 
   const upsertMut = useMutation({
@@ -106,6 +114,7 @@ export function useRebalancingAlertFormState({
         account_id: mode === "AUTO" && accountId ? accountId : null,
         order_type: orderType,
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
+        auto_execution_time: mode === "AUTO" && autoExecutionTime ? autoExecutionTime : null,
       }),
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
@@ -147,6 +156,8 @@ export function useRebalancingAlertFormState({
     setOrderType,
     marketConditionMode,
     setMarketConditionMode,
+    autoExecutionTime,
+    setAutoExecutionTime,
     // mutations
     upsertMut,
     deleteMut,

@@ -10,6 +10,7 @@ import type { DashboardData } from "@/api/dashboard";
 const AssetAllocationChart = lazy(() => import("./AssetAllocationChart"));
 
 const CASH_TYPES = new Set(["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"]);
+const CHART_COLORS = ["#2563EB", "#16A34A", "#D97706", "#DC2626", "#7C3AED", "#0891B2"];
 
 interface Props {
   data: DashboardData | undefined;
@@ -84,19 +85,41 @@ export default memo(function HeroSummaryCard({
   }
 
   return (
-    <div className="card flex flex-col gap-3 lg:gap-4">
-      {/* 헤더: 총 자산 요약 + 접기/펼침 토글 */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
-          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+    <div className="card !p-3 sm:!p-5 flex flex-col gap-3 lg:gap-4">
+      <div className="flex flex-row items-start gap-2 sm:gap-4">
+        {/* 좌: 제목/금액 + expanded 시 지표 */}
+        <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
+            <div className="flex items-center gap-1">
+              {onSync && (
+                <button
+                  onClick={onSync}
+                  disabled={syncing}
+                  className="lg:hidden p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  aria-label="데이터 갱신"
+                >
+                  <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
+                </button>
+              )}
+              <button
+                onClick={() => setExpanded((v) => !v)}
+                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                aria-label={expanded ? "카드 접기" : "카드 펼치기"}
+                aria-expanded={expanded}
+              >
+                {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            </div>
+          </div>
+          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50">
             {fmtKrw(Math.floor(data.total_assets_krw))}
           </p>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-sm sm:text-sm text-gray-400 dark:text-gray-500">
             {Math.floor(data.total_assets_krw).toLocaleString()}원
           </p>
           {!expanded && (
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-3">
               <span
                 className={`text-sm font-semibold ${
                   data.cumulative_return_pct == null
@@ -116,130 +139,115 @@ export default memo(function HeroSummaryCard({
               )}
             </div>
           )}
-        </div>
-        <div className="flex items-center gap-1 shrink-0 mt-1">
-          {onSync && (
-            <button
-              onClick={onSync}
-              disabled={syncing}
-              className="lg:hidden p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
-              aria-label="데이터 갱신"
-            >
-              <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
-            </button>
+          {expanded && (
+            <>
+              <div className="grid grid-cols-2 gap-1 sm:gap-4 pt-0">
+                <div>
+                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+                  <p
+                    className={`text-sm sm:text-lg font-bold mt-0 ${
+                      data.cumulative_return_pct == null
+                        ? "text-gray-400 dark:text-gray-500"
+                        : pnlColor(data.cumulative_return_pct)
+                    }`}
+                  >
+                    {fmtPct(data.cumulative_return_pct)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">주식 수익률</p>
+                  <p
+                    className={`text-sm sm:text-lg font-bold mt-0 ${
+                      data.stock_return_pct === 0
+                        ? "text-gray-400 dark:text-gray-500"
+                        : pnlColor(data.stock_return_pct)
+                    }`}
+                  >
+                    {data.stock_return_pct === 0 ? "—" : fmtPct(data.stock_return_pct)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
+                  <p
+                    className={`text-sm sm:text-base font-semibold mt-0 ${
+                      data.annual_return_pct == null
+                        ? "text-gray-400 dark:text-gray-500"
+                        : pnlColor(data.annual_return_pct)
+                    }`}
+                  >
+                    {fmtPct(data.annual_return_pct)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">
+                    환율(USD/KRW)
+                  </p>
+                  <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0">
+                    {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
+                  </p>
+                </div>
+              </div>
+              {estimatedAnnualDividends != null && estimatedAnnualDividends > 0 && (
+                <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-700">
+                  <span>연간 배당</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    {fmtKrwShort(estimatedAnnualDividends)}원
+                  </span>
+                  {dividendYield != null && (
+                    <span>({dividendYield.toFixed(1)}%)</span>
+                  )}
+                  <Link
+                    to="/assets?tab=투자현황&portfolioTab=배당"
+                    className="ml-auto text-blue-500 dark:text-blue-400 hover:underline"
+                  >
+                    자세히 →
+                  </Link>
+                </div>
+              )}
+              {updatedLabel && (
+                <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
+              )}
+            </>
           )}
-          <button
-            onClick={() => setExpanded((v) => !v)}
-            className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            aria-label={expanded ? "카드 접기" : "카드 펼치기"}
-            aria-expanded={expanded}
-          >
-            {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          </button>
+        </div>
+
+        {/* 우: 도넛(크게, aspect-square) + 가로 범례 */}
+        <div className="shrink-0 w-52 sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-1">
+          {allocationChartData.length > 0 ? (
+            <Suspense fallback={<div className="w-full aspect-square" />}>
+              <>
+                <div className="w-full aspect-square">
+                  <AssetAllocationChart
+                    data={allocationChartData}
+                    size="compact"
+                    fillHeight={true}
+                    showLegend={false}
+                  />
+                </div>
+                <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 justify-center">
+                  {allocationChartData.map((item, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <span
+                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                        style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
+                      />
+                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                        {item.name} {item.pct.toFixed(0)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            </Suspense>
+          ) : (
+            <div className="flex items-center justify-center w-full aspect-square text-gray-300 dark:text-gray-600 text-xs text-center">
+              자산
+              <br />
+              없음
+            </div>
+          )}
         </div>
       </div>
-
-      {/* 펼침 상태: 상세 정보 */}
-      {expanded && (
-        <div className="flex flex-row gap-3 lg:gap-6 items-start">
-          {/* 좌측: 수익률 지표 */}
-          <div className="flex-1 min-w-0 flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
-                <p
-                  className={`text-lg sm:text-xl font-bold mt-0.5 ${
-                    data.cumulative_return_pct == null
-                      ? "text-gray-400 dark:text-gray-500"
-                      : pnlColor(data.cumulative_return_pct)
-                  }`}
-                >
-                  {fmtPct(data.cumulative_return_pct)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">주식 수익률</p>
-                <p
-                  className={`text-lg sm:text-xl font-bold mt-0.5 ${
-                    data.stock_return_pct === 0
-                      ? "text-gray-400 dark:text-gray-500"
-                      : pnlColor(data.stock_return_pct)
-                  }`}
-                >
-                  {data.stock_return_pct === 0 ? "—" : fmtPct(data.stock_return_pct)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
-                <p
-                  className={`text-sm font-semibold mt-0.5 ${
-                    data.annual_return_pct == null
-                      ? "text-gray-400 dark:text-gray-500"
-                      : pnlColor(data.annual_return_pct)
-                  }`}
-                >
-                  {fmtPct(data.annual_return_pct)}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                  환율(USD/KRW)
-                </p>
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0.5">
-                  {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
-                </p>
-              </div>
-            </div>
-            {/* 배당 요약 한 줄 */}
-            {estimatedAnnualDividends != null && estimatedAnnualDividends > 0 && (
-              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-700">
-                <span>연간 배당</span>
-                <span className="font-medium text-gray-700 dark:text-gray-300">
-                  {fmtKrwShort(estimatedAnnualDividends)}원
-                </span>
-                {dividendYield != null && (
-                  <span>({dividendYield.toFixed(1)}%)</span>
-                )}
-                <Link
-                  to="/assets?tab=투자현황&portfolioTab=배당"
-                  className="ml-auto text-blue-500 dark:text-blue-400 hover:underline"
-                >
-                  자세히 →
-                </Link>
-              </div>
-            )}
-            {updatedLabel && (
-              <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
-            )}
-          </div>
-          {/* 모바일: compact-sm 도넛 차트 (우측 고정) */}
-          <div className="lg:hidden w-36 sm:w-44 shrink-0">
-            {allocationChartData.length > 0 ? (
-              <Suspense fallback={<div className="h-36" />}>
-                <AssetAllocationChart data={allocationChartData} size="compact-sm" />
-              </Suspense>
-            ) : (
-              <div className="flex items-center justify-center h-28 text-gray-300 dark:text-gray-600 text-xs text-center">
-                자산
-                <br />
-                없음
-              </div>
-            )}
-          </div>
-          {/* 데스크탑: mobile 사이즈 도넛 차트 */}
-          <div className="hidden lg:block lg:w-80 xl:w-96 shrink-0">
-            {allocationChartData.length > 0 ? (
-              <Suspense fallback={<div className="h-56" />}>
-                <AssetAllocationChart data={allocationChartData} size="mobile" />
-              </Suspense>
-            ) : (
-              <div className="flex items-center justify-center h-40 text-gray-300 dark:text-gray-600 text-sm">
-                자산 데이터 없음
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 });

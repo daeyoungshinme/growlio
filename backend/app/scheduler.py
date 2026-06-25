@@ -53,6 +53,14 @@ def init_scheduler() -> None:
         id="dca_auto_execution_daily",
         replace_existing=True,
     )
+    from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
+
+    scheduler.add_job(
+        run_rebalancing_auto_execution,
+        CronTrigger(minute="*/5", hour="9-15", timezone="Asia/Seoul"),
+        id="rebalancing_auto_execution_intraday",
+        replace_existing=True,
+    )
     from app.jobs.stock_price_alert import run_stock_price_alert_check
 
     scheduler.add_job(

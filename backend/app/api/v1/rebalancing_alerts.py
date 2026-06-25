@@ -31,10 +31,12 @@ class RebalancingAlertCreate(BaseModel):
     schedule_day_of_month: int | None = None  # MONTHLY/QUARTERLY/SEMIANNUAL/ANNUAL: 1~28
     trigger_condition: Literal["DRIFT_ONLY", "SCHEDULE_ONLY", "BOTH"] = "DRIFT_ONLY"
     mode: Literal["NOTIFY", "AUTO"] = "NOTIFY"
-    strategy: Literal["FULL", "BUY_ONLY"] = "BUY_ONLY"
+    strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] = "BUY_ONLY"
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
+    # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30"). None이면 장 개시 후 첫 tick에 실행
+    auto_execution_time: str | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -57,6 +59,20 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("날짜는 1~28 사이여야 합니다")
         return v
 
+    @field_validator("auto_execution_time")
+    @classmethod
+    def validate_auto_execution_time(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            hh, mm = v.split(":")
+            hour, minute = int(hh), int(mm)
+        except (ValueError, AttributeError):
+            raise ValueError("실행 시각은 HH:MM 형식이어야 합니다 (예: 09:30)")
+        if not (9 <= hour <= 15) or not (0 <= minute <= 59):
+            raise ValueError("실행 시각은 09:00~15:00 KST 범위여야 합니다")
+        return f"{hour:02d}:{minute:02d}"
+
 
 class RebalancingAlertResponse(BaseModel):
     id: uuid.UUID
@@ -72,6 +88,7 @@ class RebalancingAlertResponse(BaseModel):
     account_id: uuid.UUID | None
     order_type: str
     market_condition_mode: str
+    auto_execution_time: str | None
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -92,6 +109,7 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         account_id=alert.account_id,
         order_type=alert.order_type,
         market_condition_mode=alert.market_condition_mode,
+        auto_execution_time=getattr(alert, "auto_execution_time", None),
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
@@ -177,6 +195,7 @@ async def upsert_rebalancing_alert(
         alert.account_id = body.account_id
         alert.order_type = body.order_type
         alert.market_condition_mode = body.market_condition_mode
+        alert.auto_execution_time = body.auto_execution_time
         alert.is_active = True
     else:
         alert = RebalancingAlert(
@@ -192,6 +211,7 @@ async def upsert_rebalancing_alert(
             account_id=body.account_id,
             order_type=body.order_type,
             market_condition_mode=body.market_condition_mode,
+            auto_execution_time=body.auto_execution_time,
             is_active=True,
         )
         db.add(alert)

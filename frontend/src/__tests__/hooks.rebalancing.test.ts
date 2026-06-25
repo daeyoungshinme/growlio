@@ -152,6 +152,7 @@ const baseState: ExecutionState = {
   livePricesUsd: {},
   globalUsdRate: null,
   orderType: "MARKET",
+  strategy: "FULL",
   limitPriceOverrides: {},
   qtyOverrides: {},
   buyAccounts: {},

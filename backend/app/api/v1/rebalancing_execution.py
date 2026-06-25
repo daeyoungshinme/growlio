@@ -65,7 +65,7 @@ async def execute_portfolio_rebalancing(
         redis=redis,
         portfolio_id=portfolio_id,
         triggered_by="MANUAL",
-        strategy="FULL",
+        strategy=getattr(body, "strategy", "FULL") or "FULL",
     )
 
 

@@ -173,9 +173,7 @@ async def analyze_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
-    portfolio_acct_ids = (
-        [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
-    )
+    portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
     overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
 

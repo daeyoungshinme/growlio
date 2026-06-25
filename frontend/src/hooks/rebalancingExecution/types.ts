@@ -3,6 +3,7 @@ import type { ExecutionResult, KisBalancePosition } from "@/api/rebalancing";
 export type Phase = "confirm" | "executing" | "result";
 export type BalanceLoadState = "idle" | "loading" | "loaded" | "error" | "not_found";
 export type OrderType = "MARKET" | "LIMIT";
+export type Strategy = "FULL" | "BUY_ONLY" | "TWO_PHASE";
 export type PriceLoadState = "idle" | "loading" | "loaded" | "error";
 
 export interface CashAnalysis {
@@ -35,6 +36,7 @@ export interface ExecutionState {
   livePricesUsd: Record<string, number>;
   globalUsdRate: number | null;
   orderType: OrderType;
+  strategy: Strategy;
   limitPriceOverrides: Record<string, number>;
   qtyOverrides: Record<string, number>;
   buyAccounts: Record<string, string[]>;
@@ -73,6 +75,7 @@ export type ExecutionAction =
       usdRate: number | null;
     }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
+  | { type: "SET_STRATEGY"; strategy: Strategy }
   | { type: "SET_LIMIT_PRICE"; key: string; price: number }
   | { type: "SET_QTY"; key: string; qty: number }
   | { type: "SET_QTY_AND_SELECT"; key: string; qty: number }

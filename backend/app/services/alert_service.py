@@ -34,6 +34,7 @@ __all__ = [
     "check_and_trigger_alerts",
     "check_and_trigger_stock_price_alerts",
     "check_rebalancing_alerts",
+    "execute_auto_rebalancing_for_alert",
     "list_alert_history",
 ]
 
@@ -103,7 +104,7 @@ async def _process_rebalancing_alert(
             mode = "NOTIFY"
 
     if mode == "AUTO" and alert.account_id and drifting:
-        return await _execute_auto_rebalancing(alert, portfolio, drifting, db)
+        return await execute_auto_rebalancing_for_alert(alert, portfolio, drifting, db)
 
     # NOTIFY: 이메일 + FCM 병렬 전송
     drift_count = len(drifting)
@@ -149,13 +150,36 @@ async def _process_rebalancing_alert(
     return True
 
 
+async def execute_auto_rebalancing_for_alert(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    drifting: list,
+    db: AsyncSession,
+) -> bool:
+    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다.
+
+    장 중 여부 확인 후 실행. 성공 시 True, 오류/건너뜀 시 False 반환.
+    신규 AUTO 전용 Job(rebalancing_auto_execution.py)에서도 직접 호출한다.
+    """
+    from app.utils.market_hours import is_korean_market_open
+
+    if not is_korean_market_open():
+        logger.info(
+            "rebalancing_auto_skipped_market_closed",
+            alert_id=str(alert.id),
+        )
+        return False
+
+    return await _execute_auto_rebalancing(alert, portfolio, drifting, db)
+
+
 async def _execute_auto_rebalancing(
     alert,
     portfolio: Portfolio,
     drifting: list,
     db: AsyncSession,
 ) -> bool:
-    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다.
+    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다 (내부용, 장 중 체크 없음).
 
     성공 시 True, 오류 시 False 반환.
     """

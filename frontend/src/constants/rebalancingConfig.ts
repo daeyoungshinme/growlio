@@ -48,9 +48,18 @@ export const MODE_OPTIONS: { value: "NOTIFY" | "AUTO"; label: string; desc: stri
   { value: "AUTO", label: "자동 실행", desc: "조건 충족 시 주문 자동 실행" },
 ];
 
-export const STRATEGY_OPTIONS: { value: "BUY_ONLY" | "FULL"; label: string; desc: string }[] = [
+export const STRATEGY_OPTIONS: {
+  value: "BUY_ONLY" | "FULL" | "TWO_PHASE";
+  label: string;
+  desc: string;
+}[] = [
   { value: "BUY_ONLY", label: "매수만 (권장)", desc: "세금 절감" },
-  { value: "FULL", label: "매도+매수", desc: "완전 리밸런싱" },
+  { value: "FULL", label: "매도+매수", desc: "매도 후 매수 순서로 완전 리밸런싱" },
+  {
+    value: "TWO_PHASE",
+    label: "2단계 자동실행",
+    desc: "예수금 매수 → 과비중 매도 → 매도금 추가 매수",
+  },
 ];
 
 export const MARKET_CONDITION_OPTIONS: {

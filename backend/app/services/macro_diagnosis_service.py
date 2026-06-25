@@ -138,11 +138,7 @@ def _analyze_fomc_schedule(
     today = date.today()
 
     # 1차: 캘린더 이벤트 중 FED_RATE 관련 항목 검색
-    fed_events = [
-        e
-        for e in calendar_events
-        if "기준금리" in e.get("event", "") or "Fed" in e.get("event", "")
-    ]
+    fed_events = [e for e in calendar_events if "기준금리" in e.get("event", "") or "Fed" in e.get("event", "")]
     for event in sorted(fed_events, key=lambda x: x["date"]):
         try:
             d = date.fromisoformat(event["date"])
@@ -269,9 +265,7 @@ async def get_macro_diagnosis(redis: Any) -> dict[str, Any]:
             logger.warning("macro_calendar_fetch_failed", error=str(exc))
             return []
 
-    cpi_hist, fed_hist, calendar_events = await asyncio.gather(
-        _safe_fetch_cpi(), _safe_fetch_fed(), _safe_fetch_cal()
-    )
+    cpi_hist, fed_hist, calendar_events = await asyncio.gather(_safe_fetch_cpi(), _safe_fetch_fed(), _safe_fetch_cal())
 
     cpi = _analyze_cpi_trend(cpi_hist)
     fed = _analyze_fed_rate(fed_hist)

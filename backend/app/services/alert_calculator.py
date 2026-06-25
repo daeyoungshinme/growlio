@@ -71,9 +71,7 @@ def _should_trigger_price(
     if not hit:
         return False
     return not (
-        max_trigger_count > 1
-        and triggered_at
-        and datetime.now(tz=UTC) - triggered_at < _MULTI_TRIGGER_COOLDOWN
+        max_trigger_count > 1 and triggered_at and datetime.now(tz=UTC) - triggered_at < _MULTI_TRIGGER_COOLDOWN
     )
 
 
