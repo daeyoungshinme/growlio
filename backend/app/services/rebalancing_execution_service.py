@@ -439,16 +439,12 @@ async def _execute_two_phase_orders(
         logger.info("two_phase_fallback_overseas_detected", account_no=account_no)
         results: list[OrderResult] = []
         for order in sells + buys:
-            results.append(
-                await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock)
-            )
+            results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
         return results
 
     # Phase 1: 예수금으로 매수 가능한 만큼 실행
     try:
-        orderable_cash = await get_orderable_cash(
-            app_key, app_secret, access_token, account_no, is_mock=is_mock
-        )
+        orderable_cash = await get_orderable_cash(app_key, app_secret, access_token, account_no, is_mock=is_mock)
     except Exception as exc:
         logger.warning("two_phase_orderable_cash_failed_p1", error=str(exc))
         orderable_cash = 0.0
@@ -463,9 +459,7 @@ async def _execute_two_phase_orders(
     logger.info("two_phase_phase2_sells", sell_count=len(sells))
     sell_results: list[OrderResult] = []
     for order in sells:
-        sell_results.append(
-            await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock)
-        )
+        sell_results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
 
     # Phase 3: 매도 후 주문가능금액 재조회 → 나머지 BUY 실행
     phase3_results: list[OrderResult] = []
@@ -554,9 +548,7 @@ async def _execute_buys_within_budget(
             order_type=order.order_type,
             limit_price=order.limit_price,
         )
-        result = await _execute_single_order(
-            exec_order, app_key, app_secret, access_token, account_no, is_mock
-        )
+        result = await _execute_single_order(exec_order, app_key, app_secret, access_token, account_no, is_mock)
         results.append(result)
 
         if result.status == "SUCCESS" and price and price > 0:

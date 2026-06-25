@@ -94,9 +94,7 @@ async def _run_auto_execution() -> None:
                 f"리밸런싱 자동 실행: {portfolio.name} [시장신호: {composite_level}]",
             )
             # last_triggered_at 갱신
-            alert_row = await db_save.scalar(
-                select(RebalancingAlert).where(RebalancingAlert.id == alert.id)
-            )
+            alert_row = await db_save.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert.id))
             if alert_row:
                 alert_row.last_triggered_at = datetime.now(tz=UTC)
             await db_save.commit()
@@ -119,14 +117,10 @@ async def _execute_for_alert(
     from app.services.rebalancing_service import analyze_rebalancing
 
     saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids: list[uuid.UUID] | None = (
-        [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
-    )
+    effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
 
     try:
-        overview = await build_portfolio_overview(
-            alert.user_id, db, account_ids=effective_account_ids
-        )
+        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
     except Exception as exc:
         logger.error("rebalancing_auto_overview_failed", alert_id=str(alert.id), error=str(exc))
         return False

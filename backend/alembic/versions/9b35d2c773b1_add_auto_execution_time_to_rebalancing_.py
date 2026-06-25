@@ -5,6 +5,7 @@ Revises: ac1_remove_deposit_trigger
 Create Date: 2026-06-25 18:00:43.198350
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
