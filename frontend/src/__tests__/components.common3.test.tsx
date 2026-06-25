@@ -165,6 +165,20 @@ describe("OfflineBanner", () => {
     expect(screen.getByRole("alert")).toBeDefined();
     expect(screen.getByText(/오프라인 상태입니다/)).toBeDefined();
   });
+
+  it("lastOnlineAt이 5분 전이면 N분 전 텍스트를 표시한다", () => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60_000);
+    vi.mocked(useOnlineStatus).mockReturnValue({ online: false, lastOnlineAt: fiveMinutesAgo });
+    renderWithProviders(<OfflineBanner />);
+    expect(screen.getByText(/5분 전/)).toBeDefined();
+  });
+
+  it("lastOnlineAt이 2시간 전이면 N시간 전 텍스트를 표시한다", () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 3_600_000);
+    vi.mocked(useOnlineStatus).mockReturnValue({ online: false, lastOnlineAt: twoHoursAgo });
+    renderWithProviders(<OfflineBanner />);
+    expect(screen.getByText(/2시간 전/)).toBeDefined();
+  });
 });
 
 // ------- PageLoader -------

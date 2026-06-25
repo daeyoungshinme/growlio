@@ -4,11 +4,28 @@ import {
   formatUsdAsKrw,
   fmtKrw,
   fmtKrwNullable,
+  fmtKrwPrice,
   fmtKrwShort,
   fmtMonth,
   fmtPct,
   relativeTime,
 } from "@/utils/format";
+
+describe("fmtKrwPrice", () => {
+  it("정수 주가를 원 단위로 표시한다", () => {
+    expect(fmtKrwPrice(20_000)).toBe("20,000원");
+    expect(fmtKrwPrice(150_000)).toBe("150,000원");
+  });
+
+  it("소수점 이하는 버린다", () => {
+    expect(fmtKrwPrice(20_000.9)).toBe("20,000원");
+    expect(fmtKrwPrice(1_234.56)).toBe("1,234원");
+  });
+
+  it("0을 처리한다", () => {
+    expect(fmtKrwPrice(0)).toBe("0원");
+  });
+});
 
 describe("fmtKrw", () => {
   it("억원 단위 변환", () => {

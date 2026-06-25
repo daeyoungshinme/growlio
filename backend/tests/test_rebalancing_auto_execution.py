@@ -145,7 +145,9 @@ class TestRunAutoExecution:
             ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution._execute_for_alert", new=AsyncMock(return_value=True)) as mock_exec,
+            patch(
+                "app.jobs.rebalancing_auto_execution._execute_for_alert", new=AsyncMock(return_value=True)
+            ) as mock_exec,
             patch("app.jobs.rebalancing_auto_execution.save_alert_history", new=AsyncMock()),
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution

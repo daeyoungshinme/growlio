@@ -37,7 +37,8 @@ function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
-  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } = useAllocationHistory(12);
+  const [months, setMonths] = useState(12);
+  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } = useAllocationHistory(months);
 
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
 
@@ -56,8 +57,23 @@ function AllocationHistoryChart() {
     <div className="card">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-          자산 추이 (최근 12개월)
+          자산 추이
         </h2>
+        <div className="flex gap-1">
+          {[3, 6, 12].map((m) => (
+            <button
+              key={m}
+              onClick={() => setMonths(m)}
+              className={`text-xs px-2 py-0.5 rounded-md transition-colors ${
+                months === m
+                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"
+                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              }`}
+            >
+              {m}개월
+            </button>
+          ))}
+        </div>
       </div>
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

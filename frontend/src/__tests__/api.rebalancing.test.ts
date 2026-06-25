@@ -57,6 +57,14 @@ describe("api/rebalancing", () => {
     expect(params.getAll("account_ids")).toEqual(["acc-1", "acc-2"]);
   });
 
+  it("analyzePortfolio passes depositKrwOverride as URLSearchParam", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await analyzePortfolio("port-1", undefined, 500000);
+    const [, config] = vi.mocked(api.get).mock.calls[0];
+    const params = config!.params as URLSearchParams;
+    expect(params.get("deposit_krw_override")).toBe("500000");
+  });
+
   it("executeRebalancing calls POST /rebalancing/portfolios/:id/execute", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: [] });
     await executeRebalancing("port-1", { orders: [] });

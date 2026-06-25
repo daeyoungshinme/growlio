@@ -115,7 +115,7 @@ export default memo(function HeroSummaryCard({
           <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50">
             {fmtKrw(Math.floor(data.total_assets_krw))}
           </p>
-          <p className="text-sm sm:text-sm text-gray-400 dark:text-gray-500">
+          <p className="text-sm text-gray-400 dark:text-gray-500 truncate">
             {Math.floor(data.total_assets_krw).toLocaleString()}원
           </p>
           {!expanded && (
@@ -141,11 +141,11 @@ export default memo(function HeroSummaryCard({
           )}
           {expanded && (
             <>
-              <div className="grid grid-cols-2 gap-1 sm:gap-4 pt-0">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-0">
                 <div>
-                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
                   <p
-                    className={`text-sm sm:text-lg font-bold mt-0 ${
+                    className={`text-sm sm:text-lg font-bold ${
                       data.cumulative_return_pct == null
                         ? "text-gray-400 dark:text-gray-500"
                         : pnlColor(data.cumulative_return_pct)
@@ -155,9 +155,9 @@ export default memo(function HeroSummaryCard({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">주식 수익률</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">주식 수익률</p>
                   <p
-                    className={`text-sm sm:text-lg font-bold mt-0 ${
+                    className={`text-sm sm:text-lg font-bold ${
                       data.stock_return_pct === 0
                         ? "text-gray-400 dark:text-gray-500"
                         : pnlColor(data.stock_return_pct)
@@ -167,9 +167,9 @@ export default memo(function HeroSummaryCard({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
                   <p
-                    className={`text-sm sm:text-base font-semibold mt-0 ${
+                    className={`text-sm sm:text-base font-semibold ${
                       data.annual_return_pct == null
                         ? "text-gray-400 dark:text-gray-500"
                         : pnlColor(data.annual_return_pct)
@@ -179,10 +179,10 @@ export default memo(function HeroSummaryCard({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] sm:text-xs text-gray-400 dark:text-gray-500 font-medium">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
                     환율(USD/KRW)
                   </p>
-                  <p className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 mt-0">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                     {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
                   </p>
                 </div>
@@ -211,12 +211,12 @@ export default memo(function HeroSummaryCard({
           )}
         </div>
 
-        {/* 우: 도넛(크게, aspect-square) + 가로 범례 */}
-        <div className="shrink-0 w-52 sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-0">
+        {/* 우: 도넛 + 범례 */}
+        <div className="shrink-0 w-[180px] sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-0">
           {allocationChartData.length > 0 ? (
             <Suspense fallback={<div className="w-full aspect-square" />}>
               <>
-                <div className="w-full aspect-[4/3]">
+                <div className="w-full aspect-square sm:aspect-[4/3]">
                   <AssetAllocationChart
                     data={allocationChartData}
                     size="compact"
@@ -224,15 +224,18 @@ export default memo(function HeroSummaryCard({
                     showLegend={false}
                   />
                 </div>
-                <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 justify-center -mt-5">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-1 sm:gap-x-2 justify-start sm:justify-center mt-1 sm:-mt-5">
                   {allocationChartData.map((item, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <span
-                        className="inline-block w-2 h-2 rounded-sm shrink-0"
+                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
-                      <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+                      <span className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">
                         {item.name} {item.pct.toFixed(0)}%
+                        <span className="text-gray-400 dark:text-gray-500 ml-0.5">
+                          · {fmtKrwShort(item.value)}
+                        </span>
                       </span>
                     </div>
                   ))}

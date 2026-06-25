@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 
 describe("extractErrorMessage", () => {
   it("axios 응답 detail 추출", () => {
@@ -39,5 +39,28 @@ describe("extractErrorMessage", () => {
   it("axios detail이 배열도 문자열도 아닌 경우 기본 메시지를 반환한다", () => {
     const err = { response: { data: { detail: 42 as unknown as string } } };
     expect(extractErrorMessage(err)).toBe("오류가 발생했습니다");
+  });
+});
+
+describe("getHttpStatus", () => {
+  it("Axios 응답 status를 반환한다", () => {
+    const err = { response: { status: 404 } };
+    expect(getHttpStatus(err)).toBe(404);
+  });
+
+  it("500 상태코드를 반환한다", () => {
+    expect(getHttpStatus({ response: { status: 500 } })).toBe(500);
+  });
+
+  it("response가 없으면 undefined를 반환한다", () => {
+    expect(getHttpStatus(new Error("네트워크 오류"))).toBeUndefined();
+  });
+
+  it("null을 전달하면 undefined를 반환한다", () => {
+    expect(getHttpStatus(null)).toBeUndefined();
+  });
+
+  it("빈 객체를 전달하면 undefined를 반환한다", () => {
+    expect(getHttpStatus({})).toBeUndefined();
   });
 });

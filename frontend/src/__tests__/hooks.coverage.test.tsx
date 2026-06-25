@@ -714,4 +714,157 @@ describe("useAccountMutations", () => {
     expect(toast).toHaveBeenCalledWith("동기화에 실패했습니다");
     expect(result.current.syncingBankId).toBeNull();
   });
+
+  it("createMutation 성공 시 (MANUAL) toast와 onBankModalClose를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post).mockResolvedValue({ data: { id: "acc-1", data_source: "MANUAL", name: "test" } });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.createMutation.mutateAsync({ name: "test", asset_type: "BANK_ACCOUNT" } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith("계좌가 추가되었습니다", "success");
+    expect(mockCallbacks.onBankModalClose).toHaveBeenCalled();
+  });
+
+  it("createMutation 성공 시 (KIS_API) syncAccount를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({ data: { id: "acc-1", data_source: "KIS_API", name: "KIS" } })
+      .mockResolvedValueOnce({ data: {} });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.createMutation.mutateAsync({ name: "KIS", asset_type: "STOCK_KIS" } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith("계좌가 추가되었습니다", "success");
+  });
+
+  it("createMutation KIS_API sync 실패 시 에러 toast를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post)
+      .mockResolvedValueOnce({ data: { id: "acc-1", data_source: "KIS_API", name: "KIS" } })
+      .mockRejectedValueOnce(new Error("sync error"));
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.createMutation.mutateAsync({ name: "KIS", asset_type: "STOCK_KIS" } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("동기화 실패"));
+  });
+
+  it("updateBankMutation 성공 시 onEditBankClose와 toast를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.put).mockResolvedValue({ data: { id: "acc-1", name: "updated" } });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateBankMutation.mutateAsync({
+        id: "acc-1",
+        data: { name: "updated" },
+      } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith("저장되었습니다", "success");
+    expect(mockCallbacks.onEditBankClose).toHaveBeenCalled();
+  });
+
+  it("updateDepositMutation 성공 시 toast를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateDepositMutation.mutateAsync({
+        id: "acc-1",
+        deposit_krw: 500000,
+      } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith("예수금이 업데이트되었습니다", "success");
+  });
+
+  it("updateNameMutation 성공 시 toast를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.updateNameMutation.mutateAsync({ id: "acc-1", name: "새 이름" } as never);
+    });
+
+    expect(toast).toHaveBeenCalledWith("계좌명이 저장되었습니다", "success");
+  });
+
+  it("handleSyncKisAccount 성공 시 toast를 호출한다", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post).mockResolvedValue({ data: {} });
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    const accounts = [{ id: "acc-1", asset_type: "STOCK_KIS", is_active: true }] as never[];
+
+    await act(async () => {
+      await result.current.handleSyncKisAccount("acc-1", accounts);
+    });
+
+    expect(toast).toHaveBeenCalledWith("동기화 완료", "success");
+  });
+
+  it("handleSyncKisAccount 실패 시 broker별 에러 toast를 호출한다 (KIS)", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post).mockRejectedValue(new Error("sync error"));
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    const accounts = [{ id: "acc-1", asset_type: "STOCK_KIS", is_active: true }] as never[];
+
+    await act(async () => {
+      await result.current.handleSyncKisAccount("acc-1", accounts);
+    });
+
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("KIS"));
+  });
+
+  it("handleSyncKisAccount 실패 시 broker별 에러 toast를 호출한다 (키움)", async () => {
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(api.post).mockRejectedValue(new Error("sync error"));
+
+    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
+      wrapper: createWrapper(),
+    });
+
+    const accounts = [{ id: "acc-1", asset_type: "STOCK_KIWOOM", is_active: true }] as never[];
+
+    await act(async () => {
+      await result.current.handleSyncKisAccount("acc-1", accounts);
+    });
+
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("키움"));
+  });
 });

@@ -90,9 +90,9 @@ export default function DashboardPage() {
     );
 
   return (
-    <div className="space-y-6">
-      {/* Row 0: 동기화 버튼 (데스크탑) */}
-      <div className="hidden lg:flex items-center justify-end">
+    <>
+      {/* 데스크탑 동기화 버튼 — space-y-6 밖으로 분리하여 HeroSummaryCard에 margin-top이 생기지 않도록 */}
+      <div className="hidden lg:flex items-center justify-end mb-4">
         <button
           onClick={handleSync}
           disabled={syncing}
@@ -102,7 +102,7 @@ export default function DashboardPage() {
           {syncing ? "갱신 중..." : "데이터 갱신"}
         </button>
       </div>
-
+      <div className="space-y-6">
       {/* Row 1: Hero Card — 자산 현황 */}
       <ErrorBoundary variant="section">
         <HeroSummaryCard
@@ -144,5 +144,6 @@ export default function DashboardPage() {
         </Suspense>
       </ErrorBoundary>
     </div>
+    </>
   );
 }

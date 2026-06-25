@@ -38,7 +38,8 @@ import {
 import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchDartDisclosures } from "@/api/dart";
 import { fetchInsights, fetchInsightsSummary } from "@/api/insights";
-import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
+import { fetchPortfolioRisk, fetchCurrencyExposure, fetchFactorAnalysis, fetchPortfolioFactorAnalysis, fetchEfficientFrontier, fetchRebalancingStrategy } from "@/api/risk";
+import { fetchMacroDiagnosis } from "@/api/marketSignals";
 
 describe("api/settings", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -212,5 +213,58 @@ describe("api/risk", () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchCurrencyExposure();
     expect(api.get).toHaveBeenCalledWith("/portfolio/currency-exposure");
+  });
+
+  it("fetchFactorAnalysis calls GET /portfolio/factor-analysis", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchFactorAnalysis();
+    expect(api.get).toHaveBeenCalledWith("/portfolio/factor-analysis");
+  });
+
+  it("fetchPortfolioFactorAnalysis calls GET /portfolio/factor-analysis/:id", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchPortfolioFactorAnalysis("port-1");
+    expect(api.get).toHaveBeenCalledWith("/portfolio/factor-analysis/port-1");
+  });
+
+  it("fetchEfficientFrontier calls GET /portfolio/efficient-frontier without compare id", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchEfficientFrontier();
+    expect(api.get).toHaveBeenCalledWith("/portfolio/efficient-frontier");
+  });
+
+  it("fetchEfficientFrontier calls GET /portfolio/efficient-frontier with compare id", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchEfficientFrontier("port-1");
+    expect(api.get).toHaveBeenCalledWith(
+      "/portfolio/efficient-frontier?compare_portfolio_id=port-1",
+    );
+  });
+
+  it("fetchRebalancingStrategy calls GET /portfolio/rebalancing-strategy", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchRebalancingStrategy("port-1");
+    expect(api.get).toHaveBeenCalledWith(
+      "/portfolio/rebalancing-strategy?portfolio_id=port-1",
+    );
+  });
+});
+
+describe("api/marketSignals — macroDiagnosis", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fetchMacroDiagnosis calls GET /market-signals/macro-diagnosis", async () => {
+    const mockData = {
+      cpi: null,
+      fed_rate: null,
+      fomc: { next_meeting_date: null, days_until: null, source: "unknown" as const },
+      implication: null,
+      data_freshness: "STALE" as const,
+      computed_at: "2024-01-01T00:00:00Z",
+    };
+    vi.mocked(api.get).mockResolvedValue({ data: mockData });
+    const result = await fetchMacroDiagnosis();
+    expect(api.get).toHaveBeenCalledWith("/market-signals/macro-diagnosis");
+    expect(result).toEqual(mockData);
   });
 });

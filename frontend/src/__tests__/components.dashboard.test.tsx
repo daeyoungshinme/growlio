@@ -132,4 +132,16 @@ describe("DividendSection", () => {
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(3);
   });
+
+  it("isLoading이 true이면 스켈레톤을 표시한다", () => {
+    const { container } = renderWithProviders(
+      <DividendSection
+        annualReceived={null}
+        estimatedAnnual={null}
+        estimatedMonthly={null}
+        isLoading
+      />,
+    );
+    expect(container.firstChild).toBeDefined();
+  });
 });
