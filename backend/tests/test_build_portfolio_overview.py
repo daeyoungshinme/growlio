@@ -32,6 +32,8 @@ def _make_account(acc_id=None, asset_type="STOCK_KIS", include_in_total=True):
         is_mock_mode=False,
         manual_amount=None,
         real_estate_details=None,
+        deposit_krw=None,
+        deposit_usd=None,
         sort_order=0,
         created_at=None,
     )
@@ -217,6 +219,8 @@ class TestBuildPortfolioOverviewWithAccounts:
             is_mock_mode=False,
             manual_amount=500_000_000,
             real_estate_details={"mortgage_balance_krw": 200_000_000},
+            deposit_krw=None,
+            deposit_usd=None,
             sort_order=0,
             created_at=None,
         )

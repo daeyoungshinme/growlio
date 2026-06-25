@@ -22,18 +22,24 @@ export const SCHEDULE_LABEL: Record<ScheduleType, string> = {
 
 export const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
+export const TRIGGER_CONDITION_SHORT_LABEL: Record<TriggerCondition, string> = {
+  DRIFT_ONLY: "이탈 감지",
+  SCHEDULE_ONLY: "정기 리포트",
+  BOTH: "이탈+정기",
+};
+
 export const TRIGGER_CONDITION_OPTIONS: { value: TriggerCondition; label: string; desc: string }[] =
   [
     { value: "DRIFT_ONLY", label: "비중 이탈 시에만", desc: "이탈 종목이 있을 때만 동작합니다" },
     {
       value: "SCHEDULE_ONLY",
       label: "주기마다 항상",
-      desc: "이탈 여부와 관계없이 주기마다 리포트를 받습니다",
+      desc: "주기마다 무조건 리포트를 받습니다",
     },
     {
       value: "BOTH",
       label: "주기마다 + 비중 이탈 시",
-      desc: "주기 리포트를 받으면서 이탈 감지 시 즉시 추가 알림 (예수금 포함)",
+      desc: "정기 리포트 + 이탈 즉시 알림",
     },
   ];
 

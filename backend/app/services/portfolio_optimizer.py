@@ -172,9 +172,11 @@ async def get_efficient_frontier(  # noqa: C901
     db: AsyncSession,
     redis: RedisType = None,
     compare_portfolio_id: str | None = None,
+    account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
     """효율적 프론티어 데이터 반환. compare_portfolio_id 지정 시 목표 포트폴리오 위치도 포함."""
-    cache_key = f"efficient_frontier:{user_id}:{compare_portfolio_id or ''}"
+    acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
+    cache_key = f"efficient_frontier:{user_id}:{compare_portfolio_id or ''}:{acct_suffix}"
 
     if redis:
         try:
@@ -185,7 +187,7 @@ async def get_efficient_frontier(  # noqa: C901
             logger.debug("frontier_cache_read_error", cache_key=cache_key, error=str(e))
 
     # 최신 스냅샷 포지션 조회
-    pos_map = await query_latest_position_map(user_id, db)
+    pos_map = await query_latest_position_map(user_id, db, account_ids=account_ids)
 
     if len(pos_map) < _MIN_POSITIONS:
         return {

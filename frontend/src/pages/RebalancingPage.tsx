@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchMarketSignal, fetchMacroDiagnosis } from "@/api/marketSignals";
 import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
-import type { PortfolioRiskMetrics, CurrencyExposure } from "@/api/risk";
+import type { CurrencyExposure } from "@/api/risk";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -13,8 +13,14 @@ import { STALE_TIME } from "@/constants/queryConfig";
 const RebalancingStatusCard = lazy(
   () => import("../components/dashboard/RebalancingStatusCard"),
 );
+const RiskMetricsCard = lazy(
+  () => import("../components/rebalancing/RiskMetricsCard"),
+);
 const MarketSignalBanner = lazy(
   () => import("../components/rebalancing/MarketSignalBanner"),
+);
+const MacroDiagnosisCard = lazy(
+  () => import("../components/rebalancing/MacroDiagnosisCard"),
 );
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
@@ -31,48 +37,6 @@ const BacktestTab = lazy(
 
 const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "백테스팅", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
-
-function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMetrics }) {
-  if (!metrics.data_available) return null;
-  const diversityColor =
-    metrics.diversification_score >= 70 ? "text-green-600 dark:text-green-400"
-    : metrics.diversification_score >= 40 ? "text-yellow-600 dark:text-yellow-400"
-    : "text-red-600 dark:text-red-400";
-  return (
-    <div className="card">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">포트폴리오 위험 지표</p>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">VaR (95%)</p>
-          <p className="text-sm font-semibold text-red-600 dark:text-red-400">
-            {metrics.var_95_pct.toFixed(2)}%
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">연간 변동성</p>
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {metrics.annualized_volatility_pct.toFixed(1)}%
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">S&amp;P 500 베타</p>
-          <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-            {metrics.beta_sp500.toFixed(2)}
-          </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">분산도 점수</p>
-          <p className={`text-sm font-semibold ${diversityColor}`}>
-            {metrics.diversification_score}/100
-          </p>
-        </div>
-      </div>
-      {metrics.note && (
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-2.5 leading-relaxed">{metrics.note}</p>
-      )}
-    </div>
-  );
-}
 
 function CurrencyExposureCard({ exposure }: { exposure: CurrencyExposure }) {
   const bars: { label: string; pct: number; color: string }[] = [
@@ -144,10 +108,18 @@ export default function RebalancingPage() {
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
     (id: string) => {
-      handlePortfolioChange(id);
-      handleTabChange("포트폴리오");
+      setLocalTab("포트폴리오");
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("portfolioId", id);
+          next.set("rtab", "포트폴리오");
+          return next;
+        },
+        { replace: true },
+      );
     },
-    [handlePortfolioChange, handleTabChange],
+    [setSearchParams],
   );
 
   const executionRef = useRef<HTMLDivElement>(null);
@@ -163,6 +135,13 @@ export default function RebalancingPage() {
     queryKey: QUERY_KEYS.marketSignal,
     queryFn: fetchMarketSignal,
     staleTime: STALE_TIME.LONG,
+  });
+
+  const { data: macroDiagnosis } = useQuery({
+    queryKey: QUERY_KEYS.macroDiagnosis,
+    queryFn: fetchMacroDiagnosis,
+    staleTime: STALE_TIME.LONG,
+    enabled: localTab === "진단",
   });
 
   const { data: riskMetrics } = useQuery({
@@ -201,6 +180,13 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
+            {macroDiagnosis && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={1} />}>
+                  <MacroDiagnosisCard diagnosis={macroDiagnosis} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
@@ -211,7 +197,13 @@ export default function RebalancingPage() {
                 />
               </Suspense>
             </ErrorBoundary>
-            {riskMetrics && <RiskMetricsCard metrics={riskMetrics} />}
+            {riskMetrics && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard />}>
+                  <RiskMetricsCard metrics={riskMetrics} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
             {currencyExposure && <CurrencyExposureCard exposure={currencyExposure} />}
           </>
         )}

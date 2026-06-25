@@ -29,7 +29,7 @@ export function RebalancingExecutionModal({
   return (
     <RebalancingExecutionContext.Provider value={exec}>
       <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 sm:p-4">
-        <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-[92vh] flex flex-col">
+        <div className="bg-gray-900 border border-gray-700 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-4xl max-h-[85dvh] flex flex-col">
           <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-700">
             <h2 className="text-base font-semibold text-white">리밸런싱 실행</h2>
             <button
@@ -59,7 +59,7 @@ export function RebalancingExecutionModal({
           </div>
 
           <div
-            className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-700 flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3"
+            className="shrink-0 px-4 sm:px-6 py-3 border-t border-gray-700 flex flex-col sm:flex-row sm:justify-end gap-2 sm:gap-3"
             style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
           >
             {phase === "confirm" && (

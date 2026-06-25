@@ -7,11 +7,14 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import DividendSection from "@/components/dashboard/DividendSection";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
-import DriftAlertSummary from "@/components/dashboard/DriftAlertSummary";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+
+const RebalancingStatusCard = lazy(
+  () => import("../components/dashboard/RebalancingStatusCard"),
+);
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 
@@ -126,9 +129,19 @@ export default function DashboardPage() {
         <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
       </ErrorBoundary>
 
-      {/* Row 3: 리밸런싱 현황 요약 */}
+      {/* Row 3: 리밸런싱 진단 요약 */}
       <ErrorBoundary variant="section">
-        <DriftAlertSummary />
+        <Suspense fallback={<SkeletonCard rows={2} />}>
+          <RebalancingStatusCard
+            showAllInsights={false}
+            showDriftRows={true}
+            maxDriftRows={3}
+            hideSignalBanner={true}
+            onPortfolioSelect={(id) =>
+              navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)
+            }
+          />
+        </Suspense>
       </ErrorBoundary>
 
       {/* Row 4: 배당 현황 */}

@@ -165,24 +165,28 @@ async def get_rebalancing_strategy(
     """팩터·프론티어 분석을 종합한 리밸런싱 전략 반환."""
     from app.models.portfolio import Portfolio
 
-    cache_key = f"rebalancing_strategy:{user_id}:{portfolio_id}"
-
-    cached = await get_cached_json(redis, cache_key)
-    if cached is not None:
-        return cached
-
     portfolio = await db.scalar(
         select(Portfolio).options(selectinload(Portfolio.items)).where(Portfolio.id == portfolio_id)
     )
     if not portfolio:
         return {"error": "포트폴리오를 찾을 수 없습니다"}
 
+    portfolio_acct_ids: list[uuid.UUID] | None = (
+        [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
+    )
+    acct_suffix = "_".join(sorted(str(a) for a in portfolio_acct_ids)) if portfolio_acct_ids else "all"
+    cache_key = f"rebalancing_strategy:{user_id}:{portfolio_id}:{acct_suffix}"
+
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
+
     # 1+2. 팩터·프론티어 병렬 조회 — 세 호출이 서로 독립적이므로 asyncio.gather로 동시 실행.
     # 캐시 히트(TTL=1h) 시 DB 접근 없이 Redis에서 즉시 반환되어 AsyncSession 경합 없음.
     current_factors_data, target_factors_data, frontier_data = await asyncio.gather(
-        get_factor_analysis(user_id, db, redis),
+        get_factor_analysis(user_id, db, redis, account_ids=portfolio_acct_ids),
         get_factor_analysis_for_portfolio(portfolio_id, db, redis),
-        get_efficient_frontier(user_id, db, redis, compare_portfolio_id=portfolio_id),
+        get_efficient_frontier(user_id, db, redis, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids),
     )
 
     current_pf = current_factors_data.get("portfolio_factors", {})
@@ -233,8 +237,8 @@ async def get_rebalancing_strategy(
             "target_sharpe": None,
         }
 
-    # 3. 현재 포지션 map 조회 (거래 추천용)
-    current_pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    # 3. 현재 포지션 map 조회 (거래 추천용) — 포트폴리오 연결 계좌만 포함
+    current_pos_map = await query_latest_position_map(user_id, db, include_name=True, account_ids=portfolio_acct_ids)
 
     # 4. 거래 추천
     trade_recommendations = _build_trade_recommendations(current_pos_map, portfolio.items, factor_changes)

@@ -7,15 +7,20 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
-@pytest.mark.asyncio
-async def test_run_exchange_rate_alert_check_calls_service():
-    """run_exchange_rate_alert_check가 check_and_trigger_alerts를 호출한다."""
+def _make_mock_db():
     mock_db = MagicMock()
     mock_db.__aenter__ = AsyncMock(return_value=mock_db)
     mock_db.__aexit__ = AsyncMock(return_value=False)
+    return mock_db
+
+
+@pytest.mark.asyncio
+async def test_run_exchange_rate_alert_check_calls_service():
+    """run_exchange_rate_alert_check가 check_and_trigger_alerts를 호출한다."""
+    mock_db = _make_mock_db()
 
     with (
-        patch("app.jobs.exchange_rate_alert.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.exchange_rate_alert.check_and_trigger_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
@@ -28,14 +33,13 @@ async def test_run_exchange_rate_alert_check_calls_service():
 @pytest.mark.asyncio
 async def test_run_exchange_rate_alert_check_handles_exception():
     """check_and_trigger_alerts 예외 발생 시 Job이 크래시하지 않는다."""
-    mock_db = MagicMock()
-    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-    mock_db.__aexit__ = AsyncMock(return_value=False)
+    mock_db = _make_mock_db()
 
     with (
-        patch("app.jobs.exchange_rate_alert.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
-            "app.jobs.exchange_rate_alert.check_and_trigger_alerts", new=AsyncMock(side_effect=RuntimeError("DB error"))
+            "app.jobs.exchange_rate_alert.check_and_trigger_alerts",
+            new=AsyncMock(side_effect=RuntimeError("DB error")),
         ),
     ):
         from app.jobs.exchange_rate_alert import run_exchange_rate_alert_check
@@ -46,12 +50,10 @@ async def test_run_exchange_rate_alert_check_handles_exception():
 @pytest.mark.asyncio
 async def test_run_rebalancing_alert_check_calls_service():
     """run_rebalancing_alert_check가 check_rebalancing_alerts를 호출한다."""
-    mock_db = MagicMock()
-    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-    mock_db.__aexit__ = AsyncMock(return_value=False)
+    mock_db = _make_mock_db()
 
     with (
-        patch("app.jobs.rebalancing_alert.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.rebalancing_alert.check_rebalancing_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.rebalancing_alert import run_rebalancing_alert_check
@@ -64,14 +66,13 @@ async def test_run_rebalancing_alert_check_calls_service():
 @pytest.mark.asyncio
 async def test_run_rebalancing_alert_check_handles_exception():
     """check_rebalancing_alerts 예외 발생 시 Job이 크래시하지 않는다."""
-    mock_db = MagicMock()
-    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-    mock_db.__aexit__ = AsyncMock(return_value=False)
+    mock_db = _make_mock_db()
 
     with (
-        patch("app.jobs.rebalancing_alert.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
-            "app.jobs.rebalancing_alert.check_rebalancing_alerts", new=AsyncMock(side_effect=ValueError("분석 실패"))
+            "app.jobs.rebalancing_alert.check_rebalancing_alerts",
+            new=AsyncMock(side_effect=ValueError("분석 실패")),
         ),
     ):
         from app.jobs.rebalancing_alert import run_rebalancing_alert_check
@@ -82,14 +83,12 @@ async def test_run_rebalancing_alert_check_handles_exception():
 @pytest.mark.asyncio
 async def test_run_stock_price_alert_check_calls_service():
     """run_stock_price_alert_check가 check_and_trigger_stock_price_alerts를 호출한다."""
-    mock_db = MagicMock()
-    mock_db.__aenter__ = AsyncMock(return_value=mock_db)
-    mock_db.__aexit__ = AsyncMock(return_value=False)
+    mock_db = _make_mock_db()
     mock_redis = MagicMock()
 
     with (
-        patch("app.jobs.stock_price_alert.get_redis", new=AsyncMock(return_value=mock_redis)),
-        patch("app.jobs.stock_price_alert.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.stock_price_alert.check_and_trigger_stock_price_alerts", new=AsyncMock()) as mock_check,
     ):
         from app.jobs.stock_price_alert import run_stock_price_alert_check

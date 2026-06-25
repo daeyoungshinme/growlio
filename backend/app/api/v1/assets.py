@@ -3,7 +3,6 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,6 +20,9 @@ from app.schemas.asset import (
     AssetAccountResponse,
     AssetAccountUpdate,
     AssetSnapshotResponse,
+    BatchSetTargetPortfolioRequest,
+    KisCredentialVerifyRequest,
+    SetTargetPortfolioRequest,
 )
 from app.services.asset_service import (
     list_accounts as _list_accounts,
@@ -34,7 +36,7 @@ from app.services.asset_service import (
 from app.services.asset_service import (
     sync_account as _sync_account_service,
 )
-from app.services.credential_service import encrypt
+from app.services.credential_service import encrypt, encrypt_if_present
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
     TTL_ACCOUNT_DETAIL,
@@ -72,12 +74,6 @@ async def list_accounts(
 ):
     accounts = await _list_accounts(current_user.id, db, skip=skip, limit=limit)
     return [_account_response(a) for a in accounts]
-
-
-class KisCredentialVerifyRequest(BaseModel):
-    kis_app_key: str
-    kis_app_secret: str
-    is_mock: bool = True
 
 
 @router.post("/verify-kis-credentials")
@@ -235,12 +231,12 @@ async def update_account(
         setattr(account, field, value)
 
     if req.kis_app_key is not None:
-        account.kis_app_key = encrypt(req.kis_app_key) if req.kis_app_key else None
-        account.kis_app_secret = encrypt(req.kis_app_secret) if req.kis_app_secret else None
+        account.kis_app_key = encrypt_if_present(req.kis_app_key)
+        account.kis_app_secret = encrypt_if_present(req.kis_app_secret)
 
     if req.kiwoom_app_key is not None:
-        account.kiwoom_app_key = encrypt(req.kiwoom_app_key) if req.kiwoom_app_key else None
-        account.kiwoom_app_secret = encrypt(req.kiwoom_app_secret) if req.kiwoom_app_secret else None
+        account.kiwoom_app_key = encrypt_if_present(req.kiwoom_app_key)
+        account.kiwoom_app_secret = encrypt_if_present(req.kiwoom_app_secret)
 
     if (
         req.manual_amount is not None
@@ -426,11 +422,6 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
     }
 
 
-class BatchSetTargetPortfolioRequest(BaseModel):
-    portfolio_id: UUID | None
-    account_ids: list[UUID]
-
-
 @router.patch("/batch-target-portfolio", response_model=list[AssetAccountResponse])
 @limiter.limit("30/minute")
 async def batch_set_target_portfolio(
@@ -451,10 +442,6 @@ async def batch_set_target_portfolio(
     for account in accounts:
         await db.refresh(account)
     return [_account_response(a) for a in accounts]
-
-
-class SetTargetPortfolioRequest(BaseModel):
-    target_portfolio_id: UUID | None
 
 
 @router.patch("/{account_id}/target-portfolio", response_model=AssetAccountResponse)

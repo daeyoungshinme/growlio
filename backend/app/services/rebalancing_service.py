@@ -353,7 +353,8 @@ def analyze_rebalancing(
     target_div_sum = round(sum(i.annual_dividend_current_krw for i in result_items), 0)
     target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(result_items, current_map, returns_map)
     ticker_account_map = _build_ticker_account_map(overview)
-    available_cash_krw = max(
+    _total_deposit = float(overview.get("total_deposit_krw") or 0)
+    available_cash_krw = _total_deposit if _total_deposit > 0 else max(
         0.0,
         float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)),
     )
@@ -394,7 +395,8 @@ def compute_portfolio_drift_summary(
         base_krw = float(overview.get("total_assets_krw", 0))
     else:
         total_stock = float(overview.get("total_stock_krw", 0))
-        available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+        _dep = float(overview.get("total_deposit_krw") or 0)
+        available_cash = _dep if _dep > 0 else max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
         base_krw = total_stock + available_cash
 
     if base_krw <= 0:

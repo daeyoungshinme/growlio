@@ -59,7 +59,10 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
         livePricesKrw: action.krw,
         livePricesUsd: action.usd,
         globalUsdRate: action.usdRate ?? state.globalUsdRate,
-        priceState: Object.keys(action.krw).length > 0 ? "loaded" : "error",
+        priceState:
+          Object.keys(action.krw).length > 0 || Object.keys(action.usd).length > 0
+            ? "loaded"
+            : "error",
       };
     case "SET_ORDER_TYPE":
       return { ...state, orderType: action.orderType };

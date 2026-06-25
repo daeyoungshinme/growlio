@@ -282,13 +282,6 @@ export default function PortfolioListSection({
                         >
                           <GripVertical size={14} />
                         </button>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(p.id)}
-                          onChange={() => onToggleSelect(p.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          className="mt-0.5 rounded text-blue-600 flex-shrink-0"
-                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-1">
                             <div className="min-w-0">
@@ -393,7 +386,7 @@ export default function PortfolioListSection({
                                     ? "목표 지정 해제"
                                     : "이 포트폴리오를 목표로 지정"
                                 }
-                                className={`flex items-center gap-0.5 px-1.5 py-1 rounded-lg transition-colors text-xs ${
+                                className={`flex items-center gap-0.5 px-2 py-1.5 rounded-lg transition-colors text-xs ${
                                   tState === "full"
                                     ? "text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
                                     : tState === "partial"
@@ -401,7 +394,7 @@ export default function PortfolioListSection({
                                       : "text-gray-400 dark:text-gray-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950"
                                 }`}
                               >
-                                <Target size={12} />
+                                <Target size={14} />
                                 {tState === "none" && <span>목표 지정</span>}
                               </button>
                               <button
@@ -410,16 +403,16 @@ export default function PortfolioListSection({
                                   onOpenEditor(p);
                                 }}
                                 aria-label="포트폴리오 수정"
-                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                                className="p-2 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
                               >
-                                <Edit2 size={13} />
+                                <Edit2 size={15} />
                               </button>
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onOpenAlertModal(p.id);
                                 }}
-                                className={`p-1.5 rounded-lg transition-colors ${
+                                className={`p-2 rounded-lg transition-colors ${
                                   alertPortfolioIds.has(p.id)
                                     ? "text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
                                     : "text-gray-300 dark:text-gray-600 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950"
@@ -427,7 +420,7 @@ export default function PortfolioListSection({
                                 title="리밸런싱 알림 설정"
                                 aria-label="리밸런싱 알림 설정"
                               >
-                                <Bell size={13} />
+                                <Bell size={15} />
                               </button>
                               <button
                                 onClick={(e) => {
@@ -435,9 +428,9 @@ export default function PortfolioListSection({
                                   onConfirmDelete(p.id);
                                 }}
                                 aria-label="포트폴리오 삭제"
-                                className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                                className="p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
                               >
-                                <Trash2 size={13} />
+                                <Trash2 size={15} />
                               </button>
                             </div>
                           </div>

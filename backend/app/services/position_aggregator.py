@@ -15,14 +15,17 @@ async def query_latest_position_map(
     user_id: uuid.UUID,
     db: AsyncSession,
     include_name: bool = False,
+    account_ids: list[uuid.UUID] | None = None,
 ) -> dict[str, dict]:
     """사용자의 최신 스냅샷 포지션을 ticker-market 키로 집계한다.
+
+    account_ids가 주어지면 해당 계좌만 집계한다.
 
     Returns:
         {"{ticker}-{market}": {"ticker": ..., "market": ..., "value_krw": ..., ["name": ...]}}
     """
     subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
+    q = (
         select(AssetSnapshot, AssetAccount)
         .join(
             subq,
@@ -31,6 +34,9 @@ async def query_latest_position_map(
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
         .where(AssetAccount.is_active == True)  # noqa: E712
     )
+    if account_ids:
+        q = q.where(AssetAccount.id.in_(account_ids))
+    result = await db.execute(q)
     rows = result.all()
 
     snap_ids = [snap.id for snap, _ in rows]

@@ -57,13 +57,16 @@ export interface RebalancingAnalysis {
   available_cash_krw?: number;
 }
 
-export const analyzePortfolio = (id: string, accountIds?: string[]) => {
+export const analyzePortfolio = (id: string, accountIds?: string[], depositKrwOverride?: number) => {
   const params = new URLSearchParams();
   if (accountIds?.length) {
     for (const aid of accountIds) params.append("account_ids", aid);
   }
+  if (depositKrwOverride !== undefined) {
+    params.append("deposit_krw_override", String(Math.round(depositKrwOverride)));
+  }
   return apiGet<RebalancingAnalysis>(`/rebalancing/portfolios/${id}/analyze`, {
-    params: accountIds?.length ? params : undefined,
+    params: params.size > 0 ? params : undefined,
   });
 };
 

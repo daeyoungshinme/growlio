@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteRebalancingAlert,
@@ -68,16 +68,12 @@ export function useRebalancingAlertQueries({
 interface UseRebalancingAlertFormStateOpts {
   alert: RebalancingAlert | null;
   portfolioId: string;
-  accountIds?: string[] | null;
-  kisAccounts: ReturnType<typeof useRebalancingAlertQueries>["kisAccounts"];
   onClose: () => void;
 }
 
 export function useRebalancingAlertFormState({
   alert,
   portfolioId,
-  accountIds: _accountIds,
-  kisAccounts,
   onClose,
 }: UseRebalancingAlertFormStateOpts) {
   const qc = useQueryClient();
@@ -96,26 +92,6 @@ export function useRebalancingAlertFormState({
   const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
     alert?.market_condition_mode ?? "DISABLED",
   );
-  const [depositTriggerEnabled, setDepositTriggerEnabled] = useState(
-    alert?.deposit_trigger_enabled ?? false,
-  );
-  const [depositTriggerAccountIds, setDepositTriggerAccountIds] = useState<string[]>(
-    alert?.deposit_trigger_account_ids ?? [],
-  );
-  const [depositTriggerMinAmount, setDepositTriggerMinAmount] = useState<number>(
-    alert?.deposit_trigger_min_amount_krw ?? 100_000,
-  );
-
-  useEffect(() => {
-    if (depositTriggerAccountIds.length > 0 && kisAccounts.length > 0) {
-      const validIds = kisAccounts.map((a) => a.id);
-      const filtered = depositTriggerAccountIds.filter((id) => validIds.includes(id));
-      if (filtered.length !== depositTriggerAccountIds.length) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setDepositTriggerAccountIds(filtered);
-      }
-    }
-  }, [kisAccounts, depositTriggerAccountIds]);
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -130,9 +106,6 @@ export function useRebalancingAlertFormState({
         account_id: mode === "AUTO" && accountId ? accountId : null,
         order_type: orderType,
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
-        deposit_trigger_enabled: depositTriggerEnabled,
-        deposit_trigger_account_ids: depositTriggerEnabled ? depositTriggerAccountIds : [],
-        deposit_trigger_min_amount_krw: depositTriggerEnabled ? depositTriggerMinAmount : null,
       }),
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
@@ -174,12 +147,6 @@ export function useRebalancingAlertFormState({
     setOrderType,
     marketConditionMode,
     setMarketConditionMode,
-    depositTriggerEnabled,
-    setDepositTriggerEnabled,
-    depositTriggerAccountIds,
-    setDepositTriggerAccountIds,
-    depositTriggerMinAmount,
-    setDepositTriggerMinAmount,
     // mutations
     upsertMut,
     deleteMut,

@@ -208,15 +208,17 @@ async def get_factor_analysis(
     user_id: uuid.UUID,
     db: AsyncSession,
     redis: RedisType = None,
+    account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
     """포트폴리오 팩터 노출도 분석 반환."""
-    cache_key = f"factor_analysis:{user_id}"
+    acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
+    cache_key = f"factor_analysis:{user_id}:{acct_suffix}"
 
     cached = await get_cached_json(redis, cache_key)
     if cached is not None:
         return cached
 
-    pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    pos_map = await query_latest_position_map(user_id, db, include_name=True, account_ids=account_ids)
 
     if not pos_map:
         return _empty_factor_result()

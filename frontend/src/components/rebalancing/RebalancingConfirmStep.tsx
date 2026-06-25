@@ -211,7 +211,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       <span className="text-xs text-gray-400 shrink-0">({acc.kis_account_no})</span>
                     )}
                     <span
-                      className={`text-[11px] px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
                         acc.is_mock_mode
                           ? "bg-yellow-900/40 text-yellow-400 border border-yellow-700/50"
                           : "bg-red-900/30 text-red-400 border border-red-700/40"
@@ -220,7 +220,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       {acc.is_mock_mode ? "모의" : "실계좌"}
                     </span>
                     {!acc.is_active && (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-gray-700 text-gray-400 border border-gray-600 shrink-0">
                         비활성
                       </span>
                     )}
@@ -232,7 +232,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                       {buys > 0 && <span className="text-red-400">매수 {buys}건</span>}
                     </span>
                     {(state.orderableKrw[acc.id] != null || depositKrw[acc.id] != null) && (
-                      <span className="text-[11px] text-gray-500">
+                      <span className="text-xs text-gray-500">
                         {state.orderableKrw[acc.id] != null ? "주문가능" : "예수금"}{" "}
                         <span className="text-gray-300">
                           {fmtKrwPrice(state.orderableKrw[acc.id] ?? depositKrw[acc.id])}
@@ -242,7 +242,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                     <button
                       onClick={() => loadLiveBalance(acc.id)}
                       disabled={bState === "loading"}
-                      className="text-[11px] px-2 py-0.5 rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-600"
+                      className="text-xs px-2 py-0.5 rounded bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 transition-colors border border-gray-600"
                     >
                       {bState === "loading"
                         ? "조회 중..."
@@ -298,7 +298,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                                 accountId: acc.id,
                               });
                           }}
-                          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-[11px] text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-600 cursor-pointer"
+                          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-400 focus:outline-none focus:border-indigo-500 hover:border-gray-600 cursor-pointer"
                         >
                           <option value="">+ 이 계좌에 매수 종목 추가</option>
                           {unassignedBuyItems.map((i) => (

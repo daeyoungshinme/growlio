@@ -33,6 +33,11 @@ def encrypt(plaintext: str) -> str:
     return (nonce + ct).hex()
 
 
+def encrypt_if_present(plaintext: str | None) -> str | None:
+    """값이 있으면 암호화하고, None이면 None을 반환한다."""
+    return encrypt(plaintext) if plaintext else None
+
+
 def decrypt(ciphertext_hex: str) -> str:
     """hex 문자열을 복호화 → 원문 반환."""
     key = _get_key()

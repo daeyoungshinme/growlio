@@ -42,54 +42,67 @@ logger = structlog.get_logger()
 
 # ── 개별 소스 fetcher (try/except 캡슐화) ────────────────────────
 
+_EMPTY_DIV: dict = {"dps": 0, "dividend_yield": 0}
+_EMPTY_DIV_WITH_MONTHS: dict = {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+
+
+async def _try_source(coro, log_key: str, ticker: str, fallback: dict | None = None) -> dict:
+    """코루틴을 실행하고 예외 발생 시 fallback dict를 반환하는 공통 래퍼."""
+    try:
+        return await coro
+    except Exception as e:
+        logger.warning(log_key, ticker=ticker, error=str(e))
+        return fallback if fallback is not None else _EMPTY_DIV
+
 
 async def _try_naver(ticker: str, is_etf: bool, loop: asyncio.AbstractEventLoop) -> dict:
     """Naver Finance 조회. 실패 시 빈 결과 반환."""
     fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-    try:
-        return await naver_circuit.call(loop.run_in_executor, None, partial(fn, ticker))
-    except Exception as e:
-        logger.warning("naver_dividend_circuit_skipped", ticker=ticker, error=str(e))
-        return {"dps": 0, "dividend_yield": 0, "dividend_months": []}
+    return await _try_source(
+        naver_circuit.call(loop.run_in_executor, None, partial(fn, ticker)),
+        "naver_dividend_circuit_skipped",
+        ticker,
+        _EMPTY_DIV_WITH_MONTHS,
+    )
 
 
 async def _try_kis_etf(ticker: str, kis_creds: dict) -> dict:
     """KIS ETF 전용 배당 조회. 실패 시 빈 결과 반환."""
-    try:
-        return await get_domestic_etf_dividend_info(
+    return await _try_source(
+        get_domestic_etf_dividend_info(
             app_key=kis_creds["app_key"],
             app_secret=kis_creds["app_secret"],
             access_token=kis_creds["access_token"],
             ticker=ticker,
             is_mock=kis_creds["is_mock"],
-        )
-    except Exception as e:
-        logger.warning("kis_etf_dividend_fallback_failed", ticker=ticker, error=str(e))
-        return {"dps": 0, "dividend_yield": 0}
+        ),
+        "kis_etf_dividend_fallback_failed",
+        ticker,
+    )
 
 
 async def _try_fdr(ticker: str, loop: asyncio.AbstractEventLoop) -> dict:
     """FinanceDataReader ETF 배당 조회. 실패 시 빈 결과 반환."""
-    try:
-        return await fdr_circuit.call(loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker))
-    except Exception as e:
-        logger.warning("fdr_dividend_circuit_skipped", ticker=ticker, error=str(e))
-        return {"dps": 0, "dividend_yield": 0}
+    return await _try_source(
+        fdr_circuit.call(loop.run_in_executor, None, partial(sync_fdr_etf_dividend_info, ticker)),
+        "fdr_dividend_circuit_skipped",
+        ticker,
+    )
 
 
 async def _try_kis_general(ticker: str, kis_creds: dict) -> dict:
     """KIS 일반주식 배당 조회. 실패 시 빈 결과 반환."""
-    try:
-        return await get_domestic_dividend_info(
+    return await _try_source(
+        get_domestic_dividend_info(
             app_key=kis_creds["app_key"],
             app_secret=kis_creds["app_secret"],
             access_token=kis_creds["access_token"],
             ticker=ticker,
             is_mock=kis_creds["is_mock"],
-        )
-    except Exception as e:
-        logger.warning("kis_dividend_fallback_failed", ticker=ticker, error=str(e))
-        return {"dps": 0, "dividend_yield": 0}
+        ),
+        "kis_dividend_fallback_failed",
+        ticker,
+    )
 
 
 def _merge_source(src: dict, dps: float, yield_decimal: float) -> tuple[float, float]:

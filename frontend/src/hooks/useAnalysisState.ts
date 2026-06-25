@@ -23,10 +23,10 @@ export function useAnalysisState({
   const [state, setState] = useState<AnalysisState>(INITIAL_STATE);
   const autoAnalyzedRef = useRef<string | undefined>(undefined);
 
-  const triggerRebalancingAnalysis = useCallback(async (id: string) => {
+  const triggerRebalancingAnalysis = useCallback(async (id: string, depositKrwOverride?: number) => {
     setState({ mode: "rebalancing", analysis: null, analyzing: true, error: null });
     try {
-      const result = await analyzePortfolio(id);
+      const result = await analyzePortfolio(id, undefined, depositKrwOverride);
       setState((s) => ({ ...s, analysis: result, analyzing: false }));
     } catch (err) {
       setState((s) => ({

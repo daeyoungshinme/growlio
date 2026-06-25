@@ -343,3 +343,18 @@ class DashboardResponse(BaseModel):
     xirr_is_estimated: bool = False
     goal_annual_return_pct: float | None = None
     retirement_target_year: int | None = None
+
+
+class KisCredentialVerifyRequest(BaseModel):
+    kis_app_key: str
+    kis_app_secret: str
+    is_mock: bool = True
+
+
+class BatchSetTargetPortfolioRequest(BaseModel):
+    portfolio_id: UUID | None
+    account_ids: list[UUID]
+
+
+class SetTargetPortfolioRequest(BaseModel):
+    target_portfolio_id: UUID | None

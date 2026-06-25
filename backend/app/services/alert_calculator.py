@@ -59,29 +59,41 @@ def already_fired_today(alert: RebalancingAlert) -> bool:
     return fired_date == today
 
 
+def _should_trigger_price(
+    direction: str,
+    current: float,
+    target: float,
+    max_trigger_count: int,
+    triggered_at: datetime | None,
+) -> bool:
+    """방향·현재값·목표값으로 알림 발동 여부를 판단하는 공통 로직."""
+    hit = (direction == "BELOW" and current <= target) or (direction == "ABOVE" and current >= target)
+    if not hit:
+        return False
+    return not (
+        max_trigger_count > 1
+        and triggered_at
+        and datetime.now(tz=UTC) - triggered_at < _MULTI_TRIGGER_COOLDOWN
+    )
+
+
 def should_trigger_exchange_rate(alert: ExchangeRateAlert, current_rate: float) -> bool:
     """환율 알림 발동 조건 충족 여부."""
-    target = float(alert.target_rate)
-    triggered = (alert.direction == "BELOW" and current_rate <= target) or (
-        alert.direction == "ABOVE" and current_rate >= target
+    return _should_trigger_price(
+        alert.direction,
+        current_rate,
+        float(alert.target_rate),
+        alert.max_trigger_count,
+        alert.triggered_at,
     )
-    if not triggered:
-        return False
-    if alert.max_trigger_count > 1 and alert.triggered_at:
-        elapsed = datetime.now(tz=UTC) - alert.triggered_at
-        if elapsed < _MULTI_TRIGGER_COOLDOWN:
-            return False
-    return True
 
 
 def should_trigger_stock_price(alert: StockPriceAlert, price: float) -> bool:
     """주가 알림 발동 조건 충족 여부."""
-    target = float(alert.target_price)
-    triggered = (alert.direction == "BELOW" and price <= target) or (alert.direction == "ABOVE" and price >= target)
-    if not triggered:
-        return False
-    if alert.max_trigger_count > 1 and alert.triggered_at:
-        elapsed = datetime.now(tz=UTC) - alert.triggered_at
-        if elapsed < _MULTI_TRIGGER_COOLDOWN:
-            return False
-    return True
+    return _should_trigger_price(
+        alert.direction,
+        price,
+        float(alert.target_price),
+        alert.max_trigger_count,
+        alert.triggered_at,
+    )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import StockPriceAlert
 from app.models.user import User, UserSettings
 from app.services.alert_calculator import should_trigger_stock_price
-from app.services.alert_repository import save_alert_history
+from app.services.alert_repository import apply_alert_trigger
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
@@ -73,15 +71,11 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
             fcm_token=fcm_token,
         )
 
-        alert.trigger_count += 1
-        alert.triggered_at = datetime.now(tz=UTC)
-        if alert.trigger_count >= alert.max_trigger_count:
-            alert.is_active = False
-        await save_alert_history(
+        await apply_alert_trigger(
             db,
-            alert.user_id,
+            alert,
             "STOCK_PRICE",
-            (f"주가 알림: {alert.name}({alert.ticker}) {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})"),
+            f"주가 알림: {alert.name}({alert.ticker}) {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
         )
         triggered_count += 1
 

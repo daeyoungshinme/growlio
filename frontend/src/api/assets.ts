@@ -118,3 +118,8 @@ export interface StockPrice {
 
 export const fetchStockPrice = (ticker: string, market: string): Promise<StockPrice> =>
   apiGet<StockPrice>("/stocks/price", { params: { ticker, market } });
+
+export const fetchStockPricesBatch = (
+  items: { ticker: string; market: string }[],
+): Promise<Record<string, StockPrice>> =>
+  apiPost<Record<string, StockPrice>>("/stocks/prices-batch", { items });

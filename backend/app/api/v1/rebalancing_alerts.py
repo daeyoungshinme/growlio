@@ -8,14 +8,14 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, field_validator
-from sqlalchemy import delete, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.api.v1._account_deps import get_owned_or_404
 from app.database import get_db
 from app.limiter import limiter
-from app.models.alert import RebalancingAlert, RebalancingAlertDepositAccount
+from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -35,9 +35,6 @@ class RebalancingAlertCreate(BaseModel):
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
-    deposit_trigger_enabled: bool = False
-    deposit_trigger_account_ids: list[uuid.UUID] = []
-    deposit_trigger_min_amount_krw: int | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -60,13 +57,6 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("날짜는 1~28 사이여야 합니다")
         return v
 
-    @field_validator("deposit_trigger_min_amount_krw")
-    @classmethod
-    def validate_min_amount(cls, v: int | None) -> int | None:
-        if v is not None and v < 10_000:
-            raise ValueError("최소 감지 금액은 10,000원 이상이어야 합니다")
-        return v
-
 
 class RebalancingAlertResponse(BaseModel):
     id: uuid.UUID
@@ -85,10 +75,6 @@ class RebalancingAlertResponse(BaseModel):
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
-    deposit_trigger_enabled: bool
-    deposit_trigger_account_ids: list[uuid.UUID]
-    deposit_trigger_min_amount_krw: int | None
-    last_deposit_checked_at: datetime | None
 
 
 def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
@@ -109,10 +95,6 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
-        deposit_trigger_enabled=alert.deposit_trigger_enabled,
-        deposit_trigger_account_ids=[da.account_id for da in (alert.deposit_accounts or [])],
-        deposit_trigger_min_amount_krw=alert.deposit_trigger_min_amount_krw,
-        last_deposit_checked_at=alert.last_deposit_checked_at,
     )
 
 
@@ -196,8 +178,6 @@ async def upsert_rebalancing_alert(
         alert.order_type = body.order_type
         alert.market_condition_mode = body.market_condition_mode
         alert.is_active = True
-        alert.deposit_trigger_enabled = body.deposit_trigger_enabled
-        alert.deposit_trigger_min_amount_krw = body.deposit_trigger_min_amount_krw
     else:
         alert = RebalancingAlert(
             user_id=current_user.id,
@@ -213,35 +193,8 @@ async def upsert_rebalancing_alert(
             order_type=body.order_type,
             market_condition_mode=body.market_condition_mode,
             is_active=True,
-            deposit_trigger_enabled=body.deposit_trigger_enabled,
-            deposit_trigger_min_amount_krw=body.deposit_trigger_min_amount_krw,
         )
         db.add(alert)
-        await db.flush()  # alert.id 확보
-
-    # 기존 deposit account 연결 전부 교체
-    await db.execute(delete(RebalancingAlertDepositAccount).where(RebalancingAlertDepositAccount.alert_id == alert.id))
-
-    if body.deposit_trigger_enabled and body.deposit_trigger_account_ids:
-        for acc_id in body.deposit_trigger_account_ids:
-            acc = await db.scalar(
-                select(AssetAccount).where(
-                    AssetAccount.id == acc_id,
-                    AssetAccount.user_id == current_user.id,
-                )
-            )
-            if not acc or acc.asset_type != "STOCK_KIS":
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail="예수금 감지 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
-                )
-            db.add(
-                RebalancingAlertDepositAccount(
-                    alert_id=alert.id,
-                    account_id=acc_id,
-                    last_known_deposit_krw=float(acc.deposit_krw) if acc.deposit_krw is not None else None,
-                )
-            )
 
     await db.commit()
     await db.refresh(alert)

@@ -20,6 +20,7 @@ from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, set_cached_json
+from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
@@ -238,6 +239,13 @@ async def get_currency_exposure(
                 usd_total += val
             else:
                 other_total += val
+
+    # 계좌별 예수금 합산 (Position에 포함되지 않는 현금 잔고)
+    has_usd_deposit = any(float(acc.deposit_usd or 0) > 0 for _, acc in rows)
+    usd_rate = (await fetch_usd_krw(redis) or 1.0) if has_usd_deposit else 1.0
+    for _, acc in rows:
+        krw_total += float(acc.deposit_krw or 0)
+        usd_total += float(acc.deposit_usd or 0) * usd_rate
 
     grand_total = krw_total + usd_total + other_total
     if grand_total <= 0:

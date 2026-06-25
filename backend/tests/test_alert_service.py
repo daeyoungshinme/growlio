@@ -408,7 +408,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     drifting_item = SimpleNamespace(
@@ -456,7 +456,7 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
@@ -504,7 +504,7 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
@@ -543,7 +543,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
@@ -672,7 +672,7 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
     alert = _make_both_alert(user_id, portfolio_id, schedule_type="DAILY")
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(
@@ -715,7 +715,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
     alert.schedule_day_of_week = wrong_day
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     drifting_item = SimpleNamespace(
@@ -758,7 +758,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
     alert.schedule_day_of_week = wrong_day
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     item = SimpleNamespace(

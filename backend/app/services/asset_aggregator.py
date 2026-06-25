@@ -40,8 +40,10 @@ _get_monthly_trend = get_monthly_trend
 logger = structlog.get_logger()
 
 
-async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[date | None, float]:
-    """first_snap_date + net_deposits_ytd를 CTE 단일 쿼리로 조회."""
+async def _get_scalar_init_data(
+    user_id: uuid.UUID, db: AsyncSession
+) -> tuple[date | None, float, float, date | None, float]:
+    """first_snap_date + net_deposits_ytd + net_investment + first_tx_date + first_snap_total을 CTE 단일 쿼리로 조회."""
     year = date.today().year
     row = (
         await db.execute(
@@ -55,6 +57,15 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                       AND a.is_active = TRUE
                       AND a.include_in_total = TRUE
                   ),
+                  fs_total AS (
+                    SELECT COALESCE(SUM(s.amount_krw), 0) AS first_total
+                    FROM asset_snapshots s
+                    JOIN asset_accounts a ON a.id = s.account_id
+                    WHERE s.user_id = :uid
+                      AND a.is_active = TRUE
+                      AND a.include_in_total = TRUE
+                      AND s.snapshot_date = (SELECT first_date FROM fs)
+                  ),
                   nd AS (
                     SELECT COALESCE(
                       SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
@@ -63,15 +74,29 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
                     WHERE user_id = :uid
                       AND EXTRACT(YEAR FROM transaction_date) = :year
                       AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+                  ),
+                  ni AS (
+                    SELECT
+                      COALESCE(
+                        SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
+                      ) AS net_investment,
+                      MIN(CASE WHEN transaction_type = 'DEPOSIT' THEN transaction_date END) AS first_tx_date
+                    FROM transactions
+                    WHERE user_id = :uid
+                      AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
                   )
-                SELECT fs.first_date, nd.net FROM fs, nd
+                SELECT fs.first_date, nd.net, ni.net_investment, ni.first_tx_date, fs_total.first_total
+                FROM fs, fs_total, nd, ni
             """),
             {"uid": str(user_id), "year": year},
         )
     ).first()
     first_snap = row.first_date if row else None
     net_deposits = float(row.net) if row else 0.0
-    return first_snap, net_deposits
+    net_investment = float(row.net_investment) if row else 0.0
+    first_tx_date: date | None = row.first_tx_date if row else None
+    first_snap_total = float(row.first_total) if row else 0.0
+    return first_snap, net_deposits, net_investment, first_tx_date, first_snap_total
 
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
@@ -82,7 +107,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
 
     # 1단계: 서로 독립적인 쿼리들을 병렬 실행
     (
-        (first_snap_date, net_deposits_ytd),
+        (first_snap_date, net_deposits_ytd, net_investment, first_tx_date, first_snap_total),
         settings_row,
         monthly_trend,
         div_summary,
@@ -99,12 +124,15 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 
-    bank_total = total_assets_krw - stock_value
-    base = bank_total + total_invested
-    if stock_value > 0 and total_invested == 0:
-        annualized_return, cumulative_return = None, None
+    if first_snap_total > 0 and first_snap_date:
+        # 최초 스냅샷 총액 기준 — 거래내역 미기록 시에도 신뢰할 수 있는 기준점
+        # net_investment(거래내역 합계)는 KIS 싱크 사용자의 경우 실제 투자금보다 훨씬 작을 수 있어 제외
+        annualized_return, cumulative_return = calc_returns(total_assets_krw, first_snap_total, first_snap_date)
+    elif total_invested > 0 and first_snap_date:
+        # 포지션 원가 기반 폴백 — 스냅샷 합계가 없을 때 avg_price × qty 기준
+        annualized_return, cumulative_return = calc_returns(stock_value, total_invested, first_snap_date)
     else:
-        annualized_return, cumulative_return = calc_returns(total_assets_krw, base, first_snap_date)
+        annualized_return, cumulative_return = None, None
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0
 
     goal = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None

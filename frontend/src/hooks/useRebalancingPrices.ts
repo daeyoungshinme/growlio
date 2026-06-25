@@ -1,4 +1,4 @@
-import { fetchStockPrice } from "@/api/assets";
+import { fetchStockPricesBatch } from "@/api/assets";
 import { CASH_TICKER } from "@/constants/assets";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import type { ExecutionAction } from "./useRebalancingExecution";
@@ -39,23 +39,29 @@ export function useRebalancingPrices(
 
     const entries = Array.from(tickerMarketMap.entries());
 
-    // 캐시 히트 항목은 즉시 반영, 미스 항목만 fetch
-    const toFetch = entries.filter(([ticker]) => !getCached(ticker));
+    // 캐시 미스 항목만 배치로 fetch (N개 병렬 → 단 1회 호출)
+    const toFetch = entries
+      .filter(([ticker]) => !getCached(ticker))
+      .map(([ticker, market]) => ({ ticker, market }));
 
-    if (toFetch.length > 0) dispatch({ type: "PRICES_START", total: toFetch.length });
-
-    let loaded = 0;
-    const results = await Promise.allSettled(
-      toFetch.map(async ([ticker, market]) => {
-        const result = await fetchStockPrice(ticker, market);
-        _priceCache.set(ticker, { ...result, fetchedAt: Date.now() });
-        dispatch({ type: "PRICES_PROGRESS", loaded: ++loaded });
-      }),
-    );
-
-    const failedCount = results.filter((r) => r.status === "rejected").length;
-    if (failedCount > 0 && failedCount < toFetch.length) {
-      toast(`${failedCount}개 종목 현재가 조회 실패`, "error");
+    if (toFetch.length > 0) {
+      dispatch({ type: "PRICES_START", total: toFetch.length });
+      try {
+        const batchResult = await fetchStockPricesBatch(toFetch);
+        for (const { ticker } of toFetch) {
+          const entry = batchResult[ticker];
+          if (entry) {
+            _priceCache.set(ticker, { ...entry, fetchedAt: Date.now() });
+          }
+        }
+        const failedCount = toFetch.filter(({ ticker }) => !batchResult[ticker]?.price_krw && !batchResult[ticker]?.price_usd).length;
+        if (failedCount > 0 && failedCount < toFetch.length) {
+          toast(`${failedCount}개 종목 현재가 조회 실패`, "error");
+        }
+      } catch {
+        toast("현재가 일괄 조회 실패 — 잠시 후 다시 시도하세요", "error");
+      }
+      dispatch({ type: "PRICES_PROGRESS", loaded: toFetch.length });
     }
 
     // 캐시(기존+신규)에서 최종 가격 맵 구성

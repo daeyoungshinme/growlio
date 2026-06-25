@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
-
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
 from app.services.alert_calculator import should_trigger_exchange_rate
-from app.services.alert_repository import save_alert_history
+from app.services.alert_repository import apply_alert_trigger
 from app.utils.currency import fetch_usd_krw
 from app.utils.metrics import alert_trigger_count
 
@@ -67,13 +65,9 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
             fcm_token=fcm_token,
         )
 
-        alert.trigger_count += 1
-        alert.triggered_at = datetime.now(tz=UTC)
-        if alert.trigger_count >= alert.max_trigger_count:
-            alert.is_active = False
-        await save_alert_history(
+        await apply_alert_trigger(
             db,
-            alert.user_id,
+            alert,
             "EXCHANGE_RATE",
             f"환율 알림: USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
         )

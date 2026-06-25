@@ -13,56 +13,40 @@ import pytest
 class TestGetDartKey:
     @pytest.mark.asyncio
     async def test_returns_settings_dart_key_when_user_has_custom(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _get_dart_key
+        from app.services.dividend._dividend_queries import fetch_dart_api_key
 
         settings_row = SimpleNamespace(dart_api_key=b"encrypted_key")
         mock_db.scalar = AsyncMock(return_value=settings_row)
 
-        with patch("app.services.dividend.orchestrator.decrypt", return_value="user-dart-key"):
-            result = await _get_dart_key(uuid.uuid4(), mock_db)
+        with patch("app.services.dividend._dividend_queries.decrypt", return_value="user-dart-key"):
+            result = await fetch_dart_api_key(uuid.uuid4(), mock_db)
 
         assert result == "user-dart-key"
 
     @pytest.mark.asyncio
     async def test_falls_back_to_config_when_no_user_settings(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _get_dart_key
+        from app.services.dividend._dividend_queries import fetch_dart_api_key
 
         mock_db.scalar = AsyncMock(return_value=None)
 
-        with patch("app.services.dividend.orchestrator.settings") as mock_settings:
+        with patch("app.services.dividend._dividend_queries.settings") as mock_settings:
             mock_settings.dart_api_key = "config-dart-key"
-            result = await _get_dart_key(uuid.uuid4(), mock_db)
+            result = await fetch_dart_api_key(uuid.uuid4(), mock_db)
 
         assert result == "config-dart-key"
 
     @pytest.mark.asyncio
     async def test_falls_back_to_config_when_no_dart_api_key(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _get_dart_key
+        from app.services.dividend._dividend_queries import fetch_dart_api_key
 
         settings_row = SimpleNamespace(dart_api_key=None)
         mock_db.scalar = AsyncMock(return_value=settings_row)
 
-        with patch("app.services.dividend.orchestrator.settings") as mock_settings:
+        with patch("app.services.dividend._dividend_queries.settings") as mock_settings:
             mock_settings.dart_api_key = "config-dart-key"
-            result = await _get_dart_key(uuid.uuid4(), mock_db)
+            result = await fetch_dart_api_key(uuid.uuid4(), mock_db)
 
         assert result == "config-dart-key"
-
-
-class TestGetKisCredentials:
-    @pytest.mark.asyncio
-    async def test_delegates_to_get_kis_user_credentials(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _get_kis_credentials
-
-        expected = {"app_key": "key", "app_secret": "secret"}
-
-        with patch(
-            "app.services.dividend.orchestrator.get_kis_user_credentials",
-            new=AsyncMock(return_value=expected),
-        ):
-            result = await _get_kis_credentials(uuid.uuid4(), mock_db)
-
-        assert result == expected
 
 
 class TestCollectPositions:
@@ -129,25 +113,25 @@ class TestCollectPositions:
 class TestLoadUserOverrides:
     @pytest.mark.asyncio
     async def test_returns_empty_when_no_settings(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _load_user_overrides
+        from app.services.dividend._dividend_queries import load_user_dividend_overrides
 
         exec_result = MagicMock()
         exec_result.scalars.return_value.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        result = await _load_user_overrides(uuid.uuid4(), mock_db)
+        result = await load_user_dividend_overrides(uuid.uuid4(), mock_db)
         assert result == {}
 
     @pytest.mark.asyncio
     async def test_returns_dividend_months_map(self, mock_db, override_settings):
-        from app.services.dividend.orchestrator import _load_user_overrides
+        from app.services.dividend._dividend_queries import load_user_dividend_overrides
 
         row = SimpleNamespace(ticker="AAPL", market="NASDAQ", dividend_months=[3, 6, 9, 12])
         exec_result = MagicMock()
         exec_result.scalars.return_value.all.return_value = [row]
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        result = await _load_user_overrides(uuid.uuid4(), mock_db)
+        result = await load_user_dividend_overrides(uuid.uuid4(), mock_db)
 
         assert ("AAPL", "NASDAQ") in result
         assert result[("AAPL", "NASDAQ")] == [3, 6, 9, 12]
@@ -256,9 +240,9 @@ class TestGetTickerDividendSummary:
         with (
             patch("app.services.dividend.orchestrator.get_redis", new=AsyncMock(return_value=mock_redis)),
             patch("app.services.dividend.orchestrator._collect_positions", new=AsyncMock(return_value={})),
-            patch("app.services.dividend.orchestrator._load_user_overrides", new=AsyncMock(return_value={})),
-            patch("app.services.dividend.orchestrator._get_dart_key", new=AsyncMock(return_value="key")),
-            patch("app.services.dividend.orchestrator._get_kis_credentials", new=AsyncMock(return_value=None)),
+            patch("app.services.dividend.orchestrator.load_user_dividend_overrides", new=AsyncMock(return_value={})),
+            patch("app.services.dividend.orchestrator.fetch_dart_api_key", new=AsyncMock(return_value="key")),
+            patch("app.services.dividend.orchestrator.get_kis_user_credentials", new=AsyncMock(return_value=None)),
             patch("app.services.dividend.orchestrator.get_usd_krw_rate", new=AsyncMock(return_value=1350.0)),
         ):
             result = await get_ticker_dividend_summary(uuid.uuid4(), mock_db)

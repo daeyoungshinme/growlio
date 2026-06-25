@@ -66,7 +66,7 @@ export function RebalancingResultSection({ results }: Props) {
                 </div>
                 <div className="flex items-center gap-2 mt-1.5 text-xs text-gray-400 flex-wrap">
                   <span
-                    className={`px-1.5 py-0.5 rounded font-medium text-[11px] ${o.order_type === "LIMIT" ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40" : "bg-gray-700 text-gray-400"}`}
+                    className={`px-1.5 py-0.5 rounded font-medium text-xs ${o.order_type === "LIMIT" ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40" : "bg-gray-700 text-gray-400"}`}
                   >
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>
@@ -95,14 +95,14 @@ export function RebalancingResultSection({ results }: Props) {
                 <tr key={idx} className="text-white">
                   <td className="px-3 py-2">
                     <div className="font-medium truncate max-w-[120px]">{o.name}</div>
-                    <div className="text-gray-400 text-[11px]">{o.ticker}</div>
+                    <div className="text-gray-400 text-xs">{o.ticker}</div>
                   </td>
                   <td className="px-3 py-2 text-center">
                     <SideBadge isBuy={o.side === "BUY"} />
                   </td>
                   <td className="px-3 py-2 text-center">
                     <span
-                      className={`text-[11px] px-1.5 py-0.5 rounded font-medium ${
+                      className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                         o.order_type === "LIMIT"
                           ? "bg-indigo-900/40 text-indigo-300 border border-indigo-700/40"
                           : "bg-gray-700 text-gray-400"

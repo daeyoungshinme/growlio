@@ -7,7 +7,6 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -19,6 +18,7 @@ from app.models.asset import Position
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import ManualPosition, PositionListResponse
+from app.services._position_queries import fetch_manual_positions
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.currency import fetch_usd_krw
@@ -73,14 +73,8 @@ async def get_positions(
 ):
     """수동 종목 목록 조회 (매입합계·평가합계·수익률 포함)."""
     account = await get_owned_account(account_id, current_user.id, db)
-    result = await db.execute(
-        select(Position).where(
-            Position.account_id == account.id,
-            Position.snapshot_id == None,  # noqa: E711
-        )
-    )
-    positions = [p.to_dict() for p in result.scalars().all()]
-    return _enrich_positions(positions)
+    pos_objs = await fetch_manual_positions(account.id, db)
+    return _enrich_positions([p.to_dict() for p in pos_objs])
 
 
 @router.put("/{account_id}/positions", response_model=PositionListResponse)
@@ -120,7 +114,7 @@ async def save_positions(
                 avg_price_usd=p.avg_price_usd,
                 current_price=eff_price,
                 value_krw=eff_price * p.qty,
-                currency="USD" if p.avg_price_usd else "KRW",
+                currency="USD" if (p.avg_price_usd or p.market in OVERSEAS_MARKETS) else "KRW",
                 usd_rate=p.usd_rate,
             )
 
@@ -178,13 +172,7 @@ async def sync_position_prices(
                 detail="현재가 동기화가 이미 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
 
-        pos_result = await db.execute(
-            select(Position).where(
-                Position.account_id == account.id,
-                Position.snapshot_id == None,  # noqa: E711
-            )
-        )
-        pos_objs = pos_result.scalars().all()
+        pos_objs = await fetch_manual_positions(account.id, db)
         if not pos_objs:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="저장된 종목이 없습니다")
 

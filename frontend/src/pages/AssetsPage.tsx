@@ -13,7 +13,7 @@ export default function AssetsPage() {
   const activeTab: AssetsTopTab =
     (ASSETS_TOP_TABS as readonly string[]).includes(rawTab ?? "")
       ? (rawTab as AssetsTopTab)
-      : "계좌관리";
+      : "투자현황";
 
   const handleTabChange = (tab: AssetsTopTab) => {
     setSearchParams((prev) => {

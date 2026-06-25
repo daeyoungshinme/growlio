@@ -1,4 +1,5 @@
 import { Bell, BellOff, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
 import { type ScheduleType, type TriggerCondition } from "@/api/alerts";
@@ -65,7 +66,7 @@ export default function RebalancingAlertModal({
   accountIds,
   onClose,
 }: Props) {
-  const { alert, isLoading, kisAccounts, kisExecutionAccounts, marketSignal } =
+  const { alert, isLoading, kisExecutionAccounts, marketSignal } =
     useRebalancingAlertQueries({ portfolioId, accountIds });
 
   return (
@@ -79,10 +80,8 @@ export default function RebalancingAlertModal({
           <AlertFormBody
             key={alert?.id ?? "new"}
             alert={alert}
-            kisAccounts={kisAccounts}
             kisExecutionAccounts={kisExecutionAccounts}
             portfolioId={portfolioId}
-            accountIds={accountIds}
             onClose={onClose}
             marketSignal={marketSignal}
           />
@@ -98,43 +97,48 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 
 function AlertFormBody({
   alert,
-  kisAccounts,
   kisExecutionAccounts,
   portfolioId,
-  accountIds,
   onClose,
   marketSignal,
 }: {
   alert: RebalancingAlert | null;
-  kisAccounts: AssetAccount[];
   kisExecutionAccounts: AssetAccount[];
   portfolioId: string;
-  accountIds?: string[] | null;
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
 }) {
   const form = useRebalancingAlertFormState({
     alert,
     portfolioId,
-    accountIds,
-    kisAccounts,
     onClose,
   });
 
   const hasAlert = !!alert;
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  function handleDeleteClick() {
+    if (!confirmingDelete) {
+      setConfirmingDelete(true);
+      setTimeout(() => setConfirmingDelete(false), 3000);
+    } else {
+      form.deleteMut.mutate();
+    }
+  }
 
   return (
     <>
-      <div className="p-6 space-y-5 pb-2">
+      <div className="p-4 space-y-4 pb-2">
         {/* ── 알림 주기 ── */}
         <div>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 주기</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
             {SCHEDULE_OPTIONS.map(({ value, label }) => (
               <button
                 key={value}
                 onClick={() => form.setScheduleType(value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                aria-pressed={form.scheduleType === value}
+                className={`py-3 rounded-lg text-xs font-medium transition-colors ${
                   form.scheduleType === value
                     ? "bg-blue-600 text-white"
                     : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -155,7 +159,9 @@ function AlertFormBody({
                 <button
                   key={idx}
                   onClick={() => form.setDayOfWeek(idx)}
-                  className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  aria-pressed={form.dayOfWeek === idx}
+                  aria-label={`${day}요일`}
+                  className={`py-2.5 rounded-lg text-xs font-medium transition-colors ${
                     form.dayOfWeek === idx
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
@@ -196,19 +202,26 @@ function AlertFormBody({
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 조건</p>
           <div className="space-y-2">
             {TRIGGER_CONDITION_OPTIONS.map(({ value, label, desc }) => (
-              <label key={value} className="flex items-start gap-2.5 cursor-pointer">
+              <label
+                key={value}
+                className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  form.triggerCondition === value
+                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                    : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                }`}
+              >
                 <input
                   type="radio"
                   checked={form.triggerCondition === value}
                   onChange={() => form.setTriggerCondition(value)}
-                  className="mt-0.5 text-blue-600"
+                  className="mt-0.5 accent-blue-600 shrink-0"
                 />
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {label}
-                  <span className="block text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {desc}
-                  </span>
-                </span>
+                <div>
+                  <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                    {label}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{desc}</div>
+                </div>
               </label>
             ))}
           </div>
@@ -359,147 +372,24 @@ function AlertFormBody({
                   </div>
                 )}
               </div>
-              <div className="space-y-1.5">
+              <select
+                className={inputClass}
+                value={form.marketConditionMode}
+                onChange={(e) =>
+                  form.setMarketConditionMode(
+                    e.target.value as "DISABLED" | "CAUTIOUS" | "STRICT",
+                  )
+                }
+              >
                 {MARKET_CONDITION_OPTIONS.map(({ value, label, desc }) => (
-                  <label
-                    key={value}
-                    className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
-                      form.marketConditionMode === value
-                        ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                        : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="market_condition_mode"
-                      value={value}
-                      checked={form.marketConditionMode === value}
-                      onChange={() => form.setMarketConditionMode(value)}
-                      className="mt-0.5 accent-blue-600"
-                    />
-                    <div>
-                      <div className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                        {label}
-                      </div>
-                      <div className="text-xs text-gray-400 dark:text-gray-500">{desc}</div>
-                    </div>
-                  </label>
+                  <option key={value} value={value}>
+                    {label} — {desc}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           </div>
         )}
-
-        {/* ── 예수금 입금 감지 ── */}
-        <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between mb-1">
-            <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                예수금 입금 감지
-              </p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                입금 확인 시 위 설정(알림/자동실행)으로 비중 배분 매수
-              </p>
-            </div>
-            <button
-              role="switch"
-              aria-checked={form.depositTriggerEnabled}
-              onClick={() => form.setDepositTriggerEnabled((v) => !v)}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                form.depositTriggerEnabled ? "bg-blue-600" : "bg-gray-300 dark:bg-gray-600"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  form.depositTriggerEnabled ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
-          </div>
-
-          <div
-            className={`grid transition-all duration-200 ${form.depositTriggerEnabled ? "grid-rows-[1fr] mt-3" : "grid-rows-[0fr]"}`}
-          >
-            <div className="overflow-hidden">
-              <div className="space-y-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    감시 계좌 (복수 선택 가능)
-                  </label>
-                  {kisAccounts.length === 0 ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      {accountIds != null
-                        ? "이 포트폴리오에 연결된 KIS 계좌가 없습니다. 포트폴리오 설정에서 KIS 계좌를 연결해주세요."
-                        : "KIS 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요."}
-                    </p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {kisAccounts.map((a) => {
-                        const checked = form.depositTriggerAccountIds.includes(a.id);
-                        const toggle = () =>
-                          form.setDepositTriggerAccountIds((prev) =>
-                            checked ? prev.filter((id) => id !== a.id) : [...prev, a.id],
-                          );
-                        return (
-                          <label
-                            key={a.id}
-                            className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2.5 py-2 hover:bg-blue-100 dark:hover:bg-blue-900 transition-colors"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={toggle}
-                              className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="flex-1 text-sm text-gray-700 dark:text-gray-300">
-                              {a.name}
-                            </span>
-                            {a.deposit_krw != null && (
-                              <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                                {a.deposit_krw.toLocaleString("ko-KR")}원
-                              </span>
-                            )}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {form.depositTriggerAccountIds.length > 1 && (
-                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-1.5">
-                      선택된 계좌들의 입금 합산액이 최소 금액 이상이면 동작합니다
-                    </p>
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    최소 감지 금액 (KRW)
-                  </label>
-                  <input
-                    type="number"
-                    min={10_000}
-                    step={10_000}
-                    value={form.depositTriggerMinAmount}
-                    onChange={(e) => form.setDepositTriggerMinAmount(Number(e.target.value))}
-                    className={inputClass}
-                    placeholder="예: 100000"
-                  />
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    이 금액 이상 입금 시에만 동작 (최소 10,000원)
-                  </p>
-                </div>
-
-                {alert?.last_deposit_checked_at && (
-                  <p className="text-xs text-blue-600 dark:text-blue-400">
-                    마지막 확인: {new Date(alert.last_deposit_checked_at).toLocaleString("ko-KR")}
-                  </p>
-                )}
-              </div>
-            </div>
-            {/* end overflow-hidden */}
-          </div>
-          {/* end grid animation wrapper */}
-        </div>
 
         {/* ── 설명 텍스트 ── */}
         <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
@@ -544,16 +434,20 @@ function AlertFormBody({
         </button>
         {hasAlert && (
           <button
-            onClick={() => form.deleteMut.mutate()}
+            onClick={handleDeleteClick}
             disabled={form.isPending}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
+            className={`flex items-center justify-center gap-1.5 px-4 py-2 text-sm rounded-lg disabled:opacity-50 transition-colors ${
+              confirmingDelete
+                ? "bg-red-600 text-white hover:bg-red-700 border border-red-600"
+                : "border border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+            }`}
           >
             {form.deleteMut.isPending ? (
               <Loader2 size={14} className="animate-spin" />
             ) : (
               <BellOff size={14} />
             )}
-            설정 해제
+            {confirmingDelete ? "정말 해제?" : "설정 해제"}
           </button>
         )}
       </div>

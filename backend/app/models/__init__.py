@@ -2,7 +2,6 @@ from app.models.alert import (
     AlertHistory,
     ExchangeRateAlert,
     RebalancingAlert,
-    RebalancingAlertDepositAccount,
     StockPriceAlert,
 )
 from app.models.asset import (
@@ -38,7 +37,6 @@ __all__ = [
     "PortfolioAccount",
     "ExchangeRateAlert",
     "RebalancingAlert",
-    "RebalancingAlertDepositAccount",
     "StockPriceAlert",
     "AlertHistory",
     "IndicatorSubscription",

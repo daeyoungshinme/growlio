@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.utils.pnl import calc_position_pnl, eval_value, invested_value, pnl_pct
+from app.utils.pnl import calc_net_asset_amount, calc_position_pnl, eval_value, invested_value, pnl_pct
 
 
 def _pos(avg_price=1000.0, qty=10.0, current_price=None):
@@ -39,6 +39,10 @@ class TestEvalValue:
     def test_none_avg_and_current_price_treated_as_zero(self):
         pos = SimpleNamespace(avg_price=None, qty=10.0, current_price=None)
         assert eval_value([pos]) == pytest.approx(0.0)
+
+    def test_handles_float_strings_via_float_cast(self):
+        positions = [SimpleNamespace(current_price="12000", avg_price="10000", qty="4")]
+        assert eval_value(positions) == pytest.approx(12_000 * 4)
 
 
 class TestInvestedValue:
@@ -93,7 +97,29 @@ class TestCalcPositionPnl:
         assert invested == pytest.approx(0.0)
         assert rate == pytest.approx(0.0)
 
+    def test_zero_qty_returns_zero_values(self):
+        invested, value, pnl, rate = calc_position_pnl(qty=0, avg_price=5_000, current_price=6_000)
+        assert invested == 0.0
+        assert value == 0.0
+        assert rate == 0.0
+
     def test_breakeven(self):
         _, _, pnl, rate = calc_position_pnl(qty=10.0, avg_price=1000.0, current_price=1000.0)
         assert pnl == pytest.approx(0.0)
         assert rate == pytest.approx(0.0)
+
+
+class TestCalcNetAssetAmount:
+    def test_non_real_estate_returns_manual_amount(self):
+        assert calc_net_asset_amount(5_000_000.0, "CASH_OTHER", None) == pytest.approx(5_000_000.0)
+
+    def test_real_estate_deducts_mortgage(self):
+        details = {"mortgage_balance_krw": 100_000_000}
+        result = calc_net_asset_amount(500_000_000.0, "REAL_ESTATE", details)
+        assert result == pytest.approx(400_000_000.0)
+
+    def test_none_manual_amount_treated_as_zero(self):
+        assert calc_net_asset_amount(None, "CASH_OTHER", None) == pytest.approx(0.0)
+
+    def test_none_real_estate_details_no_deduction(self):
+        assert calc_net_asset_amount(300_000_000.0, "REAL_ESTATE", None) == pytest.approx(300_000_000.0)

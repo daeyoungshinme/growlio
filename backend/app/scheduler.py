@@ -45,20 +45,6 @@ def init_scheduler() -> None:
         id="rebalancing_alert_check_daily",
         replace_existing=True,
     )
-    from app.jobs.deposit_monitor import run_deposit_monitor
-
-    scheduler.add_job(
-        run_deposit_monitor,
-        CronTrigger(hour=15, minute=35, timezone="Asia/Seoul"),
-        id="deposit_monitor_intraday",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_deposit_monitor,
-        CronTrigger(hour=18, minute=5, timezone="Asia/Seoul"),
-        id="deposit_monitor_daily",
-        replace_existing=True,
-    )
     from app.jobs.dca_auto_buy import run_dca_auto_execution
 
     scheduler.add_job(

@@ -86,7 +86,7 @@ export function RebalancingMobileCard({
             <span className="text-gray-400 text-sm shrink-0">주</span>
           </div>
           {marketOrderEst != null && orderType === "MARKET" && (
-            <p className="text-[11px] text-gray-500 mt-0.5">≈ {fmtKrw(marketOrderEst)}</p>
+            <p className="text-xs text-gray-500 mt-0.5">≈ {fmtKrw(marketOrderEst)}</p>
           )}
           {extra}
         </div>
@@ -94,7 +94,7 @@ export function RebalancingMobileCard({
 
       {/* Row 2: 현재가 인라인 */}
       <div className="mt-0.5 pl-7 flex items-center gap-1.5">
-        <span className="text-[11px] text-gray-500">현재가</span>
+        <span className="text-xs text-gray-500">현재가</span>
         <PriceCell
           ticker={item.ticker}
           market={item.market}
@@ -108,13 +108,13 @@ export function RebalancingMobileCard({
       {orderType === "LIMIT" && (
         <div className="mt-1 pl-7">
           <div className="flex items-center justify-between mb-0.5">
-            <p className="text-[11px] text-gray-500">지정가</p>
+            <p className="text-xs text-gray-500">지정가</p>
             {priceState === "loaded" && currentNativePrice != null && (
               <button
                 onClick={() =>
                   dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })
                 }
-                className="text-[11px] text-indigo-400 hover:text-indigo-300"
+                className="text-xs text-indigo-400 hover:text-indigo-300 px-1.5 py-1 rounded hover:bg-indigo-950/30 transition-colors"
               >
                 현재가로
               </button>
@@ -139,7 +139,7 @@ export function RebalancingMobileCard({
             <span className="text-gray-400 text-sm shrink-0">{overseas ? "USD" : "원"}</span>
           </div>
           {nativeLimitPrice > 0 && (
-            <p className="text-[11px] text-gray-600 mt-0.5 text-right">
+            <p className="text-xs text-gray-600 mt-0.5 text-right">
               ≈{" "}
               {fmtKrw(
                 overseas && globalUsdRate != null

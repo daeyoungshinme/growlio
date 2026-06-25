@@ -82,7 +82,7 @@ export function RebalancingOrderTable({
       <div className="md:hidden divide-y divide-gray-700/30">
         {sellRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매도</div>
+            <div className="px-3 py-1.5 text-xs text-gray-500 bg-gray-800/30">매도</div>
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
               const key = `sell_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
@@ -104,7 +104,7 @@ export function RebalancingOrderTable({
                   isBuy={false}
                   maxQty={currentQty}
                   extra={
-                    <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                    <p className="text-xs text-gray-500 mt-0.5 text-right">
                       현재 {currentQty.toLocaleString()}주 보유
                     </p>
                   }
@@ -126,7 +126,7 @@ export function RebalancingOrderTable({
         )}
         {buyRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-[11px] text-gray-500 bg-gray-800/30">매수</div>
+            <div className="px-3 py-1.5 text-xs text-gray-500 bg-gray-800/30">매수</div>
             {buyRows.map(({ item, suggestedQty, currentQty }) => {
               const key = `buy_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
@@ -153,14 +153,14 @@ export function RebalancingOrderTable({
                   extra={
                     isMultiAccount ? (
                       <div
-                        className={`text-[11px] mt-0.5 text-right ${
+                        className={`text-xs mt-0.5 text-right ${
                           allocated === needed ? "text-gray-500" : "text-amber-400"
                         }`}
                       >
                         배분 {allocated} / {needed}주
                       </div>
                     ) : (
-                      <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                      <p className="text-xs text-gray-500 mt-0.5 text-right">
                         {item.target_qty != null ? (
                           <>
                             {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} → 목표{" "}
@@ -205,7 +205,7 @@ export function RebalancingOrderTable({
             <col style={{ width: "32px" }} />
           </colgroup>
           <thead>
-            <tr className="text-[11px] text-gray-500 border-b border-gray-700/50">
+            <tr className="text-xs text-gray-500 border-b border-gray-700/50">
               <th scope="col" />
               <th scope="col" className="px-3 py-2 text-left font-normal">
                 종목
@@ -233,7 +233,7 @@ export function RebalancingOrderTable({
                 <tr>
                   <td
                     colSpan={orderType === "LIMIT" ? 7 : 6}
-                    className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30"
+                    className="px-4 py-1.5 text-xs text-gray-500 bg-gray-800/30"
                   >
                     매도
                   </td>
@@ -266,8 +266,8 @@ export function RebalancingOrderTable({
                       </td>
                       <td className="px-3 py-2">
                         <div className="text-white font-medium truncate">{item.name}</div>
-                        <div className="text-gray-400 text-[11px]">{item.ticker}</div>
-                        <div className="text-gray-500 text-[11px]">
+                        <div className="text-gray-400 text-xs">{item.ticker}</div>
+                        <div className="text-gray-500 text-xs">
                           현재 {currentQty.toLocaleString()}주 보유
                         </div>
                       </td>
@@ -303,7 +303,7 @@ export function RebalancingOrderTable({
                           <span className="text-gray-400">주</span>
                         </div>
                         {est != null && orderType === "MARKET" && (
-                          <div className="text-[11px] text-gray-500 mt-0.5 text-right">
+                          <div className="text-xs text-gray-500 mt-0.5 text-right">
                             ≈ {fmtKrw(est)}
                           </div>
                         )}
@@ -331,7 +331,7 @@ export function RebalancingOrderTable({
                 <tr>
                   <td
                     colSpan={orderType === "LIMIT" ? 7 : 6}
-                    className="px-4 py-1.5 text-[11px] text-gray-500 bg-gray-800/30"
+                    className="px-4 py-1.5 text-xs text-gray-500 bg-gray-800/30"
                   >
                     매수
                   </td>
@@ -369,8 +369,8 @@ export function RebalancingOrderTable({
                       </td>
                       <td className="px-3 py-2">
                         <div className="text-white font-medium truncate">{item.name}</div>
-                        <div className="text-gray-400 text-[11px]">{item.ticker}</div>
-                        <div className="text-gray-500 text-[11px]">
+                        <div className="text-gray-400 text-xs">{item.ticker}</div>
+                        <div className="text-gray-500 text-xs">
                           {item.target_qty != null ? (
                             <>
                               {currentQty > 0
@@ -417,7 +417,7 @@ export function RebalancingOrderTable({
                         </div>
                         {isMultiAccount ? (
                           <div
-                            className={`text-[11px] mt-0.5 text-right ${
+                            className={`text-xs mt-0.5 text-right ${
                               allocated === needed ? "text-gray-500" : "text-amber-400"
                             }`}
                           >
@@ -426,7 +426,7 @@ export function RebalancingOrderTable({
                         ) : (
                           est != null &&
                           orderType === "MARKET" && (
-                            <div className="text-[11px] text-gray-500 mt-0.5 text-right">
+                            <div className="text-xs text-gray-500 mt-0.5 text-right">
                               ≈ {fmtKrw(est)}
                             </div>
                           )

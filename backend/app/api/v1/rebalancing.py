@@ -153,6 +153,7 @@ async def analyze_portfolio(
     request: Request,
     portfolio_id: uuid.UUID,
     account_ids: list[uuid.UUID] | None = Query(default=None),
+    deposit_krw_override: float | None = Query(default=None, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
@@ -172,7 +173,11 @@ async def analyze_portfolio(
     if not portfolio:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=account_ids)
+    portfolio_acct_ids = (
+        [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
+    )
+    effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
 
     base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
@@ -191,6 +196,15 @@ async def analyze_portfolio(
     returns_map = await get_historical_returns(list(set(target_tickers) | set(current_tickers)), redis=redis)
 
     overview = await _enrich_overview_with_prices(portfolio, overview, current_user.id, db, redis)
+
+    if deposit_krw_override is not None:
+        old_deposit = float(overview.get("total_deposit_krw") or 0)
+        delta = deposit_krw_override - old_deposit
+        overview = {
+            **overview,
+            "total_deposit_krw": deposit_krw_override,
+            "total_assets_krw": float(overview.get("total_assets_krw", 0)) + delta,
+        }
 
     return analyze_rebalancing(
         portfolio,

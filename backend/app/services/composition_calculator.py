@@ -119,9 +119,15 @@ async def build_asset_totals(
         amount = float(snap.amount_krw)
         if acc.asset_type in _STOCK_TYPES:
             pos_list = snap_positions.get(snap.id) or current_positions.get(acc.id) or []
-            stock_equity = _eval_value(pos_list) if pos_list else amount
+            if pos_list:
+                stock_equity = _eval_value(pos_list)
+                inv = float(snap.invested_amount or 0) or _invested_value(pos_list)
+            else:
+                # 종목 미보유 계좌: 잔액 전체가 예수금 — stock_equity를 0으로 처리해야
+                # bank_total + total_invested 로 구성되는 base에서 금액 누락 방지
+                stock_equity = 0.0
+                inv = 0.0
             cash = amount - stock_equity
-            inv = float(snap.invested_amount or 0) or _invested_value(pos_list)
             stock_value += stock_equity
             total_invested += inv
             by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + stock_equity
@@ -139,8 +145,9 @@ async def build_asset_totals(
             deposit = float(acc.deposit_krw or 0) + float(acc.deposit_usd or 0) * usd_rate
             computed = pos_equity + deposit
             amount = computed if computed > 0 else float(acc.manual_amount or 0)
-            inv = _invested_value(pos_list) if pos_list else float(acc.manual_amount or 0)
-            stock_value += pos_equity or amount
+            inv = _invested_value(pos_list) if pos_list else (0.0 if computed > 0 else float(acc.manual_amount or 0))
+            # 예수금만 있는 경우(computed>0이지만 pos_equity=0)에는 stock_value에 추가하지 않음
+            stock_value += pos_equity if (pos_list or computed > 0) else amount
             total_invested += inv
             if computed > 0:
                 by_type[acc.asset_type] = by_type.get(acc.asset_type, 0) + pos_equity

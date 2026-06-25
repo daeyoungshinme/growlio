@@ -5,6 +5,7 @@ from app.database import AsyncSessionLocal
 from app.kis.auth import _fetch_and_store_token
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
+from app.providers.openbanking import ensure_ob_token_fresh
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 
@@ -25,8 +26,6 @@ async def refresh_all_user_tokens() -> None:
     for user, settings_row in rows:
         if settings_row.ob_refresh_token:
             try:
-                from app.providers.openbanking import ensure_ob_token_fresh
-
                 async with AsyncSessionLocal() as db:
                     settings_fresh = await db.get(UserSettings, user.id)
                     if settings_fresh and settings_fresh.ob_refresh_token:

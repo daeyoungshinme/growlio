@@ -10,11 +10,20 @@ import httpx
 import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
+from pydantic import BaseModel, Field
 
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.redis_client import get_redis
-from app.utils.cache_keys import USD_KRW_RATE as _USD_KRW_KEY
+from app.utils.cache_keys import (
+    TTL_PRICE_CURRENT,
+    current_price_key,
+    get_cached_json,
+    set_cached_json,
+)
+from app.utils.cache_keys import (
+    USD_KRW_RATE as _USD_KRW_KEY,
+)
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -132,16 +141,22 @@ async def get_exchange_rate(request: Request, redis: aioredis.Redis = Depends(ge
 
 
 @router.get("/price")
-@limiter.limit("30/minute")
+@limiter.limit("60/minute")
 async def get_stock_price(
     request: Request,
     ticker: str = Query(..., min_length=1, max_length=20),
     market: str = Query(...),
+    redis: aioredis.Redis = Depends(get_redis),
 ):
     """단일 종목 현재가 조회 (인증 불필요 — Yahoo Finance).
-    해외 종목은 USD → KRW 변환 후 반환.
+    해외 종목은 USD → KRW 변환 후 반환. Redis 캐시 TTL 900s.
     """
     from app.services.yahoo_price import _sync_usdkrw, _sync_yahoo_price
+
+    cache_key = current_price_key(ticker, market)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     loop = asyncio.get_running_loop()
     price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
@@ -150,10 +165,92 @@ async def get_stock_price(
 
     if market in OVERSEAS_MARKETS:
         usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
-        return {
-            "price_krw": round(price * usd_rate),
+        if not usd_rate:
+            usd_rate = await get_usd_krw_rate(redis)
+        result = {
+            "price_krw": round(price * usd_rate) if usd_rate else None,
             "price_usd": price,
-            "usd_rate": usd_rate,
+            "usd_rate": usd_rate or None,
         }
+    else:
+        result = {"price_krw": price, "price_usd": None, "usd_rate": None}
 
-    return {"price_krw": price, "price_usd": None, "usd_rate": None}
+    if result["price_krw"] is not None:
+        await set_cached_json(redis, cache_key, result, TTL_PRICE_CURRENT)
+    return result
+
+
+class _TickerMarket(BaseModel):
+    ticker: str = Field(..., min_length=1, max_length=20)
+    market: str
+
+
+class _BatchRequest(BaseModel):
+    items: list[_TickerMarket] = Field(..., max_length=50)
+
+
+@router.post("/prices-batch")
+@limiter.limit("60/minute")
+async def get_stock_prices_batch(
+    request: Request,
+    body: _BatchRequest,
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """복수 종목 현재가 일괄 조회. yfinance 단 1회 호출로 N개 조회.
+    Response: {ticker: {price_krw, price_usd, usd_rate}}
+    """
+    from app.services.yahoo_price import _sync_usdkrw, _sync_yahoo_batch
+
+    if not body.items:
+        return {}
+
+    # 캐시 히트 먼저 처리
+    result: dict[str, dict] = {}
+    to_fetch: list[tuple[str, str]] = []
+    for item in body.items:
+        cache_key = current_price_key(item.ticker, item.market)
+        cached = await get_cached_json(redis, cache_key)
+        if cached is not None:
+            result[item.ticker] = cached
+        else:
+            to_fetch.append((item.ticker, item.market))
+
+    if not to_fetch:
+        return result
+
+    # 배치 조회 (단 1회 yfinance.download)
+    loop = asyncio.get_running_loop()
+    price_map = await loop.run_in_executor(None, partial(_sync_yahoo_batch, to_fetch))
+
+    # 해외 종목이 있으면 환율 1회 조회
+    overseas_tickers = {t for t, m in to_fetch if m in OVERSEAS_MARKETS}
+    usd_rate: float = 0.0
+    if overseas_tickers:
+        from app.services.yahoo_price import _sync_usdkrw
+
+        usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
+        if not usd_rate:
+            usd_rate = await get_usd_krw_rate(redis)
+        if usd_rate:
+            await cache_usd_krw_rate(redis, usd_rate)
+
+    for ticker, market in to_fetch:
+        price = price_map.get(ticker)
+        if not price:
+            result[ticker] = {"price_krw": None, "price_usd": None, "usd_rate": None}
+            continue
+
+        if market in OVERSEAS_MARKETS:
+            entry = {
+                "price_krw": round(price * usd_rate) if usd_rate else None,
+                "price_usd": price,
+                "usd_rate": usd_rate or None,
+            }
+        else:
+            entry = {"price_krw": price, "price_usd": None, "usd_rate": None}
+
+        result[ticker] = entry
+        if entry["price_krw"] is not None:
+            await set_cached_json(redis, current_price_key(ticker, market), entry, TTL_PRICE_CURRENT)
+
+    return result

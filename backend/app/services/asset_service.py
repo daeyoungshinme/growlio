@@ -90,7 +90,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
     else:
         balance = await _retry_provider_sync(provider, account, db, redis)
 
-    if balance.deposit_krw:
+    if balance.deposit_krw is not None:
         account.deposit_krw = balance.deposit_krw
     if balance.deposit_foreign:
         account.deposit_usd = balance.deposit_foreign

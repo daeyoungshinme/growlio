@@ -15,7 +15,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, declared_attr, mapped_column, relationship
+from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
 from app.database import Base
 
@@ -78,13 +78,6 @@ class RebalancingAlert(_AlertMixin, Base):
     # 시장 신호 연동 모드: DISABLED | CAUTIOUS(RED 시 건너뜀) | STRICT(YELLOW|RED 시 건너뜀)
     market_condition_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="DISABLED")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # ── 예수금 입금 감지 트리거 ──────────────────────────────────────
-    deposit_trigger_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    deposit_trigger_min_amount_krw: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    last_deposit_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    deposit_accounts: Mapped[list["RebalancingAlertDepositAccount"]] = relationship(
-        "RebalancingAlertDepositAccount", cascade="all, delete-orphan", lazy="selectin"
-    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
@@ -110,26 +103,6 @@ class StockPriceAlert(_AlertMixin, Base):
     __table_args__ = (
         Index("idx_stock_price_alerts_user_active", "user_id", "is_active"),
         Index("idx_stock_price_alerts_ticker", "ticker"),
-    )
-
-
-class RebalancingAlertDepositAccount(Base):
-    """예수금 입금 감지 대상 계좌 — RebalancingAlert 당 복수 선택 가능."""
-
-    __tablename__ = "rebalancing_alert_deposit_accounts"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    alert_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("rebalancing_alerts.id", ondelete="CASCADE"), nullable=False
-    )
-    account_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="CASCADE"), nullable=False
-    )
-    last_known_deposit_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("alert_id", "account_id", name="uq_alert_deposit_account"),
-        Index("idx_alert_deposit_accounts_alert", "alert_id"),
     )
 
 

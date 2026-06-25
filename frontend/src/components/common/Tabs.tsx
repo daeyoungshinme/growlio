@@ -19,7 +19,7 @@ export default function Tabs<T extends string>({
     return (
       <div
         role="tablist"
-        className={`flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none ${className ?? ""}`}
+        className={`flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none [scroll-snap-type:x_mandatory] ${className ?? ""}`}
       >
         {tabs.map((tab) => (
           <button
@@ -29,7 +29,7 @@ export default function Tabs<T extends string>({
             tabIndex={activeTab === tab ? 0 : -1}
             onClick={() => onChange(tab)}
             className={[
-              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0",
+              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 [scroll-snap-align:start]",
               activeTab === tab
                 ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200",

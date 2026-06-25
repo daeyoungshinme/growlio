@@ -59,7 +59,7 @@ def calc_returns(current_total: float, base: float, first_date: date | None) -> 
     if days < 1:
         return None, None
     cumulative = (current_total / base - 1) * 100
-    if days < 30:
+    if days < 90:
         return None, cumulative
     annualized = ((current_total / base) ** (365.0 / days) - 1) * 100
     return annualized, cumulative

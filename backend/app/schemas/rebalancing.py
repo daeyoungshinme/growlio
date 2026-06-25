@@ -66,7 +66,7 @@ class RebalancingAnalysis(BaseModel):
     target_weighted_cagr_10y_pct: float | None = None  # 목표 비중 기준 가중 CAGR (10년)
     current_weighted_cagr_10y_pct: float | None = None  # 현재 비중 기준 가중 CAGR (10년)
     ticker_account_map: dict[str, list[TickerAccountInfo]] = {}  # ticker → 보유 계좌 목록
-    available_cash_krw: float = 0.0  # 현재 예수금 (total_assets_krw - total_stock_krw)
+    available_cash_krw: float = 0.0  # 현재 예수금 (account.deposit_krw 합산; fallback: total_assets - total_stock)
 
 
 # ── 리밸런싱 실행 ─────────────────────────────────────────────

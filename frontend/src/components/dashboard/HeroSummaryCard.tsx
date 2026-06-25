@@ -87,6 +87,9 @@ export default memo(function HeroSummaryCard({
           <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50 mt-0.5">
             {fmtKrw(Math.floor(data.total_assets_krw))}
           </p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
+            {Math.floor(data.total_assets_krw).toLocaleString()}원
+          </p>
           {!expanded && (
             <div className="flex items-center gap-3 mt-1">
               <span
@@ -162,17 +165,15 @@ export default memo(function HeroSummaryCard({
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                  {data.annual_return_pct != null ? "연간 수익률" : "누적 수익률"}
-                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
                 <p
                   className={`text-sm font-semibold mt-0.5 ${
-                    (data.annual_return_pct ?? data.cumulative_return_pct) == null
+                    data.annual_return_pct == null
                       ? "text-gray-400 dark:text-gray-500"
-                      : pnlColor((data.annual_return_pct ?? data.cumulative_return_pct)!)
+                      : pnlColor(data.annual_return_pct)
                   }`}
                 >
-                  {fmtPct(data.annual_return_pct ?? data.cumulative_return_pct)}
+                  {fmtPct(data.annual_return_pct)}
                 </p>
               </div>
               <div>

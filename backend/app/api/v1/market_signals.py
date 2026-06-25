@@ -9,6 +9,7 @@ from app.api.deps import get_current_user
 from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis
+from app.services.macro_diagnosis_service import get_macro_diagnosis
 from app.services.market_signal_service import get_market_signal
 
 router = APIRouter(prefix="/market-signals", tags=["market_signals"])
@@ -32,3 +33,21 @@ async def get_market_signal_endpoint(
     """
     redis = await get_redis()
     return await get_market_signal(redis)
+
+
+@router.get("/macro-diagnosis")
+@limiter.limit("20/minute")
+async def get_macro_diagnosis_endpoint(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """CPI 추세·기준금리·FOMC 일정을 종합한 거시경제 진단을 반환한다.
+
+    - cpi: CPI 방향성(rising/flat/falling) + 전년비 % + 최신값
+    - fed_rate: 현재 기준금리 + 방향(rising/stable/falling) + 고금리 여부
+    - fomc: 다음 FOMC 회의 날짜 + 남은 일수
+    - implication: 리밸런싱 시사점 (label, growth_bias, message, action)
+    - data_freshness: LIVE | PARTIAL | STALE
+    """
+    redis = await get_redis()
+    return await get_macro_diagnosis(redis)

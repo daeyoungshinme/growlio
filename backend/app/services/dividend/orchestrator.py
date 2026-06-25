@@ -21,11 +21,11 @@ from app.config import settings
 from app.kis.auth import get_access_token
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
 from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
-from app.models.user import UserSettings
 from app.redis_client import get_redis
 from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import decrypt, get_kis_user_credentials
+from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.calculator import calculate_position_dividend
 from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
 from app.services.dividend_fetcher import fetch_ticker_dividend_info
@@ -43,12 +43,6 @@ logger = structlog.get_logger()
 _DIVIDEND_FETCH_SEM = asyncio.Semaphore(settings.api_semaphore_limit)
 
 
-async def _get_dart_key(user_id: uuid.UUID, db: AsyncSession) -> str:
-    """user_settings에서 DART API 키 조회 및 복호화. 없으면 config 기본값 사용."""
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if row and row.dart_api_key:
-        return decrypt(row.dart_api_key)
-    return settings.dart_api_key
 
 
 async def _call_kis_dividend_api(
@@ -117,9 +111,6 @@ async def _get_kis_etf_dividend_fallback(
     )
 
 
-async def _get_kis_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
-    return await get_kis_user_credentials(user_id, db)
-
 
 async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], dict]:
     """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → 포지션 정보 맵 수집."""
@@ -169,11 +160,6 @@ async def _collect_positions(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple
     return positions_map
 
 
-async def _load_user_overrides(user_id: uuid.UUID, db: AsyncSession) -> dict[tuple[str, str], list[int]]:
-    """사용자 ticker 설정에서 배당월 override map 로드."""
-    result = await db.execute(select(UserTickerSettings).where(UserTickerSettings.user_id == user_id))
-    rows = result.scalars().all()
-    return {(row.ticker, row.market): list(row.dividend_months) for row in rows if row.dividend_months}
 
 
 def _build_ticker_output_entry(
@@ -264,9 +250,9 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
         normalized[normalized_key] = normalized.get(normalized_key, 0.0) + val
     received_map = normalized
 
-    overrides = await _load_user_overrides(user_id, db)
-    dart_key = await _get_dart_key(user_id, db)
-    kis_creds = await _get_kis_credentials(user_id, db)
+    overrides = await load_user_dividend_overrides(user_id, db)
+    dart_key = await fetch_dart_api_key(user_id, db)
+    kis_creds = await get_kis_user_credentials(user_id, db)
     usd_krw_rate: float = await get_usd_krw_rate(redis)
 
     async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
@@ -368,9 +354,9 @@ async def get_ticker_dividend_summary(user_id: uuid.UUID, db: AsyncSession) -> l
 async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """보유 종목별 배당수익률과 예상 배당금을 반환한다."""
     positions = await _collect_positions(user_id, db)
-    overrides = await _load_user_overrides(user_id, db)
-    dart_key = await _get_dart_key(user_id, db)
-    kis_creds = await _get_kis_credentials(user_id, db)
+    overrides = await load_user_dividend_overrides(user_id, db)
+    dart_key = await fetch_dart_api_key(user_id, db)
+    kis_creds = await get_kis_user_credentials(user_id, db)
 
     redis = await get_redis()
 

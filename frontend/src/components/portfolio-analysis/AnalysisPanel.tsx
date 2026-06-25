@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
+import { fetchBrokerBalance } from "@/api/rebalancing";
 
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
@@ -75,13 +76,53 @@ export function AnalysisPanel({
   const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
     useAnalysisState({ autoAnalyzeId, selectedIdStr });
 
+  const analysisResultRef = useRef<HTMLDivElement>(null);
+  const autoScrolledForRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    autoScrolledForRef.current = undefined;
+  }, [autoAnalyzeId]);
+
+  useEffect(() => {
+    if (!autoAnalyzeId || !analysis || autoScrolledForRef.current === autoAnalyzeId) return;
+    autoScrolledForRef.current = autoAnalyzeId;
+    const timer = setTimeout(() => {
+      analysisResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [autoAnalyzeId, analysis]);
+
   const canRebalance = selectedIds.size === 1;
 
-  const handleRebalancingAnalysis = useCallback(() => {
+  const handleRebalancingAnalysis = useCallback(async () => {
     const [id] = Array.from(selectedIds);
     if (!id) return;
-    void triggerRebalancingAnalysis(id);
-  }, [selectedIds, triggerRebalancingAnalysis]);
+
+    const currentPortfolio = portfolios.find((p) => p.id === id);
+    const brokerAccounts = (
+      currentPortfolio?.account_ids?.length
+        ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
+        : activeAccounts
+    ).filter((a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM");
+
+    let depositKrwOverride: number | undefined;
+    if (brokerAccounts.length > 0) {
+      const results = await Promise.allSettled(
+        brokerAccounts.map((a) => fetchBrokerBalance(a.id))
+      );
+      let total = 0;
+      let hasSuccess = false;
+      for (const r of results) {
+        if (r.status === "fulfilled" && !r.value.error) {
+          total += r.value.deposit_krw ?? 0;
+          hasSuccess = true;
+        }
+      }
+      if (hasSuccess) depositKrwOverride = total;
+    }
+
+    void triggerRebalancingAnalysis(id, depositKrwOverride);
+  }, [selectedIds, portfolios, activeAccounts, triggerRebalancingAnalysis]);
 
   return (
     <div className="flex-1 min-w-0 space-y-4">
@@ -131,12 +172,20 @@ export function AnalysisPanel({
 
       {/* 리밸런싱 결과 */}
       {mode === "rebalancing" && analysis && (
-        <div className="card pb-20 sm:pb-0">
+        <div ref={analysisResultRef} className="card pb-20 sm:pb-0">
           <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-4">
             {analysis.portfolio_name} — 리밸런싱 분석
           </h3>
           {(() => {
-            const analysisAccounts = activeAccounts;
+            const currentPortfolio = portfolios.find(
+              (p) => p.id === analysis.portfolio_id.toString(),
+            );
+            const analysisAccounts =
+              currentPortfolio?.account_ids?.length
+                ? activeAccounts.filter((a) =>
+                    currentPortfolio.account_ids!.includes(a.id),
+                  )
+                : activeAccounts;
             return (
               <>
                 <RebalancingTable

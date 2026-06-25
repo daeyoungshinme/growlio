@@ -37,6 +37,9 @@ ASSET_TYPE_LABELS: dict[str, str] = {
 
 STOCK_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_OTHER})
 
+# 브로커 계좌: deposit_krw를 보유하는 유형 (예수금 합산 대상)
+_BROKER_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER})
+
 
 async def _fetch_latest_snapshots(acc_ids: list[uuid.UUID], db: AsyncSession) -> dict[str, AssetSnapshot]:
     """계좌 ID 목록의 최신 스냅샷을 {account_id_str: snapshot} 딕셔너리로 반환한다."""
@@ -243,6 +246,7 @@ async def build_portfolio_overview(
     total_assets_krw = 0.0
     total_invested_krw = 0.0
     unrealized_pnl_krw = 0.0
+    total_deposit_krw = 0.0
     asset_type_totals: dict[str, float] = {}
     all_positions: list[dict] = []
     # lite 모드에서 stock_allocation 계산용 최소 필드만 수집
@@ -278,6 +282,9 @@ async def build_portfolio_overview(
         )
         account_rows.append(account_row)
 
+        if acc.asset_type in _BROKER_TYPES and acc.include_in_total:
+            total_deposit_krw += float(acc.deposit_krw or 0)
+
     stock_total_krw = total_invested_krw + unrealized_pnl_krw
     stock_return_pct = (unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw else 0.0
 
@@ -306,6 +313,7 @@ async def build_portfolio_overview(
         "stock_return_pct": round(stock_return_pct, 2),
         "domestic_stock_krw": domestic_stock_krw,
         "foreign_stock_krw": foreign_stock_krw,
+        "total_deposit_krw": total_deposit_krw,
         "asset_type_allocation": asset_type_allocation,
         "stock_allocation": _build_stock_allocation(stock_alloc_source, stock_total_krw),
         "all_positions": all_positions,
@@ -327,6 +335,7 @@ def _empty_overview() -> dict[str, Any]:
         "stock_return_pct": 0,
         "domestic_stock_krw": 0,
         "foreign_stock_krw": 0,
+        "total_deposit_krw": 0.0,
         "asset_type_allocation": [],
         "stock_allocation": [],
         "all_positions": [],

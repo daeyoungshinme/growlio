@@ -210,7 +210,6 @@ limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
   ├── dca_auto_buy.py         # 매일 09:00 KST DCA 자동매수
-  ├── deposit_monitor.py      # 15:35 KST + 18:05 KST 예수금 모니터링
   ├── economic_indicator_sync.py  # 08:00 KST 경제지표 갱신 + 08:05 KST 알림 체크
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인

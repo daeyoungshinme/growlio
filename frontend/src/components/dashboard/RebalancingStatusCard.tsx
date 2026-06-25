@@ -28,28 +28,22 @@ function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummar
   return (
     <button
       onClick={() => onClick?.(summary.portfolio_id)}
-      className="w-full flex items-center gap-2 py-2 px-2.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors"
+      className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors"
     >
-      <span className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`} />
-      <span className="text-xs font-medium text-gray-700 dark:text-gray-300 min-w-0 flex-1 truncate">
-        {summary.portfolio_name}
-      </span>
-      <span className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
-        최대 {summary.max_drift_pct.toFixed(1)}%
-      </span>
-      {summary.top_drifted_items.slice(0, 2).map((item) => (
-        <span
-          key={item.ticker}
-          className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 shrink-0"
-        >
-          {item.ticker} {item.weight_diff_pct > 0 ? "▲" : "▼"}{Math.abs(item.weight_diff_pct).toFixed(1)}%
+      <div className="flex items-center gap-2 w-full">
+        <span className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`} />
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 truncate min-w-0">
+          {summary.portfolio_name}
         </span>
-      ))}
-      {isAlert && (
-        <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
-          필요
+        <span className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
+          최대 {summary.max_drift_pct.toFixed(1)}%
         </span>
-      )}
+        {isAlert && (
+          <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
+            필요
+          </span>
+        )}
+      </div>
     </button>
   );
 }
@@ -78,10 +72,10 @@ function InsightRow({ insight }: { insight: Insight }) {
     INFO: "bg-blue-400",
   };
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-gray-100 dark:border-gray-700 last:border-0">
+    <div className="flex items-start gap-3 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
       <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${severityDot[insight.severity] ?? "bg-gray-400"}`} />
       <div className="flex-1 min-w-0">
-        <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">{insight.title}</span>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{insight.title}</span>
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{insight.detail}</p>
         {insight.action_label && insight.action_url && (
           <button
@@ -101,6 +95,8 @@ interface Props {
   onPortfolioSelect?: (id: string) => void;
   showAllInsights?: boolean;
   hideSignalBanner?: boolean;
+  showDriftRows?: boolean;
+  maxDriftRows?: number;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -113,7 +109,7 @@ const ALL_INSIGHT_TYPES: InsightType[] = [
 ];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
-export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect: _onPortfolioSelect, showAllInsights = false, hideSignalBanner = false }: Props) {
+export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect, showAllInsights = false, hideSignalBanner = false, showDriftRows = false, maxDriftRows }: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -139,6 +135,11 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect:
   const concentrationInsight = diagInsights.find((i) => i.type === "CONCENTRATION");
   const otherInsights = diagInsights.filter((i) => i.type !== "CONCENTRATION");
   const hasDiagnosis = diagInsights.length > 0;
+
+  const sortedDriftSummaries = useMemo(
+    () => [...(driftSummaries ?? [])].sort((a, b) => b.max_drift_pct - a.max_drift_pct),
+    [driftSummaries],
+  );
 
   const needsCount = useMemo(() => {
     if (!driftSummaries) return 0;
@@ -206,19 +207,19 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect:
         </Link>
       )}
 
-      {/* 포트폴리오별 드리프트 현황 (진단 탭 전용) */}
-      {showAllInsights && driftSummaries && driftSummaries.length > 0 && (
+      {/* 포트폴리오별 드리프트 현황 */}
+      {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
         <div className="space-y-0.5 mt-1 mb-2">
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">포트폴리오 이탈 현황</p>
-          {driftSummaries.map((s) => (
-            <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={_onPortfolioSelect} />
+          {(maxDriftRows != null ? sortedDriftSummaries.slice(0, maxDriftRows) : sortedDriftSummaries).map((s) => (
+            <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
           ))}
         </div>
       )}
 
       {/* 진단 결과 섹션 */}
       {hasDiagnosis && (
-        <div className="space-y-2">
+        <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
           <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
           {concentrationInsight?.metric_value != null && (
             <DiagnosticGauge value={concentrationInsight.metric_value} />

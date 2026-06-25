@@ -8,7 +8,7 @@ export function CashSummaryBar({ analysis }: { analysis: CashAnalysis }) {
   const hasBuy = buyCost !== null && buyCost > 0;
   const surplusKnown = surplus !== null;
   return (
-    <div className="px-4 py-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] bg-gray-900/20 border-b border-gray-700/30">
+    <div className="px-4 py-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs bg-gray-900/20 border-b border-gray-700/30">
       <span className="text-gray-500">
         {isOrderableKnown ? "주문가능" : "예수금"}{" "}
         <span className="text-gray-300">{fmtKrwPrice(deposit)}</span>

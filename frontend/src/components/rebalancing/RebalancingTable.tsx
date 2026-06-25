@@ -540,7 +540,10 @@ export default function RebalancingTable({
       </div>
 
       {/* 모바일: 하단 고정 실행 버튼 */}
-      <div className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20 pb-2">
+      <div
+        className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20"
+        style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
+      >
         <button
           onClick={() => setExecutionOpen(true)}
           disabled={kisAccounts.length === 0}
