@@ -125,6 +125,7 @@ export default defineConfig({
         "src/types/**",
         "src/**/*.d.ts",
         "src/main.tsx",
+        "src/App.tsx",
         "src/lib/**",
         "src/plugins/**",
         "src/hooks/useBiometric.ts",
