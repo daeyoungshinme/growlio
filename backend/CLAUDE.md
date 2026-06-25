@@ -128,7 +128,9 @@ API Request
         ├── open_banking.py   # 오픈뱅킹 계좌 연결
         ├── portfolio.py      # 전체 계좌 통합 조회 (/overview)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
+        ├── portfolio_analysis.py  # 포트폴리오 분석 API (/portfolio-analysis)
         ├── rebalancing.py    # 리밸런싱 추천
+        ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
         ├── stocks.py         # 종목 검색
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
@@ -158,6 +160,7 @@ services/
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
+  ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
   ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
@@ -166,9 +169,13 @@ services/
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions)
   ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼
+  ├── _account_queries.py     # 활성 계좌 조회 쿼리 헬퍼 (is_active == True 필터)
+  ├── _position_queries.py    # 포지션 DB 쿼리 헬퍼
   ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
   ├── alert_calculator.py           # 알림 조건 판단 로직 (alert_service.py에서 분리)
   ├── alert_repository.py           # 알림 DB 쿼리 레이어 (alert_service.py에서 분리)
+  ├── exchange_rate_alert_service.py # 환율 알림 조건 체크 서비스
+  ├── stock_price_alert_service.py  # 주가 알림 조건 체크 서비스
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
   ├── composition_calculator.py     # 자산 구성 비중 계산
   ├── trend_calculator.py           # 월별 자산 추이 계산
@@ -180,6 +187,7 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
+  ├── macro_diagnosis_service.py    # 거시경제 진단 — CPI 추세·기준금리·FOMC 일정 → 리밸런싱 시사점 반환
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
@@ -198,15 +206,12 @@ providers/                    # 금융 데이터 provider
   └── openbanking_provider.py # 오픈뱅킹 계좌 조회 provider
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
-  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). 임계값: KIS/Kiwoom 5회 실패→60s 차단, Yahoo/DART 5회→120s, OpenBanking 3회→90s
-  #                             **인메모리 상태** — 서버 재시작 시 모든 브레이커 상태 초기화됨 (Redis 미사용).
-  #                             새 외부 API 추가 시: `get_circuit_breaker(name, fail_threshold, reset_timeout)` 호출 후 `try/except CircuitOpenError` 패턴으로 감쌈.
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART 5회→120s, OpenBanking 3회→90s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   ├── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
   └── redis_lock.py           # Redis 분산 락 — 동일 계좌 동시 sync 방지
-limiter.py                    # slowapi 레이트 리미터. 엔드포인트에 @limiter.limit("X/minute") 데코레이터로 적용
-                              # 예: @limiter.limit("60/minute") — request: Request 파라미터 필수
+limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수)
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
   ├── dca_auto_buy.py         # 매일 09:00 KST DCA 자동매수
@@ -216,11 +221,13 @@ jobs/                         # APScheduler 정기 작업
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
   ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
   ├── rebalancing_alert.py    # 매일 08:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
+  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 자동 실행
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
-  └── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
+  ├── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
+  └── _job_helpers.py         # job 공통 헬퍼 유틸리티
+```
 
 > **새 job 추가:** `jobs/` 에 파일 생성 후 `app/scheduler.py`의 `init_scheduler()`에 `scheduler.add_job()` 호출로 등록. `timezone="Asia/Seoul"` 필수.
-```
 
 **자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
