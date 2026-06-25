@@ -212,11 +212,11 @@ export default memo(function HeroSummaryCard({
         </div>
 
         {/* 우: 도넛(크게, aspect-square) + 가로 범례 */}
-        <div className="shrink-0 w-52 sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-1">
+        <div className="shrink-0 w-52 sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-0">
           {allocationChartData.length > 0 ? (
             <Suspense fallback={<div className="w-full aspect-square" />}>
               <>
-                <div className="w-full aspect-square">
+                <div className="w-full aspect-[4/3]">
                   <AssetAllocationChart
                     data={allocationChartData}
                     size="compact"
@@ -224,14 +224,14 @@ export default memo(function HeroSummaryCard({
                     showLegend={false}
                   />
                 </div>
-                <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 justify-center">
+                <div className="flex flex-row flex-wrap gap-x-2 gap-y-0.5 justify-center -mt-5">
                   {allocationChartData.map((item, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <span
-                        className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                        className="inline-block w-2 h-2 rounded-sm shrink-0"
                         style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
-                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                      <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
                         {item.name} {item.pct.toFixed(0)}%
                       </span>
                     </div>
