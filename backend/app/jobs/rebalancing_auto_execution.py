@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
+
 from app.database import AsyncSessionLocal
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio

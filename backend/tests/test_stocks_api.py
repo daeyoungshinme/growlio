@@ -5,7 +5,6 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-
 _SEARCH_RESULTS = [
     {"ticker": "005930", "name": "삼성전자", "market": "KOSPI"},
 ]

@@ -10,7 +10,6 @@ import pytest
 
 from app.services.dividend_plan_service import _calc_monthly_projected, get_dividend_plan
 
-
 # ---------------------------------------------------------------------------
 # _calc_monthly_projected 순수 함수 테스트
 # ---------------------------------------------------------------------------
