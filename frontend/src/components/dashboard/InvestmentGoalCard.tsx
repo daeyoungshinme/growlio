@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowRight, Target, TrendingDown, TrendingUp, ChevronRight } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
@@ -23,6 +23,21 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const hasDepositGoal = data?.annual_deposit_goal != null && data.deposit_achievement_pct != null;
   const hasAssetGoal = data?.goal_amount != null && data.goal_achievement_pct != null;
   const hasDividendGoal = data?.annual_dividend_goal != null && data.dividend_goal_achievement_pct != null;
+
+  // 하단 컨텍스트 링크: 우선순위 순으로 1개만 표시
+  const contextLink = (() => {
+    if (hasDividendGoal && (data!.dividend_goal_achievement_pct ?? 100) < 80) {
+      return { to: "/assets?tab=투자현황&portfolioTab=배당", label: "배당주 포트폴리오 확인" };
+    }
+    if (
+      hasAssetGoal &&
+      ((data!.goal_achievement_pct ?? 100) < 80 ||
+        (timeline?.lead_lag_months != null && timeline.lead_lag_months < 0))
+    ) {
+      return { to: "/invest-plan", label: "투자 계획 확인" };
+    }
+    return null;
+  })();
 
   if (!isLoading && !hasDepositGoal && !hasAssetGoal && !hasDividendGoal) {
     return (
@@ -386,6 +401,19 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
             DCA 투자 계획 설정하기 <ArrowRight size={12} />
+          </Link>
+        </div>
+      )}
+
+      {/* 컨텍스트 액션 링크 — 달성률이 낮거나 지연일 때만 표시 */}
+      {contextLink && (
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+          <Link
+            to={contextLink.to}
+            className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            <ChevronRight size={12} />
+            {contextLink.label}
           </Link>
         </div>
       )}

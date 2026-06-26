@@ -1,6 +1,5 @@
 import { lazy, memo, Suspense, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
-import { Link } from "react-router-dom";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
@@ -19,8 +18,8 @@ interface Props {
   isLoading?: boolean;
   onSync?: () => void;
   syncing?: boolean;
-  estimatedAnnualDividends?: number | null;
   dividendYield?: number | null;
+  goalAchievementPct?: number | null;
 }
 
 export default memo(function HeroSummaryCard({
@@ -30,8 +29,8 @@ export default memo(function HeroSummaryCard({
   isLoading,
   onSync,
   syncing,
-  estimatedAnnualDividends,
   dividendYield,
+  goalAchievementPct,
 }: Props) {
   const [expanded, setExpanded] = useState(true);
 
@@ -119,7 +118,7 @@ export default memo(function HeroSummaryCard({
             {Math.floor(data.total_assets_krw).toLocaleString()}원
           </p>
           {!expanded && (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <span
                 className={`text-sm font-semibold ${
                   data.cumulative_return_pct == null
@@ -127,15 +126,26 @@ export default memo(function HeroSummaryCard({
                     : pnlColor(data.cumulative_return_pct)
                 }`}
               >
-                {fmtPct(data.cumulative_return_pct)}
+                수익률 {fmtPct(data.cumulative_return_pct)}
               </span>
-              {data.stock_return_pct !== 0 && (
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  주식 {fmtPct(data.stock_return_pct)}
+              {goalAchievementPct != null && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  자산목표{" "}
+                  <span className="font-semibold text-blue-600 dark:text-blue-400">
+                    {Math.min(goalAchievementPct, 100).toFixed(1)}%
+                  </span>
+                </span>
+              )}
+              {dividendYield != null && dividendYield > 0 && (
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  배당{" "}
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                    {dividendYield.toFixed(1)}%
+                  </span>
                 </span>
               )}
               {updatedLabel && (
-                <span className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</span>
+                <span className="text-xs text-gray-300 dark:text-gray-600 ml-auto">{updatedLabel}</span>
               )}
             </div>
           )}
@@ -155,30 +165,6 @@ export default memo(function HeroSummaryCard({
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">주식 수익률</p>
-                  <p
-                    className={`text-sm sm:text-lg font-bold ${
-                      data.stock_return_pct === 0
-                        ? "text-gray-400 dark:text-gray-500"
-                        : pnlColor(data.stock_return_pct)
-                    }`}
-                  >
-                    {data.stock_return_pct === 0 ? "—" : fmtPct(data.stock_return_pct)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">연간 수익률</p>
-                  <p
-                    className={`text-sm sm:text-base font-semibold ${
-                      data.annual_return_pct == null
-                        ? "text-gray-400 dark:text-gray-500"
-                        : pnlColor(data.annual_return_pct)
-                    }`}
-                  >
-                    {fmtPct(data.annual_return_pct)}
-                  </p>
-                </div>
-                <div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
                     환율(USD/KRW)
                   </p>
@@ -187,23 +173,6 @@ export default memo(function HeroSummaryCard({
                   </p>
                 </div>
               </div>
-              {estimatedAnnualDividends != null && estimatedAnnualDividends > 0 && (
-                <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-700">
-                  <span>연간 배당</span>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {fmtKrwShort(estimatedAnnualDividends)}원
-                  </span>
-                  {dividendYield != null && (
-                    <span>({dividendYield.toFixed(1)}%)</span>
-                  )}
-                  <Link
-                    to="/assets?tab=투자현황&portfolioTab=배당"
-                    className="ml-auto text-blue-500 dark:text-blue-400 hover:underline"
-                  >
-                    자세히 →
-                  </Link>
-                </div>
-              )}
               {updatedLabel && (
                 <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
               )}
@@ -212,11 +181,11 @@ export default memo(function HeroSummaryCard({
         </div>
 
         {/* 우: 도넛 + 범례 */}
-        <div className="shrink-0 w-[180px] sm:w-44 lg:w-52 xl:w-56 flex flex-col gap-0">
+        <div className="shrink-0 w-[185px] sm:w-48 lg:w-56 xl:w-60 flex flex-col gap-0 -mt-8 sm:-mt-14">
           {allocationChartData.length > 0 ? (
             <Suspense fallback={<div className="w-full aspect-square" />}>
               <>
-                <div className="w-full aspect-square sm:aspect-[4/3]">
+                <div className="w-full aspect-square">
                   <AssetAllocationChart
                     data={allocationChartData}
                     size="compact"
@@ -224,7 +193,7 @@ export default memo(function HeroSummaryCard({
                     showLegend={false}
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-1 sm:gap-x-2 justify-start sm:justify-center mt-1 sm:-mt-5">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-0.5 sm:gap-x-1.5 justify-start sm:justify-center -mt-6 sm:-mt-16">
                   {allocationChartData.map((item, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <span
