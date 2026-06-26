@@ -17,6 +17,10 @@ migrate-down:
 
 install-backend:
 	cd backend && uv venv && uv pip install -e ".[dev]"
+	pre-commit install
+
+format-backend:
+	cd backend && uv run ruff format . && uv run ruff check . --fix
 
 install-frontend:
 	cd frontend && npm install

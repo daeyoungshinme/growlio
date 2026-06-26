@@ -33,7 +33,9 @@ class GoalUpdate(BaseModel):
     goal_initial_amount: float | None = None
     annual_dividend_goal: float | None = None
 
-    @field_validator("goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount", "annual_dividend_goal")
+    @field_validator(
+        "goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount", "annual_dividend_goal"
+    )
     @classmethod
     def validate_positive(cls, v: float | None) -> float | None:
         if v is not None and v < 0:

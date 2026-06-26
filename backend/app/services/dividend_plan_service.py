@@ -24,17 +24,13 @@ async def get_dividend_plan(
     """연배당 목표 달성 현황 및 월별/연도별 배당 분포 반환."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
     annual_dividend_goal = (
-        float(settings_row.annual_dividend_goal)
-        if settings_row and settings_row.annual_dividend_goal
-        else None
+        float(settings_row.annual_dividend_goal) if settings_row and settings_row.annual_dividend_goal else None
     )
 
     # 종목별 예상 배당 (Redis 캐시 활용)
     ticker_summaries = await get_ticker_dividend_summary(user_id, db)
 
-    estimated_annual_krw = sum(
-        float(item.get("estimated_annual_krw") or 0) for item in ticker_summaries
-    )
+    estimated_annual_krw = sum(float(item.get("estimated_annual_krw") or 0) for item in ticker_summaries)
     estimated_monthly_krw = estimated_annual_krw / 12 if estimated_annual_krw else 0.0
 
     goal_achievement_pct: float | None = None

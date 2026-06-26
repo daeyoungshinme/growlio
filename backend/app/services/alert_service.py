@@ -63,9 +63,11 @@ __all__ = [
 def __getattr__(name: str):
     if name == "check_and_trigger_alerts":
         from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+
         return check_and_trigger_alerts
     if name == "check_and_trigger_stock_price_alerts":
         from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+
         return check_and_trigger_stock_price_alerts
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 

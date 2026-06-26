@@ -19,7 +19,13 @@ from app.schemas.portfolio import (
     PortfolioResponse,
     PortfolioUpdate,
 )
-from app.utils.cache_keys import TTL_PORTFOLIO_LIST, get_cached_json, invalidate_user_caches, portfolio_list_key, set_cached_json
+from app.utils.cache_keys import (
+    TTL_PORTFOLIO_LIST,
+    get_cached_json,
+    invalidate_user_caches,
+    portfolio_list_key,
+    set_cached_json,
+)
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 

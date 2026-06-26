@@ -74,7 +74,9 @@ async def update_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """백테스팅 포트폴리오 수정."""
-    portfolio = await get_owned_or_404(db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
+    portfolio = await get_owned_or_404(
+        db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다"
+    )
 
     if body.name is not None:
         portfolio.name = body.name
@@ -95,7 +97,9 @@ async def delete_portfolio(
     db: AsyncSession = Depends(get_db),
 ):
     """백테스팅 포트폴리오 삭제."""
-    portfolio = await get_owned_or_404(db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
+    portfolio = await get_owned_or_404(
+        db, BacktestPortfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다"
+    )
 
     await db.delete(portfolio)
     await db.commit()

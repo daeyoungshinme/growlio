@@ -53,8 +53,6 @@ def _make_tx(user_id=None, tx_id=None):
     )
 
 
-
-
 def _setup_app(user, db):
     from app.api.deps import get_current_user
     from app.database import get_db

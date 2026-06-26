@@ -20,8 +20,6 @@ def _make_user():
     )
 
 
-
-
 def _setup_app(user):
     from app.api.deps import get_current_user
     from app.main import app

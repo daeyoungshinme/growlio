@@ -68,7 +68,13 @@ jobs:
         run: uv venv && uv pip install --python .venv/bin/python -e ".[dev]"
 
       - name: Format check (ruff format)
-        run: .venv/bin/ruff format --check .
+        run: |
+          .venv/bin/ruff format --check . || {
+            echo ""
+            echo "::error::포맷 오류 발견. 로컬에서 'make format-backend' 실행 후 재커밋 하세요."
+            .venv/bin/ruff format --diff . | head -100
+            exit 1
+          }
 
       - name: Lint (ruff)
         run: .venv/bin/ruff check .

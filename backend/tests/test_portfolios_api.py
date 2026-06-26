@@ -55,8 +55,6 @@ def _make_portfolio(user_id=None, portfolio_id=None):
     )
 
 
-
-
 def _setup_app(user, db):
     from app.api.deps import get_current_user
     from app.database import get_db
