@@ -22,6 +22,12 @@ const SIGNAL_BG = {
 
 const SIGNAL_LABEL = { GREEN: "안정", YELLOW: "주의", RED: "위험" };
 
+const SIGNAL_BADGE_CLASS = {
+  GREEN: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  YELLOW: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  RED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+};
+
 
 function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummary; onClick?: (id: string) => void }) {
   const isAlert = summary.needs_rebalancing;
@@ -157,17 +163,17 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 min-w-0"
           aria-expanded={isOpen}
         >
-          <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg">
+          <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
             <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
           <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
             투자 현황 진단
           </h2>
           {needsCount > 0 && (
-            <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5">
+            <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
               {needsCount}개 필요
             </span>
           )}
@@ -176,14 +182,22 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
             className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        {!showAllInsights && (
-          <Link
-            to="/rebalancing"
-            className="flex items-center gap-1 -my-1 py-1.5 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors"
-          >
-            분석하기 <ArrowRight size={12} />
-          </Link>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {marketSignal && hideSignalBanner && (
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+              {SIGNAL_LABEL[marketSignal.composite_level]}
+            </span>
+          )}
+          {!showAllInsights && (
+            <Link
+              to="/rebalancing"
+              className="flex items-center gap-1 -my-1 py-1.5 px-2 -mr-2 rounded-md text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 active:opacity-70 transition-colors"
+            >
+              분석하기 <ArrowRight size={12} />
+            </Link>
+          )}
+        </div>
       </div>
 
       {isOpen && <>

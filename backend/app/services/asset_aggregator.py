@@ -145,6 +145,15 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
     )
     retirement_target_year = settings_row.retirement_target_year if settings_row else None
+    annual_dividend_goal = (
+        float(settings_row.annual_dividend_goal) if settings_row and settings_row.annual_dividend_goal else None
+    )
+    estimated_annual = div_summary.get("estimated_annual")
+    dividend_goal_achievement_pct = (
+        round(estimated_annual / annual_dividend_goal * 100, 1)
+        if annual_dividend_goal and estimated_annual
+        else None
+    )
 
     result: dict[str, Any] = {
         "total_assets_krw": total_assets_krw,
@@ -167,6 +176,8 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         "annual_dividends_received": div_summary["annual_received"],
         "estimated_annual_dividends": div_summary["estimated_annual"],
         "dividend_monthly_breakdown": div_summary["monthly_breakdown"],
+        "annual_dividend_goal": annual_dividend_goal,
+        "dividend_goal_achievement_pct": dividend_goal_achievement_pct,
     }
     await set_cached_json(redis, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     return result

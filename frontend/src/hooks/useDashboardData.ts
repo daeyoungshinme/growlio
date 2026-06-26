@@ -3,6 +3,7 @@ import { fetchAccounts } from "@/api/assets";
 import { fetchDashboard } from "@/api/dashboard";
 import { fetchDCAAnalysis } from "@/api/invest";
 import { fetchAllocationHistory, fetchPortfolioOverviewLite } from "@/api/portfolios";
+import { fetchMarketSignal } from "@/api/marketSignals";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
@@ -38,6 +39,13 @@ export function useDashboardData() {
 
   const exchangeRate = useExchangeRate();
 
+  const { data: marketSignal } = useQuery({
+    queryKey: QUERY_KEYS.marketSignal,
+    queryFn: fetchMarketSignal,
+    staleTime: STALE_TIME.MEDIUM,
+    refetchOnWindowFocus: false,
+  });
+
   // AllocationHistoryChart가 마운트되기 전에 미리 fetch해 waterfall을 제거한다.
   useQuery({
     queryKey: QUERY_KEYS.allocationHistory(12),
@@ -56,5 +64,6 @@ export function useDashboardData() {
     accounts,
     accountsLoading,
     exchangeRate,
+    marketSignal,
   };
 }

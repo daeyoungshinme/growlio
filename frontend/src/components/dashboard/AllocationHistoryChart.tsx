@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, BarChart2 } from "lucide-react";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
@@ -35,6 +35,7 @@ const DEFAULT_COLOR = "#94A3B8";
 
 function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
+  const [isOpen, setIsOpen] = useState(() => window.innerWidth >= 1024);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [months, setMonths] = useState(12);
@@ -55,27 +56,50 @@ function AllocationHistoryChart() {
 
   return (
     <div className="card">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
-          자산 추이
-        </h2>
-        <div className="flex gap-1">
-          {[3, 6, 12].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMonths(m)}
-              className={`text-xs px-2 py-0.5 rounded-md transition-colors ${
-                months === m
-                  ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"
-                  : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-              }`}
-            >
-              {m}개월
-            </button>
-          ))}
-        </div>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => setIsOpen((v) => !v)}
+          className="flex items-center gap-2"
+          aria-expanded={isOpen}
+        >
+          <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
+            <BarChart2 size={16} className="text-gray-500 dark:text-gray-400" />
+          </div>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            자산 추이
+          </h2>
+          <ChevronDown
+            size={14}
+            className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          />
+        </button>
+        {isOpen && (
+          <div className="flex gap-1">
+            {[3, 6, 12].map((m) => (
+              <button
+                key={m}
+                onClick={() => setMonths(m)}
+                className={`text-xs px-2 py-0.5 rounded-md transition-colors ${
+                  months === m
+                    ? "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300"
+                    : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}
+              >
+                {m}개월
+              </button>
+            ))}
+          </div>
+        )}
       </div>
-      <div className="h-[180px] sm:h-[220px]">
+
+      {!isOpen && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5 ml-0.5">
+          탭하여 {months}개월 추이 보기
+        </p>
+      )}
+
+      {isOpen && <>
+      <div className="h-[180px] sm:h-[220px] mt-4">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid
@@ -241,6 +265,7 @@ function AllocationHistoryChart() {
           </table>
         </div>
       )}
+      </>}
     </div>
   );
 }

@@ -46,6 +46,7 @@ export default function DashboardPage() {
     accounts,
     accountsLoading,
     exchangeRate,
+    marketSignal,
   } = useDashboardData();
 
   const overallDividendYield = useMemo(() => {
@@ -130,6 +131,7 @@ export default function DashboardPage() {
             showDriftRows={true}
             maxDriftRows={3}
             hideSignalBanner={true}
+            marketSignal={marketSignal}
             onPortfolioSelect={(id) =>
               navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)
             }

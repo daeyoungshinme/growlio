@@ -1,8 +1,14 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtKrw, fmtMonth } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
+
+function achievementColor(pct: number): string {
+  if (pct >= 80) return "text-green-600 dark:text-green-400";
+  if (pct >= 50) return "text-blue-600 dark:text-blue-400";
+  return "text-gray-500 dark:text-gray-400";
+}
 
 interface Props {
   data: DashboardData | undefined;
@@ -16,8 +22,9 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
   const hasDepositGoal = data?.annual_deposit_goal != null && data.deposit_achievement_pct != null;
   const hasAssetGoal = data?.goal_amount != null && data.goal_achievement_pct != null;
+  const hasDividendGoal = data?.annual_dividend_goal != null && data.dividend_goal_achievement_pct != null;
 
-  if (!isLoading && !hasDepositGoal && !hasAssetGoal) {
+  if (!isLoading && !hasDepositGoal && !hasAssetGoal && !hasDividendGoal) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-2 sm:mb-4">
@@ -60,11 +67,16 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">연간 입금</p>
           {hasDepositGoal ? (
             <>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <p className={`text-sm font-semibold ${achievementColor(data!.deposit_achievement_pct!)}`}>
                 {Math.min(data!.deposit_achievement_pct!, 100).toFixed(1)}%
                 <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">달성</span>
               </p>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                {fmtKrwShort(Math.round(data!.annual_deposit_goal! * data!.deposit_achievement_pct! / 100))}
+                <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
+                {fmtKrwShort(data!.annual_deposit_goal!)}원
+              </p>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${Math.min(data!.deposit_achievement_pct!, 100)}%` }}
@@ -82,14 +94,44 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">자산 목표</p>
           {hasAssetGoal ? (
             <>
-              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <p className={`text-sm font-semibold ${achievementColor(data!.goal_achievement_pct!)}`}>
                 {Math.min(data!.goal_achievement_pct!, 100).toFixed(1)}%
                 <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">달성</span>
               </p>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                {fmtKrwShort(Math.floor(data!.total_assets_krw))}
+                <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
+                {fmtKrwShort(data!.goal_amount!)}원
+              </p>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${Math.min(data!.goal_achievement_pct!, 100)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
+          )}
+        </div>
+
+        <div className="w-px bg-gray-100 dark:bg-gray-700 self-stretch" />
+
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">배당 목표</p>
+          {hasDividendGoal ? (
+            <>
+              <p className={`text-sm font-semibold ${achievementColor(data!.dividend_goal_achievement_pct!)}`}>
+                {Math.min(data!.dividend_goal_achievement_pct!, 100).toFixed(1)}%
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">달성</span>
+              </p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                {fmtKrwShort(data!.annual_dividend_goal!)}원 목표
+              </p>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${Math.min(data!.dividend_goal_achievement_pct!, 100)}%` }}
                 />
               </div>
             </>
@@ -145,7 +187,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 </span>
               )}
             </div>
-            <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
+            <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
               <div
                 className="h-full bg-blue-500 rounded-full transition-all"
                 style={{ width: `${Math.min(currentProgressPct ?? 0, 100)}%` }}
@@ -162,8 +204,8 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         )}
       </div>
 
-      {/* 데스크탑 목표 2열 — compact secondary */}
-      <div className="hidden sm:grid sm:grid-cols-2 sm:gap-3">
+      {/* 데스크탑 목표 3열 — compact secondary */}
+      <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>연간 입금 달성률</span>
@@ -175,13 +217,18 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           </div>
           {hasDepositGoal ? (
             <>
-              <div className="flex items-end gap-1">
-                <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <div className="flex items-end gap-1.5">
+                <span className={`text-sm font-semibold ${achievementColor(data!.deposit_achievement_pct!)}`}>
                   {Math.min(data!.deposit_achievement_pct!, 100).toFixed(1)}%
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
+                  {fmtKrwShort(Math.round(data!.annual_deposit_goal! * data!.deposit_achievement_pct! / 100))}
+                  <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
+                  {fmtKrwShort(data!.annual_deposit_goal!)}원
+                </span>
               </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1">
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${Math.min(data!.deposit_achievement_pct!, 100)}%` }}
@@ -196,29 +243,61 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>자산 목표 달성률</span>
-            {hasAssetGoal && (
+            {hasAssetGoal && data!.retirement_target_year != null && (
               <span className="font-medium text-gray-700 dark:text-gray-300">
-                목표 {fmtKrw(data!.goal_amount!)}
+                {data!.retirement_target_year}년 목표
               </span>
             )}
           </div>
           {hasAssetGoal ? (
             <>
-              <div className="flex items-end gap-1">
-                <span className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+              <div className="flex items-end gap-1.5">
+                <span className={`text-sm font-semibold ${achievementColor(data!.goal_achievement_pct!)}`}>
                   {Math.min(data!.goal_achievement_pct!, 100).toFixed(1)}%
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
-                {data!.retirement_target_year != null && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-1">
-                    ({data!.retirement_target_year}년 목표)
-                  </span>
-                )}
+                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
+                  {fmtKrwShort(Math.floor(data!.total_assets_krw))}
+                  <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
+                  {fmtKrwShort(data!.goal_amount!)}원
+                </span>
               </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1">
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
                 <div
                   className="h-full rounded-full bg-blue-500 transition-all duration-500"
                   style={{ width: `${Math.min(data!.goal_achievement_pct!, 100)}%` }}
+                />
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
+          )}
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
+            <span>배당 목표 달성률</span>
+            {hasDividendGoal && (
+              <span className="font-medium text-gray-700 dark:text-gray-300">
+                목표 {fmtKrw(data!.annual_dividend_goal!)}
+              </span>
+            )}
+          </div>
+          {hasDividendGoal ? (
+            <>
+              <div className="flex items-end gap-1.5">
+                <span className={`text-sm font-semibold ${achievementColor(data!.dividend_goal_achievement_pct!)}`}>
+                  {Math.min(data!.dividend_goal_achievement_pct!, 100).toFixed(1)}%
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
+                  예상 {fmtKrwShort(data!.estimated_annual_dividends ?? 0)}원
+                </span>
+              </div>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${Math.min(data!.dividend_goal_achievement_pct!, 100)}%` }}
                 />
               </div>
             </>

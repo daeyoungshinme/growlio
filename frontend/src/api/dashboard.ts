@@ -35,6 +35,8 @@ export interface DashboardData {
   benchmark_sp500_pct: number | null;
   goal_annual_return_pct: number | null;
   retirement_target_year: number | null;
+  annual_dividend_goal: number | null;
+  dividend_goal_achievement_pct: number | null;
 }
 
 export const fetchDashboard = () => apiGet<DashboardData>("/dashboard");

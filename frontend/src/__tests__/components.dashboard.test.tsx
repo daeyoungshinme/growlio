@@ -35,6 +35,8 @@ const baseDashboard: DashboardData = {
   xirr_is_estimated: false,
   benchmark_sp500_pct: null,
   goal_annual_return_pct: null,
+  annual_dividend_goal: null,
+  dividend_goal_achievement_pct: null,
 };
 
 describe("InvestmentGoalCard", () => {

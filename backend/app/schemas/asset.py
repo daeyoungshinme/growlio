@@ -343,6 +343,8 @@ class DashboardResponse(BaseModel):
     xirr_is_estimated: bool = False
     goal_annual_return_pct: float | None = None
     retirement_target_year: int | None = None
+    annual_dividend_goal: float | None = None
+    dividend_goal_achievement_pct: float | None = None
 
 
 class KisCredentialVerifyRequest(BaseModel):

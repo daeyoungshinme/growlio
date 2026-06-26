@@ -4,7 +4,7 @@ import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// ── mocks must come before any imports that use them ──
+// mocks must come before any imports that use them
 vi.mock("@/hooks/useDashboardData", () => ({
   useDashboardData: vi.fn(),
 }));
@@ -92,6 +92,7 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: true,
       exchangeRate: null,
+      marketSignal: undefined,
     });
     renderDashboard();
     await waitFor(() => {
@@ -99,7 +100,7 @@ describe("DashboardPage", () => {
     });
   });
 
-  it("에러 상태일 때 에러 메시지와 재시도 버튼을 표시한다", () => {
+  it("에러 상태에서 에러 메시지와 다시 시도 버튼을 표시한다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -110,13 +111,14 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: false,
       exchangeRate: null,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
   });
 
-  it("에러 없어도 data가 없으면 에러 메시지를 표시한다", () => {
+  it("에러 없고 data가 없으면 에러 메시지를 표시한다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: undefined,
       isLoading: false,
@@ -127,6 +129,7 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: false,
       exchangeRate: null,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
@@ -143,6 +146,7 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: false,
       exchangeRate: 1350,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByText("등록된 자산이 없습니다")).toBeInTheDocument();
@@ -160,6 +164,7 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: true,
       exchangeRate: 1350,
+      marketSignal: undefined,
     });
     renderDashboard();
     // accountsLoading=true means we skip the empty-accounts branch
@@ -168,7 +173,7 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
   });
 
-  it("정상 데이터와 계좌 있을 때 메인 콘텐츠를 렌더링한다", () => {
+  it("정상 데이터가 왔을 때 주요 4가지 메인 섹션을 렌더링한다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: mockDashboardData as never,
       isLoading: false,
@@ -179,6 +184,7 @@ describe("DashboardPage", () => {
       accounts: [{ id: "acc-1", name: "KB증권", asset_type: "STOCK_KIS" }] as never,
       accountsLoading: false,
       exchangeRate: 1350,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -186,7 +192,7 @@ describe("DashboardPage", () => {
     expect(screen.getByTestId("allocation-chart")).toBeInTheDocument();
   });
 
-  it("estimated_annual_dividends가 있을 때 페이지가 정상 렌더링된다", () => {
+  it("estimated_annual_dividends가 있을 때 섹션이 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: { ...mockDashboardData, estimated_annual_dividends: 2_000_000 } as never,
       isLoading: false,
@@ -197,12 +203,13 @@ describe("DashboardPage", () => {
       accounts: [{ id: "acc-1" }] as never,
       accountsLoading: false,
       exchangeRate: 1350,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
   });
 
-  it("estimated_annual_dividends가 null이면 페이지가 정상 렌더링된다", () => {
+  it("estimated_annual_dividends가 null이면 섹션이 정상 렌더링된다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: { ...mockDashboardData, estimated_annual_dividends: null } as never,
       isLoading: false,
@@ -213,6 +220,7 @@ describe("DashboardPage", () => {
       accounts: [{ id: "acc-1" }] as never,
       accountsLoading: false,
       exchangeRate: 1350,
+      marketSignal: undefined,
     });
     renderDashboard();
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
@@ -229,6 +237,7 @@ describe("DashboardPage", () => {
       accounts: [],
       accountsLoading: false,
       exchangeRate: null,
+      marketSignal: undefined,
     });
     renderDashboard();
     const retryBtn = screen.getByRole("button", { name: "다시 시도" });
