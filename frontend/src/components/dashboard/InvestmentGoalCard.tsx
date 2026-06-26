@@ -26,9 +26,6 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
 
   // 하단 컨텍스트 링크: 우선순위 순으로 1개만 표시
   const contextLink = (() => {
-    if (hasDividendGoal && (data!.dividend_goal_achievement_pct ?? 100) < 80) {
-      return { to: "/assets?tab=투자현황&portfolioTab=배당", label: "배당주 포트폴리오 확인" };
-    }
     if (
       hasAssetGoal &&
       ((data!.goal_achievement_pct ?? 100) < 80 ||
