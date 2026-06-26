@@ -7,8 +7,6 @@ from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.database import AsyncSessionLocal
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
@@ -82,7 +80,7 @@ async def _run_auto_execution() -> None:
             )
             continue
 
-        triggered = await _execute_for_alert(alert, portfolio, db)
+        triggered = await _execute_for_alert(alert, portfolio)
         if not triggered:
             continue
 
@@ -109,7 +107,6 @@ async def _run_auto_execution() -> None:
 async def _execute_for_alert(
     alert: RebalancingAlert,
     portfolio: Portfolio,
-    db: AsyncSession,
 ) -> bool:
     """개별 알림에 대해 드리프트 분석 후 자동 실행한다."""
     from app.services.alert_service import execute_auto_rebalancing_for_alert
@@ -119,23 +116,24 @@ async def _execute_for_alert(
     saved_ids = getattr(portfolio, "account_ids", None)
     effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
 
-    try:
-        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
-    except Exception as exc:
-        logger.error("rebalancing_auto_overview_failed", alert_id=str(alert.id), error=str(exc))
-        return False
+    async with AsyncSessionLocal() as db:
+        try:
+            overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
+        except Exception as exc:
+            logger.error("rebalancing_auto_overview_failed", alert_id=str(alert.id), error=str(exc))
+            return False
 
-    try:
-        analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
-    except Exception as exc:
-        logger.error("rebalancing_auto_analysis_failed", alert_id=str(alert.id), error=str(exc))
-        return False
+        try:
+            analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        except Exception as exc:
+            logger.error("rebalancing_auto_analysis_failed", alert_id=str(alert.id), error=str(exc))
+            return False
 
-    threshold = float(alert.threshold_pct)
-    drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
+        threshold = float(alert.threshold_pct)
+        drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
 
-    if not drifting:
-        logger.info("rebalancing_auto_no_drift", alert_id=str(alert.id))
-        return False
+        if not drifting:
+            logger.info("rebalancing_auto_no_drift", alert_id=str(alert.id))
+            return False
 
-    return await execute_auto_rebalancing_for_alert(alert, portfolio, drifting, db)
+        return await execute_auto_rebalancing_for_alert(alert, portfolio, drifting, db)

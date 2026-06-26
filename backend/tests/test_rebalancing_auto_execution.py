@@ -314,7 +314,7 @@ class TestRunAutoExecution:
 
         call_count = 0
 
-        async def _exec_side_effect(alert, portfolio, db):
+        async def _exec_side_effect(alert, portfolio):
             nonlocal call_count
             result = call_count == 1  # 첫 번째 False, 두 번째 True
             call_count += 1
@@ -346,30 +346,34 @@ class TestRunAutoExecution:
 
 class TestExecuteForAlert:
     @pytest.mark.asyncio
-    async def test_returns_false_when_no_items_exceed_threshold(self, mock_db):
+    async def test_returns_false_when_no_items_exceed_threshold(self):
         alert = _make_alert(threshold_pct=5.0)
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=2.0)])
+        mock_db = _make_mock_db()
 
         with (
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch("app.services.alert_service.execute_auto_rebalancing_for_alert", new=AsyncMock()) as mock_exec,
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
-            result = await _execute_for_alert(alert, portfolio, mock_db)
+            result = await _execute_for_alert(alert, portfolio)
 
         assert result is False
         mock_exec.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_returns_true_when_drift_exceeds_threshold(self, mock_db):
+    async def test_returns_true_when_drift_exceeds_threshold(self):
         alert = _make_alert(threshold_pct=5.0)
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)])
+        mock_db = _make_mock_db()
 
         with (
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch(
@@ -378,48 +382,56 @@ class TestExecuteForAlert:
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
-            result = await _execute_for_alert(alert, portfolio, mock_db)
+            result = await _execute_for_alert(alert, portfolio)
 
         assert result is True
         mock_exec.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_returns_false_when_overview_fails(self, mock_db):
+    async def test_returns_false_when_overview_fails(self):
         alert = _make_alert()
         portfolio = _make_portfolio()
+        mock_db = _make_mock_db()
 
-        with patch(
-            "app.services.portfolio_service.build_portfolio_overview",
-            new=AsyncMock(side_effect=RuntimeError("DB error")),
+        with (
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
+            patch(
+                "app.services.portfolio_service.build_portfolio_overview",
+                new=AsyncMock(side_effect=RuntimeError("DB error")),
+            ),
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
-            result = await _execute_for_alert(alert, portfolio, mock_db)
+            result = await _execute_for_alert(alert, portfolio)
 
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_returns_false_when_analysis_fails(self, mock_db):
+    async def test_returns_false_when_analysis_fails(self):
         alert = _make_alert()
         portfolio = _make_portfolio()
+        mock_db = _make_mock_db()
 
         with (
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", side_effect=ValueError("bad data")),
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
-            result = await _execute_for_alert(alert, portfolio, mock_db)
+            result = await _execute_for_alert(alert, portfolio)
 
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_negative_drift_also_triggers_execution(self, mock_db):
+    async def test_negative_drift_also_triggers_execution(self):
         alert = _make_alert(threshold_pct=5.0)
         portfolio = _make_portfolio()
         analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=-8.0)])
+        mock_db = _make_mock_db()
 
         with (
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch(
@@ -428,7 +440,7 @@ class TestExecuteForAlert:
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
-            result = await _execute_for_alert(alert, portfolio, mock_db)
+            result = await _execute_for_alert(alert, portfolio)
 
         assert result is True
         mock_exec.assert_called_once()

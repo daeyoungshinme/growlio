@@ -136,8 +136,8 @@ async def _process_rebalancing_alert(
             )
             mode = "NOTIFY"
 
-    if mode == "AUTO" and alert.account_id and drifting:
-        return await execute_auto_rebalancing_for_alert(alert, portfolio, drifting, db)
+    # AUTO 모드 실행은 rebalancing_auto_execution 인트라데이 잡이 전담한다.
+    # 08:30 daily job(check_rebalancing_alerts)에서는 이메일/FCM 리포트만 발송한다.
 
     # NOTIFY: 이메일 + FCM 병렬 전송
     drift_count = len(drifting)
@@ -359,7 +359,11 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             "REBALANCING",
             (f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) [시장신호: {composite_level}]"),
         )
-        alert.last_triggered_at = datetime.now(tz=UTC)
+        # AUTO 모드는 last_triggered_at을 갱신하지 않는다.
+        # 인트라데이 잡(rebalancing_auto_execution)에서 실제 실행 후 갱신하므로,
+        # 여기서 갱신하면 already_fired_today()가 True → 당일 자동 실행 차단됨.
+        if getattr(alert, "mode", "NOTIFY") != "AUTO":
+            alert.last_triggered_at = datetime.now(tz=UTC)
         triggered_count += 1
 
     if triggered_count:
