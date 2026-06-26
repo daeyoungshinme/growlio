@@ -343,6 +343,7 @@ class TestGetDashboardSummary:
             annual_deposit_goal=24_000_000.0,
             goal_annual_return_pct=7.0,
             retirement_target_year=2040,
+            annual_dividend_goal=None,
         )
         mock_db.scalar = AsyncMock(return_value=settings)
 
