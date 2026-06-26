@@ -49,7 +49,6 @@ from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount
 from app.utils.redis_lock import redis_lock
 
-
 _CREDENTIAL_FIELDS: frozenset[str] = frozenset({"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"})
 
 
