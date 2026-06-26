@@ -134,13 +134,13 @@ export default function RebalancingPage() {
   const { data: signal } = useQuery({
     queryKey: QUERY_KEYS.marketSignal,
     queryFn: fetchMarketSignal,
-    staleTime: STALE_TIME.LONG,
+    staleTime: STALE_TIME.MEDIUM,
   });
 
   const { data: macroDiagnosis } = useQuery({
     queryKey: QUERY_KEYS.macroDiagnosis,
     queryFn: fetchMacroDiagnosis,
-    staleTime: STALE_TIME.LONG,
+    staleTime: STALE_TIME.MEDIUM,
     enabled: localTab === "진단",
   });
 
@@ -219,6 +219,13 @@ export default function RebalancingPage() {
             </Suspense>
             {portfolioId && (
               <div ref={executionRef}>
+                <div className="flex items-center gap-3 px-1">
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                  <span className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide whitespace-nowrap">
+                    분석 및 실행
+                  </span>
+                  <div className="flex-1 h-px bg-gray-200 dark:bg-gray-700" />
+                </div>
                 <Suspense fallback={<SkeletonCard />}>
                   <PortfolioExecutionTab portfolioId={portfolioId} />
                 </Suspense>

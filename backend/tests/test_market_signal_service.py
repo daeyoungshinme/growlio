@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from app.services.market_signal_service import compute_composite_signal
+from unittest.mock import AsyncMock, patch
+
+import pytest
+
+from app.services.market_signal_service import (
+    _FNG_CLASSIFICATION_MAP,
+    compute_composite_signal,
+    fetch_fear_greed_signal,
+)
 
 
 def _vix(sub_score: int) -> dict:
@@ -82,6 +90,117 @@ class TestFearGreedFlags:
         result = compute_composite_signal(_vix(0), _yc(0), None)
         assert result["fear_greed_contrarian_buy"] is False
         assert result["fear_greed_extreme_greed"] is False
+
+
+class TestFearGreedClassificationMapping:
+    """fetch_fear_greed_signal()이 API value_classification을 우선 사용하는지 검증."""
+
+    def _make_fng_entry(self, value: int, value_classification: str) -> dict:
+        return {"value": str(value), "value_classification": value_classification}
+
+    @pytest.mark.asyncio
+    async def test_classification_follows_api_not_threshold(self):
+        """value=25는 API가 'Fear'를 반환하므로 FEAR여야 함 (EXTREME_FEAR 아님)."""
+        entry = self._make_fng_entry(25, "Fear")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["classification"] == "FEAR"
+        assert result["label"] == "공포"
+        assert result["label_en"] == "Fear"
+
+    @pytest.mark.asyncio
+    async def test_value_46_fear_via_api(self):
+        """value=46은 API가 'Fear' → FEAR (코드 임계값 기준 ≤45이면 NEUTRAL이었음)."""
+        entry = self._make_fng_entry(46, "Fear")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["classification"] == "FEAR"
+
+    @pytest.mark.asyncio
+    async def test_value_52_greed_via_api(self):
+        """value=52는 API가 'Greed' → GREED (코드 임계값 기준 ≤55이면 NEUTRAL이었음)."""
+        entry = self._make_fng_entry(52, "Greed")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["classification"] == "GREED"
+
+    @pytest.mark.asyncio
+    async def test_value_75_extreme_greed_via_api(self):
+        """value=75는 API가 'Extreme Greed' → EXTREME_GREED (코드 임계값 기준 ≤75이면 GREED였음)."""
+        entry = self._make_fng_entry(75, "Extreme Greed")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["classification"] == "EXTREME_GREED"
+        assert result["label_en"] == "Extreme Greed"
+
+    @pytest.mark.asyncio
+    async def test_unknown_api_classification_falls_back_to_neutral(self):
+        """API가 예상 외 문자열을 반환하면 NEUTRAL 폴백."""
+        entry = self._make_fng_entry(50, "Unknown Value")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["classification"] == "NEUTRAL"
+
+    def test_classification_map_covers_all_api_values(self):
+        """_FNG_CLASSIFICATION_MAP이 Alternative.me의 모든 분류를 포함한다."""
+        expected_keys = {"extreme fear", "fear", "neutral", "greed", "extreme greed"}
+        assert set(_FNG_CLASSIFICATION_MAP.keys()) == expected_keys
+
+    @pytest.mark.asyncio
+    async def test_sub_score_still_value_based(self):
+        """sub_score는 value 기반 유지 — 분류와 무관하게 복합 점수 일관성 보장."""
+        # value=20 (EXTREME_FEAR 구간) → sub_score=2
+        entry = self._make_fng_entry(20, "Extreme Fear")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["sub_score"] == 2
+
+        # value=80 (EXTREME_GREED 구간) → sub_score=3
+        entry2 = self._make_fng_entry(80, "Extreme Greed")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry2),
+        ):
+            result2 = await fetch_fear_greed_signal()
+        assert result2 is not None
+        assert result2["sub_score"] == 3
+
+    @pytest.mark.asyncio
+    async def test_label_and_label_en_consistent_with_classification(self):
+        """label(한국어)과 label_en이 classification과 일치한다."""
+        entry = self._make_fng_entry(30, "Fear")
+        with patch(
+            "app.services.market_signal_service._call_fng_api",
+            AsyncMock(return_value=entry),
+        ):
+            result = await fetch_fear_greed_signal()
+        assert result is not None
+        assert result["label"] == "공포"
+        assert result["label_en"] == "Fear"
 
 
 class TestResultStructure:

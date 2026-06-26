@@ -34,6 +34,14 @@ FOMC_DATES_FALLBACK: list[str] = [
     "2026-09-16",
     "2026-10-28",
     "2026-12-16",
+    "2027-01-27",
+    "2027-03-17",
+    "2027-05-05",
+    "2027-06-16",
+    "2027-07-28",
+    "2027-09-15",
+    "2027-10-27",
+    "2027-12-15",
 ]
 
 # CPI direction 판정 임계값 (지수값 기준, CPIAUCSL 단위)
@@ -128,44 +136,24 @@ def _analyze_fed_rate(
     }
 
 
-def _analyze_fomc_schedule(
-    calendar_events: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """캘린더 이벤트 목록에서 FED_RATE 관련 이벤트를 필터링해 다음 FOMC 날짜를 반환한다.
+def _analyze_fomc_schedule() -> dict[str, Any]:
+    """FOMC_DATES_FALLBACK에서 다음 FOMC 회의 날짜를 반환한다.
 
-    이벤트가 없으면 하드코딩된 FOMC 일정(FOMC_DATES_FALLBACK)을 폴백으로 사용한다.
+    economic_calendar_service는 FRED 경제지표 발표일(release date)을 제공하며
+    FOMC 회의 개최일과 다르므로 캘린더 기반 검색을 사용하지 않는다.
     """
     today = date.today()
-
-    # 1차: 캘린더 이벤트 중 FED_RATE 관련 항목 검색
-    fed_events = [e for e in calendar_events if "기준금리" in e.get("event", "") or "Fed" in e.get("event", "")]
-    for event in sorted(fed_events, key=lambda x: x["date"]):
-        try:
-            d = date.fromisoformat(event["date"])
-        except (ValueError, TypeError):
-            continue
-        if d >= today:
-            days_until = (d - today).days
-            return {
-                "next_meeting_date": d.isoformat(),
-                "days_until": days_until,
-                "source": "calendar",
-            }
-
-    # 2차 폴백: 하드코딩된 FOMC 일정
     for date_str in FOMC_DATES_FALLBACK:
         try:
             d = date.fromisoformat(date_str)
         except (ValueError, TypeError):
             continue
         if d >= today:
-            days_until = (d - today).days
             return {
                 "next_meeting_date": d.isoformat(),
-                "days_until": days_until,
+                "days_until": (d - today).days,
                 "source": "fallback",
             }
-
     return {"next_meeting_date": None, "days_until": None, "source": "unknown"}
 
 
@@ -238,14 +226,13 @@ async def get_macro_diagnosis(redis: Any) -> dict[str, Any]:
     Redis 1시간 캐시. 개별 지표는 fetch_indicator_history 6시간 캐시를 재사용하므로
     FRED API 추가 호출이 발생하지 않는다.
     """
-    from app.services.economic_calendar_service import get_calendar_events
     from app.services.economic_indicator_service import fetch_indicator_history
 
     cache_key = macro_diagnosis_key()
     if (hit := await get_cached_json(redis, cache_key)) is not None:
         return hit
 
-    # 지표 시계열 + 캘린더 병렬 조회
+    # 지표 시계열 병렬 조회
     import asyncio
 
     async def _safe_fetch_cpi() -> list[dict[str, Any]]:
@@ -262,18 +249,11 @@ async def get_macro_diagnosis(redis: Any) -> dict[str, Any]:
             logger.warning("macro_fed_fetch_failed", error=str(exc))
             return []
 
-    async def _safe_fetch_cal() -> list[dict[str, Any]]:
-        try:
-            return await get_calendar_events(redis)
-        except Exception as exc:
-            logger.warning("macro_calendar_fetch_failed", error=str(exc))
-            return []
-
-    cpi_hist, fed_hist, calendar_events = await asyncio.gather(_safe_fetch_cpi(), _safe_fetch_fed(), _safe_fetch_cal())
+    cpi_hist, fed_hist = await asyncio.gather(_safe_fetch_cpi(), _safe_fetch_fed())
 
     cpi = _analyze_cpi_trend(cpi_hist)
     fed = _analyze_fed_rate(fed_hist)
-    fomc = _analyze_fomc_schedule(calendar_events)
+    fomc = _analyze_fomc_schedule()
     implication = _derive_implication(cpi, fed)
 
     # data_freshness 판단

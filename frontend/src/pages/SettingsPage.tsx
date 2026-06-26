@@ -12,7 +12,6 @@ import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
-import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -76,8 +75,12 @@ function AlertHistorySection() {
 const inputClass = `mt-1 w-full ${INPUT_MD}`;
 const labelClass = LABEL_MD;
 
+const ALERT_TABS = ["환율 알림", "주가 알림", "발송 이력"] as const;
+type AlertTab = (typeof ALERT_TABS)[number];
+
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
+  const [alertTab, setAlertTab] = useState<AlertTab>("환율 알림");
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
   const qc = useQueryClient();
@@ -124,22 +127,6 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* 계좌 및 자산 관리 */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          계좌 및 자산 관리
-        </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-          은행계좌, 증권계좌, 부동산 등록 및 포트폴리오 조회는 자산 탭에서 할 수 있습니다.
-        </p>
-        <Link
-          to="/assets"
-          className="inline-flex items-center gap-1.5 text-sm text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          자산 탭으로 이동 →
-        </Link>
-      </div>
-
       {/* DART OpenAPI */}
       <SectionCard
         title="DART OpenAPI (금융감독원)"
@@ -208,50 +195,51 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
-      {/* 자동 정기매수 (DCA) */}
-      <SectionCard title="자동 정기매수 (DCA)">
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          포트폴리오 비중에 맞춰 설정한 날짜에 자동으로 매수합니다.
-        </p>
-        <DCASettingsSection
-          key={current ? "dca-loaded" : "dca-loading"}
-          current={current ?? null}
-          onSettingsChange={invalidateSettings}
-        />
-      </SectionCard>
-
       {/* 알림 설정 그룹 */}
       <div>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
           알림 설정
         </h2>
-        <div className="space-y-4">
-          <div className="px-1">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
-              <Link
-                to="/rebalancing?rtab=포트폴리오"
-                className="text-blue-600 dark:text-blue-400 underline"
-              >
-                리밸런싱 탭
-              </Link>
-              에서 포트폴리오별로 설정합니다.
-            </p>
-          </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 px-1">
+          리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
+          <Link
+            to="/rebalancing?rtab=포트폴리오"
+            className="text-blue-600 dark:text-blue-400 underline"
+          >
+            리밸런싱 탭
+          </Link>
+          에서 포트폴리오별로 설정합니다.
+        </p>
 
+        {/* 알림 탭 */}
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4">
+          {ALERT_TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setAlertTab(tab)}
+              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
+                alertTab === tab
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {alertTab === "환율 알림" && (
           <ExchangeRateAlertSection
             userEmail={current?.user_email}
             onSettingsChange={invalidateSettings}
           />
-
-          <StockPriceAlertSection />
-        </div>
+        )}
+        {alertTab === "주가 알림" && <StockPriceAlertSection />}
+        {alertTab === "발송 이력" && <AlertHistorySection />}
       </div>
 
-      <AlertHistorySection />
-
-      {/* 모바일 전용: 앱 설정 */}
-      <div className="lg:hidden">
+      {/* 앱 설정 */}
+      <div>
         <SectionCard title="앱 설정">
           <button
             onClick={toggle}

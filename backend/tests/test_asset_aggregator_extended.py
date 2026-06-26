@@ -185,7 +185,7 @@ class TestGetScalarInitData:
         result.first.return_value = None
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(
+        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total, net_flows_after = await _get_scalar_init_data(
             uuid.uuid4(), mock_db
         )
 
@@ -194,6 +194,7 @@ class TestGetScalarInitData:
         assert net_investment == 0.0
         assert first_tx_date is None
         assert first_snap_total == 0.0
+        assert net_flows_after == 0.0
 
     @pytest.mark.asyncio
     async def test_with_data_returns_values(self, mock_db, override_settings):
@@ -205,12 +206,13 @@ class TestGetScalarInitData:
             net_investment=10_000_000.0,
             first_tx_date=date(2023, 1, 15),
             first_total=8_000_000.0,
+            net_flows_after=2_000_000.0,
         )
         result = MagicMock()
         result.first.return_value = row
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total = await _get_scalar_init_data(
+        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total, net_flows_after = await _get_scalar_init_data(
             uuid.uuid4(), mock_db
         )
 
@@ -219,6 +221,7 @@ class TestGetScalarInitData:
         assert net_investment == 10_000_000.0
         assert first_tx_date == date(2023, 1, 15)
         assert first_snap_total == 8_000_000.0
+        assert net_flows_after == 2_000_000.0
 
 
 # ── _get_monthly_trend (DB mock) ─────────────────────────────
@@ -285,7 +288,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0)),
+                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0, 0.0)),
             ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
@@ -350,7 +353,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 12_000_000.0, 0.0, None, 0.0)),
+                new=AsyncMock(return_value=(None, 12_000_000.0, 0.0, None, 0.0, 0.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",
@@ -390,7 +393,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0)),
+                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0, 0.0)),
             ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
@@ -559,8 +562,8 @@ class TestBuildAssetTotals:
 
     @pytest.mark.asyncio
     async def test_dashboard_base_uses_first_snapshot_total(self, mock_db, override_settings):
-        """first_snap_total이 있으면 net_investment 대신 스냅샷 총액을 기준으로 누적 수익률 계산.
-        (net_investment는 거래내역 미기록 시 실제 투자금보다 훨씬 작을 수 있어 분모로 부적합)
+        """first_snap_total이 있으면 스냅샷 총액 기준으로 누적 수익률 계산 (입금 없는 경우).
+        net_flows_after=0 → Modified Dietz = 단순 수익률 공식과 동일.
         """
         from datetime import date as _date
 
@@ -570,10 +573,10 @@ class TestBuildAssetTotals:
         mock_db.scalar = AsyncMock(return_value=None)
 
         with (
-            # 최초 스냅샷 총액 5,000만원, 순투자금(거래내역)은 1,000만원(불완전)
+            # 최초 스냅샷 총액 5,000만원, 이후 입금 없음
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 10_000_000.0, first_snap, 50_000_000.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 10_000_000.0, first_snap, 50_000_000.0, 0.0)),
             ),
             # 현재 총자산 6,000만원, 주식 원가 3,000만원
             patch(
@@ -589,7 +592,7 @@ class TestBuildAssetTotals:
         ):
             result = await get_dashboard_summary(uuid.uuid4(), mock_db)
 
-        # 스냅샷 기준: cumulative = (6,000 / 5,000 - 1) × 100 = 20%  (net_investment=1,000만 아님)
+        # net_flows=0 → gain=(60M-50M-0)=10M, weighted_base=50M → cumulative=20%
         assert result["cumulative_return_pct"] == pytest.approx(20.0, abs=0.1)
 
     @pytest.mark.asyncio
@@ -606,7 +609,7 @@ class TestBuildAssetTotals:
             # 최초 스냅샷 총액 0 (스냅샷 없음), 순투자금(거래내역) 5,000만원
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, first_snap, 0.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, first_snap, 0.0, 0.0)),
             ),
             # 현재 총자산 6,000만원, 주식 원가 3,000만원, 주식 평가액 4,000만원
             patch(
@@ -624,3 +627,77 @@ class TestBuildAssetTotals:
 
         # 포지션 원가 기준: cumulative = (4,000 / 3,000 - 1) × 100 = 33.33%
         assert result["cumulative_return_pct"] == pytest.approx(33.33, abs=0.1)
+
+    @pytest.mark.asyncio
+    async def test_dashboard_modified_dietz_excludes_deposits(self, mock_db, override_settings):
+        """최초 스냅샷 이후 입금분은 수익률에서 제외됨 (Modified Dietz).
+
+        기준: 5,000만원, 이후 1,000만원 입금, 현재 6,200만원
+        순투자 수익: 6,200 - 5,000 - 1,000 = 200만원
+        Modified Dietz weighted_base: 5,000 + 0.5×1,000 = 5,500만원
+        cumulative ≈ 200/5500 × 100 ≈ 3.636%
+        """
+        from datetime import date as _date
+
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        first_snap = _date(2023, 6, 1)
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, first_snap, 50_000_000.0, 10_000_000.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(return_value=(62_000_000.0, 0.0, 0.0, {})),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        # gain=2M, weighted_base=55M → 2/55×100 ≈ 3.636%
+        assert result["cumulative_return_pct"] == pytest.approx(2_000_000 / 55_000_000 * 100, abs=0.01)
+
+    @pytest.mark.asyncio
+    async def test_dashboard_modified_dietz_with_withdrawal(self, mock_db, override_settings):
+        """출금이 있을 때 Modified Dietz가 올바른 수익률을 반환.
+
+        기준: 5,000만원, 이후 500만원 출금(net_flows_after=-500만), 현재 4,300만원
+        순투자 수익: 4,300 - 5,000 - (-500) = -200만원 (손실)
+        Modified Dietz weighted_base: 5,000 + 0.5×(-500) = 4,750만원
+        cumulative ≈ -200/4750 × 100 ≈ -4.211%
+        """
+        from datetime import date as _date
+
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        first_snap = _date(2023, 6, 1)
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, first_snap, 50_000_000.0, -5_000_000.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(return_value=(43_000_000.0, 0.0, 0.0, {})),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        # gain=-2M, weighted_base=47.5M → -2/47.5×100 ≈ -4.211%
+        assert result["cumulative_return_pct"] == pytest.approx(-2_000_000 / 47_500_000 * 100, abs=0.01)

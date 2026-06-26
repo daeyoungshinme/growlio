@@ -22,6 +22,23 @@ logger = structlog.get_logger()
 
 FNG_API_URL = "https://api.alternative.me/fng/"
 
+# Alternative.me API value_classification → 내부 ENUM 매핑
+_FNG_CLASSIFICATION_MAP: dict[str, str] = {
+    "extreme fear": "EXTREME_FEAR",
+    "fear": "FEAR",
+    "neutral": "NEUTRAL",
+    "greed": "GREED",
+    "extreme greed": "EXTREME_GREED",
+}
+
+_FNG_LABEL_EN_MAP: dict[str, str] = {
+    "EXTREME_FEAR": "Extreme Fear",
+    "FEAR": "Fear",
+    "NEUTRAL": "Neutral",
+    "GREED": "Greed",
+    "EXTREME_GREED": "Extreme Greed",
+}
+
 # Fear & Greed API 전용 서킷브레이커 (3회 실패 → 120초 차단)
 fear_greed_circuit = CircuitBreaker("FearGreedAPI", fail_max=3, reset_timeout=120.0)
 # FRED API 서킷브레이커 — VIX·장단기금리차 공유 (4회 실패 → 300초 차단)
@@ -139,20 +156,19 @@ async def fetch_fear_greed_signal() -> dict[str, Any] | None:
         value = int(value_raw)
         classification_raw = (entry.get("value_classification") or "Neutral").lower()
 
+        # API 원본 분류를 그대로 사용해 Alternative.me 사이트 값과 일치시킴
+        classification = _FNG_CLASSIFICATION_MAP.get(classification_raw, "NEUTRAL")
+
+        # sub_score는 복합 신호(GREEN/YELLOW/RED) 산정용으로 value 기반 유지
         if value <= 25:
-            classification = "EXTREME_FEAR"
             sub_score = 2
         elif value <= 45:
-            classification = "FEAR"
             sub_score = 1
         elif value <= 55:
-            classification = "NEUTRAL"
             sub_score = 0
         elif value <= 75:
-            classification = "GREED"
             sub_score = 1
         else:
-            classification = "EXTREME_GREED"
             sub_score = 3
 
         label_map = {
@@ -167,7 +183,7 @@ async def fetch_fear_greed_signal() -> dict[str, Any] | None:
             "value": value,
             "classification": classification,
             "label": label_map[classification],
-            "label_en": classification_raw.replace("_", " ").title(),
+            "label_en": _FNG_LABEL_EN_MAP[classification],
             "sub_score": sub_score,
         }
 

@@ -124,41 +124,31 @@ class TestAnalyzeFedRate:
 
 
 class TestAnalyzeFomcSchedule:
-    def test_calendar_source_priority(self):
-        events = [
-            {"event": "미국 기준금리", "date": "2099-12-31", "impact": "High"},
-        ]
-        result = _analyze_fomc_schedule(events)
-        assert result["source"] == "calendar"
-        assert result["next_meeting_date"] == "2099-12-31"
-        assert result["days_until"] is not None
-
-    def test_fallback_when_no_calendar(self):
-        result = _analyze_fomc_schedule([])
-        # FOMC_DATES_FALLBACK 중 미래 날짜가 있으면 fallback 또는 unknown
+    def test_returns_fallback_source(self):
+        result = _analyze_fomc_schedule()
         assert result["source"] in ("fallback", "unknown")
+
+    def test_next_meeting_date_is_future_or_none(self):
+        import datetime
+
+        result = _analyze_fomc_schedule()
+        if result["next_meeting_date"] is not None:
+            d = datetime.date.fromisoformat(result["next_meeting_date"])
+            assert d >= datetime.date.today()
+            assert result["days_until"] >= 0
 
     def test_fallback_dates_not_empty(self):
         assert len(FOMC_DATES_FALLBACK) > 0
-        # 모두 유효한 날짜 형식
         import datetime
 
         for d in FOMC_DATES_FALLBACK:
             datetime.date.fromisoformat(d)
 
-    def test_unknown_when_all_past(self):
-        result = _analyze_fomc_schedule([])
-        # 미래 날짜가 폴백에 없으면 unknown — 테스트 실행 시점에 따라 다를 수 있으므로
-        # fallback or unknown 모두 허용
-        assert result["source"] in ("fallback", "unknown")
+    def test_fallback_dates_sorted_ascending(self):
+        import datetime
 
-    def test_past_calendar_event_skipped(self):
-        events = [
-            {"event": "Fed 기준금리", "date": "2000-01-01", "impact": "High"},
-        ]
-        result = _analyze_fomc_schedule(events)
-        # 과거 이벤트이므로 폴백으로 내려감
-        assert result["source"] in ("fallback", "unknown")
+        dates = [datetime.date.fromisoformat(d) for d in FOMC_DATES_FALLBACK]
+        assert dates == sorted(dates)
 
 
 # ---------------------------------------------------------------------------

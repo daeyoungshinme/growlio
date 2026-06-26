@@ -7,13 +7,16 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
-import InvestmentSnapshotCard from "@/components/dashboard/InvestmentSnapshotCard";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
 const RebalancingStatusCard = lazy(
   () => import("../components/dashboard/RebalancingStatusCard"),
+);
+
+const InvestmentSnapshotCard = lazy(
+  () => import("../components/dashboard/InvestmentSnapshotCard"),
 );
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
@@ -171,9 +174,11 @@ export default function DashboardPage() {
           <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
         </ErrorBoundary>
 
-        {/* Row 3: 투자현황 스냅샷 — 주식·배당 요약 */}
+        {/* Row 3: 주식 투자 현황 */}
         <ErrorBoundary variant="section">
-          <InvestmentSnapshotCard overview={overview} data={data} />
+          <Suspense fallback={<SkeletonCard />}>
+            <InvestmentSnapshotCard overview={overview} data={data} />
+          </Suspense>
         </ErrorBoundary>
 
         {/* Row 4: 리밸런싱 진단 요약 */}

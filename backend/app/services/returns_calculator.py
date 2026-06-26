@@ -47,9 +47,17 @@ def xirr(cashflows: list[tuple[date, float]]) -> float | None:
     return None
 
 
-def calc_returns(current_total: float, base: float, first_date: date | None) -> tuple[float | None, float | None]:
+def calc_returns(
+    current_total: float,
+    base: float,
+    first_date: date | None,
+    net_flows: float = 0.0,
+) -> tuple[float | None, float | None]:
     """연환산 수익률과 누적 수익률을 반환. (annualized, cumulative)
-    30일 미만 기간은 annualized=None, cumulative만 반환.
+
+    net_flows가 있으면 Modified Dietz 공식 적용 — 입금/출금이 기간 중반에
+    발생한다고 가정(0.5 가중치)해 순입금을 수익률 계산에서 제거한다.
+    90일 미만 기간은 annualized=None, cumulative만 반환.
     """
     if base <= 0 or not first_date:
         return None, None
@@ -58,10 +66,20 @@ def calc_returns(current_total: float, base: float, first_date: date | None) -> 
     days = (today - first_date).days
     if days < 1:
         return None, None
-    cumulative = (current_total / base - 1) * 100
+
+    weighted_base = base + 0.5 * net_flows
+    if weighted_base <= 0:
+        return None, None
+
+    gain = current_total - base - net_flows
+    cumulative = (gain / weighted_base) * 100
+
     if days < 90:
         return None, cumulative
-    annualized = ((current_total / base) ** (365.0 / days) - 1) * 100
+    ratio = 1.0 + cumulative / 100.0
+    if ratio <= 0:
+        return None, cumulative
+    annualized = (ratio ** (365.0 / days) - 1) * 100
     return annualized, cumulative
 
 

@@ -1,9 +1,13 @@
 import { lazy, Suspense, useState } from "react";
 import { Settings2 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
+import { api } from "@/api/client";
+import type { SettingsData } from "@/api/settings";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
@@ -23,6 +27,14 @@ type Tab = (typeof TABS)[number];
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<Tab>("적립 계획");
+
+  const { data: settingsData } = useQuery({
+    queryKey: QUERY_KEYS.settings,
+    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
+    staleTime: STALE_TIME.LONG,
+  });
+
+  const invalidateSettings = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 
   const {
     data,
@@ -158,12 +170,7 @@ export default function InvestPlanPage() {
               </div>
             </div>
             <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-              연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다.{" "}
-              자동 정기매수 실행 설정은{" "}
-              <Link to="/settings" className="text-blue-600 dark:text-blue-400 hover:underline">
-                설정 탭
-              </Link>
-              에서 변경할 수 있습니다.
+              연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다. 자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
             </p>
             {data && !isConfigured && (
               <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
@@ -259,6 +266,18 @@ export default function InvestPlanPage() {
               placeholder="10000000"
               hint="예상 연배당이 이 금액을 넘으면 목표 달성"
             />
+
+            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
+              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
+                자동 실행 설정
+              </p>
+              <DCASettingsSection
+                key={settingsData ? "dca-loaded" : "dca-loading"}
+                current={settingsData ?? null}
+                onSettingsChange={invalidateSettings}
+                flat
+              />
+            </div>
 
             <div className="flex gap-3 pt-4">
               <button

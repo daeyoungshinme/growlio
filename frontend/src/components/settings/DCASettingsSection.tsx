@@ -12,9 +12,10 @@ import { SectionCard, inputClass, labelClass } from "./shared";
 interface Props {
   current: SettingsData | null;
   onSettingsChange: () => void;
+  flat?: boolean;
 }
 
-export function DCASettingsSection({ current, onSettingsChange }: Props) {
+export function DCASettingsSection({ current, onSettingsChange, flat = false }: Props) {
   const [dcaForm, setDcaForm] = useState(() => ({
     enabled: current?.auto_dca_enabled ?? false,
     day: current?.auto_dca_day ? String(current.auto_dca_day) : "1",
@@ -53,8 +54,8 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
     onError: (e) => toast(extractErrorMessage(e, "저장에 실패했습니다"), "error"),
   });
 
-  return (
-    <SectionCard title="자동 정기매수 (DCA)">
+  const inner = (
+    <>
       <p className="text-xs text-gray-500 dark:text-gray-400">
         매월 설정한 날에 지정 포트폴리오 비중대로 KIS 계좌에서 자동 매수합니다. 실거래 주문이
         실행되므로 신중히 설정하세요.
@@ -153,6 +154,10 @@ export function DCASettingsSection({ current, onSettingsChange }: Props) {
           마지막 자동매수: {new Date(current.auto_dca_last_executed_at).toLocaleString("ko-KR")}
         </p>
       )}
-    </SectionCard>
+    </>
   );
+
+  if (flat) return <div className="space-y-4">{inner}</div>;
+
+  return <SectionCard title="자동 정기매수 (DCA)">{inner}</SectionCard>;
 }
