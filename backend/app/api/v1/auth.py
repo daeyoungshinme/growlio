@@ -2,8 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_token_payload
-from app.database import get_db
+from app.api.deps import get_current_user, get_db, get_token_payload
 from app.limiter import limiter
 from app.models.user import User, UserSettings
 from app.schemas.auth import (

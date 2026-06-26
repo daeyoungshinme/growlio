@@ -43,6 +43,7 @@ class UserSettings(Base):
     annual_deposit_goal: Mapped[float | None] = mapped_column(Numeric(18, 2))
     monthly_deposit_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     retirement_target_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    annual_dividend_goal: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 오픈뱅킹

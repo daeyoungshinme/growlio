@@ -32,19 +32,6 @@ def _make_mock_db():
     return db
 
 
-@pytest.fixture(autouse=True)
-def mock_redis_scheduler(monkeypatch):
-    import app.redis_client as rc
-    import app.scheduler as sched
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    monkeypatch.setattr(rc, "redis_client", mock_redis)
-    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
-    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
-    yield
-    rc.redis_client = None
 
 
 def _setup_app(user, db):
@@ -108,6 +95,7 @@ class TestGetSettings:
             annual_deposit_goal=10_000_000,
             monthly_deposit_amount=None,
             retirement_target_year=2045,
+            annual_dividend_goal=None,
             notification_email=None,
             auto_dca_enabled=False,
             auto_dca_day=None,
@@ -148,6 +136,7 @@ class TestUpdateGoal:
             retirement_target_year=None,
             goal_start_date=None,
             goal_initial_amount=None,
+            annual_dividend_goal=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -179,6 +168,7 @@ class TestUpdateGoal:
             retirement_target_year=None,
             goal_start_date=None,
             goal_initial_amount=None,
+            annual_dividend_goal=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -195,6 +185,7 @@ class TestUpdateGoal:
                         "retirement_target_year": 2045,
                         "goal_start_date": "2026-01-01",
                         "goal_initial_amount": 5_000_000,
+                        "annual_dividend_goal": 12_000_000,
                     },
                     headers={"Authorization": "Bearer fake"},
                 )
@@ -224,5 +215,34 @@ class TestUpdateGoal:
             from app.api.deps import get_current_user
             from app.database import get_db
 
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+
+class TestUpdateDartKey:
+    def test_put_dart_returns_200(self, override_settings):
+        """DART API 키 저장 성공."""
+        from unittest.mock import patch as _patch
+
+        user = _make_user()
+        db = _make_mock_db()
+        settings_row = SimpleNamespace(dart_api_key=None)
+        db.scalar = AsyncMock(return_value=settings_row)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                _patch("app.api.v1.settings.encrypt", return_value="enc_key"),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.put(
+                    "/api/v1/settings/dart",
+                    json={"api_key": "test_dart_key"},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)

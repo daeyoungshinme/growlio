@@ -9,9 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_account
-from app.database import get_db
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.asset import Position

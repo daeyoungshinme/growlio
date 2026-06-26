@@ -6,24 +6,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-@pytest.fixture(autouse=True)
-def mock_redis_scheduler(monkeypatch):
-    import app.redis_client as rc
-    import app.scheduler as sched
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None)
-    mock_redis.set = AsyncMock()
-    mock_redis.setex = AsyncMock()
-    monkeypatch.setattr(rc, "redis_client", mock_redis)
-    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
-    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
-    yield
-    rc.redis_client = None
-
-
 _SEARCH_RESULTS = [
     {"ticker": "005930", "name": "삼성전자", "market": "KOSPI"},
 ]

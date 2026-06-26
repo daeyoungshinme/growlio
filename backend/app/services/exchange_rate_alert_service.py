@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
 from app.services.alert_calculator import should_trigger_exchange_rate
-from app.services.alert_repository import apply_alert_trigger
+from app.services.alert_service import apply_alert_trigger
 from app.utils.currency import fetch_usd_krw
 from app.utils.metrics import alert_trigger_count
 

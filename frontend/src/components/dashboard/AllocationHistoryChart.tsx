@@ -75,7 +75,8 @@ function AllocationHistoryChart() {
           ))}
         </div>
       </div>
-      <ResponsiveContainer width="100%" height={220}>
+      <div className="h-[180px] sm:h-[220px]">
+      <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid
             strokeDasharray="3 3"
@@ -117,6 +118,7 @@ function AllocationHistoryChart() {
           ))}
         </BarChart>
       </ResponsiveContainer>
+      </div>
 
       <button
         onClick={() => setShowDetail((v) => !v)}

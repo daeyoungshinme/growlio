@@ -1,0 +1,243 @@
+"""KIS 리밸런싱 주문 실행 — 단건·TWO_PHASE 전략."""
+
+from __future__ import annotations
+
+import structlog
+
+from app.kis.balance import get_orderable_cash
+from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
+from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
+
+logger = structlog.get_logger()
+
+
+async def _execute_single_order(
+    order: ExecutionOrderItem,
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+) -> OrderResult:
+    if order.quantity <= 0:
+        return OrderResult(
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="SKIPPED",
+            error_msg="주문 수량이 0 이하입니다.",
+        )
+
+    try:
+        if is_overseas_market(order.market):
+            result = await place_overseas_order(
+                app_key,
+                app_secret,
+                access_token,
+                account_no,
+                side=order.side,
+                ticker=order.ticker,
+                market=order.market,
+                quantity=order.quantity,
+                is_mock=is_mock,
+                order_type=order.order_type,
+                limit_price=order.limit_price,
+            )
+        else:
+            result = await place_domestic_order(
+                app_key,
+                app_secret,
+                access_token,
+                account_no,
+                side=order.side,
+                ticker=order.ticker,
+                quantity=order.quantity,
+                is_mock=is_mock,
+                order_type=order.order_type,
+                limit_price=order.limit_price,
+            )
+
+        logger.info(
+            "order_placed",
+            ticker=order.ticker,
+            side=order.side,
+            quantity=order.quantity,
+            order_no=result.get("order_no"),
+            is_mock=is_mock,
+            order_type=order.order_type,
+        )
+        return OrderResult(
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="SUCCESS",
+            order_no=result.get("order_no"),
+            order_type=order.order_type,
+        )
+
+    except Exception as e:
+        logger.warning(
+            "order_failed",
+            ticker=order.ticker,
+            side=order.side,
+            quantity=order.quantity,
+            error=str(e),
+        )
+        return OrderResult(
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=order.quantity,
+            status="FAILED",
+            error_msg=str(e),
+            order_type=order.order_type,
+        )
+
+
+async def _execute_two_phase_orders(
+    group_orders: list[ExecutionOrderItem],
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+) -> list[OrderResult]:
+    """TWO_PHASE 전략 실행: 예수금 매수 → 매도 → 매도금 추가 매수.
+
+    Phase 1: KIS 주문가능금액 조회 → 예수금 범위 내 BUY 실행
+    Phase 2: SELL 전체 실행
+    Phase 3: 주문가능금액 재조회(매도예정금 포함) → 나머지 BUY 실행
+    """
+    sells = [o for o in group_orders if o.side == "SELL"]
+    buys = [o for o in group_orders if o.side == "BUY"]
+
+    if not buys and not sells:
+        return []
+
+    # 해외 주식 포함 시 get_orderable_cash()가 국내 전용이므로 FULL 방식으로 폴백
+    has_overseas = any(is_overseas_market(o.market) for o in buys)
+    if has_overseas:
+        logger.info("two_phase_fallback_overseas_detected", account_no=account_no)
+        results: list[OrderResult] = []
+        for order in sells + buys:
+            results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
+        return results
+
+    # Phase 1: 예수금으로 매수 가능한 만큼 실행
+    try:
+        orderable_cash = await get_orderable_cash(app_key, app_secret, access_token, account_no, is_mock=is_mock)
+    except Exception as exc:
+        logger.warning("two_phase_orderable_cash_failed_p1", error=str(exc))
+        orderable_cash = 0.0
+
+    logger.info("two_phase_phase1_start", orderable_cash=orderable_cash, buy_count=len(buys))
+
+    phase1_results, remaining_buys, _ = await _execute_buys_within_budget(
+        buys, orderable_cash, app_key, app_secret, access_token, account_no, is_mock
+    )
+
+    # Phase 2: 매도 전체 실행
+    logger.info("two_phase_phase2_sells", sell_count=len(sells))
+    sell_results: list[OrderResult] = []
+    for order in sells:
+        sell_results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
+
+    # Phase 3: 매도 후 주문가능금액 재조회 → 나머지 BUY 실행
+    phase3_results: list[OrderResult] = []
+    if remaining_buys:
+        try:
+            new_orderable_cash = await get_orderable_cash(
+                app_key, app_secret, access_token, account_no, is_mock=is_mock
+            )
+        except Exception as exc:
+            logger.warning("two_phase_orderable_cash_failed_p3", error=str(exc))
+            new_orderable_cash = 0.0
+
+        logger.info(
+            "two_phase_phase3_start",
+            new_orderable_cash=new_orderable_cash,
+            remaining_buy_count=len(remaining_buys),
+        )
+        phase3_results, _, _ = await _execute_buys_within_budget(
+            remaining_buys, new_orderable_cash, app_key, app_secret, access_token, account_no, is_mock
+        )
+
+    return phase1_results + sell_results + phase3_results
+
+
+async def _execute_buys_within_budget(
+    buy_orders: list[ExecutionOrderItem],
+    budget: float,
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+) -> tuple[list[OrderResult], list[ExecutionOrderItem], float]:
+    """예산(budget) 범위 내에서 매수 주문을 실행한다.
+
+    지정가(limit_price)가 있는 경우 예산 초과분은 수량 조정하고 나머지를 remaining에 추가한다.
+    시장가 주문은 가격 추정이 불가하므로 전량 시도 후 remaining 없음.
+    Returns: (실행 결과 목록, 예산 부족으로 남은 주문 목록, 사용된 예산)
+    """
+    results: list[OrderResult] = []
+    remaining: list[ExecutionOrderItem] = []
+    remaining_budget = budget
+
+    for order in buy_orders:
+        price = order.limit_price
+        if price and price > 0:
+            if remaining_budget <= 0:
+                remaining.append(order)
+                continue
+            affordable_qty = int(remaining_budget // price)
+            if affordable_qty <= 0:
+                remaining.append(order)
+                continue
+            execute_qty = min(order.quantity, affordable_qty)
+            leftover_qty = order.quantity - execute_qty
+        else:
+            # 시장가: 가격 모름, 전량 시도
+            execute_qty = order.quantity
+            leftover_qty = 0
+
+        if execute_qty <= 0:
+            remaining.append(order)
+            continue
+
+        if leftover_qty > 0:
+            remaining.append(
+                ExecutionOrderItem(
+                    ticker=order.ticker,
+                    name=order.name,
+                    market=order.market,
+                    side=order.side,
+                    quantity=leftover_qty,
+                    account_id=order.account_id,
+                    order_type=order.order_type,
+                    limit_price=order.limit_price,
+                )
+            )
+
+        exec_order = ExecutionOrderItem(
+            ticker=order.ticker,
+            name=order.name,
+            market=order.market,
+            side=order.side,
+            quantity=execute_qty,
+            account_id=order.account_id,
+            order_type=order.order_type,
+            limit_price=order.limit_price,
+        )
+        result = await _execute_single_order(exec_order, app_key, app_secret, access_token, account_no, is_mock)
+        results.append(result)
+
+        if result.status == "SUCCESS" and price and price > 0:
+            remaining_budget -= execute_qty * price
+
+    return results, remaining, budget - remaining_budget

@@ -99,23 +99,23 @@ class TestGetCurrentUser:
 class TestGetOwnedResource:
     @pytest.mark.asyncio
     async def test_returns_resource_when_found(self, mock_db):
-        from app.api.deps import get_owned_resource
+        from app.api.deps import get_owned_or_404
         from app.models.asset import Transaction
 
         tx = SimpleNamespace(id=uuid.uuid4(), user_id=uuid.uuid4())
         mock_db.scalar = AsyncMock(return_value=tx)
 
-        result = await get_owned_resource(Transaction, tx.id, tx.user_id, mock_db)
+        result = await get_owned_or_404(mock_db, Transaction, tx.id, tx.user_id)
         assert result is tx
 
     @pytest.mark.asyncio
     async def test_raises_404_when_not_found(self, mock_db):
-        from app.api.deps import get_owned_resource
+        from app.api.deps import get_owned_or_404
         from app.models.asset import Transaction
 
         mock_db.scalar = AsyncMock(return_value=None)
 
         with pytest.raises(HTTPException) as exc_info:
-            await get_owned_resource(Transaction, uuid.uuid4(), uuid.uuid4(), mock_db)
+            await get_owned_or_404(mock_db, Transaction, uuid.uuid4(), uuid.uuid4())
 
         assert exc_info.value.status_code == 404

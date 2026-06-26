@@ -35,20 +35,6 @@ def _make_mock_db():
     return db
 
 
-@pytest.fixture(autouse=True)
-def mock_redis_scheduler(monkeypatch):
-    import app.redis_client as rc
-    import app.scheduler as sched
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None)
-    monkeypatch.setattr(rc, "redis_client", mock_redis)
-    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
-    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
-    yield
-    rc.redis_client = None
 
 
 def _setup_app(user, db):

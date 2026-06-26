@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from redis.exceptions import RedisError
 
 
 def _make_user():
@@ -54,20 +55,6 @@ def _make_portfolio(user_id=None, portfolio_id=None):
     )
 
 
-@pytest.fixture(autouse=True)
-def mock_redis_scheduler(monkeypatch):
-    import app.redis_client as rc
-    import app.scheduler as sched
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None)
-    monkeypatch.setattr(rc, "redis_client", mock_redis)
-    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
-    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
-    yield
-    rc.redis_client = None
 
 
 def _setup_app(user, db):
@@ -517,7 +504,7 @@ class TestListPortfoliosExtended:
                     "app.api.v1.portfolios.get_redis",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
-                        get=AsyncMock(side_effect=Exception("redis error")),
+                        get=AsyncMock(side_effect=RedisError("redis error")),
                         setex=AsyncMock(),
                     ),
                 ),
@@ -540,7 +527,7 @@ class TestListPortfoliosExtended:
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         get=AsyncMock(return_value=None),
-                        setex=AsyncMock(side_effect=Exception("redis write error")),
+                        setex=AsyncMock(side_effect=RedisError("redis write error")),
                     ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,

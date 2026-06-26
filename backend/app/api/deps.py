@@ -61,13 +61,17 @@ class PaginationParams(BaseModel):
 PaginationDep = Annotated[PaginationParams, Depends(PaginationParams)]
 
 
-async def get_owned_resource(  # noqa: E501
-    model: type[T], resource_id: Any, user_id: uuid.UUID, db: AsyncSession
+async def get_owned_or_404(
+    db: AsyncSession,
+    model: type[T],
+    resource_id: Any,
+    user_id: uuid.UUID,
+    detail: str = "찾을 수 없습니다",
 ) -> T:
     """user_id 소유 리소스를 조회하고 없으면 404를 raise한다."""
     row: T | None = await db.scalar(
         select(model).where(model.id == resource_id, model.user_id == user_id)  # type: ignore[attr-defined, arg-type]
     )
     if row is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="리소스를 찾을 수 없습니다")  # noqa: E501
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=detail)
     return row

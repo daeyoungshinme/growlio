@@ -11,7 +11,7 @@ import pytest
 _FETCH_RATE = "app.services.exchange_rate_alert_service.fetch_usd_krw"
 _SEND_EMAIL = "app.services.email_service.send_exchange_rate_alert"
 _SEND_PUSH = "app.services.push_service.send_push_to_user"
-_SAVE_HIST = "app.services.alert_repository.save_alert_history"
+_SAVE_HIST = "app.services.alert_service.save_alert_history"
 
 
 def _make_alert(

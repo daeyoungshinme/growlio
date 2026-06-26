@@ -10,8 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.database import get_db
+from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
@@ -32,8 +31,9 @@ class GoalUpdate(BaseModel):
     retirement_target_year: int | None = None
     goal_start_date: date | None = None
     goal_initial_amount: float | None = None
+    annual_dividend_goal: float | None = None
 
-    @field_validator("goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount")
+    @field_validator("goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount", "annual_dividend_goal")
     @classmethod
     def validate_positive(cls, v: float | None) -> float | None:
         if v is not None and v < 0:
@@ -105,6 +105,7 @@ class SettingsResponse(BaseModel):
     auto_dca_portfolio_id: str | None = None
     auto_dca_account_id: str | None = None
     auto_dca_last_executed_at: str | None = None
+    annual_dividend_goal: float | None = None
     fcm_token_stored: bool = False
 
 
@@ -159,6 +160,7 @@ async def get_settings(
         auto_dca_portfolio_id=str(row.auto_dca_portfolio_id) if row.auto_dca_portfolio_id else None,
         auto_dca_account_id=str(row.auto_dca_account_id) if row.auto_dca_account_id else None,
         auto_dca_last_executed_at=row.auto_dca_last_executed_at.isoformat() if row.auto_dca_last_executed_at else None,
+        annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal else None,
         fcm_token_stored=bool(row.fcm_token),
     )
 
@@ -218,6 +220,8 @@ async def update_goal(
         row.goal_start_date = datetime.combine(req.goal_start_date, datetime.min.time()).replace(tzinfo=UTC)
     if req.goal_initial_amount is not None:
         row.goal_initial_amount = req.goal_initial_amount
+    if req.annual_dividend_goal is not None:
+        row.annual_dividend_goal = req.annual_dividend_goal
     await db.commit()
     return {"detail": "목표가 저장되었습니다"}
 

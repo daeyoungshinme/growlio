@@ -31,19 +31,6 @@ def _make_mock_db():
     return db
 
 
-@pytest.fixture(autouse=True)
-def mock_redis_scheduler(monkeypatch):
-    import app.redis_client as rc
-    import app.scheduler as sched
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    monkeypatch.setattr(rc, "redis_client", mock_redis)
-    monkeypatch.setattr(sched.scheduler, "start", lambda: None)
-    monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
-    yield
-    rc.redis_client = None
 
 
 def _setup_app(user, db):
@@ -122,3 +109,35 @@ class TestDcaAnalysis:
             resp = client.get("/api/v1/invest/dca-analysis")
         data = resp.json()
         assert "projection_months" in data
+
+
+_MOCK_DIVIDEND_PLAN = {
+    "annual_dividend_goal": None,
+    "estimated_annual_krw": 1_200_000,
+    "estimated_monthly_krw": 100_000,
+    "actual_annual_received_krw": 500_000,
+    "goal_achievement_pct": None,
+    "monthly_projected": [{"month": m, "amount_krw": 0} for m in range(1, 13)],
+    "monthly_received": [],
+    "yearly_received": [],
+}
+
+
+class TestDividendPlan:
+    def test_returns_200_with_mocked_service(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.invest.dividend_plan_service.get_dividend_plan",
+                AsyncMock(return_value=_MOCK_DIVIDEND_PLAN),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/invest/dividend-plan")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "estimated_annual_krw" in data
+        assert "monthly_projected" in data
+        assert len(data["monthly_projected"]) == 12

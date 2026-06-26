@@ -7,10 +7,9 @@ from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
-from app.database import get_db
 from app.limiter import limiter
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.user import User
@@ -41,11 +40,17 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import (
     TTL_ACCOUNT_DETAIL,
     account_detail_key,
+    get_cached_json,
     invalidate_asset_account_caches,
+    invalidate_user_caches,
+    set_cached_json,
 )
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount
 from app.utils.redis_lock import redis_lock
+
+
+_CREDENTIAL_FIELDS: frozenset[str] = frozenset({"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"})
 
 
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
@@ -122,15 +127,13 @@ async def create_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
-
     if req.data_source == "KIS_API":
         if not req.kis_app_key or not req.kis_app_secret:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="KIS API 자격증명(App Key, App Secret)을 모두 입력하세요.",
             )
-        req_data = req.model_dump(exclude=_exclude_creds)
+        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
         req_data["kis_app_key"] = encrypt(req.kis_app_key)
         req_data["kis_app_secret"] = encrypt(req.kis_app_secret)
         account = AssetAccount(user_id=current_user.id, **req_data)
@@ -140,13 +143,13 @@ async def create_account(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="키움 계좌번호와 API 자격증명(App Key, App Secret)을 모두 입력하세요.",
             )
-        req_data = req.model_dump(exclude=_exclude_creds)
+        req_data = req.model_dump(exclude=_CREDENTIAL_FIELDS)
         req_data["kiwoom_app_key"] = encrypt(req.kiwoom_app_key)
         req_data["kiwoom_app_secret"] = encrypt(req.kiwoom_app_secret)
         req_data["asset_type"] = "STOCK_KIWOOM"
         account = AssetAccount(user_id=current_user.id, **req_data)
     else:
-        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=_exclude_creds))
+        account = AssetAccount(user_id=current_user.id, **req.model_dump(exclude=_CREDENTIAL_FIELDS))
     db.add(account)
     await db.commit()
     await db.refresh(account)
@@ -197,22 +200,15 @@ async def get_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    import contextlib
-    import json
-
-    from redis.exceptions import RedisError
-
     redis = await get_redis()
     cache_key = account_detail_key(current_user.id, account_id)
-    with contextlib.suppress(RedisError):
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     account = await _get_owned_account(account_id, current_user.id, db)
     response = _account_response(account)
-    with contextlib.suppress(RedisError):
-        await redis.setex(cache_key, TTL_ACCOUNT_DETAIL, response.model_dump_json())
+    await set_cached_json(redis, cache_key, response.model_dump(mode="json"), TTL_ACCOUNT_DETAIL)
     return response
 
 
@@ -225,8 +221,7 @@ async def update_account(
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
 
-    _exclude_creds = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
-    update_fields = req.model_dump(exclude_none=True, exclude=_exclude_creds)
+    update_fields = req.model_dump(exclude_none=True, exclude=_CREDENTIAL_FIELDS)
     for field, value in update_fields.items():
         setattr(account, field, value)
 
@@ -358,10 +353,6 @@ async def _delete_account_credentials(
     token_model,
     redis_key: str,
 ) -> None:
-    import contextlib
-
-    from redis.exceptions import RedisError
-
     account = await _get_owned_account(account_id, user_id, db)
     setattr(account, app_key_attr, None)
     setattr(account, app_secret_attr, None)
@@ -370,8 +361,7 @@ async def _delete_account_credentials(
 
     redis = await get_redis()
     await redis.delete(redis_key)
-    with contextlib.suppress(RedisError):
-        await redis.delete(account_detail_key(user_id, account_id))
+    await invalidate_user_caches(redis, account_detail_key(user_id, account_id))
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)

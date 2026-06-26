@@ -42,13 +42,19 @@ export function invalidatePortfolioData(qc: QueryClient) {
   ]);
 }
 
-/** DCA 목표 변경 후 — dca-analysis + settings + dashboard */
+/** DCA 목표 변경 후 — dca-analysis + settings + dashboard + dividend-plan */
 export function invalidateDcaData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dcaAnalysis }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan }),
   ]);
+}
+
+/** 배당 계획 목표 변경 후 */
+export function invalidateDividendPlanData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPlan });
 }
 
 /** 환율 알림 CUD 후 */

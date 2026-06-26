@@ -18,6 +18,7 @@ export interface SettingsData {
   auto_dca_portfolio_id: string | null;
   auto_dca_account_id: string | null;
   auto_dca_last_executed_at: string | null;
+  annual_dividend_goal: number | null;
   fcm_token_stored: boolean;
 }
 

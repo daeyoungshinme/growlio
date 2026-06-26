@@ -1,4 +1,4 @@
-"""services/alert_repository.py 단위 테스트."""
+"""services/alert_service.py의 save_alert_history 단위 테스트."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from app.services.alert_repository import save_alert_history
+from app.services.alert_service import save_alert_history
 
 
 class TestSaveAlertHistory:

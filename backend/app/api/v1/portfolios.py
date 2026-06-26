@@ -1,16 +1,13 @@
 """통합 포트폴리오 CRUD API (백테스팅·리밸런싱 공용)."""
 
-import json
 import uuid
 
-import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import case, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user
-from app.database import get_db
+from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
@@ -22,9 +19,7 @@ from app.schemas.portfolio import (
     PortfolioResponse,
     PortfolioUpdate,
 )
-from app.utils.cache_keys import TTL_PORTFOLIO_LIST, invalidate_user_caches, portfolio_list_key
-
-logger = structlog.get_logger()
+from app.utils.cache_keys import TTL_PORTFOLIO_LIST, get_cached_json, invalidate_user_caches, portfolio_list_key, set_cached_json
 
 router = APIRouter(prefix="/portfolios", tags=["portfolios"])
 
@@ -69,12 +64,9 @@ async def list_portfolios(
     """저장된 포트폴리오 목록."""
     redis = await get_redis()
     cache_key = portfolio_list_key(current_user.id)
-    try:
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
-    except Exception as e:
-        logger.warning("portfolio_cache_read_failed", key=cache_key, error=str(e))
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     rows = await db.execute(
         _with_relations(
@@ -86,11 +78,7 @@ async def list_portfolios(
     portfolios = rows.scalars().all()
     result = [PortfolioResponse.model_validate(p).model_dump(mode="json") for p in portfolios]
 
-    try:
-        await redis.setex(cache_key, TTL_PORTFOLIO_LIST, json.dumps(result))
-    except Exception as e:
-        logger.warning("portfolio_cache_write_failed", key=cache_key, error=str(e))
-
+    await set_cached_json(redis, cache_key, result, TTL_PORTFOLIO_LIST)
     return result
 
 

@@ -15,7 +15,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.alert_calculator import already_fired_today
-from app.services.alert_repository import save_alert_history
+from app.services.alert_service import save_alert_history
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
 from app.utils.metrics import alert_trigger_count

@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.alert import StockPriceAlert
 from app.models.user import User, UserSettings
 from app.services.alert_calculator import should_trigger_stock_price
-from app.services.alert_repository import apply_alert_trigger
+from app.services.alert_service import apply_alert_trigger
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()

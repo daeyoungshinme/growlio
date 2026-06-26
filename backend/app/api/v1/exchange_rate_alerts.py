@@ -11,9 +11,8 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_or_404
-from app.database import get_db
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User

@@ -241,6 +241,7 @@ describe("useGoalSettings", () => {
       goal_initial_amount: "",
       annual_deposit_goal: "",
       retirement_target_year: "",
+      annual_dividend_goal: "",
     });
   });
 

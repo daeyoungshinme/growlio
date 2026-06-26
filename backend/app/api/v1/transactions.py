@@ -8,8 +8,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import PaginationDep, get_current_user, get_owned_resource
-from app.database import get_db
+from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
@@ -137,4 +136,4 @@ async def _invalidate_tx_caches(user_id: UUID) -> None:
 
 
 async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:
-    return await get_owned_resource(Transaction, tx_id, user_id, db)
+    return await get_owned_or_404(db, Transaction, tx_id, user_id)

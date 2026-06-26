@@ -9,27 +9,48 @@ from __future__ import annotations
 import contextlib
 import uuid
 from datetime import UTC, datetime
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.alert import RebalancingAlert
+from app.models.alert import AlertHistory, RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alert_calculator import (
     already_fired_today,
     should_fire_today,
 )
-from app.services.alert_repository import save_alert_history
-from app.services.exchange_rate_alert_service import check_and_trigger_alerts
-from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
 
-# backward-compatible re-exports
+
+async def save_alert_history(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    alert_type: str,
+    message: str,
+) -> None:
+    db.add(AlertHistory(user_id=user_id, alert_type=alert_type, message=message))
+
+
+async def apply_alert_trigger(
+    db: AsyncSession,
+    alert: Any,
+    alert_type: str,
+    history_message: str,
+) -> None:
+    """알림 발동 후 상태 갱신(trigger_count, triggered_at, is_active) 및 이력 저장."""
+    alert.trigger_count += 1
+    alert.triggered_at = datetime.now(tz=UTC)
+    if alert.trigger_count >= alert.max_trigger_count:
+        alert.is_active = False
+    await save_alert_history(db, alert.user_id, alert_type, history_message)
+
+
+# backward-compatible re-exports (lazy to avoid circular import)
 __all__ = [
     "check_and_trigger_alerts",
     "check_and_trigger_stock_price_alerts",
@@ -37,6 +58,16 @@ __all__ = [
     "execute_auto_rebalancing_for_alert",
     "list_alert_history",
 ]
+
+
+def __getattr__(name: str):
+    if name == "check_and_trigger_alerts":
+        from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+        return check_and_trigger_alerts
+    if name == "check_and_trigger_stock_price_alerts":
+        from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+        return check_and_trigger_stock_price_alerts
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _select_items_to_show(

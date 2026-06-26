@@ -2,29 +2,21 @@
 
 from __future__ import annotations
 
-import contextlib
-import json
-
-import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.database import get_db
+from app.api.deps import get_current_user, get_db
+from app.constants import DOMESTIC_MARKETS
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Position
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 from app.services.dart_service import fetch_disclosures_for_tickers
-from app.utils.cache_keys import TTL_DART, dart_disclosures_key
+from app.utils.cache_keys import TTL_DART, dart_disclosures_key, get_cached_json, set_cached_json
 
 router = APIRouter(prefix="/dart", tags=["dart"])
-logger = structlog.get_logger()
-
-_DOMESTIC_MARKETS = frozenset({"KOSPI", "KOSDAQ"})
 
 
 @router.get("/disclosures")
@@ -52,12 +44,9 @@ async def get_disclosures(
 
     redis = await get_redis()
     cache_key = dart_disclosures_key(current_user.id, days)
-    try:
-        cached = await redis.get(cache_key)
-        if cached:
-            return json.loads(cached)
-    except (RedisError, json.JSONDecodeError) as e:
-        logger.warning("dart_cache_read_failed", error=str(e))
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
 
     result = await db.execute(
         select(Position.ticker)
@@ -66,7 +55,7 @@ async def get_disclosures(
             AssetAccount.user_id == current_user.id,
             AssetAccount.is_active == True,  # noqa: E712
             Position.snapshot_id == None,  # noqa: E711
-            Position.market.in_(_DOMESTIC_MARKETS),
+            Position.market.in_(DOMESTIC_MARKETS),
         )
         .distinct()
     )
@@ -76,8 +65,5 @@ async def get_disclosures(
         return []
 
     items = await fetch_disclosures_for_tickers(tickers, api_key, days=days)
-
-    with contextlib.suppress(RedisError):
-        await redis.set(cache_key, json.dumps(items, ensure_ascii=False), ex=TTL_DART)
-
+    await set_cached_json(redis, cache_key, items, TTL_DART)
     return items

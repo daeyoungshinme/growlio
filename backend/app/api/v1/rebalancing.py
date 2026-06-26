@@ -11,9 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_db
 from app.constants import DOMESTIC_MARKETS
-from app.database import get_db
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_orderable_cash
 from app.kis.client import KisApiError

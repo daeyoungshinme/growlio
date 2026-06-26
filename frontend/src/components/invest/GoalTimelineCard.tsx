@@ -24,10 +24,10 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
         <span className="flex flex-col gap-0.5">
           <span className="text-red-500 flex items-center gap-1">
             <TrendingUp size={14} />
-            {lead_lag_months}개월 앞서고 있음
+            {lead_lag_months}개월 앞서
           </span>
           {actual_expected_goal_date && (
-            <span className="text-xs text-red-400">
+            <span className="text-xs text-red-400 hidden sm:block">
               {fmtMonth(actual_expected_goal_date)} 달성 예상
             </span>
           )}
@@ -38,16 +38,16 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
         <span className="flex flex-col gap-0.5">
           <span className="text-blue-500 flex items-center gap-1">
             <TrendingDown size={14} />
-            {Math.abs(lead_lag_months)}개월 뒤처지고 있음
+            {Math.abs(lead_lag_months)}개월 지연
           </span>
           {actual_expected_goal_date && (
-            <span className="text-xs text-blue-400">
+            <span className="text-xs text-blue-400 hidden sm:block">
               {fmtMonth(actual_expected_goal_date)} 달성 예상
             </span>
           )}
         </span>
       );
-    return <span className="text-gray-500 dark:text-gray-400">계획과 정확히 일치</span>;
+    return <span className="text-gray-500 dark:text-gray-400">계획 일치</span>;
   };
 
   return (
@@ -106,7 +106,13 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
           </div>
           <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-blue-500 rounded-full transition-all"
+              className={`h-full rounded-full transition-all ${
+                on_track === true
+                  ? "bg-red-500"
+                  : on_track === false
+                    ? "bg-blue-500"
+                    : "bg-gray-400 dark:bg-gray-600"
+              }`}
               style={{ width: `${Math.min(current_progress_pct, 100)}%` }}
             />
           </div>

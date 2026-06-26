@@ -11,8 +11,8 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user
-from app.database import get_db
+from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.api.v1._account_deps import get_owned_account
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import RebalancingExecution
@@ -48,14 +48,9 @@ async def execute_portfolio_rebalancing(
     redis=Depends(get_redis),
 ):
     """선택된 주문 항목을 KIS API를 통해 실제로 매수/매도 실행한다."""
-    portfolio = await db.scalar(
-        select(Portfolio).where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+    portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
+    if body.account_id:
+        await get_owned_account(body.account_id, current_user.id, db)
 
     return await execute_rebalancing(
         user_id=current_user.id,
@@ -79,14 +74,7 @@ async def quick_execute_rebalancing(
     redis=Depends(get_redis),
 ):
     """포트폴리오 리밸런싱 알림 설정에 기반해 분석 후 즉시 실행한다 (원클릭 실행)."""
-    portfolio = await db.scalar(
-        select(Portfolio).where(
-            Portfolio.id == portfolio_id,
-            Portfolio.user_id == current_user.id,
-        )
-    )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+    portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
 
     alert_row = await db.scalar(
         select(RebalancingAlert).where(

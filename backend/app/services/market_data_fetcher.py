@@ -1,7 +1,8 @@
-"""yfinance 데이터 조회 공통 유틸.
+"""거시 시장 지표 조회 유틸.
 
-factor_service, portfolio_optimizer, risk_service 세 곳에서 동일하게 사용되는
-yfinance batch download + MultiIndex 파싱 + NaN 필터링 패턴을 한 곳에서 관리한다.
+**이 모듈의 책임:** VIX·장단기 금리차·공포탐욕 지수 등 매크로 지표 및 팩터·리스크 분석용
+배치 수익률 데이터 수집 (factor_service, portfolio_optimizer, risk_service 공용).
+개별 종목 가격·수익률 조회는 yahoo_price.py가 담당한다.
 """
 
 from __future__ import annotations

@@ -371,7 +371,7 @@ async def test_save_alert_history_adds_to_session(mock_db):
     """_save_alert_history가 AlertHistory 객체를 session에 추가한다."""
     user_id = uuid.uuid4()
 
-    from app.services.alert_repository import save_alert_history
+    from app.services.alert_service import save_alert_history
 
     await save_alert_history(mock_db, user_id, "EXCHANGE_RATE", "환율 알림: 1290원")
 

@@ -6,8 +6,7 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
-from app.database import get_db
+from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis

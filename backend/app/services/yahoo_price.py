@@ -1,4 +1,7 @@
-"""Yahoo Finance 가격 조회 유틸리티.
+"""Yahoo Finance 종목 가격 조회 유틸리티.
+
+**이 모듈의 책임:** 개별 종목의 현재가·배치 가격·기간 수익률 조회 (종목 단위 I/O).
+거시 지표(VIX, 금리차 등)는 market_data_fetcher.py가 담당한다.
 
 티커 변환:
   KOSPI  005930  →  005930.KS
