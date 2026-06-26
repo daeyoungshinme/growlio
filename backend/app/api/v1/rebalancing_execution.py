@@ -48,7 +48,7 @@ async def execute_portfolio_rebalancing(
     redis=Depends(get_redis),
 ):
     """선택된 주문 항목을 KIS API를 통해 실제로 매수/매도 실행한다."""
-    portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
+    await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
     if body.account_id:
         await get_owned_account(body.account_id, current_user.id, db)
 

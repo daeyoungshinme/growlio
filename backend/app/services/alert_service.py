@@ -51,7 +51,7 @@ async def apply_alert_trigger(
 
 
 # backward-compatible re-exports (lazy to avoid circular import)
-__all__ = [
+__all__ = [  # noqa: F822
     "check_and_trigger_alerts",
     "check_and_trigger_stock_price_alerts",
     "check_rebalancing_alerts",
