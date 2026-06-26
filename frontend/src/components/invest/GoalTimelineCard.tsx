@@ -24,7 +24,7 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
         <span className="flex flex-col gap-0.5">
           <span className="text-red-500 flex items-center gap-1">
             <TrendingUp size={14} />
-            {lead_lag_months}개월 앞서
+            {lead_lag_months}개월 앞서고 있음
           </span>
           {actual_expected_goal_date && (
             <span className="text-xs text-red-400 hidden sm:block">
@@ -38,7 +38,7 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
         <span className="flex flex-col gap-0.5">
           <span className="text-blue-500 flex items-center gap-1">
             <TrendingDown size={14} />
-            {Math.abs(lead_lag_months)}개월 지연
+            {Math.abs(lead_lag_months)}개월 뒤처지고 있음
           </span>
           {actual_expected_goal_date && (
             <span className="text-xs text-blue-400 hidden sm:block">
@@ -47,7 +47,7 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
           )}
         </span>
       );
-    return <span className="text-gray-500 dark:text-gray-400">계획 일치</span>;
+    return <span className="text-gray-500 dark:text-gray-400">계획과 정확히 일치</span>;
   };
 
   return (

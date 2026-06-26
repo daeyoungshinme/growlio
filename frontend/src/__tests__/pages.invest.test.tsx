@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -342,7 +342,8 @@ describe("InvestPlanPage", () => {
       expect(screen.getByTestId("confirm-modal")).toBeInTheDocument();
     });
     // Confirm closing
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    const confirmModal = screen.getByTestId("confirm-modal");
+    fireEvent.click(within(confirmModal).getByRole("button", { name: "닫기" }));
     await waitFor(() => {
       expect(screen.queryByText("투자 목표 설정")).not.toBeInTheDocument();
     });

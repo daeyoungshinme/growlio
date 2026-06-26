@@ -150,9 +150,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     )
     estimated_annual = div_summary.get("estimated_annual")
     dividend_goal_achievement_pct = (
-        round(estimated_annual / annual_dividend_goal * 100, 1)
-        if annual_dividend_goal and estimated_annual
-        else None
+        round(estimated_annual / annual_dividend_goal * 100, 1) if annual_dividend_goal and estimated_annual else None
     )
 
     result: dict[str, Any] = {

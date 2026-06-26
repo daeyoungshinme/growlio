@@ -149,8 +149,8 @@ describe("DashboardPage", () => {
       marketSignal: undefined,
     });
     renderDashboard();
-    expect(screen.getByText("등록된 자산이 없습니다")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "자산관리로 이동" })).toBeInTheDocument();
+    expect(screen.getByText("Growlio 시작하기")).toBeInTheDocument();
+    expect(screen.getByText("1단계: 계좌 등록")).toBeInTheDocument();
   });
 
   it("accounts가 로딩 중이면 '자산 없음' 화면을 표시하지 않는다", () => {
@@ -168,7 +168,7 @@ describe("DashboardPage", () => {
     });
     renderDashboard();
     // accountsLoading=true means we skip the empty-accounts branch
-    expect(screen.queryByText("등록된 자산이 없습니다")).not.toBeInTheDocument();
+    expect(screen.queryByText("Growlio 시작하기")).not.toBeInTheDocument();
     // main content rendered instead
     expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
   });
