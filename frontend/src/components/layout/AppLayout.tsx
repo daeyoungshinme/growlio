@@ -120,7 +120,7 @@ export default function AppLayout() {
             )}
             <main
               ref={mainRef}
-              className="flex-1 overflow-auto overscroll-y-contain px-3 py-4 pb-[calc(3.75rem+env(safe-area-inset-bottom))] lg:p-6 lg:pb-6"
+              className="flex-1 overflow-auto overscroll-y-contain px-3 py-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:p-6 lg:pb-6"
               style={
                 isPulling
                   ? { transform: `translateY(${pullDistance}px)`, transition: "none" }

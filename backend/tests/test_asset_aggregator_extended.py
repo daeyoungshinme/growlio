@@ -61,6 +61,39 @@ class TestCalcReturns:
         assert cum is not None
         assert cum < 0
 
+    def test_inactive_account_txn_in_net_flows_distorts_return(self, override_settings):
+        """비활성 계좌 거래가 net_flows에 포함되면 수익률이 왜곡됨을 보여주는 회귀 시나리오.
+
+        base=1000만원(활성 A), 현재=1200만원, 실제 추가 입금 없음 → 올바른 수익률 20%.
+        버그: 비활성 B의 입금 300만원이 net_flows에 포함되면 gain이 줄어 수익률이 음수로 왜곡됨.
+        """
+        from app.services.returns_calculator import calc_returns as _calc_returns
+
+        one_year_ago = date.today().replace(year=date.today().year - 1)
+
+        _, cum_correct = _calc_returns(12_000_000, 10_000_000, one_year_ago, net_flows=0)
+        assert cum_correct == pytest.approx(20.0, abs=0.01)
+
+        _, cum_wrong = _calc_returns(12_000_000, 10_000_000, one_year_ago, net_flows=3_000_000)
+        assert cum_wrong < 0
+
+    def test_later_added_account_initial_deposit_double_counting(self, override_settings):
+        """나중 추가된 계좌의 초기 입금이 first_snap_total과 net_flows 양쪽에 반영되면 수익률 왜곡.
+
+        시나리오: A(1000만) + B(600만 초기포함) = base 1600만, 현재 1800만.
+        A 이후 추가 입금 200만원만 net_flows여야 수익률 0%(실비용만 회수).
+        버그: B 초기 입금 500만원도 net_flows에 포함되면 gain이 이중으로 빠져 수익률이 음수로 왜곡됨.
+        """
+        from app.services.returns_calculator import calc_returns as _calc_returns
+
+        one_year_ago = date.today().replace(year=date.today().year - 1)
+
+        _, cum_correct = _calc_returns(18_000_000, 16_000_000, one_year_ago, net_flows=2_000_000)
+        assert cum_correct == pytest.approx(0.0, abs=0.01)
+
+        _, cum_wrong = _calc_returns(18_000_000, 16_000_000, one_year_ago, net_flows=7_000_000)
+        assert cum_wrong < -10
+
 
 # ── _get_latest_snapshot_rows (DB mock) ──────────────────────
 

@@ -91,12 +91,13 @@ async def _get_scalar_init_data(
                   ),
                   net_after AS (
                     SELECT COALESCE(
-                      SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
+                      SUM(CASE WHEN t.transaction_type = 'DEPOSIT' THEN t.amount ELSE -t.amount END), 0
                     ) AS net_flows_after
-                    FROM transactions
-                    WHERE user_id = :uid
-                      AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
-                      AND transaction_date > (SELECT first_date FROM fs)
+                    FROM transactions t
+                    JOIN paf ON paf.account_id = t.account_id
+                    WHERE t.user_id = :uid
+                      AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
+                      AND t.transaction_date > paf.first_date
                   )
                 SELECT fs.first_date, nd.net, ni.net_investment, ni.first_tx_date,
                        fs.first_total, net_after.net_flows_after
