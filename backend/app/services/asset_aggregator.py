@@ -43,7 +43,8 @@ logger = structlog.get_logger()
 async def _get_scalar_init_data(
     user_id: uuid.UUID, db: AsyncSession
 ) -> tuple[date | None, float, float, date | None, float, float]:
-    """first_snap_date + net_deposits_ytd + net_investment + first_tx_date + first_snap_total + net_flows_after를 CTE 단일 쿼리로 조회.
+    """first_snap_date + net_deposits_ytd + net_investment +
+    first_tx_date + first_snap_total + net_flows_after를 CTE 단일 쿼리로 조회.
 
     first_snap_total: 각 계좌의 첫 스냅샷 금액 합산 (계좌별 기준일 사용 — 나중에 추가한 계좌도 포함)
     net_flows_after: 첫 스냅샷 이후 순입금(입금-출금) — Modified Dietz 수익률 계산에 사용
