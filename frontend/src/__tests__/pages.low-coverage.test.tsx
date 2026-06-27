@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -414,6 +414,7 @@ describe("SettingsPage", () => {
 
   it("알림 발송 이력 섹션이 표시된다", () => {
     renderPage(<SettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
     expect(screen.getByText("알림 발송 이력")).toBeInTheDocument();
   });
 

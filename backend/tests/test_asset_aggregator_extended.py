@@ -185,9 +185,14 @@ class TestGetScalarInitData:
         result.first.return_value = None
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total, net_flows_after = await _get_scalar_init_data(
-            uuid.uuid4(), mock_db
-        )
+        (
+            first_snap,
+            net_deposits,
+            net_investment,
+            first_tx_date,
+            first_snap_total,
+            net_flows_after,
+        ) = await _get_scalar_init_data(uuid.uuid4(), mock_db)
 
         assert first_snap is None
         assert net_deposits == 0.0
@@ -212,9 +217,14 @@ class TestGetScalarInitData:
         result.first.return_value = row
         mock_db.execute = AsyncMock(return_value=result)
 
-        first_snap, net_deposits, net_investment, first_tx_date, first_snap_total, net_flows_after = await _get_scalar_init_data(
-            uuid.uuid4(), mock_db
-        )
+        (
+            first_snap,
+            net_deposits,
+            net_investment,
+            first_tx_date,
+            first_snap_total,
+            net_flows_after,
+        ) = await _get_scalar_init_data(uuid.uuid4(), mock_db)
 
         assert first_snap == date(2023, 1, 1)
         assert net_deposits == 5_000_000.0
