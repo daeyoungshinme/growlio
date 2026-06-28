@@ -112,10 +112,8 @@ async def _process_rebalancing_alert(
 ) -> bool:
     """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일/FCM 발송).
 
-    성공 시 True, continue 필요(건너뜀) 시 False 반환.
+    이메일·FCM 중 하나라도 성공하면 True 반환. 둘 다 실패하면 False 반환.
     """
-    import asyncio
-
     from app.services.email_service import send_rebalancing_alert
     from app.services.push_service import send_push_to_user
 
@@ -139,7 +137,6 @@ async def _process_rebalancing_alert(
     # AUTO 모드 실행은 rebalancing_auto_execution 인트라데이 잡이 전담한다.
     # 08:30 daily job(check_rebalancing_alerts)에서는 이메일/FCM 리포트만 발송한다.
 
-    # NOTIFY: 이메일 + FCM 병렬 전송
     drift_count = len(drifting)
     push_title = f"리밸런싱 알림 — {portfolio.name}"
     push_body = (
@@ -148,8 +145,10 @@ async def _process_rebalancing_alert(
         else f"{portfolio.name} 정기 리밸런싱 리포트"
     )
 
-    email_task = asyncio.create_task(
-        send_rebalancing_alert(
+    # 이메일 독립 처리
+    email_sent = False
+    try:
+        email_sent = await send_rebalancing_alert(
             to_email=email,
             portfolio_name=portfolio.name,
             threshold_pct=threshold,
@@ -158,29 +157,29 @@ async def _process_rebalancing_alert(
             is_scheduled_report=is_scheduled_report,
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
         )
-    )
-    push_task = asyncio.create_task(
-        send_push_to_user(
+    except Exception as exc:
+        logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
+
+    # FCM 독립 처리 — 이메일 실패와 무관하게 항상 시도
+    push_sent = False
+    with contextlib.suppress(Exception):
+        push_sent = await send_push_to_user(
             user_id=alert.user_id,
             title=push_title,
             body=push_body,
             fcm_token=fcm_token,
             data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
         )
-    )
 
-    try:
-        await email_task
-    except Exception as exc:
-        logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
-        push_task.cancel()
-        return False
-
-    # FCM 실패는 무시 (이메일이 성공하면 OK)
-    with contextlib.suppress(Exception):
-        await push_task
-
-    return True
+    any_sent = email_sent or push_sent
+    if not any_sent:
+        logger.warning(
+            "rebalancing_alert_no_channel_sent",
+            alert_id=str(alert.id),
+            email_sent=email_sent,
+            push_sent=push_sent,
+        )
+    return any_sent
 
 
 async def execute_auto_rebalancing_for_alert(
@@ -309,8 +308,15 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
         # BOTH: 매일 체크; DRIFT_ONLY/SCHEDULE_ONLY: 스케줄 날만 체크
         if not is_schedule_day and trigger_condition != "BOTH":
+            logger.debug(
+                "rebalancing_alert_not_schedule_day",
+                alert_id=str(alert.id),
+                schedule=alert.schedule_type,
+                trigger_condition=trigger_condition,
+            )
             continue
         if already_fired_today(alert):
+            logger.debug("rebalancing_alert_already_fired_today", alert_id=str(alert.id))
             continue
 
         saved_ids = getattr(portfolio, "account_ids", None)
@@ -333,6 +339,12 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
         selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items)
         if selected is None:
+            logger.debug(
+                "rebalancing_alert_no_items_selected",
+                alert_id=str(alert.id),
+                trigger_condition=trigger_condition,
+                drifting_count=len(drifting),
+            )
             continue
         items_to_show, is_scheduled_report = selected
 

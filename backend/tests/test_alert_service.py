@@ -783,3 +783,130 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
 
     if today_weekday != wrong_day:
         mock_email.assert_not_called()
+
+
+# ── _process_rebalancing_alert 채널 독립성 테스트 ─────────────
+
+
+def _make_process_alert_args(user_id, portfolio_id):
+    """_process_rebalancing_alert 호출에 필요한 공통 인수 생성."""
+    alert = SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        portfolio_id=portfolio_id,
+        schedule_type="DAILY",
+        threshold_pct=5.0,
+        mode="NOTIFY",
+        market_condition_mode="DISABLED",
+    )
+    portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio")
+    drifting = []
+    items_to_show = []
+    return alert, portfolio, drifting, items_to_show
+
+
+@pytest.mark.asyncio
+async def test_process_rebalancing_alert_smtp_not_configured_fcm_succeeds(mock_db):
+    """SMTP 미설정 시 이메일은 False 반환 → FCM은 독립 실행되어 성공하면 True 반환."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
+
+    from app.services.alert_service import _process_rebalancing_alert
+
+    with (
+        patch(
+            "app.services.email_service.send_rebalancing_alert",
+            new=AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.push_service.send_push_to_user",
+            new=AsyncMock(return_value=True),
+        ),
+    ):
+        result = await _process_rebalancing_alert(
+            alert=alert,
+            portfolio=portfolio,
+            drifting=drifting,
+            items_to_show=items,
+            is_scheduled_report=True,
+            threshold=5.0,
+            email="user@example.com",
+            composite_level="GREEN",
+            db=mock_db,
+            fcm_token="fcm-token-xyz",
+        )
+
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_process_rebalancing_alert_email_fails_fcm_still_runs(mock_db):
+    """이메일 전송 예외 발생 시에도 FCM은 독립적으로 실행된다."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
+
+    from app.services.alert_service import _process_rebalancing_alert
+
+    with (
+        patch(
+            "app.services.email_service.send_rebalancing_alert",
+            new=AsyncMock(side_effect=Exception("SMTP 연결 오류")),
+        ),
+        patch(
+            "app.services.push_service.send_push_to_user",
+            new=AsyncMock(return_value=True),
+        ) as mock_push,
+    ):
+        result = await _process_rebalancing_alert(
+            alert=alert,
+            portfolio=portfolio,
+            drifting=drifting,
+            items_to_show=items,
+            is_scheduled_report=True,
+            threshold=5.0,
+            email="user@example.com",
+            composite_level="GREEN",
+            db=mock_db,
+            fcm_token="fcm-token-xyz",
+        )
+
+    # FCM은 이메일 실패와 무관하게 실행돼야 함
+    mock_push.assert_called_once()
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_process_rebalancing_alert_both_channels_fail_returns_false(mock_db):
+    """이메일·FCM 둘 다 실패(False) 시 False 반환."""
+    user_id = uuid.uuid4()
+    portfolio_id = uuid.uuid4()
+    alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
+
+    from app.services.alert_service import _process_rebalancing_alert
+
+    with (
+        patch(
+            "app.services.email_service.send_rebalancing_alert",
+            new=AsyncMock(return_value=False),
+        ),
+        patch(
+            "app.services.push_service.send_push_to_user",
+            new=AsyncMock(return_value=False),
+        ),
+    ):
+        result = await _process_rebalancing_alert(
+            alert=alert,
+            portfolio=portfolio,
+            drifting=drifting,
+            items_to_show=items,
+            is_scheduled_report=True,
+            threshold=5.0,
+            email="user@example.com",
+            composite_level="GREEN",
+            db=mock_db,
+            fcm_token=None,
+        )
+
+    assert result is False

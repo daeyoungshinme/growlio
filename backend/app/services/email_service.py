@@ -89,11 +89,11 @@ async def send_rebalancing_alert(
     drifting_count: int,
     is_scheduled_report: bool = False,
     schedule_type: str = "DAILY",
-) -> None:
-    """리밸런싱 알림 이메일 발송."""
+) -> bool:
+    """리밸런싱 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = rebalancing_alert_template(
         portfolio_name, threshold_pct, items_to_show, drifting_count, is_scheduled_report, schedule_type
     )
@@ -107,6 +107,7 @@ async def send_rebalancing_alert(
             drifting=drifting_count,
             is_scheduled=is_scheduled_report,
         )
+        return True
     except Exception as e:
         logger.error("rebalancing_alert_email_failed", to=to_email, error=str(e))
         raise
