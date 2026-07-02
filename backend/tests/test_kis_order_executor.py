@@ -17,6 +17,51 @@ def _make_order(
     return ExecutionOrderItem(ticker=ticker, name="삼성전자", market=market, side=side, quantity=quantity)
 
 
+class TestExecuteSingleOrderPrice:
+    """OrderResult.price는 limit_price를 우선하고, 없으면 reference_price로 채워져야 한다."""
+
+    @pytest.mark.asyncio
+    async def test_limit_order_result_uses_limit_price(self):
+        order = ExecutionOrderItem(
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            side="BUY",
+            quantity=1,
+            order_type="LIMIT",
+            limit_price=71000.0,
+            reference_price=70000.0,
+        )
+        with patch.object(
+            _kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})
+        ):
+            result = await _kis_order_executor._execute_single_order(
+                order, "key", "secret", "token", "12345678-01", True
+            )
+        assert result.status == "SUCCESS"
+        assert result.price == 71000.0
+
+    @pytest.mark.asyncio
+    async def test_market_order_result_falls_back_to_reference_price(self):
+        order = ExecutionOrderItem(
+            ticker="005930",
+            name="삼성전자",
+            market="KOSPI",
+            side="BUY",
+            quantity=1,
+            order_type="MARKET",
+            reference_price=70000.0,
+        )
+        with patch.object(
+            _kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})
+        ):
+            result = await _kis_order_executor._execute_single_order(
+                order, "key", "secret", "token", "12345678-01", True
+            )
+        assert result.status == "SUCCESS"
+        assert result.price == 70000.0
+
+
 class TestExecuteTwoPhaseOrdersSellClamp:
     """TWO_PHASE Phase 2(매도)도 실행 계좌 실제 보유수량으로 clamp되어야 한다."""
 

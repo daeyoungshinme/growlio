@@ -20,6 +20,8 @@ async def _execute_single_order(
     account_no: str,
     is_mock: bool,
 ) -> OrderResult:
+    price = order.limit_price or order.reference_price
+
     if order.quantity <= 0:
         return OrderResult(
             ticker=order.ticker,
@@ -29,6 +31,7 @@ async def _execute_single_order(
             quantity=order.quantity,
             status="SKIPPED",
             error_msg="주문 수량이 0 이하입니다.",
+            price=price,
         )
 
     try:
@@ -78,6 +81,7 @@ async def _execute_single_order(
             status="SUCCESS",
             order_no=result.get("order_no"),
             order_type=order.order_type,
+            price=price,
         )
 
     except Exception as e:
@@ -97,6 +101,7 @@ async def _execute_single_order(
             status="FAILED",
             error_msg=str(e),
             order_type=order.order_type,
+            price=price,
         )
 
 
@@ -281,6 +286,7 @@ async def _execute_buys_within_budget(
                     account_id=order.account_id,
                     order_type=order.order_type,
                     limit_price=order.limit_price,
+                    reference_price=order.reference_price,
                 )
             )
 
@@ -293,6 +299,7 @@ async def _execute_buys_within_budget(
             account_id=order.account_id,
             order_type=order.order_type,
             limit_price=order.limit_price,
+            reference_price=order.reference_price,
         )
         result = await _execute_single_order(exec_order, app_key, app_secret, access_token, account_no, is_mock)
         results.append(result)

@@ -13,13 +13,24 @@ interface Props {
 }
 
 // 종목별 실제 거래 계획 패널 — 매도 먼저, 매수 나중 (모바일 카드 뷰 / 데스크탑 테이블 뷰)
-export default function RebalancingTradePlanPanel({ items, totalBuySummary, totalSellSummary }: Props) {
+export default function RebalancingTradePlanPanel({
+  items,
+  totalBuySummary,
+  totalSellSummary,
+}: Props) {
   const [showTradePlan, setShowTradePlan] = useState(false);
 
-  const buyItems = items.filter((i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw);
-  const sellItems = items.filter((i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw);
+  const buyItems = items.filter(
+    (i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw,
+  );
+  const sellItems = items.filter(
+    (i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw,
+  );
   const unpricedItems = items.filter(
-    (i) => i.diff_krw !== 0 && (i.shares_to_trade === null || !i.current_price_krw) && i.ticker !== CASH_TICKER,
+    (i) =>
+      i.diff_krw !== 0 &&
+      (i.shares_to_trade === null || !i.current_price_krw) &&
+      i.ticker !== CASH_TICKER,
   );
 
   const estFee = (totalBuySummary + totalSellSummary) * TRADING_FEE_RATE;
@@ -33,6 +44,8 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
         <button
           onClick={() => setShowTradePlan((v) => !v)}
           className="sm:hidden text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          aria-expanded={showTradePlan}
+          aria-label="종목별 거래 계획 상세"
         >
           {showTradePlan ? "▲ 접기" : "▼ 상세 보기"}
         </button>
@@ -48,12 +61,15 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
                 <div className="min-w-0 flex-1">
                   <div className="text-gray-200 font-medium truncate">{item.name}</div>
                   <div className="text-gray-500 mt-0.5">
-                    {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
+                    {Math.abs(Math.round(item.shares_to_trade!))}주 ×{" "}
+                    {fmtKrw(item.current_price_krw!)}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className={`font-medium ${LOSS_COLOR}`}>{fmtKrw(calcTradeKrw(item))}</div>
-                  <div className="text-gray-500 mt-0.5">수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}</div>
+                  <div className="text-gray-500 mt-0.5">
+                    수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -73,12 +89,15 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
                 <div className="min-w-0 flex-1">
                   <div className="text-gray-200 font-medium truncate">{item.name}</div>
                   <div className="text-gray-500 mt-0.5">
-                    {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)}
+                    {Math.abs(Math.round(item.shares_to_trade!))}주 ×{" "}
+                    {fmtKrw(item.current_price_krw!)}
                   </div>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className={`font-medium ${PROFIT_COLOR}`}>{fmtKrw(calcTradeKrw(item))}</div>
-                  <div className="text-gray-500 mt-0.5">수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}</div>
+                  <div className="text-gray-500 mt-0.5">
+                    수수료 {fmtKrw(calcTradeKrw(item) * TRADING_FEE_RATE)}
+                  </div>
                 </div>
               </div>
             ))}
@@ -114,8 +133,12 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
                 </tr>
                 {sellItems.map((item, idx) => (
                   <tr key={idx} className="border-b border-gray-700/30">
-                    <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">{item.name}</td>
-                    <td className="py-1.5 px-3 text-right text-gray-400">{fmtKrw(item.current_price_krw!)}</td>
+                    <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                      {item.name}
+                    </td>
+                    <td className="py-1.5 px-3 text-right text-gray-400">
+                      {fmtKrw(item.current_price_krw!)}
+                    </td>
                     <td className="py-1.5 px-3 text-right text-gray-200">
                       {Math.abs(Math.round(item.shares_to_trade!))}주
                     </td>
@@ -138,8 +161,12 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
                 </tr>
                 {buyItems.map((item, idx) => (
                   <tr key={idx} className="border-b border-gray-700/30">
-                    <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">{item.name}</td>
-                    <td className="py-1.5 px-3 text-right text-gray-400">{fmtKrw(item.current_price_krw!)}</td>
+                    <td className="py-1.5 pr-3 text-gray-200 truncate max-w-[140px]">
+                      {item.name}
+                    </td>
+                    <td className="py-1.5 px-3 text-right text-gray-400">
+                      {fmtKrw(item.current_price_krw!)}
+                    </td>
                     <td className="py-1.5 px-3 text-right text-gray-200">
                       {Math.abs(Math.round(item.shares_to_trade!))}주
                     </td>
@@ -170,8 +197,8 @@ export default function RebalancingTradePlanPanel({ items, totalBuySummary, tota
       {/* 현재가 미조회로 거래 계획에서 제외된 종목 안내 */}
       {unpricedItems.length > 0 && (
         <div className="text-xs text-amber-500/80 pt-1">
-          {unpricedItems.map((i) => i.name).join(", ")} 등 {unpricedItems.length}개 종목은 현재가 미조회로 거래
-          계획에서 제외됨
+          {unpricedItems.map((i) => i.name).join(", ")} 등 {unpricedItems.length}개 종목은 현재가
+          미조회로 거래 계획에서 제외됨
         </div>
       )}
     </div>

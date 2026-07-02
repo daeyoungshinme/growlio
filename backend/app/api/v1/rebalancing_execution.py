@@ -1,6 +1,5 @@
 """리밸런싱 실행 API — 주문 실행, 이력 조회."""
 
-import math
 import uuid
 from collections import defaultdict
 from typing import Literal, cast
@@ -26,9 +25,11 @@ from app.schemas.rebalancing import (
     ExecutionRequest,
     ExecutionResult,
     OrderResult,
+    QuickExecuteOverride,
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
 )
+from app.services.alert_service import build_rebalancing_orders, refresh_live_prices
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.rebalancing_execution_service import execute_rebalancing
 from app.services.rebalancing_service import analyze_rebalancing
@@ -69,12 +70,29 @@ async def execute_portfolio_rebalancing(
 async def quick_execute_rebalancing(
     request: Request,
     portfolio_id: uuid.UUID,
+    body: QuickExecuteOverride | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis=Depends(get_redis),
 ):
-    """포트폴리오 리밸런싱 알림 설정에 기반해 분석 후 즉시 실행한다 (원클릭 실행)."""
-    portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
+    """포트폴리오 리밸런싱 알림 설정에 기반해 분석 후 즉시 실행한다 (원클릭 실행).
+
+    `body`에 값이 있으면 저장된 알림 설정 대신 화면에서 선택한 값을 우선 사용한다
+    (저장하지 않고 바로 테스트 실행할 때 화면 값이 반영되도록).
+    """
+    portfolio = await db.scalar(
+        select(Portfolio)
+        .options(
+            selectinload(Portfolio.linked_accounts),
+            selectinload(Portfolio.items),
+        )
+        .where(
+            Portfolio.id == portfolio_id,
+            Portfolio.user_id == current_user.id,
+        )
+    )
+    if not portfolio:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
 
     alert_row = await db.scalar(
         select(RebalancingAlert).where(
@@ -89,39 +107,26 @@ async def quick_execute_rebalancing(
             detail="이 포트폴리오에 자동 실행 계좌가 설정되지 않았습니다. 자동화 설정에서 계좌를 선택해주세요.",
         )
 
-    account_id = alert_row.account_id
-    strategy = alert_row.strategy or "BUY_ONLY"
-    order_type = cast(Literal["MARKET", "LIMIT"], alert_row.order_type or "MARKET")
+    if body and body.account_id and body.account_id != alert_row.account_id:
+        await get_owned_account(body.account_id, current_user.id, db)
+
+    account_id = (body.account_id if body and body.account_id else None) or alert_row.account_id
+    strategy = (body.strategy if body and body.strategy else None) or alert_row.strategy or "BUY_ONLY"
+    order_type = cast(
+        Literal["MARKET", "LIMIT"],
+        (body.order_type if body and body.order_type else None) or alert_row.order_type or "MARKET",
+    )
 
     saved_ids = getattr(portfolio, "account_ids", None)
     effective_account_ids = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
     overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_account_ids)
     analysis = analyze_rebalancing(portfolio, overview)
 
-    orders: list[ExecItem] = []
-    for item in analysis.items:
-        if item.ticker == "CASH" or item.market == "KR_PROPERTY":
-            continue
-        shares = item.shares_to_trade
-        if shares is None or shares == 0:
-            continue
-        side = "BUY" if shares > 0 else "SELL"
-        qty = abs(math.floor(shares))
-        if qty <= 0:
-            continue
-        if strategy == "BUY_ONLY" and side == "SELL":
-            continue
-        orders.append(
-            ExecItem(
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                side=side,
-                quantity=qty,
-                account_id=str(account_id),
-                order_type=order_type,
-            )
-        )
+    await refresh_live_prices(analysis.items, current_user.id, db, redis)
+
+    orders: list[ExecItem] = build_rebalancing_orders(
+        analysis.items, analysis.ticker_account_map, strategy, order_type, str(account_id)
+    )
 
     if not orders:
         raise HTTPException(

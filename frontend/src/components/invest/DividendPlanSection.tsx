@@ -1,14 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  Legend,
-} from "recharts";
+import { Link } from "react-router-dom";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 import { TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -18,7 +10,20 @@ import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
 import SkeletonCard from "@/components/common/SkeletonCard";
 
-const MONTH_LABELS = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+const MONTH_LABELS = [
+  "1월",
+  "2월",
+  "3월",
+  "4월",
+  "5월",
+  "6월",
+  "7월",
+  "8월",
+  "9월",
+  "10월",
+  "11월",
+  "12월",
+];
 
 interface Props {
   onOpenSettings: () => void;
@@ -70,8 +75,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
   }));
 
   // 평균 예상 배당금 (약한 달 판정용)
-  const avgProjected =
-    monthly_projected.reduce((s, p) => s + p.amount_krw, 0) / 12;
+  const avgProjected = monthly_projected.reduce((s, p) => s + p.amount_krw, 0) / 12;
 
   const progressPct = goal_achievement_pct !== null ? Math.min(goal_achievement_pct, 100) : null;
 
@@ -79,9 +83,17 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     <div className="space-y-5">
       {/* 배당 목표 달성 카드 */}
       <div className="card">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
-          배당 목표 달성 현황
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+            배당 목표 달성 현황
+          </h3>
+          <Link
+            to="/assets?tab=투자현황&portfolioTab=배당"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            종목별 배당 내역 보기
+          </Link>
+        </div>
 
         {annual_dividend_goal ? (
           <>
@@ -90,7 +102,9 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               <div className="flex items-start justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-xl mb-3">
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">배당 달성률</p>
-                  <p className={`text-3xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}>
+                  <p
+                    className={`text-3xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}
+                  >
                     {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
                   </p>
                   {(goal_achievement_pct ?? 0) >= 100 && (
@@ -111,16 +125,26 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">예상 연배당</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">
+                    예상 연배당
+                  </p>
                   <p className="text-sm font-bold text-red-500">{fmtKrw(estimated_annual_krw)}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">월 평균</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-50">{fmtKrw(estimated_monthly_krw)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">
+                    월 평균
+                  </p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-50">
+                    {fmtKrw(estimated_monthly_krw)}
+                  </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">올해 실수령</p>
-                  <p className="text-sm font-bold text-gray-900 dark:text-gray-50">{fmtKrw(actual_annual_received_krw)}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 leading-tight">
+                    올해 실수령
+                  </p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-gray-50">
+                    {fmtKrw(actual_annual_received_krw)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -138,9 +162,7 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 예상 연배당</p>
-                <p className="text-xl font-bold text-red-500">
-                  {fmtKrw(estimated_annual_krw)}
-                </p>
+                <p className="text-xl font-bold text-red-500">{fmtKrw(estimated_annual_krw)}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                   월 평균 {fmtKrw(estimated_monthly_krw)}
                 </p>
@@ -153,7 +175,9 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               </div>
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">달성률</p>
-                <p className={`text-xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}>
+                <p
+                  className={`text-xl font-bold ${(goal_achievement_pct ?? 0) >= 100 ? "text-red-500" : "text-blue-500"}`}
+                >
                   {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : "—"}
                 </p>
                 {(goal_achievement_pct ?? 0) >= 100 && (
@@ -168,7 +192,9 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
               <div>
                 <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
                   <span>0%</span>
-                  <span>{goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : ""}</span>
+                  <span>
+                    {goal_achievement_pct !== null ? `${goal_achievement_pct.toFixed(1)}%` : ""}
+                  </span>
                   <span>100%</span>
                 </div>
                 <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
@@ -231,67 +257,8 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           예상 배당금 기준. 약한 달(평균 50% 미만)은 연한 색으로 표시.
         </p>
         <div className="h-[180px] sm:h-[220px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={monthlyChartData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tickFormatter={(v: number) => fmtKrwShort(v)}
-              tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
-              axisLine={false}
-              tickLine={false}
-              width={50}
-            />
-            <Tooltip
-              formatter={(v: number, name: string) => [fmtKrw(v), name]}
-              contentStyle={tooltipStyle.contentStyle}
-              labelStyle={tooltipStyle.labelStyle}
-              itemStyle={tooltipStyle.itemStyle}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="예상" name="예상" radius={[3, 3, 0, 0]}>
-              {monthlyChartData.map((_entry, i) => {
-                const projected = monthly_projected[i]?.amount_krw ?? 0;
-                const isWeak = avgProjected > 0 && projected < avgProjected * 0.5;
-                return (
-                  <Cell
-                    key={`proj-${i}`}
-                    fill={isWeak ? (isDark ? "#93c5fd" : "#bfdbfe") : (isDark ? "#3b82f6" : "#2563eb")}
-                  />
-                );
-              })}
-            </Bar>
-            <Bar dataKey="실수령" name="실수령" fill={isDark ? "#6ee7b7" : "#10b981"} radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* 연도별 배당 추이 */}
-      {yearly_received.length > 0 && (
-        <div className="card">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
-            연도별 실수령 배당 추이
-          </h3>
-          <div className="h-[130px] sm:h-[160px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={yearly_received.map((y, i) => ({
-                name: `${y.year}년`,
-                배당: y.amount_krw,
-                growth:
-                  i > 0 && yearly_received[i - 1].amount_krw > 0
-                    ? ((y.amount_krw - yearly_received[i - 1].amount_krw) /
-                        yearly_received[i - 1].amount_krw) *
-                      100
-                    : null,
-              }))}
-              margin={{ top: 0, right: 4, left: 0, bottom: 0 }}
-            >
+            <BarChart data={monthlyChartData} margin={{ top: 0, right: 4, left: 0, bottom: 0 }}>
               <XAxis
                 dataKey="name"
                 tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
@@ -306,18 +273,84 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 width={50}
               />
               <Tooltip
-                formatter={(v: number) => [fmtKrw(v), "실수령 배당"]}
+                formatter={(v: number, name: string) => [fmtKrw(v), name]}
                 contentStyle={tooltipStyle.contentStyle}
                 labelStyle={tooltipStyle.labelStyle}
                 itemStyle={tooltipStyle.itemStyle}
               />
-              <Bar dataKey="배당" fill={isDark ? "#34d399" : "#059669"} radius={[3, 3, 0, 0]}>
-                {yearly_received.map((_y, i) => (
-                  <Cell key={`yr-${i}`} fill={isDark ? "#34d399" : "#059669"} />
-                ))}
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+              <Bar dataKey="예상" name="예상" radius={[3, 3, 0, 0]}>
+                {monthlyChartData.map((_entry, i) => {
+                  const projected = monthly_projected[i]?.amount_krw ?? 0;
+                  const isWeak = avgProjected > 0 && projected < avgProjected * 0.5;
+                  return (
+                    <Cell
+                      key={`proj-${i}`}
+                      fill={
+                        isWeak ? (isDark ? "#93c5fd" : "#bfdbfe") : isDark ? "#3b82f6" : "#2563eb"
+                      }
+                    />
+                  );
+                })}
               </Bar>
+              <Bar
+                dataKey="실수령"
+                name="실수령"
+                fill={isDark ? "#6ee7b7" : "#10b981"}
+                radius={[3, 3, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* 연도별 배당 추이 */}
+      {yearly_received.length > 0 && (
+        <div className="card">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
+            연도별 실수령 배당 추이
+          </h3>
+          <div className="h-[130px] sm:h-[160px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={yearly_received.map((y, i) => ({
+                  name: `${y.year}년`,
+                  배당: y.amount_krw,
+                  growth:
+                    i > 0 && yearly_received[i - 1].amount_krw > 0
+                      ? ((y.amount_krw - yearly_received[i - 1].amount_krw) /
+                          yearly_received[i - 1].amount_krw) *
+                        100
+                      : null,
+                }))}
+                margin={{ top: 0, right: 4, left: 0, bottom: 0 }}
+              >
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tickFormatter={(v: number) => fmtKrwShort(v)}
+                  tick={{ fontSize: 11, fill: isDark ? "#9ca3af" : "#6b7280" }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={50}
+                />
+                <Tooltip
+                  formatter={(v: number) => [fmtKrw(v), "실수령 배당"]}
+                  contentStyle={tooltipStyle.contentStyle}
+                  labelStyle={tooltipStyle.labelStyle}
+                  itemStyle={tooltipStyle.itemStyle}
+                />
+                <Bar dataKey="배당" fill={isDark ? "#34d399" : "#059669"} radius={[3, 3, 0, 0]}>
+                  {yearly_received.map((_y, i) => (
+                    <Cell key={`yr-${i}`} fill={isDark ? "#34d399" : "#059669"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
           <div className="mt-2 flex flex-wrap gap-3">
             {yearly_received.map((y, i) => {

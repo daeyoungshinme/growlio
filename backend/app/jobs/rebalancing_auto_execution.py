@@ -192,4 +192,6 @@ async def _execute_for_alert(
             logger.info("rebalancing_auto_no_drift", alert_id=str(alert.id))
             return False
 
-        return await execute_auto_rebalancing_for_alert(alert, portfolio, drifting, db)
+        return await execute_auto_rebalancing_for_alert(
+            alert, portfolio, drifting, db, ticker_account_map=analysis.ticker_account_map
+        )

@@ -1,15 +1,18 @@
-import { Bell, BellOff, Loader2, Send } from "lucide-react";
+import { Bell, BellOff, Loader2, PlayCircle, Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
 import { type ScheduleType, type TriggerCondition, sendTestRebalancingAlert } from "@/api/alerts";
+import { quickExecuteRebalancing, type ExecutionResult } from "@/api/rebalancing";
+import { RebalancingResultSection } from "@/components/rebalancing/RebalancingResultSection";
 import {
   useRebalancingAlertQueries,
   useRebalancingAlertFormState,
 } from "@/hooks/useRebalancingAlertForm";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
+import { invalidateRebalancingHistoryData } from "@/utils/queryInvalidation";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import {
   SCHEDULE_OPTIONS,
@@ -129,6 +132,8 @@ function AlertFormBody({
 
   const hasAlert = !!alert;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [executionResults, setExecutionResults] = useState<ExecutionResult[] | null>(null);
+  const queryClient = useQueryClient();
 
   const testMut = useMutation({
     mutationFn: () => sendTestRebalancingAlert(portfolioId),
@@ -137,6 +142,27 @@ function AlertFormBody({
     },
     onError: (e) => {
       toast(extractErrorMessage(e, "테스트 알림 발송에 실패했습니다"), "error");
+    },
+  });
+
+  // "지금 테스트 실행" — 저장된(또는 화면에 입력된 미저장) 자동화 설정값으로 실제 스케줄 AUTO
+  // 실행과 동일한 로직(실시간 시세 반영, 매도 보유계좌 라우팅, 실시간 잔고 clamp)을 원클릭으로 실행한다.
+  const quickExecuteMut = useMutation({
+    mutationFn: () =>
+      quickExecuteRebalancing(portfolioId, {
+        account_id: form.accountId || undefined,
+        strategy: form.strategy,
+        order_type: form.orderType,
+      }),
+    onSuccess: (results) => {
+      setExecutionResults(results);
+      const successCount = results.reduce((sum, r) => sum + r.success_count, 0);
+      const failCount = results.reduce((sum, r) => sum + r.fail_count, 0);
+      toast(`실행 완료 — 성공 ${successCount}건 · 실패 ${failCount}건`, failCount ? "error" : "success");
+      void invalidateRebalancingHistoryData(queryClient);
+    },
+    onError: (e) => {
+      toast(extractErrorMessage(e, "리밸런싱 실행에 실패했습니다"), "error");
     },
   });
 
@@ -501,8 +527,32 @@ function AlertFormBody({
             테스트 알림 발송
           </button>
         )}
+
+        {/* ── 지금 테스트 실행 (AUTO 모드 전용, 실제 매매 발생) ── */}
+        {hasAlert && form.mode === "AUTO" && form.accountId && (
+          <button
+            onClick={() => quickExecuteMut.mutate()}
+            disabled={quickExecuteMut.isPending}
+            className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-950 disabled:opacity-50 transition-colors"
+          >
+            {quickExecuteMut.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <PlayCircle size={14} />
+            )}
+            지금 테스트 실행
+          </button>
+        )}
       </div>
       {/* end p-6 form fields */}
+
+      {executionResults && (
+        <Modal title="실행 결과" onClose={() => setExecutionResults(null)} size="md" closeOnBackdrop>
+          <div className="p-4 space-y-4 overflow-y-auto">
+            <RebalancingResultSection results={executionResults} />
+          </div>
+        </Modal>
+      )}
 
       {/* ── 버튼 ── */}
       <div className="sticky bottom-0 bg-white dark:bg-gray-900 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">

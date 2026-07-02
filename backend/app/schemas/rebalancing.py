@@ -81,6 +81,7 @@ class ExecutionOrderItem(BaseModel):
     account_id: str | None = None  # 실행할 KIS 계좌 ID (None이면 default_account_id 사용)
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     limit_price: float | None = None  # 국내=KRW 정수, 해외=USD 소수점 2자리
+    reference_price: float | None = None  # 주문 생성 시점 조회한 참고 시세(표시 전용, 브로커 API에는 전달 안 됨)
 
     @model_validator(mode="after")
     def validate_limit_price(self) -> "ExecutionOrderItem":
@@ -100,6 +101,14 @@ class ExecutionRequest(BaseModel):
         if not v:
             raise ValueError("주문 항목이 최소 1개 이상이어야 합니다.")
         return v
+
+
+class QuickExecuteOverride(BaseModel):
+    """원클릭 실행(quick-execute) 시 저장된 알림 설정 대신 사용할 화면 값 override."""
+
+    account_id: uuid.UUID | None = None
+    strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] | None = None
+    order_type: Literal["MARKET", "LIMIT"] | None = None
 
 
 class KisBalancePosition(BaseModel):
@@ -136,6 +145,7 @@ class OrderResult(BaseModel):
     order_no: str | None = None
     error_msg: str | None = None
     order_type: str = "MARKET"
+    price: float | None = None  # 지정가 또는 주문 생성 시점 참고 시세 (국내=KRW, 해외=USD)
 
 
 class ExecutionResult(BaseModel):

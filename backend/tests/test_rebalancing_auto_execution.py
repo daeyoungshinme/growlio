@@ -369,7 +369,7 @@ class TestExecuteForAlert:
     async def test_returns_true_when_drift_exceeds_threshold(self):
         alert = _make_alert(threshold_pct=5.0)
         portfolio = _make_portfolio()
-        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)])
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
         mock_db = _make_mock_db()
 
         with (
@@ -427,7 +427,7 @@ class TestExecuteForAlert:
     async def test_negative_drift_also_triggers_execution(self):
         alert = _make_alert(threshold_pct=5.0)
         portfolio = _make_portfolio()
-        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=-8.0)])
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=-8.0)], ticker_account_map={})
         mock_db = _make_mock_db()
 
         with (

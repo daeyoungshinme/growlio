@@ -97,115 +97,40 @@ async def execute_rebalancing(
     results: list[ExecutionResult] = []
 
     for acc_id_str, group_orders in groups.items():
-        acc_uuid = uuid.UUID(acc_id_str)
-        account = await _load_account(acc_uuid, user_id, db)
-        is_mock = account.is_mock_mode
-
-        if account.asset_type == "STOCK_KIWOOM":
-            app_key, app_secret = await _load_kiwoom_credentials(account)
-            account_no = account.kiwoom_account_no
-            access_token = await kiwoom_get_access_token(
-                app_key,
-                app_secret,
-                is_mock=is_mock,
-                redis=redis,
-                db=db,
-                user_id=str(user_id),
-                account_id=str(acc_uuid),
+        try:
+            results.append(
+                await _execute_account_group(acc_id_str, group_orders, user_id, db, redis, strategy)
             )
-
-            sells = [o for o in group_orders if o.side == "SELL"]
-            buys = [o for o in group_orders if o.side == "BUY"]
-
-            account_results: list[OrderResult] = await _execute_kiwoom_sells_with_clamp(
-                sells,
-                access_token,
-                account_no,  # type: ignore[arg-type]
-                is_mock,
-                kiwoom_place_order,
+        except Exception as e:
+            detail = e.detail if isinstance(e, HTTPException) else str(e)
+            logger.warning(
+                "rebalancing_group_failed", user_id=str(user_id), account_id=acc_id_str, error=detail
             )
-            for order in buys:
-                account_results.append(
-                    await _execute_kiwoom_single_order(
-                        order,
-                        access_token,
-                        account_no,  # type: ignore[arg-type]
-                        is_mock,
-                        kiwoom_place_order,
-                    )
+            fail_orders = [
+                OrderResult(
+                    ticker=o.ticker,
+                    name=o.name,
+                    market=o.market,
+                    side=o.side,
+                    quantity=o.quantity,
+                    status="FAILED",
+                    error_msg=str(detail),
+                    order_type=o.order_type,
+                    price=o.limit_price or o.reference_price,
                 )
-        else:
-            # KIS 계좌
-            app_key, app_secret = await _load_credentials(account)
-            account_no = account.kis_account_no
-
-            access_token = await get_access_token(
-                app_key,
-                app_secret,
-                is_mock=is_mock,
-                redis=redis,
-                db=db,
-                user_id=str(user_id),
-                account_id=str(acc_uuid),
-            )
-
-            if strategy == "TWO_PHASE":
-                account_results = await _execute_two_phase_orders(
-                    group_orders,
-                    app_key,
-                    app_secret,
-                    access_token,
-                    account_no,  # type: ignore[arg-type]
-                    is_mock,
+                for o in group_orders
+            ]
+            results.append(
+                ExecutionResult(
+                    account_id=acc_id_str,
+                    account_name=acc_id_str,
+                    is_mock=False,
+                    orders=fail_orders,
+                    success_count=0,
+                    fail_count=len(fail_orders),
+                    executed_at=datetime.now(UTC).isoformat(),
                 )
-            else:
-                sells = [o for o in group_orders if o.side == "SELL"]
-                buys = [o for o in group_orders if o.side == "BUY"]
-
-                account_results = await _execute_sells_with_clamp(
-                    sells,
-                    app_key,
-                    app_secret,
-                    access_token,
-                    account_no,  # type: ignore[arg-type]
-                    is_mock,
-                )
-                for order in buys:
-                    account_results.append(
-                        await _execute_single_order(
-                            order,
-                            app_key,
-                            app_secret,
-                            access_token,
-                            account_no,  # type: ignore[arg-type]
-                            is_mock,
-                        )
-                    )
-
-        success_count = sum(1 for r in account_results if r.status == "SUCCESS")
-        fail_count = sum(1 for r in account_results if r.status == "FAILED")
-
-        logger.info(
-            "rebalancing_group_executed",
-            user_id=str(user_id),
-            account_id=acc_id_str,
-            is_mock=is_mock,
-            orders=len(group_orders),
-            success=success_count,
-            failed=fail_count,
-        )
-
-        results.append(
-            ExecutionResult(
-                account_id=str(account.id),
-                account_name=account.name,
-                is_mock=is_mock,
-                orders=account_results,
-                success_count=success_count,
-                fail_count=fail_count,
-                executed_at=datetime.now(UTC).isoformat(),
             )
-        )
 
     total_success = sum(r.success_count for r in results)
     total_fail = sum(r.fail_count for r in results)
@@ -266,3 +191,121 @@ async def execute_rebalancing(
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
     return results
+
+
+async def _execute_account_group(
+    acc_id_str: str,
+    group_orders: list[ExecutionOrderItem],
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    redis,
+    strategy: str,
+) -> ExecutionResult:
+    """단일 계좌 그룹의 주문을 실행하고 ExecutionResult를 반환한다."""
+    acc_uuid = uuid.UUID(acc_id_str)
+    account = await _load_account(acc_uuid, user_id, db)
+    is_mock = account.is_mock_mode
+
+    if account.asset_type == "STOCK_KIWOOM":
+        app_key, app_secret = await _load_kiwoom_credentials(account)
+        account_no = account.kiwoom_account_no
+        access_token = await kiwoom_get_access_token(
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(user_id),
+            account_id=str(acc_uuid),
+        )
+
+        sells = [o for o in group_orders if o.side == "SELL"]
+        buys = [o for o in group_orders if o.side == "BUY"]
+
+        account_results: list[OrderResult] = await _execute_kiwoom_sells_with_clamp(
+            sells,
+            access_token,
+            account_no,  # type: ignore[arg-type]
+            is_mock,
+            kiwoom_place_order,
+        )
+        for order in buys:
+            account_results.append(
+                await _execute_kiwoom_single_order(
+                    order,
+                    access_token,
+                    account_no,  # type: ignore[arg-type]
+                    is_mock,
+                    kiwoom_place_order,
+                )
+            )
+    else:
+        # KIS 계좌
+        app_key, app_secret = await _load_credentials(account)
+        account_no = account.kis_account_no
+
+        access_token = await get_access_token(
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(user_id),
+            account_id=str(acc_uuid),
+        )
+
+        if strategy == "TWO_PHASE":
+            account_results = await _execute_two_phase_orders(
+                group_orders,
+                app_key,
+                app_secret,
+                access_token,
+                account_no,  # type: ignore[arg-type]
+                is_mock,
+            )
+        else:
+            sells = [o for o in group_orders if o.side == "SELL"]
+            buys = [o for o in group_orders if o.side == "BUY"]
+
+            account_results = await _execute_sells_with_clamp(
+                sells,
+                app_key,
+                app_secret,
+                access_token,
+                account_no,  # type: ignore[arg-type]
+                is_mock,
+            )
+            for order in buys:
+                account_results.append(
+                    await _execute_single_order(
+                        order,
+                        app_key,
+                        app_secret,
+                        access_token,
+                        account_no,  # type: ignore[arg-type]
+                        is_mock,
+                    )
+                )
+
+    success_count = sum(1 for r in account_results if r.status == "SUCCESS")
+    fail_count = sum(1 for r in account_results if r.status == "FAILED")
+
+    logger.info(
+        "rebalancing_group_executed",
+        user_id=str(user_id),
+        account_id=acc_id_str,
+        is_mock=is_mock,
+        orders=len(group_orders),
+        success=success_count,
+        failed=fail_count,
+    )
+
+    return ExecutionResult(
+        account_id=str(account.id),
+        account_name=account.name,
+        is_mock=is_mock,
+        orders=account_results,
+        success_count=success_count,
+        fail_count=fail_count,
+        executed_at=datetime.now(UTC).isoformat(),
+    )

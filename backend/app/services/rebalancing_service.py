@@ -7,6 +7,8 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
+import structlog
+
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
     DriftedItem,
@@ -17,10 +19,40 @@ from app.schemas.rebalancing import (
 )
 from app.schemas.service_dtypes import DividendMapEntry, PositionMapEntry, ReturnsMapEntry
 
+logger = structlog.get_logger()
+
 
 def _item_attr(item: object, field: str) -> Any:
     """PortfolioItem ORM 객체 또는 레거시 dict에서 필드를 통합 조회한다."""
     return item[field] if isinstance(item, dict) else getattr(item, field)
+
+
+def _effective_price(
+    current_price: Any,
+    current_value: float,
+    current_qty: float,
+    ticker: str,
+    market: str,
+) -> float | None:
+    """가격 필드가 비어있을 때 보유 평가금액/수량 비율을 폴백 가격으로 사용한다.
+
+    브로커 동기화 시 current_price/avg_price가 모두 누락돼도 평가금액(value_krw)은
+    별도 필드에서 채워지는 경우가 있어, 이 경우 수량 계산이 불가능해 매도 주문이
+    통째로 스킵되는 것을 방지한다.
+    """
+    if current_price and float(current_price) > 0:
+        return float(current_price)
+    if current_qty and current_qty > 0 and current_value > 0:
+        implied = current_value / current_qty
+        logger.info(
+            "rebalancing_price_fallback_used",
+            ticker=ticker,
+            market=market,
+            current_qty=current_qty,
+            implied_price=implied,
+        )
+        return implied
+    return None
 
 
 def _build_current_map(overview: dict) -> dict[tuple[str, str], PositionMapEntry]:
@@ -100,8 +132,9 @@ def _build_target_items(
             current_value = pos["value_krw"]
             current_price = pos.get("current_price")
             current_qty = pos.get("qty", 0.0)
-            if current_price and float(current_price) > 0:
-                target_qty = float(math.floor(target_value / float(current_price)))
+            effective_price = _effective_price(current_price, current_value, current_qty, ticker, market)
+            if effective_price is not None:
+                target_qty = float(math.floor(target_value / effective_price))
                 shares = target_qty - current_qty
             else:
                 shares = None
@@ -167,7 +200,8 @@ def _build_untracked_items(
         current_qty_u: float = data.get("qty", 0.0)
         weight_u = (current_value_u / base_krw * 100) if base_krw > 0 else 0.0
         diff_u = -current_value_u
-        shares_u: float | None = -current_qty_u if current_price_u and float(current_price_u) > 0 else None
+        # 목표 비중이 0(전량 매도)이므로 target_qty는 항상 0 — 가격 유무와 무관하게 계산 가능
+        shares_u: float | None = -current_qty_u if current_qty_u else None
 
         div_yield_u, annual_div_current_u = _div_info(ticker_u, market_u, dividend_map)
         ret_u = returns_map.get(key) if (returns_map and market_u != "KR_PROPERTY") else None

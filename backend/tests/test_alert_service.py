@@ -921,3 +921,390 @@ async def test_process_rebalancing_alert_both_channels_fail_returns_false(mock_d
         )
 
     assert result is False
+
+
+# ── _execute_auto_rebalancing / _build_sell_orders 테스트 ─────
+
+
+def _make_auto_alert(**kwargs):
+    defaults = {
+        "id": uuid.uuid4(),
+        "user_id": uuid.uuid4(),
+        "account_id": uuid.uuid4(),
+        "strategy": "FULL",
+        "order_type": "MARKET",
+    }
+    defaults.update(kwargs)
+    return SimpleNamespace(**defaults)
+
+
+def _make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, **kwargs):
+    defaults = {
+        "ticker": ticker,
+        "name": "삼성전자",
+        "market": "KOSPI",
+        "diff_krw": diff_krw,
+        "shares_to_trade": shares_to_trade,
+        "current_price_krw": 70000.0,
+    }
+    defaults.update(kwargs)
+    return SimpleNamespace(**defaults)
+
+
+def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_name="계좌"):
+    from app.schemas.rebalancing import TickerAccountInfo
+
+    return TickerAccountInfo(
+        account_id=str(account_id),
+        account_name=account_name,
+        asset_type=asset_type,
+        quantity=quantity,
+        value_krw=quantity * 70000.0,
+    )
+
+
+class TestBuildSellOrders:
+    def test_distributes_across_holding_accounts_largest_first(self):
+        from app.services.alert_service import _build_sell_orders
+
+        acc_small = uuid.uuid4()
+        acc_large = uuid.uuid4()
+        item = _make_drift_item()
+        ticker_account_map = {
+            "005930": [
+                _make_ticker_account(acc_small, quantity=2),
+                _make_ticker_account(acc_large, quantity=10),
+            ]
+        }
+
+        orders = _build_sell_orders(item, 5, ticker_account_map, "MARKET", None)
+
+        assert len(orders) == 1
+        assert orders[0].account_id == str(acc_large)
+        assert orders[0].quantity == 5
+
+    def test_splits_across_multiple_accounts_when_needed(self):
+        from app.services.alert_service import _build_sell_orders
+
+        acc_a = uuid.uuid4()
+        acc_b = uuid.uuid4()
+        item = _make_drift_item()
+        ticker_account_map = {
+            "005930": [
+                _make_ticker_account(acc_a, quantity=3),
+                _make_ticker_account(acc_b, quantity=4),
+            ]
+        }
+
+        orders = _build_sell_orders(item, 6, ticker_account_map, "MARKET", None)
+
+        assert {o.account_id: o.quantity for o in orders} == {str(acc_b): 4, str(acc_a): 2}
+
+    def test_unallocated_remainder_is_skipped_not_forced(self):
+        from app.services.alert_service import _build_sell_orders
+
+        acc = uuid.uuid4()
+        item = _make_drift_item()
+        ticker_account_map = {"005930": [_make_ticker_account(acc, quantity=2)]}
+
+        orders = _build_sell_orders(item, 10, ticker_account_map, "MARKET", None)
+
+        assert len(orders) == 1
+        assert orders[0].quantity == 2
+
+    def test_no_holding_accounts_returns_empty(self):
+        from app.services.alert_service import _build_sell_orders
+
+        item = _make_drift_item()
+        orders = _build_sell_orders(item, 5, {}, "MARKET", None)
+
+        assert orders == []
+
+    def test_manual_asset_type_account_excluded(self):
+        from app.services.alert_service import _build_sell_orders
+
+        acc_manual = uuid.uuid4()
+        acc_kis = uuid.uuid4()
+        item = _make_drift_item()
+        ticker_account_map = {
+            "005930": [
+                _make_ticker_account(acc_manual, quantity=100, asset_type="STOCK_OTHER"),
+                _make_ticker_account(acc_kis, quantity=3, asset_type="STOCK_KIS"),
+            ]
+        }
+
+        orders = _build_sell_orders(item, 3, ticker_account_map, "MARKET", None)
+
+        assert len(orders) == 1
+        assert orders[0].account_id == str(acc_kis)
+
+
+class TestBuildRebalancingOrders:
+    """공용 build_rebalancing_orders() — AUTO 실행과 quick-execute가 공유하는 주문 생성 로직."""
+
+    def test_sell_distributed_and_buy_uses_given_account(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        holder_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0),
+            _make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0),
+        ]
+        ticker_account_map = {"005930": [_make_ticker_account(holder_account, quantity=10)]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "FULL", "MARKET", str(buy_account))
+
+        sell = next(o for o in orders if o.side == "SELL")
+        buy = next(o for o in orders if o.side == "BUY")
+        assert sell.account_id == str(holder_account)
+        assert sell.quantity == 5
+        assert buy.account_id == str(buy_account)
+        assert buy.quantity == 3
+
+    def test_buy_only_strategy_skips_sell(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
+        ticker_account_map = {"005930": [_make_ticker_account(uuid.uuid4(), quantity=10)]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "BUY_ONLY", "MARKET", str(buy_account))
+
+        assert orders == []
+
+    def test_missing_shares_to_trade_skipped(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        drifting = [_make_drift_item(shares_to_trade=None)]
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(uuid.uuid4()))
+        assert orders == []
+
+    def test_limit_order_uses_current_price_as_limit_price(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0)
+        ]
+
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "LIMIT", str(buy_account))
+
+        assert orders[0].order_type == "LIMIT"
+        assert orders[0].limit_price == 50000.0
+        assert orders[0].reference_price == 50000.0
+
+    def test_market_order_still_carries_reference_price(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0)
+        ]
+
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(buy_account))
+
+        assert orders[0].order_type == "MARKET"
+        assert orders[0].limit_price is None
+        assert orders[0].reference_price == 50000.0
+
+    def test_sell_orders_carry_reference_price(self):
+        from app.services.alert_service import build_rebalancing_orders
+
+        holder_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(
+                ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, current_price_krw=70000.0
+            )
+        ]
+        ticker_account_map = {"005930": [_make_ticker_account(holder_account, quantity=10)]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "FULL", "LIMIT", str(uuid.uuid4()))
+
+        sell = next(o for o in orders if o.side == "SELL")
+        assert sell.limit_price == 70000.0
+        assert sell.reference_price == 70000.0
+
+
+class TestExecuteAutoRebalancing:
+    @pytest.mark.asyncio
+    async def test_sell_orders_routed_to_actual_holding_account(self, mock_db):
+        """SELL 주문은 alert.account_id가 아니라 실제 보유 계좌로 생성돼야 한다."""
+        from app.services.alert_service import _execute_auto_rebalancing
+
+        exec_account_id = uuid.uuid4()  # AUTO 실행(매수) 계좌 — 이 종목 보유는 없음
+        holder_account_id = uuid.uuid4()  # 실제 이 종목을 보유한 다른 연결 계좌
+        alert = _make_auto_alert(account_id=exec_account_id, strategy="FULL")
+        portfolio = SimpleNamespace(id=uuid.uuid4())
+        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
+        ticker_account_map = {"005930": [_make_ticker_account(holder_account_id, quantity=10)]}
+
+        captured_orders = []
+
+        async def fake_execute_rebalancing(**kwargs):
+            captured_orders.extend(kwargs["orders"])
+            return []
+
+        with (
+            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch(
+                "app.services.rebalancing_execution_service.execute_rebalancing",
+                new=AsyncMock(side_effect=fake_execute_rebalancing),
+            ),
+        ):
+            result = await _execute_auto_rebalancing(
+                alert, portfolio, drifting, mock_db, ticker_account_map=ticker_account_map
+            )
+
+        assert result is True
+        assert len(captured_orders) == 1
+        assert captured_orders[0].side == "SELL"
+        assert captured_orders[0].account_id == str(holder_account_id)
+        assert captured_orders[0].quantity == 5
+
+    @pytest.mark.asyncio
+    async def test_buy_orders_still_use_alert_account_id(self, mock_db):
+        from app.services.alert_service import _execute_auto_rebalancing
+
+        exec_account_id = uuid.uuid4()
+        alert = _make_auto_alert(account_id=exec_account_id, strategy="FULL")
+        portfolio = SimpleNamespace(id=uuid.uuid4())
+        drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
+
+        captured_orders = []
+
+        async def fake_execute_rebalancing(**kwargs):
+            captured_orders.extend(kwargs["orders"])
+            return []
+
+        with (
+            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch(
+                "app.services.rebalancing_execution_service.execute_rebalancing",
+                new=AsyncMock(side_effect=fake_execute_rebalancing),
+            ),
+        ):
+            result = await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
+
+        assert result is True
+        assert len(captured_orders) == 1
+        assert captured_orders[0].side == "BUY"
+        assert captured_orders[0].account_id == str(exec_account_id)
+
+    @pytest.mark.asyncio
+    async def test_sell_with_no_holding_account_produces_no_order(self, mock_db):
+        """보유 계좌 정보가 없으면(ticker_account_map에 없음) 매도 주문 자체를 생성하지 않는다."""
+        from app.services.alert_service import _execute_auto_rebalancing
+
+        alert = _make_auto_alert(strategy="FULL")
+        portfolio = SimpleNamespace(id=uuid.uuid4())
+        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
+
+        with (
+            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch(
+                "app.services.rebalancing_execution_service.execute_rebalancing", new=AsyncMock()
+            ) as mock_exec,
+        ):
+            result = await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
+
+        assert result is True
+        mock_exec.assert_not_called()
+
+
+class TestRefreshLivePrices:
+    """refresh_live_prices() — 자동/원클릭 실행이 수동 실행 모달과 동일하게 실시간 시세를 지정가에 반영하는지 검증."""
+
+    @pytest.mark.asyncio
+    async def test_updates_current_price_krw_from_live_quote(self, mock_db):
+        from app.services.alert_service import refresh_live_prices
+
+        item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": 71500.0}),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.current_price_krw == 71500.0
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_existing_price_when_quote_missing(self, mock_db):
+        from app.services.alert_service import refresh_live_prices
+
+        item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={}),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.current_price_krw == 70000.0
+
+    @pytest.mark.asyncio
+    async def test_falls_back_to_existing_price_when_fetch_raises(self, mock_db):
+        from app.services.alert_service import refresh_live_prices
+
+        item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(side_effect=RuntimeError("network error")),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.current_price_krw == 70000.0
+
+    @pytest.mark.asyncio
+    async def test_skips_cash_and_real_estate_tickers(self, mock_db):
+        from app.services.alert_service import refresh_live_prices
+
+        cash_item = _make_drift_item(ticker="CASH", current_price_krw=None)
+        stock_item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
+
+        fetch_mock = AsyncMock(return_value={"005930": 71500.0})
+        with patch("app.services.price_service.fetch_prices_batch", new=fetch_mock):
+            await refresh_live_prices([cash_item, stock_item], uuid.uuid4(), mock_db, MagicMock())
+
+        called_tickers = fetch_mock.call_args.args[1]
+        assert called_tickers == [("005930", "KOSPI")]
+        assert cash_item.current_price_krw is None
+
+    @pytest.mark.asyncio
+    async def test_limit_order_uses_refreshed_live_price(self, mock_db):
+        """자동 실행 전체 경로 — LIMIT 주문의 limit_price가 실시간 시세로 갱신되는지 검증."""
+        from app.services.alert_service import _execute_auto_rebalancing
+
+        alert = _make_auto_alert(strategy="FULL", order_type="LIMIT")
+        portfolio = SimpleNamespace(id=uuid.uuid4())
+        drifting = [
+            _make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0, current_price_krw=70000.0)
+        ]
+
+        captured_orders = []
+
+        async def fake_execute_rebalancing(**kwargs):
+            captured_orders.extend(kwargs["orders"])
+            return []
+
+        with (
+            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch(
+                "app.services.price_service.fetch_prices_batch",
+                new=AsyncMock(return_value={"005930": 72300.0}),
+            ),
+            patch(
+                "app.services.rebalancing_execution_service.execute_rebalancing",
+                new=AsyncMock(side_effect=fake_execute_rebalancing),
+            ),
+        ):
+            await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
+
+        assert len(captured_orders) == 1
+        assert captured_orders[0].order_type == "LIMIT"
+        assert captured_orders[0].limit_price == 72300.0

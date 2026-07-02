@@ -86,7 +86,10 @@ describe("api/rebalancing", () => {
   it("quickExecuteRebalancing calls POST /rebalancing/portfolios/:id/quick-execute", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: [] });
     await quickExecuteRebalancing("port-1");
-    expect(api.post).toHaveBeenCalledWith("/rebalancing/portfolios/port-1/quick-execute");
+    expect(api.post).toHaveBeenCalledWith(
+      "/rebalancing/portfolios/port-1/quick-execute",
+      undefined,
+    );
   });
 
   it("fetchRebalancingHistory calls GET /rebalancing/history with default limit", async () => {

@@ -74,3 +74,8 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
   ]);
 }
+
+/** 리밸런싱 주문 실행 후 — 실행 이력 */
+export function invalidateRebalancingHistoryData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory });
+}

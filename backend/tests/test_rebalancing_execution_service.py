@@ -440,6 +440,58 @@ class TestExecuteRebalancing:
         assert results[0].fail_count == 1
         assert results[0].success_count == 1
 
+    @pytest.mark.asyncio
+    async def test_one_account_group_failure_does_not_lose_other_group_results(
+        self, mock_db, mock_redis, override_settings
+    ):
+        """한 계좌 그룹 처리 중 예외가 발생해도 다른 계좌 그룹의 정상 결과는 보존돼야 한다."""
+        from app.services.rebalancing_execution_service import execute_rebalancing
+
+        user_id = uuid.uuid4()
+        valid_account = _make_kis_account(user_id=user_id)
+        missing_account_id = uuid.uuid4()
+
+        valid_order = _make_order(ticker="A", side="BUY", account_id=str(valid_account.id))
+        broken_order = _make_order(ticker="B", side="BUY", account_id=str(missing_account_id))
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        mock_db.scalar = AsyncMock(side_effect=[valid_account, None])
+        mock_db.flush = AsyncMock()
+        mock_db.commit = AsyncMock()
+        mock_db.add = MagicMock()
+
+        with (
+            patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
+            patch(
+                "app.services.rebalancing_execution_service.get_access_token",
+                new_callable=AsyncMock,
+                return_value="token",
+            ),
+            patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await execute_rebalancing(
+                user_id, None, [valid_order, broken_order], mock_db, mock_redis
+            )
+
+        assert len(results) == 2
+        valid_result = next(r for r in results if r.account_id == str(valid_account.id))
+        broken_result = next(r for r in results if r.account_id == str(missing_account_id))
+
+        assert valid_result.success_count == 1
+        assert valid_result.fail_count == 0
+        assert broken_result.fail_count == 1
+        assert broken_result.orders[0].status == "FAILED"
+        assert "찾을 수 없습니다" in (broken_result.orders[0].error_msg or "")
+
 
 class TestRebalancingSchemaValidators:
     """schemas/rebalancing.py 검증자 커버리지 (lines 81, 92-94)."""

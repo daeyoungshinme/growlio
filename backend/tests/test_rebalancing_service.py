@@ -273,7 +273,7 @@ class TestShareCalculationEdgeCases:
                 )
 
     def test_zero_price_no_shares(self):
-        """current_price=0 이면 shares_to_trade=None."""
+        """current_price=0이고 보유수량도 0이면 shares_to_trade=None (계산 불가)."""
         portfolio = _make_portfolio(
             [
                 {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
@@ -287,6 +287,63 @@ class TestShareCalculationEdgeCases:
         )
         result = analyze_rebalancing(portfolio, overview)
         assert result.items[0].shares_to_trade is None
+
+    def test_zero_price_with_holding_falls_back_to_implied_price(self):
+        """current_price=0이지만 보유수량>0이면 value_krw/qty를 폴백 가격으로 사용해 매도 수량 계산."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 0},
+            ]
+        )
+        overview = _make_overview(
+            total_stock_krw=1_000_000,
+            all_positions=[
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000,
+                    "current_price": 0,
+                    "qty": 10,
+                },
+            ],
+        )
+        result = analyze_rebalancing(portfolio, overview)
+        item = result.items[0]
+        # implied_price = 1_000_000/10 = 100_000, target_qty = floor(0/100_000) = 0, shares = 0-10 = -10
+        assert item.shares_to_trade == -10
+
+    def test_untracked_item_sells_full_qty_even_without_price(self):
+        """목표 포트폴리오에 없는(untracked) 보유 종목은 가격 데이터가 없어도 전량 매도 수량 계산."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "MSFT", "name": "Microsoft", "market": "NASDAQ", "weight": 100},
+            ]
+        )
+        overview = _make_overview(
+            total_stock_krw=1_000_000,
+            all_positions=[
+                {
+                    "ticker": "MSFT",
+                    "market": "NASDAQ",
+                    "name": "Microsoft",
+                    "value_krw": 500_000,
+                    "current_price": 200_000,
+                    "qty": 2.5,
+                },
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 300_000,
+                    "current_price": None,
+                    "qty": 3,
+                },
+            ],
+        )
+        result = analyze_rebalancing(portfolio, overview)
+        aapl = next(i for i in result.items if i.ticker == "AAPL")
+        assert aapl.shares_to_trade == -3
 
     def test_no_positions_zero_base(self):
         """보유 자산이 없어 base_krw=0 이면 current_weight_pct=0."""

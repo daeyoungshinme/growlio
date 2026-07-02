@@ -32,6 +32,8 @@ export default function RebalancingDetailMetrics({ analysis }: Props) {
       <button
         onClick={() => setShowDetails((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-400 hover:bg-gray-700/40 transition-colors"
+        aria-expanded={showDetails}
+        aria-label="상세 지표 (집중도·CAGR)"
       >
         <span className="font-medium">상세 지표</span>
         <span>{showDetails ? "▲" : "▼"}</span>
@@ -55,7 +57,10 @@ export default function RebalancingDetailMetrics({ analysis }: Props) {
           </div>
           {hasCagrData && (
             <div className="grid grid-cols-2 gap-3">
-              <CagrCard label="현재 포트폴리오 CAGR" cagr={analysis.current_weighted_cagr_10y_pct} />
+              <CagrCard
+                label="현재 포트폴리오 CAGR"
+                cagr={analysis.current_weighted_cagr_10y_pct}
+              />
               <CagrCard label="목표 포트폴리오 CAGR" cagr={analysis.target_weighted_cagr_10y_pct} />
             </div>
           )}

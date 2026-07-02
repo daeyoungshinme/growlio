@@ -184,11 +184,15 @@ async def _process_rebalancing_alert(
     return any_sent
 
 
+_BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+
+
 async def execute_auto_rebalancing_for_alert(
     alert: RebalancingAlert,
     portfolio: Portfolio,
     drifting: list,
     db: AsyncSession,
+    ticker_account_map: dict[str, list] | None = None,
 ) -> bool:
     """AUTO 모드 리밸런싱 주문을 생성하고 실행한다.
 
@@ -204,46 +208,165 @@ async def execute_auto_rebalancing_for_alert(
         )
         return False
 
-    return await _execute_auto_rebalancing(alert, portfolio, drifting, db)
+    return await _execute_auto_rebalancing(alert, portfolio, drifting, db, ticker_account_map or {})
 
 
-async def _execute_auto_rebalancing(
-    alert,
-    portfolio: Portfolio,
-    drifting: list,
-    db: AsyncSession,
-) -> bool:
-    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다 (내부용, 장 중 체크 없음).
+def _build_sell_orders(
+    item: Any,
+    qty: int,
+    ticker_account_map: dict[str, list],
+    effective_order_type: str,
+    limit_price: float | None,
+    reference_price: float | None = None,
+) -> list[Any]:
+    """매도 주문을 실제 종목을 보유한 브로커 연동 계좌(들)로 분산 생성한다.
 
-    성공 시 True, 오류 시 False 반환.
+    포트폴리오 전체 합산 기준으로 계산된 매도 수량을, 종목을 실제로 보유한 계좌들 중
+    보유수량이 큰 순서로 채워나간다. 배분 후에도 부족분이 남으면 억지로 다른 계좌에 밀어넣지 않고
+    건너뛴다(계좌 실행 시점의 실시간 잔고 clamp가 최종 안전망 역할을 한다).
     """
-    from app.redis_client import get_redis
     from app.schemas.rebalancing import ExecutionOrderItem
-    from app.services.rebalancing_execution_service import execute_rebalancing
 
-    strategy = getattr(alert, "strategy", "BUY_ONLY")
-    order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+    holders = [
+        a
+        for a in ticker_account_map.get(item.ticker, [])
+        if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
+    ]
+    holders.sort(key=lambda a: a.quantity, reverse=True)
 
+    orders: list[Any] = []
+    remaining = qty
+    for acc in holders:
+        if remaining <= 0:
+            break
+        take = min(remaining, int(acc.quantity))
+        if take <= 0:
+            continue
+        orders.append(
+            ExecutionOrderItem(
+                ticker=item.ticker,
+                name=item.name,
+                market=item.market,
+                side="SELL",
+                quantity=take,
+                account_id=acc.account_id,
+                order_type=effective_order_type,
+                limit_price=limit_price,
+                reference_price=reference_price,
+            )
+        )
+        remaining -= take
+
+    if remaining > 0:
+        logger.info(
+            "rebalancing_auto_sell_unallocated",
+            ticker=item.ticker,
+            requested_qty=qty,
+            unallocated_qty=remaining,
+            holder_accounts=len(holders),
+        )
+    return orders
+
+
+async def refresh_live_prices(
+    items: list,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    redis: Any = None,
+) -> None:
+    """드리프트 항목의 `current_price_krw`를 실시간 시세로 갱신한다 (in-place).
+
+    `analyze_rebalancing()`이 채운 `current_price_krw`는 계좌 동기화 시점의 DB 스냅샷 값이라
+    자동실행·원클릭실행 시점에는 이미 낡았을 수 있다. 수동 실행 모달(`/stocks/prices-batch`)과
+    동일하게 `price_service.fetch_prices_batch()`로 실시간 시세를 조회해 지정가 산정에 반영한다.
+    조회 실패 종목은 기존 값을 그대로 둔다(폴백).
+    """
+    from app.services.price_service import fetch_prices_batch
+
+    tickers = [
+        (item.ticker, item.market) for item in items if item.ticker not in ("CASH", "REAL_ESTATE")
+    ]
+    if not tickers:
+        return
+
+    try:
+        price_map = await fetch_prices_batch(user_id, tickers, db, redis)
+    except Exception as exc:
+        logger.warning("rebalancing_live_price_refresh_failed", error=str(exc))
+        return
+
+    for item in items:
+        price = price_map.get(item.ticker)
+        if price and price > 0:
+            item.current_price_krw = float(price)
+
+
+def build_rebalancing_orders(
+    drifting: list,
+    ticker_account_map: dict[str, list],
+    strategy: str,
+    order_type: Literal["MARKET", "LIMIT"],
+    buy_account_id: str,
+    alert_id: str | None = None,
+) -> list[Any]:
+    """드리프트 항목 목록으로부터 실행 주문 목록을 생성한다.
+
+    매도 주문은 `ticker_account_map`을 사용해 실제 종목을 보유한 브로커 연동 계좌(들)로
+    분산 생성하고, 매수 주문은 `buy_account_id` 단일 계좌로 생성한다.
+    AUTO 자동실행(`_execute_auto_rebalancing`)과 원클릭 실행(`quick_execute_rebalancing`)이
+    공유하는 주문 생성 로직 — 두 경로가 서로 다른 동작을 하지 않도록 여기서 단일화한다.
+    """
+    from app.schemas.rebalancing import ExecutionOrderItem
+
+    ticker_account_map = ticker_account_map or {}
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
         if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
+            logger.info(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=item.ticker,
+                reason="cash_or_no_shares_to_trade",
+            )
             continue
         qty = abs(int(item.shares_to_trade))
         if qty <= 0:
+            logger.info(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=item.ticker,
+                reason="zero_qty",
+                shares_to_trade=item.shares_to_trade,
+            )
             continue
         side = "BUY" if item.diff_krw > 0 else "SELL"
         if strategy == "BUY_ONLY" and side == "SELL":
+            logger.info(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=item.ticker,
+                reason="buy_only_strategy",
+            )
             continue
 
         # LIMIT 주문 시 현재가를 지정가로 사용 (None이면 MARKET으로 fallback)
         effective_order_type = order_type
+        current_price = getattr(item, "current_price_krw", None)
+        reference_price: float | None = float(current_price) if current_price and current_price > 0 else None
         limit_price: float | None = None
         if order_type == "LIMIT":
-            price = getattr(item, "current_price_krw", None)
-            if price and price > 0:
-                limit_price = float(price)
+            if reference_price is not None:
+                limit_price = reference_price
             else:
                 effective_order_type = "MARKET"
+
+        if side == "SELL":
+            orders.extend(
+                _build_sell_orders(
+                    item, qty, ticker_account_map, effective_order_type, limit_price, reference_price
+                )
+            )
+            continue
 
         orders.append(
             ExecutionOrderItem(
@@ -252,15 +375,42 @@ async def _execute_auto_rebalancing(
                 market=item.market,
                 side=side,
                 quantity=qty,
-                account_id=str(alert.account_id),
+                account_id=buy_account_id,
                 order_type=effective_order_type,
                 limit_price=limit_price,
+                reference_price=reference_price,
             )
         )
 
+    return orders
+
+
+async def _execute_auto_rebalancing(
+    alert,
+    portfolio: Portfolio,
+    drifting: list,
+    db: AsyncSession,
+    ticker_account_map: dict[str, list] | None = None,
+) -> bool:
+    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다 (내부용, 장 중 체크 없음).
+
+    성공 시 True, 오류 시 False 반환.
+    """
+    from app.redis_client import get_redis
+    from app.services.rebalancing_execution_service import execute_rebalancing
+
+    strategy = getattr(alert, "strategy", "BUY_ONLY")
+    order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+
+    redis = await get_redis()
+    await refresh_live_prices(drifting, alert.user_id, db, redis)
+
+    orders = build_rebalancing_orders(
+        drifting, ticker_account_map or {}, strategy, order_type, str(alert.account_id), alert_id=str(alert.id)
+    )
+
     if orders:
         try:
-            redis = await get_redis()
             await execute_rebalancing(
                 user_id=alert.user_id,
                 account_id=alert.account_id,

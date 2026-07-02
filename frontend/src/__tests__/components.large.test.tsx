@@ -433,24 +433,40 @@ describe("DividendTab", () => {
   };
 
   it("renders without crash", () => {
-    renderWithProviders(<DividendTab {...defaultProps} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} />
+      </MemoryRouter>,
+    );
     expect(document.body).toBeDefined();
   });
 
   it("shows subtab navigation", () => {
-    renderWithProviders(<DividendTab {...defaultProps} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} />
+      </MemoryRouter>,
+    );
     expect(screen.getByText("종목별 배당")).toBeDefined();
     expect(screen.getByText("월별 배당")).toBeDefined();
   });
 
   it("switches to monthly dividend tab", () => {
-    renderWithProviders(<DividendTab {...defaultProps} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} />
+      </MemoryRouter>,
+    );
     fireEvent.click(screen.getByText("월별 배당"));
     expect(document.body).toBeDefined();
   });
 
   it("shows empty state when no dividend data", () => {
-    renderWithProviders(<DividendTab {...defaultProps} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <DividendTab {...defaultProps} />
+      </MemoryRouter>,
+    );
     const emptyText = screen.queryByText(/배당 데이터가 없습니다|데이터가 없습니다/);
     if (emptyText) expect(emptyText).toBeDefined();
     else expect(document.body).toBeDefined();

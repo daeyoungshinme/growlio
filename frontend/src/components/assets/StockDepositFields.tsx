@@ -40,10 +40,14 @@ export default function StockDepositFields({
               inputMode="decimal"
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={depositKrw ?? ""}
-              onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))}
+              onChange={(e) =>
+                setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
+              }
               placeholder="0"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              원
+            </span>
           </div>
           <AmountUnitButtons onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)} />
         </div>
@@ -52,14 +56,18 @@ export default function StockDepositFields({
             외화 예수금 (USD)
           </label>
           <div className="relative mt-0.5">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              $
+            </span>
             <input
               id="stock-deposit-usd"
               type="number"
               inputMode="decimal"
               className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={depositUsd ?? ""}
-              onChange={(e) => setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))}
+              onChange={(e) =>
+                setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
+              }
               placeholder="0"
             />
           </div>
@@ -74,7 +82,9 @@ export default function StockDepositFields({
         {hasAnyDeposit && (
           <div className="flex justify-between items-center pt-1 border-t border-gray-100 dark:border-gray-700">
             <span className="text-xs text-gray-500 dark:text-gray-400">합계</span>
-            <span className="text-sm font-medium text-gray-900 dark:text-gray-50">{fmtKrw(totalKrw)}</span>
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-50">
+              {fmtKrw(totalKrw)}
+            </span>
           </div>
         )}
       </div>
@@ -83,28 +93,42 @@ export default function StockDepositFields({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">예수금 (수동 보정)</label>
+      <label
+        htmlFor="stock-deposit-krw-edit"
+        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+      >
+        예수금 (수동 보정)
+      </label>
       <div className="relative">
         <input
+          id="stock-deposit-krw-edit"
           type="number"
           inputMode="decimal"
           className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={depositKrw ?? ""}
-          onChange={(e) => setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))}
+          onChange={(e) =>
+            setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
+          }
           placeholder="원화 예수금"
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
       </div>
       <AmountUnitButtons onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)} />
       <div className="relative">
+        <label htmlFor="stock-deposit-usd-edit" className="sr-only">
+          외화 예수금 (USD)
+        </label>
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">$</span>
         <input
+          id="stock-deposit-usd-edit"
           type="number"
           inputMode="decimal"
           step="0.01"
           className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           value={depositUsd ?? ""}
-          onChange={(e) => setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))}
+          onChange={(e) =>
+            setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
+          }
           placeholder="외화 예수금 (USD)"
         />
       </div>

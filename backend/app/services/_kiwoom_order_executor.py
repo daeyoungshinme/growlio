@@ -20,6 +20,8 @@ async def _execute_kiwoom_single_order(
     place_order_fn,
 ) -> OrderResult:
     """키움 단건 주문 실행 — 국내주식만 지원 (해외주식 미지원)."""
+    price = order.limit_price or order.reference_price
+
     if order.quantity <= 0:
         return OrderResult(
             ticker=order.ticker,
@@ -29,6 +31,7 @@ async def _execute_kiwoom_single_order(
             quantity=order.quantity,
             status="SKIPPED",
             error_msg="주문 수량이 0 이하입니다.",
+            price=price,
         )
     if is_overseas_market(order.market):
         return OrderResult(
@@ -39,6 +42,7 @@ async def _execute_kiwoom_single_order(
             quantity=order.quantity,
             status="SKIPPED",
             error_msg="키움 연동은 국내주식만 지원합니다.",
+            price=price,
         )
 
     try:
@@ -70,6 +74,7 @@ async def _execute_kiwoom_single_order(
             status="SUCCESS",
             order_no=result.get("order_no"),
             order_type=order.order_type,
+            price=price,
         )
     except Exception as e:
         logger.warning("kiwoom_order_failed", ticker=order.ticker, side=order.side, error=str(e))
@@ -82,6 +87,7 @@ async def _execute_kiwoom_single_order(
             status="FAILED",
             error_msg=str(e),
             order_type=order.order_type,
+            price=price,
         )
 
 

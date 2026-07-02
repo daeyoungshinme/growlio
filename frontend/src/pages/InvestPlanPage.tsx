@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense } from "react";
 import { Settings2 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -26,7 +27,19 @@ type Tab = (typeof TABS)[number];
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>("적립 계획");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("tab");
+  const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
+    ? (rawTab as Tab)
+    : "적립 계획";
+  const setActiveTab = (tab: Tab) =>
+    setSearchParams(
+      (prev) => {
+        prev.set("tab", tab);
+        return prev;
+      },
+      { replace: true },
+    );
 
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -170,11 +183,13 @@ export default function InvestPlanPage() {
               </div>
             </div>
             <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-              연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다. 자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
+              연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다. 자동 정기매수 설정은 아래 설정
+              편집에서 변경할 수 있습니다.
             </p>
             {data && !isConfigured && (
               <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
-                월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수 있습니다.{" "}
+                월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
+                있습니다.{" "}
                 <button onClick={openEdit} className="underline font-medium">
                   지금 설정하기
                 </button>
@@ -189,7 +204,10 @@ export default function InvestPlanPage() {
                   <DCAProjectionChart data={data.projection_months} />
                 </Suspense>
                 <div className="space-y-5">
-                  <GoalTimelineCard timeline={data.goal_timeline} goalAmount={s?.goal_amount ?? null} />
+                  <GoalTimelineCard
+                    timeline={data.goal_timeline}
+                    goalAmount={s?.goal_amount ?? null}
+                  />
                   <YearlyAchievementTable data={data.yearly_achievements} />
                   <MonthlyAchievementTable data={data.projection_months} />
                 </div>

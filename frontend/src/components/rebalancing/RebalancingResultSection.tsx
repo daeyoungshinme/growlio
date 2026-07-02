@@ -3,12 +3,19 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { ExecutionResult } from "@/api/rebalancing";
 import { syncAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
+import { isOverseasMarket } from "@/constants/markets";
+import { fmtKrw } from "@/utils/format";
 import { SideBadge, StatusBadge } from "./RebalancingBadges";
 
 type SyncState = "idle" | "syncing" | "done" | "error";
 
 interface Props {
   results: ExecutionResult[];
+}
+
+function fmtOrderPrice(price: number | null | undefined, market: string): string {
+  if (price == null) return "-";
+  return isOverseasMarket(market) ? `$${price.toFixed(2)}` : fmtKrw(price);
 }
 
 export function RebalancingResultSection({ results }: Props) {
@@ -70,6 +77,7 @@ export function RebalancingResultSection({ results }: Props) {
                   >
                     {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                   </span>
+                  <span>{fmtOrderPrice(o.price, o.market)}</span>
                   {(o.order_no ?? o.error_msg) && (
                     <span className="truncate max-w-[160px]">{o.order_no ?? o.error_msg}</span>
                   )}
@@ -85,6 +93,7 @@ export function RebalancingResultSection({ results }: Props) {
                 <th className="px-3 py-2 text-left">종목</th>
                 <th className="px-3 py-2 text-center">구분</th>
                 <th className="px-3 py-2 text-center">유형</th>
+                <th className="px-3 py-2 text-right">가격</th>
                 <th className="px-3 py-2 text-right">주수</th>
                 <th className="px-3 py-2 text-center">결과</th>
                 <th className="px-3 py-2 text-left">주문번호 / 사유</th>
@@ -111,6 +120,7 @@ export function RebalancingResultSection({ results }: Props) {
                       {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                     </span>
                   </td>
+                  <td className="px-3 py-2 text-right text-gray-300">{fmtOrderPrice(o.price, o.market)}</td>
                   <td className="px-3 py-2 text-right">{o.quantity}주</td>
                   <td className="px-3 py-2 text-center">
                     <StatusBadge status={o.status} />

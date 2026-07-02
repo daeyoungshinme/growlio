@@ -1,4 +1,5 @@
 import { lazy, Suspense, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -195,20 +196,28 @@ export default function DividendTab({
         </div>
       </div>
 
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
-        {DIV_SUBTABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setDivSubTab(t)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              divSubTab === t
-                ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
+          {DIV_SUBTABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setDivSubTab(t)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                divSubTab === t
+                  ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+        <Link
+          to="/invest-plan?tab=배당 계획"
+          className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          배당 목표 달성 현황 보기
+        </Link>
       </div>
 
       {divSubTab === "종목별 배당" && dividendChartData.length > 0 && (
@@ -424,7 +433,6 @@ export default function DividendTab({
           </div>
         </div>
       )}
-
     </div>
   );
 }

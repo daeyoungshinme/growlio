@@ -22,7 +22,12 @@ export function RebalancingExecutionModal({
   onExecuted,
   onClose,
 }: Props) {
-  const exec = useRebalancingExecution({ portfolioId, analysis, accounts, onExecuted });
+  const exec = useRebalancingExecution({
+    portfolioId,
+    analysis,
+    accounts,
+    onExecuted,
+  });
   const { state, orders, dispatch } = exec;
   const { phase, results, confirmed, orderType, priceState, priceLoadProgress } = state;
 

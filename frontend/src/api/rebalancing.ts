@@ -99,6 +99,7 @@ export interface OrderResult {
   order_no: string | null;
   error_msg: string | null;
   order_type?: string;
+  price?: number | null;
 }
 
 export interface ExecutionResult {
@@ -147,8 +148,17 @@ export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
 
 // ── 원클릭 실행 ──────────────────────────────────────────────
 
-export const quickExecuteRebalancing = (portfolioId: string): Promise<ExecutionResult[]> =>
-  apiPost<ExecutionResult[]>(`/rebalancing/portfolios/${portfolioId}/quick-execute`);
+export interface QuickExecuteOverride {
+  account_id?: string | null;
+  strategy?: "FULL" | "BUY_ONLY" | "TWO_PHASE";
+  order_type?: "MARKET" | "LIMIT";
+}
+
+export const quickExecuteRebalancing = (
+  portfolioId: string,
+  override?: QuickExecuteOverride,
+): Promise<ExecutionResult[]> =>
+  apiPost<ExecutionResult[]>(`/rebalancing/portfolios/${portfolioId}/quick-execute`, override);
 
 // ── 실행 이력 ──────────────────────────────────────────────
 
