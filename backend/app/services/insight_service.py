@@ -102,25 +102,6 @@ async def generate_insights(
     return data
 
 
-async def get_insights_summary(
-    user_id: uuid.UUID,
-    db: AsyncSession,
-    redis: RedisType = None,
-) -> dict[str, int]:
-    """심각도별 인사이트 개수 (대시보드 뱃지용)."""
-    insights = await generate_insights(user_id, db, redis)
-    summary: dict[str, int] = {
-        InsightSeverity.ALERT: 0,
-        InsightSeverity.WARNING: 0,
-        InsightSeverity.INFO: 0,
-    }
-    for i in insights:
-        sev = i.get("severity", InsightSeverity.INFO)
-        if sev in summary:
-            summary[sev] += 1
-    return summary
-
-
 # ---------------------------------------------------------------------------
 # 체커 1: 집중도
 # ---------------------------------------------------------------------------
@@ -309,7 +290,7 @@ async def _check_tax_loss_harvest(
                 "세금 상세 페이지에서 확인하세요."
             ),
             action_label="세금 계획 보기",
-            action_url="/portfolio?tab=analysis",
+            action_url="/assets?tab=투자현황&portfolioTab=세금",
             metric_value=round(tax_saved, 0),
         )
     ]

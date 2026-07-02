@@ -90,6 +90,50 @@ class TestFetchYfDailyReturns:
         # MultiIndex 경로 실행 — 예외 없이 dict 반환
         assert isinstance(result, dict)
 
+    def test_domestic_symbol_falls_back_to_pykrx_when_yahoo_fails(self):
+        """Yahoo가 실패해도 국내(.KS) 심볼은 pykrx로 보완된다."""
+        import pandas as pd
+
+        pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0, 72000.0]})
+
+        with (
+            patch("yfinance.download", side_effect=Exception("401 Unauthorized")),
+            patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
+        ):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["005930.KS"])
+
+        assert "005930.KS" in result
+        assert len(result["005930.KS"]) == 3
+
+    def test_overseas_symbol_stays_empty_when_yahoo_fails(self):
+        """해외 심볼은 대체 소스가 없어 Yahoo 실패 시 빈 결과를 유지한다."""
+        with patch("yfinance.download", side_effect=Exception("401 Unauthorized")):
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["AAPL"])
+
+        assert result == {}
+
+    def test_circuit_open_still_tries_pykrx_for_domestic(self):
+        """yahoo_circuit이 OPEN이어도 국내 심볼은 pykrx 경로로 조회된다."""
+        import pandas as pd
+
+        pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0]})
+
+        with (
+            patch("app.services.market_data_fetcher.yahoo_circuit") as mock_circuit,
+            patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
+        ):
+            mock_circuit.is_available.return_value = False
+
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            result = fetch_yf_daily_returns(["005930.KS"])
+
+        assert "005930.KS" in result
+
 
 class TestFetchYfCloseSeries:
     def test_returns_series_for_symbols(self):
@@ -119,6 +163,23 @@ class TestFetchYfCloseSeries:
             result = fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
 
         assert result == {}
+
+    def test_domestic_symbol_falls_back_to_pykrx_when_yahoo_fails(self):
+        """Yahoo가 실패해도 국내(.KS) 심볼은 pykrx 종가 Series로 보완된다."""
+        import pandas as pd
+
+        pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0]})
+
+        with (
+            patch("yfinance.download", side_effect=Exception("401 Unauthorized")),
+            patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
+        ):
+            from app.services.market_data_fetcher import fetch_yf_close_series
+
+            result = fetch_yf_close_series(["005930.KS"], date(2024, 1, 1), date(2024, 1, 31))
+
+        assert "005930.KS" in result
+        assert len(result["005930.KS"]) == 3
 
 
 class TestFetchYfInfo:

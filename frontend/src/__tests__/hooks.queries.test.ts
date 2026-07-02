@@ -24,7 +24,6 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/insights", () => ({
   fetchInsights: vi.fn(),
-  fetchInsightsSummary: vi.fn(),
 }));
 
 vi.mock("@/api/invest", () => ({
@@ -57,7 +56,7 @@ vi.mock("react-router-dom", () => ({
 
 // ── imports ───────────────────────────────────────────────────────────────────
 
-import { useInsights, useInsightsSummary } from "@/hooks/useInsights";
+import { useInsights } from "@/hooks/useInsights";
 import { useLogout } from "@/hooks/useLogout";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
@@ -105,21 +104,6 @@ describe("useInsights", () => {
     const { result } = renderHook(() => useInsights(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
-  });
-});
-
-describe("useInsightsSummary", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchInsightsSummary를 호출하고 요약 데이터를 반환한다", async () => {
-    const mockSummary = { INFO: 2, WARNING: 1, ALERT: 0 };
-    const { fetchInsightsSummary } = await import("@/api/insights");
-    vi.mocked(fetchInsightsSummary).mockResolvedValue(mockSummary);
-
-    const { result } = renderHook(() => useInsightsSummary(), { wrapper: createWrapper() });
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data).toEqual(mockSummary);
   });
 });
 

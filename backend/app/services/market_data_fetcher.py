@@ -14,10 +14,38 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
+from app.utils.circuit_breaker import yahoo_circuit
+
 if TYPE_CHECKING:
     import pandas as pd
 
 logger = structlog.get_logger()
+
+
+def _returns_from_series(series: pd.Series) -> list[float] | None:
+    if len(series) < 2:
+        return None
+    returns = series.pct_change().dropna().tolist()
+    return [float(r) for r in returns if math.isfinite(r)]
+
+
+def _pykrx_daily_returns_fallback(
+    missing_syms: list[str], start: date, end: date
+) -> dict[str, list[float]]:
+    """국내(.KS/.KQ) 심볼만 pykrx로 보완한다. 해외 종목·지수는 대체 소스가 없어 제외."""
+    result: dict[str, list[float]] = {}
+    for sym in missing_syms:
+        ticker = yf_symbol_to_krx_ticker(sym)
+        if ticker is None:
+            continue
+        series = sync_pykrx_close_series(ticker, start, end)
+        if series is None:
+            continue
+        returns = _returns_from_series(series)
+        if returns is not None:
+            result[sym] = returns
+    return result
 
 
 def fetch_yf_daily_returns(
@@ -29,9 +57,9 @@ def fetch_yf_daily_returns(
 
     portfolio_optimizer, risk_service에서 공통으로 사용.
     extra_symbols(예: ^GSPC)를 포함해 다운로드하되 결과에는 symbols + extra_symbols 모두 포함.
+    Yahoo가 실패/차단된 국내(.KS/.KQ) 심볼은 pykrx로 보완한다.
     """
     import pandas as pd
-    import yfinance as yf
 
     all_syms = list(set(symbols + (extra_symbols or [])))
     if not all_syms:
@@ -39,34 +67,47 @@ def fetch_yf_daily_returns(
 
     end = date.today()
     start = end - timedelta(days=period_days)
-    try:
-        raw = yf.download(
-            all_syms,
-            start=start.isoformat(),
-            end=end.isoformat(),
-            auto_adjust=True,
-            progress=False,
-            threads=True,
-        )
-    except Exception as e:
-        logger.warning("yf_download_failed", symbols=all_syms[:5], error=str(e))
-        return {}
-
-    close: pd.DataFrame | None = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
-    if close is None or close.empty:
-        return {}
-    if not isinstance(close, pd.DataFrame):
-        close = close.to_frame(name=all_syms[0])
-
     result: dict[str, list[float]] = {}
-    for sym in all_syms:
-        if sym not in close.columns:
-            continue
-        series = close[sym].dropna()
-        if len(series) < 2:
-            continue
-        returns = series.pct_change().dropna().tolist()
-        result[sym] = [float(r) for r in returns if math.isfinite(r)]
+
+    if yahoo_circuit.is_available():
+        import yfinance as yf
+
+        try:
+            raw = yf.download(
+                all_syms,
+                start=start.isoformat(),
+                end=end.isoformat(),
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+        except Exception as e:
+            logger.warning("yf_download_failed", symbols=all_syms[:5], error=str(e))
+            yahoo_circuit.record_failure()
+            raw = None
+
+        close: pd.DataFrame | None = None
+        if raw is not None:
+            close = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
+            if close is None or close.empty:
+                yahoo_circuit.record_failure()
+                close = None
+            else:
+                yahoo_circuit.record_success()
+                if not isinstance(close, pd.DataFrame):
+                    close = close.to_frame(name=all_syms[0])
+
+        if close is not None:
+            for sym in all_syms:
+                if sym not in close.columns:
+                    continue
+                returns = _returns_from_series(close[sym].dropna())
+                if returns is not None:
+                    result[sym] = returns
+
+    missing = [sym for sym in all_syms if sym not in result]
+    if missing:
+        result.update(_pykrx_daily_returns_fallback(missing, start, end))
     return result
 
 
@@ -78,44 +119,57 @@ def fetch_yf_close_series(
     """지정 기간의 종목별 종가 Series를 반환한다.
 
     factor_service 모멘텀 계산(12-1M)에서 사용.
+    Yahoo가 실패/차단된 국내(.KS/.KQ) 심볼은 pykrx로 보완한다.
     """
     import pandas as pd
-    import yfinance as yf
 
     if not symbols:
         return {}
 
-    try:
-        raw = yf.download(
-            symbols,
-            start=start.isoformat(),
-            end=end.isoformat(),
-            auto_adjust=True,
-            progress=False,
-            threads=True,
-        )
-    except Exception as e:
-        logger.warning("yf_close_series_failed", symbols=symbols[:5], error=str(e))
-        return {}
-
-    if raw is None or raw.empty:
-        return {}
-
-    close: pd.DataFrame
-    if isinstance(raw.columns, pd.MultiIndex):
-        close_raw = raw.get("Close")
-        if close_raw is None:
-            return {}
-        close = close_raw
-    else:
-        close = raw if isinstance(raw, pd.DataFrame) else raw.to_frame(name=symbols[0])
-
     result: dict[str, pd.Series] = {}
-    for sym in symbols:
-        if sym in close.columns:
-            series = close[sym].dropna()
-            if not series.empty:
-                result[sym] = series
+
+    if yahoo_circuit.is_available():
+        import yfinance as yf
+
+        try:
+            raw = yf.download(
+                symbols,
+                start=start.isoformat(),
+                end=end.isoformat(),
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+        except Exception as e:
+            logger.warning("yf_close_series_failed", symbols=symbols[:5], error=str(e))
+            yahoo_circuit.record_failure()
+            raw = None
+
+        if raw is not None and not raw.empty:
+            yahoo_circuit.record_success()
+            close: pd.DataFrame | None
+            if isinstance(raw.columns, pd.MultiIndex):
+                close = raw.get("Close")
+            else:
+                close = raw if isinstance(raw, pd.DataFrame) else raw.to_frame(name=symbols[0])
+
+            if close is not None:
+                for sym in symbols:
+                    if sym in close.columns:
+                        series = close[sym].dropna()
+                        if not series.empty:
+                            result[sym] = series
+        elif raw is not None:
+            yahoo_circuit.record_failure()
+
+    missing = [sym for sym in symbols if sym not in result]
+    for sym in missing:
+        ticker = yf_symbol_to_krx_ticker(sym)
+        if ticker is None:
+            continue
+        series = sync_pykrx_close_series(ticker, start, end)
+        if series is not None:
+            result[sym] = series
     return result
 
 
@@ -128,6 +182,9 @@ def fetch_yf_info(
     factor_service P/E·P/B·시가총액 수집에서 사용.
     """
     import yfinance as yf
+
+    if not symbols or not yahoo_circuit.is_available():
+        return {}
 
     def _fetch_one(sym: str) -> tuple[str, dict]:
         try:
@@ -144,4 +201,9 @@ def fetch_yf_info(
                 info_map[sym] = info
             except Exception as e:
                 logger.warning("yf_info_fetch_failed", error=str(e))
+
+    if any(info_map.values()):
+        yahoo_circuit.record_success()
+    else:
+        yahoo_circuit.record_failure()
     return info_map

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { arrayMove } from "@dnd-kit/sortable";
 import { DragEndEvent } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -22,6 +22,7 @@ import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModa
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
+import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
@@ -37,6 +38,11 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
   });
+
+  const handleRefresh = useCallback(async () => {
+    await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
+  }, [qc]);
+  useRegisterRefresh(handleRefresh);
   const portfolios = useMemo(
     () => (Array.isArray(portfoliosRaw) ? portfoliosRaw : []),
     [portfoliosRaw],
@@ -226,9 +232,6 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
         onBatchSetTarget={(pid, accountIds) =>
           batchTargetMut.mutate({ portfolioId: pid, accountIds })
         }
-        onRefresh={async () => {
-          await qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios });
-        }}
       />
 
       {editorOpen && (

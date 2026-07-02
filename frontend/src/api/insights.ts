@@ -20,12 +20,4 @@ export interface Insight {
   metric_value: number | null;
 }
 
-export interface InsightsSummary {
-  INFO: number;
-  WARNING: number;
-  ALERT: number;
-}
-
 export const fetchInsights = () => apiGet<Insight[]>("/insights");
-
-export const fetchInsightsSummary = () => apiGet<InsightsSummary>("/insights/summary");

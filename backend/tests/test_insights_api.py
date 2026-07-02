@@ -50,7 +50,6 @@ def _setup_app(user, db):
 _MOCK_INSIGHTS = [
     {"type": "CONCENTRATION_RISK", "severity": "WARNING", "message": "삼성전자 비중이 30% 초과"},
 ]
-_MOCK_SUMMARY = {"total": 1, "warning": 1, "info": 0}
 
 
 class TestInsights:
@@ -77,17 +76,3 @@ class TestInsights:
             resp = client.get("/api/v1/insights")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
-
-    def test_insights_summary_returns_200(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        with (
-            patch(
-                "app.api.v1.insights.get_insights_summary",
-                AsyncMock(return_value=_MOCK_SUMMARY),
-            ),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.get("/api/v1/insights/summary")
-        assert resp.status_code == 200

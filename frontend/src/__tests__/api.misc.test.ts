@@ -37,8 +37,8 @@ import {
 } from "@/api/backtest";
 import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchDartDisclosures } from "@/api/dart";
-import { fetchInsights, fetchInsightsSummary } from "@/api/insights";
-import { fetchPortfolioRisk, fetchFactorAnalysis, fetchPortfolioFactorAnalysis, fetchEfficientFrontier, fetchRebalancingStrategy } from "@/api/risk";
+import { fetchInsights } from "@/api/insights";
+import { fetchPortfolioRisk, fetchRebalancingStrategy } from "@/api/risk";
 
 describe("api/settings", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -191,12 +191,6 @@ describe("api/insights", () => {
     await fetchInsights();
     expect(api.get).toHaveBeenCalledWith("/insights");
   });
-
-  it("fetchInsightsSummary calls GET /insights/summary", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchInsightsSummary();
-    expect(api.get).toHaveBeenCalledWith("/insights/summary");
-  });
 });
 
 describe("api/risk", () => {
@@ -212,32 +206,6 @@ describe("api/risk", () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchPortfolioRisk("port-1");
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk/port-1");
-  });
-
-  it("fetchFactorAnalysis calls GET /portfolio/factor-analysis", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchFactorAnalysis();
-    expect(api.get).toHaveBeenCalledWith("/portfolio/factor-analysis");
-  });
-
-  it("fetchPortfolioFactorAnalysis calls GET /portfolio/factor-analysis/:id", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchPortfolioFactorAnalysis("port-1");
-    expect(api.get).toHaveBeenCalledWith("/portfolio/factor-analysis/port-1");
-  });
-
-  it("fetchEfficientFrontier calls GET /portfolio/efficient-frontier without compare id", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchEfficientFrontier();
-    expect(api.get).toHaveBeenCalledWith("/portfolio/efficient-frontier");
-  });
-
-  it("fetchEfficientFrontier calls GET /portfolio/efficient-frontier with compare id", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchEfficientFrontier("port-1");
-    expect(api.get).toHaveBeenCalledWith(
-      "/portfolio/efficient-frontier?compare_portfolio_id=port-1",
-    );
   });
 
   it("fetchRebalancingStrategy calls GET /portfolio/rebalancing-strategy", async () => {

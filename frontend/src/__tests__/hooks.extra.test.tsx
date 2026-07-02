@@ -100,7 +100,6 @@ vi.mock("@/api/transactions", () => ({
 
 vi.mock("@/api/insights", () => ({
   fetchInsights: vi.fn().mockResolvedValue([]),
-  fetchInsightsSummary: vi.fn().mockResolvedValue({ total: 0, by_type: {} }),
 }));
 
 vi.mock("@/api/economicIndicators", () => ({

@@ -1,60 +1,6 @@
 import { apiGet } from "./client";
 
 // ---------------------------------------------------------------------------
-// 팩터 분석
-// ---------------------------------------------------------------------------
-
-export interface FactorHolding {
-  ticker: string;
-  name: string;
-  weight_pct: number;
-  pe_ratio: number | null;
-  pb_ratio: number | null;
-  market_cap: number | null;
-  momentum_pct: number | null;
-  value_score: number;
-  growth_score: number;
-  size_score: number;
-  momentum_score: number;
-}
-
-export interface FactorAnalysis {
-  holdings: FactorHolding[];
-  portfolio_factors: {
-    value: number;
-    growth: number;
-    size: number;
-    momentum: number;
-  };
-  position_count: number;
-  portfolio_name?: string;
-  note: string;
-}
-
-// ---------------------------------------------------------------------------
-// 효율적 프론티어
-// ---------------------------------------------------------------------------
-
-export interface FrontierPoint {
-  risk: number;
-  return: number;
-}
-
-export interface FrontierAsset {
-  symbol: string;
-  expected_return_pct: number;
-  volatility_pct: number;
-}
-
-export interface EfficientFrontier {
-  frontier: FrontierPoint[];
-  current: FrontierPoint | null;
-  target: FrontierPoint | null;
-  assets: FrontierAsset[];
-  note: string;
-}
-
-// ---------------------------------------------------------------------------
 // 위험 지표 (기존)
 // ---------------------------------------------------------------------------
 
@@ -118,18 +64,6 @@ export interface RebalancingStrategy {
 
 export const fetchPortfolioRisk = (portfolioId?: string) =>
   apiGet<PortfolioRiskMetrics>(portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk");
-
-export const fetchFactorAnalysis = () => apiGet<FactorAnalysis>("/portfolio/factor-analysis");
-
-export const fetchPortfolioFactorAnalysis = (portfolioId: string) =>
-  apiGet<FactorAnalysis>(`/portfolio/factor-analysis/${portfolioId}`);
-
-export const fetchEfficientFrontier = (comparePortfolioId?: string) =>
-  apiGet<EfficientFrontier>(
-    comparePortfolioId
-      ? `/portfolio/efficient-frontier?compare_portfolio_id=${comparePortfolioId}`
-      : "/portfolio/efficient-frontier",
-  );
 
 export const fetchRebalancingStrategy = (portfolioId: string) =>
   apiGet<RebalancingStrategy>(`/portfolio/rebalancing-strategy?portfolio_id=${portfolioId}`);

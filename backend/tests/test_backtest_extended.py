@@ -64,6 +64,24 @@ class TestFetchPricesSync:
         assert "AAPL" in result
         assert "TSLA" in result
 
+    def test_domestic_symbol_falls_back_to_pykrx_when_yahoo_fails(self, override_settings):
+        """Yahoo가 실패해도 국내(.KS) 심볼은 pykrx로 보완된다."""
+        import pandas as pd
+
+        from app.services.backtest_service import _sync_download_history
+
+        idx = pd.date_range("2020-01-01", periods=3)
+        pykrx_df = pd.DataFrame({"종가": [70000.0, 71000.0, 69000.0]}, index=idx)
+
+        with (
+            patch("yfinance.download", side_effect=Exception("401 Unauthorized")),
+            patch("pykrx.stock.get_market_ohlcv_by_date", return_value=pykrx_df),
+        ):
+            result = _sync_download_history(["005930.KS"], date(2020, 1, 1), date(2020, 1, 3))
+
+        assert "005930.KS" in result
+        assert len(result["005930.KS"]) == 3
+
 
 class TestComputeCorrelationSync:
     def test_empty_symbols_returns_empty(self, override_settings):

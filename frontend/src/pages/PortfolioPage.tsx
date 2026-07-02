@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState, lazy, Suspense } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
@@ -10,6 +10,7 @@ import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrwPrice } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
+import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { toast } from "@/utils/toast";
 import { pnlColor } from "@/utils/colors";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -72,6 +73,9 @@ export default function PortfolioPage() {
   const [chartsOpen, setChartsOpen] = useState(
     () => localStorage.getItem(CHARTS_OPEN_KEY) !== "false",
   );
+
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
 
   const handleChartsToggle = useCallback(() => {
     setChartsOpen((v) => {
@@ -224,58 +228,59 @@ export default function PortfolioPage() {
       {/* 탭 */}
       <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="pill" />
 
-      {tab === "종목 현황" && (
-        <ErrorBoundary variant="section">
-          {chartsOpen && (
-            <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-              <DomesticForeignBar items={marketChartData} />
-              <TreemapChart data={stockChartData} title="종목별 비중" />
+      <div ref={tabContentRef}>
+        {tab === "종목 현황" && (
+          <ErrorBoundary variant="section">
+            {chartsOpen && (
+              <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+                <DomesticForeignBar items={marketChartData} />
+                <TreemapChart data={stockChartData} title="종목별 비중" />
+              </Suspense>
+            )}
+            <button
+              onClick={handleChartsToggle}
+              className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
+            >
+              {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+              비중 차트 {chartsOpen ? "접기" : "펼치기"}
+            </button>
+            {(() => {
+              const dividendMap = Object.fromEntries(
+                dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
+              );
+              return (
+                <StockHoldingsTable
+                  positions={data.all_positions}
+                  totalStock={data.total_stock_krw}
+                  dividendMap={dividendMap}
+                  divLoading={divLoading}
+                  divError={divError}
+                />
+              );
+            })()}
+          </ErrorBoundary>
+        )}
+
+        {tab === "배당" && (
+          <ErrorBoundary variant="section">
+            <DividendTab
+              dividendData={dividendData}
+              divLoading={divLoading}
+              divSummary={divSummary}
+              dividendByTicker={dividendByTicker}
+              totalInvestedKrw={data?.total_invested_krw}
+            />
+          </ErrorBoundary>
+        )}
+
+        {tab === "세금" && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+              <TaxOptimizationCard />
             </Suspense>
-          )}
-          <button
-            onClick={handleChartsToggle}
-            className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors mt-2"
-          >
-            {chartsOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            비중 차트 {chartsOpen ? "접기" : "펼치기"}
-          </button>
-          {(() => {
-            const dividendMap = Object.fromEntries(
-              dividendData.map((d) => [`${d.ticker}-${d.market}`, d]),
-            );
-            return (
-              <StockHoldingsTable
-                positions={data.all_positions}
-                totalStock={data.total_stock_krw}
-                dividendMap={dividendMap}
-                divLoading={divLoading}
-                divError={divError}
-              />
-            );
-          })()}
-        </ErrorBoundary>
-      )}
-
-      {tab === "배당" && (
-        <ErrorBoundary variant="section">
-          <DividendTab
-            dividendData={dividendData}
-            divLoading={divLoading}
-            divSummary={divSummary}
-            dividendByTicker={dividendByTicker}
-            totalInvestedKrw={data?.total_invested_krw}
-          />
-        </ErrorBoundary>
-      )}
-
-      {tab === "세금" && (
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-            <TaxOptimizationCard />
-          </Suspense>
-        </ErrorBoundary>
-      )}
-
+          </ErrorBoundary>
+        )}
+      </div>
     </div>
   );
 }

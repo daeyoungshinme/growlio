@@ -11,6 +11,8 @@ from datetime import date
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from app.utils.circuit_breaker import yahoo_circuit
+
 logger = structlog.get_logger()
 
 
@@ -40,6 +42,9 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
     """
     import yfinance as yf
 
+    if not yahoo_circuit.is_available():
+        return {"ex_dividend_date": None, **_zero_div()}
+
     try:
         ticker = yf.Ticker(yahoo_symbol)
         info = ticker.info
@@ -67,9 +72,11 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
             trailing_dps = trailing_dps / 100
 
         dps = round(trailing_dps, 2) if trailing_dps > 0 else round(last_price * yld, 2)
+        yahoo_circuit.record_success()
         return {"dividend_yield": yld, "dps": dps, "ex_dividend_date": None}
     except Exception as e:
         logger.warning("yahoo_dividend_info_failed", symbol=yahoo_symbol, error=str(e))
+        yahoo_circuit.record_failure()
         return {"ex_dividend_date": None, **_zero_div()}
 
 
@@ -258,6 +265,9 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
     """과거 2년 배당락일에서 지급월 추출. calendar로 ex-date/payment-date 오프셋 보정."""
     import yfinance as yf
 
+    if not yahoo_circuit.is_available():
+        return []
+
     try:
         t = yf.Ticker(yahoo_symbol)
 
@@ -275,6 +285,7 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
 
         divs = t.dividends
         if divs is None or len(divs) == 0:
+            yahoo_circuit.record_success()
             return []
         cutoff_year = date.today().year - 2
         months: set[int] = set()
@@ -282,7 +293,9 @@ def sync_fetch_dividend_months(yahoo_symbol: str) -> list[int]:
             if hasattr(ts, "year") and ts.year >= cutoff_year:
                 payment_month = ((int(ts.month) - 1 + offset_months) % 12) + 1
                 months.add(payment_month)
+        yahoo_circuit.record_success()
         return sorted(months)
     except Exception as e:
         logger.warning("yfinance_dividend_months_failed", symbol=yahoo_symbol, error=str(e))
+        yahoo_circuit.record_failure()
         return []

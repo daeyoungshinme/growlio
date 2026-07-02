@@ -34,10 +34,8 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.rebalancingHistory).toEqual(["rebalancing-history"]);
     expect(QUERY_KEYS.alertHistory).toEqual(["alert-history"]);
     expect(QUERY_KEYS.insights).toEqual(["insights"]);
-    expect(QUERY_KEYS.insightsSummary).toEqual(["insights", "summary"]);
     expect(QUERY_KEYS.monthlyOptimization).toEqual(["monthly-optimization"]);
     expect(QUERY_KEYS.marketSignal).toEqual(["market-signal"]);
-    expect(QUERY_KEYS.factorAnalysis).toEqual(["factor-analysis"]);
     expect(QUERY_KEYS.overseasPositionsTax).toEqual(["overseas-positions-tax"]);
   });
 
@@ -50,13 +48,7 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.dartDisclosures(30)).toEqual(["dart-disclosures", 30]);
     expect(QUERY_KEYS.allocationHistory(12)).toEqual(["allocation-history", 12]);
     expect(QUERY_KEYS.portfolioRisk("p-1")).toEqual(["portfolio-risk", "p-1"]);
-    expect(QUERY_KEYS.portfolioFactorAnalysis("p-2")).toEqual(["factor-analysis", "p-2"]);
     expect(QUERY_KEYS.rebalancingStrategy("p-3")).toEqual(["rebalancing-strategy", "p-3"]);
-  });
-
-  it("efficientFrontier는 comparePortfolioId 없으면 null을 포함한다", () => {
-    expect(QUERY_KEYS.efficientFrontier()).toEqual(["efficient-frontier", null]);
-    expect(QUERY_KEYS.efficientFrontier("p-1")).toEqual(["efficient-frontier", "p-1"]);
   });
 });
 

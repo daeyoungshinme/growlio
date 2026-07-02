@@ -5,8 +5,6 @@ const MAIN_PAGE_PREFIXES = [
   "portfolios",
   "accounts",
   "rebalancing-alerts",
-  "factor-analysis",
-  "efficient-frontier",
   "rebalancing-strategy",
   // 대시보드 탭
   "dashboard",

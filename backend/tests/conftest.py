@@ -37,6 +37,27 @@ def override_settings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_circuit_breakers():
+    """서킷 브레이커 모듈 싱글톤을 각 테스트 전에 CLOSED로 초기화한다.
+
+    yahoo_circuit 등은 모듈 싱글톤이라 한 테스트에서의 연속 실패가 다음 테스트로
+    누적되어(OPEN 상태) 무관한 테스트가 빈 결과를 받는 오탐을 유발할 수 있다.
+    """
+    from app.utils import circuit_breaker as _cb
+
+    for breaker in (
+        _cb.kis_circuit,
+        _cb.kiwoom_circuit,
+        _cb.yahoo_circuit,
+        _cb.dart_circuit,
+        _cb.openbanking_circuit,
+        _cb.naver_circuit,
+        _cb.fdr_circuit,
+    ):
+        breaker.record_success()  # _failures=0, _state=CLOSED로 리셋
+
+
+@pytest.fixture(autouse=True)
 def reset_rate_limiter():
     """slowapi 인메모리 레이트 리미터 카운터를 각 테스트 전에 초기화한다.
 

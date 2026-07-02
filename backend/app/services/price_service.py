@@ -1,10 +1,12 @@
 """현재가 조회 서비스.
 
 우선순위:
-  1. Yahoo Finance (API 키 불필요 — 국내·해외 모두 지원, ~15분 지연)
-  2. KIS API (설정된 경우, 실시간)
+  1. 국내(KOSPI/KOSDAQ): Naver Finance → pykrx → Yahoo Finance → KIS API
+  2. 해외: Yahoo Finance (API 키 불필요, ~15분 지연) → KIS API (설정된 경우, 실시간)
 
-Yahoo Finance 함수 → yahoo_price.py
+Yahoo Finance가 Render 등 클라우드 호스팅 IP를 차단해 401을 반환하는 경우를 대비해
+국내 종목은 Naver/pykrx를 우선 시도한다 (yfinance 함수 → yahoo_price.py,
+국내 폴백 함수 → price_sync_sources.py).
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.constants import DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
 from app.services.credential_service import decrypt
+from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
     _sync_calc_return,
     _sync_yahoo_batch,
@@ -36,9 +39,24 @@ from app.utils.cache_keys import (
     current_price_key,
     price_return_key,
 )
-from app.utils.circuit_breaker import yahoo_circuit
+from app.utils.circuit_breaker import CircuitOpenError, naver_circuit, yahoo_circuit
 
 logger = structlog.get_logger()
+
+
+async def _domestic_price_fallback(ticker: str, loop: asyncio.AbstractEventLoop) -> float | None:
+    """국내 종목 전용 폴백: Naver Finance → pykrx 순으로 시도."""
+    try:
+        price = await naver_circuit.call(loop.run_in_executor, None, partial(sync_naver_price, ticker))
+    except CircuitOpenError:
+        price = None
+    except Exception as e:
+        logger.warning("naver_price_failed", ticker=ticker, error=str(e))
+        price = None
+    if price:
+        return price
+
+    return await loop.run_in_executor(None, partial(sync_pykrx_price, ticker))
 
 
 async def fetch_current_price(
@@ -49,7 +67,7 @@ async def fetch_current_price(
     redis: RedisType = None,
 ) -> float | None:
     """단일 종목 현재가 조회.
-    Redis 15분 캐시 → Yahoo Finance → KIS 순으로 시도한다.
+    Redis 15분 캐시 → (국내: Naver/pykrx →) Yahoo Finance → KIS 순으로 시도한다.
     """
     cache_key = current_price_key(ticker, market)
     if redis:
@@ -60,7 +78,11 @@ async def fetch_current_price(
 
     loop = asyncio.get_running_loop()
 
-    if yahoo_circuit.is_available():
+    price: float | None = None
+    if market.upper() in DOMESTIC_MARKETS:
+        price = await _domestic_price_fallback(ticker, loop)
+
+    if not price and yahoo_circuit.is_available():
         async with _yfinance_sem:
             price = await loop.run_in_executor(None, partial(_sync_yahoo_price, ticker, market))
         if price:
@@ -91,22 +113,33 @@ async def fetch_prices_batch(
 ) -> dict[str, float]:
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
-    Yahoo Finance 배치 조회 후, 실패한 종목만 KIS로 보완한다.
+    국내 종목은 Naver/pykrx로 먼저 채우고, 남은 종목만 Yahoo Finance 배치 조회 →
+    그래도 실패한 종목은 KIS로 보완한다.
     """
     if not tickers:
         return {}
 
     loop = asyncio.get_running_loop()
+    price_map: dict[str, float] = {}
 
-    if yahoo_circuit.is_available():
+    domestic = [(t, m) for t, m in tickers if m.upper() in DOMESTIC_MARKETS]
+    if domestic:
+        domestic_results = await asyncio.gather(
+            *(_domestic_price_fallback(t, loop) for t, _ in domestic), return_exceptions=True
+        )
+        for (ticker, _), result in zip(domestic, domestic_results, strict=False):
+            if isinstance(result, (int, float)) and result > 0:
+                price_map[ticker] = float(result)
+
+    yahoo_targets = [(t, m) for t, m in tickers if t not in price_map]
+    if yahoo_targets and yahoo_circuit.is_available():
         async with _yfinance_sem:
-            price_map: dict[str, float] = await loop.run_in_executor(None, partial(_sync_yahoo_batch, tickers))
-        if price_map:
+            yahoo_map = await loop.run_in_executor(None, partial(_sync_yahoo_batch, yahoo_targets))
+        if yahoo_map:
             yahoo_circuit.record_success()
         else:
             yahoo_circuit.record_failure()
-    else:
-        price_map = {}
+        price_map.update(yahoo_map)
 
     missing = [(t, m) for t, m in tickers if t not in price_map or price_map[t] == 0]
     if missing:

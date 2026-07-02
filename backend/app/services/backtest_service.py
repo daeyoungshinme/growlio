@@ -31,7 +31,9 @@ from app.schemas.backtest import (
     SeriesData,
 )
 from app.services.backtest_metrics import compute_metrics, compute_portfolio_series
+from app.services.price_sync_sources import sync_pykrx_close_series, yf_symbol_to_krx_ticker
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
+from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
 
@@ -52,39 +54,62 @@ def _sync_download_history(
     end: date,
     reinvest_dividends: bool = True,
 ) -> dict[str, list[tuple[str, float]]]:
-    """symbol → [(date_str, price), ...] 반환. 동기 함수."""
+    """symbol → [(date_str, price), ...] 반환. 동기 함수.
+
+    Yahoo가 실패/차단된 국내(.KS/.KQ) 심볼은 pykrx로 보완한다
+    (배당 재투자 조정은 미반영 — Yahoo 완전 차단 시의 근사치).
+    """
     import pandas as pd
-    import yfinance as yf
 
     if not symbols:
         return {}
 
-    try:
-        raw = yf.download(
-            symbols,
-            start=start.isoformat(),
-            end=end.isoformat(),
-            auto_adjust=reinvest_dividends,
-            progress=False,
-            threads=False,
-        )
-    except Exception as e:
-        logger.warning("yfinance_download_failed", symbols=symbols, error=str(e))
-        return {}
-
-    close = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
-    if close is None or close.empty:
-        return {}
-
-    if not isinstance(close, pd.DataFrame):
-        close = close.to_frame(name=symbols[0])
-
     result: dict[str, list[tuple[str, float]]] = {}
-    for sym in symbols:
-        if sym not in close.columns:
+
+    if yahoo_circuit.is_available():
+        import yfinance as yf
+
+        try:
+            raw = yf.download(
+                symbols,
+                start=start.isoformat(),
+                end=end.isoformat(),
+                auto_adjust=reinvest_dividends,
+                progress=False,
+                threads=False,
+            )
+        except Exception as e:
+            logger.warning("yfinance_download_failed", symbols=symbols, error=str(e))
+            yahoo_circuit.record_failure()
+            raw = None
+
+        close = None
+        if raw is not None:
+            close = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
+            if close is None or close.empty:
+                yahoo_circuit.record_failure()
+                close = None
+            else:
+                yahoo_circuit.record_success()
+                if not isinstance(close, pd.DataFrame):
+                    close = close.to_frame(name=symbols[0])
+
+        if close is not None:
+            for sym in symbols:
+                if sym not in close.columns:
+                    continue
+                series = close[sym].dropna()
+                if series.empty:
+                    continue
+                result[sym] = [(idx.strftime("%Y-%m-%d"), float(val)) for idx, val in series.items() if val > 0]
+
+    missing = [sym for sym in symbols if sym not in result]
+    for sym in missing:
+        ticker = yf_symbol_to_krx_ticker(sym)
+        if ticker is None:
             continue
-        series = close[sym].dropna()
-        if series.empty:
+        series = sync_pykrx_close_series(ticker, start, end)
+        if series is None:
             continue
         result[sym] = [(idx.strftime("%Y-%m-%d"), float(val)) for idx, val in series.items() if val > 0]
 
@@ -324,6 +349,9 @@ def _sync_compute_correlation(
     if not symbols:
         return [], []
 
+    if not yahoo_circuit.is_available():
+        return [], []
+
     try:
         raw = yf.download(
             symbols,
@@ -335,14 +363,18 @@ def _sync_compute_correlation(
         )
     except Exception as e:
         logger.warning("correlation_download_failed", error=str(e))
+        yahoo_circuit.record_failure()
         return [], []
 
     if raw is None or (hasattr(raw, "empty") and raw.empty):
+        yahoo_circuit.record_failure()
         return [], []
 
     close = raw.get("Close") if isinstance(raw.columns, pd.MultiIndex) else raw
     if close is None or (hasattr(close, "empty") and close.empty):
+        yahoo_circuit.record_failure()
         return [], []
+    yahoo_circuit.record_success()
 
     if not isinstance(close, pd.DataFrame):
         close = close.to_frame(name=symbols[0])

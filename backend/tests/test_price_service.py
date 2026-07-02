@@ -42,6 +42,7 @@ class TestFetchCurrentPrice:
         user_id = uuid.uuid4()
 
         with (
+            patch("app.services.price_service._domestic_price_fallback", new=AsyncMock(return_value=None)),
             patch("app.services.price_service._sync_yahoo_price", return_value=75000.0),
             patch("asyncio.get_event_loop") as mock_loop,
         ):
@@ -135,6 +136,26 @@ class TestFetchPricesBatch:
 
         assert result.get("AAPL") == 180.0
 
+    @pytest.mark.asyncio
+    async def test_domestic_ticker_filled_by_naver_skips_yahoo_call(self, mock_db, mock_redis, override_settings):
+        """국내 종목이 Naver로 채워지면 해당 티커는 Yahoo 배치 대상에서 제외된다."""
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        user_id = uuid.uuid4()
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with (
+            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.price_service._sync_yahoo_batch") as mock_yahoo_batch,
+        ):
+            from app.services.price_service import fetch_prices_batch
+
+            result = await fetch_prices_batch(user_id, [("005930", "KOSPI")], mock_db, mock_redis)
+
+        assert result.get("005930") == 286000.0
+        mock_yahoo_batch.assert_not_called()
+
 
 # ── get_historical_returns ────────────────────────────────────
 
@@ -218,3 +239,100 @@ class TestFetchCurrentPriceCacheHit:
         price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, redis)
 
         assert price == 75000.0
+
+
+# ── _domestic_price_fallback: 국내 종목 Naver→pykrx 폴백 ────────
+
+
+class TestDomesticPriceFallback:
+    @pytest.mark.asyncio
+    async def test_naver_success_skips_pykrx(self, override_settings):
+        import asyncio
+        from unittest.mock import patch
+
+        with (
+            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.price_service.sync_pykrx_price") as mock_pykrx,
+        ):
+            from app.services.price_service import _domestic_price_fallback
+
+            loop = asyncio.get_running_loop()
+            price = await _domestic_price_fallback("005930", loop)
+
+        assert price == 286000.0
+        mock_pykrx.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_naver_fails_falls_back_to_pykrx(self, override_settings):
+        import asyncio
+        from unittest.mock import patch
+
+        with (
+            patch("app.services.price_service.sync_naver_price", return_value=None),
+            patch("app.services.price_service.sync_pykrx_price", return_value=284000.0),
+        ):
+            from app.services.price_service import _domestic_price_fallback
+
+            loop = asyncio.get_running_loop()
+            price = await _domestic_price_fallback("005930", loop)
+
+        assert price == 284000.0
+
+    @pytest.mark.asyncio
+    async def test_both_sources_fail_returns_none(self, override_settings):
+        import asyncio
+        from unittest.mock import patch
+
+        with (
+            patch("app.services.price_service.sync_naver_price", return_value=None),
+            patch("app.services.price_service.sync_pykrx_price", return_value=None),
+        ):
+            from app.services.price_service import _domestic_price_fallback
+
+            loop = asyncio.get_running_loop()
+            price = await _domestic_price_fallback("005930", loop)
+
+        assert price is None
+
+
+class TestFetchCurrentPriceDomesticPriority:
+    """국내 종목은 Naver/pykrx가 성공하면 Yahoo를 호출하지 않아야 한다."""
+
+    @pytest.mark.asyncio
+    async def test_domestic_naver_success_skips_yahoo(self, mock_db, mock_redis, override_settings):
+        import uuid
+        from unittest.mock import patch
+
+        user_id = uuid.uuid4()
+        mock_db.scalar.return_value = None
+
+        with (
+            patch("app.services.price_service.sync_naver_price", return_value=286000.0),
+            patch("app.services.price_service._sync_yahoo_price") as mock_yahoo,
+        ):
+            from app.services.price_service import fetch_current_price
+
+            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_redis)
+
+        assert price == 286000.0
+        mock_yahoo.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_overseas_ticker_skips_domestic_fallback(self, mock_db, mock_redis, override_settings):
+        """해외 종목은 국내 폴백(Naver/pykrx)을 거치지 않고 바로 Yahoo로 간다."""
+        import uuid
+        from unittest.mock import patch
+
+        user_id = uuid.uuid4()
+        mock_db.scalar.return_value = None
+
+        with (
+            patch("app.services.price_service._domestic_price_fallback") as mock_domestic,
+            patch("app.services.price_service._sync_yahoo_price", return_value=180.0),
+        ):
+            from app.services.price_service import fetch_current_price
+
+            price = await fetch_current_price(user_id, "AAPL", "NASDAQ", mock_db, mock_redis)
+
+        assert price == 180.0
+        mock_domestic.assert_not_called()
