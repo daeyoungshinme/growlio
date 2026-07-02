@@ -30,9 +30,7 @@ def _returns_from_series(series: pd.Series) -> list[float] | None:
     return [float(r) for r in returns if math.isfinite(r)]
 
 
-def _pykrx_daily_returns_fallback(
-    missing_syms: list[str], start: date, end: date
-) -> dict[str, list[float]]:
+def _pykrx_daily_returns_fallback(missing_syms: list[str], start: date, end: date) -> dict[str, list[float]]:
     """국내(.KS/.KQ) 심볼만 pykrx로 보완한다. 해외 종목·지수는 대체 소스가 없어 제외."""
     result: dict[str, list[float]] = {}
     for sym in missing_syms:
