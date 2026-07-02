@@ -1,16 +1,16 @@
-import { useState } from "react";
-import { CheckCircle, XCircle, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Modal from "@/components/common/Modal";
-import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
-import { verifyKisCredentials } from "@/api/assets";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
-import { extractErrorMessage } from "@/utils/error";
-import { convertUsdToKrw, fmtKrw } from "@/utils/format";
+import { useKisCredentialVerify } from "@/hooks/useKisCredentialVerify";
+import { convertUsdToKrw } from "@/utils/format";
 import { STOCK_TYPE_LABELS } from "@/constants";
+import StockDepositFields from "./StockDepositFields";
+import KisCredentialFields from "./KisCredentialFields";
+import KiwoomCredentialFields from "./KiwoomCredentialFields";
 
 const STOCK_ASSET_TYPE_OPTIONS: Record<string, string> = {
   STOCK_KIS: "주식 (KIS 한국투자증권)",
@@ -72,26 +72,12 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
   const kisValid =
     !isKis || isEdit || (kisAccountNoValid && !!form.kis_app_key && !!form.kis_app_secret);
 
-  const [verifyState, setVerifyState] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [verifyError, setVerifyError] = useState("");
+  const { verifyState, verifyError, verify, reset: resetVerify } = useKisCredentialVerify();
 
   const handleVerify = async () => {
     if (!form.kis_app_key || !form.kis_app_secret) return;
-    setVerifyState("loading");
-    try {
-      await verifyKisCredentials({
-        kis_app_key: form.kis_app_key,
-        kis_app_secret: form.kis_app_secret,
-        is_mock: form.is_mock_mode ?? true,
-      });
-      setVerifyState("ok");
-    } catch (e) {
-      setVerifyState("error");
-      setVerifyError(extractErrorMessage(e, "자격증명 확인 실패"));
-    }
+    await verify(form.kis_app_key, form.kis_app_secret, form.is_mock_mode ?? true);
   };
-
-  const resetVerify = () => setVerifyState("idle");
 
   const handleSourceChange = (source: string) => {
     set("data_source", source);
@@ -264,280 +250,51 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
 
             {/* MANUAL 예수금 */}
             {form.data_source === "MANUAL" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  예수금
-                </label>
-                <div>
-                  <label
-                    htmlFor="stock-deposit-krw"
-                    className="text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    원화 예수금
-                  </label>
-                  <div className="relative mt-0.5">
-                    <input
-                      id="stock-deposit-krw"
-                      type="number"
-                      inputMode="decimal"
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={depositKrw ?? ""}
-                      onChange={(e) =>
-                        setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
-                      }
-                      placeholder="0"
-                    />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                      원
-                    </span>
-                  </div>
-                  <AmountUnitButtons
-                    onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="stock-deposit-usd"
-                    className="text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    외화 예수금 (USD)
-                  </label>
-                  <div className="relative mt-0.5">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                      $
-                    </span>
-                    <input
-                      id="stock-deposit-usd"
-                      type="number"
-                      inputMode="decimal"
-                      className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      value={depositUsd ?? ""}
-                      onChange={(e) =>
-                        setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
-                      }
-                      placeholder="0"
-                    />
-                  </div>
-                  {(depositUsd ?? 0) > 0 && (
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                      {usdRate == null
-                        ? "환율 정보를 불러오는 중..."
-                        : `≈ ${fmtKrw(usdAsKrw)} (환율 ${usdRate.toLocaleString()}원/USD)`}
-                    </p>
-                  )}
-                </div>
-                {hasAnyDeposit && (
-                  <div className="flex justify-between items-center pt-1 border-t border-gray-100 dark:border-gray-700">
-                    <span className="text-xs text-gray-500 dark:text-gray-400">합계</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                      {fmtKrw(totalKrw)}
-                    </span>
-                  </div>
-                )}
-              </div>
+              <StockDepositFields
+                mode="create"
+                depositKrw={depositKrw}
+                depositUsd={depositUsd}
+                setDepositKrw={setDepositKrw}
+                setDepositUsd={setDepositUsd}
+                usdRate={usdRate}
+                usdAsKrw={usdAsKrw}
+                totalKrw={totalKrw}
+                hasAnyDeposit={hasAnyDeposit}
+              />
             )}
 
             {/* 편집 모드: KIS/키움 예수금 수동 보정 */}
             {isEdit && form.data_source !== "MANUAL" && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  예수금 (수동 보정)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={depositKrw ?? ""}
-                    onChange={(e) =>
-                      setDepositKrw(e.target.value === "" ? undefined : Number(e.target.value))
-                    }
-                    placeholder="원화 예수금"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                    원
-                  </span>
-                </div>
-                <AmountUnitButtons
-                  onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
-                />
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg pl-6 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    value={depositUsd ?? ""}
-                    onChange={(e) =>
-                      setDepositUsd(e.target.value === "" ? undefined : Number(e.target.value))
-                    }
-                    placeholder="외화 예수금 (USD)"
-                  />
-                </div>
-                {(depositUsd ?? 0) > 0 && usdRate != null && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    ≈ {fmtKrw(usdAsKrw)} (환율 {usdRate.toLocaleString()}원/USD)
-                  </p>
-                )}
-              </div>
+              <StockDepositFields
+                mode="edit"
+                depositKrw={depositKrw}
+                depositUsd={depositUsd}
+                setDepositKrw={setDepositKrw}
+                setDepositUsd={setDepositUsd}
+                usdRate={usdRate}
+                usdAsKrw={usdAsKrw}
+                totalKrw={totalKrw}
+                hasAnyDeposit={hasAnyDeposit}
+              />
             )}
 
             {/* KIS 자격증명 */}
             {form.data_source === "KIS_API" && (
-              <>
-                {!isEdit && (
-                  <div>
-                    <label
-                      htmlFor="stock-kis-account-no"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      KIS 계좌번호 *
-                    </label>
-                    <input
-                      id="stock-kis-account-no"
-                      className={`mt-1 w-full ${INPUT_SM}`}
-                      value={form.kis_account_no ?? ""}
-                      onChange={(e) => set("kis_account_no", e.target.value)}
-                      placeholder="12345678-01"
-                    />
-                    {isKis && form.kis_account_no && !kisAccountNoValid && (
-                      <p className="mt-1 text-xs text-red-500">
-                        형식 오류: 12345678-01 형식으로 입력하세요
-                      </p>
-                    )}
-                  </div>
-                )}
-                <div>
-                  <label
-                    htmlFor="stock-kis-app-key"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    KIS App Key{!isEdit && " *"}
-                  </label>
-                  {isEdit && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
-                      비워두면 기존 키를 유지합니다
-                    </p>
-                  )}
-                  <input
-                    id="stock-kis-app-key"
-                    type="password"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.kis_app_key ?? ""}
-                    onChange={(e) => {
-                      set("kis_app_key", e.target.value);
-                      resetVerify();
-                    }}
-                    placeholder={isEdit ? "기존 키 유지" : "KIS 앱 키"}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="stock-kis-app-secret"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    KIS App Secret{!isEdit && " *"}
-                  </label>
-                  <input
-                    id="stock-kis-app-secret"
-                    type="password"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.kis_app_secret ?? ""}
-                    onChange={(e) => {
-                      set("kis_app_secret", e.target.value);
-                      resetVerify();
-                    }}
-                    placeholder={isEdit ? "기존 시크릿 유지" : "KIS 앱 시크릿"}
-                  />
-                </div>
-                {(!isEdit || form.kis_app_key || form.kis_app_secret) && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleVerify}
-                      disabled={
-                        verifyState === "loading" || !form.kis_app_key || !form.kis_app_secret
-                      }
-                      className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
-                    >
-                      {verifyState === "loading" ? "확인 중..." : "자격증명 확인"}
-                    </button>
-                    {verifyState === "ok" && (
-                      <span className="flex items-center gap-1 text-xs text-green-600 dark:text-green-400">
-                        <CheckCircle size={14} /> 자격증명 확인됨
-                      </span>
-                    )}
-                    {verifyState === "error" && (
-                      <span className="flex items-center gap-1 text-xs text-red-500">
-                        <XCircle size={14} /> {verifyError}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </>
+              <KisCredentialFields
+                form={form}
+                set={set}
+                isEdit={isEdit}
+                kisAccountNoValid={kisAccountNoValid}
+                verifyState={verifyState}
+                verifyError={verifyError}
+                onVerify={handleVerify}
+                onCredentialChange={resetVerify}
+              />
             )}
 
             {/* 키움 자격증명 */}
             {form.data_source === "KIWOOM_API" && (
-              <>
-                {!isEdit && (
-                  <div>
-                    <label
-                      htmlFor="stock-kiwoom-account-no"
-                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                    >
-                      키움 계좌번호 *
-                    </label>
-                    <input
-                      id="stock-kiwoom-account-no"
-                      className={`mt-1 w-full ${INPUT_SM}`}
-                      value={form.kiwoom_account_no ?? ""}
-                      onChange={(e) => set("kiwoom_account_no", e.target.value)}
-                      placeholder="12345678-01"
-                    />
-                  </div>
-                )}
-                <div>
-                  <label
-                    htmlFor="stock-kiwoom-app-key"
-                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >
-                    키움 App Key{!isEdit && " *"}
-                  </label>
-                  {isEdit && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
-                      비워두면 기존 키를 유지합니다
-                    </p>
-                  )}
-                  <input
-                    id="stock-kiwoom-app-key"
-                    type="password"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.kiwoom_app_key ?? ""}
-                    onChange={(e) => set("kiwoom_app_key", e.target.value || undefined)}
-                    placeholder={isEdit ? "기존 키 유지" : "키움 앱 키"}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="stock-kiwoom-app-secret"
-                    className="text-sm font-medium text-gray-600 dark:text-gray-400"
-                  >
-                    키움 App Secret{!isEdit && " *"}
-                  </label>
-                  <input
-                    id="stock-kiwoom-app-secret"
-                    type="password"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.kiwoom_app_secret ?? ""}
-                    onChange={(e) => set("kiwoom_app_secret", e.target.value || undefined)}
-                    placeholder={isEdit ? "기존 시크릿 유지" : "키움 앱 시크릿"}
-                  />
-                </div>
-              </>
+              <KiwoomCredentialFields form={form} set={set} isEdit={isEdit} />
             )}
 
             {!isEdit && form.data_source !== "MANUAL" && (

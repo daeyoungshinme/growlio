@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.api.v1._account_deps import get_owned_or_404
+from app.api.v1._alert_crud import register_alert_reactivate_delete
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User
@@ -115,30 +115,14 @@ async def create_exchange_rate_alert(
     return AlertResponse.model_validate(alert)
 
 
-@router.patch("/exchange-rate/{alert_id}/reactivate", response_model=AlertResponse)
-async def reactivate_exchange_rate_alert(
-    alert_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """비활성 알림을 재활성화하고 발동 횟수를 초기화한다."""
-    alert = await get_owned_or_404(db, ExchangeRateAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
-    alert.is_active = True
-    alert.trigger_count = 0
-    await db.commit()
-    await db.refresh(alert)
-    await invalidate_exchange_rate_alert_caches(await get_redis(), current_user.id)
-    return AlertResponse.model_validate(alert)
+async def _invalidate_exchange_rate_caches(user_id: uuid.UUID) -> None:
+    await invalidate_exchange_rate_alert_caches(await get_redis(), user_id)
 
 
-@router.delete("/exchange-rate/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_exchange_rate_alert(
-    alert_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """목표환율 알림 삭제."""
-    alert = await get_owned_or_404(db, ExchangeRateAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
-    await db.delete(alert)
-    await db.commit()
-    await invalidate_exchange_rate_alert_caches(await get_redis(), current_user.id)
+register_alert_reactivate_delete(
+    router,
+    path_prefix="/exchange-rate",
+    model=ExchangeRateAlert,
+    response_model=AlertResponse,
+    invalidate_cache=_invalidate_exchange_rate_caches,
+)

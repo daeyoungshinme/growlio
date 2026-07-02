@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.api.v1._account_deps import get_owned_or_404
+from app.api.v1._alert_crud import register_alert_reactivate_delete
 from app.limiter import limiter
 from app.models.alert import StockPriceAlert
 from app.models.user import User
@@ -103,32 +103,9 @@ async def create_stock_price_alert(
     return StockPriceAlertResponse.model_validate(alert)
 
 
-@router.patch("/stock-price/{alert_id}/reactivate", response_model=StockPriceAlertResponse)
-@limiter.limit("20/minute")
-async def reactivate_stock_price_alert(
-    request: Request,
-    alert_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """주가 알림 재활성화."""
-    alert = await get_owned_or_404(db, StockPriceAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
-    alert.is_active = True
-    alert.trigger_count = 0
-    await db.commit()
-    await db.refresh(alert)
-    return StockPriceAlertResponse.model_validate(alert)
-
-
-@router.delete("/stock-price/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limit("20/minute")
-async def delete_stock_price_alert(
-    request: Request,
-    alert_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """주가 알림 삭제."""
-    alert = await get_owned_or_404(db, StockPriceAlert, alert_id, current_user.id, "알림을 찾을 수 없습니다")
-    await db.delete(alert)
-    await db.commit()
+register_alert_reactivate_delete(
+    router,
+    path_prefix="/stock-price",
+    model=StockPriceAlert,
+    response_model=StockPriceAlertResponse,
+)
