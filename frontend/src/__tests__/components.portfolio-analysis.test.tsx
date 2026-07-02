@@ -1,58 +1,10 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import { MemoryRouter } from "react-router-dom";
 import type { AssetAccount } from "@/api/assets";
 
-vi.mock("@/hooks/useInsights", () => ({
-  useInsights: vi.fn(() => ({ data: [], isLoading: false })),
-}));
-
-import PortfolioDiagnosisCard from "@/components/portfolio-analysis/PortfolioDiagnosisCard";
 import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 import PortfolioAccountSelector from "@/components/portfolio-analysis/PortfolioAccountSelector";
-// ------- PortfolioDiagnosisCard -------
-describe("PortfolioDiagnosisCard", () => {
-  it("renders no issues state", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioDiagnosisCard />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText("포트폴리오 진단 결과")).toBeDefined();
-    expect(screen.getByText(/이상 없음/)).toBeDefined();
-  });
-
-  it("renders with portfolio name", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioDiagnosisCard portfolioName="내 포트폴리오" />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText(/'내 포트폴리오' 기준/)).toBeDefined();
-  });
-
-  it("expands on click", () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioDiagnosisCard />
-      </MemoryRouter>,
-    );
-    const btn = screen.getByRole("button");
-    fireEvent.click(btn);
-    expect(screen.getByText("포트폴리오 이상 없음")).toBeDefined();
-  });
-
-  it("renders with custom insights via mock override", () => {
-    // Just verify that basic render works (mock setup is at module level)
-    renderWithProviders(
-      <MemoryRouter>
-        <PortfolioDiagnosisCard portfolioName="테스트" />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText(/테스트/)).toBeDefined();
-  });
-});
 
 // ------- PortfolioWeightChart -------
 describe("PortfolioWeightChart", () => {

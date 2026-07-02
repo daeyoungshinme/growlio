@@ -278,6 +278,12 @@ describe("executionReducer", () => {
     expect(result.orderType).toBe("LIMIT");
   });
 
+  it("SET_STRATEGY — 실행 전략을 업데이트한다", () => {
+    const action: ExecutionAction = { type: "SET_STRATEGY", strategy: "TWO_PHASE" };
+    const result = executionReducer(baseState, action);
+    expect(result.strategy).toBe("TWO_PHASE");
+  });
+
   it("TOGGLE_SELECTED — 선택되지 않은 키를 추가한다", () => {
     const action: ExecutionAction = { type: "TOGGLE_SELECTED", key: "buy_005930_acc1" };
     const result = executionReducer(baseState, action);

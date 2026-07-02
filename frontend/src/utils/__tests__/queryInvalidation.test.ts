@@ -5,9 +5,11 @@ import {
   invalidateTransactionData,
   invalidatePortfolioData,
   invalidateDcaData,
+  invalidateDividendPlanData,
   invalidateAlertData,
   invalidateStockPriceAlertData,
   invalidateRebalancingAlertData,
+  invalidateRebalancingHistoryData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -71,6 +73,15 @@ describe("invalidateDcaData", () => {
   });
 });
 
+describe("invalidateDividendPlanData", () => {
+  it("dividend-plan 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateDividendPlanData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("dividend-plan");
+  });
+});
+
 describe("invalidateAlertData", () => {
   it("exchange-rate-alerts 무효화", async () => {
     const qc = makeQueryClient();
@@ -100,5 +111,14 @@ describe("invalidateRebalancingAlertData", () => {
       (c) => c[0].queryKey[0] === "rebalancing-alert",
     );
     expect(alertCall![0].queryKey[1]).toBe("portfolio-123");
+  });
+});
+
+describe("invalidateRebalancingHistoryData", () => {
+  it("rebalancing-history 무효화", async () => {
+    const qc = makeQueryClient();
+    await invalidateRebalancingHistoryData(qc as any);
+    const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
+    expect(keys).toContain("rebalancing-history");
   });
 });

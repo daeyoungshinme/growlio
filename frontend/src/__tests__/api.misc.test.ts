@@ -25,7 +25,7 @@ vi.mock("@/api/client", () => {
 
 import { api } from "@/api/client";
 import { fetchSettings, updateAutoDca, registerPushToken } from "@/api/settings";
-import { fetchDCAAnalysis } from "@/api/invest";
+import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
 import {
   fetchBacktestPortfolios,
@@ -83,6 +83,12 @@ describe("api/invest", () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchDCAAnalysis();
     expect(api.get).toHaveBeenCalledWith("/invest/dca-analysis");
+  });
+
+  it("fetchDividendPlan calls GET /invest/dividend-plan", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: {} });
+    await fetchDividendPlan();
+    expect(api.get).toHaveBeenCalledWith("/invest/dividend-plan");
   });
 });
 

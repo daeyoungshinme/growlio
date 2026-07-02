@@ -51,9 +51,6 @@ vi.mock("../components/portfolio/TreemapChart", () => ({
 vi.mock("../components/portfolio/DomesticForeignBar", () => ({
   default: () => <div data-testid="domestic-foreign-bar">DomesticForeignBar</div>,
 }));
-vi.mock("../components/portfolio-analysis/PortfolioDiagnosisCard", () => ({
-  default: () => <div data-testid="portfolio-diagnosis-card">PortfolioDiagnosisCard</div>,
-}));
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
 }));

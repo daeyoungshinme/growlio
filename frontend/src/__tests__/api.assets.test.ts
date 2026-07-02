@@ -37,6 +37,7 @@ import {
   searchStocks,
   fetchExchangeRate,
   fetchStockPrice,
+  fetchStockPricesBatch,
 } from "@/api/assets";
 
 const mockAccount = {
@@ -173,5 +174,16 @@ describe("api/assets", () => {
       params: { ticker: "005930", market: "KOSPI" },
     });
     expect(result).toEqual(mockPrice);
+  });
+
+  it("fetchStockPricesBatch calls POST /stocks/prices-batch", async () => {
+    const mockResult = {
+      "005930:KOSPI": { price_krw: 75000, price_usd: null, usd_rate: null },
+    };
+    vi.mocked(api.post).mockResolvedValue({ data: mockResult });
+    const items = [{ ticker: "005930", market: "KOSPI" }];
+    const result = await fetchStockPricesBatch(items);
+    expect(api.post).toHaveBeenCalledWith("/stocks/prices-batch", { items });
+    expect(result).toEqual(mockResult);
   });
 });

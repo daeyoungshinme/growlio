@@ -10,6 +10,7 @@ import {
 } from "@/api/transactions";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
+import { formatUsdAsKrw } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
@@ -212,7 +213,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                 </div>
                 {usdRate && amountUsd > 0 && (
                   <p className="text-xs text-gray-400 text-right mt-0.5">
-                    ≈ ₩{Math.round(amountUsd * usdRate).toLocaleString()}
+                    {formatUsdAsKrw(amountUsd, usdRate)}
                   </p>
                 )}
                 {!usdRate && currency === "USD" && (

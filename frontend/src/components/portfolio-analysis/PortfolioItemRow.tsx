@@ -108,7 +108,7 @@ export default function PortfolioItemRow({
       <button
         onClick={() => onRemove(idx)}
         aria-label="항목 삭제"
-        className="p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+        className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
       >
         <Trash2 size={15} />
       </button>

@@ -80,7 +80,7 @@ export default function RebalancingAlertModal({
     useRebalancingAlertQueries({ portfolioId, accountIds });
 
   return (
-    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="sm" closeOnBackdrop>
+    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="md" closeOnBackdrop>
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <div className="flex justify-center py-4">

@@ -3,6 +3,7 @@ import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "@/api/assets";
 import Modal from "@/components/common/Modal";
 import { fmtKrw } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 
@@ -192,7 +193,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
                 <span>순자산</span>
-                <span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>
+                <span className={pnlColor(equity)}>
                   {fmtKrw(equity)}
                 </span>
               </div>
@@ -401,7 +402,7 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
                 <span>순자산</span>
-                <span className={equity >= 0 ? "text-red-500" : "text-blue-500"}>
+                <span className={pnlColor(equity)}>
                   {fmtKrw(equity)}
                 </span>
               </div>
@@ -509,18 +510,14 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">순자산</p>
-          <p
-            className={`text-xs font-semibold mt-0.5 ${equity >= 0 ? "text-red-500" : "text-blue-500"}`}
-          >
+          <p className={`text-xs font-semibold mt-0.5 ${pnlColor(equity)}`}>
             {fmtKrw(equity)}
           </p>
         </div>
         {appreciation !== null && (
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">매입차익</p>
-            <p
-              className={`text-xs font-semibold mt-0.5 ${appreciation >= 0 ? "text-red-500" : "text-blue-500"}`}
-            >
+            <p className={`text-xs font-semibold mt-0.5 ${pnlColor(appreciation)}`}>
               {appreciation >= 0 ? "+" : ""}
               {fmtKrw(appreciation)}
             </p>

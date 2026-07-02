@@ -1,3 +1,5 @@
+import { fmtKrwPrice } from "@/utils/format";
+
 interface PriceCellProps {
   krw: number | null | undefined;
   usd?: number | null;
@@ -29,5 +31,5 @@ export default function PriceCell({
     );
   }
 
-  return <span className={textClass}>{(krw ?? 0).toLocaleString()}원</span>;
+  return <span className={textClass}>{fmtKrwPrice(krw ?? 0)}</span>;
 }
