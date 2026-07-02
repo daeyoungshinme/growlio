@@ -193,23 +193,6 @@ class TestCheckAndTriggerAlerts:
         mock_db.commit.assert_not_called()
 
 
-# ── check_rebalancing_alerts (stub) ──────────────────────────
-
-
-class TestCheckRebalancingAlerts:
-    @pytest.mark.asyncio
-    async def test_no_alerts_nothing_happens(self, mock_db, override_settings):
-        from app.services.alert_service import check_rebalancing_alerts
-
-        exec_result = MagicMock()
-        exec_result.all.return_value = []
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        await check_rebalancing_alerts(mock_db)
-
-        mock_db.commit.assert_not_called()
-
-
 # ── check_and_trigger_stock_price_alerts (stub) ───────────────
 
 

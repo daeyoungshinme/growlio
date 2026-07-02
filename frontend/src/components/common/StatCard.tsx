@@ -27,7 +27,7 @@ export default function StatCard({
     <div
       className={`bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 ${isSm ? "p-3" : "p-3 sm:p-5"} ${className ?? ""}`}
     >
-      <p className="text-[11px] tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
+      <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
         {label}
       </p>
       <p

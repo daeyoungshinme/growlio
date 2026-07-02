@@ -36,12 +36,6 @@ _MOCK_SIGNAL = {
     "data_freshness": "LIVE",
 }
 
-_MOCK_MACRO = {
-    "cpi": {"direction": "flat"},
-    "implication": {"label": "중립"},
-    "data_freshness": "LIVE",
-}
-
 
 class TestGetMarketSignalEndpoint:
     def test_returns_200_with_mocked_service(self, override_settings):
@@ -62,15 +56,3 @@ class TestGetMarketSignalEndpoint:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/api/v1/market-signals")
         assert resp.status_code == 401
-
-
-class TestGetMacroDiagnosisEndpoint:
-    def test_returns_200_with_mocked_service(self, override_settings):
-        user = _make_user()
-        app = _setup_app(user)
-        with (
-            patch("app.api.v1.market_signals.get_macro_diagnosis", new=AsyncMock(return_value=_MOCK_MACRO)),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.get("/api/v1/market-signals/macro-diagnosis")
-        assert resp.status_code == 200

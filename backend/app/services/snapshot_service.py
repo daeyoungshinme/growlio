@@ -42,6 +42,31 @@ async def _upsert_snapshot(
     return result.scalar_one()
 
 
+async def get_latest_snapshot_with_positions(
+    db: AsyncSession, account_id: uuid.UUID
+) -> tuple[AssetSnapshot | None, list[Position]]:
+    """계좌의 최신 스냅샷과 그 포지션 목록을 반환한다.
+
+    스냅샷이 없으면 아직 스냅샷에 속하지 않은 수동 포지션(snapshot_id IS NULL)을 반환한다.
+    """
+    latest_snap = await db.scalar(
+        select(AssetSnapshot)
+        .where(AssetSnapshot.account_id == account_id)
+        .order_by(AssetSnapshot.snapshot_date.desc())
+        .limit(1)
+    )
+    if latest_snap:
+        pos_result = await db.execute(select(Position).where(Position.snapshot_id == latest_snap.id))
+    else:
+        pos_result = await db.execute(
+            select(Position).where(
+                Position.account_id == account_id,
+                Position.snapshot_id == None,  # noqa: E711
+            )
+        )
+    return latest_snap, list(pos_result.scalars().all())
+
+
 async def sync_snapshot_positions(
     db: AsyncSession,
     *,

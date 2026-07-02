@@ -145,15 +145,17 @@ API Request
         └── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
 
 services/
+> 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
-  ├── alert_service.py        # 알림 생성·조회. `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`는 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py) — 의도된 설계, 제거 대상 아님
+  ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
+  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크·AUTO 자동실행 주문 생성 (alert_service.py에서 분리)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
   ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
-  ├── dividend_providers.py   # 배당 데이터 제공자 추상화
+  ├── dividend_sync_sources.py # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — dividend_fetcher.py 체인이 호출
   ├── dividend/               # 배당 서비스 패키지 (리팩토링됨)
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
   │   └── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
@@ -167,10 +169,13 @@ services/
   ├── rebalancing_service.py  # 리밸런싱 추천
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
-  ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions)
+  ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
   ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼
-  ├── _account_queries.py     # 활성 계좌 조회 쿼리 헬퍼 (is_active == True 필터)
+  ├── _account_queries.py     # 활성 계좌 조회 쿼리 헬퍼 (is_active == True 필터, 브로커 계좌 필터, 비활성 포함 단건 조회)
   ├── _position_queries.py    # 포지션 DB 쿼리 헬퍼
+  ├── _settings_queries.py    # UserSettings 조회/get-or-create + has_active_kis_credentials 쿼리 헬퍼 (settings.py 라우터에서 분리)
+  ├── _rebalancing_alert_queries.py  # RebalancingAlert portfolio_id+user_id 조회 헬퍼 (rebalancing_alerts.py 라우터에서 분리)
+  ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
   ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
   ├── alert_calculator.py           # 알림 조건 판단 로직 (alert_service.py에서 분리)
   ├── alert_repository.py           # 알림 DB 쿼리 레이어 (alert_service.py에서 분리)
@@ -187,7 +192,6 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
-  ├── macro_diagnosis_service.py    # 거시경제 진단 — CPI 추세·기준금리·FOMC 일정 → 리밸런싱 시사점 반환
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송

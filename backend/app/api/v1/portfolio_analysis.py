@@ -22,10 +22,7 @@ from app.services.portfolio_history_service import get_allocation_history
 from app.services.portfolio_optimizer import get_efficient_frontier
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.rebalancing_strategy_service import get_rebalancing_strategy
-from app.services.risk_service import (
-    get_currency_exposure,
-    get_portfolio_risk_metrics,
-)
+from app.services.risk_service import get_portfolio_risk_metrics
 from app.utils.cache_keys import TTL_PORTFOLIO_SUMMARY, get_cached_json, portfolio_summary_key, set_cached_json
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -227,15 +224,3 @@ async def portfolio_rebalancing_strategy(
     if "error" in result:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=result["error"])
     return result
-
-
-@router.get("/currency-exposure")
-@limiter.limit("10/minute")
-async def portfolio_currency_exposure(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """KRW/USD/기타 통화 비중 분석."""
-    redis = await get_redis()
-    return await get_currency_exposure(current_user.id, db, redis)

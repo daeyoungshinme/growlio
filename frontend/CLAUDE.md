@@ -137,6 +137,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`)
+- `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]`). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `index.ts` — 상수 re-export
 
@@ -255,6 +256,10 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `INPUT_SM` / `INPUT_MD` — `text-sm` / `text-base` 입력 필드 (border, bg, focus ring 포함)
 - `LABEL_SM` / `LABEL_MD` — `text-xs` / `text-sm font-medium` 레이블
 - `SELECT_SM` — INPUT_SM과 동일 (select 요소용), `TEXTAREA_SM` — resize-none 포함
+
+**모바일 UI 최소 크기 규칙**
+- 텍스트는 `text-xs`(12px) 미만 임의값(`text-[9px]`, `text-[10px]` 등) 사용 금지 — 모바일 가독성 저하.
+- 인터랙티브 요소(버튼/입력 등) 터치 영역은 `src/constants/uiSizes.ts`의 `TOUCH_TARGET_MIN`(`min-h-[44px] min-w-[44px]`) 사용.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.

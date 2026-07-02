@@ -1,4 +1,4 @@
-"""portfolio_service.py 추가 단위 테스트 — get_allocation_history."""
+"""portfolio_history_service.py 단위 테스트 — get_allocation_history."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pytest
 class TestGetAllocationHistory:
     @pytest.mark.asyncio
     async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         cached = [{"month": "2024-01-01", "total_krw": 10_000_000, "allocations": []}]
         redis = AsyncMock()
@@ -26,7 +26,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_empty_result_returns_empty_list(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
@@ -38,7 +38,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_aggregates_monthly_data(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="STOCK_KIS", amount_krw=5_000_000.0)
         row2 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=3_000_000.0)
@@ -67,7 +67,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_position_data_overrides_stock_types(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="STOCK_KIS", amount_krw=5_000_000.0)
 
@@ -97,7 +97,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_result_stored_in_redis(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=1_000_000.0)
 
@@ -125,7 +125,7 @@ class TestGetAllocationHistory:
 
     @pytest.mark.asyncio
     async def test_zero_total_months_excluded(self, mock_db, override_settings):
-        from app.services.portfolio_service import get_allocation_history
+        from app.services.portfolio_history_service import get_allocation_history
 
         # A month with 0 total should be excluded
         row1 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=0.0)

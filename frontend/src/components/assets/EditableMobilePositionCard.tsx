@@ -3,6 +3,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { convertUsdToKrw, fmtKrwShort } from "@/utils/format";
 import { isOverseasMarket, POSITION_MARKETS } from "@/constants/markets";
 import { SCROLL_INTO_VIEW_DELAY } from "@/constants/timers";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { SuggestionDropdown } from "@/components/common/SuggestionDropdown";
 import { PnlCell } from "./PositionHelpers";
 import type { EditablePositionRowProps } from "./PositionHelpers";
@@ -86,7 +87,7 @@ export function EditableMobilePositionCard({
         <button
           onClick={() => removeRow(i)}
           aria-label={`${i + 1}번 행 삭제`}
-          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg"
+          className={`p-2 text-gray-300 dark:text-gray-600 hover:text-red-500 rounded-lg ${TOUCH_TARGET_MIN}`}
         >
           <Trash2 size={16} />
         </button>

@@ -38,8 +38,7 @@ import {
 import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchDartDisclosures } from "@/api/dart";
 import { fetchInsights, fetchInsightsSummary } from "@/api/insights";
-import { fetchPortfolioRisk, fetchCurrencyExposure, fetchFactorAnalysis, fetchPortfolioFactorAnalysis, fetchEfficientFrontier, fetchRebalancingStrategy } from "@/api/risk";
-import { fetchMacroDiagnosis } from "@/api/marketSignals";
+import { fetchPortfolioRisk, fetchFactorAnalysis, fetchPortfolioFactorAnalysis, fetchEfficientFrontier, fetchRebalancingStrategy } from "@/api/risk";
 
 describe("api/settings", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -215,12 +214,6 @@ describe("api/risk", () => {
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk/port-1");
   });
 
-  it("fetchCurrencyExposure calls GET /portfolio/currency-exposure", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: {} });
-    await fetchCurrencyExposure();
-    expect(api.get).toHaveBeenCalledWith("/portfolio/currency-exposure");
-  });
-
   it("fetchFactorAnalysis calls GET /portfolio/factor-analysis", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchFactorAnalysis();
@@ -253,24 +246,5 @@ describe("api/risk", () => {
     expect(api.get).toHaveBeenCalledWith(
       "/portfolio/rebalancing-strategy?portfolio_id=port-1",
     );
-  });
-});
-
-describe("api/marketSignals — macroDiagnosis", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchMacroDiagnosis calls GET /market-signals/macro-diagnosis", async () => {
-    const mockData = {
-      cpi: null,
-      fed_rate: null,
-      fomc: { next_meeting_date: null, days_until: null, source: "unknown" as const },
-      implication: null,
-      data_freshness: "STALE" as const,
-      computed_at: "2024-01-01T00:00:00Z",
-    };
-    vi.mocked(api.get).mockResolvedValue({ data: mockData });
-    const result = await fetchMacroDiagnosis();
-    expect(api.get).toHaveBeenCalledWith("/market-signals/macro-diagnosis");
-    expect(result).toEqual(mockData);
   });
 });

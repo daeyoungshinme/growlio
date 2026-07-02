@@ -6,17 +6,6 @@ import uuid
 
 import pytest
 
-# ── _account_queries 헬퍼 ────────────────────────────────────
-
-
-def test_active_accounts_filter_returns_tuple():
-    from app.services._account_queries import active_accounts_filter
-
-    result = active_accounts_filter()
-    assert isinstance(result, tuple)
-    assert len(result) == 1
-
-
 # ── RebalancingAlertCreate 검증 ──────────────────────────────
 
 
@@ -25,14 +14,14 @@ def _make_base() -> dict:
 
 
 def test_validate_dow_returns_valid_value():
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     model = RebalancingAlertCreate(**_make_base(), schedule_day_of_week=3)
     assert model.schedule_day_of_week == 3
 
 
 def test_validate_dom_valid_value():
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     model = RebalancingAlertCreate(**_make_base(), schedule_day_of_month=15)
     assert model.schedule_day_of_month == 15
@@ -41,21 +30,21 @@ def test_validate_dom_valid_value():
 def test_validate_dom_out_of_range_raises():
     from pydantic import ValidationError
 
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     with pytest.raises(ValidationError, match="schedule_day_of_month"):
         RebalancingAlertCreate(**_make_base(), schedule_day_of_month=29)
 
 
 def test_validate_auto_execution_time_none_returns_none():
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     model = RebalancingAlertCreate(**_make_base(), auto_execution_time=None)
     assert model.auto_execution_time is None
 
 
 def test_validate_auto_execution_time_valid_format():
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     model = RebalancingAlertCreate(**_make_base(), auto_execution_time="09:30")
     assert model.auto_execution_time == "09:30"
@@ -64,7 +53,7 @@ def test_validate_auto_execution_time_valid_format():
 def test_validate_auto_execution_time_invalid_format_raises():
     from pydantic import ValidationError
 
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     with pytest.raises(ValidationError, match="auto_execution_time"):
         RebalancingAlertCreate(**_make_base(), auto_execution_time="invalid")
@@ -73,7 +62,7 @@ def test_validate_auto_execution_time_invalid_format_raises():
 def test_validate_auto_execution_time_out_of_range_raises():
     from pydantic import ValidationError
 
-    from app.api.v1.rebalancing_alerts import RebalancingAlertCreate
+    from app.schemas.rebalancing import RebalancingAlertCreate
 
     with pytest.raises(ValidationError, match="auto_execution_time"):
         RebalancingAlertCreate(**_make_base(), auto_execution_time="08:00")

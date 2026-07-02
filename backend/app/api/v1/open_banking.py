@@ -16,11 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.config import settings
 from app.limiter import limiter
-from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
-from app.providers.openbanking import exchange_code_for_token, get_authorize_url, get_user_accounts
+from app.providers.openbanking import exchange_code_for_token, get_authorize_url
 from app.redis_client import get_redis
-from app.services.credential_service import decrypt, encrypt
+from app.services.credential_service import encrypt
 from app.utils.cache_keys import TTL_OB_STATE, TTL_OB_TOKEN, ob_state_key
 
 logger = structlog.get_logger()
@@ -96,69 +95,6 @@ async def open_banking_callback(
 
     # 프론트엔드로 리다이렉트 (연결 성공 페이지)
     return RedirectResponse(url=f"{settings.frontend_url}/settings?ob_connected=1")
-
-
-@router.get("/accounts")
-@limiter.limit("30/minute")
-async def list_ob_accounts(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """오픈뱅킹으로 연결된 은행 계좌 목록 조회."""
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
-    if not settings_row or not settings_row.ob_access_token:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="오픈뱅킹이 연결되지 않았습니다. /connect를 먼저 실행하세요.",
-        )
-
-    accounts = await get_user_accounts(
-        access_token=decrypt(settings_row.ob_access_token),
-        user_seq_no=settings_row.ob_user_seq_no or "",
-    )
-    return {
-        "connected": True,
-        "token_expires_at": settings_row.ob_token_expires_at,
-        "accounts": accounts,
-    }
-
-
-@router.post("/accounts/register")
-@limiter.limit("20/minute")
-async def register_ob_account(
-    request: Request,
-    fintech_use_no: str,
-    bank_code: str,
-    bank_name: str,
-    account_alias: str = "오픈뱅킹 계좌",
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """오픈뱅킹 계좌를 자산 계좌로 등록."""
-    # 이미 등록된 계좌인지 확인
-    existing = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == current_user.id,
-            AssetAccount.ob_fintech_use_no == fintech_use_no,
-        )
-    )
-    if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 계좌입니다")
-
-    account = AssetAccount(
-        user_id=current_user.id,
-        name=account_alias,
-        asset_type="BANK_ACCOUNT",
-        data_source="OPEN_BANKING",
-        institution=bank_name,
-        ob_bank_code=bank_code,
-        ob_fintech_use_no=fintech_use_no,
-    )
-    db.add(account)
-    await db.commit()
-    await db.refresh(account)
-    return {"id": str(account.id), "name": account.name, "institution": account.institution}
 
 
 @router.delete("/disconnect")

@@ -9,8 +9,11 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import Select, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount
+
+_BROKER_ASSET_TYPES = ["STOCK_KIS", "STOCK_KIWOOM"]
 
 
 def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
@@ -21,6 +24,18 @@ def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
     )
 
 
-def active_accounts_filter() -> tuple:
-    """is_active 단독 조건 튜플 — JOIN 쿼리에서 .where()에 스프레드할 때 사용."""
-    return (AssetAccount.is_active == True,)  # noqa: E712
+def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
+    """user_id의 활성 KIS/키움 연동 계좌를 조회하는 SELECT 구문 반환."""
+    return active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(_BROKER_ASSET_TYPES))
+
+
+async def get_account_including_inactive(
+    db: AsyncSession, account_id: uuid.UUID, user_id: uuid.UUID
+) -> AssetAccount | None:
+    """비활성 계좌도 포함해 소유 계좌를 조회한다 (실시간 잔고 조회 등 일부 API에서 필요)."""
+    return await db.scalar(
+        select(AssetAccount).where(
+            AssetAccount.id == account_id,
+            AssetAccount.user_id == user_id,
+        )
+    )

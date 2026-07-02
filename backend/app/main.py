@@ -77,11 +77,6 @@ async def lifespan(app: FastAPI):
     if settings.app_env == "production" and not settings.metrics_token:
         logger.warning("metrics_token_unset", message="/metrics 엔드포인트가 차단됩니다. METRICS_TOKEN을 설정하세요.")
 
-    from app.utils.cache_keys import macro_diagnosis_key
-
-    await redis.delete(macro_diagnosis_key())
-    logger.info("macro_diagnosis_cache_cleared")
-
     init_scheduler()
     logger.info("app_started", env=settings.app_env)
     yield

@@ -200,7 +200,7 @@ export default memo(function HeroSummaryCard({
                         className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
-                      <span className="text-[9px] text-gray-500 dark:text-gray-400 leading-tight">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                         {item.name} {item.pct.toFixed(0)}%
                         <span className="text-gray-400 dark:text-gray-500 ml-0.5">
                           · {fmtKrwShort(item.value)}

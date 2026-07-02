@@ -19,9 +19,8 @@ from app.kis.client import KisApiError
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.limiter import limiter
-from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
-from app.models.portfolio import Portfolio, PortfolioAccount
+from app.models.portfolio import Portfolio
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
@@ -31,10 +30,12 @@ from app.schemas.rebalancing import (
     RebalancingAnalysis,
 )
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
+from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
+from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services.credential_service import decrypt
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.dividend_constants import is_korean_etf
-from app.services.dividend_providers import (
+from app.services.dividend_sync_sources import (
     sync_naver_etf_dividend_info,
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
@@ -321,12 +322,7 @@ async def get_broker_account_balance(
     redis=Depends(get_redis),
 ):
     """KIS 또는 키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
-    account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.id == account_id,
-            AssetAccount.user_id == current_user.id,
-        )
-    )
+    account = await get_account_including_inactive(db, account_id, current_user.id)
     if not account:
         logger.warning(
             "broker_balance_account_not_found",
@@ -361,13 +357,7 @@ async def get_all_broker_balances(
     redis=Depends(get_redis),
 ):
     """연동된 모든 활성 KIS/키움 계좌의 실시간 잔고를 병렬로 조회한다."""
-    acc_result = await db.execute(
-        select(AssetAccount).where(
-            AssetAccount.user_id == current_user.id,
-            AssetAccount.asset_type.in_(["STOCK_KIS", "STOCK_KIWOOM"]),
-            AssetAccount.is_active == True,  # noqa: E712
-        )
-    )
+    acc_result = await db.execute(active_broker_accounts_stmt(current_user.id))
     accounts = acc_result.scalars().all()
 
     if not accounts:
@@ -400,36 +390,11 @@ async def get_drift_summary(
     db: AsyncSession = Depends(get_db),
 ):
     """모든 포트폴리오의 비중 이탈 현황을 빠르게 반환한다 (배당·수익률 외부 API 미사용)."""
-    linked_ids_result = await db.execute(
-        select(PortfolioAccount.portfolio_id)
-        .join(Portfolio, Portfolio.id == PortfolioAccount.portfolio_id)
-        .where(Portfolio.user_id == current_user.id)
-        .distinct()
-    )
-    linked_portfolio_ids = linked_ids_result.scalars().all()
-
-    if not linked_portfolio_ids:
+    portfolios = await get_linked_portfolios(db, current_user.id)
+    if not portfolios:
         return []
 
-    portfolios_result = await db.execute(
-        select(Portfolio)
-        .options(
-            selectinload(Portfolio.items),
-            selectinload(Portfolio.linked_accounts),
-        )
-        .where(Portfolio.id.in_(linked_portfolio_ids))
-    )
-    portfolios = portfolios_result.scalars().all()
-
-    alerts_result = await db.execute(
-        select(RebalancingAlert).where(
-            RebalancingAlert.user_id == current_user.id,
-            RebalancingAlert.is_active == True,  # noqa: E712
-        )
-    )
-    alert_by_portfolio: dict[str, float] = {
-        str(a.portfolio_id): float(a.threshold_pct) for a in alerts_result.scalars().all()
-    }
+    alert_by_portfolio = await get_active_alert_thresholds(db, current_user.id)
 
     summaries: list[PortfolioDriftSummary] = []
     for portfolio in portfolios:

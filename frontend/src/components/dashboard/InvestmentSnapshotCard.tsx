@@ -40,7 +40,7 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
           <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
             {fmtKrwShort(overview.total_stock_krw)}원
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
             {Math.floor(overview.total_stock_krw).toLocaleString()}
           </p>
         </div>
@@ -50,7 +50,7 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
           <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
             {fmtKrwShort(overview.total_invested_krw)}원
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
             {Math.floor(overview.total_invested_krw).toLocaleString()}
           </p>
         </div>
@@ -69,7 +69,7 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
               {pnlPct.toFixed(1)}%)
             </span>
           </p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+          <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
             {pnl >= 0 ? "+" : ""}
             {Math.floor(pnl).toLocaleString()}
           </p>

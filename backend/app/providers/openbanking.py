@@ -82,24 +82,6 @@ async def refresh_access_token(refresh_token: str) -> dict[str, Any]:
     return resp.json()
 
 
-async def get_user_accounts(access_token: str, user_seq_no: str) -> list[dict]:
-    """연결된 은행 계좌 목록 조회 (핀테크이용번호 포함)."""
-
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10), reraise=True)
-    async def _call() -> list[dict]:
-        client = _get_client(ssl_verify=True)
-        resp = await client.get(
-            f"{settings.open_banking_base_url}/v2.0/user/me",
-            headers={"Authorization": f"Bearer {access_token}"},
-            params={"user_seq_no": user_seq_no},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        return data.get("res_list", [])
-
-    return await openbanking_circuit.call(_call)
-
-
 async def ensure_ob_token_fresh(settings_row: UserSettings, db: AsyncSession) -> str:
     """오픈뱅킹 토큰 만료 1시간 전에 자동 갱신 후 유효한 액세스 토큰 반환.
 

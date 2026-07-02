@@ -14,7 +14,6 @@ from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.composition_calculator import fetch_position_maps
-from app.services.portfolio_history_service import get_allocation_history as get_allocation_history
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_OVERVIEW,
     RedisType,

@@ -356,7 +356,9 @@ class TestExecuteForAlert:
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.alert_service.execute_auto_rebalancing_for_alert", new=AsyncMock()) as mock_exec,
+            patch(
+                "app.services.rebalancing_alert_service.execute_auto_rebalancing_for_alert", new=AsyncMock()
+            ) as mock_exec,
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
 
@@ -377,7 +379,8 @@ class TestExecuteForAlert:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch(
-                "app.services.alert_service.execute_auto_rebalancing_for_alert", new=AsyncMock(return_value=True)
+                "app.services.rebalancing_alert_service.execute_auto_rebalancing_for_alert",
+                new=AsyncMock(return_value=True),
             ) as mock_exec,
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert
@@ -435,7 +438,8 @@ class TestExecuteForAlert:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch(
-                "app.services.alert_service.execute_auto_rebalancing_for_alert", new=AsyncMock(return_value=True)
+                "app.services.rebalancing_alert_service.execute_auto_rebalancing_for_alert",
+                new=AsyncMock(return_value=True),
             ) as mock_exec,
         ):
             from app.jobs.rebalancing_auto_execution import _execute_for_alert

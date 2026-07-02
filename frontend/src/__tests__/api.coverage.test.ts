@@ -30,7 +30,7 @@ vi.mock("@/api/client", () => {
 import { api } from "@/api/client";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchDCAAnalysis } from "@/api/invest";
-import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
+import { fetchPortfolioRisk } from "@/api/risk";
 import {
   fetchBacktestPortfolios,
   createBacktestPortfolio,
@@ -178,20 +178,6 @@ describe("api/risk", () => {
     expect(result).toEqual(mockRisk);
   });
 
-  it("fetchCurrencyExposure calls GET /portfolio/currency-exposure", async () => {
-    const mockExposure = {
-      krw_value: 5000000,
-      usd_value: 2000000,
-      other_value: 0,
-      krw_pct: 71.4,
-      usd_pct: 28.6,
-      other_pct: 0,
-    };
-    vi.mocked(api.get).mockResolvedValue({ data: mockExposure });
-    const result = await fetchCurrencyExposure();
-    expect(api.get).toHaveBeenCalledWith("/portfolio/currency-exposure");
-    expect(result).toEqual(mockExposure);
-  });
 });
 
 // ── api/backtest ──────────────────────────────────────────────────────────────

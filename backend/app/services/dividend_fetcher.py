@@ -20,7 +20,7 @@ from app.services.dividend_constants import (
     KNOWN_DIVIDEND_SCHEDULES,
     is_korean_etf,
 )
-from app.services.dividend_providers import (
+from app.services.dividend_sync_sources import (
     sync_fdr_etf_dividend_info,
     sync_fetch_dividend_months,
     sync_naver_etf_dividend_info,

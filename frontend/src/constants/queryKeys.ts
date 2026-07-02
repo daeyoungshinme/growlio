@@ -36,6 +36,4 @@ export const QUERY_KEYS = {
     ["efficient-frontier", comparePortfolioId ?? null] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   driftSummary: ["drift-summary"] as const,
-  currencyExposure: ["currency-exposure"] as const,
-  macroDiagnosis: ["macro-diagnosis"] as const,
 } as const;

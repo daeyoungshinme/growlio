@@ -7,13 +7,12 @@ from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr, field_validator
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
-from app.models.asset import AssetAccount
-from app.models.user import User, UserSettings
+from app.models.user import User
+from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -119,18 +118,8 @@ async def get_settings(
     db: AsyncSession = Depends(get_db),
 ):
     """현재 설정 조회 (자격증명 원문은 반환하지 않음)."""
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
-
-    # has_kis: 자격증명이 설정된 활성 KIS 계좌 존재 여부
-    kis_account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == current_user.id,
-            AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.kis_app_key != None,  # noqa: E711
-        )
-    )
-    has_kis = kis_account is not None
+    row = await get_settings_row(db, current_user.id)
+    has_kis = await has_active_kis_credentials(db, current_user.id)
 
     if not row:
         return SettingsResponse(
@@ -176,7 +165,7 @@ async def update_dart_api_key(
     db: AsyncSession = Depends(get_db),
 ):
     """DART OpenAPI 키 저장."""
-    row = await _get_or_create_settings(current_user.id, db)
+    row = await get_or_create_settings(db, current_user.id)
     row.dart_api_key = encrypt(req.api_key)
     await db.commit()
     return {"detail": "DART API 키가 저장되었습니다"}
@@ -189,7 +178,7 @@ async def delete_dart_api_key(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    row = await get_settings_row(db, current_user.id)
     if row:
         row.dart_api_key = None
         await db.commit()
@@ -205,7 +194,7 @@ async def update_goal(
     db: AsyncSession = Depends(get_db),
 ):
     """투자 목표 설정."""
-    row = await _get_or_create_settings(current_user.id, db)
+    row = await get_or_create_settings(db, current_user.id)
     if req.goal_amount is not None:
         row.goal_amount = req.goal_amount
     if req.goal_annual_return_pct is not None:
@@ -237,7 +226,7 @@ async def update_notification_email(
     db: AsyncSession = Depends(get_db),
 ):
     """알림 수신 이메일 설정. 비워두면 로그인 이메일로 발송됩니다."""
-    row = await _get_or_create_settings(current_user.id, db)
+    row = await get_or_create_settings(db, current_user.id)
     row.notification_email = req.notification_email or None
     await db.commit()
     return {"detail": "알림 이메일이 저장되었습니다"}
@@ -252,7 +241,7 @@ async def update_auto_dca(
     db: AsyncSession = Depends(get_db),
 ):
     """자동 DCA 정기매수 설정."""
-    row = await _get_or_create_settings(current_user.id, db)
+    row = await get_or_create_settings(db, current_user.id)
     row.auto_dca_enabled = req.enabled
     row.auto_dca_day = req.day
     row.auto_dca_amount = req.amount
@@ -271,7 +260,7 @@ async def update_push_token(
     db: AsyncSession = Depends(get_db),
 ):
     """FCM 푸시 알림 토큰 등록/삭제. fcm_token=null 전달 시 토큰 삭제."""
-    row = await _get_or_create_settings(current_user.id, db)
+    row = await get_or_create_settings(db, current_user.id)
     row.fcm_token = req.fcm_token or None
     await db.commit()
     msg = "푸시 알림 토큰이 저장되었습니다" if req.fcm_token else "푸시 알림 토큰이 삭제되었습니다"
@@ -288,7 +277,7 @@ async def send_test_email_endpoint(
     """알림 이메일 설정 확인용 테스트 이메일 발송."""
     from app.services.email_service import send_test_email
 
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
+    row = await get_settings_row(db, current_user.id)
     to_email = (row.notification_email if row else None) or current_user.email
 
     try:
@@ -306,12 +295,3 @@ async def send_test_email_endpoint(
         )
 
     return {"detail": f"{to_email}으로 테스트 이메일을 발송했습니다."}
-
-
-async def _get_or_create_settings(user_id, db: AsyncSession) -> UserSettings:
-    row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
-    if not row:
-        row = UserSettings(user_id=user_id)
-        db.add(row)
-        await db.flush()
-    return row

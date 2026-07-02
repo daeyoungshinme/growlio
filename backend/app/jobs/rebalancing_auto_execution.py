@@ -165,8 +165,8 @@ async def _execute_for_alert(
     portfolio: Portfolio,
 ) -> bool:
     """개별 알림에 대해 드리프트 분석 후 자동 실행한다."""
-    from app.services.alert_service import execute_auto_rebalancing_for_alert
     from app.services.portfolio_service import build_portfolio_overview
+    from app.services.rebalancing_alert_service import execute_auto_rebalancing_for_alert
     from app.services.rebalancing_service import analyze_rebalancing
 
     saved_ids = getattr(portfolio, "account_ids", None)

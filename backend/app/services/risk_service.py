@@ -11,16 +11,12 @@ import math
 import uuid
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.asset import AssetAccount, AssetSnapshot, Position
-from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, set_cached_json
-from app.utils.currency import fetch_usd_krw
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
@@ -199,66 +195,3 @@ def _empty_risk_result() -> dict:
         "data_available": False,
         "note": "포지션 데이터 없음",
     }
-
-
-async def get_currency_exposure(
-    user_id: uuid.UUID,
-    db: AsyncSession,
-    redis: RedisType = None,
-) -> dict:
-    """국내/해외/통화 비중 분석."""
-    cache_key = f"currency_exposure:{user_id}"
-
-    cached = await get_cached_json(redis, cache_key)
-    if cached is not None:
-        return cached
-
-    subq = latest_snapshot_subquery(user_id=user_id)
-    result = await db.execute(
-        select(AssetSnapshot, AssetAccount)
-        .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
-        .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
-    )
-    rows = result.all()
-
-    krw_total = 0.0
-    usd_total = 0.0
-    other_total = 0.0
-
-    # 배치 조회로 N+1 방지
-    snap_ids = [snap.id for snap, _ in rows]
-    if snap_ids:
-        all_pos_result = await db.execute(select(Position).where(Position.snapshot_id.in_(snap_ids)))
-        for pos in all_pos_result.scalars().all():
-            val = float(pos.value_krw or 0)
-            currency = (pos.currency or "KRW").upper()
-            if currency == "KRW":
-                krw_total += val
-            elif currency == "USD":
-                usd_total += val
-            else:
-                other_total += val
-
-    # 계좌별 예수금 합산 (Position에 포함되지 않는 현금 잔고)
-    has_usd_deposit = any(float(acc.deposit_usd or 0) > 0 for _, acc in rows)
-    usd_rate = (await fetch_usd_krw(redis) or 1.0) if has_usd_deposit else 1.0
-    for _, acc in rows:
-        krw_total += float(acc.deposit_krw or 0)
-        usd_total += float(acc.deposit_usd or 0) * usd_rate
-
-    grand_total = krw_total + usd_total + other_total
-    if grand_total <= 0:
-        return {"krw_pct": 0, "usd_pct": 0, "other_pct": 0, "krw_value": 0, "usd_value": 0, "other_value": 0}
-
-    data = {
-        "krw_value": round(krw_total, 0),
-        "usd_value": round(usd_total, 0),
-        "other_value": round(other_total, 0),
-        "krw_pct": round(krw_total / grand_total * 100, 2),
-        "usd_pct": round(usd_total / grand_total * 100, 2),
-        "other_pct": round(other_total / grand_total * 100, 2),
-    }
-
-    await set_cached_json(redis, cache_key, data, TTL_RISK_ANALYSIS)
-    return data

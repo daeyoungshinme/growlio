@@ -1,9 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { fetchMarketSignal, fetchMacroDiagnosis } from "@/api/marketSignals";
-import { fetchPortfolioRisk, fetchCurrencyExposure } from "@/api/risk";
-import type { CurrencyExposure } from "@/api/risk";
+import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchPortfolioRisk } from "@/api/risk";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -18,9 +17,6 @@ const RiskMetricsCard = lazy(
 );
 const MarketSignalBanner = lazy(
   () => import("../components/rebalancing/MarketSignalBanner"),
-);
-const MacroDiagnosisCard = lazy(
-  () => import("../components/rebalancing/MacroDiagnosisCard"),
 );
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
@@ -37,35 +33,6 @@ const BacktestTab = lazy(
 
 const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "백테스팅", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
-
-function CurrencyExposureCard({ exposure }: { exposure: CurrencyExposure }) {
-  const bars: { label: string; pct: number; color: string }[] = [
-    { label: "KRW", pct: exposure.krw_pct, color: "bg-blue-500" },
-    { label: "USD", pct: exposure.usd_pct, color: "bg-green-500" },
-    ...(exposure.other_pct > 0 ? [{ label: "기타", pct: exposure.other_pct, color: "bg-gray-400" }] : []),
-  ];
-  return (
-    <div className="card">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-3">통화 노출</p>
-      <div className="space-y-2">
-        {bars.map(({ label, pct, color }) => (
-          <div key={label}>
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
-              <span>{label}</span>
-              <span className="font-medium">{pct.toFixed(1)}%</span>
-            </div>
-            <div className="h-2 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${color}`}
-                style={{ width: `${Math.min(pct, 100)}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export default function RebalancingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,23 +104,9 @@ export default function RebalancingPage() {
     staleTime: STALE_TIME.MEDIUM,
   });
 
-  const { data: macroDiagnosis } = useQuery({
-    queryKey: QUERY_KEYS.macroDiagnosis,
-    queryFn: fetchMacroDiagnosis,
-    staleTime: STALE_TIME.MEDIUM,
-    enabled: localTab === "진단",
-  });
-
   const { data: riskMetrics } = useQuery({
     queryKey: QUERY_KEYS.portfolioRisk(),
     queryFn: () => fetchPortfolioRisk(),
-    staleTime: STALE_TIME.LONG,
-    enabled: localTab === "진단",
-  });
-
-  const { data: currencyExposure } = useQuery({
-    queryKey: QUERY_KEYS.currencyExposure,
-    queryFn: fetchCurrencyExposure,
     staleTime: STALE_TIME.LONG,
     enabled: localTab === "진단",
   });
@@ -180,13 +133,6 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
-            {macroDiagnosis && (
-              <ErrorBoundary variant="section">
-                <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <MacroDiagnosisCard diagnosis={macroDiagnosis} />
-                </Suspense>
-              </ErrorBoundary>
-            )}
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
@@ -204,7 +150,6 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
-            {currencyExposure && <CurrencyExposureCard exposure={currencyExposure} />}
           </>
         )}
 

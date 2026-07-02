@@ -40,7 +40,6 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 }));
 vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
-  fetchMacroDiagnosis: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@/components/dashboard/RebalancingStatusCard", () => ({
   default: () => <div data-testid="rebalancing-status-card" />,

@@ -70,15 +70,6 @@ export interface PortfolioRiskMetrics {
   note: string;
 }
 
-export interface CurrencyExposure {
-  krw_value: number;
-  usd_value: number;
-  other_value: number;
-  krw_pct: number;
-  usd_pct: number;
-  other_pct: number;
-}
-
 // ---------------------------------------------------------------------------
 // 리밸런싱 전략
 // ---------------------------------------------------------------------------
@@ -127,8 +118,6 @@ export interface RebalancingStrategy {
 
 export const fetchPortfolioRisk = (portfolioId?: string) =>
   apiGet<PortfolioRiskMetrics>(portfolioId ? `/portfolio/risk/${portfolioId}` : "/portfolio/risk");
-
-export const fetchCurrencyExposure = () => apiGet<CurrencyExposure>("/portfolio/currency-exposure");
 
 export const fetchFactorAnalysis = () => apiGet<FactorAnalysis>("/portfolio/factor-analysis");
 

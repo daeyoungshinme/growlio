@@ -4,14 +4,13 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import delete as sql_delete
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.limiter import limiter
-from app.models.asset import AssetAccount, AssetSnapshot, Position
+from app.models.asset import AssetAccount
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import (
@@ -36,7 +35,7 @@ from app.services.asset_service import (
     sync_account as _sync_account_service,
 )
 from app.services.credential_service import encrypt, encrypt_if_present
-from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions, sync_snapshot_positions
 from app.utils.cache_keys import (
     TTL_ACCOUNT_DETAIL,
     account_detail_key,
@@ -257,24 +256,7 @@ async def update_account(
     if req.deposit_krw is not None or req.deposit_usd is not None:
         redis = await get_redis()
         usd_rate = await fetch_usd_krw(redis)
-        latest_snap = await db.scalar(
-            select(AssetSnapshot)
-            .where(AssetSnapshot.account_id == account.id)
-            .order_by(AssetSnapshot.snapshot_date.desc())
-            .limit(1)
-        )
-        snap_id = latest_snap.id if latest_snap else None
-        if snap_id:
-            pos_result = await db.execute(select(Position).where(Position.snapshot_id == snap_id))
-            pos_list = list(pos_result.scalars().all())
-        else:
-            cur_result = await db.execute(
-                select(Position).where(
-                    Position.account_id == account.id,
-                    Position.snapshot_id == None,  # noqa: E711
-                )
-            )
-            pos_list = list(cur_result.scalars().all())
+        latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
 
         pos_value = sum(
             (float(p.current_price) if p.current_price else float(p.avg_price or 0)) * float(p.qty or 0)

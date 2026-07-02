@@ -5,6 +5,7 @@ import { SideBadge } from "./RebalancingBadges";
 import { isOverseasMarket } from "@/hooks/useRebalancingExecution";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
 import { PriceCell } from "./RebalancingPriceCell";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 export interface RebalancingMobileCardProps {
   orderKey: string;
@@ -79,7 +80,7 @@ export function RebalancingMobileCard({
                   qty: parseInt(e.target.value) || 0,
                 })
               }
-              className={`w-24 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
+              className={`w-24 bg-gray-800 border border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
                 isBuy ? "text-red-400" : "text-blue-400"
               }`}
             />
@@ -114,7 +115,7 @@ export function RebalancingMobileCard({
                 onClick={() =>
                   dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })
                 }
-                className="text-xs text-indigo-400 hover:text-indigo-300 px-1.5 py-1 rounded hover:bg-indigo-950/30 transition-colors"
+                className={`text-xs text-indigo-400 hover:text-indigo-300 px-2 rounded hover:bg-indigo-950/30 transition-colors ${TOUCH_TARGET_MIN}`}
               >
                 현재가로
               </button>
@@ -134,7 +135,7 @@ export function RebalancingMobileCard({
                   price: parseFloat(e.target.value) || 0,
                 })
               }
-              className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-2 py-1 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-2 py-2.5 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
             />
             <span className="text-gray-400 text-sm shrink-0">{overseas ? "USD" : "원"}</span>
           </div>

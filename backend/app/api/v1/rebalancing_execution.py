@@ -29,8 +29,8 @@ from app.schemas.rebalancing import (
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
 )
-from app.services.alert_service import build_rebalancing_orders, refresh_live_prices
 from app.services.portfolio_service import build_portfolio_overview
+from app.services.rebalancing_alert_service import build_rebalancing_orders, refresh_live_prices
 from app.services.rebalancing_execution_service import execute_rebalancing
 from app.services.rebalancing_service import analyze_rebalancing
 
