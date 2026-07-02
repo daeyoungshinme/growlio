@@ -1113,9 +1113,7 @@ class TestBuildRebalancingOrders:
 
         holder_account = uuid.uuid4()
         drifting = [
-            _make_drift_item(
-                ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, current_price_krw=70000.0
-            )
+            _make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, current_price_krw=70000.0)
         ]
         ticker_account_map = {"005930": [_make_ticker_account(holder_account, quantity=10)]}
 
@@ -1205,9 +1203,7 @@ class TestExecuteAutoRebalancing:
         with (
             patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
-            patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing", new=AsyncMock()
-            ) as mock_exec,
+            patch("app.services.rebalancing_execution_service.execute_rebalancing", new=AsyncMock()) as mock_exec,
         ):
             result = await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
 

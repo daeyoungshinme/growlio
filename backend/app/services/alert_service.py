@@ -228,9 +228,7 @@ def _build_sell_orders(
     from app.schemas.rebalancing import ExecutionOrderItem
 
     holders = [
-        a
-        for a in ticker_account_map.get(item.ticker, [])
-        if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
+        a for a in ticker_account_map.get(item.ticker, []) if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
     ]
     holders.sort(key=lambda a: a.quantity, reverse=True)
 
@@ -283,9 +281,7 @@ async def refresh_live_prices(
     """
     from app.services.price_service import fetch_prices_batch
 
-    tickers = [
-        (item.ticker, item.market) for item in items if item.ticker not in ("CASH", "REAL_ESTATE")
-    ]
+    tickers = [(item.ticker, item.market) for item in items if item.ticker not in ("CASH", "REAL_ESTATE")]
     if not tickers:
         return
 
@@ -362,9 +358,7 @@ def build_rebalancing_orders(
 
         if side == "SELL":
             orders.extend(
-                _build_sell_orders(
-                    item, qty, ticker_account_map, effective_order_type, limit_price, reference_price
-                )
+                _build_sell_orders(item, qty, ticker_account_map, effective_order_type, limit_price, reference_price)
             )
             continue
 

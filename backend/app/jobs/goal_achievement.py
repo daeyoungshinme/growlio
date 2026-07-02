@@ -101,8 +101,7 @@ async def run_goal_achievement_check() -> None:
                     )
                     if sent:
                         msg = (
-                            f"연간 입금 목표 달성 {deposit_pct:.1f}% — "
-                            f"{current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
+                            f"연간 입금 목표 달성 {deposit_pct:.1f}% — {current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
                         )
                         db.add(
                             AlertHistory(

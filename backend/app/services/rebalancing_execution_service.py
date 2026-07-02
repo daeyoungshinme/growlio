@@ -98,14 +98,10 @@ async def execute_rebalancing(
 
     for acc_id_str, group_orders in groups.items():
         try:
-            results.append(
-                await _execute_account_group(acc_id_str, group_orders, user_id, db, redis, strategy)
-            )
+            results.append(await _execute_account_group(acc_id_str, group_orders, user_id, db, redis, strategy))
         except Exception as e:
             detail = e.detail if isinstance(e, HTTPException) else str(e)
-            logger.warning(
-                "rebalancing_group_failed", user_id=str(user_id), account_id=acc_id_str, error=detail
-            )
+            logger.warning("rebalancing_group_failed", user_id=str(user_id), account_id=acc_id_str, error=detail)
             fail_orders = [
                 OrderResult(
                     ticker=o.ticker,

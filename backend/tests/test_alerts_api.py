@@ -390,10 +390,13 @@ class TestRebalancingAlertExtended:
         db.scalar = AsyncMock(return_value=alert_orm)
         app = _setup_app(user, db)
 
-        with patch(
-            "app.services.alert_service.send_test_rebalancing_alert",
-            new=AM(return_value={"email_sent": True, "push_sent": True}),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.services.alert_service.send_test_rebalancing_alert",
+                new=AM(return_value={"email_sent": True, "push_sent": True}),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
 
         assert resp.status_code == 200
@@ -414,10 +417,13 @@ class TestRebalancingAlertExtended:
         db.scalar = AsyncMock(return_value=alert_orm)
         app = _setup_app(user, db)
 
-        with patch(
-            "app.services.alert_service.send_test_rebalancing_alert",
-            new=AM(return_value={"email_sent": True, "push_sent": False}),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.services.alert_service.send_test_rebalancing_alert",
+                new=AM(return_value={"email_sent": True, "push_sent": False}),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
 
         assert resp.status_code == 200
@@ -438,10 +444,13 @@ class TestRebalancingAlertExtended:
         db.scalar = AsyncMock(return_value=alert_orm)
         app = _setup_app(user, db)
 
-        with patch(
-            "app.services.alert_service.send_test_rebalancing_alert",
-            new=AM(return_value={"email_sent": False, "push_sent": False}),
-        ), TestClient(app, raise_server_exceptions=False) as client:
+        with (
+            patch(
+                "app.services.alert_service.send_test_rebalancing_alert",
+                new=AM(return_value={"email_sent": False, "push_sent": False}),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
             resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
 
         assert resp.status_code == 200

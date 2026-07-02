@@ -32,9 +32,7 @@ class TestExecuteSingleOrderPrice:
             limit_price=71000.0,
             reference_price=70000.0,
         )
-        with patch.object(
-            _kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})
-        ):
+        with patch.object(_kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})):
             result = await _kis_order_executor._execute_single_order(
                 order, "key", "secret", "token", "12345678-01", True
             )
@@ -52,9 +50,7 @@ class TestExecuteSingleOrderPrice:
             order_type="MARKET",
             reference_price=70000.0,
         )
-        with patch.object(
-            _kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})
-        ):
+        with patch.object(_kis_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "123"})):
             result = await _kis_order_executor._execute_single_order(
                 order, "key", "secret", "token", "12345678-01", True
             )

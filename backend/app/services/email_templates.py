@@ -75,11 +75,15 @@ def rebalancing_alert_template(
 
     test_prefix = "[테스트] " if is_test else ""
     test_banner = (
-        "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
-        "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
-        "⚠️ 이것은 테스트 알림입니다. 실제 리밸런싱 조건과 무관하게 발송되었습니다."
-        "</div>"
-    ) if is_test else ""
+        (
+            "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
+            "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
+            "⚠️ 이것은 테스트 알림입니다. 실제 리밸런싱 조건과 무관하게 발송되었습니다."
+            "</div>"
+        )
+        if is_test
+        else ""
+    )
 
     if is_scheduled_report:
         subject = f"{test_prefix}[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"

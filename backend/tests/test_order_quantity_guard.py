@@ -40,9 +40,7 @@ class TestClampSellOrders:
         order = _make_order(ticker="AAPL", market="NASDAQ", quantity=10)
         held = {"AAPL:NASDAQ": 4}
 
-        adjusted, skipped = clamp_sell_orders(
-            [order], held, key_fn=lambda o: f"{o.ticker}:{o.market.upper()}"
-        )
+        adjusted, skipped = clamp_sell_orders([order], held, key_fn=lambda o: f"{o.ticker}:{o.market.upper()}")
 
         assert skipped == []
         assert adjusted[0].quantity == 4

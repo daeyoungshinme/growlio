@@ -478,9 +478,7 @@ class TestExecuteRebalancing:
             ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
-            results = await execute_rebalancing(
-                user_id, None, [valid_order, broken_order], mock_db, mock_redis
-            )
+            results = await execute_rebalancing(user_id, None, [valid_order, broken_order], mock_db, mock_redis)
 
         assert len(results) == 2
         valid_result = next(r for r in results if r.account_id == str(valid_account.id))

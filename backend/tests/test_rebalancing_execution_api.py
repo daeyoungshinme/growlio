@@ -252,9 +252,7 @@ class TestQuickExecuteOverride:
 
         mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
 
-        mock_get_owned = AsyncMock(
-            side_effect=HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다")
-        )
+        mock_get_owned = AsyncMock(side_effect=HTTPException(status_code=404, detail="계좌를 찾을 수 없습니다"))
         with (
             patch("app.api.v1.rebalancing_execution.get_owned_account", new=mock_get_owned),
             pytest.raises(HTTPException) as exc_info,
