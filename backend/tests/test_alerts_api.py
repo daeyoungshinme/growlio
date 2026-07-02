@@ -368,6 +368,88 @@ class TestRebalancingAlertExtended:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
         assert resp.status_code == 422
 
+    def test_test_rebalancing_alert_not_found(self, override_settings):
+        """알림 미설정 시 404 반환."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post(f"/api/v1/alerts/rebalancing/{uuid.uuid4()}/test")
+        assert resp.status_code == 404
+
+    def test_test_rebalancing_alert_email_and_push_success(self, override_settings):
+        """이메일+FCM 모두 성공 시 200 반환."""
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import patch
+
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
+        db.scalar = AsyncMock(return_value=alert_orm)
+        app = _setup_app(user, db)
+
+        with patch(
+            "app.services.alert_service.send_test_rebalancing_alert",
+            new=AM(return_value={"email_sent": True, "push_sent": True}),
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["email_sent"] is True
+        assert data["push_sent"] is True
+        assert "✓" in data["message"]
+
+    def test_test_rebalancing_alert_email_only(self, override_settings):
+        """이메일만 성공(FCM 미설정) 시 적절한 message 반환."""
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import patch
+
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
+        db.scalar = AsyncMock(return_value=alert_orm)
+        app = _setup_app(user, db)
+
+        with patch(
+            "app.services.alert_service.send_test_rebalancing_alert",
+            new=AM(return_value={"email_sent": True, "push_sent": False}),
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["email_sent"] is True
+        assert data["push_sent"] is False
+        assert "FCM" in data["message"]
+
+    def test_test_rebalancing_alert_no_channel(self, override_settings):
+        """이메일+FCM 모두 실패해도 200 반환 (결과를 유저에게 알림)."""
+        from unittest.mock import AsyncMock as AM
+        from unittest.mock import patch
+
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
+        db.scalar = AsyncMock(return_value=alert_orm)
+        app = _setup_app(user, db)
+
+        with patch(
+            "app.services.alert_service.send_test_rebalancing_alert",
+            new=AM(return_value={"email_sent": False, "push_sent": False}),
+        ), TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post(f"/api/v1/alerts/rebalancing/{portfolio_id}/test")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["email_sent"] is False
+        assert data["push_sent"] is False
+        assert "없음" in data["message"] or "확인" in data["message"]
+
 
 class TestStockPriceAlertExtended:
     def _make_stock_alert_orm(self, user_id):

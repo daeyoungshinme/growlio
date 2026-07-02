@@ -14,8 +14,12 @@ from app.kiwoom.order import place_domestic_order as kiwoom_place_order
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services._account_queries import active_accounts_stmt
-from app.services._kis_order_executor import _execute_single_order, _execute_two_phase_orders
-from app.services._kiwoom_order_executor import _execute_kiwoom_single_order
+from app.services._kis_order_executor import (
+    _execute_sells_with_clamp,
+    _execute_single_order,
+    _execute_two_phase_orders,
+)
+from app.services._kiwoom_order_executor import _execute_kiwoom_sells_with_clamp, _execute_kiwoom_single_order
 from app.services.credential_service import decrypt
 from app.utils.metrics import rebalancing_execution_count
 
@@ -113,8 +117,14 @@ async def execute_rebalancing(
             sells = [o for o in group_orders if o.side == "SELL"]
             buys = [o for o in group_orders if o.side == "BUY"]
 
-            account_results: list[OrderResult] = []
-            for order in sells + buys:
+            account_results: list[OrderResult] = await _execute_kiwoom_sells_with_clamp(
+                sells,
+                access_token,
+                account_no,  # type: ignore[arg-type]
+                is_mock,
+                kiwoom_place_order,
+            )
+            for order in buys:
                 account_results.append(
                     await _execute_kiwoom_single_order(
                         order,
@@ -152,8 +162,15 @@ async def execute_rebalancing(
                 sells = [o for o in group_orders if o.side == "SELL"]
                 buys = [o for o in group_orders if o.side == "BUY"]
 
-                account_results = []
-                for order in sells + buys:
+                account_results = await _execute_sells_with_clamp(
+                    sells,
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account_no,  # type: ignore[arg-type]
+                    is_mock,
+                )
+                for order in buys:
                     account_results.append(
                         await _execute_single_order(
                             order,

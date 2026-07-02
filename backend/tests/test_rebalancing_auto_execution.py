@@ -132,7 +132,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -163,7 +163,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -190,7 +190,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -218,7 +218,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -246,7 +246,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
@@ -274,7 +274,7 @@ class TestRunAutoExecution:
         portfolio = _make_portfolio()
 
         execute_result = MagicMock()
-        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None)]
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
         mock_db.scalar = AsyncMock(return_value=MagicMock())
 
@@ -306,8 +306,8 @@ class TestRunAutoExecution:
 
         execute_result = MagicMock()
         execute_result.all.return_value = [
-            (alert1, portfolio, "u1@test.com", None),
-            (alert2, portfolio, "u2@test.com", None),
+            (alert1, portfolio, "u1@test.com", None, None),
+            (alert2, portfolio, "u2@test.com", None, None),
         ]
         mock_db.execute = AsyncMock(return_value=execute_result)
         mock_db.scalar = AsyncMock(return_value=MagicMock())

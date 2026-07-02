@@ -65,23 +65,24 @@ async def run_goal_achievement_check() -> None:
                     and not await _already_notified_this_month(db, user.id, "GOAL_ASSET")
                 ):
                     goal_amount = float(settings_row.goal_amount)
-                    await send_goal_achievement_email(
+                    sent = await send_goal_achievement_email(
                         to_email=to_email,
                         goal_type="ASSET",
                         goal_amount=goal_amount,
                         current_amount=total_assets,
                         achievement_pct=goal_pct,
                     )
-                    msg = f"총 자산 목표 달성 {goal_pct:.1f}% — {total_assets:,.0f}원 / {goal_amount:,.0f}원"
-                    db.add(
-                        AlertHistory(
-                            user_id=user.id,
-                            alert_type="GOAL_ASSET",
-                            message=msg,
+                    if sent:
+                        msg = f"총 자산 목표 달성 {goal_pct:.1f}% — {total_assets:,.0f}원 / {goal_amount:,.0f}원"
+                        db.add(
+                            AlertHistory(
+                                user_id=user.id,
+                                alert_type="GOAL_ASSET",
+                                message=msg,
+                            )
                         )
-                    )
-                    await db.commit()
-                    logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
+                        await db.commit()
+                        logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
 
                 if (
                     settings_row.annual_deposit_goal
@@ -91,23 +92,27 @@ async def run_goal_achievement_check() -> None:
                 ):
                     deposit_goal = float(settings_row.annual_deposit_goal)
                     current_deposit = deposit_goal * deposit_pct / 100
-                    await send_goal_achievement_email(
+                    sent = await send_goal_achievement_email(
                         to_email=to_email,
                         goal_type="DEPOSIT",
                         goal_amount=deposit_goal,
                         current_amount=current_deposit,
                         achievement_pct=deposit_pct,
                     )
-                    msg = f"연간 입금 목표 달성 {deposit_pct:.1f}% — {current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
-                    db.add(
-                        AlertHistory(
-                            user_id=user.id,
-                            alert_type="GOAL_DEPOSIT",
-                            message=msg,
+                    if sent:
+                        msg = (
+                            f"연간 입금 목표 달성 {deposit_pct:.1f}% — "
+                            f"{current_deposit:,.0f}원 / {deposit_goal:,.0f}원"
                         )
-                    )
-                    await db.commit()
-                    logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
+                        db.add(
+                            AlertHistory(
+                                user_id=user.id,
+                                alert_type="GOAL_DEPOSIT",
+                                message=msg,
+                            )
+                        )
+                        await db.commit()
+                        logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
 
         except Exception as e:
             logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))

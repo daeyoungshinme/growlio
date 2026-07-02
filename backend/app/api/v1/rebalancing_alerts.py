@@ -36,6 +36,8 @@ class RebalancingAlertCreate(BaseModel):
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
     # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30"). None이면 장 개시 후 첫 tick에 실행
     auto_execution_time: str | None = None
+    # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
+    notify_time: str = "08:30"
 
     @field_validator("threshold_pct")
     @classmethod
@@ -72,6 +74,24 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("실행 시각은 09:00~15:00 KST 범위여야 합니다")
         return f"{hour:02d}:{minute:02d}"
 
+    @field_validator("notify_time")
+    @classmethod
+    def validate_notify_time(cls, v: str) -> str:
+        try:
+            hh, mm = v.split(":")
+            hour, minute = int(hh), int(mm)
+        except (ValueError, AttributeError):
+            raise ValueError("알림 시각은 HH:MM 형식이어야 합니다 (예: 08:30)") from None
+        if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+            raise ValueError("알림 시각은 00:00~23:59 범위여야 합니다")
+        return f"{hour:02d}:{minute:02d}"
+
+
+class TestAlertResponse(BaseModel):
+    email_sent: bool
+    push_sent: bool
+    message: str
+
 
 class RebalancingAlertResponse(BaseModel):
     id: uuid.UUID
@@ -88,6 +108,7 @@ class RebalancingAlertResponse(BaseModel):
     order_type: str
     market_condition_mode: str
     auto_execution_time: str | None
+    notify_time: str
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
@@ -109,6 +130,7 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         order_type=alert.order_type,
         market_condition_mode=alert.market_condition_mode,
         auto_execution_time=getattr(alert, "auto_execution_time", None),
+        notify_time=getattr(alert, "notify_time", "08:30"),
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
@@ -164,7 +186,12 @@ async def upsert_rebalancing_alert(
     """포트폴리오 리밸런싱 알림 생성 또는 수정 (upsert)."""
     await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
 
-    if body.mode == "AUTO" and body.account_id is not None:
+    if body.mode == "AUTO":
+        if body.account_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="자동 실행 모드에는 KIS 연동 계좌를 선택해야 합니다",
+            )
         exec_account = await db.scalar(
             select(AssetAccount).where(
                 AssetAccount.id == body.account_id,
@@ -195,6 +222,7 @@ async def upsert_rebalancing_alert(
         alert.order_type = body.order_type
         alert.market_condition_mode = body.market_condition_mode
         alert.auto_execution_time = body.auto_execution_time
+        alert.notify_time = body.notify_time
         alert.is_active = True
     else:
         alert = RebalancingAlert(
@@ -211,6 +239,7 @@ async def upsert_rebalancing_alert(
             order_type=body.order_type,
             market_condition_mode=body.market_condition_mode,
             auto_execution_time=body.auto_execution_time,
+            notify_time=body.notify_time,
             is_active=True,
         )
         db.add(alert)
@@ -218,6 +247,50 @@ async def upsert_rebalancing_alert(
     await db.commit()
     await db.refresh(alert)
     return _build_response(alert)
+
+
+@router.post("/rebalancing/{portfolio_id}/test", response_model=TestAlertResponse)
+@limiter.limit("3/minute")
+async def trigger_rebalancing_alert_test(
+    request: Request,
+    portfolio_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """리밸런싱 자동화 알림 테스트 발송.
+
+    스케줄/드리프트 조건 없이 즉시 현재 포트폴리오 데이터로 이메일+FCM 발송.
+    """
+    from app.services.alert_service import send_test_rebalancing_alert
+
+    alert = await db.scalar(
+        select(RebalancingAlert).where(
+            RebalancingAlert.portfolio_id == portfolio_id,
+            RebalancingAlert.user_id == current_user.id,
+        )
+    )
+    if not alert:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="알림이 설정되지 않았습니다")
+
+    result = await send_test_rebalancing_alert(
+        portfolio_id=portfolio_id,
+        user_id=current_user.id,
+        db=db,
+    )
+
+    email_sent = result["email_sent"]
+    push_sent = result["push_sent"]
+
+    if email_sent and push_sent:
+        message = "테스트 알림 발송 완료 (이메일 ✓, 푸시 ✓)"
+    elif email_sent:
+        message = "테스트 이메일 발송 완료 (FCM 미설정 또는 토큰 없음)"
+    elif push_sent:
+        message = "테스트 푸시 발송 완료 (SMTP 미설정)"
+    else:
+        message = "알림 채널 없음 — 이메일 또는 FCM 설정을 확인해주세요"
+
+    return TestAlertResponse(email_sent=email_sent, push_sent=push_sent, message=message)
 
 
 @router.delete("/rebalancing/{portfolio_id}", status_code=status.HTTP_204_NO_CONTENT)

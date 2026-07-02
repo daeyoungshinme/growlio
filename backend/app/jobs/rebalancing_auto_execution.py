@@ -7,14 +7,17 @@ from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
 from app.models.alert import RebalancingAlert
+from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.alert_calculator import already_fired_today
 from app.services.alert_service import save_alert_history
+from app.services.email_service import send_rebalancing_execution_email
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
 from app.utils.metrics import alert_trigger_count
@@ -50,10 +53,11 @@ async def _run_auto_execution() -> None:
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
-            select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email)
+            select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
             .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
             .join(User, User.id == RebalancingAlert.user_id)
             .outerjoin(UserSettings, UserSettings.user_id == User.id)
+            .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
             .where(
                 RebalancingAlert.is_active == True,  # noqa: E712
                 RebalancingAlert.mode == "AUTO",
@@ -62,7 +66,7 @@ async def _run_auto_execution() -> None:
         rows = result.all()
 
     triggered_count = 0
-    for alert, portfolio, _user_email, _notification_email in rows:
+    for alert, portfolio, _user_email, _notification_email, _fcm_token in rows:
         if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
             continue
         if already_fired_today(alert):
@@ -85,13 +89,64 @@ async def _run_auto_execution() -> None:
         if not triggered:
             continue
 
-        async with AsyncSessionLocal() as db_save:
-            await save_alert_history(
-                db_save,
-                alert.user_id,
-                "REBALANCING",
-                f"리밸런싱 자동 실행: {portfolio.name} [시장신호: {composite_level}]",
+        # 실행 결과 조회 (알림 발송용)
+        exec_result: RebalancingExecution | None = None
+        async with AsyncSessionLocal() as db_exec:
+            exec_result = await db_exec.scalar(
+                select(RebalancingExecution)
+                .options(selectinload(RebalancingExecution.result_items))
+                .where(
+                    RebalancingExecution.user_id == alert.user_id,
+                    RebalancingExecution.portfolio_id == portfolio.id,
+                    RebalancingExecution.triggered_by == "AUTO",
+                )
+                .order_by(RebalancingExecution.executed_at.desc())
             )
+
+        # 이메일 알림
+        _email = _notification_email or _user_email
+        if _email and exec_result:
+            try:
+                await send_rebalancing_execution_email(
+                    to_email=_email,
+                    portfolio_name=portfolio.name,
+                    executed_at=exec_result.executed_at,
+                    result_items=exec_result.result_items,
+                    total_success=exec_result.total_success,
+                    total_fail=exec_result.total_fail,
+                    total_skipped=exec_result.total_skipped,
+                )
+            except Exception as exc:
+                logger.error("rebalancing_auto_execution_email_failed", alert_id=str(alert.id), error=str(exc))
+
+        # FCM 푸시 알림
+        if exec_result:
+            from app.services.push_service import send_push_to_user
+
+            success_n = exec_result.total_success
+            fail_n = exec_result.total_fail
+            push_body = f"{success_n}건 완료"
+            if fail_n:
+                push_body += f", {fail_n}건 실패"
+            try:
+                await send_push_to_user(
+                    user_id=alert.user_id,
+                    title=f"리밸런싱 자동 실행 완료 — {portfolio.name}",
+                    body=push_body,
+                    fcm_token=_fcm_token,
+                    data={"type": "REBALANCING_EXECUTED", "portfolio_id": str(portfolio.id)},
+                )
+            except Exception as exc:
+                logger.error("rebalancing_auto_execution_push_failed", alert_id=str(alert.id), error=str(exc))
+
+        async with AsyncSessionLocal() as db_save:
+            success_n = exec_result.total_success if exec_result else 0
+            fail_n = exec_result.total_fail if exec_result else 0
+            history_msg = (
+                f"리밸런싱 자동 실행: {portfolio.name} — "
+                f"성공 {success_n}건, 실패 {fail_n}건 [시장신호: {composite_level}]"
+            )
+            await save_alert_history(db_save, alert.user_id, "REBALANCING", history_msg)
             # last_triggered_at 갱신
             alert_row = await db_save.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert.id))
             if alert_row:

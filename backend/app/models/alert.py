@@ -79,6 +79,8 @@ class RebalancingAlert(_AlertMixin, Base):
     market_condition_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="DISABLED")
     # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30"), None이면 장 중 최초 5분 tick에 실행
     auto_execution_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
+    # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
+    notify_time: Mapped[str] = mapped_column(String(5), nullable=False, server_default="08:30")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

@@ -147,7 +147,7 @@ API Request
 services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
-  ├── alert_service.py        # 알림 생성·조회
+  ├── alert_service.py        # 알림 생성·조회. `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`는 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py) — 의도된 설계, 제거 대상 아님
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)

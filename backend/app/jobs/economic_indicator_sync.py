@@ -82,10 +82,12 @@ async def run_economic_indicator_alert_check() -> None:
         to_email = getattr(settings_row, "notification_email", None) or user.email
 
         try:
-            await send_indicator_alert_email(
+            sent = await send_indicator_alert_email(
                 to_email=to_email,
                 indicators=indicators_data,
             )
+            if not sent:
+                continue
 
             async with AsyncSessionLocal() as db:
                 names = ", ".join(d["name"] for d in indicators_data[:3])

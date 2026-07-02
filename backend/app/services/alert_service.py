@@ -14,6 +14,7 @@ from typing import Any, Literal, cast
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.alert import AlertHistory, RebalancingAlert
 from app.models.portfolio import Portfolio
@@ -22,6 +23,7 @@ from app.services.alert_calculator import (
     already_fired_today,
     should_fire_today,
 )
+from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
@@ -276,6 +278,85 @@ async def _execute_auto_rebalancing(
     return True
 
 
+async def send_test_rebalancing_alert(
+    portfolio_id: uuid.UUID,
+    user_id: uuid.UUID,
+    db: AsyncSession,
+) -> dict[str, bool]:
+    """리밸런싱 자동화 알림을 즉시 테스트 발송한다.
+
+    스케줄/드리프트 조건 및 시장 신호 게이트를 무시하고 현재 포트폴리오 데이터로 발송.
+    반환: {"email_sent": bool, "push_sent": bool}
+    """
+    from app.services.email_service import send_rebalancing_alert
+    from app.services.portfolio_service import build_portfolio_overview
+    from app.services.push_service import send_push_to_user
+    from app.services.rebalancing_service import analyze_rebalancing
+
+    result = await db.execute(
+        select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
+        .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
+        .join(User, User.id == RebalancingAlert.user_id)
+        .outerjoin(UserSettings, UserSettings.user_id == RebalancingAlert.user_id)
+        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
+        .where(
+            RebalancingAlert.portfolio_id == portfolio_id,
+            RebalancingAlert.user_id == user_id,
+        )
+    )
+    row = result.first()
+    if not row:
+        raise ValueError("알림 설정을 찾을 수 없습니다")
+
+    alert, portfolio, user_email, notification_email, fcm_token = row
+    email = notification_email or user_email
+    threshold = float(alert.threshold_pct)
+
+    saved_ids = getattr(portfolio, "account_ids", None)
+    effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+
+    items_to_show: list = []
+    drifting: list = []
+    try:
+        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids)
+        analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
+        drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
+        items_to_show = analysis.items
+    except Exception as exc:
+        logger.error("test_rebalancing_alert_analysis_failed", portfolio_id=str(portfolio_id), error=str(exc))
+
+    email_sent = False
+    try:
+        email_sent = await send_rebalancing_alert(
+            to_email=email,
+            portfolio_name=portfolio.name,
+            threshold_pct=threshold,
+            items_to_show=items_to_show,
+            drifting_count=len(drifting),
+            is_scheduled_report=False,
+            schedule_type=getattr(alert, "schedule_type", "DAILY"),
+            is_test=True,
+        )
+    except Exception as exc:
+        logger.error("test_rebalancing_alert_email_failed", portfolio_id=str(portfolio_id), error=str(exc))
+
+    push_sent = False
+    drift_info = f"{len(drifting)}개 종목이 ±{threshold:.1f}% 이상 이탈" if drifting else "현재 이탈 없음"
+    with contextlib.suppress(Exception):
+        push_sent = await send_push_to_user(
+            user_id=user_id,
+            title=f"[테스트] 리밸런싱 알림 — {portfolio.name}",
+            body=f"테스트 알림입니다. {drift_info}.",
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
+        )
+
+    await save_alert_history(db, user_id, "REBALANCING", f"[테스트] 리밸런싱 알림: {portfolio.name}")
+    await db.commit()
+
+    return {"email_sent": email_sent, "push_sent": push_sent}
+
+
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
     from app.redis_client import get_redis
@@ -297,12 +378,18 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
         .join(User, User.id == RebalancingAlert.user_id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
+        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
         .where(RebalancingAlert.is_active == True)  # noqa: E712
     )
     rows = result.all()
 
     triggered_count = 0
     for alert, portfolio, user_email, notification_email, fcm_token in rows:
+        # 각 알림의 notify_time(HH:MM)과 현재 시각이 일치(±4분)하는지 확인
+        notify_time = getattr(alert, "notify_time", "08:30")
+        if not is_alert_execution_time(notify_time):
+            continue
+
         trigger_condition = getattr(alert, "trigger_condition", "DRIFT_ONLY")
         is_schedule_day = should_fire_today(alert)
 

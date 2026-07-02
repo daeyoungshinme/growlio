@@ -100,6 +100,7 @@ export function useRebalancingAlertFormState({
   const [autoExecutionTime, setAutoExecutionTime] = useState<string>(
     alert?.auto_execution_time ?? "09:05",
   );
+  const [notifyTime, setNotifyTime] = useState<string>(alert?.notify_time ?? "08:30");
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -115,6 +116,7 @@ export function useRebalancingAlertFormState({
         order_type: orderType,
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
         auto_execution_time: mode === "AUTO" && autoExecutionTime ? autoExecutionTime : null,
+        notify_time: notifyTime,
       }),
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
@@ -158,6 +160,8 @@ export function useRebalancingAlertFormState({
     setMarketConditionMode,
     autoExecutionTime,
     setAutoExecutionTime,
+    notifyTime,
+    setNotifyTime,
     // mutations
     upsertMut,
     deleteMut,

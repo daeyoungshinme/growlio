@@ -50,17 +50,15 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
 
         email = notification_email or user_email
         target = float(alert.target_price)
-        try:
-            await send_stock_price_alert(
-                to_email=email,
-                ticker=alert.ticker,
-                name=alert.name,
-                target_price=target,
-                current_price=price,
-                direction=alert.direction,
-            )
-        except Exception as exc:
-            logger.error("stock_price_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+        sent = await send_stock_price_alert(
+            to_email=email,
+            ticker=alert.ticker,
+            name=alert.name,
+            target_price=target,
+            current_price=price,
+            direction=alert.direction,
+        )
+        if not sent:
             continue
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"

@@ -1,12 +1,15 @@
-import { Bell, BellOff, Loader2 } from "lucide-react";
+import { Bell, BellOff, Loader2, Send } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
-import { type ScheduleType, type TriggerCondition } from "@/api/alerts";
+import { type ScheduleType, type TriggerCondition, sendTestRebalancingAlert } from "@/api/alerts";
 import {
   useRebalancingAlertQueries,
   useRebalancingAlertFormState,
 } from "@/hooks/useRebalancingAlertForm";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import {
   SCHEDULE_OPTIONS,
@@ -17,6 +20,7 @@ import {
   MODE_OPTIONS,
   STRATEGY_OPTIONS,
   MARKET_CONDITION_OPTIONS,
+  NOTIFY_TIME_OPTIONS,
 } from "@/constants/rebalancingConfig";
 
 interface Props {
@@ -34,8 +38,9 @@ function buildDescription(
   threshold: number,
   mode: "NOTIFY" | "AUTO",
   autoExecutionTime?: string,
+  notifyTime?: string,
 ): string {
-  const timeLabel = mode === "AUTO" && autoExecutionTime ? autoExecutionTime : "08:30";
+  const timeLabel = mode === "AUTO" ? (autoExecutionTime ?? "09:00") : (notifyTime ?? "08:30");
   const when =
     scheduleType === "DAILY"
       ? `매일 ${timeLabel}에`
@@ -124,6 +129,16 @@ function AlertFormBody({
 
   const hasAlert = !!alert;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const testMut = useMutation({
+    mutationFn: () => sendTestRebalancingAlert(portfolioId),
+    onSuccess: (data) => {
+      toast(data.message, data.email_sent || data.push_sent ? "success" : "error");
+    },
+    onError: (e) => {
+      toast(extractErrorMessage(e, "테스트 알림 발송에 실패했습니다"), "error");
+    },
+  });
 
   function handleDeleteClick() {
     if (!confirmingDelete) {
@@ -290,6 +305,29 @@ function AlertFormBody({
           </div>
         </div>
 
+        {/* ── NOTIFY 모드 알림 시각 ── */}
+        {form.mode === "NOTIFY" && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              알림 시각 (KST)
+            </label>
+            <select
+              value={form.notifyTime}
+              onChange={(e) => form.setNotifyTime(e.target.value)}
+              className={inputClass}
+            >
+              {NOTIFY_TIME_OPTIONS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              매일 지정 시각에 알림을 확인합니다. 기본값: 08:30
+            </p>
+          </div>
+        )}
+
         {/* ── 자동 실행 옵션 ── */}
         {form.mode === "AUTO" && (
           <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
@@ -432,6 +470,7 @@ function AlertFormBody({
             form.threshold,
             form.mode,
             form.autoExecutionTime,
+            form.notifyTime,
           )}
         </p>
 
@@ -445,6 +484,22 @@ function AlertFormBody({
               </span>
             )}
           </div>
+        )}
+
+        {/* ── 테스트 알림 발송 ── */}
+        {hasAlert && (
+          <button
+            onClick={() => testMut.mutate()}
+            disabled={testMut.isPending}
+            className="w-full flex items-center justify-center gap-2 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+          >
+            {testMut.isPending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Send size={14} />
+            )}
+            테스트 알림 발송
+          </button>
         )}
       </div>
       {/* end p-6 form fields */}

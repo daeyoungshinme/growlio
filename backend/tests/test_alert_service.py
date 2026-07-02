@@ -254,7 +254,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
         patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch(
             "app.services.email_service.send_exchange_rate_alert",
-            AsyncMock(side_effect=Exception("SMTP 오류")),
+            AsyncMock(return_value=False),
         ),
     ):
         from app.services.alert_service import check_and_trigger_alerts
@@ -405,6 +405,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         account_id=None,
         strategy="BUY_ONLY",
         order_type="MARKET",
+        notify_time=_current_notify_time(),
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
@@ -540,6 +541,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         account_id=None,
         strategy="BUY_ONLY",
         order_type="MARKET",
+        notify_time=_current_notify_time(),
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[])
     execute_result = MagicMock()
@@ -634,7 +636,7 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
 
     with (
         patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
-        patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(side_effect=Exception("SMTP Error"))),
+        patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(return_value=False)),
     ):
         from app.services.alert_service import check_and_trigger_stock_price_alerts
 
@@ -644,6 +646,14 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
 
 
 # ── trigger_condition=BOTH 테스트 ─────────────────────────────
+
+
+def _current_notify_time() -> str:
+    """is_alert_execution_time 게이트를 항상 통과하도록 현재 KST 시각(HH:MM)을 반환."""
+    from datetime import timezone
+
+    now = datetime.now(tz=timezone(timedelta(hours=9)))
+    return f"{now.hour:02d}:{now.minute:02d}"
 
 
 def _make_both_alert(user_id, portfolio_id, schedule_type="DAILY"):
@@ -661,6 +671,7 @@ def _make_both_alert(user_id, portfolio_id, schedule_type="DAILY"):
         account_id=None,
         strategy="BUY_ONLY",
         order_type="MARKET",
+        notify_time=_current_notify_time(),
     )
 
 

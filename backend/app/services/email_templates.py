@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 
 def _kv_table(rows: list[tuple[str, str]]) -> str:
     """key-value 2열 테이블. 각 행: (label, value_html)."""
@@ -59,6 +61,7 @@ def rebalancing_alert_template(
     drifting_count: int,
     is_scheduled_report: bool = False,
     schedule_type: str = "DAILY",
+    is_test: bool = False,
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
         "DAILY": "매일",
@@ -70,8 +73,16 @@ def rebalancing_alert_template(
     }
     schedule_label = _SCHEDULE_LABEL.get(schedule_type, "주기")
 
+    test_prefix = "[테스트] " if is_test else ""
+    test_banner = (
+        "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
+        "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
+        "⚠️ 이것은 테스트 알림입니다. 실제 리밸런싱 조건과 무관하게 발송되었습니다."
+        "</div>"
+    ) if is_test else ""
+
     if is_scheduled_report:
-        subject = f"[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"
+        subject = f"{test_prefix}[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"
         heading = "정기 리밸런싱 현황"
         subheading = f"포트폴리오 <strong>{portfolio_name}</strong>의 {schedule_label} 리밸런싱 현황입니다."
         if drifting_count:
@@ -80,7 +91,7 @@ def rebalancing_alert_template(
                 f"목표 비중에서 ±{threshold_pct:.1f}% 이상 이탈했습니다."
             )
     else:
-        subject = f"[Growlio] 리밸런싱 알림 — {portfolio_name} (비중 이탈 감지)"
+        subject = f"{test_prefix}[Growlio] 리밸런싱 알림 — {portfolio_name} (비중 이탈 감지)"
         heading = "비중 이탈 감지"
         subheading = (
             f"포트폴리오 <strong>{portfolio_name}</strong>의 {len(items_to_show)}개 종목이 "
@@ -112,6 +123,7 @@ def rebalancing_alert_template(
         f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>이 알림은 {schedule_label} 발송됩니다."
     )
     body = (
+        f"{test_banner}"
         f"<p style='color:#374151;margin-top:8px;'>{subheading}</p>"
         f"<table style='width:100%;border-collapse:collapse;margin-top:16px;font-size:13px;'>"
         f"<thead><tr style='background:#f1f5f9;'>"
@@ -125,6 +137,89 @@ def rebalancing_alert_template(
         f"<tbody>{rows_html}</tbody></table>"
     )
     html = _email_div(heading, "#1d4ed8", body, footer)
+    return subject, html
+
+
+def rebalancing_execution_template(
+    portfolio_name: str,
+    executed_at: datetime,
+    result_items: list,
+    total_success: int,
+    total_fail: int,
+    total_skipped: int,
+) -> tuple[str, str]:
+    """리밸런싱 자동 실행 완료 이메일 템플릿."""
+    has_fail = total_fail > 0
+    heading_color = "#ef4444" if has_fail else "#16a34a"
+    heading = "리밸런싱 자동 실행 완료" if not has_fail else "리밸런싱 자동 실행 완료 (일부 실패)"
+    subject = f"[Growlio] 리밸런싱 자동 실행 완료 — {portfolio_name}"
+
+    _KST_OFFSET = 9 * 3600
+    kst_time = datetime.fromtimestamp(executed_at.timestamp() + _KST_OFFSET)
+    time_str = kst_time.strftime("%Y-%m-%d %H:%M KST")
+
+    _ACTION_LABEL = {"BUY": "매수", "SELL": "매도", "SKIPPED": "건너뜀"}
+    _STATUS_COLOR = {"SUCCESS": "#16a34a", "FAILED": "#ef4444", "SKIPPED": "#6b7280"}
+    _STATUS_LABEL = {"SUCCESS": "성공", "FAILED": "실패", "SKIPPED": "건너뜀"}
+
+    td = "padding:8px;border-bottom:1px solid #e2e8f0;font-size:13px;"
+    rows_html = ""
+    for item in result_items:
+        action = getattr(item, "action", "")
+        status = getattr(item, "status", "")
+        ticker = getattr(item, "ticker", "") or ""
+        name = getattr(item, "name", "") or ""
+        quantity = getattr(item, "quantity", None)
+        error_msg = getattr(item, "error_message", None)
+        status_color = _STATUS_COLOR.get(status, "#6b7280")
+        status_label = _STATUS_LABEL.get(status, status)
+        action_label = _ACTION_LABEL.get(action, action)
+        qty_str = f"{quantity:,}주" if quantity else "—"
+        error_html = (
+            f"<br><span style='font-size:11px;color:#ef4444;'>{error_msg}</span>"
+            if error_msg and status == "FAILED"
+            else ""
+        )
+        rows_html += (
+            f"<tr>"
+            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"<td style='{td}text-align:center;'>{action_label}</td>"
+            f"<td style='{td}text-align:right;'>{qty_str}</td>"
+            f"<td style='{td}text-align:center;color:{status_color};font-weight:bold;'>"
+            f"{status_label}{error_html}</td>"
+            f"</tr>"
+        )
+
+    summary_color = "#16a34a" if not has_fail else "#f59e0b"
+    body = (
+        f"<p style='color:#374151;margin-top:8px;'>"
+        f"포트폴리오 <strong>{portfolio_name}</strong>의 리밸런싱이 자동으로 실행되었습니다.<br>"
+        f"실행 시각: {time_str}</p>"
+        f"<div style='background:#f8fafc;border-radius:8px;padding:12px 16px;margin:16px 0;"
+        f"font-size:14px;border-left:4px solid {summary_color};'>"
+        f"<strong style='color:{summary_color};'>성공 {total_success}건</strong>"
+        + (f" &nbsp;·&nbsp; <strong style='color:#ef4444;'>실패 {total_fail}건</strong>" if has_fail else "")
+        + (f" &nbsp;·&nbsp; 건너뜀 {total_skipped}건" if total_skipped else "")
+        + "</div>"
+        + (
+            f"<table style='width:100%;border-collapse:collapse;margin-top:8px;'>"
+            f"<thead><tr style='background:#f1f5f9;'>"
+            f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
+            f"<th style='padding:8px;text-align:center;font-size:13px;'>구분</th>"
+            f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
+            f"<th style='padding:8px;text-align:center;font-size:13px;'>결과</th>"
+            f"</tr></thead>"
+            f"<tbody>{rows_html}</tbody></table>"
+            if rows_html
+            else ""
+        )
+    )
+    html = _email_div(
+        heading,
+        heading_color,
+        body,
+        "Growlio 앱 > 리밸런싱 > 실행 이력에서 상세 내역을 확인하세요.",
+    )
     return subject, html
 
 

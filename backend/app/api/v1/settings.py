@@ -292,22 +292,18 @@ async def send_test_email_endpoint(
     to_email = (row.notification_email if row else None) or current_user.email
 
     try:
-        await send_test_email(to_email)
+        sent = await send_test_email(to_email)
     except RuntimeError as e:
-        if "smtp_not_configured" in str(e):
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="SMTP가 설정되지 않았습니다. 서버 관리자에게 문의하세요",
-            ) from e
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SMTP가 설정되지 않았습니다. 서버 관리자에게 문의하세요",
+        ) from e
+
+    if not sent:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="이메일 발송에 실패했습니다",
-        ) from e
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="이메일 발송에 실패했습니다",
-        ) from e
+        )
 
     return {"detail": f"{to_email}으로 테스트 이메일을 발송했습니다."}
 

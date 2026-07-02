@@ -108,10 +108,14 @@ describe("api/alerts — rebalancing alerts", () => {
     schedule_day_of_week: null,
     schedule_day_of_month: null,
     only_when_drift: true,
+    trigger_condition: "DRIFT_ONLY" as const,
     mode: "NOTIFY" as const,
     strategy: "FULL" as const,
     account_id: null,
     order_type: "MARKET" as const,
+    market_condition_mode: "DISABLED" as const,
+    auto_execution_time: null,
+    notify_time: "08:30",
     last_triggered_at: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
@@ -144,6 +148,7 @@ describe("api/alerts — rebalancing alerts", () => {
       order_type: "MARKET",
       market_condition_mode: "DISABLED",
       auto_execution_time: null,
+      notify_time: "08:30",
     });
     expect(api.put).toHaveBeenCalledWith(
       "/alerts/rebalancing/port-1",

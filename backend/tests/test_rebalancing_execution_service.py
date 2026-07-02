@@ -154,6 +154,171 @@ class TestExecuteKiwoomSingleOrder:
         assert result.error_msg is not None
 
 
+# ── _execute_sells_with_clamp (KIS) 테스트 ──────────────────
+
+
+class TestExecuteSellsWithClamp:
+    """_execute_sells_with_clamp: 매도 주문을 실행 계좌의 실제 보유수량으로 clamp."""
+
+    @pytest.mark.asyncio
+    async def test_empty_sells_returns_empty(self, override_settings):
+        from app.services._kis_order_executor import _execute_sells_with_clamp
+
+        result = await _execute_sells_with_clamp([], "key", "secret", "token", "12345678-01", True)
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_clamps_domestic_sell_to_actual_holdings(self, override_settings):
+        from app.services import _kis_order_executor
+
+        order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
+        mock_balance = AsyncMock(return_value={"positions": [{"ticker": "005930", "qty": 3}]})
+        captured_quantity = None
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            nonlocal captured_quantity
+            captured_quantity = order.quantity
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_domestic_balance", mock_balance),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_sells_with_clamp(
+                [order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert captured_quantity == 3
+        assert results[0].status == "SUCCESS"
+
+    @pytest.mark.asyncio
+    async def test_skips_sell_with_zero_holdings(self, override_settings):
+        from app.services import _kis_order_executor
+
+        order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
+        mock_balance = AsyncMock(return_value={"positions": []})
+
+        with patch.object(_kis_order_executor, "get_domestic_balance", mock_balance):
+            results = await _kis_order_executor._execute_sells_with_clamp(
+                [order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert len(results) == 1
+        assert results[0].status == "SKIPPED"
+
+    @pytest.mark.asyncio
+    async def test_balance_fetch_failure_falls_back_to_unclamped_execution(self, override_settings):
+        from app.services import _kis_order_executor
+
+        order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
+        mock_balance = AsyncMock(side_effect=Exception("API 오류"))
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_domestic_balance", mock_balance),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_sells_with_clamp(
+                [order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert results[0].status == "SUCCESS"
+        assert results[0].quantity == 10  # clamp 실패 시 원래 수량으로 진행(기존 동작 유지)
+
+    @pytest.mark.asyncio
+    async def test_clamps_overseas_sell_using_ticker_and_market(self, override_settings):
+        from app.services import _kis_order_executor
+
+        order = _make_order(ticker="AAPL", market="NASDAQ", side="SELL", quantity=10)
+        mock_balance = AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "NASDAQ", "qty": 2}]})
+        captured_quantity = None
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            nonlocal captured_quantity
+            captured_quantity = order.quantity
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_overseas_balance", mock_balance),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_sells_with_clamp(
+                [order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert captured_quantity == 2
+        assert results[0].status == "SUCCESS"
+
+
+# ── _execute_kiwoom_sells_with_clamp 테스트 ──────────────────
+
+
+class TestExecuteKiwoomSellsWithClamp:
+    """_execute_kiwoom_sells_with_clamp: 키움 매도 주문을 실행 계좌의 실제 보유수량으로 clamp."""
+
+    @pytest.mark.asyncio
+    async def test_empty_sells_returns_empty(self, override_settings):
+        from app.services._kiwoom_order_executor import _execute_kiwoom_sells_with_clamp
+
+        result = await _execute_kiwoom_sells_with_clamp([], "token", "12345", True, AsyncMock())
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_clamps_sell_to_actual_holdings(self, override_settings):
+        from app.services import _kiwoom_order_executor
+
+        order = _make_order(ticker="005930", side="SELL", quantity=10)
+        mock_balance = AsyncMock(return_value={"positions": [{"ticker": "005930", "qty": 4}]})
+        mock_place = AsyncMock(return_value={"order_no": "ORD001"})
+
+        with patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance):
+            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp(
+                [order], "token", "12345", True, mock_place
+            )
+
+        assert results[0].status == "SUCCESS"
+        _, kwargs = mock_place.call_args
+        assert kwargs["quantity"] == 4
+
+    @pytest.mark.asyncio
+    async def test_skips_sell_with_zero_holdings(self, override_settings):
+        from app.services import _kiwoom_order_executor
+
+        order = _make_order(ticker="005930", side="SELL", quantity=10)
+        mock_balance = AsyncMock(return_value={"positions": []})
+
+        with patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance):
+            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp(
+                [order], "token", "12345", True, AsyncMock()
+            )
+
+        assert len(results) == 1
+        assert results[0].status == "SKIPPED"
+
+
 # ── execute_rebalancing 테스트 ──────────────────────────────
 
 
@@ -194,6 +359,12 @@ class TestExecuteRebalancing:
                 status="SUCCESS",
             )
 
+        async def mock_execute_sells_with_clamp(sells, app_key, app_secret, access_token, account_no, is_mock):
+            return [
+                await mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock)
+                for order in sells
+            ]
+
         mock_db.scalar = AsyncMock(return_value=account)
         mock_db.flush = AsyncMock()
         mock_db.commit = AsyncMock()
@@ -207,6 +378,10 @@ class TestExecuteRebalancing:
                 return_value="token",
             ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch(
+                "app.services.rebalancing_execution_service._execute_sells_with_clamp",
+                side_effect=mock_execute_sells_with_clamp,
+            ),
         ):
             await execute_rebalancing(user_id, account.id, [buy_order, sell_order], mock_db, mock_redis)
 

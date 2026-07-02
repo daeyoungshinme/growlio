@@ -41,8 +41,8 @@ def init_scheduler() -> None:
     )
     scheduler.add_job(
         run_rebalancing_alert_check,
-        CronTrigger(hour=8, minute=30, timezone="Asia/Seoul"),
-        id="rebalancing_alert_check_daily",
+        IntervalTrigger(minutes=10),
+        id="rebalancing_alert_check_interval",
         replace_existing=True,
     )
     from app.jobs.dca_auto_buy import run_dca_auto_execution

@@ -50,6 +50,7 @@ export interface RebalancingAlert {
   order_type: "MARKET" | "LIMIT";
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
+  notify_time: string;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -68,6 +69,7 @@ export interface RebalancingAlertUpsert {
   order_type: "MARKET" | "LIMIT";
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
+  notify_time: string;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");
@@ -86,6 +88,15 @@ export const upsertRebalancingAlert = (
 
 export const deleteRebalancingAlert = (portfolioId: string) =>
   apiDelete(`/alerts/rebalancing/${portfolioId}`);
+
+export interface TestAlertResult {
+  email_sent: boolean;
+  push_sent: boolean;
+  message: string;
+}
+
+export const sendTestRebalancingAlert = (portfolioId: string) =>
+  apiPost<TestAlertResult>(`/alerts/rebalancing/${portfolioId}/test`, {});
 
 // ── 주가 목표 알림 ──────────────────────────────────────────────────────────
 

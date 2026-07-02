@@ -62,6 +62,17 @@ export const STRATEGY_OPTIONS: {
   },
 ];
 
+export const NOTIFY_TIME_OPTIONS: { value: string; label: string }[] = Array.from(
+  { length: 33 },
+  (_, i) => {
+    const totalMinutes = 360 + i * 30; // 06:00 부터 30분 간격
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    const value = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    return { value, label: value };
+  },
+);
+
 export const MARKET_CONDITION_OPTIONS: {
   value: MarketConditionMode;
   label: string;

@@ -609,8 +609,8 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_exchange_rate_alert_exception_raised(monkeypatch):
-    """_send_html_email 예외 시 re-raise."""
+async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
+    """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -618,21 +618,20 @@ async def test_send_exchange_rate_alert_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_exchange_rate_alert(
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_exchange_rate_alert(
             to_email="user@example.com",
             target_rate=1300.0,
             direction="BELOW",
             current_rate=1295.0,
         )
 
+    assert result is False
+
 
 @pytest.mark.asyncio
-async def test_send_rebalancing_alert_exception_raised(monkeypatch):
-    """_send_html_email 예외 시 re-raise."""
+async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
+    """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -640,11 +639,8 @@ async def test_send_rebalancing_alert_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_rebalancing_alert(
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_rebalancing_alert(
             to_email="user@example.com",
             portfolio_name="포트폴리오",
             threshold_pct=5.0,
@@ -652,10 +648,12 @@ async def test_send_rebalancing_alert_exception_raised(monkeypatch):
             drifting_count=0,
         )
 
+    assert result is False
+
 
 @pytest.mark.asyncio
-async def test_send_monthly_report_exception_raised(monkeypatch):
-    """월간 리포트 이메일 발송 실패 시 re-raise."""
+async def test_send_monthly_report_exception_returns_false(monkeypatch):
+    """월간 리포트 이메일 발송 실패 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -663,11 +661,8 @@ async def test_send_monthly_report_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_monthly_report_email(
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_monthly_report_email(
             to_email="user@example.com",
             report_month="2026년 5월",
             total_assets_krw=100_000_000.0,
@@ -683,10 +678,12 @@ async def test_send_monthly_report_exception_raised(monkeypatch):
             asset_allocation=[],
         )
 
+    assert result is False
+
 
 @pytest.mark.asyncio
-async def test_send_stock_price_alert_exception_raised(monkeypatch):
-    """send_stock_price_alert _send_html_email 예외 시 re-raise."""
+async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
+    """send_stock_price_alert _send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -694,11 +691,8 @@ async def test_send_stock_price_alert_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_stock_price_alert(
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_stock_price_alert(
             to_email="user@example.com",
             ticker="005930",
             name="삼성전자",
@@ -707,10 +701,12 @@ async def test_send_stock_price_alert_exception_raised(monkeypatch):
             direction="BELOW",
         )
 
+    assert result is False
+
 
 @pytest.mark.asyncio
-async def test_send_goal_achievement_exception_raised(monkeypatch):
-    """send_goal_achievement_email 예외 시 re-raise."""
+async def test_send_goal_achievement_exception_returns_false(monkeypatch):
+    """send_goal_achievement_email 예외 시 예외를 삼키고 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -718,11 +714,8 @@ async def test_send_goal_achievement_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_goal_achievement_email(
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_goal_achievement_email(
             to_email="user@example.com",
             goal_type="ASSET",
             goal_amount=1_000_000_000.0,
@@ -730,10 +723,12 @@ async def test_send_goal_achievement_exception_raised(monkeypatch):
             achievement_pct=105.0,
         )
 
+    assert result is False
+
 
 @pytest.mark.asyncio
-async def test_send_test_email_exception_raised(monkeypatch):
-    """send_test_email 예외 시 re-raise."""
+async def test_send_test_email_exception_returns_false(monkeypatch):
+    """send_test_email은 SMTP 설정이 되어 있는데 발송 자체가 실패하면 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -741,16 +736,15 @@ async def test_send_test_email_exception_raised(monkeypatch):
 
     import app.services.email_service as em
 
-    with (
-        patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))),
-        pytest.raises(Exception, match="smtp error"),
-    ):
-        await em.send_test_email("user@example.com")
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+        result = await em.send_test_email("user@example.com")
+
+    assert result is False
 
 
 @pytest.mark.asyncio
-async def test_send_password_reset_exception_silenced(monkeypatch):
-    """send_password_reset_email은 예외 발생 시 re-raise 없이 조용히 실패한다."""
+async def test_send_password_reset_exception_returns_false(monkeypatch):
+    """send_password_reset_email은 예외 발생 시 re-raise 없이 False를 반환한다."""
     monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
     monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
 
@@ -760,4 +754,6 @@ async def test_send_password_reset_exception_silenced(monkeypatch):
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
         # 예외가 propagate되지 않아야 함
-        await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")
+        result = await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")
+
+    assert result is False

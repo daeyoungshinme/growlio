@@ -171,7 +171,7 @@ class TestCheckAndTriggerStockPriceAlerts:
             patch(
                 "app.services.email_service.send_stock_price_alert",
                 new_callable=AsyncMock,
-                side_effect=Exception("smtp"),
+                return_value=False,
             ),
         ):
             from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts

@@ -140,7 +140,7 @@ class TestCheckAndTriggerAlerts:
 
         with (
             patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1280.0),
-            patch(_SEND_EMAIL, new_callable=AsyncMock, side_effect=Exception("smtp error")),
+            patch(_SEND_EMAIL, new_callable=AsyncMock, return_value=False),
         ):
             from app.services.exchange_rate_alert_service import check_and_trigger_alerts
 

@@ -54,7 +54,7 @@ async def run_monthly_report() -> None:
                 mom_change_krw = curr_val - prev_val
                 mom_change_pct = (mom_change_krw / prev_val * 100) if prev_val else None
 
-            await send_monthly_report_email(
+            sent = await send_monthly_report_email(
                 to_email=to_email,
                 report_month=report_month,
                 total_assets_krw=float(summary.get("total_assets_krw") or 0),
@@ -69,6 +69,8 @@ async def run_monthly_report() -> None:
                 annual_dividends_received=float(summary.get("annual_dividends_received") or 0),
                 asset_allocation=summary.get("asset_allocation") or [],
             )
+            if not sent:
+                continue
 
             # 이메일 발송 성공 후 인앱 AlertHistory 저장
             async with AsyncSessionLocal() as db:

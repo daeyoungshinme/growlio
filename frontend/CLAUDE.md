@@ -61,22 +61,20 @@ make build-android-release         # APK Release 빌드
 
 ## Architecture (`frontend/src/`)
 
-**페이지 구성:**
+**페이지 구성** (실제 라우트는 `src/App.tsx` 참고 — 인증 필요 라우트는 `/` 하위 `PrivateRoute`로 감싸짐):
 - `/login` — 로그인 (LoginPage)
-- `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
-- `/portfolio` — 주식 계좌 **조회 전용** (읽기 전용). 계좌별 sync, 차트, 종목 현황. 계좌 추가/삭제/종목관리/입출금은 여기서 하지 않음
-- `/asset-management` — **모든 계좌 관리 허브**. 은행계좌/증권계좌 추가·삭제, 종목관리(StockPositionsModal), 입출금(TransactionModal), 입출금·배당 내역 탭
-- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — KIS/키움 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
 - `/register` — 회원가입 (RegisterPage)
+- `/find-account` — 계정 찾기 (FindAccountPage)
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
-- `/find-account` — 계정 찾기 (FindAccountPage)
+- `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
+- `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
+- `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
+- `/settings` — KIS/키움 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
-- `/market` — 시장 신호 대시보드. VIX·장단기 금리차·경제지표·인사이트 (MarketPage)
-- `/trend` — `/dashboard`로 리다이렉트 (TrendPage 제거됨)
+- 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
-> 구 URL 리다이렉트: `/assets` → `/portfolio`
+> `/market`, `/portfolio`, `/asset-management`, `/trend` 라우트는 존재하지 않음(과거 구조, 제거됨). `BottomNav`(`src/constants/nav.ts`)도 홈/자산/리밸런싱/계획/설정 5탭만 존재.
 > 새 페이지 추가 시 `src/App.tsx`에 `<Route>` 등록 필수.
 
 **최상위 컴포넌트 (`src/`):**
@@ -84,7 +82,7 @@ make build-android-release         # APK Release 빌드
 - `Toaster.tsx` — `growlio:toast` 이벤트 구독 전역 토스트 UI
 
 **컴포넌트 디렉토리 (`src/components/`):**
-assets, backtest, common, dashboard, invest, layout, market, portfolio, portfolio-analysis, rebalancing, settings, trend
+assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings
 
 **컨텍스트 (`src/context/`):**
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.

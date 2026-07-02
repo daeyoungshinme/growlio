@@ -46,15 +46,13 @@ async def check_and_trigger_alerts(db: AsyncSession) -> None:
 
         email = notification_email or user_email
         target = float(alert.target_rate)
-        try:
-            await send_exchange_rate_alert(
-                to_email=email,
-                target_rate=target,
-                direction=alert.direction,
-                current_rate=current_rate,
-            )
-        except Exception as exc:
-            logger.error("exchange_rate_alert_email_failed", error=str(exc), alert_id=str(alert.id))
+        sent = await send_exchange_rate_alert(
+            to_email=email,
+            target_rate=target,
+            direction=alert.direction,
+            current_rate=current_rate,
+        )
+        if not sent:
             continue
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"

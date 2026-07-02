@@ -1,4 +1,9 @@
-"""이메일 발송 서비스 (aiosmtplib SMTP)."""
+"""이메일 발송 서비스 (aiosmtplib SMTP).
+
+계약: 모든 `send_*` 함수는 예외를 삼키고 bool을 반환한다(True=발송 성공,
+False=SMTP 미설정 또는 발송 실패). 예외는 SMTP 설정 확인 진단이 필요한
+`send_test_email`의 "미설정" 케이스에서만 RuntimeError로 표면화된다.
+"""
 
 from __future__ import annotations
 
@@ -24,6 +29,7 @@ from app.services.email_templates import (
     monthly_report_template,
     password_reset_template,
     rebalancing_alert_template,
+    rebalancing_execution_template,
     stock_price_alert_template,
     test_email_template,
 )
@@ -67,18 +73,19 @@ async def send_exchange_rate_alert(
     target_rate: float,
     direction: str,
     current_rate: float,
-) -> None:
-    """목표환율 도달 알림 이메일 발송."""
+) -> bool:
+    """목표환율 도달 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = exchange_rate_alert_template(target_rate, direction, current_rate)
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("exchange_rate_alert_email_sent", to=to_email, target_rate=target_rate, current_rate=current_rate)
+        return True
     except Exception as e:
         logger.error("exchange_rate_alert_email_failed", to=to_email, error=str(e))
-        raise
+        return False
 
 
 async def send_rebalancing_alert(
@@ -89,13 +96,20 @@ async def send_rebalancing_alert(
     drifting_count: int,
     is_scheduled_report: bool = False,
     schedule_type: str = "DAILY",
+    is_test: bool = False,
 ) -> bool:
     """리밸런싱 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
         return False
     subject, html = rebalancing_alert_template(
-        portfolio_name, threshold_pct, items_to_show, drifting_count, is_scheduled_report, schedule_type
+        portfolio_name,
+        threshold_pct,
+        items_to_show,
+        drifting_count,
+        is_scheduled_report,
+        schedule_type,
+        is_test=is_test,
     )
     try:
         await _send_html_email(to_email, subject, html)
@@ -110,7 +124,38 @@ async def send_rebalancing_alert(
         return True
     except Exception as e:
         logger.error("rebalancing_alert_email_failed", to=to_email, error=str(e))
-        raise
+        return False
+
+
+async def send_rebalancing_execution_email(
+    to_email: str,
+    portfolio_name: str,
+    executed_at,
+    result_items: list,
+    total_success: int,
+    total_fail: int,
+    total_skipped: int,
+) -> bool:
+    """리밸런싱 자동 실행 완료 이메일 발송. 발송 성공 시 True, SMTP 미설정 시 False 반환."""
+    if not _smtp_configured():
+        logger.warning("smtp_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = rebalancing_execution_template(
+        portfolio_name, executed_at, result_items, total_success, total_fail, total_skipped
+    )
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info(
+            "rebalancing_execution_email_sent",
+            to=to_email,
+            portfolio=portfolio_name,
+            success=total_success,
+            fail=total_fail,
+        )
+        return True
+    except Exception as e:
+        logger.error("rebalancing_execution_email_failed", to=to_email, error=str(e))
+        return False
 
 
 async def send_deposit_trigger_alert(
@@ -118,11 +163,11 @@ async def send_deposit_trigger_alert(
     portfolio_name: str,
     deposit_increment: float,
     items: list[dict],
-) -> None:
-    """예수금 입금 감지 알림 이메일 발송."""
+) -> bool:
+    """예수금 입금 감지 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = deposit_trigger_alert_template(portfolio_name, deposit_increment, items)
     try:
         await _send_html_email(to_email, subject, html)
@@ -132,9 +177,10 @@ async def send_deposit_trigger_alert(
             portfolio=portfolio_name,
             increment=deposit_increment,
         )
+        return True
     except Exception as exc:
         logger.error("deposit_trigger_alert_email_failed", to=to_email, error=str(exc))
-        raise
+        return False
 
 
 async def send_stock_price_alert(
@@ -144,18 +190,19 @@ async def send_stock_price_alert(
     target_price: float,
     current_price: float,
     direction: str,
-) -> None:
-    """주가 목표가 도달 알림 이메일 발송."""
+) -> bool:
+    """주가 목표가 도달 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = stock_price_alert_template(ticker, name, target_price, current_price, direction)
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("stock_price_alert_email_sent", to=to_email, ticker=ticker, current_price=current_price)
+        return True
     except Exception as e:
         logger.error("stock_price_alert_email_failed", to=to_email, error=str(e))
-        raise
+        return False
 
 
 async def send_monthly_report_email(
@@ -172,11 +219,11 @@ async def send_monthly_report_email(
     deposit_achievement_pct: float | None,
     annual_dividends_received: float,
     asset_allocation: list[dict],
-) -> None:
-    """월별 포트폴리오 요약 리포트 이메일 발송."""
+) -> bool:
+    """월별 포트폴리오 요약 리포트 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = monthly_report_template(
         report_month,
         total_assets_krw,
@@ -194,9 +241,10 @@ async def send_monthly_report_email(
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("monthly_report_email_sent", to=to_email, month=report_month)
+        return True
     except Exception as e:
         logger.error("monthly_report_email_failed", to=to_email, error=str(e))
-        raise
+        return False
 
 
 async def send_goal_achievement_email(
@@ -205,58 +253,71 @@ async def send_goal_achievement_email(
     goal_amount: float,
     current_amount: float,
     achievement_pct: float,
-) -> None:
-    """투자 목표 달성 알림 이메일 발송. goal_type: 'ASSET' | 'DEPOSIT'."""
+) -> bool:
+    """투자 목표 달성 알림 이메일 발송. goal_type: 'ASSET' | 'DEPOSIT'.
+
+    발송 성공 시 True, SMTP 미설정/실패 시 False 반환.
+    """
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = goal_achievement_template(goal_type, goal_amount, current_amount, achievement_pct)
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("goal_achievement_email_sent", to=to_email, goal_type=goal_type, pct=achievement_pct)
+        return True
     except Exception as e:
         logger.error("goal_achievement_email_failed", to=to_email, error=str(e))
-        raise
+        return False
 
 
-async def send_test_email(to_email: str) -> None:
-    """이메일 설정 확인용 테스트 이메일 발송."""
+async def send_test_email(to_email: str) -> bool:
+    """이메일 설정 확인용 테스트 이메일 발송.
+
+    SMTP 미설정 시에는 호출부(설정 진단 API)가 구분된 응답을 내려줄 수 있도록
+    RuntimeError("smtp_not_configured")를 발생시킨다. 발송 자체가 실패하면
+    다른 send_* 함수와 동일하게 예외를 삼키고 False를 반환한다.
+    """
     if not _smtp_configured():
         raise RuntimeError("smtp_not_configured")
     subject, html = test_email_template()
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("test_email_sent", to=to_email)
+        return True
     except Exception as e:
         logger.error("test_email_failed", to=to_email, error=str(e))
-        raise
+        return False
 
 
-async def send_password_reset_email(to_email: str, reset_link: str) -> None:
-    """비밀번호 재설정 링크 이메일 발송."""
+async def send_password_reset_email(to_email: str, reset_link: str) -> bool:
+    """비밀번호 재설정 링크 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_password_reset_email", to=to_email, reset_link=reset_link)
-        return
+        return False
     subject, html = password_reset_template(reset_link)
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("password_reset_email_sent", to=to_email)
+        return True
     except Exception as e:
         logger.error("password_reset_email_failed", to=to_email, error=str(e))
+        return False
 
 
 async def send_indicator_alert_email(
     to_email: str,
     indicators: list[dict],
-) -> None:
-    """경제지표 발표 알림 이메일 발송."""
+) -> bool:
+    """경제지표 발표 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정/실패 시 False 반환."""
     if not _smtp_configured():
         logger.warning("smtp_not_configured_skip_email", to=to_email)
-        return
+        return False
     subject, html = indicator_alert_template(indicators)
     try:
         await _send_html_email(to_email, subject, html)
         logger.info("indicator_alert_email_sent", to=to_email, count=len(indicators))
+        return True
     except Exception as e:
         logger.error("indicator_alert_email_failed", to=to_email, error=str(e))
-        raise
+        return False
