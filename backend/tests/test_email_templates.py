@@ -76,6 +76,41 @@ class TestRebalancingAlertTemplate:
         _, html = rebalancing_alert_template("P", 5.0, [], 0)
         assert len(html) > 100
 
+    def test_composite_triggered_without_drift_uses_dedicated_heading(self):
+        subject, html = rebalancing_alert_template(
+            portfolio_name="복합신호포트폴리오",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=0,
+            is_composite_triggered=True,
+            composite_reason="시장 위험 신호가 RED 단계입니다",
+        )
+        assert "점검 권장" in subject
+        assert "복합신호포트폴리오" in subject
+        assert "시장 위험 신호가 RED 단계입니다" in html
+
+    def test_composite_triggered_with_drift_uses_normal_drift_heading(self):
+        """drift가 있으면 복합신호 여부와 무관하게 기존 '비중 이탈 감지' 문구를 사용한다."""
+        subject, _ = rebalancing_alert_template(
+            portfolio_name="P",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=2,
+            is_composite_triggered=True,
+            composite_reason="시장 위험 신호가 RED 단계입니다",
+        )
+        assert "비중 이탈 감지" in subject
+
+    def test_composite_triggered_false_uses_normal_heading(self):
+        subject, _ = rebalancing_alert_template(
+            portfolio_name="P",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=0,
+            is_scheduled_report=True,
+        )
+        assert "점검 권장" not in subject
+
 
 class TestStockPriceAlertTemplate:
     def test_returns_tuple(self):

@@ -42,6 +42,11 @@ from app.services.dividend_sync_sources import (
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import fetch_prices_batch, get_historical_returns
+from app.services.rebalancing_diagnosis_service import (
+    build_diagnosis_context,
+    check_composite_signal,
+    fetch_market_and_risk_signal,
+)
 from app.services.rebalancing_service import _item_attr, analyze_rebalancing, compute_portfolio_drift_summary
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 from app.utils.currency import get_usd_krw_rate
@@ -204,12 +209,22 @@ async def analyze_portfolio(
             "total_assets_krw": float(overview.get("total_assets_krw", 0)) + delta,
         }
 
-    return analyze_rebalancing(
+    analysis = analyze_rebalancing(
         portfolio,
         overview,
         cast(dict[tuple[str, str], DividendMapEntry], dividend_map),
         cast(dict[tuple[str, str], ReturnsMapEntry], returns_map),
     )
+
+    try:
+        analysis.diagnosis_context = await build_diagnosis_context(
+            current_user.id, db, redis, analysis, overview
+        )
+    except Exception as e:
+        logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
+        analysis.diagnosis_context = None
+
+    return analysis
 
 
 async def _fetch_broker_balance(
@@ -388,6 +403,7 @@ async def get_drift_summary(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
 ):
     """모든 포트폴리오의 비중 이탈 현황을 빠르게 반환한다 (배당·수익률 외부 API 미사용)."""
     portfolios = await get_linked_portfolios(db, current_user.id)
@@ -395,6 +411,21 @@ async def get_drift_summary(
         return []
 
     alert_by_portfolio = await get_active_alert_thresholds(db, current_user.id)
+
+    # 시장상황/리스크는 유저 단위 신호이므로 포트폴리오 루프 밖에서 1회만 조회한다.
+    has_composite_signal = False
+    composite_reason: str | None = None
+    try:
+        market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
+        has_composite_signal, composite_reason = check_composite_signal(
+            market_level,
+            bool(risk.get("data_available")),
+            risk.get("diversification_score"),
+            risk.get("top_holding_weight_pct"),
+            risk.get("annualized_volatility_pct"),
+        )
+    except Exception as e:
+        logger.warning("drift_summary_composite_signal_failed", error=str(e))
 
     summaries: list[PortfolioDriftSummary] = []
     for portfolio in portfolios:
@@ -404,6 +435,8 @@ async def get_drift_summary(
             overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
             threshold = alert_by_portfolio.get(str(portfolio.id), 5.0)
             summary = compute_portfolio_drift_summary(portfolio, overview, threshold)
+            summary.has_composite_signal = has_composite_signal
+            summary.composite_reason = composite_reason
             summaries.append(summary)
         except Exception as e:
             logger.error(

@@ -52,6 +52,46 @@ class CurrentHolding(BaseModel):
     current_weight_pct: float
 
 
+class TaxImpactItem(BaseModel):
+    """세금 영향 미리보기 — 매도 대상 종목별 추정치(근사치, 참고용)."""
+
+    ticker: str
+    name: str
+    market: str
+    is_overseas: bool
+    sell_qty: float
+    estimated_realized_gain_krw: float  # 양수=이익, 음수=손실
+    excluded_reason: str | None = None  # 가격/평단가 부족 등으로 추정 제외 시 사유
+
+
+class DiagnosisContext(BaseModel):
+    """리밸런싱 진단 화면 부가 설명.
+
+    needs_rebalancing 판정/알림 트리거 로직과는 별개 — 화면 설명 전용 정보다.
+    외부 API 조회 실패 시 해당 필드만 None/False로 안전하게 누락 처리된다.
+    """
+
+    generated_at: str  # ISO timestamp
+
+    # 시장 상황
+    market_level: Literal["GREEN", "YELLOW", "RED"] | None = None
+    market_note: str | None = None
+
+    # 리스크 지표 (전체 계좌 기준 — RiskMetricsCard와 동일 캐시 재사용)
+    risk_available: bool = False
+    annualized_volatility_pct: float | None = None
+    beta_sp500: float | None = None
+    diversification_score: int | None = None
+    risk_note: str | None = None  # 특이사항 없으면 None (조용히 생략)
+
+    # 세금/거래비용 영향 미리보기 (diff_krw < 0 항목 기준 근사치)
+    estimated_sell_realized_gain_krw: float = 0.0
+    estimated_overseas_tax_krw: float = 0.0
+    estimated_fee_krw: float = 0.0
+    tax_notes: list[str] = []
+    tax_detail_items: list[TaxImpactItem] = []  # 절대값 기준 상위 5개
+
+
 class RebalancingAnalysis(BaseModel):
     portfolio_id: uuid.UUID
     portfolio_name: str
@@ -67,6 +107,7 @@ class RebalancingAnalysis(BaseModel):
     current_weighted_cagr_10y_pct: float | None = None  # 현재 비중 기준 가중 CAGR (10년)
     ticker_account_map: dict[str, list[TickerAccountInfo]] = {}  # ticker → 보유 계좌 목록
     available_cash_krw: float = 0.0  # 현재 예수금 (account.deposit_krw 합산; fallback: total_assets - total_stock)
+    diagnosis_context: DiagnosisContext | None = None  # 시장상황·리스크·세금 부가 설명 (실패 시 None)
 
 
 # ── 리밸런싱 실행 ─────────────────────────────────────────────
@@ -175,6 +216,8 @@ class PortfolioDriftSummary(BaseModel):
     max_drift_pct: float  # 이탈 종목 중 최대 |weight_diff_pct|
     drifted_items_count: int  # threshold를 초과한 종목 수
     top_drifted_items: list[DriftedItem]  # 이탈 크기 상위 3개
+    has_composite_signal: bool = False  # drift는 없지만 리스크/시장 신호로 점검을 권장하는 경우
+    composite_reason: str | None = None  # has_composite_signal=True일 때 사유 문구
 
 
 # ── 리밸런싱 실행 이력 ────────────────────────────────────────
@@ -216,6 +259,8 @@ class RebalancingAlertCreate(BaseModel):
     auto_execution_time: str | None = None
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: str = "08:30"
+    # drift가 없어도 리스크 집중/시장 위험 신호가 있으면 추가로 발송 (기본 True, AUTO 실행에는 영향 없음)
+    enable_composite_signals: bool = True
 
     @field_validator("threshold_pct")
     @classmethod
@@ -287,6 +332,7 @@ class RebalancingAlertResponse(BaseModel):
     market_condition_mode: str
     auto_execution_time: str | None
     notify_time: str
+    enable_composite_signals: bool = True
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime

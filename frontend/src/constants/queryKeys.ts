@@ -22,7 +22,6 @@ export const QUERY_KEYS = {
   rebalancingHistory: ["rebalancing-history"] as const,
   taxSummary: (year: number) => ["tax-summary", year] as const,
   overseasPositionsTax: ["overseas-positions-tax"] as const,
-  dartDisclosures: (days: number) => ["dart-disclosures", days] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
   alertHistory: ["alert-history"] as const,
   insights: ["insights"] as const,

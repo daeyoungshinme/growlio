@@ -212,36 +212,6 @@ class TestTickerSettings:
         assert resp.json()["deleted"] is True
 
 
-class TestDividendDripSimulationExtended:
-    def test_drip_simulation_with_custom_yield(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        mock_div_summary = {"total_dividend_krw": 0.0, "estimated_annual": 0.0}
-        mock_result = {"annual_dividends": [], "compounding_years": []}
-        with (
-            patch("app.api.v1.dividends.get_dividend_summary", AsyncMock(return_value=mock_div_summary)),
-            patch("app.api.v1.dividends.simulate_drip", MagicMock(return_value=mock_result)),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.post(
-                "/api/v1/dividends/drip-simulation",
-                json={"n_years": 5, "annual_dividend_yield_pct": 3.5},
-            )
-        assert resp.status_code == 200
-
-    def test_drip_simulation_invalid_years(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.post(
-                "/api/v1/dividends/drip-simulation",
-                json={"n_years": 100},
-            )
-        assert resp.status_code == 422
-
-
 class TestDividendMonthlyOptimization:
     def test_monthly_optimization_returns_200(self, override_settings):
         user = _make_user()
@@ -256,64 +226,4 @@ class TestDividendMonthlyOptimization:
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/dividends/monthly-optimization")
-        assert resp.status_code == 200
-
-
-class TestDividendDripSimulationWithDashboardError:
-    def test_drip_simulation_handles_dashboard_error(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        mock_div_summary = {"total_dividend_krw": 0.0, "estimated_annual": 0.0, "estimated_annual_krw": 0.0}
-        mock_result = {"annual_dividends": [], "compounding_years": []}
-        with (
-            patch("app.api.v1.dividends.get_dividend_summary", AsyncMock(return_value=mock_div_summary)),
-            patch(
-                "app.services.asset_aggregator.get_dashboard_summary",
-                AsyncMock(side_effect=Exception("dashboard error")),
-            ),
-            patch("app.api.v1.dividends.simulate_drip", MagicMock(return_value=mock_result)),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.post("/api/v1/dividends/drip-simulation", json={})
-        assert resp.status_code == 200
-
-    def test_drip_simulation_uses_yield_from_values(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        mock_div_summary = {"total_dividend_krw": 500000.0, "estimated_annual": 100000.0}
-        mock_result = {"annual_dividends": [], "compounding_years": []}
-        with (
-            patch("app.api.v1.dividends.get_dividend_summary", AsyncMock(return_value=mock_div_summary)),
-            patch(
-                "app.services.asset_aggregator.get_dashboard_summary",
-                AsyncMock(return_value={"total_assets_krw": 5000000.0}),
-            ),
-            patch("app.api.v1.dividends.simulate_drip", MagicMock(return_value=mock_result)),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.post("/api/v1/dividends/drip-simulation", json={})
-        assert resp.status_code == 200
-
-
-class TestDividendDripSimulation:
-    def test_drip_simulation_returns_200(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        mock_div_summary = {"total_dividend_krw": 0.0, "estimated_annual": 0.0, "estimated_annual_krw": 0.0}
-        mock_result = {"annual_dividends": [], "compounding_years": []}
-        with (
-            patch(
-                "app.api.v1.dividends.get_dividend_summary",
-                AsyncMock(return_value=mock_div_summary),
-            ),
-            patch(
-                "app.api.v1.dividends.simulate_drip",
-                MagicMock(return_value=mock_result),
-            ),
-            TestClient(app, raise_server_exceptions=False) as client,
-        ):
-            resp = client.post("/api/v1/dividends/drip-simulation", json={})
         assert resp.status_code == 200

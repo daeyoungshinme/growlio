@@ -25,6 +25,7 @@ from app.services.alert_calculator import (
     should_fire_today,
 )
 from app.services.alert_service import save_alert_history
+from app.services.rebalancing_diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
@@ -36,24 +37,31 @@ def _select_items_to_show(
     is_schedule_day: bool,
     drifting: list,
     all_items: list,
-) -> tuple[list, bool] | None:
-    """trigger_condition에 따라 (items_to_show, is_scheduled_report)를 반환.
+    extra_trigger: bool = False,
+) -> tuple[list, bool, bool] | None:
+    """trigger_condition + extra_trigger(복합 리스크/시장 신호)에 따라
+    (items_to_show, is_scheduled_report, is_composite_triggered)를 반환.
 
-    발송하지 않아야 하는 경우 None 반환.
+    발송하지 않아야 하는 경우 None 반환. extra_trigger는 drift/스케줄로 이미 발송이
+    확정되지 않은 경우에만 "추가로" 발송시킨다 — 기존 발송 조건을 억제하지 않는다.
     """
     if trigger_condition == "SCHEDULE_ONLY":
         if not is_schedule_day:
             return None
-        return all_items, True
+        return all_items, True, False
     if trigger_condition == "DRIFT_ONLY":
-        if not drifting:
-            return None
-        return drifting, False
+        if drifting:
+            return drifting, False, False
+        if extra_trigger:
+            return all_items, False, True
+        return None
     # BOTH
     if is_schedule_day:
-        return all_items, True
+        return all_items, True, False
     if drifting:
-        return drifting, False
+        return drifting, False, False
+    if extra_trigger:
+        return all_items, False, True
     return None
 
 
@@ -68,6 +76,8 @@ async def _process_rebalancing_alert(
     composite_level: str,
     db: AsyncSession,
     fcm_token: str | None = None,
+    is_composite_triggered: bool = False,
+    composite_reason: str | None = None,
 ) -> bool:
     """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일/FCM 발송).
 
@@ -98,11 +108,12 @@ async def _process_rebalancing_alert(
 
     drift_count = len(drifting)
     push_title = f"리밸런싱 알림 — {portfolio.name}"
-    push_body = (
-        f"{drift_count}개 종목이 ±{threshold:.1f}% 이상 이탈했습니다."
-        if drift_count
-        else f"{portfolio.name} 정기 리밸런싱 리포트"
-    )
+    if drift_count:
+        push_body = f"{drift_count}개 종목이 ±{threshold:.1f}% 이상 이탈했습니다."
+    elif is_composite_triggered:
+        push_body = f"드리프트는 없지만 점검이 필요합니다: {composite_reason}"
+    else:
+        push_body = f"{portfolio.name} 정기 리밸런싱 리포트"
 
     # 이메일 독립 처리
     email_sent = False
@@ -115,6 +126,8 @@ async def _process_rebalancing_alert(
             drifting_count=drift_count,
             is_scheduled_report=is_scheduled_report,
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
+            is_composite_triggered=is_composite_triggered,
+            composite_reason=composite_reason,
         )
     except Exception as exc:
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
@@ -525,16 +538,38 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         threshold = float(alert.threshold_pct)
         drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
 
-        selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items)
+        # drift/스케줄만으로 이미 발송이 확정되는 경우 복합신호 조회를 스킵해 불필요한 리스크 API 호출을 절약한다.
+        will_send_without_composite = bool(drifting) or (
+            trigger_condition in ("SCHEDULE_ONLY", "BOTH") and is_schedule_day
+        )
+        extra_trigger = False
+        composite_reason: str | None = None
+        if not will_send_without_composite and getattr(alert, "enable_composite_signals", True):
+            try:
+                market_level, risk = await fetch_market_and_risk_signal(alert.user_id, db, _redis)
+                extra_trigger, composite_reason = check_composite_signal(
+                    market_level,
+                    bool(risk.get("data_available")),
+                    risk.get("diversification_score"),
+                    risk.get("top_holding_weight_pct"),
+                    risk.get("annualized_volatility_pct"),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc)
+                )
+
+        selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items, extra_trigger)
         if selected is None:
             logger.debug(
                 "rebalancing_alert_no_items_selected",
                 alert_id=str(alert.id),
                 trigger_condition=trigger_condition,
                 drifting_count=len(drifting),
+                extra_trigger=extra_trigger,
             )
             continue
-        items_to_show, is_scheduled_report = selected
+        items_to_show, is_scheduled_report, is_composite_triggered = selected
 
         email = notification_email or user_email
         triggered = await _process_rebalancing_alert(
@@ -548,11 +583,17 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             composite_level=composite_level,
             db=db,
             fcm_token=fcm_token,
+            is_composite_triggered=is_composite_triggered,
+            composite_reason=composite_reason,
         )
         if not triggered:
             continue
 
-        drift_desc = f"{len(drifting)}개 종목 드리프트" if drifting else "정기 보고"
+        drift_desc = (
+            f"{len(drifting)}개 종목 드리프트"
+            if drifting
+            else ("복합 리스크 신호" if is_composite_triggered else "정기 보고")
+        )
         await save_alert_history(
             db,
             alert.user_id,

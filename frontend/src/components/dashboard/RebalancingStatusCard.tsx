@@ -11,6 +11,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 import { useInsights } from "@/hooks/useInsights";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
 import type { MarketSignalResponse } from "@/api/marketSignals";
+import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
 
 const SIGNAL_BG = {
   GREEN:
@@ -31,6 +32,7 @@ const SIGNAL_BADGE_CLASS = {
 
 function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummary; onClick?: (id: string) => void }) {
   const isAlert = summary.needs_rebalancing;
+  const showCompositeBadge = !isAlert && summary.has_composite_signal;
   return (
     <button
       onClick={() => onClick?.(summary.portfolio_id)}
@@ -47,6 +49,14 @@ function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummar
         {isAlert && (
           <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-1.5 py-0.5 shrink-0">
             필요
+          </span>
+        )}
+        {showCompositeBadge && (
+          <span
+            className="text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full px-1.5 py-0.5 shrink-0"
+            title={summary.composite_reason ?? undefined}
+          >
+            점검 권장
           </span>
         )}
       </div>
@@ -152,6 +162,11 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
     return driftSummaries.filter((s) => s.needs_rebalancing).length;
   }, [driftSummaries]);
 
+  const combinedStatusNote = useMemo(
+    () => buildCombinedStatusNote(needsCount, marketSignal?.composite_level),
+    [needsCount, marketSignal?.composite_level],
+  );
+
   if (portfolioCount === 0) return null;
 
   const cardClass = needsCount > 0
@@ -219,6 +234,13 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
           </span>
           <ArrowRight size={12} className="ml-auto flex-shrink-0" />
         </Link>
+      )}
+
+      {/* 이탈 종목 + 시장상황 결합 안내 */}
+      {combinedStatusNote && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
+          {combinedStatusNote}
+        </p>
       )}
 
       {/* 포트폴리오별 드리프트 현황 */}

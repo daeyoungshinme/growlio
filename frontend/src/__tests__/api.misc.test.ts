@@ -36,7 +36,6 @@ import {
   runCorrelation,
 } from "@/api/backtest";
 import { fetchMonthlyOptimization } from "@/api/dividends";
-import { fetchDartDisclosures } from "@/api/dart";
 import { fetchInsights } from "@/api/insights";
 import { fetchPortfolioRisk, fetchRebalancingStrategy } from "@/api/risk";
 
@@ -170,16 +169,6 @@ describe("api/dividends", () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchMonthlyOptimization();
     expect(api.get).toHaveBeenCalledWith("/dividends/monthly-optimization");
-  });
-});
-
-describe("api/dart", () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it("fetchDartDisclosures calls GET /dart/disclosures with days param", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    await fetchDartDisclosures(7);
-    expect(api.get).toHaveBeenCalledWith("/dart/disclosures", { params: { days: 7 } });
   });
 });
 

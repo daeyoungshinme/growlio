@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
 from typing import Any, TypedDict
 
 from sqlalchemy import func, select
@@ -60,6 +61,33 @@ def _get_rates(year: int) -> _TaxRates:
         return _TAX_RATES[year]
     closest = min(_TAX_RATES.keys(), key=lambda y: abs(y - year))
     return _TAX_RATES[closest]
+
+
+class OverseasTransferTaxEstimate(TypedDict):
+    taxable_gain_krw: float
+    estimated_tax_krw: float
+    rate_pct: float
+    deduction_krw: float
+
+
+def estimate_overseas_transfer_tax(
+    realized_gain_krw: float, year: int | None = None
+) -> OverseasTransferTaxEstimate:
+    """해외주식 실현손익 추정치의 대략적 양도세(250만원 공제, 22%)를 계산한다.
+
+    리밸런싱 진단의 "세금 영향 미리보기"에서 재사용하는 참고용 근사치 —
+    연간 다른 매매손익과 합산되는 정확한 세액은 get_tax_summary()의 연간 집계를 따른다.
+    """
+    yr = year if year is not None else datetime.now(UTC).year
+    rates = _get_rates(yr)
+    taxable = max(0.0, realized_gain_krw - rates["overseas_deduction"])
+    tax = taxable * rates["overseas_gain"]
+    return {
+        "taxable_gain_krw": round(taxable, 0),
+        "estimated_tax_krw": round(tax, 0),
+        "rate_pct": rates["overseas_gain"] * 100,
+        "deduction_krw": float(rates["overseas_deduction"]),
+    }
 
 
 class GeuMTSimulationResult(TypedDict):

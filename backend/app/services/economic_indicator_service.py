@@ -92,6 +92,33 @@ INDICATORS: dict[str, dict[str, str]] = {
         "frequency": "daily",
         "description": "10년물-2년물 미국 국채 스프레드 — 역전(-) 시 경기침체 선행지표",
     },
+    "HIGH_YIELD_SPREAD": {
+        "name": "하이일드 채권 스프레드",
+        "name_en": "US High Yield Spread",
+        "source": "fred",
+        "series": "BAMLH0A0HYM2",
+        "unit": "%",
+        "frequency": "daily",
+        "description": "ICE BofA 하이일드 채권 옵션조정스프레드 — 급등 시 신용 경색·부도위험 확대 신호",
+    },
+    "DOLLAR_INDEX": {
+        "name": "달러 인덱스 (Broad)",
+        "name_en": "Trade Weighted US Dollar Index (Broad)",
+        "source": "fred",
+        "series": "DTWEXBGS",
+        "unit": "지수",
+        "frequency": "daily",
+        "description": "주요 교역국 대비 미 달러 가치 — 급등 시 신흥국·원자재 자금 이탈 신호",
+    },
+    "RATE_2Y": {
+        "name": "미국 2년물 국채금리",
+        "name_en": "US 2-Year Treasury Yield",
+        "source": "fred",
+        "series": "DGS2",
+        "unit": "%",
+        "frequency": "daily",
+        "description": "기준금리 대비 낮을수록 시장의 금리 인하 기대가 큼을 시사",
+    },
 }
 
 FRED_BASE = "https://api.stlouisfed.org/fred"

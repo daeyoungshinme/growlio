@@ -38,6 +38,7 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         market_condition_mode=alert.market_condition_mode,
         auto_execution_time=getattr(alert, "auto_execution_time", None),
         notify_time=getattr(alert, "notify_time", "08:30"),
+        enable_composite_signals=getattr(alert, "enable_composite_signals", True),
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
@@ -120,6 +121,7 @@ async def upsert_rebalancing_alert(
         alert.market_condition_mode = body.market_condition_mode
         alert.auto_execution_time = body.auto_execution_time
         alert.notify_time = body.notify_time
+        alert.enable_composite_signals = body.enable_composite_signals
         alert.is_active = True
     else:
         alert = RebalancingAlert(
@@ -137,6 +139,7 @@ async def upsert_rebalancing_alert(
             market_condition_mode=body.market_condition_mode,
             auto_execution_time=body.auto_execution_time,
             notify_time=body.notify_time,
+            enable_composite_signals=body.enable_composite_signals,
             is_active=True,
         )
         db.add(alert)

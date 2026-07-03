@@ -10,10 +10,7 @@ from app.api.deps import PaginationDep, get_current_user, get_db
 from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis
-from app.services.dividend.drip_service import (
-    calc_monthly_optimization,
-    simulate_drip,
-)
+from app.services.dividend.drip_service import calc_monthly_optimization
 from app.services.dividend.orchestrator import (
     delete_ticker_settings,
     get_position_dividend_yields,
@@ -131,73 +128,6 @@ async def del_ticker_setting(
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="설정이 존재하지 않습니다")
     return {"deleted": True}
-
-
-# ---------------------------------------------------------------------------
-# DRIP 시뮬레이션
-# ---------------------------------------------------------------------------
-
-
-class DRIPSimulationRequest(BaseModel):
-    n_years: int = 10
-    annual_dividend_yield_pct: float | None = None
-
-    @field_validator("n_years")
-    @classmethod
-    def years_valid(cls, v: int) -> int:
-        if not (1 <= v <= 50):
-            raise ValueError("시뮬레이션 기간은 1~50년 범위여야 합니다")
-        return v
-
-
-@router.post("/drip-simulation")
-@limiter.limit("10/minute")
-async def drip_simulation(
-    request: Request,
-    body: DRIPSimulationRequest,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
-):
-    """DRIP(배당 재투자) vs 현금수령 비교 투영."""
-    from sqlalchemy import select
-
-    from app.models.user import UserSettings
-
-    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == current_user.id))
-    div_summary = await get_dividend_summary(current_user.id, db, redis)
-    dashboard_data = {}
-    try:
-        from app.services.asset_aggregator import get_dashboard_summary
-
-        dashboard_data = await get_dashboard_summary(current_user.id, db, redis)
-    except Exception as e:
-        logger.warning("drip_dashboard_summary_failed", user_id=str(current_user.id), error=str(e))
-
-    initial_value = float(dashboard_data.get("total_assets_krw") or 0)
-    monthly_contribution = float(
-        (settings_row.monthly_deposit_amount if settings_row and settings_row.monthly_deposit_amount else None) or 0
-    )
-    annual_return_pct = float(
-        (settings_row.goal_annual_return_pct if settings_row and settings_row.goal_annual_return_pct else None) or 6.0
-    )
-    estimated_annual = float(div_summary.get("estimated_annual", 0) or 0)
-
-    if body.annual_dividend_yield_pct is not None:
-        annual_div_yield = body.annual_dividend_yield_pct
-    elif initial_value > 0 and estimated_annual > 0:
-        annual_div_yield = estimated_annual / initial_value * 100
-    else:
-        annual_div_yield = 2.0
-
-    return simulate_drip(
-        initial_portfolio_value=initial_value,
-        monthly_contribution=monthly_contribution,
-        annual_return_pct=annual_return_pct,
-        annual_dividend_yield_pct=annual_div_yield,
-        n_years=body.n_years,
-        drip=True,
-    )
 
 
 # ---------------------------------------------------------------------------

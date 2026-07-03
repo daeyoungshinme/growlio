@@ -13,7 +13,6 @@ from app.utils.cache_keys import (
     backtest_key,
     correlation_key,
     current_price_key,
-    dart_disclosures_key,
     dividend_info_key,
     dividend_months_key,
     dividend_summary_key,
@@ -71,11 +70,6 @@ class TestCacheKeyBuilders:
         uid = uuid.uuid4()
         key = correlation_key(uid, "hash42")
         assert "hash42" in key
-
-    def test_dart_disclosures_key(self, override_settings):
-        uid = uuid.uuid4()
-        key = dart_disclosures_key(uid, 7)
-        assert "7" in key
 
     def test_alloc_history_key(self, override_settings):
         uid = uuid.uuid4()

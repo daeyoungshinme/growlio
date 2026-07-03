@@ -81,6 +81,8 @@ class RebalancingAlert(_AlertMixin, Base):
     auto_execution_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: Mapped[str] = mapped_column(String(5), nullable=False, server_default="08:30")
+    # drift가 없어도 리스크 집중/시장 위험 신호가 있으면 추가로 발송 (기본 True, AUTO 실행 트리거에는 영향 없음)
+    enable_composite_signals: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, server_default="true")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

@@ -98,10 +98,6 @@ def correlation_key(user_id: uuid.UUID, param_hash: str) -> str:
     return f"{_env_prefix()}correlation:{user_id}:{param_hash}"
 
 
-def dart_disclosures_key(user_id: uuid.UUID, days: int) -> str:
-    return f"{_env_prefix()}dart:disclosures:{user_id}:{days}"
-
-
 def alloc_history_key(user_id: uuid.UUID, months: int) -> str:
     return f"{_env_prefix()}alloc_history_v2:{user_id}:{months}"
 
@@ -163,7 +159,9 @@ def economic_indicator_calendar_key() -> str:
 
 
 def market_signal_latest_key() -> str:
-    return f"{_env_prefix()}market:signal:latest"
+    # v2: 하이일드 스프레드·달러인덱스·금리인하기대 3개 신호 추가로 스키마 변경 — 배포 직후
+    # 구버전 캐시(3개 신호 필드)가 신버전 응답에 섞이는 것을 방지하기 위해 키를 분리
+    return f"{_env_prefix()}market:signal:latest:v2"
 
 
 async def get_cached_json(redis: RedisType, key: str) -> Any:

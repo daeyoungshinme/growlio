@@ -77,7 +77,7 @@ make build-android-release         # APK Release 빌드
 > `/market`, `/portfolio`, `/asset-management`, `/trend` 라우트는 존재하지 않음(과거 구조, 제거됨). `BottomNav`(`src/constants/nav.ts`)도 홈/자산/리밸런싱/계획/설정 5탭만 존재.
 > 새 페이지 추가 시 `src/App.tsx`에 `<Route>` 등록 필수.
 
-**최상위 컴포넌트 (`src/`):**
+**최상위 컴포넌트 (`src/components/`):**
 - `ErrorBoundary.tsx` — React 에러 바운더리 (App.tsx에서 전체를 감쌈)
 - `Toaster.tsx` — `growlio:toast` 이벤트 구독 전역 토스트 UI
 
@@ -87,16 +87,20 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **컨텍스트 (`src/context/`):**
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
 
-`components/common/` 주요 파일: `ConfirmModal.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `TreemapCell.tsx`
+`components/common/` 주요 파일: `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
+
+> 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
 **데이터 흐름:**
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
-  └── api/{alerts,assets,backtest,dashboard,dart,dividends,economicIndicators,
+  └── api/{alerts,assets,backtest,dashboard,dividends,
            insights,invest,marketSignals,portfolios,rebalancing,risk,settings,tax,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
+
+> 백엔드 `/economic-indicators` 라우터는 존재하지만 이를 호출하는 프론트 API 모듈이 없음(프론트 미연동).
 
 **hooks/**
 - `useExchangeRate.ts` — 환율 조회
@@ -107,9 +111,12 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAssetManagementData.ts` — 자산관리 페이지 전용 데이터 훅 (accounts + portfolio overview + transactions 통합)
 - `useAssetModals.ts` — 자산관리 페이지 모달 열기/닫기 상태 통합 관리
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
+- `useDividendData.ts` — 배당 요약 데이터 조회
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
+- `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
+- `useKisCredentialVerify.ts` — KIS 자격증명 검증 상태 머신 (`verifyKisCredentials` 래핑)
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
-- `rebalancingExecution/` — 리밸런싱 주문 실행 훅 패키지 (`index.ts`: `useRebalancingExecution` + `RebalancingExecutionContext`/`useRebalancingExecutionContext`, `reducer.ts`, `types.ts`)
+- `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
@@ -117,9 +124,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)
-- `useDartDisclosures.ts` — DART 공시 조회
-- `useDRIPSimulation.ts` — 배당 재투자(DRIP) 시뮬레이션
-- `useEconomicIndicators.ts` / `useInsights.ts` — 경제지표·인사이트 조회
+- `useInsights.ts` — 인사이트 조회
 - `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useHaptic.ts` / `usePullToRefresh.ts` / `useSwipeNavigation.ts` — 모바일 UX
 - `useLogout.ts` — 로그아웃 로직, `useOnlineStatus.ts` — 온라인/오프라인 감지
@@ -127,7 +132,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `usePushNotifications.ts` / `useRegisterRefresh.ts` / `useWidget.ts` — FCM 푸시·홈 위젯 (Android)
 - `useTransactionFormState.ts` — 거래내역 입력 폼 상태
 
-새 커스텀 훅은 이 디렉토리에 추가.
+새 커스텀 훅은 이 디렉토리에 추가/삭제 시 위 목록도 갱신.
 
 **기타 상수 (`src/constants/`):**
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
@@ -139,6 +144,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`)
 - `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]`). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
+- `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`)
+- `nav.ts` — `BottomNav` 탭 정의 (홈/자산/리밸런싱/계획/설정 5탭)
 - `index.ts` — 상수 re-export
 
 **타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
@@ -214,8 +221,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `fmtKrw(n)` — 억원/만원/원 (음수 포함). 일반 텍스트 표시용.
 - `fmtKrwNullable(n)` — null/undefined이면 "—" 반환. 테이블 셀 등.
 - `fmtKrwShort(n)` — "억"/"만" (단위 없음). 차트 레이블용.
+- `fmtKrwPrice(n)` — 소수점 없는 원화 가격 표시.
 - `fmtMonth(str)` — "YYYY-MM" → "YYYY년 M월".
 - `fmtPct(n)` — "+5.23%" 형식. null이면 "—".
+- `convertUsdToKrw(usd, rate)` / `formatUsdAsKrw(usd, rate)` — USD → KRW 환산·포맷.
+- `relativeTime(date)` — "3분 전" 등 상대 시간 표시.
 - 차트 X축은 `"YY.M"` 형식 (`"25.1"` 등) — 직접 문자열 파싱으로 타임존 이슈 방지
 
 **에러 유틸리티 (`src/utils/error.ts`)**
@@ -234,6 +244,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **포트폴리오 유틸리티 (`src/utils/portfolio.ts`)**
 - `groupPositionsByTicker(positions)` — 종목 배열을 ticker+market 기준으로 집계. 여러 계좌 보유 종목 합산 표시 시 사용.
+
+**계좌 유틸리티 (`src/utils/accounts.ts`)**
+- `isPortfolioAccount(account)` / `isStockAccount(account)` / `isBankAccount(account)` — 계좌 유형 판별. 인라인 `asset_type` 비교 금지.
 
 **색상 유틸리티 (`src/utils/colors.ts`)**
 - P&L 색상은 `pnlColor(value)` 함수 사용 — `PROFIT_COLOR`(`text-red-500`) / `LOSS_COLOR`(`text-blue-500`) 상수도 export됨.
@@ -288,6 +301,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.
+- 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.
+- 주가 알림 CUD 후: `invalidateStockPriceAlertData(queryClient)`.
+- 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 > **새 invalidation 함수 추가 시:** 이 파일에 `invalidate<Domain>Data(queryClient)` 형태로 추가하고, 관련 mutation의 `onSuccess`에서 호출. 컴포넌트·훅 내부에서 직접 `queryClient.invalidateQueries()` 호출 금지.

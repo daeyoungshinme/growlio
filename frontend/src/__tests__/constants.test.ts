@@ -45,7 +45,6 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.allTransactions(2024)).toEqual(["transactions", "all", 2024]);
     expect(QUERY_KEYS.rebalancingAlert("port-1")).toEqual(["rebalancing-alert", "port-1"]);
     expect(QUERY_KEYS.taxSummary(2024)).toEqual(["tax-summary", 2024]);
-    expect(QUERY_KEYS.dartDisclosures(30)).toEqual(["dart-disclosures", 30]);
     expect(QUERY_KEYS.allocationHistory(12)).toEqual(["allocation-history", 12]);
     expect(QUERY_KEYS.portfolioRisk("p-1")).toEqual(["portfolio-risk", "p-1"]);
     expect(QUERY_KEYS.rebalancingStrategy("p-3")).toEqual(["rebalancing-strategy", "p-3"]);

@@ -93,6 +93,7 @@ describe("MarketSignalLevelBadge", () => {
 const mockSignal: MarketSignalResponse = {
   composite_level: "YELLOW",
   composite_score: 50,
+  composite_score_max: 20,
   data_freshness: "LIVE",
   fear_greed_contrarian_buy: false,
   fear_greed_extreme_greed: false,
@@ -107,6 +108,9 @@ const mockSignal: MarketSignalResponse = {
       classification: "FEAR",
       sub_score: 1,
     },
+    high_yield_spread: { value: 3.5, level: "NORMAL", date: "2024-01-15", sub_score: 0 },
+    dollar_index: { value: 104.0, ma20: 103.0, deviation_pct: 0.97, level: "NORMAL", date: "2024-01-15", sub_score: 0 },
+    rate_cut_expectation: { value: -0.5, dgs2: 4.5, fedfunds: 5.0, level: "MILD_CUT_EXPECTED", date: "2024-01-15", sub_score: 1 },
   },
 };
 

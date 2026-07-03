@@ -262,3 +262,46 @@ class TestSimulateGeumtTax:
             "rates",
         }
         assert required.issubset(result.keys())
+
+
+class TestEstimateOverseasTransferTax:
+    def test_gain_below_deduction_no_tax(self):
+        from app.services.tax_service import estimate_overseas_transfer_tax
+
+        result = estimate_overseas_transfer_tax(2_000_000.0, year=2025)
+        assert result["taxable_gain_krw"] == 0.0
+        assert result["estimated_tax_krw"] == 0.0
+
+    def test_gain_above_deduction_applies_22_pct(self):
+        from app.services.tax_service import estimate_overseas_transfer_tax
+
+        # (1250만 - 250만) * 22% = 220만
+        result = estimate_overseas_transfer_tax(12_500_000.0, year=2025)
+        assert result["taxable_gain_krw"] == pytest.approx(10_000_000.0)
+        assert result["estimated_tax_krw"] == pytest.approx(2_200_000.0)
+        assert result["rate_pct"] == pytest.approx(22.0)
+        assert result["deduction_krw"] == pytest.approx(2_500_000.0)
+
+    def test_negative_gain_no_tax(self):
+        from app.services.tax_service import estimate_overseas_transfer_tax
+
+        result = estimate_overseas_transfer_tax(-1_000_000.0, year=2025)
+        assert result["taxable_gain_krw"] == 0.0
+        assert result["estimated_tax_krw"] == 0.0
+
+    def test_year_none_uses_current_year(self):
+        from datetime import UTC, datetime
+
+        from app.services.tax_service import estimate_overseas_transfer_tax
+
+        result = estimate_overseas_transfer_tax(12_500_000.0, year=None)
+        current_year_rates_result = estimate_overseas_transfer_tax(12_500_000.0, year=datetime.now(UTC).year)
+        assert result == current_year_rates_result
+
+    def test_future_year_falls_back_to_closest(self):
+        from app.services.tax_service import estimate_overseas_transfer_tax
+
+        # 2030년은 정의되지 않았으므로 가장 가까운 연도(2026)로 폴백
+        result_future = estimate_overseas_transfer_tax(12_500_000.0, year=2030)
+        result_2026 = estimate_overseas_transfer_tax(12_500_000.0, year=2026)
+        assert result_future == result_2026

@@ -62,6 +62,8 @@ def rebalancing_alert_template(
     is_scheduled_report: bool = False,
     schedule_type: str = "DAILY",
     is_test: bool = False,
+    is_composite_triggered: bool = False,
+    composite_reason: str | None = None,
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
         "DAILY": "매일",
@@ -85,7 +87,14 @@ def rebalancing_alert_template(
         else ""
     )
 
-    if is_scheduled_report:
+    if is_composite_triggered and not drifting_count:
+        subject = f"{test_prefix}[Growlio] 포트폴리오 점검 권장 — {portfolio_name} (리스크/시장 신호)"
+        heading = "리밸런싱 점검 권장"
+        subheading = (
+            f"포트폴리오 <strong>{portfolio_name}</strong>은 현재 목표 비중 이탈은 없지만, "
+            f"{composite_reason}. 리밸런싱 여부를 점검해 보세요."
+        )
+    elif is_scheduled_report:
         subject = f"{test_prefix}[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"
         heading = "정기 리밸런싱 현황"
         subheading = f"포트폴리오 <strong>{portfolio_name}</strong>의 {schedule_label} 리밸런싱 현황입니다."

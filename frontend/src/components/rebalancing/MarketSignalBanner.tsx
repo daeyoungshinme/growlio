@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
-import type { MarketSignalResponse, MarketRiskLevel, VixLevel, YieldCurveState, FearGreedClassification } from "@/api/marketSignals";
+import type {
+  MarketSignalResponse,
+  MarketRiskLevel,
+  VixLevel,
+  YieldCurveState,
+  FearGreedClassification,
+  HighYieldSpreadLevel,
+  DollarIndexLevel,
+  RateCutExpectationLevel,
+} from "@/api/marketSignals";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 
 interface Props {
@@ -77,14 +86,85 @@ const FEAR_HINT: Record<FearGreedClassification, string> = {
   EXTREME_GREED: "탐욕 과열, 차익실현 검토",
 };
 
-function scoreColor(score: number): string {
-  if (score <= 2) return "text-green-600 dark:text-green-400";
-  if (score <= 5) return "text-yellow-600 dark:text-yellow-400";
+const HIGH_YIELD_DOT: Record<HighYieldSpreadLevel, string> = {
+  NORMAL: "bg-green-500",
+  ELEVATED: "bg-yellow-500",
+  STRESSED: "bg-orange-500",
+  CRISIS: "bg-red-500",
+};
+
+const HIGH_YIELD_LABEL: Record<HighYieldSpreadLevel, string> = {
+  NORMAL: "정상",
+  ELEVATED: "주의",
+  STRESSED: "경색",
+  CRISIS: "위기",
+};
+
+const HIGH_YIELD_HINT: Record<HighYieldSpreadLevel, string> = {
+  NORMAL: "신용시장 안정",
+  ELEVATED: "신용 스프레드 확대 모니터링",
+  STRESSED: "신용 경색 우려, 위험자산 점검",
+  CRISIS: "신용 위기 수준, 방어적 포지션 고려",
+};
+
+const DOLLAR_DOT: Record<DollarIndexLevel, string> = {
+  NORMAL: "bg-green-500",
+  ELEVATED: "bg-yellow-500",
+  HIGH: "bg-orange-500",
+  BREAKOUT: "bg-red-500",
+};
+
+const DOLLAR_LABEL: Record<DollarIndexLevel, string> = {
+  NORMAL: "안정",
+  ELEVATED: "강세",
+  HIGH: "급등",
+  BREAKOUT: "돌파",
+};
+
+const DOLLAR_HINT: Record<DollarIndexLevel, string> = {
+  NORMAL: "달러 안정 국면",
+  ELEVATED: "달러 강세 전환 모니터링",
+  HIGH: "신흥국·원자재 자금 이탈 우려",
+  BREAKOUT: "20일선 상향 돌파, 위험자산 비중 점검",
+};
+
+const RATE_DOT: Record<RateCutExpectationLevel, string> = {
+  NEUTRAL: "bg-green-500",
+  MILD_CUT_EXPECTED: "bg-yellow-500",
+  CUT_EXPECTED: "bg-orange-500",
+  DEEP_CUT_EXPECTED: "bg-red-500",
+};
+
+const RATE_LABEL: Record<RateCutExpectationLevel, string> = {
+  NEUTRAL: "중립",
+  MILD_CUT_EXPECTED: "완만한 인하기대",
+  CUT_EXPECTED: "인하기대",
+  DEEP_CUT_EXPECTED: "급격한 인하기대",
+};
+
+const RATE_HINT: Record<RateCutExpectationLevel, string> = {
+  NEUTRAL: "정책금리 유지 전망",
+  MILD_CUT_EXPECTED: "인하 기대 소폭 반영",
+  CUT_EXPECTED: "금리 인하 기대 확대",
+  DEEP_CUT_EXPECTED: "경기둔화 우려, 장기채·성장주 비중 점검",
+};
+
+function scoreColor(level: MarketRiskLevel): string {
+  if (level === "GREEN") return "text-green-600 dark:text-green-400";
+  if (level === "YELLOW") return "text-yellow-600 dark:text-yellow-400";
   return "text-red-600 dark:text-red-400";
 }
 
 export default function MarketSignalBanner({ signal }: Props) {
-  const { composite_level, composite_score, data_freshness, signals, fear_greed_contrarian_buy, fear_greed_extreme_greed } = signal;
+  const {
+    composite_level,
+    composite_score,
+    composite_score_max,
+    data_freshness,
+    signals,
+    fear_greed_contrarian_buy,
+    fear_greed_extreme_greed,
+  } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
   return (
@@ -98,8 +178,8 @@ export default function MarketSignalBanner({ signal }: Props) {
           {data_freshness === "STALE" && " · 데이터 조회 불가"}
           {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}
         </span>
-        <span className={`text-xs font-semibold shrink-0 ${scoreColor(composite_score)}`}>
-          위험지수 {composite_score}/10
+        <span className={`text-xs font-semibold shrink-0 ${scoreColor(composite_level)}`}>
+          위험지수 {composite_score}/{composite_score_max ?? 20}
         </span>
         <button
           onClick={() => setIsOpen((v) => !v)}
@@ -162,6 +242,61 @@ export default function MarketSignalBanner({ signal }: Props) {
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {FEAR_HINT[signals.fear_greed.classification]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 하이일드 스프레드 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">하이일드 스프레드</span>
+            {signals.high_yield_spread ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${HIGH_YIELD_DOT[signals.high_yield_spread.level]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.high_yield_spread.value.toFixed(2)}% · {HIGH_YIELD_LABEL[signals.high_yield_spread.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {HIGH_YIELD_HINT[signals.high_yield_spread.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 달러 인덱스 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">달러 인덱스</span>
+            {signals.dollar_index ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${DOLLAR_DOT[signals.dollar_index.level]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.dollar_index.deviation_pct >= 0 ? "+" : ""}
+                  {signals.dollar_index.deviation_pct.toFixed(1)}% · {DOLLAR_LABEL[signals.dollar_index.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {DOLLAR_HINT[signals.dollar_index.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 금리인하 기대 (2Y-FEDFUNDS 스프레드, FedWatch 대체지표) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">금리인하 기대</span>
+            {signals.rate_cut_expectation ? (
+              <>
+                <span className={`w-2 h-2 rounded-full shrink-0 ${RATE_DOT[signals.rate_cut_expectation.level]}`} />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.rate_cut_expectation.value.toFixed(2)}%p · {RATE_LABEL[signals.rate_cut_expectation.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {RATE_HINT[signals.rate_cut_expectation.level]}
                 </span>
               </>
             ) : (

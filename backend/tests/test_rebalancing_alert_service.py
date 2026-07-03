@@ -213,6 +213,304 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
     mock_db.commit.assert_called_once()
 
 
+# ── _select_items_to_show (extra_trigger) ────────────────────
+
+
+class TestSelectItemsToShowExtraTrigger:
+    def test_drift_only_no_drift_no_extra_trigger_returns_none(self):
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        assert _select_items_to_show("DRIFT_ONLY", False, [], ["a", "b"]) is None
+
+    def test_drift_only_no_drift_with_extra_trigger_sends_all_items(self):
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        result = _select_items_to_show("DRIFT_ONLY", False, [], ["a", "b"], extra_trigger=True)
+        assert result == (["a", "b"], False, True)
+
+    def test_drift_only_with_drift_ignores_extra_trigger_flag(self):
+        """drift가 있으면 extra_trigger 값과 무관하게 기존처럼 drift 항목만 표시(is_composite_triggered=False)."""
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        result = _select_items_to_show("DRIFT_ONLY", False, ["drift_item"], ["a", "b"], extra_trigger=True)
+        assert result == (["drift_item"], False, False)
+
+    def test_both_non_schedule_no_drift_with_extra_trigger_sends(self):
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        result = _select_items_to_show("BOTH", False, [], ["a", "b"], extra_trigger=True)
+        assert result == (["a", "b"], False, True)
+
+    def test_both_non_schedule_no_drift_no_extra_trigger_returns_none(self):
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        assert _select_items_to_show("BOTH", False, [], ["a", "b"], extra_trigger=False) is None
+
+    def test_schedule_only_ignores_extra_trigger(self):
+        """SCHEDULE_ONLY는 스케줄일 여부만으로 결정 — extra_trigger는 관여하지 않는다."""
+        from app.services.rebalancing_alert_service import _select_items_to_show
+
+        assert _select_items_to_show("SCHEDULE_ONLY", False, [], ["a"], extra_trigger=True) is None
+        result = _select_items_to_show("SCHEDULE_ONLY", True, [], ["a"], extra_trigger=False)
+        assert result == (["a"], True, False)
+
+
+# ── check_rebalancing_alerts 복합 트리거 통합 테스트 ──────────
+
+
+def _make_no_drift_alert(user_id, portfolio_id, *, enable_composite_signals: bool = True):
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        portfolio_id=portfolio_id,
+        schedule_type="DAILY",
+        schedule_day_of_week=None,
+        schedule_day_of_month=None,
+        last_triggered_at=None,
+        threshold_pct=5.0,
+        trigger_condition="DRIFT_ONLY",
+        mode="NOTIFY",
+        account_id=None,
+        strategy="BUY_ONLY",
+        order_type="MARKET",
+        notify_time=_current_notify_time(),
+        enable_composite_signals=enable_composite_signals,
+    )
+
+
+def _make_no_drift_item():
+    return SimpleNamespace(
+        ticker="AAPL",
+        market="NASDAQ",
+        name="Apple",
+        weight_diff_pct=1.0,  # threshold(5.0) 미만 — drift 없음
+        diff_krw=10_000,
+        shares_to_trade=0.1,
+    )
+
+
+class TestCheckRebalancingAlertsCompositeTrigger:
+    @pytest.mark.asyncio
+    async def test_composite_trigger_sends_without_drift(self, mock_db):
+        """drift는 없지만 리스크/시장 복합 신호가 있으면 추가로 발송된다."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = _make_no_drift_alert(user_id, portfolio_id)
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
+            ),
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        mock_email.assert_called_once()
+        assert mock_email.call_args.kwargs["is_composite_triggered"] is True
+        assert "분산도" in mock_email.call_args.kwargs["composite_reason"]
+        mock_db.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_drift_no_composite_signal_skips(self, mock_db):
+        """drift도 없고 리스크/시장 신호도 정상이면 발송하지 않는다 (기존 동작 유지)."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = _make_no_drift_alert(user_id, portfolio_id)
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                new=AsyncMock(return_value=("GREEN", {"data_available": False})),
+            ),
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_drift_present_skips_composite_signal_fetch(self, mock_db):
+        """drift가 이미 있어 발송이 확정되면 복합신호 조회 자체를 스킵한다 (불필요한 API 호출 절약)."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = _make_no_drift_alert(user_id, portfolio_id)
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        drifting_item = SimpleNamespace(
+            ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
+        )
+        analysis = SimpleNamespace(items=[drifting_item])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
+            ) as mock_fetch,
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        mock_fetch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_composite_signal_fetch_failure_does_not_crash_and_skips(self, mock_db):
+        """복합신호 조회 실패 시 크래시 없이 발송하지 않는다 (drift 없는 상태에서)."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = _make_no_drift_alert(user_id, portfolio_id)
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                new=AsyncMock(side_effect=RuntimeError("boom")),
+            ),
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)  # 예외를 던지지 않아야 함
+
+        mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_enable_composite_signals_false_skips_fetch_and_send(self, mock_db):
+        """enable_composite_signals=False인 알림은 drift가 없으면 복합신호 조회 없이 미발송."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = _make_no_drift_alert(user_id, portfolio_id, enable_composite_signals=False)
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
+            ) as mock_fetch,
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        mock_fetch.assert_not_called()
+        mock_email.assert_not_called()
+
+
+# ── AUTO 모드 회귀 테스트 (복합 트리거 변경이 AUTO 실행 경로에 영향 없음을 증명) ──
+
+
+class TestAutoModeUnaffectedByCompositeTrigger:
+    @pytest.mark.asyncio
+    async def test_auto_mode_daily_report_still_sent_with_drift_regardless_of_composite(self, mock_db):
+        """AUTO 모드 알림도 일일 리포트(이메일)는 기존처럼 drift 기준으로 발송되고,
+        실제 매매 실행(execute_rebalancing)은 이 daily job에서 전혀 호출되지 않는다."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            schedule_type="DAILY",
+            schedule_day_of_week=None,
+            schedule_day_of_month=None,
+            last_triggered_at=None,
+            threshold_pct=5.0,
+            trigger_condition="DRIFT_ONLY",
+            mode="AUTO",
+            account_id=uuid.uuid4(),
+            strategy="BUY_ONLY",
+            order_type="MARKET",
+            notify_time=_current_notify_time(),
+            market_condition_mode="DISABLED",
+            enable_composite_signals=True,
+        )
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        drifting_item = SimpleNamespace(
+            ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
+        )
+        analysis = SimpleNamespace(items=[drifting_item])
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
+            ) as mock_fetch,
+        ):
+            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        # drift가 있으므로 복합신호 조회는 스킵되고(AUTO도 동일 최적화 경로 적용), 이메일은 기존처럼 발송된다.
+        mock_fetch.assert_not_called()
+        mock_email.assert_called_once()
+        # AUTO는 last_triggered_at을 daily job에서 갱신하지 않는다 (기존 동작 불변).
+        assert alert.last_triggered_at is None
+
+
 # ── trigger_condition=BOTH 테스트 ─────────────────────────────
 
 

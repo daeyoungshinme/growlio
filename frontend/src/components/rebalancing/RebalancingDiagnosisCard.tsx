@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle, ChevronDown, Info } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_TICKER } from "@/constants/assets";
+import DiagnosisInsightList from "./DiagnosisInsightList";
 
 const DEFAULT_THRESHOLD = 5.0;
 
@@ -119,6 +120,8 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
               최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
             </div>
           )}
+
+          <DiagnosisInsightList context={analysis.diagnosis_context} />
 
           {/* CRITICAL: 실행 CTA 버튼 */}
           {status === "critical" && onExecute && (

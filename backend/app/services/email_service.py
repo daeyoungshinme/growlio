@@ -97,6 +97,8 @@ async def send_rebalancing_alert(
     is_scheduled_report: bool = False,
     schedule_type: str = "DAILY",
     is_test: bool = False,
+    is_composite_triggered: bool = False,
+    composite_reason: str | None = None,
 ) -> bool:
     """리밸런싱 알림 이메일 발송. 발송 성공 시 True, SMTP 미설정 시 False 반환."""
     if not _smtp_configured():
@@ -110,6 +112,8 @@ async def send_rebalancing_alert(
         is_scheduled_report,
         schedule_type,
         is_test=is_test,
+        is_composite_triggered=is_composite_triggered,
+        composite_reason=composite_reason,
     )
     try:
         await _send_html_email(to_email, subject, html)

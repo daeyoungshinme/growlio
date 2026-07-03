@@ -122,13 +122,11 @@ API Request
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
         ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
-        ├── dart.py           # DART OpenAPI 공시 라우터 (dart_service.py 연동)
-        ├── dividends.py      # 배당금 요약 + 예상 배당금
+        ├── dividends.py      # 배당금 요약 + 예상 배당금 + 월별 균등화 제안
         ├── invest.py         # DCA 분석
         ├── open_banking.py   # 오픈뱅킹 계좌 연결
-        ├── portfolio.py      # 전체 계좌 통합 조회 (/overview)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
-        ├── portfolio_analysis.py  # 포트폴리오 분석 API (/portfolio-analysis)
+        ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /summary, /risk, /risk/{id}, /rebalancing-strategy
         ├── rebalancing.py    # 리밸런싱 추천
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
@@ -136,13 +134,15 @@ API Request
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
         ├── transactions.py   # 입출금/배당 내역 CRUD
         ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (클라이언트당 개별 연결)
-        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators)
+        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — 프론트 미연동, API만 존재 (구독/알림 job은 동작)
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
         └── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
+
+> 라우터 등록/prefix 변경 시 이 표도 함께 갱신.
 
 services/
 > 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
@@ -152,20 +152,27 @@ services/
   ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크·AUTO 자동실행 주문 생성 (alert_service.py에서 분리)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
-  ├── dart_service.py         # DART OpenAPI 연동 (기업 공시)
+  ├── dart_service.py         # DART OpenAPI 연동 — dividend_fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
   ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
   ├── dividend_sync_sources.py # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — dividend_fetcher.py 체인이 호출
+  ├── dividend_plan_service.py # 연배당/월배당 계획 및 목표 달성 현황 서비스
   ├── dividend/               # 배당 서비스 패키지 (리팩토링됨)
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
-  │   └── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
+  │   ├── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
+  │   ├── drip_service.py     # 배당 월별 균등화 제안 (calc_monthly_optimization) — 순수 함수
+  │   └── _dividend_queries.py # 배당 관련 DB 쿼리 헬퍼
   ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
+  ├── price_sync_sources.py   # Yahoo 클라우드 IP 차단 대비 국내종목 Naver/pykrx 폴백 가격 조회
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
-  ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행
+  ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리
+  ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (rebalancing_execution_service.py에서 분리)
+  ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (rebalancing_execution_service.py에서 분리)
+  ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
   ├── rebalancing_service.py  # 리밸런싱 추천
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
@@ -198,7 +205,14 @@ services/
   ├── rebalancing_strategy_service.py # 리밸런싱 전략 로직 (rebalancing_service.py에서 분리)
   └── risk_service.py               # 포트폴리오 리스크 지표 계산 (VaR, 변동성 등)
 
-kis/                          # KIS OpenAPI 클라이언트
+> 새 서비스 파일 추가/삭제 시 이 목록도 함께 갱신.
+
+schemas/                      # Pydantic 요청/응답 스키마
+  ├── _validators.py          # 공용 field_validator 헬퍼
+  ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py / rebalancing.py
+  └── service_dtypes.py       # 서비스 계층 내부 TypedDict (DB/외부 API 응답 형태 고정)
+
+kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)
 providers/                    # 금융 데이터 provider
   ├── base.py                 # Provider 추상 베이스
@@ -212,6 +226,7 @@ utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART 5회→120s, OpenBanking 3회→90s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
+  ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
   ├── pnl.py                  # 포지션 P&L 순수 계산 함수 (eval_value, invested_value, pnl_pct)
   └── redis_lock.py           # Redis 분산 락 — 동일 계좌 동시 sync 방지

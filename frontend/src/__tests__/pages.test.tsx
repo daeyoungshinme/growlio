@@ -110,10 +110,6 @@ vi.mock("@/api/alerts", () => ({
   fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("@/api/dart", () => ({
-  fetchDartDisclosures: vi.fn().mockResolvedValue([]),
-}));
-
 vi.mock("@/api/transactions", () => ({
   fetchTransactions: vi.fn().mockResolvedValue([]),
 }));

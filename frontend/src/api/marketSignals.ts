@@ -32,15 +32,52 @@ export interface FearGreedSignal {
   sub_score: number;
 }
 
+export type HighYieldSpreadLevel = "NORMAL" | "ELEVATED" | "STRESSED" | "CRISIS";
+export type DollarIndexLevel = "NORMAL" | "ELEVATED" | "HIGH" | "BREAKOUT";
+export type RateCutExpectationLevel =
+  | "NEUTRAL"
+  | "MILD_CUT_EXPECTED"
+  | "CUT_EXPECTED"
+  | "DEEP_CUT_EXPECTED";
+
+export interface HighYieldSpreadSignal {
+  value: number;
+  level: HighYieldSpreadLevel;
+  date: string;
+  sub_score: number;
+}
+
+export interface DollarIndexSignal {
+  value: number;
+  ma20: number;
+  deviation_pct: number;
+  level: DollarIndexLevel;
+  date: string;
+  sub_score: number;
+}
+
+export interface RateCutExpectationSignal {
+  value: number; // DGS2 - FEDFUNDS 스프레드(%p)
+  dgs2: number;
+  fedfunds: number;
+  level: RateCutExpectationLevel;
+  date: string;
+  sub_score: number;
+}
+
 export interface MarketSignalResponse {
   composite_level: MarketRiskLevel;
   composite_score: number;
+  composite_score_max: number;
   fear_greed_contrarian_buy: boolean;
   fear_greed_extreme_greed: boolean;
   signals: {
     vix: VixSignal | null;
     yield_curve: YieldCurveSignal | null;
     fear_greed: FearGreedSignal | null;
+    high_yield_spread: HighYieldSpreadSignal | null;
+    dollar_index: DollarIndexSignal | null;
+    rate_cut_expectation: RateCutExpectationSignal | null;
   };
   computed_at: string;
   data_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";

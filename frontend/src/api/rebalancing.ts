@@ -40,6 +40,32 @@ export interface TickerAccountInfo {
   is_mock_mode: boolean;
 }
 
+export interface TaxImpactItem {
+  ticker: string;
+  name: string;
+  market: string;
+  is_overseas: boolean;
+  sell_qty: number;
+  estimated_realized_gain_krw: number;
+  excluded_reason?: string | null;
+}
+
+export interface DiagnosisContext {
+  generated_at: string;
+  market_level: "GREEN" | "YELLOW" | "RED" | null;
+  market_note: string | null;
+  risk_available: boolean;
+  annualized_volatility_pct: number | null;
+  beta_sp500: number | null;
+  diversification_score: number | null;
+  risk_note: string | null;
+  estimated_sell_realized_gain_krw: number;
+  estimated_overseas_tax_krw: number;
+  estimated_fee_krw: number;
+  tax_notes: string[];
+  tax_detail_items: TaxImpactItem[];
+}
+
 export interface RebalancingAnalysis {
   portfolio_id: string;
   portfolio_name: string;
@@ -55,6 +81,7 @@ export interface RebalancingAnalysis {
   current_weighted_cagr_10y_pct?: number | null;
   ticker_account_map: Record<string, TickerAccountInfo[]>;
   available_cash_krw?: number;
+  diagnosis_context?: DiagnosisContext | null;
 }
 
 export const analyzePortfolio = (id: string, accountIds?: string[], depositKrwOverride?: number) => {
@@ -199,6 +226,8 @@ export interface PortfolioDriftSummary {
   max_drift_pct: number;
   drifted_items_count: number;
   top_drifted_items: DriftedItem[];
+  has_composite_signal?: boolean;
+  composite_reason?: string | null;
 }
 
 export const fetchDriftSummary = (): Promise<PortfolioDriftSummary[]> =>
