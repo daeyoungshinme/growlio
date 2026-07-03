@@ -378,9 +378,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
-            patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
-            ) as mock_fetch,
+            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
             from app.services.rebalancing_alert_service import check_rebalancing_alerts
 
@@ -439,9 +437,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
-            patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
-            ) as mock_fetch,
+            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
             from app.services.rebalancing_alert_service import check_rebalancing_alerts
 
@@ -496,9 +492,7 @@ class TestAutoModeUnaffectedByCompositeTrigger:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
             patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
-            patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()
-            ) as mock_fetch,
+            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
             from app.services.rebalancing_alert_service import check_rebalancing_alerts
 

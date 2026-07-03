@@ -74,9 +74,7 @@ class TestCompositeLevel:
 
     def test_new_signals_alone_can_push_to_red(self):
         """VIX/YC/FG가 전부 정상이어도 새 3신호 상한(HY4+USD3+RATE3=10)만으로 RED에 도달 가능."""
-        result = compute_composite_signal(
-            _vix(0), _yc(0), _fg(0), _hy(4), _usd(3), _rate(3)
-        )
+        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), _hy(4), _usd(3), _rate(3))
         assert result["composite_score"] == 10
         assert result["composite_level"] == "YELLOW"  # 상한 10 자체는 아직 YELLOW 최댓값
 

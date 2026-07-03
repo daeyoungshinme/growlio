@@ -555,9 +555,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
                     risk.get("annualized_volatility_pct"),
                 )
             except Exception as exc:
-                logger.warning(
-                    "rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc)
-                )
+                logger.warning("rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc))
 
         selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items, extra_trigger)
         if selected is None:

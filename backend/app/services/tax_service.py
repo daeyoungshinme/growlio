@@ -70,9 +70,7 @@ class OverseasTransferTaxEstimate(TypedDict):
     deduction_krw: float
 
 
-def estimate_overseas_transfer_tax(
-    realized_gain_krw: float, year: int | None = None
-) -> OverseasTransferTaxEstimate:
+def estimate_overseas_transfer_tax(realized_gain_krw: float, year: int | None = None) -> OverseasTransferTaxEstimate:
     """해외주식 실현손익 추정치의 대략적 양도세(250만원 공제, 22%)를 계산한다.
 
     리밸런싱 진단의 "세금 영향 미리보기"에서 재사용하는 참고용 근사치 —

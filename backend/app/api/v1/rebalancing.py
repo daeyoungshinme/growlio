@@ -217,9 +217,7 @@ async def analyze_portfolio(
     )
 
     try:
-        analysis.diagnosis_context = await build_diagnosis_context(
-            current_user.id, db, redis, analysis, overview
-        )
+        analysis.diagnosis_context = await build_diagnosis_context(current_user.id, db, redis, analysis, overview)
     except Exception as e:
         logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
         analysis.diagnosis_context = None

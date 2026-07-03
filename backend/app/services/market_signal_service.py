@@ -417,9 +417,7 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             data["data_freshness"] = "CACHED"
         return data
 
-    vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation = (
-        await _fetch_all_signals()
-    )
+    vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation = await _fetch_all_signals()
     result = compute_composite_signal(
         vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation
     )
