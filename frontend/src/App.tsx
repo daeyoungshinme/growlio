@@ -103,7 +103,10 @@ export default function App() {
       queryFn: fetchPortfolioOverviewLite,
     });
     void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
-    void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+    void queryClient.prefetchQuery({
+      queryKey: QUERY_KEYS.exchangeRate,
+      queryFn: fetchExchangeRate,
+    });
     void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.settings, queryFn: fetchSettings });
     import("./pages/DashboardPage").catch(() => {});
   }, [queryClient]);

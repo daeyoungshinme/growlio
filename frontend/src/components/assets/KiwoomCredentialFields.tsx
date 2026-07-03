@@ -14,7 +14,10 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
     <>
       {!isEdit && (
         <div>
-          <label htmlFor="stock-kiwoom-account-no" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label
+            htmlFor="stock-kiwoom-account-no"
+            className="text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
             키움 계좌번호 *
           </label>
           <input
@@ -27,11 +30,16 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
         </div>
       )}
       <div>
-        <label htmlFor="stock-kiwoom-app-key" className="text-sm font-medium text-gray-600 dark:text-gray-400">
+        <label
+          htmlFor="stock-kiwoom-app-key"
+          className="text-sm font-medium text-gray-600 dark:text-gray-400"
+        >
           키움 App Key{!isEdit && " *"}
         </label>
         {isEdit && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">비워두면 기존 키를 유지합니다</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
+            비워두면 기존 키를 유지합니다
+          </p>
         )}
         <input
           id="stock-kiwoom-app-key"
@@ -43,7 +51,10 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
         />
       </div>
       <div>
-        <label htmlFor="stock-kiwoom-app-secret" className="text-sm font-medium text-gray-600 dark:text-gray-400">
+        <label
+          htmlFor="stock-kiwoom-app-secret"
+          className="text-sm font-medium text-gray-600 dark:text-gray-400"
+        >
           키움 App Secret{!isEdit && " *"}
         </label>
         <input

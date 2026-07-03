@@ -193,9 +193,7 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
                 <span>순자산</span>
-                <span className={pnlColor(equity)}>
-                  {fmtKrw(equity)}
-                </span>
+                <span className={pnlColor(equity)}>{fmtKrw(equity)}</span>
               </div>
             </div>
           )}
@@ -402,9 +400,7 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
               )}
               <div className="flex justify-between font-semibold text-gray-900 dark:text-gray-50 border-t border-gray-200 dark:border-gray-700 pt-1">
                 <span>순자산</span>
-                <span className={pnlColor(equity)}>
-                  {fmtKrw(equity)}
-                </span>
+                <span className={pnlColor(equity)}>{fmtKrw(equity)}</span>
               </div>
             </div>
           )}
@@ -510,9 +506,7 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">순자산</p>
-          <p className={`text-xs font-semibold mt-0.5 ${pnlColor(equity)}`}>
-            {fmtKrw(equity)}
-          </p>
+          <p className={`text-xs font-semibold mt-0.5 ${pnlColor(equity)}`}>{fmtKrw(equity)}</p>
         </div>
         {appreciation !== null && (
           <div>

@@ -373,10 +373,8 @@ export function RebalancingOrderTable({
                         <div className="text-gray-500 text-xs">
                           {item.target_qty != null ? (
                             <>
-                              {currentQty > 0
-                                ? `${currentQty.toLocaleString()}주`
-                                : "미보유"}{" "}
-                              → 목표 {item.target_qty.toFixed(0)}주
+                              {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} →
+                              목표 {item.target_qty.toFixed(0)}주
                             </>
                           ) : currentQty > 0 ? (
                             `현재 ${currentQty.toLocaleString()}주 보유`

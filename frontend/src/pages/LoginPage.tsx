@@ -33,8 +33,14 @@ export default function LoginPage() {
         queryKey: QUERY_KEYS.portfolioOverviewLite,
         queryFn: fetchPortfolioOverviewLite,
       });
-      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.dcaAnalysis, queryFn: fetchDCAAnalysis });
-      void queryClient.prefetchQuery({ queryKey: QUERY_KEYS.exchangeRate, queryFn: fetchExchangeRate });
+      void queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.dcaAnalysis,
+        queryFn: fetchDCAAnalysis,
+      });
+      void queryClient.prefetchQuery({
+        queryKey: QUERY_KEYS.exchangeRate,
+        queryFn: fetchExchangeRate,
+      });
       navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");

@@ -177,7 +177,6 @@ describe("api/risk", () => {
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk/p123");
     expect(result).toEqual(mockRisk);
   });
-
 });
 
 // ── api/backtest ──────────────────────────────────────────────────────────────

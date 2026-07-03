@@ -29,7 +29,10 @@ export default function KisCredentialFields({
     <>
       {!isEdit && (
         <div>
-          <label htmlFor="stock-kis-account-no" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label
+            htmlFor="stock-kis-account-no"
+            className="text-sm font-medium text-gray-700 dark:text-gray-300"
+          >
             KIS 계좌번호 *
           </label>
           <input
@@ -45,11 +48,16 @@ export default function KisCredentialFields({
         </div>
       )}
       <div>
-        <label htmlFor="stock-kis-app-key" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label
+          htmlFor="stock-kis-app-key"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           KIS App Key{!isEdit && " *"}
         </label>
         {isEdit && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">비워두면 기존 키를 유지합니다</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 mb-1">
+            비워두면 기존 키를 유지합니다
+          </p>
         )}
         <input
           id="stock-kis-app-key"
@@ -64,7 +72,10 @@ export default function KisCredentialFields({
         />
       </div>
       <div>
-        <label htmlFor="stock-kis-app-secret" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <label
+          htmlFor="stock-kis-app-secret"
+          className="text-sm font-medium text-gray-700 dark:text-gray-300"
+        >
           KIS App Secret{!isEdit && " *"}
         </label>
         <input

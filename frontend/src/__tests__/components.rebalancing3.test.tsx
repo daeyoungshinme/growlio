@@ -29,9 +29,7 @@ describe("CashSummaryBar", () => {
   };
 
   it("deposit이 null이면 아무것도 렌더링하지 않는다", () => {
-    const { container } = render(
-      <CashSummaryBar analysis={{ ...baseAnalysis, deposit: null }} />,
-    );
+    const { container } = render(<CashSummaryBar analysis={{ ...baseAnalysis, deposit: null }} />);
     expect(container.firstChild).toBeNull();
   });
 

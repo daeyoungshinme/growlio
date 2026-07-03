@@ -71,7 +71,9 @@ export default function TransactionTickerField({
                 value={tickerQuery}
                 onChange={(e) => onTickerQueryChange(e.target.value)}
                 onFocus={() => tickerSuggestions.length > 0 && setShowTickerSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
+                onBlur={() =>
+                  setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
+                }
                 placeholder="종목명 또는 코드 검색"
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
@@ -93,9 +95,13 @@ export default function TransactionTickerField({
                         setShowTickerSuggestions(false);
                       }}
                     >
-                      <span className="font-medium text-blue-700 dark:text-blue-400">{s.ticker}</span>
+                      <span className="font-medium text-blue-700 dark:text-blue-400">
+                        {s.ticker}
+                      </span>
                       <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
-                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">{s.market}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto">
+                        {s.market}
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -121,7 +127,9 @@ export default function TransactionTickerField({
       {/* 보유 종목 참고 */}
       {accountPositions.length > 0 && (
         <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">보유 종목 참고</p>
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+            보유 종목 참고
+          </p>
           <div className="max-h-28 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>

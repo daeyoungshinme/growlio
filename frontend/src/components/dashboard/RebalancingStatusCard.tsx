@@ -29,7 +29,6 @@ const SIGNAL_BADGE_CLASS = {
   RED: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
 };
 
-
 function PortfolioDriftRow({
   summary,
   onClick,
@@ -52,11 +51,15 @@ function PortfolioDriftRow({
       className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-2 w-full">
-        <span className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`} />
+        <span
+          className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`}
+        />
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex-1 truncate min-w-0">
           {summary.portfolio_name}
         </span>
-        <span className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
+        <span
+          className={`text-xs font-semibold shrink-0 ${isAlert ? "text-red-600 dark:text-red-400" : "text-gray-400 dark:text-gray-500"}`}
+        >
           최대 {summary.max_drift_pct.toFixed(1)}%
         </span>
         {isAlert && (
@@ -100,7 +103,10 @@ function DiagnosticGauge({ value }: { value: number }) {
         <span className="font-medium">{value.toFixed(1)}%</span>
       </div>
       <div className="h-2.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
-        <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: color }} />
+        <div
+          className="h-full rounded-full transition-all"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
       </div>
     </div>
   );
@@ -115,10 +121,16 @@ function InsightRow({ insight }: { insight: Insight }) {
   };
   return (
     <div className="flex items-start gap-3 py-3 border-b border-gray-100 dark:border-gray-700 last:border-0">
-      <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${severityDot[insight.severity] ?? "bg-gray-400"}`} />
+      <span
+        className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${severityDot[insight.severity] ?? "bg-gray-400"}`}
+      />
       <div className="flex-1 min-w-0">
-        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{insight.title}</span>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{insight.detail}</p>
+        <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+          {insight.title}
+        </span>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+          {insight.detail}
+        </p>
         {insight.action_label && insight.action_url && (
           <button
             onClick={() => navigate(insight.action_url!)}
@@ -151,7 +163,14 @@ const ALL_INSIGHT_TYPES: InsightType[] = [
 ];
 const SEVERITY_ORDER: Record<InsightSeverity, number> = { ALERT: 0, WARNING: 1, INFO: 2 };
 
-export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect, showAllInsights = false, hideSignalBanner = false, showDriftRows = false, maxDriftRows }: Props) {
+export default function RebalancingStatusCard({
+  marketSignal,
+  onPortfolioSelect,
+  showAllInsights = false,
+  hideSignalBanner = false,
+  showDriftRows = false,
+  maxDriftRows,
+}: Props) {
   const [isOpen, setIsOpen] = useState(true);
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -195,9 +214,10 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
 
   if (portfolioCount === 0) return null;
 
-  const cardClass = needsCount > 0
-    ? "card border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-800/40"
-    : "card";
+  const cardClass =
+    needsCount > 0
+      ? "card border-red-300 dark:border-red-700/60 ring-1 ring-red-200 dark:ring-red-800/40"
+      : "card";
 
   return (
     <div className={cardClass}>
@@ -210,9 +230,7 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
           <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
             <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
           </div>
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-            투자 현황 진단
-          </h2>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">투자 현황 진단</h2>
           {needsCount > 0 && (
             <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
               {needsCount}개 필요
@@ -225,7 +243,9 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
         </button>
         <div className="flex items-center gap-1.5 shrink-0">
           {marketSignal && hideSignalBanner && (
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}>
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
+            >
               <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
               {SIGNAL_LABEL[marketSignal.composite_level]}
             </span>
@@ -241,61 +261,67 @@ export default function RebalancingStatusCard({ marketSignal, onPortfolioSelect,
         </div>
       </div>
 
-      {isOpen && <>
-      {/* 시장 신호 배너 */}
-      {marketSignal && !hideSignalBanner && (
-        <Link
-          to="/rebalancing"
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
-        >
-          {marketSignal.composite_level === "GREEN" ? (
-            <Activity size={13} className="flex-shrink-0" />
-          ) : (
-            <AlertTriangle size={13} className="flex-shrink-0" />
+      {isOpen && (
+        <>
+          {/* 시장 신호 배너 */}
+          {marketSignal && !hideSignalBanner && (
+            <Link
+              to="/rebalancing"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
+            >
+              {marketSignal.composite_level === "GREEN" ? (
+                <Activity size={13} className="flex-shrink-0" />
+              ) : (
+                <AlertTriangle size={13} className="flex-shrink-0" />
+              )}
+              <span>
+                시장 신호:{" "}
+                <span className="font-bold">{SIGNAL_LABEL[marketSignal.composite_level]}</span>
+                {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
+              </span>
+              <ArrowRight size={12} className="ml-auto flex-shrink-0" />
+            </Link>
           )}
-          <span>
-            시장 신호:{" "}
-            <span className="font-bold">{SIGNAL_LABEL[marketSignal.composite_level]}</span>
-            {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
-          </span>
-          <ArrowRight size={12} className="ml-auto flex-shrink-0" />
-        </Link>
-      )}
 
-      {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {combinedStatusNote && (
-        <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
-          {combinedStatusNote}
-        </p>
-      )}
-
-      {/* 포트폴리오별 드리프트 현황 */}
-      {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
-        <div className="space-y-0.5 mt-1 mb-2">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">포트폴리오 이탈 현황</p>
-          {(maxDriftRows != null ? sortedDriftSummaries.slice(0, maxDriftRows) : sortedDriftSummaries).map((s) => (
-            <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
-          ))}
-        </div>
-      )}
-
-      {/* 진단 결과 섹션 */}
-      {hasDiagnosis && (
-        <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
-          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
-          {concentrationInsight?.metric_value != null && (
-            <DiagnosticGauge value={concentrationInsight.metric_value} />
+          {/* 이탈 종목 + 시장상황 결합 안내 */}
+          {combinedStatusNote && (
+            <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
+              {combinedStatusNote}
+            </p>
           )}
-          {concentrationInsight && concentrationInsight.metric_value == null && (
-            <InsightRow insight={concentrationInsight} />
-          )}
-          {otherInsights.map((insight, idx) => (
-            <InsightRow key={`insight-${idx}`} insight={insight} />
-          ))}
-        </div>
-      )}
 
-      </>}
+          {/* 포트폴리오별 드리프트 현황 */}
+          {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
+            <div className="space-y-0.5 mt-1 mb-2">
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">
+                포트폴리오 이탈 현황
+              </p>
+              {(maxDriftRows != null
+                ? sortedDriftSummaries.slice(0, maxDriftRows)
+                : sortedDriftSummaries
+              ).map((s) => (
+                <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
+              ))}
+            </div>
+          )}
+
+          {/* 진단 결과 섹션 */}
+          {hasDiagnosis && (
+            <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
+              {concentrationInsight?.metric_value != null && (
+                <DiagnosticGauge value={concentrationInsight.metric_value} />
+              )}
+              {concentrationInsight && concentrationInsight.metric_value == null && (
+                <InsightRow insight={concentrationInsight} />
+              )}
+              {otherInsights.map((insight, idx) => (
+                <InsightRow key={`insight-${idx}`} insight={insight} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -59,9 +59,7 @@ vi.mock("@/components/settings/StockPriceAlertSection", () => ({
   ),
 }));
 vi.mock("@/components/settings/DCASettingsSection", () => ({
-  DCASettingsSection: () => (
-    <div data-testid="dca-settings-section">DCASettingsSection</div>
-  ),
+  DCASettingsSection: () => <div data-testid="dca-settings-section">DCASettingsSection</div>,
 }));
 
 import SettingsPage from "@/pages/SettingsPage";

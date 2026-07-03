@@ -36,16 +36,12 @@ const baseDashboard: DashboardData = {
 
 describe("HeroSummaryCard", () => {
   it("전체 자산이 억원 단위로 포맷되어 표시된다", () => {
-    renderWithProviders(
-      <HeroSummaryCard data={baseDashboard} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
     expect(screen.getByText("1.50억원")).toBeInTheDocument();
   });
 
   it("exchangeRate가 null이면 환율 셀에 '—'가 표시된다", () => {
-    renderWithProviders(
-      <HeroSummaryCard data={baseDashboard} exchangeRate={null} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={null} />);
     // 여러 "—"가 있을 수 있으므로 getAllByText 사용
     const dashes = screen.getAllByText("—");
     expect(dashes.length).toBeGreaterThanOrEqual(1);
@@ -59,9 +55,7 @@ describe("HeroSummaryCard", () => {
   });
 
   it("수익률이 양수이면 text-red-500 (한국 주식 관례) 클래스를 가진다", () => {
-    renderWithProviders(
-      <HeroSummaryCard data={baseDashboard} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
     const pnlEls = screen.getAllByText("+12.50%");
     expect(pnlEls.length).toBeGreaterThanOrEqual(1);
     pnlEls.forEach((el) => expect(el).toHaveClass("text-red-500"));
@@ -82,9 +76,7 @@ describe("HeroSummaryCard", () => {
   });
 
   it("환율이 있으면 1,350원 형식으로 표시된다", () => {
-    renderWithProviders(
-      <HeroSummaryCard data={baseDashboard} exchangeRate={1350} />,
-    );
+    renderWithProviders(<HeroSummaryCard data={baseDashboard} exchangeRate={1350} />);
     expect(screen.getByText("1,350원")).toBeInTheDocument();
   });
 });

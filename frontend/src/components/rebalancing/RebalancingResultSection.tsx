@@ -120,7 +120,9 @@ export function RebalancingResultSection({ results }: Props) {
                       {o.order_type === "LIMIT" ? "지정가" : "시장가"}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-right text-gray-300">{fmtOrderPrice(o.price, o.market)}</td>
+                  <td className="px-3 py-2 text-right text-gray-300">
+                    {fmtOrderPrice(o.price, o.market)}
+                  </td>
                   <td className="px-3 py-2 text-right">{o.quantity}주</td>
                   <td className="px-3 py-2 text-center">
                     <StatusBadge status={o.status} />
@@ -149,9 +151,7 @@ export function RebalancingResultSection({ results }: Props) {
             동기화 중...
           </div>
         )}
-        {syncState === "done" && (
-          <span className="text-sm text-green-400">동기화 완료</span>
-        )}
+        {syncState === "done" && <span className="text-sm text-green-400">동기화 완료</span>}
         {syncState === "error" && (
           <div className="flex items-center gap-2">
             <span className="text-sm text-yellow-400">동기화 실패</span>

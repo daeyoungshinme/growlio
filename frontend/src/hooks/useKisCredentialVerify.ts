@@ -9,7 +9,11 @@ export function useKisCredentialVerify() {
   const verify = async (appKey: string, appSecret: string, isMock: boolean) => {
     setVerifyState("loading");
     try {
-      await verifyKisCredentials({ kis_app_key: appKey, kis_app_secret: appSecret, is_mock: isMock });
+      await verifyKisCredentials({
+        kis_app_key: appKey,
+        kis_app_secret: appSecret,
+        is_mock: isMock,
+      });
       setVerifyState("ok");
     } catch (e) {
       setVerifyState("error");

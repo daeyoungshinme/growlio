@@ -30,7 +30,9 @@ function StrategyAnalysisSection({
       {/* 알림 설정 바 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
         {existingAlert ? (
-          <span className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}>
+          <span
+            className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}
+          >
             <Bell size={12} />
             {existingAlert.mode === "AUTO"
               ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
@@ -48,7 +50,6 @@ function StrategyAnalysisSection({
           {existingAlert ? "설정 변경" : "자동화 설정"}
         </button>
       </div>
-
     </div>
   );
 }
@@ -107,9 +108,7 @@ export function AnalysisPanel({
 
     let depositKrwOverride: number | undefined;
     if (brokerAccounts.length > 0) {
-      const results = await Promise.allSettled(
-        brokerAccounts.map((a) => fetchBrokerBalance(a.id))
-      );
+      const results = await Promise.allSettled(brokerAccounts.map((a) => fetchBrokerBalance(a.id)));
       let total = 0;
       let hasSuccess = false;
       for (const r of results) {
@@ -180,19 +179,18 @@ export function AnalysisPanel({
             const currentPortfolio = portfolios.find(
               (p) => p.id === analysis.portfolio_id.toString(),
             );
-            const analysisAccounts =
-              currentPortfolio?.account_ids?.length
-                ? activeAccounts.filter((a) =>
-                    currentPortfolio.account_ids!.includes(a.id),
-                  )
-                : activeAccounts;
+            const analysisAccounts = currentPortfolio?.account_ids?.length
+              ? activeAccounts.filter((a) => currentPortfolio.account_ids!.includes(a.id))
+              : activeAccounts;
             return (
               <>
                 <RebalancingTable
                   analysis={analysis}
                   portfolioId={analysis.portfolio_id}
                   accounts={analysisAccounts}
-                  alertThreshold={alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct}
+                  alertThreshold={
+                    alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct
+                  }
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}
@@ -241,7 +239,14 @@ export function AnalysisPanel({
           const [id] = Array.from(selectedIds);
           const portfolio = portfolios.find((p) => p.id === id);
           if (!id || !portfolio) return null;
-          return <StrategyAnalysisSection id={id} portfolio={portfolio} alertByPortfolioId={alertByPortfolioId} onOpenAlertModal={onOpenAlertModal} />;
+          return (
+            <StrategyAnalysisSection
+              id={id}
+              portfolio={portfolio}
+              alertByPortfolioId={alertByPortfolioId}
+              onOpenAlertModal={onOpenAlertModal}
+            />
+          );
         })()}
 
       {/* Empty state */}
@@ -249,7 +254,9 @@ export function AnalysisPanel({
         <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 dark:text-gray-500">
           <div className="text-3xl mb-3">📊</div>
           <div className="text-sm font-medium mb-1">포트폴리오를 선택하세요</div>
-          <div className="text-xs">좌측 목록에서 포트폴리오를 클릭하면 분석을 시작할 수 있습니다</div>
+          <div className="text-xs">
+            좌측 목록에서 포트폴리오를 클릭하면 분석을 시작할 수 있습니다
+          </div>
         </div>
       )}
       {!mode && selectedIds.size > 0 && (
@@ -260,8 +267,12 @@ export function AnalysisPanel({
             className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-40"
           >
             <div className="text-left">
-              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">리밸런싱 분석</div>
-              <div className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">비중 이탈 확인 및 매수/매도 수량 계산</div>
+              <div className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                리밸런싱 분석
+              </div>
+              <div className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">
+                비중 이탈 확인 및 매수/매도 수량 계산
+              </div>
             </div>
             <span className="text-blue-400 text-lg">→</span>
           </button>

@@ -155,7 +155,9 @@ export default function UnifiedPortfolioEditor({
                   <button
                     type="button"
                     onClick={() =>
-                      fillFromHoldings(qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview))
+                      fillFromHoldings(
+                        qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview),
+                      )
                     }
                     className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors"
                     title="현재 보유 종목을 현재 비중으로 자동 채웁니다"

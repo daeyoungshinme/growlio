@@ -27,7 +27,10 @@ function TreemapChart({ data, title, height = 220, bare = false, isLoading }: Pr
   const chart = isLoading ? (
     <SkeletonCard rows={4} height="h-10" />
   ) : data.length === 0 ? (
-    <div className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm" style={{ height }}>
+    <div
+      className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm"
+      style={{ height }}
+    >
       데이터 없음
     </div>
   ) : (

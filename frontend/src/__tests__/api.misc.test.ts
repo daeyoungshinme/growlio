@@ -200,8 +200,6 @@ describe("api/risk", () => {
   it("fetchRebalancingStrategy calls GET /portfolio/rebalancing-strategy", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchRebalancingStrategy("port-1");
-    expect(api.get).toHaveBeenCalledWith(
-      "/portfolio/rebalancing-strategy?portfolio_id=port-1",
-    );
+    expect(api.get).toHaveBeenCalledWith("/portfolio/rebalancing-strategy?portfolio_id=port-1");
   });
 });

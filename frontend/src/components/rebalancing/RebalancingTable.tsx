@@ -68,9 +68,7 @@ export default function RebalancingTable({
         )}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
-            <span className="text-xs text-gray-500">
-              KIS 증권계좌 연동 시 자동 주문 가능
-            </span>
+            <span className="text-xs text-gray-500">KIS 증권계좌 연동 시 자동 주문 가능</span>
           )}
           <button
             onClick={() => setExecutionOpen(true)}

@@ -171,7 +171,9 @@ export default function MarketSignalBanner({ signal }: Props) {
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
       {/* 헤더 */}
       <div className="px-4 py-3 flex items-center gap-2">
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">시장 위험 신호</span>
+        <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
+          시장 위험 신호
+        </span>
         <MarketSignalLevelBadge level={composite_level} />
         <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
           {SHORT_IMPLICATION[composite_level]}
@@ -188,7 +190,10 @@ export default function MarketSignalBanner({ signal }: Props) {
           aria-label="시장 신호 상세 보기"
         >
           {isOpen ? "접기" : "자세히"}
-          <ChevronDown size={11} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+          <ChevronDown
+            size={11}
+            className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          />
         </button>
       </div>
 
@@ -215,12 +220,17 @@ export default function MarketSignalBanner({ signal }: Props) {
 
           {/* 장단기 금리차 */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">장단기 금리차</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              장단기 금리차
+            </span>
             {signals.yield_curve ? (
               <>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${YIELD_DOT[signals.yield_curve.state]}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${YIELD_DOT[signals.yield_curve.state]}`}
+                />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.yield_curve.value.toFixed(2)}% · {YIELD_CURVE_LABEL[signals.yield_curve.state]}
+                  {signals.yield_curve.value.toFixed(2)}% ·{" "}
+                  {YIELD_CURVE_LABEL[signals.yield_curve.state]}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {YIELD_HINT[signals.yield_curve.state]}
@@ -233,10 +243,14 @@ export default function MarketSignalBanner({ signal }: Props) {
 
           {/* Fear & Greed */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">Fear &amp; Greed</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              Fear &amp; Greed
+            </span>
             {signals.fear_greed ? (
               <>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${FEAR_DOT[signals.fear_greed.classification]}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${FEAR_DOT[signals.fear_greed.classification]}`}
+                />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {signals.fear_greed.value} · {signals.fear_greed.label}
                 </span>
@@ -251,12 +265,17 @@ export default function MarketSignalBanner({ signal }: Props) {
 
           {/* 하이일드 스프레드 */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">하이일드 스프레드</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              하이일드 스프레드
+            </span>
             {signals.high_yield_spread ? (
               <>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${HIGH_YIELD_DOT[signals.high_yield_spread.level]}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${HIGH_YIELD_DOT[signals.high_yield_spread.level]}`}
+                />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.high_yield_spread.value.toFixed(2)}% · {HIGH_YIELD_LABEL[signals.high_yield_spread.level]}
+                  {signals.high_yield_spread.value.toFixed(2)}% ·{" "}
+                  {HIGH_YIELD_LABEL[signals.high_yield_spread.level]}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {HIGH_YIELD_HINT[signals.high_yield_spread.level]}
@@ -269,13 +288,18 @@ export default function MarketSignalBanner({ signal }: Props) {
 
           {/* 달러 인덱스 */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">달러 인덱스</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              달러 인덱스
+            </span>
             {signals.dollar_index ? (
               <>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${DOLLAR_DOT[signals.dollar_index.level]}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${DOLLAR_DOT[signals.dollar_index.level]}`}
+                />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   {signals.dollar_index.deviation_pct >= 0 ? "+" : ""}
-                  {signals.dollar_index.deviation_pct.toFixed(1)}% · {DOLLAR_LABEL[signals.dollar_index.level]}
+                  {signals.dollar_index.deviation_pct.toFixed(1)}% ·{" "}
+                  {DOLLAR_LABEL[signals.dollar_index.level]}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {DOLLAR_HINT[signals.dollar_index.level]}
@@ -288,12 +312,17 @@ export default function MarketSignalBanner({ signal }: Props) {
 
           {/* 금리인하 기대 (2Y-FEDFUNDS 스프레드, FedWatch 대체지표) */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">금리인하 기대</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              금리인하 기대
+            </span>
             {signals.rate_cut_expectation ? (
               <>
-                <span className={`w-2 h-2 rounded-full shrink-0 ${RATE_DOT[signals.rate_cut_expectation.level]}`} />
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${RATE_DOT[signals.rate_cut_expectation.level]}`}
+                />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.rate_cut_expectation.value.toFixed(2)}%p · {RATE_LABEL[signals.rate_cut_expectation.level]}
+                  {signals.rate_cut_expectation.value.toFixed(2)}%p ·{" "}
+                  {RATE_LABEL[signals.rate_cut_expectation.level]}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {RATE_HINT[signals.rate_cut_expectation.level]}

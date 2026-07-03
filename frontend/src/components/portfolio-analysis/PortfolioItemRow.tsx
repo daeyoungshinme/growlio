@@ -44,14 +44,20 @@ export default function PortfolioItemRow({
         </div>
       ) : item.market === KR_PROPERTY_MARKET ? (
         <div className="flex-1 flex items-center gap-2 border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-          <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded">부동산</span>
-          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">REAL_ESTATE (순자산 합산)</span>
+          <span className="text-xs font-medium text-amber-700 bg-amber-200 px-2 py-0.5 rounded">
+            부동산
+          </span>
+          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+            REAL_ESTATE (순자산 합산)
+          </span>
         </div>
       ) : item.ticker && item.name && !isEditing ? (
         /* 표시 모드: 종목 선택 완료 */
         <div className="flex-1 flex items-center justify-between gap-2 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
           <div className="flex items-baseline gap-2 min-w-0">
-            <span className="text-sm font-semibold text-gray-800 dark:text-gray-50 truncate">{item.name}</span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-gray-50 truncate">
+              {item.name}
+            </span>
             <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
               {item.ticker} · {item.market}
             </span>
@@ -86,7 +92,9 @@ export default function PortfolioItemRow({
                   className="w-full text-left px-3 py-2 hover:bg-blue-50 dark:hover:bg-blue-900/30 flex items-center gap-2 text-sm"
                   onMouseDown={() => onSelectSuggestion(idx, s)}
                 >
-                  <span className="font-medium text-gray-800 dark:text-gray-50 flex-1 truncate">{s.name}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-50 flex-1 truncate">
+                    {s.name}
+                  </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500">{s.ticker}</span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 ml-1">{s.market}</span>
                 </button>

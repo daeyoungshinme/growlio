@@ -9,27 +9,17 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
-const RebalancingStatusCard = lazy(
-  () => import("../components/dashboard/RebalancingStatusCard"),
-);
-const RiskMetricsCard = lazy(
-  () => import("../components/rebalancing/RiskMetricsCard"),
-);
-const MarketSignalBanner = lazy(
-  () => import("../components/rebalancing/MarketSignalBanner"),
-);
+const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
+const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
+const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
 );
 const PortfolioExecutionTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioExecutionTab"),
 );
-const RebalancingHistoryTab = lazy(
-  () => import("../components/rebalancing/RebalancingHistoryTab"),
-);
-const BacktestTab = lazy(
-  () => import("../components/rebalancing/BacktestTab"),
-);
+const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
+const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
 
 const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "백테스팅", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];

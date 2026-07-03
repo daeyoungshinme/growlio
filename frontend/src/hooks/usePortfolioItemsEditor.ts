@@ -56,13 +56,22 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
       return;
     }
 
-    const grouped = new Map<string, { ticker: string; name: string; market: string; totalValue: number }>();
+    const grouped = new Map<
+      string,
+      { ticker: string; name: string; market: string; totalValue: number }
+    >();
     for (const p of overview.all_positions) {
       if (!p.ticker || p.value_krw <= 0) continue;
       const key = `${p.ticker}-${p.market}`;
       const existing = grouped.get(key);
       if (existing) existing.totalValue += p.value_krw;
-      else grouped.set(key, { ticker: p.ticker, name: p.name, market: p.market, totalValue: p.value_krw });
+      else
+        grouped.set(key, {
+          ticker: p.ticker,
+          name: p.name,
+          market: p.market,
+          totalValue: p.value_krw,
+        });
     }
 
     const entries = [...grouped.values()].sort((a, b) => b.totalValue - a.totalValue);

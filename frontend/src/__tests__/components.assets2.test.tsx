@@ -118,13 +118,7 @@ describe("RebalancingMobileCard", () => {
   });
 
   it("LIMIT 주문 타입일 때 지정가 입력 UI를 표시한다", () => {
-    render(
-      <RebalancingMobileCard
-        {...baseProps}
-        orderType="LIMIT"
-        nativeLimitPrice={68000}
-      />,
-    );
+    render(<RebalancingMobileCard {...baseProps} orderType="LIMIT" nativeLimitPrice={68000} />);
     expect(screen.getByText("지정가")).toBeDefined();
     expect(screen.getByText("현재가로")).toBeDefined();
   });
@@ -139,10 +133,7 @@ describe("RebalancingMobileCard", () => {
 
   it("선택된 상태일 때 배경 클래스가 적용된다", () => {
     const { container } = render(
-      <RebalancingMobileCard
-        {...baseProps}
-        selected={new Set(["005930-KOSPI"])}
-      />,
+      <RebalancingMobileCard {...baseProps} selected={new Set(["005930-KOSPI"])} />,
     );
     expect((container.firstChild as HTMLElement)?.className).toContain("bg-indigo-950/20");
   });

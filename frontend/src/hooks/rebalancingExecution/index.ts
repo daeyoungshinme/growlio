@@ -15,7 +15,14 @@ import {
 } from "@/api/rebalancing";
 import { useRebalancingBalances } from "../useRebalancingBalances";
 import { useRebalancingPrices } from "../useRebalancingPrices";
-import type { CashAnalysis, GlobalCashSummary, OrderType, Phase, PriceLoadState, Strategy } from "./types";
+import type {
+  CashAnalysis,
+  GlobalCashSummary,
+  OrderType,
+  Phase,
+  PriceLoadState,
+  Strategy,
+} from "./types";
 import { executionReducer } from "./reducer";
 
 export type {
@@ -198,9 +205,7 @@ export function useRebalancingExecution({
       );
       const totalSuggested = Math.abs(Math.round(item.shares_to_trade!));
       const suggested =
-        allKisQty > 0
-          ? Math.round((totalSuggested * currentQty) / allKisQty)
-          : totalSuggested;
+        allKisQty > 0 ? Math.round((totalSuggested * currentQty) / allKisQty) : totalSuggested;
       if (suggested > 0) rows.push({ item, currentQty, suggestedQty: suggested });
     }
     return rows;
@@ -376,8 +381,7 @@ export function useRebalancingExecution({
       }
     }
 
-    const totalAvailable =
-      totalSellProceeds !== null ? totalDeposit + totalSellProceeds : null;
+    const totalAvailable = totalSellProceeds !== null ? totalDeposit + totalSellProceeds : null;
     const surplus =
       totalAvailable !== null && totalBuyCost !== null ? totalAvailable - totalBuyCost : null;
     return {
@@ -390,7 +394,21 @@ export function useRebalancingExecution({
       balancesLoaded: true,
     };
     // getEstimateKrw는 훅 스코프 함수 — 실제 의존값(orderType, prices, limitPriceOverrides)은 아래에 포함됨.
-  }, [kisAccounts, state.balanceState, state.depositKrw, state.orderableKrw, sellRowsByAccount, buyRowsByAccount, selected, qtyOverrides, livePricesKrw, livePricesUsd, globalUsdRate, orderType, limitPriceOverrides]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    kisAccounts,
+    state.balanceState,
+    state.depositKrw,
+    state.orderableKrw,
+    sellRowsByAccount,
+    buyRowsByAccount,
+    selected,
+    qtyOverrides,
+    livePricesKrw,
+    livePricesUsd,
+    globalUsdRate,
+    orderType,
+    limitPriceOverrides,
+  ]);
 
   function autoAdjustForCash() {
     if (!globalCashSummary.balancesLoaded || !globalCashSummary.isInsufficient) return;
@@ -440,7 +458,11 @@ export function useRebalancingExecution({
     if (orders.length === 0) return;
     dispatch({ type: "EXECUTE_START" });
     try {
-      const res = await executeRebalancing(portfolioId, { account_id: null, orders, strategy: state.strategy });
+      const res = await executeRebalancing(portfolioId, {
+        account_id: null,
+        orders,
+        strategy: state.strategy,
+      });
       dispatch({ type: "EXECUTE_SUCCESS", results: res });
       void triggerHaptic("success");
       await invalidateSyncData(queryClient);

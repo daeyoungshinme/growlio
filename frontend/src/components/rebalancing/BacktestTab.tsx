@@ -24,9 +24,7 @@ export default function BacktestTab() {
   const { startDate, endDate, activePreset, setStartDate, setEndDate, setPreset } =
     useBacktestDateRange();
 
-  const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(
-    () => new Set(),
-  );
+  const [backtestSelectedIds, setBacktestSelectedIds] = useState<Set<string>>(() => new Set());
   const [backtestResult, setBacktestResult] = useState<BacktestResult | null>(null);
   const [includeSpy, setIncludeSpy] = useState(true);
   const [includeReal, setIncludeReal] = useState(true);
@@ -65,9 +63,7 @@ export default function BacktestTab() {
                 </span>
                 <div className="flex gap-2">
                   <button
-                    onClick={() =>
-                      setBacktestSelectedIds(new Set(portfolios.map((p) => p.id)))
-                    }
+                    onClick={() => setBacktestSelectedIds(new Set(portfolios.map((p) => p.id)))}
                     className="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                   >
                     전체 선택
@@ -104,9 +100,7 @@ export default function BacktestTab() {
             </div>
           )}
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">
-              기간
-            </span>
+            <span className="text-xs text-gray-400 dark:text-gray-500 font-medium mr-1">기간</span>
             {([1, 3, 5, 10] as const).map((y) => (
               <button
                 key={y}

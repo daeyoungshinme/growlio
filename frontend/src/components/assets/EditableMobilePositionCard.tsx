@@ -41,7 +41,10 @@ export function EditableMobilePositionCard({
             setActiveInputEl(e.currentTarget);
             if (row.name && suggestions.length) setSuggestIdx(i);
             const el = e.currentTarget;
-            setTimeout(() => el.scrollIntoView({ behavior: "smooth", block: "nearest" }), SCROLL_INTO_VIEW_DELAY);
+            setTimeout(
+              () => el.scrollIntoView({ behavior: "smooth", block: "nearest" }),
+              SCROLL_INTO_VIEW_DELAY,
+            );
           }}
           onBlur={(e) => {
             setActiveInputEl(null);

@@ -65,7 +65,14 @@ export function useRebalancingAlertQueries({
       (accountIds == null || accountIds.includes(a.id)),
   );
 
-  return { alert: alert ?? null, isLoading, brokerAccounts, kisAccounts, kisExecutionAccounts, marketSignal };
+  return {
+    alert: alert ?? null,
+    isLoading,
+    brokerAccounts,
+    kisAccounts,
+    kisExecutionAccounts,
+    marketSignal,
+  };
 }
 
 interface UseRebalancingAlertFormStateOpts {

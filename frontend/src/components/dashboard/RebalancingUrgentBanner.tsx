@@ -33,9 +33,7 @@ export default function RebalancingUrgentBanner() {
       <AlertTriangle size={16} className="shrink-0 text-amber-600 dark:text-amber-400" />
       <p className="flex-1 text-sm text-amber-800 dark:text-amber-300">{label}</p>
       <button
-        onClick={() =>
-          navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${firstPortfolioId}`)
-        }
+        onClick={() => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${firstPortfolioId}`)}
         className="shrink-0 flex items-center gap-1 text-xs font-semibold text-amber-700 dark:text-amber-300 hover:underline"
       >
         리밸런싱하기 <ArrowRight size={12} />

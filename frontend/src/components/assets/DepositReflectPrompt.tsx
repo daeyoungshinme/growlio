@@ -9,12 +9,20 @@ interface Props {
 }
 
 // 거래 저장 후 "예수금에 반영할까요?" 확인 팝업
-export default function DepositReflectPrompt({ depositKrw, amount, txType, onApply, onSkip }: Props) {
+export default function DepositReflectPrompt({
+  depositKrw,
+  amount,
+  txType,
+  onApply,
+  onSkip,
+}: Props) {
   const next = Math.max(0, depositKrw + (txType === "WITHDRAWAL" ? -amount : amount));
 
   return (
     <div className="mx-6 mb-1 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
-      <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1">예수금에 반영할까요?</p>
+      <p className="text-xs font-medium text-blue-800 dark:text-blue-300 mb-1">
+        예수금에 반영할까요?
+      </p>
       <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
         {fmtKrw(depositKrw)}
         {" → "}

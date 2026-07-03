@@ -6,4 +6,3 @@ export type PortfolioTab = (typeof PORTFOLIO_TABS)[number];
 
 export const ASSETS_TOP_TABS = ["투자현황", "계좌관리"] as const;
 export type AssetsTopTab = (typeof ASSETS_TOP_TABS)[number];
-

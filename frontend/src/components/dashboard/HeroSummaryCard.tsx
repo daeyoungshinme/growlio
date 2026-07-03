@@ -123,7 +123,9 @@ export default memo(function HeroSummaryCard({
               </p>
             </div>
           </div>
-          {updatedLabel && <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>}
+          {updatedLabel && (
+            <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
+          )}
         </div>
 
         {/* 우: 도넛 + 범례 */}

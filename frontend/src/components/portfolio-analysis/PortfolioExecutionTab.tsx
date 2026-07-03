@@ -57,9 +57,7 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-3">
         <p className="text-sm text-gray-500 dark:text-gray-400">포트폴리오가 없습니다.</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">
-          위에서 포트폴리오를 만드세요.
-        </p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">위에서 포트폴리오를 만드세요.</p>
       </div>
     );
   }
@@ -83,9 +81,7 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
           key={alertModalPortfolioId}
           portfolioId={alertModalPortfolioId}
           portfolioName={portfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
-          accountIds={
-            portfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null
-          }
+          accountIds={portfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null}
           onClose={() => setAlertModalPortfolioId(null)}
         />
       )}

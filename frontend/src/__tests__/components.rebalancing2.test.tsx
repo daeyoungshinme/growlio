@@ -109,14 +109,32 @@ const mockSignal: MarketSignalResponse = {
       sub_score: 1,
     },
     high_yield_spread: { value: 3.5, level: "NORMAL", date: "2024-01-15", sub_score: 0 },
-    dollar_index: { value: 104.0, ma20: 103.0, deviation_pct: 0.97, level: "NORMAL", date: "2024-01-15", sub_score: 0 },
-    rate_cut_expectation: { value: -0.5, dgs2: 4.5, fedfunds: 5.0, level: "MILD_CUT_EXPECTED", date: "2024-01-15", sub_score: 1 },
+    dollar_index: {
+      value: 104.0,
+      ma20: 103.0,
+      deviation_pct: 0.97,
+      level: "NORMAL",
+      date: "2024-01-15",
+      sub_score: 0,
+    },
+    rate_cut_expectation: {
+      value: -0.5,
+      dgs2: 4.5,
+      fedfunds: 5.0,
+      level: "MILD_CUT_EXPECTED",
+      date: "2024-01-15",
+      sub_score: 1,
+    },
   },
 };
 
 describe("MarketSignalBanner", () => {
   const renderBanner = (signal = mockSignal) =>
-    renderWithProviders(<MemoryRouter><MarketSignalBanner signal={signal} /></MemoryRouter>);
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalBanner signal={signal} />
+      </MemoryRouter>,
+    );
 
   it("renders signal banner with label", () => {
     renderBanner();

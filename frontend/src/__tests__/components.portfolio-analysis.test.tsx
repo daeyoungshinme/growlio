@@ -149,4 +149,3 @@ describe("PortfolioAccountSelector", () => {
     expect(screen.getByText(/1개 계좌만 분석에 포함됩니다/)).toBeDefined();
   });
 });
-

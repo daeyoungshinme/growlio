@@ -60,7 +60,11 @@ vi.mock("@/utils/queryInvalidation", () => ({
 // ── imports ───────────────────────────────────────────────────────────────────
 
 import { fetchAccounts } from "@/api/assets";
-import { fetchRebalancingAlert, upsertRebalancingAlert, deleteRebalancingAlert } from "@/api/alerts";
+import {
+  fetchRebalancingAlert,
+  upsertRebalancingAlert,
+  deleteRebalancingAlert,
+} from "@/api/alerts";
 import {
   useRebalancingAlertQueries,
   useRebalancingAlertFormState,
@@ -106,29 +110,26 @@ describe("useRebalancingAlertQueries", () => {
 
   it("로딩 중 isLoading이 true다", () => {
     vi.mocked(fetchRebalancingAlert).mockReturnValue(new Promise(() => {}));
-    const { result } = renderHook(
-      () => useRebalancingAlertQueries({ portfolioId: "port-1" }),
-      { wrapper: createWrapper() },
-    );
+    const { result } = renderHook(() => useRebalancingAlertQueries({ portfolioId: "port-1" }), {
+      wrapper: createWrapper(),
+    });
     expect(result.current.isLoading).toBe(true);
   });
 
   it("alert 데이터를 로드한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(mockAlert);
-    const { result } = renderHook(
-      () => useRebalancingAlertQueries({ portfolioId: "port-1" }),
-      { wrapper: createWrapper() },
-    );
+    const { result } = renderHook(() => useRebalancingAlertQueries({ portfolioId: "port-1" }), {
+      wrapper: createWrapper(),
+    });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.alert).toEqual(mockAlert);
   });
 
   it("alert가 없으면 null을 반환한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(undefined as never);
-    const { result } = renderHook(
-      () => useRebalancingAlertQueries({ portfolioId: "port-1" }),
-      { wrapper: createWrapper() },
-    );
+    const { result } = renderHook(() => useRebalancingAlertQueries({ portfolioId: "port-1" }), {
+      wrapper: createWrapper(),
+    });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.alert).toBeNull();
   });
@@ -136,16 +137,21 @@ describe("useRebalancingAlertQueries", () => {
   it("brokerAccounts는 KIS/키움 활성 계좌만 필터한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
-      { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS", kis_account_no: null } as never,
+      {
+        id: "a1",
+        asset_type: "STOCK_KIS",
+        is_active: true,
+        name: "KIS",
+        kis_account_no: null,
+      } as never,
       { id: "a2", asset_type: "STOCK_KIWOOM", is_active: true, name: "키움" } as never,
       { id: "a3", asset_type: "BANK_ACCOUNT", is_active: true, name: "은행" } as never,
       { id: "a4", asset_type: "STOCK_KIS", is_active: false, name: "비활성" } as never,
     ]);
 
-    const { result } = renderHook(
-      () => useRebalancingAlertQueries({ portfolioId: "port-1" }),
-      { wrapper: createWrapper() },
-    );
+    const { result } = renderHook(() => useRebalancingAlertQueries({ portfolioId: "port-1" }), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.brokerAccounts).toHaveLength(2);

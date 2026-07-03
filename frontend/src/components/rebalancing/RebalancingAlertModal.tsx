@@ -76,8 +76,10 @@ export default function RebalancingAlertModal({
   accountIds,
   onClose,
 }: Props) {
-  const { alert, isLoading, kisExecutionAccounts, marketSignal } =
-    useRebalancingAlertQueries({ portfolioId, accountIds });
+  const { alert, isLoading, kisExecutionAccounts, marketSignal } = useRebalancingAlertQueries({
+    portfolioId,
+    accountIds,
+  });
 
   return (
     <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="md" closeOnBackdrop>
@@ -158,7 +160,10 @@ function AlertFormBody({
       setExecutionResults(results);
       const successCount = results.reduce((sum, r) => sum + r.success_count, 0);
       const failCount = results.reduce((sum, r) => sum + r.fail_count, 0);
-      toast(`실행 완료 — 성공 ${successCount}건 · 실패 ${failCount}건`, failCount ? "error" : "success");
+      toast(
+        `실행 완료 — 성공 ${successCount}건 · 실패 ${failCount}건`,
+        failCount ? "error" : "success",
+      );
       void invalidateRebalancingHistoryData(queryClient);
     },
     onError: (e) => {
@@ -292,7 +297,8 @@ function AlertFormBody({
                 시장/리스크 신호로 추가 알림받기
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                이탈이 없어도 시장 위험 신호가 RED이거나 리스크가 집중되어 있으면 점검을 권장하는 알림을 추가로 받습니다.
+                이탈이 없어도 시장 위험 신호가 RED이거나 리스크가 집중되어 있으면 점검을 권장하는
+                알림을 추가로 받습니다.
               </div>
             </div>
           </label>
@@ -472,7 +478,8 @@ function AlertFormBody({
               </select>
               {form.orderType === "LIMIT" && (
                 <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 leading-relaxed">
-                  자동 실행 시 분석 시점의 현재가를 지정가로 사용합니다. 가격 변동으로 미체결될 수 있습니다.
+                  자동 실행 시 분석 시점의 현재가를 지정가로 사용합니다. 가격 변동으로 미체결될 수
+                  있습니다.
                 </p>
               )}
             </div>
@@ -493,9 +500,7 @@ function AlertFormBody({
                 className={inputClass}
                 value={form.marketConditionMode}
                 onChange={(e) =>
-                  form.setMarketConditionMode(
-                    e.target.value as "DISABLED" | "CAUTIOUS" | "STRICT",
-                  )
+                  form.setMarketConditionMode(e.target.value as "DISABLED" | "CAUTIOUS" | "STRICT")
                 }
               >
                 {MARKET_CONDITION_OPTIONS.map(({ value, label, desc }) => (
@@ -569,7 +574,12 @@ function AlertFormBody({
       {/* end p-6 form fields */}
 
       {executionResults && (
-        <Modal title="실행 결과" onClose={() => setExecutionResults(null)} size="md" closeOnBackdrop>
+        <Modal
+          title="실행 결과"
+          onClose={() => setExecutionResults(null)}
+          size="md"
+          closeOnBackdrop
+        >
           <div className="p-4 space-y-4 overflow-y-auto">
             <RebalancingResultSection results={executionResults} />
           </div>

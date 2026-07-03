@@ -61,10 +61,13 @@ export default function PortfolioPage() {
 
   const handleTabChange = useCallback(
     (next: Tab) => {
-      setSearchParams((prev) => {
-        prev.set("portfolioTab", next);
-        return prev;
-      }, { replace: true });
+      setSearchParams(
+        (prev) => {
+          prev.set("portfolioTab", next);
+          return prev;
+        },
+        { replace: true },
+      );
     },
     [setSearchParams],
   );
@@ -102,9 +105,7 @@ export default function PortfolioPage() {
 
   const handleSyncAll = async () => {
     if (!data) return;
-    const accounts = data.accounts.filter(
-      (a) => isPortfolioAccount(a.asset_type),
-    );
+    const accounts = data.accounts.filter((a) => isPortfolioAccount(a.asset_type));
     setSyncingAll(true);
     setSyncProgress({ done: 0, total: accounts.length });
     try {
@@ -131,10 +132,7 @@ export default function PortfolioPage() {
   };
 
   const stockAccounts = useMemo(
-    () =>
-      data?.accounts.filter(
-        (a) => isPortfolioAccount(a.asset_type),
-      ) ?? [],
+    () => data?.accounts.filter((a) => isPortfolioAccount(a.asset_type)) ?? [],
     [data],
   );
 

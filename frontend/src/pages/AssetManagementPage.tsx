@@ -173,7 +173,10 @@ export default function AssetManagementPage() {
               <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
                 <EmptyState
                   title="등록된 부동산이 없습니다."
-                  action={{ label: "+ 부동산 추가하기", onClick: () => setShowRealEstateModal(true) }}
+                  action={{
+                    label: "+ 부동산 추가하기",
+                    onClick: () => setShowRealEstateModal(true),
+                  }}
                 />
               </div>
             ) : (

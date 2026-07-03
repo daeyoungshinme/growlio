@@ -49,7 +49,10 @@ export default function BottomNav() {
           <div className="relative">
             <Icon size={22} aria-hidden="true" />
             {to === "/rebalancing" && showRebalancingBadge && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" aria-label={`리밸런싱 필요 ${needsCount}개`} />
+              <span
+                className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full"
+                aria-label={`리밸런싱 필요 ${needsCount}개`}
+              />
             )}
           </div>
           <span className="truncate max-w-full">{label}</span>

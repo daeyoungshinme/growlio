@@ -11,13 +11,9 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
-const RebalancingStatusCard = lazy(
-  () => import("../components/dashboard/RebalancingStatusCard"),
-);
+const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 
-const InvestmentSnapshotCard = lazy(
-  () => import("../components/dashboard/InvestmentSnapshotCard"),
-);
+const InvestmentSnapshotCard = lazy(() => import("../components/dashboard/InvestmentSnapshotCard"));
 
 const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 
@@ -38,8 +34,12 @@ function OnboardingChecklist() {
           <li className="flex items-start gap-3">
             <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">1단계: 계좌 등록</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500">은행·증권 계좌를 연결하세요.</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                1단계: 계좌 등록
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                은행·증권 계좌를 연결하세요.
+              </p>
             </div>
             <Link
               to="/settings?tab=계좌"
@@ -59,9 +59,7 @@ function OnboardingChecklist() {
                 목표 비중을 설정해 리밸런싱을 관리하세요.
               </p>
             </div>
-            <span className="shrink-0 text-xs text-gray-300 dark:text-gray-600">
-              계좌 등록 후
-            </span>
+            <span className="shrink-0 text-xs text-gray-300 dark:text-gray-600">계좌 등록 후</span>
           </li>
 
           <li className="flex items-start gap-3">
@@ -181,9 +179,7 @@ export default function DashboardPage() {
               maxDriftRows={3}
               hideSignalBanner={true}
               marketSignal={marketSignal}
-              onPortfolioSelect={(id) =>
-                navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)
-              }
+              onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
             />
           </Suspense>
         </ErrorBoundary>

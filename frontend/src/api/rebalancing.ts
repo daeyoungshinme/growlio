@@ -84,7 +84,11 @@ export interface RebalancingAnalysis {
   diagnosis_context?: DiagnosisContext | null;
 }
 
-export const analyzePortfolio = (id: string, accountIds?: string[], depositKrwOverride?: number) => {
+export const analyzePortfolio = (
+  id: string,
+  accountIds?: string[],
+  depositKrwOverride?: number,
+) => {
   const params = new URLSearchParams();
   if (accountIds?.length) {
     for (const aid of accountIds) params.append("account_ids", aid);

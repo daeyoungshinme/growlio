@@ -12,7 +12,11 @@ export interface DividendSummary {
 }
 
 export function useDividendData(enabled: boolean) {
-  const { data: dividendPositions = [], isLoading, isError } = useQuery({
+  const {
+    data: dividendPositions = [],
+    isLoading,
+    isError,
+  } = useQuery({
     queryKey: QUERY_KEYS.dividendPositions,
     queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
     staleTime: STALE_TIME.LONG,

@@ -33,7 +33,10 @@ const STATUS_CONFIG = {
     badge: "bg-green-900/40 text-green-300",
     label: "포트폴리오 안정",
   },
-} satisfies Record<DriftStatus, { bg: string; icon: React.ReactNode; badge: string; label: string }>;
+} satisfies Record<
+  DriftStatus,
+  { bg: string; icon: React.ReactNode; badge: string; label: string }
+>;
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -49,9 +52,8 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
     const tradeable = analysis.items.filter(
       (i) => i.ticker !== CASH_TICKER && i.market !== "KR_PROPERTY",
     );
-    const maxDrift = tradeable.length > 0
-      ? Math.max(...tradeable.map((i) => Math.abs(i.weight_diff_pct)))
-      : 0;
+    const maxDrift =
+      tradeable.length > 0 ? Math.max(...tradeable.map((i) => Math.abs(i.weight_diff_pct))) : 0;
     const driftedCount = tradeable.filter((i) => Math.abs(i.weight_diff_pct) >= threshold).length;
     return { tradeable, maxDrift, driftedCount };
   }, [analysis.items, threshold]);
@@ -104,8 +106,11 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
                     className="flex items-center gap-1 bg-gray-800/60 rounded-lg px-2.5 py-1"
                   >
                     <span className="text-xs font-medium text-gray-200">{item.name}</span>
-                    <span className={`text-xs font-bold ${isOver ? "text-red-400" : "text-blue-400"}`}>
-                      {isOver ? "▲" : "▼"}{Math.abs(diff).toFixed(1)}%
+                    <span
+                      className={`text-xs font-bold ${isOver ? "text-red-400" : "text-blue-400"}`}
+                    >
+                      {isOver ? "▲" : "▼"}
+                      {Math.abs(diff).toFixed(1)}%
                     </span>
                   </div>
                 );

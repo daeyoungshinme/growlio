@@ -28,7 +28,9 @@ describe("buildDiagnosisNotes", () => {
   });
 
   it("market_note가 있으면 포함한다", () => {
-    const notes = buildDiagnosisNotes(makeContext({ market_note: "시장 변동성이 확대되는 국면입니다" }));
+    const notes = buildDiagnosisNotes(
+      makeContext({ market_note: "시장 변동성이 확대되는 국면입니다" }),
+    );
     const note = notes.find((n) => n.icon === "market");
     expect(note).toBeDefined();
     expect(note?.text).toBe("시장 변동성이 확대되는 국면입니다");

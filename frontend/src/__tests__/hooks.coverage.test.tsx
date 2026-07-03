@@ -455,8 +455,7 @@ describe("useAnalysisState", () => {
 
   it("selectedIdStr 변경으로 다중 선택이 되면 mode가 null로 리셋된다", () => {
     const { result, rerender } = renderHook(
-      ({ selectedIdStr }: { selectedIdStr: string }) =>
-        useAnalysisState({ selectedIdStr }),
+      ({ selectedIdStr }: { selectedIdStr: string }) => useAnalysisState({ selectedIdStr }),
       { initialProps: { selectedIdStr: "1" } },
     );
 
@@ -500,8 +499,7 @@ describe("useAnalysisState — additional coverage", () => {
     vi.mocked(analyzePortfolio).mockResolvedValue(mockAnalysis as never);
 
     const { result, rerender } = renderHook(
-      ({ selectedIdStr }: { selectedIdStr: string }) =>
-        useAnalysisState({ selectedIdStr }),
+      ({ selectedIdStr }: { selectedIdStr: string }) => useAnalysisState({ selectedIdStr }),
       { initialProps: { selectedIdStr: "1" } },
     );
 
@@ -623,7 +621,7 @@ describe("executionReducer — missing actions", () => {
     const state = {
       ...baseReducerState,
       selected: new Set(["buy_005930_acc1"]),
-      qtyOverrides: { "buy_005930_acc1": 5 },
+      qtyOverrides: { buy_005930_acc1: 5 },
     };
     const result = executionReducer(state, {
       type: "BULK_SET_QTY",
@@ -717,14 +715,19 @@ describe("useAccountMutations", () => {
 
   it("createMutation 성공 시 (MANUAL) toast와 onBankModalClose를 호출한다", async () => {
     const { toast } = await import("@/utils/toast");
-    vi.mocked(api.post).mockResolvedValue({ data: { id: "acc-1", data_source: "MANUAL", name: "test" } });
+    vi.mocked(api.post).mockResolvedValue({
+      data: { id: "acc-1", data_source: "MANUAL", name: "test" },
+    });
 
     const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
       wrapper: createWrapper(),
     });
 
     await act(async () => {
-      await result.current.createMutation.mutateAsync({ name: "test", asset_type: "BANK_ACCOUNT" } as never);
+      await result.current.createMutation.mutateAsync({
+        name: "test",
+        asset_type: "BANK_ACCOUNT",
+      } as never);
     });
 
     expect(toast).toHaveBeenCalledWith("계좌가 추가되었습니다", "success");
@@ -742,7 +745,10 @@ describe("useAccountMutations", () => {
     });
 
     await act(async () => {
-      await result.current.createMutation.mutateAsync({ name: "KIS", asset_type: "STOCK_KIS" } as never);
+      await result.current.createMutation.mutateAsync({
+        name: "KIS",
+        asset_type: "STOCK_KIS",
+      } as never);
     });
 
     expect(toast).toHaveBeenCalledWith("계좌가 추가되었습니다", "success");
@@ -759,7 +765,10 @@ describe("useAccountMutations", () => {
     });
 
     await act(async () => {
-      await result.current.createMutation.mutateAsync({ name: "KIS", asset_type: "STOCK_KIS" } as never);
+      await result.current.createMutation.mutateAsync({
+        name: "KIS",
+        asset_type: "STOCK_KIS",
+      } as never);
     });
 
     expect(toast).toHaveBeenCalledWith(expect.stringContaining("동기화 실패"));
@@ -811,7 +820,10 @@ describe("useAccountMutations", () => {
     });
 
     await act(async () => {
-      await result.current.updateNameMutation.mutateAsync({ id: "acc-1", name: "새 이름" } as never);
+      await result.current.updateNameMutation.mutateAsync({
+        id: "acc-1",
+        name: "새 이름",
+      } as never);
     });
 
     expect(toast).toHaveBeenCalledWith("계좌명이 저장되었습니다", "success");

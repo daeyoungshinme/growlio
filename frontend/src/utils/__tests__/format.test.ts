@@ -134,8 +134,7 @@ describe("formatUsdAsKrw", () => {
 describe("relativeTime", () => {
   afterEach(() => vi.useRealTimers());
 
-  const nowIso = (offsetMs: number) =>
-    new Date(Date.now() - offsetMs).toISOString();
+  const nowIso = (offsetMs: number) => new Date(Date.now() - offsetMs).toISOString();
 
   it("방금 전 — 1분 미만", () => {
     expect(relativeTime(nowIso(30_000))).toBe("방금 전");

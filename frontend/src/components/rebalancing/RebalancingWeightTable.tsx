@@ -1,6 +1,12 @@
 import { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
-import { DiffCell, QuantityCell, Return10yCell, WeightBar, WeightDiffBadge } from "./RebalancingCells";
+import {
+  DiffCell,
+  QuantityCell,
+  Return10yCell,
+  WeightBar,
+  WeightDiffBadge,
+} from "./RebalancingCells";
 import { calcSignedTradeKrw } from "./rebalancingTradeMath";
 
 function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
@@ -15,7 +21,9 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
             <p className="font-medium text-gray-100 truncate text-sm">{item.name}</p>
             {isUntracked && <span className="text-xs text-amber-500 shrink-0">목표 외</span>}
             {directionIcon && (
-              <span className={`text-xs shrink-0 ${weightDiff > 0 ? "text-red-400" : "text-blue-400"}`}>
+              <span
+                className={`text-xs shrink-0 ${weightDiff > 0 ? "text-red-400" : "text-blue-400"}`}
+              >
                 {directionIcon}
               </span>
             )}
@@ -51,7 +59,9 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
         <div className="text-xs text-gray-400">{item.ticker}</div>
         {isUntracked && <div className="text-xs text-amber-500 mt-0.5">목표 외</div>}
       </td>
-      <td className="py-3.5 px-3 text-right text-gray-300">{item.current_weight_pct.toFixed(1)}%</td>
+      <td className="py-3.5 px-3 text-right text-gray-300">
+        {item.current_weight_pct.toFixed(1)}%
+      </td>
       <td className="py-3.5 px-3">
         <WeightBar current={item.current_weight_pct} target={item.target_weight_pct} />
       </td>
@@ -89,7 +99,9 @@ export default function RebalancingWeightTable({ items }: { items: RebalancingIt
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-700 text-xs text-gray-400">
-              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">종목</th>
+              <th className="text-left py-2 px-3 font-medium sticky left-0 bg-gray-800 z-10">
+                종목
+              </th>
               <th className="text-right py-2 px-3 font-medium">현재 비중</th>
               <th className="text-left py-2 px-3 font-medium">목표 비중</th>
               <th className="text-right py-2 px-3 font-medium">차이</th>

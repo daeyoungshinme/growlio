@@ -54,7 +54,9 @@ export function useRebalancingPrices(
             _priceCache.set(ticker, { ...entry, fetchedAt: Date.now() });
           }
         }
-        const failedCount = toFetch.filter(({ ticker }) => !batchResult[ticker]?.price_krw && !batchResult[ticker]?.price_usd).length;
+        const failedCount = toFetch.filter(
+          ({ ticker }) => !batchResult[ticker]?.price_krw && !batchResult[ticker]?.price_usd,
+        ).length;
         if (failedCount > 0 && failedCount < toFetch.length) {
           toast(`${failedCount}개 종목 현재가 조회 실패`, "error");
         }

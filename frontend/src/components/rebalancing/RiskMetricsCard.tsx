@@ -12,15 +12,30 @@ interface MetricConfig {
 }
 
 const LEVEL_BADGE: Record<RiskLevel, { label: string; cls: string }> = {
-  low:    { label: "낮음", cls: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  medium: { label: "보통", cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300" },
-  high:   { label: "높음", cls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+  low: {
+    label: "낮음",
+    cls: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  },
+  medium: {
+    label: "보통",
+    cls: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300",
+  },
+  high: { label: "높음", cls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
 };
 
 const SUMMARY_CONFIG = {
-  safe:    { label: "안정", cls: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800/40 dark:text-blue-300" },
-  caution: { label: "주의 필요", cls: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300" },
-  risk:    { label: "위험", cls: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300" },
+  safe: {
+    label: "안정",
+    cls: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/30 dark:border-blue-800/40 dark:text-blue-300",
+  },
+  caution: {
+    label: "주의 필요",
+    cls: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-950/30 dark:border-yellow-800/40 dark:text-yellow-300",
+  },
+  risk: {
+    label: "위험",
+    cls: "bg-red-50 border-red-200 text-red-800 dark:bg-red-950/30 dark:border-red-800/40 dark:text-red-300",
+  },
 };
 
 function varLevel(pct: number, confidence: 95 | 99): RiskLevel {
@@ -75,7 +90,8 @@ function buildMetrics(m: PortfolioRiskMetrics): MetricConfig[] {
       label: "분산도 점수",
       value: `${m.diversification_score}/100`,
       level: diversificationLevel(m.diversification_score),
-      description: "종목 간 상관관계가 낮을수록 점수 높음 — 높을수록 시장 충격이 특정 종목에 집중되지 않음",
+      description:
+        "종목 간 상관관계가 낮을수록 점수 높음 — 높을수록 시장 충격이 특정 종목에 집중되지 않음",
     },
     {
       label: "최대 종목 비중",
@@ -97,9 +113,11 @@ function RiskMetricRow({
 }) {
   const badge = LEVEL_BADGE[metric.level];
   const valueColor =
-    metric.level === "high" ? "text-red-600 dark:text-red-400"
-    : metric.level === "medium" ? "text-yellow-600 dark:text-yellow-400"
-    : "text-green-600 dark:text-green-400";
+    metric.level === "high"
+      ? "text-red-600 dark:text-red-400"
+      : metric.level === "medium"
+        ? "text-yellow-600 dark:text-yellow-400"
+        : "text-green-600 dark:text-green-400";
 
   return (
     <button
@@ -142,9 +160,11 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
 
   const highCount = metricList.filter((m) => m.level === "high").length;
   const summary =
-    highCount >= 3 ? SUMMARY_CONFIG.risk
-    : highCount >= 1 ? SUMMARY_CONFIG.caution
-    : SUMMARY_CONFIG.safe;
+    highCount >= 3
+      ? SUMMARY_CONFIG.risk
+      : highCount >= 1
+        ? SUMMARY_CONFIG.caution
+        : SUMMARY_CONFIG.safe;
 
   const summaryText =
     highCount === 0
@@ -155,8 +175,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           ? "여러 지표에서 위험 신호가 감지됩니다."
           : "다수 지표가 높은 위험을 나타내고 있습니다.";
 
-  const toggle = (label: string) =>
-    setExpandedLabel((prev) => (prev === label ? null : label));
+  const toggle = (label: string) => setExpandedLabel((prev) => (prev === label ? null : label));
 
   return (
     <div className="card">
@@ -169,19 +188,25 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           <div className="p-1.5 bg-orange-50 dark:bg-orange-950 rounded-lg">
             <ShieldAlert size={16} className="text-orange-600 dark:text-orange-400" />
           </div>
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">포트폴리오 위험 지표</h2>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+            포트폴리오 위험 지표
+          </h2>
           <ChevronDown
             size={14}
             className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
-        <span className="text-xs text-gray-400 dark:text-gray-500">{metrics.position_count}개 종목</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">
+          {metrics.position_count}개 종목
+        </span>
       </div>
 
       {isOpen && (
         <>
           {/* 종합 위험 수준 배너 */}
-          <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium mb-3 ${summary.cls}`}>
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium mb-3 ${summary.cls}`}
+          >
             <span className="font-bold">{summary.label}</span>
             <span className="opacity-80">— {summaryText}</span>
           </div>
@@ -204,7 +229,9 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           </p>
 
           {metrics.note && (
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 leading-relaxed">{metrics.note}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 leading-relaxed">
+              {metrics.note}
+            </p>
           )}
         </>
       )}

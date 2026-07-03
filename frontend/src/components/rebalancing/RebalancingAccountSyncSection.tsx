@@ -34,9 +34,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
   const isAllSelected = syncableAccounts.every((a) => selectedIds.has(a.id));
 
   function toggleAll() {
-    setSelectedIds(
-      isAllSelected ? new Set() : new Set(syncableAccounts.map((a) => a.id)),
-    );
+    setSelectedIds(isAllSelected ? new Set() : new Set(syncableAccounts.map((a) => a.id)));
   }
 
   function toggleAccount(id: string) {
@@ -68,7 +66,9 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
   return (
     <div className="border-t border-gray-100 dark:border-gray-800 pt-4 mt-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">계좌 데이터 갱신</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">
+          계좌 데이터 갱신
+        </span>
         <label className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-500 dark:text-gray-400">
           <input
             type="checkbox"

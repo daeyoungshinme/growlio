@@ -23,19 +23,22 @@ export function useAnalysisState({
   const [state, setState] = useState<AnalysisState>(INITIAL_STATE);
   const autoAnalyzedRef = useRef<string | undefined>(undefined);
 
-  const triggerRebalancingAnalysis = useCallback(async (id: string, depositKrwOverride?: number) => {
-    setState({ mode: "rebalancing", analysis: null, analyzing: true, error: null });
-    try {
-      const result = await analyzePortfolio(id, undefined, depositKrwOverride);
-      setState((s) => ({ ...s, analysis: result, analyzing: false }));
-    } catch (err) {
-      setState((s) => ({
-        ...s,
-        error: extractErrorMessage(err, "분석 중 오류가 발생했습니다."),
-        analyzing: false,
-      }));
-    }
-  }, []);
+  const triggerRebalancingAnalysis = useCallback(
+    async (id: string, depositKrwOverride?: number) => {
+      setState({ mode: "rebalancing", analysis: null, analyzing: true, error: null });
+      try {
+        const result = await analyzePortfolio(id, undefined, depositKrwOverride);
+        setState((s) => ({ ...s, analysis: result, analyzing: false }));
+      } catch (err) {
+        setState((s) => ({
+          ...s,
+          error: extractErrorMessage(err, "분석 중 오류가 발생했습니다."),
+          analyzing: false,
+        }));
+      }
+    },
+    [],
+  );
 
   const setMode = useCallback((mode: AnalysisMode) => {
     setState((s) => ({ ...s, mode, analysis: null, error: null }));

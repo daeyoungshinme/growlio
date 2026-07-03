@@ -10,17 +10,19 @@ const PortfolioContent = lazy(() => import("./PortfolioPage"));
 export default function AssetsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
-  const activeTab: AssetsTopTab =
-    (ASSETS_TOP_TABS as readonly string[]).includes(rawTab ?? "")
-      ? (rawTab as AssetsTopTab)
-      : "투자현황";
+  const activeTab: AssetsTopTab = (ASSETS_TOP_TABS as readonly string[]).includes(rawTab ?? "")
+    ? (rawTab as AssetsTopTab)
+    : "투자현황";
 
   const handleTabChange = (tab: AssetsTopTab) => {
-    setSearchParams((prev) => {
-      prev.set("tab", tab);
-      if (tab !== "투자현황") prev.delete("portfolioTab");
-      return prev;
-    }, { replace: true });
+    setSearchParams(
+      (prev) => {
+        prev.set("tab", tab);
+        if (tab !== "투자현황") prev.delete("portfolioTab");
+        return prev;
+      },
+      { replace: true },
+    );
   };
 
   return (

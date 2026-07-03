@@ -123,9 +123,7 @@ export function useGoalSettings() {
         retirement_target_year: form.retirement_target_year
           ? Number(form.retirement_target_year)
           : null,
-        annual_dividend_goal: form.annual_dividend_goal
-          ? Number(form.annual_dividend_goal)
-          : null,
+        annual_dividend_goal: form.annual_dividend_goal ? Number(form.annual_dividend_goal) : null,
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);

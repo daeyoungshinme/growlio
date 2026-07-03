@@ -13,7 +13,9 @@ export function calcTradeKrw(item: RebalancingItem): number {
 // 부호 포함 실제 거래금액 — 상세내역 DiffCell과 거래 계획 금액을 일치시키기 위해 사용
 export function calcSignedTradeKrw(item: RebalancingItem): number {
   if (item.shares_to_trade !== null && item.current_price_krw && item.current_price_krw > 0) {
-    return Math.sign(item.diff_krw) * Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw;
+    return (
+      Math.sign(item.diff_krw) * Math.abs(Math.round(item.shares_to_trade)) * item.current_price_krw
+    );
   }
   return item.diff_krw;
 }

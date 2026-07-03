@@ -178,4 +178,3 @@ describe("MonthlyOptimizationCard", () => {
     expect(document.body).toBeDefined();
   });
 });
-
