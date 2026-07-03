@@ -116,6 +116,7 @@ describe("api/alerts — rebalancing alerts", () => {
     market_condition_mode: "DISABLED" as const,
     auto_execution_time: null,
     notify_time: "08:30",
+    enable_composite_signals: true,
     last_triggered_at: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
@@ -149,6 +150,7 @@ describe("api/alerts — rebalancing alerts", () => {
       market_condition_mode: "DISABLED",
       auto_execution_time: null,
       notify_time: "08:30",
+      enable_composite_signals: true,
     });
     expect(api.put).toHaveBeenCalledWith(
       "/alerts/rebalancing/port-1",

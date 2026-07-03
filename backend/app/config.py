@@ -57,13 +57,10 @@ class Settings(BaseSettings):
     open_banking_redirect_uri: str = "http://localhost:8000/api/v1/open-banking/callback"
     open_banking_base_url: str = "https://testapi.openbanking.or.kr"
 
-    # SMTP (이메일 알림)
-    smtp_host: str = ""
-    smtp_port: int = 587
-    smtp_user: str = ""
-    smtp_password: str = ""
-    smtp_from: str = "growlio@example.com"
-    smtp_timeout: int = 10  # SMTP 연결 타임아웃(초)
+    # 이메일 알림 (Resend HTTP API)
+    resend_api_key: str = ""
+    email_from: str = "growlio@example.com"
+    email_timeout: int = 10  # 이메일 API 요청 타임아웃(초)
 
     frontend_url: str = "http://localhost:5173"
 

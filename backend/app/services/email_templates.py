@@ -521,3 +521,31 @@ def indicator_alert_template(indicators: list[dict]) -> tuple[str, str]:
         "알림 설정은 앱 &gt; 시장 &gt; 구독 관리에서 변경하세요.",
     )
     return subject, html
+
+
+_SIGNAL_LEVEL_LABEL: dict[str, str] = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
+_SIGNAL_LEVEL_COLOR: dict[str, str] = {"GREEN": "#16a34a", "YELLOW": "#d97706", "RED": "#dc2626"}
+
+
+def market_signal_change_template(old_level: str, new_level: str, reason: str | None) -> tuple[str, str]:
+    """시장 위험 신호등 등급이 전환되었을 때 발송하는 알림 이메일."""
+    old_label = _SIGNAL_LEVEL_LABEL.get(old_level, old_level)
+    new_label = _SIGNAL_LEVEL_LABEL.get(new_level, new_level)
+    new_color = _SIGNAL_LEVEL_COLOR.get(new_level, "#374151")
+    subject = f"[Growlio] 시장 위험 신호 변경 — {old_label} → {new_label}"
+    table = _kv_table(
+        [
+            ("이전 신호", old_label),
+            ("현재 신호", f"<span style='color:{new_color};font-weight:bold;'>{new_label}</span>"),
+        ]
+    )
+    body = table
+    if reason:
+        body += f"<p style='color:#64748b;font-size:13px;margin-top:12px;'>{reason}</p>"
+    html = _email_div(
+        "시장 위험 신호 변경 알림",
+        new_color,
+        body,
+        "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.",
+    )
+    return subject, html

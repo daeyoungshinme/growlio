@@ -74,13 +74,16 @@ export default function RebalancingPage() {
   );
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
-    (id: string) => {
+    (id: string, openAlert?: boolean) => {
       setLocalTab("포트폴리오");
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
           next.set("portfolioId", id);
           next.set("rtab", "포트폴리오");
+          if (openAlert) {
+            next.set("openAlert", "1");
+          }
           return next;
         },
         { replace: true },

@@ -36,8 +36,6 @@ dependencies = [
     "pykrx>=1.0.47,<2.0.0",
     # ETF 분배금/배당율 fallback 데이터 소스 (네이버 금융 기반, import: FinanceDataReader)
     "finance-datareader>=0.9,<1.0",
-    # 비동기 SMTP (이메일 알림)
-    "aiosmtplib>=3.0.0",
     # Rate limiting
     "slowapi>=0.1.9,<0.2.0",
     # Retry logic for external APIs

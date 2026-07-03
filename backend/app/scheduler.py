@@ -45,6 +45,14 @@ def init_scheduler() -> None:
         id="rebalancing_alert_check_interval",
         replace_existing=True,
     )
+    from app.jobs.market_signal_alert import run_market_signal_alert_check
+
+    scheduler.add_job(
+        run_market_signal_alert_check,
+        IntervalTrigger(minutes=10),
+        id="market_signal_alert_check_interval",
+        replace_existing=True,
+    )
     from app.jobs.dca_auto_buy import run_dca_auto_execution
 
     scheduler.add_job(

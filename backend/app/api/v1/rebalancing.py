@@ -435,6 +435,7 @@ async def get_drift_summary(
             summary = compute_portfolio_drift_summary(portfolio, overview, threshold)
             summary.has_composite_signal = has_composite_signal
             summary.composite_reason = composite_reason
+            summary.has_alert_configured = str(portfolio.id) in alert_by_portfolio
             summaries.append(summary)
         except Exception as e:
             logger.error(

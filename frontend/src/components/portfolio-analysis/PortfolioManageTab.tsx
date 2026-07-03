@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { arrayMove } from "@dnd-kit/sortable";
 import { DragEndEvent } from "@dnd-kit/core";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -99,7 +100,24 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
   const [editorOpen, setEditorOpen] = useState(false);
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
+
+  // 진단 탭의 "알림 설정" CTA에서 넘어온 경우 알림 설정 모달을 마운트 시점에 자동으로 연다.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(() =>
+    searchParams.get("openAlert") === "1" && selectedPortfolioId ? selectedPortfolioId : null,
+  );
+
+  useEffect(() => {
+    if (searchParams.get("openAlert") !== "1") return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("openAlert");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   const selectedIds = useMemo(
     () => (selectedPortfolioId ? new Set([selectedPortfolioId]) : new Set<string>()),

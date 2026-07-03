@@ -51,6 +51,7 @@ export interface RebalancingAlert {
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
   notify_time: string;
+  enable_composite_signals: boolean;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -70,6 +71,7 @@ export interface RebalancingAlertUpsert {
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
   notify_time: string;
+  enable_composite_signals: boolean;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");
@@ -132,7 +134,7 @@ export const deleteStockPriceAlert = (id: string) => apiDelete(`/alerts/stock-pr
 
 export interface AlertHistoryItem {
   id: string;
-  alert_type: "EXCHANGE_RATE" | "REBALANCING" | "STOCK_PRICE";
+  alert_type: "EXCHANGE_RATE" | "REBALANCING" | "STOCK_PRICE" | "MARKET_SIGNAL";
   message: string;
   created_at: string;
 }

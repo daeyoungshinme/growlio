@@ -21,6 +21,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
   REBALANCING: "리밸런싱 알림",
   STOCK_PRICE: "주가 알림",
+  MARKET_SIGNAL: "시장 신호 알림",
 };
 
 function AlertHistorySection() {

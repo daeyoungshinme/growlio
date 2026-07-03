@@ -1,43 +1,56 @@
-"""email_service 단위 테스트 — SMTP 전송 없이 함수 로직 검증."""
+"""email_service 단위 테스트 — Resend API 호출 없이 함수 로직 검증."""
 
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
+
+
+def _ok_response(url: str) -> httpx.Response:
+    return httpx.Response(200, request=httpx.Request("POST", url))
+
 
 # ── _send_html_email 래퍼 테스트 ─────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_send_html_email_calls_aiosmtplib(monkeypatch):
-    """_send_html_email이 aiosmtplib.send를 정상 호출한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+async def test_send_html_email_calls_resend_api(monkeypatch):
+    """_send_html_email이 Resend API를 정상 호출한다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    captured = {}
+
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["url"] = url
+        captured["headers"] = headers
+        captured["json"] = json
+        return _ok_response(url)
+
+    with patch("httpx.AsyncClient.post", new=fake_post):
         from app.services.email_service import _send_html_email
 
         await _send_html_email("user@example.com", "테스트 제목", "<p>본문</p>")
-        mock_send.assert_called_once()
-        call_kwargs = mock_send.call_args.kwargs
-        assert call_kwargs["hostname"] == "smtp.test.com"
-        assert call_kwargs["port"] == 587
+
+    assert captured["url"] == "https://api.resend.com/emails"
+    assert captured["headers"]["Authorization"] == "Bearer test-key"
+    assert captured["json"]["from"] == "noreply@test.com"
+    assert captured["json"]["to"] == ["user@example.com"]
+    assert captured["json"]["subject"] == "테스트 제목"
+    assert captured["json"]["html"] == "<p>본문</p>"
 
 
 # ── send_exchange_rate_alert ────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_send_exchange_rate_alert_smtp_not_configured(monkeypatch):
-    """SMTP 미설정 시 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_exchange_rate_alert_email_not_configured(monkeypatch):
+    """이메일 미설정 시 이메일을 발송하지 않는다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_exchange_rate_alert
 
         await send_exchange_rate_alert(
@@ -46,63 +59,51 @@ async def test_send_exchange_rate_alert_smtp_not_configured(monkeypatch):
             direction="BELOW",
             current_rate=1295.5,
         )
-        mock_send.assert_not_called()
+        mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_success(monkeypatch):
-    """SMTP 설정 시 이메일 제목에 목표 환율이 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    """이메일 설정 시 이메일 제목에 목표 환율이 포함된다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
-    captured_msg = {}
+    captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured_msg["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_exchange_rate_alert
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_exchange_rate_alert(
+        await send_exchange_rate_alert(
             to_email="user@example.com",
             target_rate=1300.0,
             direction="BELOW",
             current_rate=1295.5,
         )
 
-    assert "1,300" in captured_msg.get("subject", "")
-    assert "이하" in captured_msg.get("subject", "")
+    assert "1,300" in captured.get("subject", "")
+    assert "이하" in captured.get("subject", "")
 
 
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_above_direction(monkeypatch):
     """direction=ABOVE이면 제목에 '이상'이 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_exchange_rate_alert
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_exchange_rate_alert(
+        await send_exchange_rate_alert(
             to_email="user@example.com",
             target_rate=1400.0,
             direction="ABOVE",
@@ -116,12 +117,11 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_stock_price_alert_smtp_not_configured(monkeypatch):
-    """SMTP 미설정 시 주가 알림 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_stock_price_alert_email_not_configured(monkeypatch):
+    """이메일 미설정 시 주가 알림 이메일을 발송하지 않는다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_stock_price_alert
 
         await send_stock_price_alert(
@@ -132,31 +132,25 @@ async def test_send_stock_price_alert_smtp_not_configured(monkeypatch):
             current_price=79500.0,
             direction="BELOW",
         )
-        mock_send.assert_not_called()
+        mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_includes_ticker(monkeypatch):
     """주가 알림 이메일 제목에 종목명과 티커가 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_stock_price_alert
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_stock_price_alert(
+        await send_stock_price_alert(
             to_email="user@example.com",
             ticker="005930",
             name="삼성전자",
@@ -173,12 +167,11 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_monthly_report_email_smtp_not_configured(monkeypatch):
-    """SMTP 미설정 시 월간 리포트 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_monthly_report_email_not_configured(monkeypatch):
+    """이메일 미설정 시 월간 리포트 이메일을 발송하지 않는다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_monthly_report_email
 
         await send_monthly_report_email(
@@ -196,32 +189,26 @@ async def test_send_monthly_report_email_smtp_not_configured(monkeypatch):
             annual_dividends_received=2_000_000.0,
             asset_allocation=[],
         )
-        mock_send.assert_not_called()
+        mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_includes_month(monkeypatch):
     """월간 리포트 이메일 제목에 월이 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
-        captured["body"] = msg.get_payload(decode=False)
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        captured["html"] = json["html"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_monthly_report_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_monthly_report_email(
+        await send_monthly_report_email(
             to_email="user@example.com",
             report_month="2026년 5월",
             total_assets_krw=100_000_000.0,
@@ -243,11 +230,8 @@ async def test_send_monthly_report_email_includes_month(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
     """자산 배분이 금액 내림차순으로 정렬되어 상위 5개만 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     # 6개 항목 — 상위 5개만 이메일에 포함되어야 함
     asset_allocation = [
@@ -259,21 +243,16 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
         {"type": "OTHER", "amount_krw": 2_000_000, "pct": 2},  # 6번째 — 제외되어야 함
     ]
 
-    html_captured = []
+    captured = {}
 
-    async def fake_send(msg, **kwargs):
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                html_captured.append(part.get_payload(decode=True).decode("utf-8"))
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["html"] = json["html"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_monthly_report_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_monthly_report_email(
+        await send_monthly_report_email(
             to_email="user@example.com",
             report_month="2026년 5월",
             total_assets_krw=90_000_000.0,
@@ -289,13 +268,12 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
             asset_allocation=asset_allocation,
         )
 
-    if html_captured:
-        html = html_captured[0]
-        # 상위 5개 (STOCK_KIS, REAL_ESTATE, BANK_ACCOUNT, DEPOSIT, CASH_OTHER)는 포함
-        assert "주식(KIS)" in html
-        # 6번째 항목 "OTHER"은 5위 안에 들지 않아야 함 (OTHER은 2백만원으로 가장 작음)
-        # CASH_OTHER(3백만)은 포함, OTHER(2백만)은 제외
-        assert "기타" not in html.split("현금(기타)")[1] if "현금(기타)" in html else True
+    html = captured["html"]
+    # 상위 5개 (STOCK_KIS, REAL_ESTATE, BANK_ACCOUNT, DEPOSIT, CASH_OTHER)는 포함
+    assert "주식(KIS)" in html
+    # 6번째 항목 "OTHER"은 5위 안에 들지 않아야 함 (OTHER은 2백만원으로 가장 작음)
+    # CASH_OTHER(3백만)은 포함, OTHER(2백만)은 제외
+    assert "기타" not in html.split("현금(기타)")[1] if "현금(기타)" in html else True
 
 
 # ── send_goal_achievement_email ─────────────────────────────
@@ -304,25 +282,19 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_asset_type(monkeypatch):
     """총 자산 목표 달성 이메일 제목에 달성률이 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_goal_achievement_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_goal_achievement_email(
+        await send_goal_achievement_email(
             to_email="user@example.com",
             goal_type="ASSET",
             goal_amount=1_000_000_000.0,
@@ -336,25 +308,19 @@ async def test_send_goal_achievement_email_asset_type(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_deposit_type(monkeypatch):
     """연간 입금 목표 달성 이메일 제목에 '연간 입금 목표'가 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_goal_achievement_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_goal_achievement_email(
+        await send_goal_achievement_email(
             to_email="user@example.com",
             goal_type="DEPOSIT",
             goal_amount=24_000_000.0,
@@ -369,92 +335,74 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_send_test_email_raises_when_no_smtp(monkeypatch):
-    """SMTP 미설정 시 send_test_email은 RuntimeError를 발생시킨다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_test_email_raises_when_not_configured(monkeypatch):
+    """이메일 미설정 시 send_test_email은 RuntimeError를 발생시킨다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
     from app.services.email_service import send_test_email
 
-    with pytest.raises(RuntimeError, match="smtp_not_configured"):
+    with pytest.raises(RuntimeError, match="email_not_configured"):
         await send_test_email("user@example.com")
 
 
 @pytest.mark.asyncio
 async def test_send_test_email_success(monkeypatch):
-    """SMTP 설정 시 테스트 이메일이 발송된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    """이메일 설정 시 테스트 이메일이 발송된다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
-        from importlib import reload
+    mock_post = AsyncMock(return_value=_ok_response("https://api.resend.com/emails"))
+    with patch("httpx.AsyncClient.post", new=mock_post):
+        from app.services.email_service import send_test_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_test_email("user@example.com")
-        mock_send.assert_called_once()
+        await send_test_email("user@example.com")
+        mock_post.assert_called_once()
 
 
 # ── send_password_reset_email ───────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_send_password_reset_email_smtp_not_configured(monkeypatch):
-    """SMTP 미설정 시 비밀번호 재설정 이메일을 발송하지 않는다 (경고 로그만)."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_password_reset_email_not_configured(monkeypatch):
+    """이메일 미설정 시 비밀번호 재설정 이메일을 발송하지 않는다 (경고 로그만)."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_password_reset_email
 
         await send_password_reset_email("user@example.com", "https://reset-link/token")
-        mock_send.assert_not_called()
+        mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_send_password_reset_email_includes_link(monkeypatch):
     """비밀번호 재설정 이메일 본문에 reset 링크가 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
-    html_captured = []
+    captured = {}
 
-    async def fake_send(msg, **kwargs):
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                html_captured.append(part.get_payload(decode=True).decode("utf-8"))
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["html"] = json["html"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_password_reset_email
 
-        import app.services.email_service as em
+        await send_password_reset_email("user@example.com", "https://growlio.app/reset-password?token=abc123")
 
-        reload(em)
-
-        await em.send_password_reset_email("user@example.com", "https://growlio.app/reset-password?token=abc123")
-
-    if html_captured:
-        assert "abc123" in html_captured[0]
+    assert "abc123" in captured["html"]
 
 
 # ── send_rebalancing_alert ──────────────────────────────────
 
 
 @pytest.mark.asyncio
-async def test_send_rebalancing_alert_smtp_not_configured(monkeypatch):
-    """SMTP 미설정 시 리밸런싱 알림 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "")
-    monkeypatch.setattr("app.config.settings.smtp_user", "")
+async def test_send_rebalancing_alert_email_not_configured(monkeypatch):
+    """이메일 미설정 시 리밸런싱 알림 이메일을 발송하지 않는다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "")
 
-    with patch("aiosmtplib.send", new_callable=AsyncMock) as mock_send:
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_rebalancing_alert
 
         await send_rebalancing_alert(
@@ -464,17 +412,14 @@ async def test_send_rebalancing_alert_smtp_not_configured(monkeypatch):
             items_to_show=[],
             drifting_count=0,
         )
-        mock_send.assert_not_called()
+        mock_post.assert_not_called()
 
 
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
     """is_scheduled_report=True이면 제목에 '리포트'가 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     from types import SimpleNamespace
 
@@ -491,17 +436,14 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
 
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_rebalancing_alert
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_rebalancing_alert(
+        await send_rebalancing_alert(
             to_email="user@example.com",
             portfolio_name="성장 포트폴리오",
             threshold_pct=5.0,
@@ -518,11 +460,8 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     """is_scheduled_report=False이면 제목에 '알림'이 포함된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
     from types import SimpleNamespace
 
@@ -538,17 +477,14 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     )
     captured = {}
 
-    async def fake_send(msg, **kwargs):
-        captured["subject"] = msg["Subject"]
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_rebalancing_alert
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_rebalancing_alert(
+        await send_rebalancing_alert(
             to_email="user@example.com",
             portfolio_name="성장 포트폴리오",
             threshold_pct=5.0,
@@ -563,27 +499,19 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_with_all_values(monkeypatch):
     """월간 리포트에 MoM/수익률/목표 값이 모두 채워지면 해당 행이 생성된다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_port", 587)
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-    monkeypatch.setattr("app.config.settings.smtp_password", "password")
-    monkeypatch.setattr("app.config.settings.smtp_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
 
-    html_captured = []
+    captured = {}
 
-    async def fake_send(msg, **kwargs):
-        for part in msg.walk():
-            if part.get_content_type() == "text/html":
-                html_captured.append(part.get_payload(decode=True).decode("utf-8"))
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["html"] = json["html"]
+        return _ok_response(url)
 
-    with patch("aiosmtplib.send", side_effect=fake_send):
-        from importlib import reload
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_monthly_report_email
 
-        import app.services.email_service as em
-
-        reload(em)
-
-        await em.send_monthly_report_email(
+        await send_monthly_report_email(
             to_email="user@example.com",
             report_month="2026년 5월",
             total_assets_krw=100_000_000.0,
@@ -599,8 +527,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
             asset_allocation=[],
         )
 
-    assert len(html_captured) > 0
-    html = html_captured[0]
+    html = captured["html"]
     assert "전월 대비" in html
     assert "연환산 수익률" in html
 
@@ -611,14 +538,11 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_exchange_rate_alert(
             to_email="user@example.com",
             target_rate=1300.0,
@@ -632,14 +556,11 @@ async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_rebalancing_alert(
             to_email="user@example.com",
             portfolio_name="포트폴리오",
@@ -654,14 +575,11 @@ async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_exception_returns_false(monkeypatch):
     """월간 리포트 이메일 발송 실패 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_monthly_report_email(
             to_email="user@example.com",
             report_month="2026년 5월",
@@ -684,14 +602,11 @@ async def test_send_monthly_report_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
     """send_stock_price_alert _send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_stock_price_alert(
             to_email="user@example.com",
             ticker="005930",
@@ -707,14 +622,11 @@ async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_exception_returns_false(monkeypatch):
     """send_goal_achievement_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_goal_achievement_email(
             to_email="user@example.com",
             goal_type="ASSET",
@@ -728,15 +640,12 @@ async def test_send_goal_achievement_exception_returns_false(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_send_test_email_exception_returns_false(monkeypatch):
-    """send_test_email은 SMTP 설정이 되어 있는데 발송 자체가 실패하면 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    """send_test_email은 이메일 설정이 되어 있는데 발송 자체가 실패하면 False를 반환한다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_test_email("user@example.com")
 
     assert result is False
@@ -745,14 +654,11 @@ async def test_send_test_email_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_password_reset_exception_returns_false(monkeypatch):
     """send_password_reset_email은 예외 발생 시 re-raise 없이 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.smtp_host", "smtp.test.com")
-    monkeypatch.setattr("app.config.settings.smtp_user", "test@test.com")
-
-    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("smtp error"))):
+    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         # 예외가 propagate되지 않아야 함
         result = await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")
 

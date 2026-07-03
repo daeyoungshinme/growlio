@@ -218,6 +218,7 @@ class PortfolioDriftSummary(BaseModel):
     top_drifted_items: list[DriftedItem]  # 이탈 크기 상위 3개
     has_composite_signal: bool = False  # drift는 없지만 리스크/시장 신호로 점검을 권장하는 경우
     composite_reason: str | None = None  # has_composite_signal=True일 때 사유 문구
+    has_alert_configured: bool = False  # 활성 RebalancingAlert 설정 여부 (없으면 이 포트폴리오는 알림이 발송되지 않음)
 
 
 # ── 리밸런싱 실행 이력 ────────────────────────────────────────

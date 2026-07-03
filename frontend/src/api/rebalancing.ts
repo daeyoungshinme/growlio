@@ -228,6 +228,7 @@ export interface PortfolioDriftSummary {
   top_drifted_items: DriftedItem[];
   has_composite_signal?: boolean;
   composite_reason?: string | null;
+  has_alert_configured?: boolean;
 }
 
 export const fetchDriftSummary = (): Promise<PortfolioDriftSummary[]> =>

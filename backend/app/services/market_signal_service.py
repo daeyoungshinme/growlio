@@ -13,7 +13,9 @@ import structlog
 
 from app.utils.cache_keys import (
     TTL_MARKET_SIGNAL,
+    TTL_MARKET_SIGNAL_LAST_LEVEL,
     get_cached_json,
+    market_signal_last_level_key,
     market_signal_latest_key,
     set_cached_json,
 )
@@ -424,6 +426,18 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
 
     await set_cached_json(redis, cache_key, result, TTL_MARKET_SIGNAL)
     return result
+
+
+async def get_last_composite_level(redis: aioredis.Redis | None) -> str | None:
+    """등급 변화 감지 job이 마지막으로 관측한 composite_level을 조회한다. 없으면 None."""
+    if redis is None:
+        return None
+    return await get_cached_json(redis, market_signal_last_level_key())
+
+
+async def set_last_composite_level(redis: aioredis.Redis | None, level: str) -> None:
+    """현재 composite_level을 다음 비교를 위해 저장한다."""
+    await set_cached_json(redis, market_signal_last_level_key(), level, TTL_MARKET_SIGNAL_LAST_LEVEL)
 
 
 async def _fetch_all_signals() -> tuple[

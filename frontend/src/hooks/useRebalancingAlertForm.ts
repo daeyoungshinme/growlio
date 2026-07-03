@@ -101,6 +101,9 @@ export function useRebalancingAlertFormState({
     alert?.auto_execution_time ?? "09:05",
   );
   const [notifyTime, setNotifyTime] = useState<string>(alert?.notify_time ?? "08:30");
+  const [enableCompositeSignals, setEnableCompositeSignals] = useState<boolean>(
+    alert?.enable_composite_signals ?? true,
+  );
 
   const upsertMut = useMutation({
     mutationFn: () =>
@@ -117,6 +120,7 @@ export function useRebalancingAlertFormState({
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
         auto_execution_time: mode === "AUTO" && autoExecutionTime ? autoExecutionTime : null,
         notify_time: notifyTime,
+        enable_composite_signals: enableCompositeSignals,
       }),
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
@@ -162,6 +166,8 @@ export function useRebalancingAlertFormState({
     setAutoExecutionTime,
     notifyTime,
     setNotifyTime,
+    enableCompositeSignals,
+    setEnableCompositeSignals,
     // mutations
     upsertMut,
     deleteMut,

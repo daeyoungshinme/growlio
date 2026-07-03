@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, AlertTriangle, ArrowRight, ChevronDown, Shuffle } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
 
 import { fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
@@ -30,13 +30,26 @@ const SIGNAL_BADGE_CLASS = {
 };
 
 
-function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummary; onClick?: (id: string) => void }) {
+function PortfolioDriftRow({
+  summary,
+  onClick,
+}: {
+  summary: PortfolioDriftSummary;
+  onClick?: (id: string, openAlert?: boolean) => void;
+}) {
   const isAlert = summary.needs_rebalancing;
   const showCompositeBadge = !isAlert && summary.has_composite_signal;
+  // 구버전 API 응답(필드 없음) 호환을 위해 명시적으로 false일 때만 미설정으로 간주
+  const alertNotConfigured = summary.has_alert_configured === false;
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onClick?.(summary.portfolio_id)}
-      className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick?.(summary.portfolio_id);
+      }}
+      className="w-full flex flex-col py-2.5 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/40 text-left transition-colors cursor-pointer"
     >
       <div className="flex items-center gap-2 w-full">
         <span className={`w-2 h-2 rounded-full shrink-0 ${isAlert ? "bg-red-500" : "bg-green-500"}`} />
@@ -59,8 +72,21 @@ function PortfolioDriftRow({ summary, onClick }: { summary: PortfolioDriftSummar
             점검 권장
           </span>
         )}
+        {alertNotConfigured && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onClick?.(summary.portfolio_id, true);
+            }}
+            className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 rounded-full px-1.5 py-0.5 shrink-0 transition-colors"
+            aria-label={`${summary.portfolio_name} 알림 설정하기`}
+          >
+            <BellOff size={11} />
+            알림 설정
+          </button>
+        )}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -108,7 +134,7 @@ function InsightRow({ insight }: { insight: Insight }) {
 
 interface Props {
   marketSignal?: MarketSignalResponse | null;
-  onPortfolioSelect?: (id: string) => void;
+  onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
   showAllInsights?: boolean;
   hideSignalBanner?: boolean;
   showDriftRows?: boolean;

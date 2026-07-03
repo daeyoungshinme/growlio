@@ -93,8 +93,8 @@ cd backend && uv run mypy app/
 - `OPEN_BANKING_CLIENT_ID`, `OPEN_BANKING_CLIENT_SECRET`
 - `OPEN_BANKING_REDIRECT_URI`, `OPEN_BANKING_BASE_URL`
 
-**SMTP** (알림 이메일):
-- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_TIMEOUT`
+**이메일 알림** (Resend HTTP API — Render 등 클라우드의 outbound SMTP 포트 차단을 피하기 위해 SMTP 대신 HTTPS API 사용):
+- `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TIMEOUT`
 
 **FCM (Android 푸시 알림)**:
 - `FIREBASE_CREDENTIALS_JSON` — Firebase 서비스 계정 JSON (한 줄 문자열)
@@ -199,6 +199,7 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
+  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
@@ -240,6 +241,7 @@ jobs/                         # APScheduler 정기 작업
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
   ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
   ├── rebalancing_alert.py    # 매일 08:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
+  ├── market_signal_alert.py  # 10분 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 자동 실행
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)

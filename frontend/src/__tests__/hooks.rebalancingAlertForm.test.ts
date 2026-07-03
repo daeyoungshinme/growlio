@@ -92,6 +92,7 @@ const mockAlert: RebalancingAlert = {
   market_condition_mode: "DISABLED",
   auto_execution_time: null,
   notify_time: "08:30",
+  enable_composite_signals: true,
   is_active: true,
   last_triggered_at: null,
   created_at: "2024-01-01T00:00:00Z",
