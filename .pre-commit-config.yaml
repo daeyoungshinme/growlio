@@ -9,19 +9,17 @@ repos:
       - id: ruff-format
         files: ^backend/
 
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.16.0
+  # mypy: mirrors-mypy 대신 local system 훅 사용 — backend/.venv에 설치된 정확한 버전을 그대로 사용해야
+  # `uv run mypy app/`(CI·make typecheck에서 사용)와 결과가 항상 일치함. venv 없으면 스킵.
+  - repo: local
     hooks:
       - id: mypy
+        name: mypy (backend)
+        language: system
+        entry: >-
+          bash -c 'if [ -x backend/.venv/Scripts/mypy.exe ] || [ -x backend/.venv/bin/mypy ]; then cd backend && uv run mypy app/; else echo "SKIP: backend/.venv 없음 — uv venv && uv pip install -e .[dev] 실행 필요" && exit 0; fi'
         files: ^backend/app/
-        args: [--ignore-missing-imports]
-        additional_dependencies:
-          - pydantic
-          - sqlalchemy
-          - fastapi
-          - types-requests
-          - types-python-dateutil
-          - "redis[hiredis]"
+        pass_filenames: false
 
   # ── Frontend: TypeScript / JS ─────────────────────────────────
   # ESLint: mirrors-eslint 대신 local system 훅 사용 — frontend/node_modules의 정확한 버전(eslint@10 + 모든 플러그인)을 그대로 사용해야
