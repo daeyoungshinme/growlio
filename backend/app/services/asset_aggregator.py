@@ -44,10 +44,12 @@ async def _get_scalar_init_data(
     user_id: uuid.UUID, db: AsyncSession
 ) -> tuple[date | None, float, float, date | None, float, float]:
     """first_snap_date + net_deposits_ytd + net_investment +
-    first_tx_date + first_snap_total + net_flows_after를 CTE 단일 쿼리로 조회.
+    first_tx_date + non_stock_first_total + non_stock_net_flows_after를 CTE 단일 쿼리로 조회.
 
-    first_snap_total: 각 계좌의 첫 스냅샷 금액 합산 (계좌별 기준일 사용 — 나중에 추가한 계좌도 포함)
-    net_flows_after: 첫 스냅샷 이후 순입금(입금-출금) — Modified Dietz 수익률 계산에 사용
+    non_stock_first_total/non_stock_net_flows_after: 주식 계좌(STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER)를
+    제외한 계좌만의 첫 스냅샷 합계·순입금 — 주식은 매입원가(avg_price 기반 total_invested)로 별도
+    계산하므로(get_dashboard_summary 참고) 여기서는 이중계산 방지를 위해 제외한다.
+    first_snap_date는 연환산 기간 계산용으로 전체 계좌 기준을 유지한다.
     """
     year = date.today().year
     row = (
@@ -64,11 +66,24 @@ async def _get_scalar_init_data(
                     GROUP BY s.account_id
                   ),
                   fs AS (
-                    SELECT MIN(paf.first_date) AS first_date,
-                           COALESCE(SUM(s.amount_krw), 0) AS first_total
+                    SELECT MIN(paf.first_date) AS first_date
                     FROM paf
-                    JOIN asset_snapshots s ON s.account_id = paf.account_id
-                      AND s.snapshot_date = paf.first_date
+                  ),
+                  paf_ns AS (
+                    SELECT s.account_id, MIN(s.snapshot_date) AS first_date
+                    FROM asset_snapshots s
+                    JOIN asset_accounts a ON a.id = s.account_id
+                    WHERE s.user_id = :uid
+                      AND a.is_active = TRUE
+                      AND a.include_in_total = TRUE
+                      AND a.asset_type NOT IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_OTHER')
+                    GROUP BY s.account_id
+                  ),
+                  fs_ns AS (
+                    SELECT COALESCE(SUM(s.amount_krw), 0) AS non_stock_first_total
+                    FROM paf_ns
+                    JOIN asset_snapshots s ON s.account_id = paf_ns.account_id
+                      AND s.snapshot_date = paf_ns.first_date
                   ),
                   nd AS (
                     SELECT COALESCE(
@@ -89,19 +104,19 @@ async def _get_scalar_init_data(
                     WHERE user_id = :uid
                       AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
                   ),
-                  net_after AS (
+                  net_after_ns AS (
                     SELECT COALESCE(
                       SUM(CASE WHEN t.transaction_type = 'DEPOSIT' THEN t.amount ELSE -t.amount END), 0
-                    ) AS net_flows_after
+                    ) AS non_stock_net_flows_after
                     FROM transactions t
-                    JOIN paf ON paf.account_id = t.account_id
+                    JOIN paf_ns ON paf_ns.account_id = t.account_id
                     WHERE t.user_id = :uid
                       AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
-                      AND t.transaction_date > paf.first_date
+                      AND t.transaction_date > paf_ns.first_date
                   )
                 SELECT fs.first_date, nd.net, ni.net_investment, ni.first_tx_date,
-                       fs.first_total, net_after.net_flows_after
-                FROM fs, nd, ni, net_after
+                       fs_ns.non_stock_first_total, net_after_ns.non_stock_net_flows_after
+                FROM fs, nd, ni, fs_ns, net_after_ns
             """),
             {"uid": str(user_id), "year": year},
         )
@@ -110,9 +125,16 @@ async def _get_scalar_init_data(
     net_deposits = float(row.net) if row else 0.0
     net_investment = float(row.net_investment) if row else 0.0
     first_tx_date: date | None = row.first_tx_date if row else None
-    first_snap_total = float(row.first_total) if row else 0.0
-    net_flows_after = float(row.net_flows_after) if row else 0.0
-    return first_snap, net_deposits, net_investment, first_tx_date, first_snap_total, net_flows_after
+    non_stock_first_total = float(row.non_stock_first_total) if row else 0.0
+    non_stock_net_flows_after = float(row.non_stock_net_flows_after) if row else 0.0
+    return (
+        first_snap,
+        net_deposits,
+        net_investment,
+        first_tx_date,
+        non_stock_first_total,
+        non_stock_net_flows_after,
+    )
 
 
 async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
@@ -123,7 +145,14 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
 
     # 1단계: 서로 독립적인 쿼리들을 병렬 실행
     (
-        (first_snap_date, net_deposits_ytd, net_investment, first_tx_date, first_snap_total, net_flows_after),
+        (
+            first_snap_date,
+            net_deposits_ytd,
+            net_investment,
+            first_tx_date,
+            non_stock_first_total,
+            non_stock_net_flows_after,
+        ),
         settings_row,
         monthly_trend,
         div_summary,
@@ -140,15 +169,17 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
 
-    if first_snap_total > 0 and first_snap_date:
-        # 계좌별 첫 스냅샷 합산 기준 + Modified Dietz(순입금 제거)
-        # net_flows_after: 첫 스냅샷 이후 트랜잭션 기반 순입금 — KIS 미기록 유저는 0으로 폴백되어 무해함
+    if (total_invested > 0 or non_stock_first_total > 0) and first_snap_date:
+        # 혼합 수익률: 주식은 매입원가(avg_price 기반 total_invested) 기준 실제 손익을,
+        # 현금성/부동산 등 나머지는 Growlio 추적 시작 시점 기준 Modified Dietz를 각각 계산해 합산.
+        # base = total_invested + non_stock_first_total, net_flows는 비-주식 계좌 거래만 반영
+        # (주식 계좌는 거래 기록이 거의 없어 total_invested와 겹치지 않음 — 이중계산 없음).
         annualized_return, cumulative_return = calc_returns(
-            total_assets_krw, first_snap_total, first_snap_date, net_flows_after
+            total_assets_krw,
+            total_invested + non_stock_first_total,
+            first_snap_date,
+            non_stock_net_flows_after,
         )
-    elif total_invested > 0 and first_snap_date:
-        # 포지션 원가 기반 폴백 — 스냅샷 합계가 없을 때 avg_price × qty 기준
-        annualized_return, cumulative_return = calc_returns(stock_value, total_invested, first_snap_date)
     else:
         annualized_return, cumulative_return = None, None
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0

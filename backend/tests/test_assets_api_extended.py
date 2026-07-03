@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, date, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -176,6 +176,166 @@ class TestUpdateAccount:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/assets/{uuid.uuid4()}", json={"name": "test"})
         assert resp.status_code == 404
+
+
+class TestUpdateAccountCashTransaction:
+    """현금성 계좌(BANK_ACCOUNT/DEPOSIT/CASH_OTHER) 잔액 수정 시 입출금 거래 자동 생성 검증.
+
+    수정 없이 잔액만 바꾸면 Modified Dietz 수익률 계산(net_flows_after)에서 이 변화가
+    빠져 홈탭 누적 수익률이 왜곡되는 버그의 회귀 테스트."""
+
+    def _make_cash_account(self, user_id, asset_type="BANK_ACCOUNT", deposit_krw=1_000_000.0):
+        acc = _make_account(user_id)
+        acc.asset_type = asset_type
+        acc.deposit_krw = deposit_krw
+        acc.deposit_usd = None
+        acc.manual_amount = deposit_krw
+        return acc
+
+    def test_balance_increase_creates_deposit_transaction(self, override_settings):
+        user = _make_user()
+        account = self._make_cash_account(user.id, deposit_krw=1_000_000.0)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
+
+        with (
+            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(latest_snap, [])),
+            ),
+            patch(
+                "app.api.v1.assets._upsert_snapshot",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_krw": 5_000_000.0})
+
+        assert resp.status_code == 200
+        assert db.add.call_count == 1
+        tx = db.add.call_args_list[0].args[0]
+        assert tx.transaction_type == "DEPOSIT"
+        assert tx.amount == 4_000_000.0
+        assert tx.account_id == account.id
+
+    def test_balance_decrease_creates_withdrawal_transaction(self, override_settings):
+        user = _make_user()
+        account = self._make_cash_account(user.id, deposit_krw=5_000_000.0)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        latest_snap = SimpleNamespace(amount_krw=5_000_000.0, invested_amount=None, unrealized_pnl=None)
+
+        with (
+            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(latest_snap, [])),
+            ),
+            patch(
+                "app.api.v1.assets._upsert_snapshot",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_krw": 1_000_000.0})
+
+        assert resp.status_code == 200
+        assert db.add.call_count == 1
+        tx = db.add.call_args_list[0].args[0]
+        assert tx.transaction_type == "WITHDRAWAL"
+        assert tx.amount == 4_000_000.0
+
+    def test_no_change_creates_no_transaction(self, override_settings):
+        user = _make_user()
+        account = self._make_cash_account(user.id, deposit_krw=1_000_000.0)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
+
+        with (
+            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(latest_snap, [])),
+            ),
+            patch(
+                "app.api.v1.assets._upsert_snapshot",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_krw": 1_000_000.0})
+
+        assert resp.status_code == 200
+        assert db.add.call_count == 0
+
+    def test_first_snapshot_creates_no_transaction(self, override_settings):
+        """계좌의 최초 스냅샷(latest_snap is None)은 base 값이므로 거래로 잡지 않는다."""
+        user = _make_user()
+        account = self._make_cash_account(user.id, deposit_krw=3_000_000.0)
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(None, [])),
+            ),
+            patch(
+                "app.api.v1.assets._upsert_snapshot",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_krw": 3_000_000.0})
+
+        assert resp.status_code == 200
+        assert db.add.call_count == 0
+
+    def test_non_cash_account_creates_no_transaction(self, override_settings):
+        """STOCK_OTHER 등 비현금성 계좌는 잔액 변화가 시세 변동일 수 있으므로 거래를 만들지 않는다."""
+        user = _make_user()
+        account = _make_account(user.id)
+        account.asset_type = "STOCK_OTHER"
+        account.deposit_krw = 1_000_000.0
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
+
+        with (
+            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
+            patch(
+                "app.api.v1.assets.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(latest_snap, [])),
+            ),
+            patch(
+                "app.api.v1.assets._upsert_snapshot",
+                AsyncMock(return_value=SimpleNamespace(id=uuid.uuid4())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.put(f"/api/v1/assets/{account.id}", json={"deposit_krw": 8_000_000.0})
+
+        assert resp.status_code == 200
+        assert db.add.call_count == 0
 
 
 class TestDeleteAccount:

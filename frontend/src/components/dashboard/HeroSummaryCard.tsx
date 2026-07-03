@@ -1,5 +1,5 @@
-import { lazy, memo, Suspense, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { lazy, memo, Suspense, useMemo } from "react";
+import { RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
@@ -18,8 +18,6 @@ interface Props {
   isLoading?: boolean;
   onSync?: () => void;
   syncing?: boolean;
-  dividendYield?: number | null;
-  goalAchievementPct?: number | null;
 }
 
 export default memo(function HeroSummaryCard({
@@ -29,11 +27,7 @@ export default memo(function HeroSummaryCard({
   isLoading,
   onSync,
   syncing,
-  dividendYield,
-  goalAchievementPct,
 }: Props) {
-  const [expanded, setExpanded] = useState(true);
-
   const updatedLabel = useMemo(() => {
     if (!dataUpdatedAt) return null;
     const mins = Math.floor((Date.now() - dataUpdatedAt) / 60_000);
@@ -86,7 +80,7 @@ export default memo(function HeroSummaryCard({
   return (
     <div className="card !p-3 sm:!p-5 flex flex-col gap-3 lg:gap-4">
       <div className="flex flex-row items-start sm:gap-4">
-        {/* 좌: 제목/금액 + expanded 시 지표 */}
+        {/* 좌: 제목/금액 + 지표 */}
         <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
@@ -101,14 +95,6 @@ export default memo(function HeroSummaryCard({
                   <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
                 </button>
               )}
-              <button
-                onClick={() => setExpanded((v) => !v)}
-                className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                aria-label={expanded ? "카드 접기" : "카드 펼치기"}
-                aria-expanded={expanded}
-              >
-                {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
             </div>
           </div>
           <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 dark:text-gray-50">
@@ -117,67 +103,27 @@ export default memo(function HeroSummaryCard({
           <p className="text-sm text-gray-400 dark:text-gray-500 truncate">
             {Math.floor(data.total_assets_krw).toLocaleString()}원
           </p>
-          {!expanded && (
-            <div className="flex items-center gap-3 flex-wrap">
-              <span
-                className={`text-sm font-semibold ${
+          <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-0">
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+              <p
+                className={`text-sm sm:text-lg font-bold ${
                   data.cumulative_return_pct == null
                     ? "text-gray-400 dark:text-gray-500"
                     : pnlColor(data.cumulative_return_pct)
                 }`}
               >
-                수익률 {fmtPct(data.cumulative_return_pct)}
-              </span>
-              {goalAchievementPct != null && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  자산목표{" "}
-                  <span className="font-semibold text-blue-600 dark:text-blue-400">
-                    {Math.min(goalAchievementPct, 100).toFixed(1)}%
-                  </span>
-                </span>
-              )}
-              {dividendYield != null && dividendYield > 0 && (
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  배당{" "}
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                    {dividendYield.toFixed(1)}%
-                  </span>
-                </span>
-              )}
-              {updatedLabel && (
-                <span className="text-xs text-gray-300 dark:text-gray-600 ml-auto">{updatedLabel}</span>
-              )}
+                {fmtPct(data.cumulative_return_pct)}
+              </p>
             </div>
-          )}
-          {expanded && (
-            <>
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-0">
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
-                  <p
-                    className={`text-sm sm:text-lg font-bold ${
-                      data.cumulative_return_pct == null
-                        ? "text-gray-400 dark:text-gray-500"
-                        : pnlColor(data.cumulative_return_pct)
-                    }`}
-                  >
-                    {fmtPct(data.cumulative_return_pct)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
-                    환율(USD/KRW)
-                  </p>
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
-                    {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
-                  </p>
-                </div>
-              </div>
-              {updatedLabel && (
-                <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>
-              )}
-            </>
-          )}
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">환율(USD/KRW)</p>
+              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                {exchangeRate ? Math.round(exchangeRate).toLocaleString() + "원" : "—"}
+              </p>
+            </div>
+          </div>
+          {updatedLabel && <p className="text-xs text-gray-300 dark:text-gray-600">{updatedLabel}</p>}
         </div>
 
         {/* 우: 도넛 + 범례 */}

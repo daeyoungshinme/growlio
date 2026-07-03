@@ -10,7 +10,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.limiter import limiter
-from app.models.asset import AssetAccount
+from app.models.asset import AssetAccount, Transaction
 from app.models.user import User
 from app.redis_client import get_redis
 from app.schemas.asset import (
@@ -49,6 +49,8 @@ from app.utils.pnl import calc_net_asset_amount
 from app.utils.redis_lock import redis_lock
 
 _CREDENTIAL_FIELDS: set[str] = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
+# 시장가 변동이 없는 순수 현금성 계좌 — 잔액 변경은 전액 입출금으로 간주
+_CASH_ASSET_TYPES: set[str] = {"BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"}
 
 
 def _account_response(account: AssetAccount) -> AssetAccountResponse:
@@ -277,6 +279,22 @@ async def update_account(
         # 스냅샷 포지션 복사 (기존 포지션 → 새 스냅샷)
         if pos_list:
             await sync_snapshot_positions(db, snapshot_id=new_snap.id, account_id=account.id, positions=pos_list)
+        if latest_snap is not None and account.asset_type in _CASH_ASSET_TYPES:
+            # 현금성 계좌는 시장가 변동이 없으므로 잔액 변화 = 순수 입출금.
+            # 거래내역으로 기록하지 않으면 이 변화분이 통째로 "투자 수익"으로 오인되어
+            # 홈탭 누적 수익률(Modified Dietz)이 왜곡된다. 최초 스냅샷(latest_snap is None)은
+            # 기준값(base) 자체이므로 거래로 잡지 않는다 — 이중계산 방지.
+            delta = total - float(latest_snap.amount_krw)
+            if delta != 0:
+                db.add(
+                    Transaction(
+                        user_id=account.user_id,
+                        account_id=account.id,
+                        transaction_type="DEPOSIT" if delta > 0 else "WITHDRAWAL",
+                        amount=abs(delta),
+                        transaction_date=date.today(),
+                    )
+                )
         await db.commit()
 
     _redis = await get_redis()

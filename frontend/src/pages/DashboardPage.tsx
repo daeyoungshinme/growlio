@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Circle, RefreshCw, Wallet } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
@@ -119,13 +119,6 @@ export default function DashboardPage() {
     marketSignal,
   } = useDashboardData();
 
-  const overallDividendYield = useMemo(() => {
-    const estimated = data?.estimated_annual_dividends;
-    const invested = overview?.total_invested_krw;
-    if (estimated && invested && invested > 0) return (estimated / invested) * 100;
-    return null;
-  }, [data?.estimated_annual_dividends, overview?.total_invested_krw]);
-
   if (!isLoading && (error || !data))
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -164,8 +157,6 @@ export default function DashboardPage() {
             isLoading={isLoading}
             onSync={handleSync}
             syncing={syncing}
-            dividendYield={overallDividendYield}
-            goalAchievementPct={data?.goal_achievement_pct ?? null}
           />
         </ErrorBoundary>
 

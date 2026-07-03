@@ -15,13 +15,15 @@ export function invalidateSyncData(qc: QueryClient) {
   ]);
 }
 
-/** 계좌 CUD 후 — accounts + portfolio + dashboard */
+/** 계좌 CUD 후 — accounts + portfolio + dashboard + transactions
+ * (현금성 계좌 잔액 수정 시 백엔드가 입출금 거래를 자동 생성할 수 있음) */
 export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
   ]);
 }
 
