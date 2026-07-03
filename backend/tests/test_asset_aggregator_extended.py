@@ -221,16 +221,12 @@ class TestGetScalarInitData:
         (
             first_snap,
             net_deposits,
-            net_investment,
-            first_tx_date,
             non_stock_first_total,
             non_stock_net_flows_after,
         ) = await _get_scalar_init_data(uuid.uuid4(), mock_db)
 
         assert first_snap is None
         assert net_deposits == 0.0
-        assert net_investment == 0.0
-        assert first_tx_date is None
         assert non_stock_first_total == 0.0
         assert non_stock_net_flows_after == 0.0
 
@@ -241,8 +237,6 @@ class TestGetScalarInitData:
         row = SimpleNamespace(
             first_date=date(2023, 1, 1),
             net=5_000_000.0,
-            net_investment=10_000_000.0,
-            first_tx_date=date(2023, 1, 15),
             non_stock_first_total=8_000_000.0,
             non_stock_net_flows_after=2_000_000.0,
         )
@@ -253,18 +247,83 @@ class TestGetScalarInitData:
         (
             first_snap,
             net_deposits,
-            net_investment,
-            first_tx_date,
             non_stock_first_total,
             non_stock_net_flows_after,
         ) = await _get_scalar_init_data(uuid.uuid4(), mock_db)
 
         assert first_snap == date(2023, 1, 1)
         assert net_deposits == 5_000_000.0
-        assert net_investment == 10_000_000.0
-        assert first_tx_date == date(2023, 1, 15)
         assert non_stock_first_total == 8_000_000.0
         assert non_stock_net_flows_after == 2_000_000.0
+
+
+# ── 수익률 이중계산 불변조건 (b3101a9 → 1bb29f1 → 84dee24 3회 재작업 영역) ──
+
+
+class TestNonStockNetFlowsInvariant:
+    @pytest.mark.asyncio
+    async def test_scalar_init_data_sql_excludes_stock_accounts_from_net_flows(self, mock_db, override_settings):
+        """non_stock_net_flows_after SQL이 STOCK_KIS/KIWOOM/OTHER 계좌를 제외하고,
+        net_after_ns CTE가 (전체 계좌 기준) paf가 아닌 (비주식 필터링된) paf_ns와 JOIN하는지 고정.
+
+        누군가 이 필터를 제거/변경하면 즉시 실패해 4번째 이중계산 재발을 예방한다.
+        """
+        from app.services.asset_aggregator import _get_scalar_init_data
+
+        result = MagicMock()
+        result.first.return_value = None
+        mock_db.execute = AsyncMock(return_value=result)
+
+        await _get_scalar_init_data(uuid.uuid4(), mock_db)
+
+        sql_text = str(mock_db.execute.call_args[0][0])
+        assert "STOCK_KIS" in sql_text
+        assert "STOCK_KIWOOM" in sql_text
+        assert "STOCK_OTHER" in sql_text
+
+        net_after_ns_start = sql_text.index("net_after_ns AS")
+        net_after_ns_body = sql_text[net_after_ns_start:]
+        assert "JOIN paf_ns" in net_after_ns_body
+
+    @pytest.mark.asyncio
+    async def test_dashboard_uses_filtered_non_stock_net_flows_not_raw_totals(self, mock_db, override_settings):
+        """get_dashboard_summary가 net_flows 인자로 미필터 net_investment/net_deposits_ytd가 아니라
+        반드시 필터링된 non_stock_net_flows_after를 사용하는지 고정.
+
+        net_investment/net_deposits_ytd에는 STOCK_KIS 계좌 거래도 포함되므로, 이 값들이 실수로
+        net_flows 인자에 섞여 들어가면 STOCK_KIS 계좌에 Transaction이 있고 없음에 따라
+        cumulative_return_pct가 달라진다 — 이 테스트는 그런 오염 없이 값이 불변임을 확인한다.
+        """
+        from datetime import date as _date
+
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        first_snap = _date(2023, 6, 1)
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        # net_deposits_ytd=77M(미필터, STOCK_KIS 거래 포함 가정) 은 일부러
+        # non_stock_net_flows_after(필터링됨)=0 과 크게 다른 값으로 설정 — 실제 사용되면 즉시 티가 남.
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(first_snap, 77_000_000.0, 50_000_000.0, 0.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(return_value=(60_000_000.0, 0.0, 0.0, {})),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        # net_flows=0(필터링된 값) 사용 시: gain=(60M-50M-0)=10M, base=50M → cumulative=20%
+        # net_deposits_ytd(77M)가 잘못 사용됐다면 이 값과 크게 달라진다.
+        assert result["cumulative_return_pct"] == pytest.approx(20.0, abs=0.1)
 
 
 # ── _get_monthly_trend (DB mock) ─────────────────────────────
@@ -331,7 +390,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0, 0.0)),
+                new=AsyncMock(return_value=(None, 0.0, 0.0, 0.0)),
             ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
@@ -396,7 +455,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 12_000_000.0, 0.0, None, 0.0, 0.0)),
+                new=AsyncMock(return_value=(None, 12_000_000.0, 0.0, 0.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",
@@ -436,7 +495,7 @@ class TestGetDashboardSummary:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(None, 0.0, 0.0, None, 0.0, 0.0)),
+                new=AsyncMock(return_value=(None, 0.0, 0.0, 0.0)),
             ),
             patch("app.services.asset_aggregator._build_asset_totals", new=AsyncMock(return_value=(0.0, 0.0, 0.0, {}))),
             patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
@@ -619,7 +678,7 @@ class TestBuildAssetTotals:
             # 비주식 계좌 최초 스냅샷 총액 5,000만원, 이후 입금 없음
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 10_000_000.0, first_snap, 50_000_000.0, 0.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, 0.0)),
             ),
             # 현재 총자산 6,000만원, 주식 없음
             patch(
@@ -652,7 +711,7 @@ class TestBuildAssetTotals:
             # 비주식 계좌 없음(non_stock_first_total=0)
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, first_snap, 0.0, 0.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, 0.0)),
             ),
             # 전액 주식: 총자산 4,000만원 = 주식 평가액, 매입원가 3,000만원
             patch(
@@ -695,7 +754,7 @@ class TestBuildAssetTotals:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, first_snap, 10_000_000.0, 0.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 10_000_000.0, 0.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",
@@ -734,7 +793,7 @@ class TestBuildAssetTotals:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, first_snap, 50_000_000.0, 10_000_000.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, 10_000_000.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",
@@ -771,7 +830,7 @@ class TestBuildAssetTotals:
         with (
             patch(
                 "app.services.asset_aggregator._get_scalar_init_data",
-                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, first_snap, 50_000_000.0, -5_000_000.0)),
+                new=AsyncMock(return_value=(first_snap, 0.0, 50_000_000.0, -5_000_000.0)),
             ),
             patch(
                 "app.services.asset_aggregator._build_asset_totals",

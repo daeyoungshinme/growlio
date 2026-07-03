@@ -216,3 +216,43 @@ class TestBrokerBalance:
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+    def test_returns_400_when_kiwoom_account_no_missing(self, override_settings):
+        """kiwoom_account_no가 없으면 400을 반환한다 (nullable 계좌번호 가드)."""
+        user = _make_user()
+        db = _make_mock_db()
+        account = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=user.id,
+            name="테스트 키움",
+            asset_type="STOCK_KIWOOM",
+            is_mock_mode=False,
+            kiwoom_app_key="encrypted_key",
+            kiwoom_app_secret="encrypted_secret",
+            kiwoom_account_no=None,
+        )
+        db.scalar = AsyncMock(return_value=account)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
+                patch("app.api.v1.rebalancing.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/rebalancing/broker-balance/{account.id}",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 400
+            assert "키움 계좌번호" in resp.json()["detail"]
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)

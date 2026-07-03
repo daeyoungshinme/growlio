@@ -10,6 +10,7 @@ import {
 import type { StockSuggestion } from "@/api/assets";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -195,7 +196,7 @@ export function StockPriceAlertSection() {
                 <button
                   onClick={() => deleteMutation.mutate(alert.id)}
                   disabled={deleteMutation.isPending}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                  className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
                 >
                   <DeleteIcon />
                 </button>

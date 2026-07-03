@@ -284,6 +284,8 @@ async def _fetch_broker_balance(
     if account.asset_type == "STOCK_KIWOOM":
         if not account.kiwoom_app_key or not account.kiwoom_app_secret:
             raise ValueError("키움 API 자격증명이 설정되지 않았습니다.")
+        if not account.kiwoom_account_no:
+            raise ValueError("키움 계좌번호가 설정되지 않았습니다.")
 
         app_key = decrypt(account.kiwoom_app_key)
         app_secret = decrypt(account.kiwoom_app_secret)
@@ -299,7 +301,7 @@ async def _fetch_broker_balance(
         )
         domestic = await kiwoom_get_domestic_balance(
             access_token,
-            account.kiwoom_account_no,  # type: ignore[arg-type]
+            account.kiwoom_account_no,
             is_mock=is_mock,
         )
         positions = [

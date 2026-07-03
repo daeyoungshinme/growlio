@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import type { StockSuggestion } from "@/api/assets";
 import type { PortfolioItem } from "@/api/portfolios";
 import { CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   item: PortfolioItem;
@@ -116,7 +117,7 @@ export default function PortfolioItemRow({
       <button
         onClick={() => onRemove(idx)}
         aria-label="항목 삭제"
-        className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 dark:text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors`}
       >
         <Trash2 size={15} />
       </button>

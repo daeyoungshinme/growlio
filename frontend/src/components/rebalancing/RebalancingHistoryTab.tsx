@@ -89,48 +89,82 @@ function ExecutionRow({ item }: { item: RebalancingExecutionSummary }) {
                     </span>
                   )}
                 </div>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-gray-500">
-                      <th className="text-left py-1 pr-3">종목</th>
-                      <th className="text-right py-1 pr-3">방향</th>
-                      <th className="text-right py-1 pr-3">수량</th>
-                      <th className="text-right py-1 pr-3">주문번호</th>
-                      <th className="text-right py-1">상태</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.orders.map((order, i) => (
-                      <tr key={i} className="border-t border-gray-800">
-                        <td className="py-1.5 pr-3 text-gray-200">
+                {/* ── 모바일 카드 뷰 (sm 미만) ── */}
+                <div className="sm:hidden divide-y divide-gray-800">
+                  {result.orders.map((order, i) => (
+                    <div key={i} className="py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-gray-200">
                           {order.name} <span className="text-gray-500">({order.ticker})</span>
-                        </td>
-                        <td
-                          className={`py-1.5 pr-3 text-right font-medium ${order.side === "BUY" ? "text-red-400" : "text-blue-400"}`}
+                        </span>
+                        <span
+                          className={`font-medium shrink-0 ${order.side === "BUY" ? "text-red-400" : "text-blue-400"}`}
                         >
                           {order.side === "BUY" ? "매수" : "매도"}
-                        </td>
-                        <td className="py-1.5 pr-3 text-right text-gray-300">
-                          {order.quantity.toLocaleString()}
-                        </td>
-                        <td className="py-1.5 pr-3 text-right text-gray-500 font-mono">
-                          {order.order_no ?? "—"}
-                        </td>
-                        <td className="py-1.5 text-right">
-                          {order.status === "SUCCESS" ? (
-                            <span className="text-emerald-400">성공</span>
-                          ) : order.status === "FAILED" ? (
-                            <span className="text-red-400" title={order.error_msg ?? ""}>
-                              실패
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">건너뜀</span>
-                          )}
-                        </td>
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between gap-2 mt-1 text-gray-400">
+                        <span>{order.quantity.toLocaleString()}주</span>
+                        <span className="font-mono text-gray-500">{order.order_no ?? "—"}</span>
+                        {order.status === "SUCCESS" ? (
+                          <span className="text-emerald-400">성공</span>
+                        ) : order.status === "FAILED" ? (
+                          <span className="text-red-400" title={order.error_msg ?? ""}>
+                            실패
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">건너뜀</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-gray-500">
+                        <th className="text-left py-1 pr-3">종목</th>
+                        <th className="text-right py-1 pr-3">방향</th>
+                        <th className="text-right py-1 pr-3">수량</th>
+                        <th className="text-right py-1 pr-3">주문번호</th>
+                        <th className="text-right py-1">상태</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {result.orders.map((order, i) => (
+                        <tr key={i} className="border-t border-gray-800">
+                          <td className="py-1.5 pr-3 text-gray-200">
+                            {order.name} <span className="text-gray-500">({order.ticker})</span>
+                          </td>
+                          <td
+                            className={`py-1.5 pr-3 text-right font-medium ${order.side === "BUY" ? "text-red-400" : "text-blue-400"}`}
+                          >
+                            {order.side === "BUY" ? "매수" : "매도"}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right text-gray-300">
+                            {order.quantity.toLocaleString()}
+                          </td>
+                          <td className="py-1.5 pr-3 text-right text-gray-500 font-mono">
+                            {order.order_no ?? "—"}
+                          </td>
+                          <td className="py-1.5 text-right">
+                            {order.status === "SUCCESS" ? (
+                              <span className="text-emerald-400">성공</span>
+                            ) : order.status === "FAILED" ? (
+                              <span className="text-red-400" title={order.error_msg ?? ""}>
+                                실패
+                              </span>
+                            ) : (
+                              <span className="text-gray-500">건너뜀</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ))
           ) : (

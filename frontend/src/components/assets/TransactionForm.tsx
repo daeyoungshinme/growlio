@@ -312,32 +312,55 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
             보유 종목 참고
           </p>
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-gray-400 dark:text-gray-500">
-                <th className="text-left pb-1">종목코드</th>
-                <th className="text-left pb-1">종목명</th>
-                <th className="text-right pb-1">수량</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accountPositions.map((p) => (
-                <tr
-                  key={p.ticker}
-                  className="border-t border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-white dark:hover:bg-gray-700 transition-colors"
-                  onClick={() => setField("ticker", p.ticker)}
-                >
-                  <td className="py-1.5 text-blue-600 dark:text-blue-400 font-medium">
-                    {p.ticker}
-                  </td>
-                  <td className="py-1.5 text-gray-700 dark:text-gray-300">{p.name}</td>
-                  <td className="py-1.5 text-right text-gray-500 dark:text-gray-400">
-                    {p.qty.toLocaleString()}
-                  </td>
+          {/* ── 모바일 카드 뷰 (sm 미만) ── */}
+          <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
+            {accountPositions.map((p) => (
+              <button
+                key={p.ticker}
+                type="button"
+                onClick={() => setField("ticker", p.ticker)}
+                className="w-full flex items-center justify-between gap-2 py-2 text-left hover:bg-white dark:hover:bg-gray-700 transition-colors"
+              >
+                <div>
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">{p.ticker}</p>
+                  <p className="text-xs text-gray-700 dark:text-gray-300">{p.name}</p>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                  {p.qty.toLocaleString()}주
+                </p>
+              </button>
+            ))}
+          </div>
+
+          {/* ── 데스크탑 테이블 뷰 (sm 이상) ── */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-gray-400 dark:text-gray-500">
+                  <th className="text-left pb-1">종목코드</th>
+                  <th className="text-left pb-1">종목명</th>
+                  <th className="text-right pb-1">수량</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {accountPositions.map((p) => (
+                  <tr
+                    key={p.ticker}
+                    className="border-t border-gray-100 dark:border-gray-700 cursor-pointer hover:bg-white dark:hover:bg-gray-700 transition-colors"
+                    onClick={() => setField("ticker", p.ticker)}
+                  >
+                    <td className="py-1.5 text-blue-600 dark:text-blue-400 font-medium">
+                      {p.ticker}
+                    </td>
+                    <td className="py-1.5 text-gray-700 dark:text-gray-300">{p.name}</td>
+                    <td className="py-1.5 text-right text-gray-500 dark:text-gray-400">
+                      {p.qty.toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </>

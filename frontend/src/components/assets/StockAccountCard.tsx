@@ -6,6 +6,7 @@ import { useHaptic } from "@/hooks/useHaptic";
 import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
 
 export interface AccountStats {
@@ -104,7 +105,7 @@ export default function StockAccountCard({
             onClick={() => onEdit(account)}
             title="계좌 수정"
             aria-label="계좌 수정"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg transition-colors`}
           >
             <Settings size={16} />
           </button>
@@ -121,7 +122,7 @@ export default function StockAccountCard({
               aria-label={
                 account.data_source === "KIWOOM_API" ? "키움 데이터 동기화" : "KIS 데이터 동기화"
               }
-              className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-50`}
             >
               {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
@@ -136,7 +137,7 @@ export default function StockAccountCard({
             }
             title="종목 관리"
             aria-label="종목 관리"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors`}
           >
             <BarChart2 size={16} />
           </button>
@@ -144,7 +145,7 @@ export default function StockAccountCard({
             onClick={() => onTransactions({ id: account.id, name: account.name })}
             title="입출금 내역"
             aria-label="입출금 내역"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors`}
           >
             <Receipt size={16} />
           </button>
@@ -153,7 +154,7 @@ export default function StockAccountCard({
             disabled={isDeleting}
             title="계좌 삭제"
             aria-label="계좌 삭제"
-            className="min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50`}
           >
             <Trash2 size={16} />
           </button>

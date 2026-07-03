@@ -162,13 +162,13 @@ function AllocationHistoryChart() {
               <table className="w-full">
                 <thead className="sticky top-0 bg-white dark:bg-gray-900">
                   <tr className="border-b border-gray-100 dark:border-gray-700">
-                    <th className="py-1.5 px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    <th className="py-1.5 px-1 sm:px-2 text-left text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">
                       월
                     </th>
-                    <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    <th className="py-1.5 px-1 sm:px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">
                       자산 합계
                     </th>
-                    <th className="py-1.5 px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
+                    <th className="py-1.5 px-1 sm:px-2 text-right text-xs font-medium text-gray-400 dark:text-gray-500 uppercase whitespace-nowrap">
                       전월 대비
                     </th>
                     <th className="py-1.5 px-1 w-6" />
@@ -198,13 +198,13 @@ function AllocationHistoryChart() {
                             onClick={() => setExpandedMonth(isExpanded ? null : row.month)}
                             className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
                           >
-                            <td className="py-2 px-2 text-xs text-gray-800 dark:text-gray-200">
+                            <td className="py-2 px-1 sm:px-2 text-xs text-gray-800 dark:text-gray-200 whitespace-nowrap">
                               {fmtMonth(row.month)}
                             </td>
-                            <td className="py-2 px-2 text-xs text-right font-medium text-gray-900 dark:text-gray-50">
+                            <td className="py-2 px-1 sm:px-2 text-xs text-right font-medium text-gray-900 dark:text-gray-50 whitespace-nowrap">
                               {fmtKrw(row.total_krw)}
                             </td>
-                            <td className="py-2 px-2 text-xs text-right">
+                            <td className="py-2 px-1 sm:px-2 text-xs text-right whitespace-nowrap">
                               {change != null ? (
                                 <span className={`${pnlColor(change)} font-medium`}>
                                   {change >= 0 ? "+" : ""}

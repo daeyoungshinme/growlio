@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
 import { TX_LABELS, TX_COLORS } from "@/constants/transaction";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { extractErrorMessage } from "@/utils/error";
 
 const currentYear = new Date().getFullYear();
@@ -278,7 +279,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                       <button
                         onClick={() => startEdit(tx)}
                         aria-label="수정"
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
                       >
                         <Pencil size={14} />
                       </button>
@@ -286,7 +287,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                         onClick={() => deleteMut.mutate(tx.id)}
                         disabled={deleteMut.isPending}
                         aria-label="삭제"
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -368,7 +369,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                             <button
                               onClick={() => startEdit(tx)}
                               aria-label="수정"
-                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+                              className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
                             >
                               <Pencil size={15} />
                             </button>
@@ -376,7 +377,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
                               onClick={() => deleteMut.mutate(tx.id)}
                               disabled={deleteMut.isPending}
                               aria-label="삭제"
-                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                              className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
                             >
                               <Trash2 size={15} />
                             </button>

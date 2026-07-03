@@ -6,6 +6,7 @@ import { fmtKrw } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const PROPERTY_TYPE_OPTIONS = ["아파트", "오피스텔", "상가", "토지", "단독주택", "기타"];
 
@@ -476,7 +477,7 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
             onClick={() => onEdit(account)}
             title="수정"
             aria-label="수정"
-            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
             <Pencil size={15} />
           </button>
@@ -485,7 +486,7 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
             disabled={isDeleting}
             title="삭제"
             aria-label="삭제"
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50`}
           >
             <Trash2 size={15} />
           </button>

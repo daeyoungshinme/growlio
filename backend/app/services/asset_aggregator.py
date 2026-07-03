@@ -40,11 +40,9 @@ _get_monthly_trend = get_monthly_trend
 logger = structlog.get_logger()
 
 
-async def _get_scalar_init_data(
-    user_id: uuid.UUID, db: AsyncSession
-) -> tuple[date | None, float, float, date | None, float, float]:
-    """first_snap_date + net_deposits_ytd + net_investment +
-    first_tx_date + non_stock_first_total + non_stock_net_flows_after를 CTE 단일 쿼리로 조회.
+async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[date | None, float, float, float]:
+    """first_snap_date + net_deposits_ytd + non_stock_first_total +
+    non_stock_net_flows_after를 CTE 단일 쿼리로 조회.
 
     non_stock_first_total/non_stock_net_flows_after: 주식 계좌(STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER)를
     제외한 계좌만의 첫 스냅샷 합계·순입금 — 주식은 매입원가(avg_price 기반 total_invested)로 별도
@@ -94,16 +92,6 @@ async def _get_scalar_init_data(
                       AND EXTRACT(YEAR FROM transaction_date) = :year
                       AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
                   ),
-                  ni AS (
-                    SELECT
-                      COALESCE(
-                        SUM(CASE WHEN transaction_type = 'DEPOSIT' THEN amount ELSE -amount END), 0
-                      ) AS net_investment,
-                      MIN(CASE WHEN transaction_type = 'DEPOSIT' THEN transaction_date END) AS first_tx_date
-                    FROM transactions
-                    WHERE user_id = :uid
-                      AND transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
-                  ),
                   net_after_ns AS (
                     SELECT COALESCE(
                       SUM(CASE WHEN t.transaction_type = 'DEPOSIT' THEN t.amount ELSE -t.amount END), 0
@@ -114,24 +102,20 @@ async def _get_scalar_init_data(
                       AND t.transaction_type IN ('DEPOSIT', 'WITHDRAWAL')
                       AND t.transaction_date > paf_ns.first_date
                   )
-                SELECT fs.first_date, nd.net, ni.net_investment, ni.first_tx_date,
+                SELECT fs.first_date, nd.net,
                        fs_ns.non_stock_first_total, net_after_ns.non_stock_net_flows_after
-                FROM fs, nd, ni, fs_ns, net_after_ns
+                FROM fs, nd, fs_ns, net_after_ns
             """),
             {"uid": str(user_id), "year": year},
         )
     ).first()
     first_snap = row.first_date if row else None
     net_deposits = float(row.net) if row else 0.0
-    net_investment = float(row.net_investment) if row else 0.0
-    first_tx_date: date | None = row.first_tx_date if row else None
     non_stock_first_total = float(row.non_stock_first_total) if row else 0.0
     non_stock_net_flows_after = float(row.non_stock_net_flows_after) if row else 0.0
     return (
         first_snap,
         net_deposits,
-        net_investment,
-        first_tx_date,
         non_stock_first_total,
         non_stock_net_flows_after,
     )
@@ -148,8 +132,6 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         (
             first_snap_date,
             net_deposits_ytd,
-            net_investment,
-            first_tx_date,
             non_stock_first_total,
             non_stock_net_flows_after,
         ),

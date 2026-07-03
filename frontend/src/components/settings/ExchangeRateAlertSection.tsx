@@ -10,6 +10,7 @@ import {
 } from "@/api/alerts";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useAlertCrud } from "@/hooks/useAlertCrud";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { invalidateAlertData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -218,7 +219,7 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
                 <button
                   onClick={() => deleteAlertMutation.mutate(alert.id)}
                   disabled={deleteAlertMutation.isPending}
-                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                  className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
                   title="삭제"
                 >
                   <DeleteIcon />

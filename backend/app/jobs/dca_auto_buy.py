@@ -90,6 +90,9 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
     if not account.kis_app_key or not account.kis_app_secret:
         logger.warning("dca_missing_credentials", user_id=str(user_id))
         return
+    if not account.kis_account_no:
+        logger.warning("dca_missing_account_no", user_id=str(user_id), account_id=str(account_id))
+        return
 
     app_key = decrypt(account.kis_app_key)
     app_secret = decrypt(account.kis_app_secret)
@@ -133,7 +136,7 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
                     app_key,
                     app_secret,
                     access_token,
-                    account.kis_account_no,  # type: ignore[arg-type]
+                    account.kis_account_no,
                     side="BUY",
                     ticker=ticker,
                     market=market,
@@ -145,7 +148,7 @@ async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis)
                     app_key,
                     app_secret,
                     access_token,
-                    account.kis_account_no,  # type: ignore[arg-type]
+                    account.kis_account_no,
                     side="BUY",
                     ticker=ticker,
                     quantity=qty,
