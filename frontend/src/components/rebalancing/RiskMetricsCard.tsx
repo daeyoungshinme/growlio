@@ -197,7 +197,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
           />
         </button>
         <span className="text-xs text-gray-400 dark:text-gray-500">
-          {metrics.position_count}개 종목
+          {metrics.position_count}개 종목 · 전체 계좌 합산
         </span>
       </div>
 

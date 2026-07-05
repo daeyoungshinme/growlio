@@ -246,6 +246,7 @@ export interface CompositeSignalStatus {
   enabled: boolean;
   triggered: boolean;
   reason: string | null;
+  has_active_alert: boolean;
 }
 
 export const fetchCompositeSignalStatus = (): Promise<CompositeSignalStatus> =>

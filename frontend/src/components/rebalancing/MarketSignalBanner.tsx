@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
+import { ChevronDown, ShieldAlert, TrendingDown, TrendingUp } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MarketSignalResponse,
   MarketRiskLevel,
@@ -10,6 +12,13 @@ import type {
   DollarIndexLevel,
   RateCutExpectationLevel,
 } from "@/api/marketSignals";
+import { fetchCompositeSignalStatus } from "@/api/rebalancing";
+import { updateCompositeSignalAlerts } from "@/api/settings";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
+import { invalidateCompositeSignalData } from "@/utils/queryInvalidation";
+import { extractErrorMessage } from "@/utils/error";
+import { toast } from "@/utils/toast";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 
 interface Props {
@@ -166,6 +175,20 @@ export default function MarketSignalBanner({ signal }: Props) {
     fear_greed_extreme_greed,
   } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
+
+  const qc = useQueryClient();
+  const { data: compositeStatus } = useQuery({
+    queryKey: QUERY_KEYS.compositeSignalStatus,
+    queryFn: fetchCompositeSignalStatus,
+    staleTime: STALE_TIME.LONG,
+  });
+  const toggleMut = useMutation({
+    mutationFn: (enabled: boolean) => updateCompositeSignalAlerts(enabled),
+    onSuccess: () => {
+      void invalidateCompositeSignalData(qc);
+    },
+    onError: (e) => toast(extractErrorMessage(e, "설정 저장에 실패했습니다")),
+  });
 
   return (
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
@@ -350,6 +373,42 @@ export default function MarketSignalBanner({ signal }: Props) {
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* 시장/리스크 복합신호 알림 토글 — isOpen 상태와 무관하게 항상 표시 */}
+      {compositeStatus && (
+        <div className="flex flex-col gap-1 px-4 py-2.5 border-t border-inherit">
+          <div className="flex items-center gap-2">
+            <ShieldAlert size={13} className="text-gray-400 shrink-0" />
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
+              시장/리스크 알림
+            </span>
+            <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
+              {compositeStatus.triggered && compositeStatus.reason
+                ? compositeStatus.reason
+                : compositeStatus.enabled
+                  ? "이탈이 없어도 시장/리스크가 위험 수준이면 알림을 보내드려요"
+                  : "알림이 꺼져 있어 신호를 평가하지 않습니다"}
+            </p>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={compositeStatus.enabled}
+                disabled={toggleMut.isPending}
+                onChange={(e) => toggleMut.mutate(e.target.checked)}
+                className="sr-only peer"
+                aria-label="시장/리스크 신호 알림 받기"
+              />
+              <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
+            </label>
+          </div>
+          <Link
+            to="/settings?atab=시장 신호 알림"
+            className="text-xs text-blue-600 dark:text-blue-400 underline self-start ml-5"
+          >
+            설정 자세히 보기
+          </Link>
         </div>
       )}
     </div>

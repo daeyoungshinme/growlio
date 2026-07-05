@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
@@ -12,6 +12,7 @@ import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
+import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -77,12 +78,18 @@ function AlertHistorySection() {
 const inputClass = `mt-1 w-full ${INPUT_MD}`;
 const labelClass = LABEL_MD;
 
-const ALERT_TABS = ["환율 알림", "주가 알림", "발송 이력"] as const;
+const ALERT_TABS = ["환율 알림", "주가 알림", "시장 신호 알림", "발송 이력"] as const;
 type AlertTab = (typeof ALERT_TABS)[number];
 
 export default function SettingsPage() {
   const { isDark, toggle } = useThemeStore();
-  const [alertTab, setAlertTab] = useState<AlertTab>("환율 알림");
+  const [searchParams] = useSearchParams();
+  const initialAlertTab = searchParams.get("atab");
+  const [alertTab, setAlertTab] = useState<AlertTab>(
+    (ALERT_TABS as readonly string[]).includes(initialAlertTab ?? "")
+      ? (initialAlertTab as AlertTab)
+      : "환율 알림",
+  );
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
   const qc = useQueryClient();
@@ -240,6 +247,7 @@ export default function SettingsPage() {
 
         {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
         {alertTab === "주가 알림" && <StockPriceAlertSection />}
+        {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
         {alertTab === "발송 이력" && <AlertHistorySection />}
       </div>
 

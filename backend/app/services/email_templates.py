@@ -130,9 +130,16 @@ def rebalancing_alert_template(
             f"</tr>"
         )
 
-    footer = (
-        f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>이 알림은 {schedule_label} 발송됩니다."
-    )
+    if is_composite_triggered and not drifting_count:
+        footer = (
+            "Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>"
+            "이 알림은 시장/리스크 신호가 감지될 때 최대 하루 1회 발송됩니다.<br>"
+            "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요."
+        )
+    else:
+        footer = (
+            f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>이 알림은 {schedule_label} 발송됩니다."
+        )
     body = (
         f"{test_banner}"
         f"<p style='color:#374151;margin-top:8px;'>{subheading}</p>"
@@ -506,6 +513,8 @@ def market_signal_change_template(old_level: str, new_level: str, reason: str | 
         "시장 위험 신호 변경 알림",
         new_color,
         body,
-        "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.",
+        "이 알림은 시장 위험 신호 등급이 바뀔 때마다(10분 간격 점검) 발송됩니다.<br>"
+        "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
+        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
     )
     return subject, html

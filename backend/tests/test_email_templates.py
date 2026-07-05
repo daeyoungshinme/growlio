@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from app.services.email_templates import (
     exchange_rate_alert_template,
+    market_signal_change_template,
     password_reset_template,
     rebalancing_alert_template,
     stock_price_alert_template,
@@ -111,6 +112,45 @@ class TestRebalancingAlertTemplate:
             is_scheduled_report=True,
         )
         assert "점검 권장" not in subject
+
+    def test_composite_triggered_footer_mentions_daily_cap_and_settings(self):
+        """복합신호 전용 분기는 포트폴리오 스케줄과 무관하므로 '하루 1회' + 설정 경로를 안내해야 한다."""
+        _, html = rebalancing_alert_template(
+            portfolio_name="P",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=0,
+            is_composite_triggered=True,
+            composite_reason="시장 위험 신호가 RED 단계입니다",
+        )
+        assert "하루 1회" in html
+        assert "시장 신호 알림" in html
+
+    def test_scheduled_footer_unchanged_for_non_composite(self):
+        _, html = rebalancing_alert_template(
+            portfolio_name="P",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=2,
+            is_scheduled_report=True,
+            schedule_type="WEEKLY",
+        )
+        assert "이 알림은 매주 발송됩니다" in html
+
+
+class TestMarketSignalChangeTemplate:
+    def test_returns_subject_and_html_tuple(self):
+        subject, html = market_signal_change_template("GREEN", "YELLOW", "시장 변동성이 확대되는 국면입니다")
+        assert isinstance(subject, str)
+        assert isinstance(html, str)
+        assert "안정" in subject
+        assert "주의" in subject
+
+    def test_footer_explains_frequency_and_settings_path(self):
+        _, html = market_signal_change_template("GREEN", "RED", "시장 위험 신호가 높은 국면입니다")
+        assert "등급이 바뀔 때마다" in html
+        assert "10분 간격" in html
+        assert "시장 신호 알림" in html
 
 
 class TestStockPriceAlertTemplate:

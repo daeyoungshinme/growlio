@@ -181,6 +181,9 @@ vi.mock("@/components/settings/ExchangeRateAlertSection", () => ({
 vi.mock("@/components/settings/StockPriceAlertSection", () => ({
   StockPriceAlertSection: () => <div>주가 알림 설정</div>,
 }));
+vi.mock("@/components/settings/MarketSignalAlertSection", () => ({
+  MarketSignalAlertSection: () => <div>시장 신호 알림 설정</div>,
+}));
 vi.mock("@/components/settings/DCASettingsSection", () => ({
   DCASettingsSection: () => <div>DCA 설정</div>,
 }));

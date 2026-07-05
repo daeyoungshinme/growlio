@@ -8,10 +8,20 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 vi.mock("@/api/rebalancing", () => ({
   fetchRebalancingHistory: vi.fn().mockResolvedValue([]),
   fetchRebalancingExecutionDetail: vi.fn().mockResolvedValue(null),
+  fetchCompositeSignalStatus: vi.fn().mockResolvedValue({
+    enabled: true,
+    triggered: false,
+    reason: null,
+    has_active_alert: true,
+  }),
 }));
 
 vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/api/settings", () => ({
+  updateCompositeSignalAlerts: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/hooks/useRebalancingExecution", () => ({
@@ -160,6 +170,22 @@ describe("MarketSignalBanner", () => {
   it("shows partial data freshness inline", () => {
     renderBanner({ ...mockSignal, data_freshness: "PARTIAL" as const });
     expect(screen.getByText(/일부 데이터 없음/)).toBeDefined();
+  });
+
+  it("shows composite signal alert toggle once loaded", async () => {
+    renderBanner();
+    expect(await screen.findByLabelText("시장/리스크 신호 알림 받기")).toBeDefined();
+  });
+
+  it("shows a labeled link back to the settings page for full explanation", async () => {
+    renderBanner();
+    const link = await screen.findByText("설정 자세히 보기");
+    expect(link.getAttribute("href")).toBe("/settings?atab=시장 신호 알림");
+  });
+
+  it("labels the toggle row so it isn't a bare checkbox", async () => {
+    renderBanner();
+    expect(await screen.findByText("시장/리스크 알림")).toBeDefined();
   });
 });
 

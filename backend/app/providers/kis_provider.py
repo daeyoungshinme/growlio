@@ -113,7 +113,8 @@ class KISProvider(BrokerProvider):
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             raise ProviderNetworkError("KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from e
 
-        assert last_token is not None  # _get_token은 성공적으로 완료된 fetch 이전에 항상 최소 1회 호출됨
+        if last_token is None:
+            raise RuntimeError("last_token이 설정되지 않음: _get_token이 호출되지 않았습니다.")
         usd_krw_rate = await get_usd_krw_rate(redis)
         if overseas["positions"]:
             sample = overseas["positions"][0]

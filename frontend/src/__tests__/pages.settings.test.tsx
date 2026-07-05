@@ -58,6 +58,11 @@ vi.mock("@/components/settings/StockPriceAlertSection", () => ({
     <div data-testid="stock-price-alert-section">StockPriceAlertSection</div>
   ),
 }));
+vi.mock("@/components/settings/MarketSignalAlertSection", () => ({
+  MarketSignalAlertSection: () => (
+    <div data-testid="market-signal-alert-section">MarketSignalAlertSection</div>
+  ),
+}));
 vi.mock("@/components/settings/NotificationEmailSection", () => ({
   NotificationEmailSection: ({ userEmail }: { userEmail?: string }) => (
     <div data-testid="notification-email-section">{userEmail ?? "no-email"}</div>
@@ -113,6 +118,17 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "주가 알림" }));
     await waitFor(() => {
       expect(screen.getByTestId("stock-price-alert-section")).toBeInTheDocument();
+    });
+  });
+
+  it("시장 신호 알림 탭을 클릭하면 MarketSignalAlertSection을 표시한다", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "시장 신호 알림" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("market-signal-alert-section")).toBeInTheDocument();
     });
   });
 

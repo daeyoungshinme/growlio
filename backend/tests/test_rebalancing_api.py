@@ -268,6 +268,77 @@ class TestCompositeSignalStatus:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
+    def test_has_active_alert_false_when_no_active_rebalancing_alert(self, override_settings):
+        """활성 리밸런싱 알림이 없으면 enabled 여부와 무관하게 has_active_alert=False."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=False))
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    new_callable=AsyncMock,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/composite-signal",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["has_active_alert"] is False
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_has_active_alert_true_when_active_rebalancing_alert_exists(self, override_settings):
+        """활성 리밸런싱 알림이 1개 이상 있으면 has_active_alert=True."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=True))
+        active_alert = SimpleNamespace(portfolio_id=uuid.uuid4(), threshold_pct=5.0)
+        execute_result = MagicMock()
+        execute_result.scalars.return_value.all.return_value = [active_alert]
+        db.execute = AsyncMock(return_value=execute_result)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    new_callable=AsyncMock,
+                    return_value=("GREEN", {"data_available": True}),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/composite-signal",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert resp.json()["has_active_alert"] is True
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
 
 class TestBrokerBalance:
     def test_returns_401_without_auth(self, override_settings):

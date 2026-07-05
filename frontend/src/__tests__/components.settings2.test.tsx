@@ -44,11 +44,18 @@ vi.mock("@/api/portfolios", () => ({
 vi.mock("@/api/settings", () => ({
   updateAutoDca: vi.fn().mockResolvedValue({}),
   fetchSettings: vi.fn().mockResolvedValue({ has_dart: false }),
+  updateCompositeSignalAlerts: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/api/rebalancing", () => ({
   analyzePortfolio: vi.fn().mockResolvedValue({ items: [] }),
   fetchRebalancingHistory: vi.fn().mockResolvedValue([]),
+  fetchCompositeSignalStatus: vi.fn().mockResolvedValue({
+    enabled: true,
+    triggered: false,
+    reason: null,
+    has_active_alert: true,
+  }),
 }));
 
 // ---- Hook mocks ----
@@ -94,7 +101,9 @@ vi.mock("@/lib/supabase", () => ({
 // ---- Imports ----
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
+import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
+import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
@@ -212,6 +221,55 @@ describe("StockPriceAlertSection", () => {
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
+  });
+});
+
+// =========================================
+// MarketSignalAlertSection
+// =========================================
+describe("MarketSignalAlertSection", () => {
+  const renderSection = () =>
+    renderWithProviders(
+      <MemoryRouter>
+        <MarketSignalAlertSection />
+      </MemoryRouter>,
+    );
+
+  it("explains both trigger conditions in plain language", async () => {
+    renderSection();
+    expect(await screen.findByText(/10분마다 점검/)).toBeDefined();
+    expect(screen.getByText(/하루 최대 1회/)).toBeDefined();
+  });
+
+  it("shows a real toggle label, not just a bare checkbox", async () => {
+    renderSection();
+    expect(await screen.findByLabelText("시장/리스크 신호 알림 받기")).toBeDefined();
+    expect(screen.getByText("알림 받는 중")).toBeDefined();
+  });
+
+  it("points users to the 발송 이력 tab", async () => {
+    renderSection();
+    expect(await screen.findByText(/발송 이력 탭에서 확인/)).toBeDefined();
+  });
+
+  it("does not warn when the user already has an active rebalancing alert", async () => {
+    renderSection();
+    await screen.findByLabelText("시장/리스크 신호 알림 받기");
+    expect(screen.queryByText(/활성화된 리밸런싱 알림이 없어/)).toBeNull();
+  });
+
+  it("warns and links to rebalancing setup when there is no active alert", async () => {
+    vi.mocked(fetchCompositeSignalStatus).mockResolvedValueOnce({
+      enabled: true,
+      triggered: false,
+      reason: null,
+      has_active_alert: false,
+    });
+    renderSection();
+    const warning = await screen.findByText(/활성화된 리밸런싱 알림이 없어/);
+    expect(warning).toBeDefined();
+    const link = screen.getByText("리밸런싱 탭에서 설정하기");
+    expect(link.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
   });
 });
 

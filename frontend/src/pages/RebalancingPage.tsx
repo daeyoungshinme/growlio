@@ -12,7 +12,6 @@ import { STALE_TIME } from "@/constants/queryConfig";
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
-const CompositeSignalBanner = lazy(() => import("../components/rebalancing/CompositeSignalBanner"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
 );
@@ -117,21 +116,9 @@ export default function RebalancingPage() {
       </div>
 
       <div className="flex-1 flex flex-col gap-4">
-        {/* ── 진단 탭: 시장신호 + 전체 포트폴리오 드리프트 현황 ── */}
+        {/* ── 진단 탭: 전체 포트폴리오 드리프트 현황 + 시장신호 ── */}
         {localTab === "진단" && (
           <>
-            {signal && (
-              <ErrorBoundary variant="section">
-                <Suspense fallback={<SkeletonCard rows={1} />}>
-                  <MarketSignalBanner signal={signal} />
-                </Suspense>
-              </ErrorBoundary>
-            )}
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard rows={1} />}>
-                <CompositeSignalBanner />
-              </Suspense>
-            </ErrorBoundary>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
@@ -142,6 +129,13 @@ export default function RebalancingPage() {
                 />
               </Suspense>
             </ErrorBoundary>
+            {signal && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={1} />}>
+                  <MarketSignalBanner signal={signal} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
             {riskMetrics && (
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard />}>
