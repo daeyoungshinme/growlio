@@ -394,6 +394,7 @@ export function useRebalancingExecution({
       balancesLoaded: true,
     };
     // getEstimateKrw는 훅 스코프 함수 — 실제 의존값(orderType, prices, limitPriceOverrides)은 아래에 포함됨.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     kisAccounts,
     state.balanceState,

@@ -149,7 +149,8 @@ services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
-  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크·AUTO 자동실행 주문 생성 (alert_service.py에서 분리)
+  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH)·AUTO 자동실행 주문 생성 (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용
+  ├── rebalancing_diagnosis_service.py  # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직 (alert 아님)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend_fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
@@ -199,7 +200,7 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
-  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림
+  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing_alert_service.py/rebalancing_diagnosis_service.py와 공유
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송

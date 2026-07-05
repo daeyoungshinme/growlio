@@ -390,8 +390,9 @@ describe("TransactionList", () => {
         onDelete={vi.fn()}
       />,
     );
-    expect(screen.getByText("2024-01-15")).toBeDefined();
-    expect(screen.getByText("월급")).toBeDefined();
+    // 모바일+데스크탑 두 곳에 렌더링되므로 getAllByText 사용
+    expect(screen.getAllByText("2024-01-15")[0]).toBeDefined();
+    expect(screen.getAllByText("월급")[0]).toBeDefined();
   });
 
   it("calls onEdit when edit button clicked", () => {
@@ -422,6 +423,6 @@ describe("TransactionList", () => {
         onDelete={vi.fn()}
       />,
     );
-    expect(screen.getByText("AAPL")).toBeDefined();
+    expect(screen.getAllByText("AAPL")[0]).toBeDefined();
   });
 });
