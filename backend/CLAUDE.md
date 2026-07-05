@@ -312,6 +312,7 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 **새 라우터/모델 추가**
 - 새 라우터는 `api/v1/router.py`에 `include_router()`로 등록 필수.
 - 새 모델은 `alembic/env.py`에 import 필요 — 누락 시 autogenerate가 해당 테이블 변경 감지 못함.
+- 새 기능 E2E 순서: 모델(`models/`) → 스키마(`schemas/`) → 서비스(`services/`) → 라우터(`api/v1/`) → `router.py` 등록 → `alembic/env.py` import → 마이그레이션 생성 → 테스트
 
 **Rate Limiting**
 - `@limiter.limit("X/minute")` 데코레이터 적용 시 함수 시그니처에 `request: Request` 파라미터 필수.
