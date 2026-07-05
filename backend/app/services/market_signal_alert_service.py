@@ -2,14 +2,15 @@
 
 포트폴리오별 드리프트 알림(rebalancing_alert_service.py)과 달리, 시장 신호 자체의
 등급 전환만을 감지해 특정 포트폴리오 알림 설정 여부와 무관하게 발송한다. 대상 유저는
-enable_composite_signals=True인 활성 RebalancingAlert를 하나라도 가진 유저로 한정한다 —
-신규 구독 모델을 만들지 않고 기존 "드리프트 없어도 복합신호로 알림받기" 의사표시를 재사용한다.
+UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)이고 활성 RebalancingAlert를
+하나라도 가진 유저로 한정한다 — 신규 구독 모델을 만들지 않고 기존
+"드리프트 없어도 복합신호로 알림받기" 의사표시(이제는 유저 단위 단일 설정)를 재사용한다.
 """
 
 from __future__ import annotations
 
 import structlog
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import RebalancingAlert
@@ -27,15 +28,15 @@ logger = structlog.get_logger()
 
 
 async def _get_composite_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings | None]]:
-    """enable_composite_signals=True인 활성 RebalancingAlert를 가진 유저 목록(중복 제거)."""
+    """composite_signal_alerts_enabled가 True(기본값 포함)이고 활성 RebalancingAlert를 가진 유저 목록(중복 제거)."""
     result = await db.execute(
         select(User, UserSettings)
         .join(RebalancingAlert, RebalancingAlert.user_id == User.id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .where(
             RebalancingAlert.is_active == True,  # noqa: E712
-            RebalancingAlert.enable_composite_signals == True,  # noqa: E712
             User.is_active == True,  # noqa: E712
+            or_(UserSettings.user_id.is_(None), UserSettings.composite_signal_alerts_enabled == True),  # noqa: E712
         )
         .distinct()
     )

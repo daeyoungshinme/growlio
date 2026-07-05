@@ -7,6 +7,7 @@ import structlog
 from app.kis.balance import get_domestic_balance, get_orderable_cash, get_overseas_balance
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
+from app.services._order_executor_common import execute_single_order
 from app.services._order_quantity_guard import clamp_sell_orders
 
 logger = structlog.get_logger()
@@ -20,23 +21,9 @@ async def _execute_single_order(
     account_no: str,
     is_mock: bool,
 ) -> OrderResult:
-    price = order.limit_price or order.reference_price
-
-    if order.quantity <= 0:
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SKIPPED",
-            error_msg="주문 수량이 0 이하입니다.",
-            price=price,
-        )
-
-    try:
+    async def _place() -> dict:
         if is_overseas_market(order.market):
-            result = await place_overseas_order(
+            return await place_overseas_order(
                 app_key,
                 app_secret,
                 access_token,
@@ -49,60 +36,20 @@ async def _execute_single_order(
                 order_type=order.order_type,
                 limit_price=order.limit_price,
             )
-        else:
-            result = await place_domestic_order(
-                app_key,
-                app_secret,
-                access_token,
-                account_no,
-                side=order.side,
-                ticker=order.ticker,
-                quantity=order.quantity,
-                is_mock=is_mock,
-                order_type=order.order_type,
-                limit_price=order.limit_price,
-            )
-
-        logger.info(
-            "order_placed",
-            ticker=order.ticker,
+        return await place_domestic_order(
+            app_key,
+            app_secret,
+            access_token,
+            account_no,
             side=order.side,
+            ticker=order.ticker,
             quantity=order.quantity,
-            order_no=result.get("order_no"),
             is_mock=is_mock,
             order_type=order.order_type,
-        )
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SUCCESS",
-            order_no=result.get("order_no"),
-            order_type=order.order_type,
-            price=price,
+            limit_price=order.limit_price,
         )
 
-    except Exception as e:
-        logger.warning(
-            "order_failed",
-            ticker=order.ticker,
-            side=order.side,
-            quantity=order.quantity,
-            error=str(e),
-        )
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="FAILED",
-            error_msg=str(e),
-            order_type=order.order_type,
-            price=price,
-        )
+    return await execute_single_order(order, _place, is_mock, log_prefix="order")
 
 
 async def _execute_sells_with_clamp(

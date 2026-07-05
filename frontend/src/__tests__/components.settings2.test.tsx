@@ -164,18 +164,14 @@ const mockAnalysis: RebalancingAnalysis = {
 // =========================================
 describe("ExchangeRateAlertSection", () => {
   it("renders without crash", async () => {
-    renderWithProviders(
-      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
-    );
+    renderWithProviders(<ExchangeRateAlertSection />);
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
   });
 
   it("shows current exchange rate", async () => {
-    renderWithProviders(
-      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
-    );
+    renderWithProviders(<ExchangeRateAlertSection />);
     await waitFor(() => {
       // Shows some content about exchange rate alerts
       expect(document.body.textContent?.length).toBeGreaterThan(0);
@@ -183,21 +179,10 @@ describe("ExchangeRateAlertSection", () => {
   });
 
   it("has direction select", async () => {
-    renderWithProviders(
-      <ExchangeRateAlertSection userEmail="test@test.com" onSettingsChange={vi.fn()} />,
-    );
+    renderWithProviders(<ExchangeRateAlertSection />);
     await waitFor(() => {
       const selects = document.querySelectorAll("select");
       expect(selects.length).toBeGreaterThan(0);
-    });
-  });
-
-  it("renders with no email", async () => {
-    renderWithProviders(
-      <ExchangeRateAlertSection userEmail={undefined} onSettingsChange={vi.fn()} />,
-    );
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
     });
   });
 });

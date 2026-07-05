@@ -101,6 +101,7 @@ class TestGetSettings:
             auto_dca_account_id=None,
             auto_dca_last_executed_at=None,
             fcm_token=None,
+            composite_signal_alerts_enabled=True,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -214,6 +215,41 @@ class TestUpdateGoal:
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+
+class TestUpdateCompositeSignalAlerts:
+    def test_put_composite_signal_alerts_returns_200_and_sets_flag(self, override_settings):
+        """복합신호(시장/리스크) 알림 수신 여부를 유저 단위로 저장한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(composite_signal_alerts_enabled=True)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/composite-signal-alerts",
+                    json={"enabled": False},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.composite_signal_alerts_enabled is False
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_composite_signal_alerts_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/composite-signal-alerts", json={"enabled": True})
+        assert resp.status_code == 401
 
 
 class TestUpdateDartKey:

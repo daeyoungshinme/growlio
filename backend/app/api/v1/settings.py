@@ -88,6 +88,10 @@ class PushTokenUpdate(BaseModel):
     fcm_token: str | None = None
 
 
+class CompositeSignalAlertsUpdate(BaseModel):
+    enabled: bool
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -108,6 +112,7 @@ class SettingsResponse(BaseModel):
     auto_dca_last_executed_at: str | None = None
     annual_dividend_goal: float | None = None
     fcm_token_stored: bool = False
+    composite_signal_alerts_enabled: bool = True
 
 
 @router.get("", response_model=SettingsResponse)
@@ -153,6 +158,7 @@ async def get_settings(
         auto_dca_last_executed_at=row.auto_dca_last_executed_at.isoformat() if row.auto_dca_last_executed_at else None,
         annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal else None,
         fcm_token_stored=bool(row.fcm_token),
+        composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
     )
 
 
@@ -249,6 +255,21 @@ async def update_auto_dca(
     row.auto_dca_account_id = uuid_mod.UUID(req.account_id) if req.account_id else None
     await db.commit()
     return {"detail": "자동 정기매수 설정이 저장되었습니다"}
+
+
+@router.put("/composite-signal-alerts")
+@limiter.limit("10/minute")
+async def update_composite_signal_alerts(
+    request: Request,
+    req: CompositeSignalAlertsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """시장/리스크 복합신호 알림(이메일·푸시) 수신 여부 — 신호가 유저 단위이므로 계정 단일 설정."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.composite_signal_alerts_enabled = req.enabled
+    await db.commit()
+    return {"detail": "복합신호 알림 설정이 저장되었습니다"}
 
 
 @router.put("/push-token")

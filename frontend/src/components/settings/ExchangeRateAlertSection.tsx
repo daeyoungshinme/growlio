@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
 import {
   fetchExchangeRateAlerts,
   createExchangeRateAlert,
@@ -17,12 +16,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { SectionCard, DeleteIcon, inputClass, labelClass } from "./shared";
 
-interface Props {
-  userEmail?: string;
-  onSettingsChange: () => void;
-}
-
-export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props) {
+export function ExchangeRateAlertSection() {
   const queryClient = useQueryClient();
   const usdKrw = useExchangeRate();
 
@@ -31,8 +25,6 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
     direction: "BELOW" as "BELOW" | "ABOVE",
     max_trigger_count: "1",
   });
-  const [notificationEmail, setNotificationEmail] = useState(userEmail ?? "");
-  const [saving, setSaving] = useState<string | null>(null);
 
   const {
     items: alerts,
@@ -61,33 +53,6 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
     onError: (e) => toast(extractErrorMessage(e, "알림 등록에 실패했습니다"), "error"),
   });
 
-  const saveNotificationEmail = async () => {
-    setSaving("notification-email");
-    try {
-      await api.put("/settings/notification-email", {
-        notification_email: notificationEmail || null,
-      });
-      toast("알림 이메일이 저장되었습니다", "success");
-      onSettingsChange();
-    } catch {
-      toast("저장에 실패했습니다", "error");
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  const sendTestEmail = async () => {
-    setSaving("test-email");
-    try {
-      await api.post("/settings/test-email");
-      toast("테스트 이메일을 발송했습니다. 받은편지함을 확인하세요.", "success");
-    } catch {
-      toast("이메일 발송에 실패했습니다. SMTP 설정을 확인하세요.", "error");
-    } finally {
-      setSaving(null);
-    }
-  };
-
   return (
     <SectionCard title="목표환율 알림 (USD/KRW)">
       {usdKrw !== null && (
@@ -98,35 +63,6 @@ export function ExchangeRateAlertSection({ userEmail, onSettingsChange }: Props)
           </span>
         </p>
       )}
-      <div>
-        <label className={labelClass}>알림 수신 이메일</label>
-        <input
-          type="email"
-          className={inputClass}
-          value={notificationEmail}
-          onChange={(e) => setNotificationEmail(e.target.value)}
-          placeholder={userEmail ?? "이메일 주소"}
-        />
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-          비워두면 로그인 이메일({userEmail})로 발송됩니다.
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <button
-          onClick={saveNotificationEmail}
-          disabled={saving === "notification-email"}
-          className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          {saving === "notification-email" ? "저장 중..." : "저장"}
-        </button>
-        <button
-          onClick={sendTestEmail}
-          disabled={saving === "test-email"}
-          className="px-5 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
-        >
-          {saving === "test-email" ? "발송 중..." : "테스트 발송"}
-        </button>
-      </div>
       <p className="text-xs text-gray-400 dark:text-gray-500">
         목표환율 도달 시 이메일로 알림을 보내드립니다. 다회 발동 알림은 발동 간 최소 1시간 간격이
         적용됩니다.

@@ -48,10 +48,10 @@ TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_DCA = 3600  # DCA 자동매수 분산 락
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
 TTL_OB_TOKEN = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
-TTL_PORTFOLIO_SUMMARY = 300  # KIS 실시간 포트폴리오 집계 5분
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
+TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -135,12 +135,12 @@ def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}alerts:exchange_rate:{user_id}"
 
 
-def portfolio_summary_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}portfolio_summary:{user_id}"
-
-
 def dividends_positions_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}dividends:positions:{user_id}"
+
+
+def rebalancing_strategy_key(user_id: uuid.UUID, portfolio_id: uuid.UUID | str, acct_suffix: str) -> str:
+    return f"{_env_prefix()}rebalancing_strategy:{user_id}:{portfolio_id}:{acct_suffix}"
 
 
 def tax_overseas_key(user_id: uuid.UUID) -> str:
@@ -168,6 +168,15 @@ def market_signal_latest_key() -> str:
 def market_signal_last_level_key() -> str:
     """등급 변화 감지 job이 마지막으로 관측한 composite_level을 저장하는 키."""
     return f"{_env_prefix()}market:signal:last_level"
+
+
+def composite_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
+    """복합 리스크/시장 신호만으로 리밸런싱 알림이 발송된 유저+일자를 기록하는 키(중복 발송 억제).
+
+    이 신호는 포트폴리오와 무관하게 유저 단위로 동일하게 평가되므로, 유저가 여러
+    포트폴리오 알림을 갖고 있어도 하루 1건만 발송하도록 제한한다.
+    """
+    return f"{_env_prefix()}rebalancing:composite_sent:{user_id}:{day}"
 
 
 async def get_cached_json(redis: RedisType, key: str) -> Any:
@@ -216,10 +225,10 @@ async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.
     await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))
 
 
-async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:
-    """alloc_history 캐시를 SCAN+UNLINK 패턴으로 일괄 삭제한다.
+async def _scan_unlink(redis: RedisType, pattern: str) -> None:
+    """주어진 패턴에 매칭되는 키를 SCAN+UNLINK로 일괄 삭제한다.
 
-    range(3,37) 고정 목록 대신 실제 존재하는 키만 삭제해 불필요한 DEL 명령을 줄인다.
+    고정된 키 목록 대신 실제 존재하는 키만 삭제해 불필요한 DEL 명령을 줄인다.
     """
     if redis is None:
         return
@@ -228,7 +237,6 @@ async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> Non
     from redis.exceptions import RedisError
 
     with contextlib.suppress(RedisError):
-        pattern = f"{_env_prefix()}alloc_history_v2:{user_id}:*"
         cursor = 0
         keys_to_delete: list[bytes | str] = []
         while True:
@@ -238,6 +246,22 @@ async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> Non
                 break
         if keys_to_delete:
             await redis.unlink(*keys_to_delete)
+
+
+async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:
+    """alloc_history 캐시를 SCAN+UNLINK 패턴으로 일괄 삭제한다."""
+    await _scan_unlink(redis, f"{_env_prefix()}alloc_history_v2:{user_id}:*")
+
+
+async def invalidate_rebalancing_strategy_cache(
+    redis: RedisType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
+) -> None:
+    """리밸런싱 전략 캐시(계좌 그룹별 acct_suffix 포함)를 SCAN+UNLINK로 일괄 삭제한다.
+
+    쓰기 시점엔 acct_suffix(계좌 그룹 조합)를 알지만 무효화 시점엔 알 수 없으므로,
+    와일드카드 패턴으로 해당 user+portfolio의 모든 acct_suffix 변형 키를 삭제한다.
+    """
+    await _scan_unlink(redis, f"{_env_prefix()}rebalancing_strategy:{user_id}:{portfolio_id}:*")
 
 
 async def invalidate_asset_account_caches(
@@ -256,7 +280,6 @@ async def invalidate_asset_account_caches(
         portfolio_overview_lite_key(user_id),
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
-        portfolio_summary_key(user_id),
     ]
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
@@ -277,7 +300,6 @@ async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: 
         portfolio_overview_lite_key(user_id),
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
-        portfolio_summary_key(user_id),
         dividends_positions_key(user_id),
         tax_overseas_key(user_id),
     )

@@ -20,6 +20,7 @@ export interface SettingsData {
   auto_dca_last_executed_at: string | null;
   annual_dividend_goal: number | null;
   fcm_token_stored: boolean;
+  composite_signal_alerts_enabled: boolean;
 }
 
 export interface AutoDcaPayload {
@@ -36,3 +37,6 @@ export const updateAutoDca = (payload: AutoDcaPayload) => apiPut("/settings/auto
 
 export const registerPushToken = (fcm_token: string | null) =>
   apiPut("/settings/push-token", { fcm_token });
+
+export const updateCompositeSignalAlerts = (enabled: boolean) =>
+  apiPut("/settings/composite-signal-alerts", { enabled });

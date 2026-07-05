@@ -77,6 +77,7 @@ class TestRebalancingAlertTemplate:
         assert len(html) > 100
 
     def test_composite_triggered_without_drift_uses_dedicated_heading(self):
+        """복합신호는 특정 포트폴리오가 아닌 계정 전체 기준이므로 제목에 포트폴리오명을 넣지 않는다."""
         subject, html = rebalancing_alert_template(
             portfolio_name="복합신호포트폴리오",
             threshold_pct=5.0,
@@ -86,7 +87,7 @@ class TestRebalancingAlertTemplate:
             composite_reason="시장 위험 신호가 RED 단계입니다",
         )
         assert "점검 권장" in subject
-        assert "복합신호포트폴리오" in subject
+        assert "복합신호포트폴리오" not in subject
         assert "시장 위험 신호가 RED 단계입니다" in html
 
     def test_composite_triggered_with_drift_uses_normal_drift_heading(self):

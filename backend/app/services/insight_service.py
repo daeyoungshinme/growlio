@@ -17,7 +17,7 @@ from app.services.tax_service import (
     _get_rates,
     get_overseas_positions_detail,
 )
-from app.utils.cache_keys import RedisType, get_cached_json, invalidate_user_caches, set_cached_json
+from app.utils.cache_keys import RedisType, get_cached_json, set_cached_json
 
 logger = structlog.get_logger()
 
@@ -294,12 +294,3 @@ async def _check_tax_loss_harvest(
             metric_value=round(tax_saved, 0),
         )
     ]
-
-
-# ---------------------------------------------------------------------------
-# 캐시 무효화 헬퍼
-# ---------------------------------------------------------------------------
-
-
-async def invalidate_insights_cache(user_id: uuid.UUID, redis: RedisType) -> None:
-    await invalidate_user_caches(redis, insights_key(user_id))

@@ -230,26 +230,44 @@ async def build_diagnosis_context(
     redis: RedisType,
     analysis: RebalancingAnalysis,
     overview: dict,
+    enable_composite_signals: bool = True,
 ) -> DiagnosisContext:
     """시장상황·리스크·세금영향을 조합한 진단 부가 설명을 생성한다.
 
     market_signal_service.get_market_signal()과 risk_service.get_portfolio_risk_metrics()를
     각각 try/except로 감싸 실패 시 안전 폴백(None/False)한다 — 정직한 실패 표시이며 GREEN으로
     지어내지 않는다. 세금 미리보기는 외부 API 없이 overview 데이터만으로 항상 계산 가능하다.
+
+    enable_composite_signals(UserSettings.composite_signal_alerts_enabled)가 True이고
+    check_composite_signal 조건이 충족되면 진단탭 상단 배너(CompositeSignalBanner)가 이미
+    같은 내용을 보여주므로 market_note/risk_note는 생략해 중복 문구를 피한다.
     """
     market_level, risk = await fetch_market_and_risk_signal(user_id, db, redis)
-    market_note = _MARKET_NOTES.get(market_level) if market_level else None
 
     risk_available = bool(risk.get("data_available"))
     annualized_volatility_pct: float | None = None
     beta_sp500: float | None = None
     diversification_score: int | None = None
-    risk_note: str | None = None
+    top_holding_weight_pct: float | None = None
     if risk_available:
         annualized_volatility_pct = risk.get("annualized_volatility_pct")
         beta_sp500 = risk.get("beta_sp500")
         diversification_score = risk.get("diversification_score")
-        risk_note = _risk_note(risk)
+        top_holding_weight_pct = risk.get("top_holding_weight_pct")
+
+    composite_triggered = False
+    composite_reason: str | None = None
+    if enable_composite_signals:
+        composite_triggered, composite_reason = check_composite_signal(
+            market_level, risk_available, diversification_score, top_holding_weight_pct, annualized_volatility_pct
+        )
+
+    if composite_triggered:
+        market_note: str | None = None
+        risk_note: str | None = None
+    else:
+        market_note = _MARKET_NOTES.get(market_level) if market_level else None
+        risk_note = _risk_note(risk) if risk_available else None
 
     total_gain, overseas_tax, total_fee, tax_notes, tax_items = _build_tax_preview(analysis, overview)
 
@@ -262,6 +280,8 @@ async def build_diagnosis_context(
         beta_sp500=beta_sp500,
         diversification_score=diversification_score,
         risk_note=risk_note,
+        composite_signal_triggered=composite_triggered,
+        composite_signal_reason=composite_reason,
         estimated_sell_realized_gain_krw=round(total_gain, 0),
         estimated_overseas_tax_krw=round(overseas_tax, 0),
         estimated_fee_krw=round(total_fee, 0),

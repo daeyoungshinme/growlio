@@ -11,6 +11,7 @@ from redis.exceptions import RedisError
 from app.utils.cache_keys import (
     alloc_history_key,
     backtest_key,
+    composite_alert_sent_key,
     correlation_key,
     current_price_key,
     dividend_info_key,
@@ -20,6 +21,7 @@ from app.utils.cache_keys import (
     economic_indicator_calendar_key,
     economic_indicator_latest_key,
     has_overseas_key,
+    invalidate_rebalancing_strategy_cache,
     invalidate_user_caches,
     monthly_trend_key,
     ob_state_key,
@@ -27,6 +29,7 @@ from app.utils.cache_keys import (
     portfolio_overview_key,
     portfolio_overview_lite_key,
     price_return_key,
+    rebalancing_strategy_key,
 )
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
@@ -111,6 +114,47 @@ class TestCacheKeyBuilders:
     def test_economic_indicator_calendar_key(self, override_settings):
         key = economic_indicator_calendar_key()
         assert "calendar" in key or "economic" in key
+
+    def test_composite_alert_sent_key(self, override_settings):
+        uid = uuid.uuid4()
+        key = composite_alert_sent_key(uid, "2026-07-05")
+        assert str(uid) in key
+        assert "2026-07-05" in key
+
+    def test_composite_alert_sent_key_differs_by_day(self, override_settings):
+        uid = uuid.uuid4()
+        assert composite_alert_sent_key(uid, "2026-07-05") != composite_alert_sent_key(uid, "2026-07-06")
+
+    def test_rebalancing_strategy_key(self, override_settings):
+        uid = uuid.uuid4()
+        key = rebalancing_strategy_key(uid, "portfolio-1", "acct-a_acct-b")
+        assert str(uid) in key
+        assert "portfolio-1" in key
+        assert "acct-a_acct-b" in key
+
+
+class TestInvalidateRebalancingStrategyCache:
+    """실행 후 무효화가 쓰기 시점 acct_suffix 포함 키를 실제로 지우는지 검증 (회귀 방지)."""
+
+    @pytest.mark.asyncio
+    async def test_invalidate_deletes_key_written_with_acct_suffix(self, override_settings):
+        uid = uuid.uuid4()
+        portfolio_id = "portfolio-1"
+        written_key = rebalancing_strategy_key(uid, portfolio_id, "acct-a_acct-b")
+
+        redis = AsyncMock()
+        redis.scan = AsyncMock(return_value=(0, [written_key]))
+        redis.unlink = AsyncMock()
+
+        await invalidate_rebalancing_strategy_cache(redis, uid, portfolio_id)
+
+        redis.scan.assert_called_once()
+        _, kwargs = redis.scan.call_args
+        pattern = kwargs["match"]
+        assert str(uid) in pattern
+        assert portfolio_id in pattern
+        assert pattern.endswith(":*")
+        redis.unlink.assert_called_once_with(written_key)
 
 
 class TestInvalidateUserCaches:

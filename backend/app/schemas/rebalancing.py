@@ -84,6 +84,11 @@ class DiagnosisContext(BaseModel):
     diversification_score: int | None = None
     risk_note: str | None = None  # 특이사항 없으면 None (조용히 생략)
 
+    # 복합신호(시장 RED 또는 리스크 이상) — 진단탭 상단 배너와 동일 판정 함수(check_composite_signal) 결과.
+    # True일 때는 market_note/risk_note를 생략해(위 필드가 None) 배너와 중복 문구를 표시하지 않는다.
+    composite_signal_triggered: bool = False
+    composite_signal_reason: str | None = None
+
     # 세금/거래비용 영향 미리보기 (diff_krw < 0 항목 기준 근사치)
     estimated_sell_realized_gain_krw: float = 0.0
     estimated_overseas_tax_krw: float = 0.0
@@ -260,8 +265,6 @@ class RebalancingAlertCreate(BaseModel):
     auto_execution_time: str | None = None
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: str = "08:30"
-    # drift가 없어도 리스크 집중/시장 위험 신호가 있으면 추가로 발송 (기본 True, AUTO 실행에는 영향 없음)
-    enable_composite_signals: bool = True
 
     @field_validator("threshold_pct")
     @classmethod
@@ -333,7 +336,14 @@ class RebalancingAlertResponse(BaseModel):
     market_condition_mode: str
     auto_execution_time: str | None
     notify_time: str
-    enable_composite_signals: bool = True
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+class CompositeSignalStatus(BaseModel):
+    """진단탭 상단 복합신호(시장/리스크) 배너 — 유저 단위 단일 신호."""
+
+    enabled: bool  # UserSettings.composite_signal_alerts_enabled
+    triggered: bool  # enabled=True이고 조건(시장 RED 또는 리스크 이상) 충족 시 True
+    reason: str | None = None

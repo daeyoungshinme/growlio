@@ -126,7 +126,7 @@ API Request
         ├── invest.py         # DCA 분석
         ├── open_banking.py   # 오픈뱅킹 계좌 연결
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
-        ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /summary, /risk, /risk/{id}, /rebalancing-strategy
+        ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk, /risk/{id}, /rebalancing-strategy
         ├── rebalancing.py    # 리밸런싱 추천
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
@@ -140,7 +140,9 @@ API Request
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
-        └── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
+        ├── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
+        ├── _account_deps.py        # 계좌 소유권 검증 헬퍼(get_owned_account) + api/deps.py의 get_owned_or_404 재노출
+        └── _alert_crud.py          # 환율/주가 알림 라우터 공용 reactivate·delete 엔드포인트 팩토리(register_alert_reactivate_delete)
 
 > 라우터 등록/prefix 변경 시 이 표도 함께 갱신.
 
@@ -186,7 +188,6 @@ services/
   ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
   ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
   ├── alert_calculator.py           # 알림 조건 판단 로직 (alert_service.py에서 분리)
-  ├── alert_repository.py           # 알림 DB 쿼리 레이어 (alert_service.py에서 분리)
   ├── exchange_rate_alert_service.py # 환율 알림 조건 체크 서비스
   ├── stock_price_alert_service.py  # 주가 알림 조건 체크 서비스
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)

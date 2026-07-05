@@ -68,7 +68,7 @@ class TestCheckMarketSignalLevelChange:
 
     @pytest.mark.asyncio
     async def test_level_change_notifies_subscribers_and_saves_history(self, mock_db, mock_redis):
-        """등급이 바뀌면 enable_composite_signals=True인 구독자에게 이메일+푸시 발송, 이력 저장, 커밋."""
+        """등급이 바뀌면 composite_signal_alerts_enabled=True인 구독자에게 이메일+푸시 발송, 이력 저장, 커밋."""
         from app.services.market_signal_alert_service import check_market_signal_level_change
 
         user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)

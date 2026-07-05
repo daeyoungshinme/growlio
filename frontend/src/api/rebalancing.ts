@@ -59,6 +59,8 @@ export interface DiagnosisContext {
   beta_sp500: number | null;
   diversification_score: number | null;
   risk_note: string | null;
+  composite_signal_triggered: boolean;
+  composite_signal_reason: string | null;
   estimated_sell_realized_gain_krw: number;
   estimated_overseas_tax_krw: number;
   estimated_fee_krw: number;
@@ -237,3 +239,14 @@ export interface PortfolioDriftSummary {
 
 export const fetchDriftSummary = (): Promise<PortfolioDriftSummary[]> =>
   apiGet<PortfolioDriftSummary[]>(`/rebalancing/drift-summary`);
+
+// ── 복합신호(시장/리스크) 상태 (진단탭 상단 배너 전용, 유저 단위) ────────────
+
+export interface CompositeSignalStatus {
+  enabled: boolean;
+  triggered: boolean;
+  reason: string | null;
+}
+
+export const fetchCompositeSignalStatus = (): Promise<CompositeSignalStatus> =>
+  apiGet<CompositeSignalStatus>(`/rebalancing/composite-signal`);

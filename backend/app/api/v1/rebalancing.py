@@ -14,16 +14,17 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import get_current_user, get_db
 from app.constants import DOMESTIC_MARKETS
 from app.kis.auth import get_access_token
-from app.kis.balance import get_domestic_balance, get_orderable_cash
-from app.kis.client import KisApiError
-from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
-from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
+from app.kis.balance import get_orderable_cash
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
+from app.providers.base import BrokerProvider
+from app.providers.kis_provider import KISProvider
+from app.providers.kiwoom_provider import KiwoomProvider
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
+    CompositeSignalStatus,
     KisBalancePosition,
     KisBalanceResponse,
     PortfolioDriftSummary,
@@ -32,6 +33,7 @@ from app.schemas.rebalancing import (
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
+from app.services._settings_queries import get_settings_row
 from app.services.credential_service import decrypt
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.dividend_constants import is_korean_etf
@@ -49,7 +51,6 @@ from app.services.rebalancing_diagnosis_service import (
 )
 from app.services.rebalancing_service import _item_attr, analyze_rebalancing, compute_portfolio_drift_summary
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
-from app.utils.currency import get_usd_krw_rate
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
@@ -217,7 +218,11 @@ async def analyze_portfolio(
     )
 
     try:
-        analysis.diagnosis_context = await build_diagnosis_context(current_user.id, db, redis, analysis, overview)
+        settings_row = await get_settings_row(db, current_user.id)
+        enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
+        analysis.diagnosis_context = await build_diagnosis_context(
+            current_user.id, db, redis, analysis, overview, enable_composite_signals=enable_composite_signals
+        )
     except Exception as e:
         logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
         analysis.diagnosis_context = None
@@ -229,102 +234,63 @@ async def _fetch_broker_balance(
     account: AssetAccount,
     db: AsyncSession,
     redis,
-    usd_rate: float | None = None,
 ) -> KisBalanceResponse:
-    """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다. 실패 시 예외 발생."""
-    if account.asset_type == "STOCK_KIS":
-        if not account.kis_account_no:
-            raise ValueError("계좌번호가 설정되지 않았습니다.")
-        if not account.kis_app_key or not account.kis_app_secret:
-            raise ValueError("KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.")
+    """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
 
-        app_key = decrypt(account.kis_app_key)
-        app_secret = decrypt(account.kis_app_secret)
-        is_mock = account.is_mock_mode
-        access_token = await get_access_token(
-            app_key,
-            app_secret,
-            is_mock=is_mock,
-            redis=redis,
-            db=db,
-            user_id=str(account.user_id),
-            account_id=str(account.id),
-        )
-        domestic = await get_domestic_balance(
-            app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
-        )
+    실제 조회는 BrokerProvider(KISProvider/KiwoomProvider)에 위임한다 — 자격증명 검증,
+    토큰 갱신-재시도, 원화 포지션 변환은 sync_account()가 쓰는 것과 동일한 provider
+    경로를 공유한다. 실패 시 SyncError 계층 예외(ProviderCredentialError 등)가 그대로
+    전파되며 main.py 전역 핸들러가 HTTP 응답으로 변환한다.
+    """
+    if account.asset_type == "STOCK_KIS":
+        provider: BrokerProvider = KISProvider()
+    elif account.asset_type == "STOCK_KIWOOM":
+        provider = KiwoomProvider()
+    else:
+        raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
+
+    result = await provider.sync(account, db, redis)
+
+    orderable_krw: float | None = None
+    if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
         try:
-            orderable = await get_orderable_cash(
-                app_key, app_secret, access_token, account.kis_account_no, is_mock=is_mock
+            app_key = decrypt(account.kis_app_key)
+            app_secret = decrypt(account.kis_app_secret)
+            access_token = await get_access_token(
+                app_key,
+                app_secret,
+                is_mock=account.is_mock_mode,
+                redis=redis,
+                db=db,
+                user_id=str(account.user_id),
+                account_id=str(account.id),
+            )
+            orderable_krw = await get_orderable_cash(
+                app_key, app_secret, access_token, account.kis_account_no, is_mock=account.is_mock_mode
             )
         except Exception as e:
             logger.warning("orderable_cash_fetch_failed", account_id=str(account.id), error=str(e))
-            orderable = None
-        positions: list[KisBalancePosition] = [
-            KisBalancePosition(
-                ticker=p["ticker"],
-                name=p["name"],
-                market=p["market"],
-                quantity=int(p["qty"]),
-                avg_price=float(p["avg_price"]),
-                current_price=float(p["current_price"]),
-                value_krw=float(p["value_krw"]),
-            )
-            for p in domestic.get("positions", [])
-        ]
-        return KisBalanceResponse(
-            account_id=str(account.id),
-            account_name=account.name,
-            is_mock=is_mock,
-            positions=positions,
-            deposit_krw=float(domestic.get("deposit_krw", 0)),
-            orderable_krw=orderable,
-        )
 
-    if account.asset_type == "STOCK_KIWOOM":
-        if not account.kiwoom_app_key or not account.kiwoom_app_secret:
-            raise ValueError("키움 API 자격증명이 설정되지 않았습니다.")
-        if not account.kiwoom_account_no:
-            raise ValueError("키움 계좌번호가 설정되지 않았습니다.")
-
-        app_key = decrypt(account.kiwoom_app_key)
-        app_secret = decrypt(account.kiwoom_app_secret)
-        is_mock = account.is_mock_mode
-        access_token = await kiwoom_get_access_token(
-            app_key,
-            app_secret,
-            is_mock=is_mock,
-            redis=redis,
-            db=db,
-            user_id=str(account.user_id),
-            account_id=str(account.id),
+    positions = [
+        KisBalancePosition(
+            ticker=p.ticker,
+            name=p.name,
+            market=p.market,
+            quantity=p.qty,
+            avg_price=p.avg_price,
+            current_price=p.current_price,
+            value_krw=p.value_krw,
         )
-        domestic = await kiwoom_get_domestic_balance(
-            access_token,
-            account.kiwoom_account_no,
-            is_mock=is_mock,
-        )
-        positions = [
-            KisBalancePosition(
-                ticker=p["ticker"],
-                name=p["name"],
-                market=p["market"],
-                quantity=int(p["qty"]),
-                avg_price=float(p["avg_price"]),
-                current_price=float(p["current_price"]),
-                value_krw=float(p["value_krw"]),
-            )
-            for p in domestic.get("positions", [])
-        ]
-        return KisBalanceResponse(
-            account_id=str(account.id),
-            account_name=account.name,
-            is_mock=is_mock,
-            positions=positions,
-            deposit_krw=float(domestic.get("deposit_krw", 0)),
-        )
-
-    raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
+        for p in result.positions
+    ]
+    return KisBalanceResponse(
+        account_id=str(account.id),
+        account_name=account.name,
+        is_mock=account.is_mock_mode,
+        positions=positions,
+        deposit_krw=result.deposit_krw,
+        orderable_krw=orderable_krw,
+    )
 
 
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)
@@ -351,16 +317,10 @@ async def get_broker_account_balance(
             detail="KIS 또는 키움 계좌만 잔고 조회가 가능합니다",
         )
 
-    usd_rate = await get_usd_krw_rate(redis)
     try:
-        return await _fetch_broker_balance(account, db, redis, usd_rate)
+        return await _fetch_broker_balance(account, db, redis)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except KisApiError as e:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"KIS API 응답 오류 (코드: {e.rt_cd}). 잠시 후 다시 시도해주세요.",
-        ) from e
 
 
 @router.get("/broker-balance-all", response_model=list[KisBalanceResponse])
@@ -378,8 +338,7 @@ async def get_all_broker_balances(
     if not accounts:
         return []
 
-    usd_rate = await get_usd_krw_rate(redis)
-    tasks = [_fetch_broker_balance(acc, db, redis, usd_rate) for acc in accounts]
+    tasks = [_fetch_broker_balance(acc, db, redis) for acc in accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [
@@ -416,14 +375,17 @@ async def get_drift_summary(
     has_composite_signal = False
     composite_reason: str | None = None
     try:
-        market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
-        has_composite_signal, composite_reason = check_composite_signal(
-            market_level,
-            bool(risk.get("data_available")),
-            risk.get("diversification_score"),
-            risk.get("top_holding_weight_pct"),
-            risk.get("annualized_volatility_pct"),
-        )
+        settings_row = await get_settings_row(db, current_user.id)
+        enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
+        if enable_composite_signals:
+            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
+            has_composite_signal, composite_reason = check_composite_signal(
+                market_level,
+                bool(risk.get("data_available")),
+                risk.get("diversification_score"),
+                risk.get("top_holding_weight_pct"),
+                risk.get("annualized_volatility_pct"),
+            )
     except Exception as e:
         logger.warning("drift_summary_composite_signal_failed", error=str(e))
 
@@ -448,3 +410,33 @@ async def get_drift_summary(
             )
 
     return summaries
+
+
+@router.get("/composite-signal", response_model=CompositeSignalStatus)
+@limiter.limit("30/minute")
+async def get_composite_signal_status(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """진단탭 상단 배너 전용 — 포트폴리오 컨텍스트 없이 유저 단위 복합신호(시장/리스크) 상태만 반환."""
+    settings_row = await get_settings_row(db, current_user.id)
+    enabled = settings_row.composite_signal_alerts_enabled if settings_row else True
+
+    triggered = False
+    reason: str | None = None
+    if enabled:
+        try:
+            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
+            triggered, reason = check_composite_signal(
+                market_level,
+                bool(risk.get("data_available")),
+                risk.get("diversification_score"),
+                risk.get("top_holding_weight_pct"),
+                risk.get("annualized_volatility_pct"),
+            )
+        except Exception as e:
+            logger.warning("composite_signal_status_failed", error=str(e))
+
+    return CompositeSignalStatus(enabled=enabled, triggered=triggered, reason=reason)

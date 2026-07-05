@@ -30,4 +30,5 @@ export const QUERY_KEYS = {
   marketSignal: ["market-signal"] as const,
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   driftSummary: ["drift-summary"] as const,
+  compositeSignalStatus: ["composite-signal-status"] as const,
 } as const;

@@ -54,6 +54,8 @@ class UserSettings(Base):
     # 알림 설정
     notification_email: Mapped[str | None] = mapped_column(String(255))
     monthly_report_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # drift가 없어도 리스크 집중/시장 위험 신호가 있으면 추가로 발송 — 신호 자체가 유저 단위이므로 계정 단일 설정
+    composite_signal_alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     fcm_token: Mapped[str | None] = mapped_column(String(512))
     # 자동 DCA (정기매수)
     auto_dca_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

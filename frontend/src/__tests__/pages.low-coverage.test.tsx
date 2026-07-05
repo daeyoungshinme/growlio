@@ -201,6 +201,10 @@ vi.mock("@/components/settings/StockPriceAlertSection", () => ({
   StockPriceAlertSection: () => <div data-testid="stock-price-alert-section" />,
 }));
 
+vi.mock("@/components/settings/NotificationEmailSection", () => ({
+  NotificationEmailSection: () => <div data-testid="notification-email-section" />,
+}));
+
 vi.mock("@/components/settings/shared", () => ({
   SectionCard: ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div data-testid="section-card">

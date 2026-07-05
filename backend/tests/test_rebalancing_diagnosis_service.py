@@ -267,7 +267,43 @@ class TestFetchMarketAndRiskSignal:
 
 class TestBuildDiagnosisContext:
     @pytest.mark.asyncio
-    async def test_market_and_risk_success(self, mock_db, mock_redis):
+    async def test_market_yellow_and_risk_normal_shows_market_note(self, mock_db, mock_redis):
+        """복합신호 조건 미충족 시(YELLOW는 단독 트리거 안 됨) 기존처럼 market_note가 노출된다."""
+        analysis = _make_analysis([])
+        overview = _make_overview([])
+
+        with (
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "YELLOW"}),
+            ),
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                new=AsyncMock(
+                    return_value={
+                        "data_available": True,
+                        "annualized_volatility_pct": 10.0,
+                        "beta_sp500": 1.1,
+                        "diversification_score": 80,
+                        "top_holding_weight_pct": 20.0,
+                    }
+                ),
+            ),
+        ):
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+
+        assert ctx.market_level == "YELLOW"
+        assert ctx.market_note is not None
+        assert ctx.risk_available is True
+        assert ctx.diversification_score == 80
+        assert ctx.risk_note is None
+        assert ctx.composite_signal_triggered is False
+        assert ctx.composite_signal_reason is None
+
+    @pytest.mark.asyncio
+    async def test_composite_triggered_suppresses_market_and_risk_notes(self, mock_db, mock_redis):
+        """복합신호(check_composite_signal)가 충족되면 진단탭 상단 배너와 중복되지 않도록
+        market_note/risk_note를 생략하고 composite_signal_triggered/reason만 채운다."""
         analysis = _make_analysis([])
         overview = _make_overview([])
 
@@ -291,10 +327,44 @@ class TestBuildDiagnosisContext:
         ):
             ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
 
-        assert ctx.market_level == "YELLOW"
+        assert ctx.market_note is None
+        assert ctx.risk_note is None
+        assert ctx.composite_signal_triggered is True
+        assert ctx.composite_signal_reason is not None
+        assert "분산도" in ctx.composite_signal_reason
+
+    @pytest.mark.asyncio
+    async def test_enable_composite_signals_false_keeps_granular_notes(self, mock_db, mock_redis):
+        """enable_composite_signals=False(유저가 해당 알림을 꺼둠)면 조건을 충족해도
+        composite_signal_triggered는 False로 고정되고, 기존 market_note/risk_note는 그대로 노출된다."""
+        analysis = _make_analysis([])
+        overview = _make_overview([])
+
+        with (
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "RED"}),
+            ),
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                new=AsyncMock(
+                    return_value={
+                        "data_available": True,
+                        "annualized_volatility_pct": 25.0,
+                        "beta_sp500": 1.1,
+                        "diversification_score": 30,
+                        "top_holding_weight_pct": 20.0,
+                    }
+                ),
+            ),
+        ):
+            ctx = await build_diagnosis_context(
+                uuid.uuid4(), mock_db, mock_redis, analysis, overview, enable_composite_signals=False
+            )
+
+        assert ctx.composite_signal_triggered is False
+        assert ctx.composite_signal_reason is None
         assert ctx.market_note is not None
-        assert ctx.risk_available is True
-        assert ctx.diversification_score == 30
         assert ctx.risk_note is not None
 
     @pytest.mark.asyncio

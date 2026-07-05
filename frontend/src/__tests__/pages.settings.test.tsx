@@ -49,13 +49,18 @@ vi.mock("@/utils/toast", () => ({
 
 // Heavy sub-sections
 vi.mock("@/components/settings/ExchangeRateAlertSection", () => ({
-  ExchangeRateAlertSection: ({ userEmail }: { userEmail?: string }) => (
-    <div data-testid="exchange-rate-alert-section">{userEmail ?? "no-email"}</div>
+  ExchangeRateAlertSection: () => (
+    <div data-testid="exchange-rate-alert-section">ExchangeRateAlertSection</div>
   ),
 }));
 vi.mock("@/components/settings/StockPriceAlertSection", () => ({
   StockPriceAlertSection: () => (
     <div data-testid="stock-price-alert-section">StockPriceAlertSection</div>
+  ),
+}));
+vi.mock("@/components/settings/NotificationEmailSection", () => ({
+  NotificationEmailSection: ({ userEmail }: { userEmail?: string }) => (
+    <div data-testid="notification-email-section">{userEmail ?? "no-email"}</div>
   ),
 }));
 vi.mock("@/components/settings/DCASettingsSection", () => ({
@@ -276,13 +281,13 @@ describe("SettingsPage", () => {
     expect(toast).toHaveBeenCalledWith("DART API 키가 삭제되었습니다", "success");
   });
 
-  it("ExchangeRateAlertSection에 user_email을 전달한다", async () => {
+  it("NotificationEmailSection에 user_email을 전달한다", async () => {
     vi.mocked(api.get).mockResolvedValue({
       data: { ...mockSettings, user_email: "test@test.com" },
     });
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByTestId("exchange-rate-alert-section")).toHaveTextContent("test@test.com");
+      expect(screen.getByTestId("notification-email-section")).toHaveTextContent("test@test.com");
     });
   });
 });

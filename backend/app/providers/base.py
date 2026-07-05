@@ -43,6 +43,26 @@ class BalanceResult:
     extra: dict[str, Any] = field(default_factory=dict)
 
 
+def raw_krw_to_position(p: dict[str, Any]) -> Position:
+    """원화(KRW) 원본 포지션 dict를 Position으로 변환하는 공용 헬퍼.
+
+    KIS/Kiwoom 모두 원화 종목 변환 로직이 거의 동일했던 것을 공용화한 것.
+    해외(USD) 종목 변환은 브로커별로 환율 처리 방식이 달라 각 provider에 남겨둔다.
+    """
+    qty = int(p.get("qty", 0))
+    current_price = float(p.get("current_price", 0))
+    return Position(
+        ticker=p["ticker"],
+        name=p["name"],
+        market=p["market"],
+        qty=qty,
+        avg_price=float(p.get("avg_price", 0)),
+        current_price=current_price,
+        currency="KRW",
+        value_krw=float(p.get("value_krw", 0)) or current_price * qty,
+    )
+
+
 class BrokerProvider(ABC):
     """증권사 동기화 공통 인터페이스.
 

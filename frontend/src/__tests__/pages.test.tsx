@@ -253,7 +253,7 @@ describe("SettingsPage", () => {
       </MemoryRouter>,
     );
     await waitFor(() => {
-      expect(screen.getByText("저장")).toBeDefined();
+      expect(screen.getAllByText("저장").length).toBeGreaterThan(0);
     });
   });
 

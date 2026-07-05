@@ -279,29 +279,6 @@ function AlertFormBody({
               </label>
             ))}
           </div>
-          <label
-            className={`flex items-start gap-2 p-3 mt-2 rounded-lg border cursor-pointer transition-colors ${
-              form.enableCompositeSignals
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={form.enableCompositeSignals}
-              onChange={(e) => form.setEnableCompositeSignals(e.target.checked)}
-              className="mt-0.5 accent-blue-600 shrink-0"
-            />
-            <div>
-              <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                시장/리스크 신호로 추가 알림받기
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                이탈이 없어도 시장 위험 신호가 RED이거나 리스크가 집중되어 있으면 점검을 권장하는
-                알림을 추가로 받습니다.
-              </div>
-            </div>
-          </label>
         </div>
 
         {/* ── 임계값 슬라이더 ── */}

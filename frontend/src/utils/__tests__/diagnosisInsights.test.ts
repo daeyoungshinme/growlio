@@ -12,6 +12,8 @@ function makeContext(overrides: Partial<DiagnosisContext> = {}): DiagnosisContex
     beta_sp500: 1.0,
     diversification_score: 80,
     risk_note: null,
+    composite_signal_triggered: false,
+    composite_signal_reason: null,
     estimated_sell_realized_gain_krw: 0,
     estimated_overseas_tax_krw: 0,
     estimated_fee_krw: 0,

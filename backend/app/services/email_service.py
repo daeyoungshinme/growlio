@@ -18,7 +18,6 @@ from tenacity import (
 
 from app.config import settings
 from app.services.email_templates import (
-    deposit_trigger_alert_template,
     exchange_rate_alert_template,
     goal_achievement_template,
     indicator_alert_template,
@@ -146,31 +145,6 @@ async def send_rebalancing_execution_email(
         return True
     except Exception as e:
         logger.error("rebalancing_execution_email_failed", to=to_email, error=str(e))
-        return False
-
-
-async def send_deposit_trigger_alert(
-    to_email: str,
-    portfolio_name: str,
-    deposit_increment: float,
-    items: list[dict],
-) -> bool:
-    """예수금 입금 감지 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = deposit_trigger_alert_template(portfolio_name, deposit_increment, items)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info(
-            "deposit_trigger_alert_email_sent",
-            to=to_email,
-            portfolio=portfolio_name,
-            increment=deposit_increment,
-        )
-        return True
-    except Exception as exc:
-        logger.error("deposit_trigger_alert_email_failed", to=to_email, error=str(exc))
         return False
 
 

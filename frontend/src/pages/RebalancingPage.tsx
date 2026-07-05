@@ -12,6 +12,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
+const CompositeSignalBanner = lazy(() => import("../components/rebalancing/CompositeSignalBanner"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
 );
@@ -126,6 +127,11 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
+            <ErrorBoundary variant="section">
+              <Suspense fallback={<SkeletonCard rows={1} />}>
+                <CompositeSignalBanner />
+              </Suspense>
+            </ErrorBoundary>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard

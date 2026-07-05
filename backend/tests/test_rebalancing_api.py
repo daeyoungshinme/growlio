@@ -131,6 +131,144 @@ class TestRebalancingHistory:
             app.dependency_overrides.pop(get_db, None)
 
 
+class TestDriftSummary:
+    def test_composite_signal_alerts_disabled_forces_has_composite_signal_false(self, override_settings):
+        """유저가 composite_signal_alerts_enabled=False로 꺼두면, 실제 신호 상태와 무관하게
+        모든 포트폴리오 summary의 has_composite_signal이 False로 강제된다."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(), name="테스트 포트폴리오", account_ids=None, base_type="STOCK", items=[]
+        )
+        settings_row = SimpleNamespace(composite_signal_alerts_enabled=False)
+        db.scalar = AsyncMock(return_value=settings_row)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_linked_portfolios",
+                    new_callable=AsyncMock,
+                    return_value=[portfolio],
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_active_alert_thresholds",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    new_callable=AsyncMock,
+                    return_value={"all_positions": [], "total_assets_krw": 0, "total_stock_krw": 0},
+                ),
+                patch(
+                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    new_callable=AsyncMock,
+                ) as mock_fetch,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/drift-summary",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            summaries = resp.json()
+            assert len(summaries) == 1
+            assert summaries[0]["has_composite_signal"] is False
+            mock_fetch.assert_not_called()
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+
+class TestCompositeSignalStatus:
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/rebalancing/composite-signal")
+        assert resp.status_code == 401
+
+    def test_disabled_returns_enabled_false_and_skips_signal_fetch(self, override_settings):
+        """UserSettings 행이 없으면 enabled 기본값 True. 명시적으로 꺼둔 경우엔 신호 조회를 스킵한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings_row = SimpleNamespace(composite_signal_alerts_enabled=False)
+        db.scalar = AsyncMock(return_value=settings_row)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    new_callable=AsyncMock,
+                ) as mock_fetch,
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/composite-signal",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["enabled"] is False
+            assert data["triggered"] is False
+            mock_fetch.assert_not_called()
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_no_settings_row_defaults_enabled_true_and_reports_trigger(self, override_settings):
+        """UserSettings 행이 없으면(신규 유저) enabled 기본값 True로 신호를 평가한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.fetch_market_and_risk_signal",
+                    new_callable=AsyncMock,
+                    return_value=("RED", {"data_available": False}),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/composite-signal",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["enabled"] is True
+            assert data["triggered"] is True
+            assert data["reason"] is not None
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+
 class TestBrokerBalance:
     def test_returns_401_without_auth(self, override_settings):
         from app.api.deps import get_current_user
@@ -168,11 +306,11 @@ class TestBrokerBalance:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
-    def test_returns_502_on_kis_api_error(self, override_settings):
-        """KisApiError 발생 시 HTTP 502를 반환한다."""
+    def test_returns_400_on_provider_api_error(self, override_settings):
+        """KIS API 오류(ProviderApiError)는 provider 레이어에서 변환되어 전역 핸들러가 처리한다."""
         from types import SimpleNamespace
 
-        from app.kis.client import KisApiError
+        from app.exceptions import ProviderApiError
 
         user = _make_user()
         db = _make_mock_db()
@@ -196,11 +334,10 @@ class TestBrokerBalance:
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
-                patch("app.api.v1.rebalancing.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
                 patch(
                     "app.api.v1.rebalancing._fetch_broker_balance",
                     new_callable=AsyncMock,
-                    side_effect=KisApiError("1", "호출 후처리(MCI전송) 오류 입니다."),
+                    side_effect=ProviderApiError("KIS 계좌 조회 실패: 호출 후처리(MCI전송) 오류 입니다. (rt_cd=1)."),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -208,8 +345,8 @@ class TestBrokerBalance:
                     f"/api/v1/rebalancing/broker-balance/{account.id}",
                     headers={"Authorization": "Bearer fake"},
                 )
-            assert resp.status_code == 502
-            assert "KIS API" in resp.json()["detail"]
+            assert resp.status_code == 400
+            assert "KIS 계좌 조회 실패" in resp.json()["detail"]
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
@@ -241,7 +378,6 @@ class TestBrokerBalance:
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
-                patch("app.api.v1.rebalancing.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.get(

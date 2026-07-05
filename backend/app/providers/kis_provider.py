@@ -15,7 +15,8 @@ from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
-from app.providers.base import BalanceResult, BrokerProvider, Position
+from app.providers._retry import with_token_refresh
+from app.providers.base import BalanceResult, BrokerProvider, Position, raw_krw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
 from app.utils.cache_keys import TTL_HAS_OVERSEAS_FALSE, TTL_HAS_OVERSEAS_TRUE, has_overseas_key
@@ -52,8 +53,11 @@ class KISProvider(BrokerProvider):
 
         logger.info("kis_sync_start", account_no=account_no, is_mock=is_mock)
 
-        try:
-            access_token = await get_access_token(
+        last_token: str | None = None
+
+        async def _get_token(force_refresh: bool) -> str:
+            nonlocal last_token
+            last_token = await get_access_token(
                 app_key,
                 app_secret,
                 is_mock=is_mock,
@@ -61,56 +65,37 @@ class KISProvider(BrokerProvider):
                 db=db,
                 user_id=user_id_str,
                 account_id=account_id_str,
+                force_refresh=force_refresh,
             )
-            try:
-                domestic, overseas = await asyncio.gather(
-                    get_domestic_balance(
-                        app_key,
-                        app_secret,
-                        access_token,
-                        account_no,
-                        is_mock=is_mock,
-                    ),
-                    _fetch_overseas_cached(
-                        app_key,
-                        app_secret,
-                        access_token,
-                        account_no,
-                        is_mock,
-                        account.id,
-                        redis,
-                    ),
-                )
-            except KisTokenExpiredError:
-                logger.warning("kis_token_expired_refreshing", account_no=account_no)
-                access_token = await get_access_token(
+            return last_token
+
+        async def _fetch(access_token: str) -> tuple[dict, dict]:
+            return await asyncio.gather(
+                get_domestic_balance(
                     app_key,
                     app_secret,
+                    access_token,
+                    account_no,
                     is_mock=is_mock,
-                    redis=redis,
-                    db=db,
-                    user_id=user_id_str,
-                    account_id=account_id_str,
-                    force_refresh=True,
-                )
-                domestic, overseas = await asyncio.gather(
-                    get_domestic_balance(
-                        app_key,
-                        app_secret,
-                        access_token,
-                        account_no,
-                        is_mock=is_mock,
-                    ),
-                    _fetch_overseas_cached(
-                        app_key,
-                        app_secret,
-                        access_token,
-                        account_no,
-                        is_mock,
-                        account.id,
-                        redis,
-                    ),
-                )
+                ),
+                _fetch_overseas_cached(
+                    app_key,
+                    app_secret,
+                    access_token,
+                    account_no,
+                    is_mock,
+                    account.id,
+                    redis,
+                ),
+            )
+
+        try:
+            domestic, overseas = await with_token_refresh(
+                _fetch,
+                _get_token,
+                KisTokenExpiredError,
+                on_expired=lambda: logger.warning("kis_token_expired_refreshing", account_no=account_no),
+            )
         except KisApiError as e:
             raise ProviderApiError(
                 f"KIS 계좌 조회 실패: {e.msg} (rt_cd={e.rt_cd}). 계좌 유형 또는 API 권한 오류."
@@ -128,6 +113,7 @@ class KISProvider(BrokerProvider):
         except (httpx.ConnectError, httpx.TimeoutException) as e:
             raise ProviderNetworkError("KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from e
 
+        assert last_token is not None  # _get_token은 성공적으로 완료된 fetch 이전에 항상 최소 1회 호출됨
         usd_krw_rate = await get_usd_krw_rate(redis)
         if overseas["positions"]:
             sample = overseas["positions"][0]
@@ -135,7 +121,7 @@ class KISProvider(BrokerProvider):
                 quote = await get_overseas_price(
                     app_key,
                     app_secret,
-                    access_token,
+                    last_token,
                     sample["ticker"],
                     sample["market"],
                     is_mock=is_mock,
@@ -229,15 +215,4 @@ def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
             avg_price_usd=avg_usd,
             usd_rate=usd_krw_rate,
         )
-    qty = int(p.get("qty", 0))
-    cur_price = float(p["current_price"]) if p.get("current_price") else 0.0
-    return Position(
-        ticker=p["ticker"],
-        name=p["name"],
-        market=p["market"],
-        qty=qty,
-        avg_price=float(p.get("avg_price", 0)),
-        current_price=cur_price,
-        currency="KRW",
-        value_krw=float(p.get("value_krw", 0)) or cur_price * qty,
-    )
+    return raw_krw_to_position(p)

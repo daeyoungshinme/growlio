@@ -81,3 +81,11 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
 export function invalidateRebalancingHistoryData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory });
 }
+
+/** 복합신호(시장/리스크) 알림 수신 여부 설정 변경 후 */
+export function invalidateCompositeSignalData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.compositeSignalStatus }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+  ]);
+}

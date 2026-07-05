@@ -7,6 +7,7 @@ import structlog
 from app.kis.order import is_overseas_market
 from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
+from app.services._order_executor_common import execute_single_order
 from app.services._order_quantity_guard import clamp_sell_orders
 
 logger = structlog.get_logger()
@@ -20,20 +21,8 @@ async def _execute_kiwoom_single_order(
     place_order_fn,
 ) -> OrderResult:
     """키움 단건 주문 실행 — 국내주식만 지원 (해외주식 미지원)."""
-    price = order.limit_price or order.reference_price
-
-    if order.quantity <= 0:
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SKIPPED",
-            error_msg="주문 수량이 0 이하입니다.",
-            price=price,
-        )
-    if is_overseas_market(order.market):
+    if order.quantity > 0 and is_overseas_market(order.market):
+        price = order.limit_price or order.reference_price
         return OrderResult(
             ticker=order.ticker,
             name=order.name,
@@ -45,8 +34,8 @@ async def _execute_kiwoom_single_order(
             price=price,
         )
 
-    try:
-        result = await place_order_fn(
+    async def _place() -> dict:
+        return await place_order_fn(
             access_token,
             account_no,
             side=order.side,
@@ -56,39 +45,8 @@ async def _execute_kiwoom_single_order(
             order_type=order.order_type,
             limit_price=order.limit_price,
         )
-        logger.info(
-            "kiwoom_order_placed",
-            ticker=order.ticker,
-            side=order.side,
-            quantity=order.quantity,
-            order_no=result.get("order_no"),
-            is_mock=is_mock,
-            order_type=order.order_type,
-        )
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="SUCCESS",
-            order_no=result.get("order_no"),
-            order_type=order.order_type,
-            price=price,
-        )
-    except Exception as e:
-        logger.warning("kiwoom_order_failed", ticker=order.ticker, side=order.side, error=str(e))
-        return OrderResult(
-            ticker=order.ticker,
-            name=order.name,
-            market=order.market,
-            side=order.side,
-            quantity=order.quantity,
-            status="FAILED",
-            error_msg=str(e),
-            order_type=order.order_type,
-            price=price,
-        )
+
+    return await execute_single_order(order, _place, is_mock, log_prefix="kiwoom_order")
 
 
 async def _execute_kiwoom_sells_with_clamp(

@@ -13,7 +13,13 @@ from sqlalchemy.orm import selectinload
 from app.services.factor_service import get_factor_analysis, get_factor_analysis_for_portfolio
 from app.services.portfolio_optimizer import get_efficient_frontier
 from app.services.position_aggregator import query_latest_position_map
-from app.utils.cache_keys import TTL_REBALANCING_STRATEGY, RedisType, get_cached_json, set_cached_json
+from app.utils.cache_keys import (
+    TTL_REBALANCING_STRATEGY,
+    RedisType,
+    get_cached_json,
+    rebalancing_strategy_key,
+    set_cached_json,
+)
 
 logger = structlog.get_logger()
 _RISK_FREE_RATE = 3.0  # Sharpe 계산 기준 무위험 수익률 (%)
@@ -180,7 +186,7 @@ async def get_rebalancing_strategy(
         [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     )
     acct_suffix = "_".join(sorted(str(a) for a in portfolio_acct_ids)) if portfolio_acct_ids else "all"
-    cache_key = f"rebalancing_strategy:{user_id}:{portfolio_id}:{acct_suffix}"
+    cache_key = rebalancing_strategy_key(user_id, portfolio_id, acct_suffix)
 
     cached = await get_cached_json(redis, cache_key)
     if cached is not None:

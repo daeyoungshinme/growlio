@@ -88,12 +88,10 @@ def rebalancing_alert_template(
     )
 
     if is_composite_triggered and not drifting_count:
-        subject = f"{test_prefix}[Growlio] 포트폴리오 점검 권장 — {portfolio_name} (리스크/시장 신호)"
-        heading = "리밸런싱 점검 권장"
-        subheading = (
-            f"포트폴리오 <strong>{portfolio_name}</strong>은 현재 목표 비중 이탈은 없지만, "
-            f"{composite_reason}. 리밸런싱 여부를 점검해 보세요."
-        )
+        # 복합신호는 특정 포트폴리오가 아닌 계정 전체 기준으로 평가되므로 포트폴리오명을 노출하지 않는다.
+        subject = f"{test_prefix}[Growlio] 시장/리스크 신호 감지 — 포트폴리오 점검 권장"
+        heading = "시장/리스크 신호 감지"
+        subheading = f"현재 목표 비중 이탈은 없지만, {composite_reason}. 보유 포트폴리오 점검을 권장합니다."
     elif is_scheduled_report:
         subject = f"{test_prefix}[Growlio] {schedule_label} 리밸런싱 리포트 — {portfolio_name}"
         heading = "정기 리밸런싱 현황"
@@ -232,44 +230,6 @@ def rebalancing_execution_template(
         heading_color,
         body,
         "Growlio 앱 > 리밸런싱 > 실행 이력에서 상세 내역을 확인하세요.",
-    )
-    return subject, html
-
-
-def deposit_trigger_alert_template(
-    portfolio_name: str,
-    deposit_increment: float,
-    items: list[dict],
-) -> tuple[str, str]:
-    subject = f"[Growlio] 예수금 +{deposit_increment:,.0f}원 입금 — {portfolio_name} 비중 매수 추천"
-    td = "padding:8px;border-bottom:1px solid #e2e8f0;"
-    rows_html = "".join(
-        f"<tr>"
-        f"<td style='{td}'>{item.get('name', '')} ({item.get('ticker', '')})</td>"
-        f"<td style='{td}text-align:right;'>{float(item.get('weight_pct', 0)):.1f}%</td>"
-        f"<td style='{td}text-align:right;font-weight:bold;color:#1d4ed8;'>"
-        f"{float(item.get('alloc_amount', 0)):,.0f}원</td>"
-        f"</tr>"
-        for item in items
-    )
-    body = (
-        f"<p style='color:#374151;margin-top:8px;'>"
-        f"계좌에 <strong style='color:#16a34a;'>+{deposit_increment:,.0f}원</strong>이 "
-        f"입금되었습니다.<br>"
-        f"포트폴리오 <strong>{portfolio_name}</strong> 비중에 따른 매수 추천 내역입니다.</p>"
-        f"<table style='width:100%;border-collapse:collapse;margin-top:16px;font-size:13px;'>"
-        f"<thead><tr style='background:#f1f5f9;'>"
-        f"<th style='padding:8px;text-align:left;'>종목</th>"
-        f"<th style='padding:8px;text-align:right;'>비중</th>"
-        f"<th style='padding:8px;text-align:right;'>배분 금액</th>"
-        f"</tr></thead>"
-        f"<tbody>{rows_html}</tbody></table>"
-    )
-    html = _email_div(
-        "예수금 입금 감지",
-        "#1d4ed8",
-        body,
-        "Growlio 앱에서 직접 매수를 실행하거나, 자동 실행 설정을 활성화하면 다음 입금 시 자동으로 매수됩니다.",
     )
     return subject, html
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -343,15 +343,6 @@ async def unsubscribe_indicator(user_id, code: str, db) -> None:
     if existing:
         await db.delete(existing)
         await db.commit()
-
-
-# ---------------------------------------------------------------------------
-# 내부 유틸 (알림 잡에서 사용)
-# ---------------------------------------------------------------------------
-
-
-def _now_utc() -> datetime:
-    return datetime.now(tz=UTC)
 
 
 async def sync_all_to_cache(redis) -> dict[str, dict[str, Any]]:

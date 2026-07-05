@@ -10,7 +10,8 @@ import httpx
 import structlog
 
 from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
-from app.providers.base import BalanceResult, BrokerProvider, Position
+from app.providers._retry import with_token_refresh
+from app.providers.base import BalanceResult, BrokerProvider, raw_krw_to_position
 from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
 
@@ -45,8 +46,8 @@ class KiwoomProvider(BrokerProvider):
         is_mock = account.is_mock_mode
         logger.info("kiwoom_sync_start", account_no=account_no, is_mock=is_mock)
 
-        async def _do() -> dict:
-            token = await kiwoom_get_access_token(
+        async def _get_token(force_refresh: bool) -> str:
+            return await kiwoom_get_access_token(
                 app_key,
                 app_secret,
                 is_mock=is_mock,
@@ -54,22 +55,19 @@ class KiwoomProvider(BrokerProvider):
                 db=db,
                 user_id=str(account.user_id),
                 account_id=str(account.id),
+                force_refresh=force_refresh,
             )
-            try:
-                return await kiwoom_get_balance(token, account_no, is_mock=is_mock)
-            except KiwoomTokenExpiredError:
-                logger.warning("kiwoom_token_expired_refreshing", account_no=account_no)
-                refreshed = await kiwoom_get_access_token(
-                    app_key,
-                    app_secret,
-                    is_mock=is_mock,
-                    redis=redis,
-                    db=db,
-                    user_id=str(account.user_id),
-                    account_id=str(account.id),
-                    force_refresh=True,
-                )
-                return await kiwoom_get_balance(refreshed, account_no, is_mock=is_mock)
+
+        async def _fetch(token: str) -> dict:
+            return await kiwoom_get_balance(token, account_no, is_mock=is_mock)
+
+        async def _do() -> dict:
+            return await with_token_refresh(
+                _fetch,
+                _get_token,
+                KiwoomTokenExpiredError,
+                on_expired=lambda: logger.warning("kiwoom_token_expired_refreshing", account_no=account_no),
+            )
 
         try:
             domestic = await asyncio.wait_for(_do(), timeout=_SYNC_TIMEOUT)
@@ -95,7 +93,7 @@ class KiwoomProvider(BrokerProvider):
             raise ProviderApiError(msg, http_status=502) from e
 
         usd_krw_rate = await get_usd_krw_rate(redis)
-        positions = [_raw_to_position(p, usd_krw_rate) for p in domestic["positions"]]
+        positions = [raw_krw_to_position(p) for p in domestic["positions"]]
         stock_value_krw = domestic["total_value_krw"]
         total_value_krw = stock_value_krw + domestic["deposit_krw"]
         total_invested = domestic["invested_krw"]
@@ -111,16 +109,3 @@ class KiwoomProvider(BrokerProvider):
             usd_krw_rate=usd_krw_rate,
             extra={"source": "KIWOOM_API", "snapshot_date": date.today()},
         )
-
-
-def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
-    return Position(
-        ticker=p["ticker"],
-        name=p["name"],
-        market=p["market"],
-        qty=int(p.get("qty", 0)),
-        avg_price=float(p.get("avg_price", 0)),
-        current_price=float(p.get("current_price", 0)),
-        currency="KRW",
-        value_krw=float(p.get("value_krw", 0)) or float(p.get("current_price", 0)) * int(p.get("qty", 0)),
-    )

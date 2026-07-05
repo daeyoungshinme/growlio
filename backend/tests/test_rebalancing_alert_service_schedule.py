@@ -35,7 +35,7 @@ async def test_check_rebalancing_alerts_skips_when_should_not_fire_today(mock_db
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email:
@@ -69,7 +69,7 @@ async def test_check_rebalancing_alerts_skips_when_already_fired_today(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email:
@@ -102,7 +102,7 @@ async def test_check_rebalancing_alerts_analysis_failure_continues(mock_db):
     )
     portfolio = SimpleNamespace(id=portfolio_id, name="Test Portfolio", account_ids=None, items=[])
     execute_result = MagicMock()
-    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None)]
+    execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}

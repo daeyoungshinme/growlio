@@ -12,6 +12,7 @@ import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
+import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -212,6 +213,14 @@ export default function SettingsPage() {
           에서 포트폴리오별로 설정합니다.
         </p>
 
+        {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
+        <div className="mb-4">
+          <NotificationEmailSection
+            userEmail={current?.user_email}
+            onSettingsChange={invalidateSettings}
+          />
+        </div>
+
         {/* 알림 탭 */}
         <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4">
           {ALERT_TABS.map((tab) => (
@@ -229,12 +238,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {alertTab === "환율 알림" && (
-          <ExchangeRateAlertSection
-            userEmail={current?.user_email}
-            onSettingsChange={invalidateSettings}
-          />
-        )}
+        {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
         {alertTab === "주가 알림" && <StockPriceAlertSection />}
         {alertTab === "발송 이력" && <AlertHistorySection />}
       </div>
