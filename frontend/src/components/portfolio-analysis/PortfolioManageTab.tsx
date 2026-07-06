@@ -24,6 +24,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
+import { usePendingRecommendationStore } from "@/stores/pendingRecommendationStore";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
@@ -122,6 +123,20 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
       { replace: true },
     );
   }, [searchParams, setSearchParams]);
+
+  // GoalRecommendationCard의 "적용" 클릭을 받아 해당 포트폴리오 편집기를 추천 비중으로 미리 채워 연다.
+  const pendingRecommendation = usePendingRecommendationStore((s) => s.pending);
+  const clearPendingRecommendation = usePendingRecommendationStore((s) => s.clearPending);
+  useEffect(() => {
+    if (!pendingRecommendation) return;
+    const portfolio = portfolios.find((p) => p.id === pendingRecommendation.portfolioId);
+    if (!portfolio) return;
+    // 다른 컴포넌트(GoalRecommendationCard)가 발행한 외부 스토어 신호를 편집기 상태로 반영 — 1회성 소비 후 즉시 clear.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setEditingPortfolio({ ...portfolio, items: pendingRecommendation.items });
+    setEditorOpen(true);
+    clearPendingRecommendation();
+  }, [pendingRecommendation, portfolios, clearPendingRecommendation]);
 
   const selectedIds = useMemo(
     () => (selectedPortfolioId ? new Set([selectedPortfolioId]) : new Set<string>()),

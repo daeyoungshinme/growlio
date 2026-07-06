@@ -253,3 +253,26 @@ export interface CompositeSignalStatus {
 
 export const fetchCompositeSignalStatus = (): Promise<CompositeSignalStatus> =>
   apiGet<CompositeSignalStatus>(`/rebalancing/composite-signal`);
+
+// ── 목표 역산 추천 (로드맵 A 3단계) ──────────────────────────────
+
+export interface GoalRecommendationItem {
+  ticker: string;
+  name: string;
+  market: string;
+  weight: number;
+}
+
+export interface GoalRecommendation {
+  generated_at: string;
+  is_configured: boolean;
+  required_return_pct: number | null;
+  required_dividend_yield_pct: number | null;
+  recommended_items: GoalRecommendationItem[];
+  expected_return_pct: number | null;
+  expected_dividend_yield_pct: number | null;
+  note: string | null;
+}
+
+export const fetchGoalRecommendation = (portfolioId: string): Promise<GoalRecommendation> =>
+  apiGet<GoalRecommendation>(`/rebalancing/portfolios/${portfolioId}/goal-recommendation`);

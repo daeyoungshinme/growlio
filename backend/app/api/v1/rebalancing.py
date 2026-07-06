@@ -25,6 +25,7 @@ from app.providers.kiwoom_provider import KiwoomProvider
 from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     CompositeSignalStatus,
+    GoalRecommendation,
     KisBalancePosition,
     KisBalanceResponse,
     PortfolioDriftSummary,
@@ -42,6 +43,7 @@ from app.services.dividend_sync_sources import (
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
+from app.services.goal_recommendation_service import get_goal_recommendation
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.price_service import fetch_prices_batch, get_historical_returns
 from app.services.rebalancing_diagnosis_service import (
@@ -234,6 +236,31 @@ async def analyze_portfolio(
         analysis.diagnosis_context = None
 
     return analysis
+
+
+@router.get("/portfolios/{portfolio_id}/goal-recommendation", response_model=GoalRecommendation)
+@limiter.limit("5/minute")
+async def get_goal_recommendation_endpoint(
+    request: Request,
+    portfolio_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """투자 목표를 역산해 목표 달성에 필요한 포트폴리오 비중을 추천한다 (자동 적용 아님)."""
+    portfolio = await db.scalar(
+        select(Portfolio)
+        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
+        .where(Portfolio.id == portfolio_id, Portfolio.user_id == current_user.id)
+    )
+    if not portfolio:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+
+    portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=portfolio_acct_ids)
+    settings_row = await get_settings_row(db, current_user.id)
+
+    return await get_goal_recommendation(redis, portfolio, overview, settings_row)
 
 
 async def _fetch_broker_balance(

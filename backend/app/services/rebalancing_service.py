@@ -358,6 +358,16 @@ def _build_implicit_cash_item(
     )
 
 
+def compute_base_value_krw(portfolio: Portfolio, overview: dict) -> float:
+    """포트폴리오 base_type에 따른 기준 자산총액(KRW) — 목표역산 추천 등 base_krw가 필요한 곳에서 공용으로 사용."""
+    if portfolio.base_type == "TOTAL_ASSETS":
+        return float(overview.get("total_assets_krw", 0))
+    # STOCK_ONLY: 예수금을 항상 기준 자산에 포함
+    total_stock = float(overview.get("total_stock_krw", 0))
+    available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+    return total_stock + available_cash
+
+
 def analyze_rebalancing(
     portfolio: Portfolio,
     overview: dict,
@@ -366,12 +376,7 @@ def analyze_rebalancing(
     include_implicit_cash: bool = False,
 ) -> RebalancingAnalysis:
     """현재 자산(overview)과 목표 포트폴리오를 비교해 리밸런싱 분석 결과를 반환한다."""
-    if portfolio.base_type == "TOTAL_ASSETS":
-        base_krw = float(overview.get("total_assets_krw", 0))
-    else:  # STOCK_ONLY: 예수금을 항상 기준 자산에 포함
-        total_stock = float(overview.get("total_stock_krw", 0))
-        available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
-        base_krw = total_stock + available_cash
+    base_krw = compute_base_value_krw(portfolio, overview)
 
     current_map = _build_current_map(overview)
     result_items, target_keys = _build_target_items(

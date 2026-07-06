@@ -65,7 +65,7 @@ export default function DCAProjectionChart({ data }: Props) {
   const yDomain: [number, number] = [0, yMax];
 
   return (
-    <div className="card">
+    <div className="card pl-2 sm:pl-5">
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">
         이론 복리 곡선 vs 실제 자산
       </h3>
