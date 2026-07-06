@@ -79,6 +79,8 @@ cd backend && uv run mypy app/
 - `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
 - `ALLOWED_ORIGINS` — CORS 허용 출처 (쉼표 구분, 예: `http://localhost:5173`)
 - `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
+- `API_SEMAPHORE_LIMIT` — 외부 API 동시 호출 제한 세마포어 크기
+- `REDIS_CACHE_TTL_SECONDS` — 환율 등 Redis 캐시 기본 TTL
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -88,10 +90,6 @@ cd backend && uv run mypy app/
 - `DART_API_KEY` — opendart.fss.or.kr
 - `FRED_API_KEY` — fred.stlouisfed.org (미국 경제지표)
 - `FMP_API_KEY` — financialmodelingprep.com (증시 캘린더)
-
-**금융결제원 오픈뱅킹**:
-- `OPEN_BANKING_CLIENT_ID`, `OPEN_BANKING_CLIENT_SECRET`
-- `OPEN_BANKING_REDIRECT_URI`, `OPEN_BANKING_BASE_URL`
 
 **이메일 알림** (Resend HTTP API — Render 등 클라우드의 outbound SMTP 포트 차단을 피하기 위해 SMTP 대신 HTTPS API 사용):
 - `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TIMEOUT`
@@ -109,10 +107,13 @@ cd backend && uv run mypy app/
 
 ### 데이터 모델
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API/OPEN_BANKING) 조합으로 동작 결정
-- `AssetSnapshot` — 일별 계좌 스냅샷. `positions` JSONB에 종목 배열 저장. `(account_id, snapshot_date)` unique constraint
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정
+- `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
+- `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
 - `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
+
+> 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
 
 ```
 API Request
@@ -124,7 +125,6 @@ API Request
         ├── dashboard.py      # 대시보드 집계 라우터 (get_dashboard_summary 구현은 asset_aggregator.py)
         ├── dividends.py      # 배당금 요약 + 예상 배당금 + 월별 균등화 제안
         ├── invest.py         # DCA 분석
-        ├── open_banking.py   # 오픈뱅킹 계좌 연결
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk, /risk/{id}, /rebalancing-strategy
         ├── rebalancing.py    # 리밸런싱 추천
@@ -133,7 +133,7 @@ API Request
         ├── stocks.py         # 종목 검색
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
         ├── transactions.py   # 입출금/배당 내역 CRUD
-        ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (클라이언트당 개별 연결)
+        ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
         ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — 프론트 미연동, API만 존재 (구독/알림 job은 동작)
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
@@ -151,7 +151,7 @@ services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
-  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH)·AUTO 자동실행 주문 생성 (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용
+  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH)·AUTO 자동실행 주문 생성 (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`)
   ├── rebalancing_diagnosis_service.py  # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직 (alert 아님)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
@@ -175,6 +175,7 @@ services/
   ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리
   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (rebalancing_execution_service.py에서 분리)
   ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (rebalancing_execution_service.py에서 분리)
+  ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼 (양쪽 executor 공용)
   ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
   ├── rebalancing_service.py  # 리밸런싱 추천
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
@@ -223,11 +224,10 @@ providers/                    # 금융 데이터 provider
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── manual_provider.py      # 수동 입력 provider
-  ├── openbanking.py          # 오픈뱅킹 토큰 갱신 (`ensure_ob_token_fresh`)
-  └── openbanking_provider.py # 오픈뱅킹 계좌 조회 provider
+  └── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
-  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART 5회→120s, OpenBanking 3회→90s. 재시작 시 상태 초기화됨.
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART 5회→120s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출
@@ -246,7 +246,7 @@ jobs/                         # APScheduler 정기 작업
   ├── market_signal_alert.py  # 10분 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 자동 실행
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
-  ├── token_refresh.py        # 매일 06:00 KST KIS + 오픈뱅킹 토큰 갱신 (모든 활성 유저)
+  ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티
 ```
 
@@ -255,8 +255,6 @@ jobs/                         # APScheduler 정기 작업
 **자격증명 암호화:** KIS/키움 App Key/Secret은 `credential_service.py`의 AES-256으로 DB 저장. `encrypt()`/`decrypt()` 호출 필수.
 
 **현재가 조회 우선순위:** `price_service.py` — Yahoo Finance(yfinance, API 키 불필요) → KIS API. yfinance는 `run_in_executor`로 동기 함수 비동기 실행.
-
-**오픈뱅킹 토큰 자동 갱신:** `providers/openbanking.py`의 `ensure_ob_token_fresh(settings_row, db)` — 만료 1시간 전 `refresh_access_token()` 호출 후 DB commit. `sync_openbanking_account()`와 `token_refresh.py` 양쪽에서 호출됨.
 
 **USD/KRW 환율 캐싱:** `app/utils/currency.py`의 `get_usd_krw_rate(redis)` → Redis `usd_krw_rate` 키 조회(TTL: `settings.redis_cache_ttl_seconds`) → 없으면 `settings.usd_krw_fallback_rate` fallback. KIS API 성공 시 `cache_usd_krw_rate(redis, rate)` 호출로 갱신. 테스트 패치 경로: `app.utils.currency.cache_usd_krw_rate`.
 

@@ -292,7 +292,6 @@ describe("DCASettingsSection", () => {
       auto_dca_portfolio_id: "p1",
       auto_dca_account_id: "acc1",
       has_dart: false,
-      has_open_banking: false,
     } as unknown as SettingsData;
 
     renderWithProviders(<DCASettingsSection current={current} onSettingsChange={vi.fn()} />);

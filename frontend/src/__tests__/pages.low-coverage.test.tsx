@@ -184,11 +184,9 @@ vi.mock("@/hooks/useAccountMutations", () => ({
     updateDepositMutation: { mutate: vi.fn(), isPending: false },
     updateNameMutation: { mutate: vi.fn(), isPending: false },
     updateRealEstateMutation: { mutate: vi.fn(), isPending: false },
-    handleSyncBank: vi.fn(),
     handleSyncKisAccount: vi.fn(),
     deletingId: null,
     setDeletingId: vi.fn(),
-    syncingBankId: null,
     syncingStockIds: new Set(),
   })),
 }));
@@ -402,7 +400,7 @@ describe("SettingsPage", () => {
     vi.clearAllMocks();
     const { api } = await import("@/api/client");
     vi.mocked(api.get).mockResolvedValue({
-      data: { has_dart: false, has_open_banking: false, user_email: "test@example.com" },
+      data: { has_dart: false, user_email: "test@example.com" },
     });
   });
 
@@ -415,11 +413,6 @@ describe("SettingsPage", () => {
     expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
   });
 
-  it("오픈뱅킹 섹션이 표시된다", () => {
-    renderPage(<SettingsPage />);
-    expect(screen.getByText("금융결제원 오픈뱅킹")).toBeInTheDocument();
-  });
-
   it("알림 발송 이력 섹션이 표시된다", () => {
     renderPage(<SettingsPage />);
     fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
@@ -429,13 +422,6 @@ describe("SettingsPage", () => {
   it("DART API Key 입력 필드가 있다", () => {
     renderPage(<SettingsPage />);
     expect(screen.getByText("API Key")).toBeInTheDocument();
-  });
-
-  it("오픈뱅킹 연결 버튼이 표시된다", async () => {
-    renderPage(<SettingsPage />);
-    await waitFor(() => {
-      expect(screen.getByText("오픈뱅킹 연결")).toBeInTheDocument();
-    });
   });
 });
 

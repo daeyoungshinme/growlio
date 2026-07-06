@@ -123,17 +123,6 @@ export default function SettingsPage() {
     void invalidateSettings();
   };
 
-  const connectOpenBanking = async () => {
-    const r = await api.get<{ authorize_url: string }>("/open-banking/connect");
-    window.location.href = r.data.authorize_url;
-  };
-
-  const disconnectOpenBanking = async () => {
-    await api.delete("/open-banking/disconnect");
-    toast("오픈뱅킹 연결이 해제되었습니다", "success");
-    void invalidateSettings();
-  };
-
   return (
     <div className="space-y-6 max-w-xl">
       {/* DART OpenAPI */}
@@ -169,36 +158,6 @@ export default function SettingsPage() {
               className="px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
             >
               삭제
-            </button>
-          )}
-        </div>
-      </SectionCard>
-
-      {/* 오픈뱅킹 */}
-      <SectionCard
-        title="금융결제원 오픈뱅킹"
-        badge={current?.has_open_banking ? <ConnectedBadge /> : undefined}
-      >
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          오픈뱅킹을 연결하면 은행 통장 잔액을 자동으로 불러올 수 있습니다.
-          {current?.ob_token_expires_at && (
-            <> 토큰 만료: {new Date(current.ob_token_expires_at).toLocaleDateString("ko-KR")}</>
-          )}
-        </p>
-        <div className="flex items-center gap-3">
-          {current?.has_open_banking ? (
-            <button
-              onClick={disconnectOpenBanking}
-              className="px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-            >
-              연결 해제
-            </button>
-          ) : (
-            <button
-              onClick={connectOpenBanking}
-              className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
-            >
-              오픈뱅킹 연결
             </button>
           )}
         </div>

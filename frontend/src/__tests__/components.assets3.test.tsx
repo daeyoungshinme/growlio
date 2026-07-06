@@ -162,9 +162,7 @@ describe("BankAccountCard", () => {
         onDelete={vi.fn()}
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
-        onSync={vi.fn()}
         isDeleting={false}
-        isSyncing={false}
       />,
     );
     expect(screen.getByText("국민은행 입출금")).toBeDefined();
@@ -179,9 +177,7 @@ describe("BankAccountCard", () => {
         onDelete={vi.fn()}
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
-        onSync={vi.fn()}
         isDeleting={false}
-        isSyncing={false}
       />,
     );
     fireEvent.click(screen.getByLabelText("계좌명 수정"));
@@ -196,9 +192,7 @@ describe("BankAccountCard", () => {
         onDelete={onDelete}
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
-        onSync={vi.fn()}
         isDeleting={false}
-        isSyncing={false}
       />,
     );
     fireEvent.click(screen.getByLabelText("계좌 삭제"));
@@ -212,28 +206,10 @@ describe("BankAccountCard", () => {
         onDelete={vi.fn()}
         onEditModal={vi.fn()}
         onEditName={vi.fn()}
-        onSync={vi.fn()}
         isDeleting={false}
-        isSyncing={false}
       />,
     );
     expect(screen.getByLabelText("금액 수정")).toBeDefined();
-  });
-
-  it("shows sync button for OPEN_BANKING accounts", () => {
-    const obAccount = { ...mockBankAccount, data_source: "OPEN_BANKING" };
-    renderWithProviders(
-      <BankAccountCard
-        account={obAccount}
-        onDelete={vi.fn()}
-        onEditModal={vi.fn()}
-        onEditName={vi.fn()}
-        onSync={vi.fn()}
-        isDeleting={false}
-        isSyncing={false}
-      />,
-    );
-    expect(screen.getByLabelText("잔액 새로고침")).toBeDefined();
   });
 });
 

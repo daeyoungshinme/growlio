@@ -46,11 +46,6 @@ class UserSettings(Base):
     annual_dividend_goal: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
-    # 오픈뱅킹
-    ob_access_token: Mapped[str | None] = mapped_column(String)
-    ob_refresh_token: Mapped[str | None] = mapped_column(String)
-    ob_token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    ob_user_seq_no: Mapped[str | None] = mapped_column(String(20))
     # 알림 설정
     notification_email: Mapped[str | None] = mapped_column(String(255))
     monthly_report_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

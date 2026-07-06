@@ -19,7 +19,7 @@ cd frontend && npm run dev
 cd frontend && npm run build
 
 # 타입 체크만 (빌드 산출물 없음)
-cd frontend && npx tsc --noEmit
+cd frontend && npm run typecheck   # npx tsc --noEmit 과 동일
 ```
 
 ### API 타입 자동 생성
@@ -36,7 +36,7 @@ cd frontend && npm run generate:api-types
 cd frontend && npm run lint    # ESLint (eslint src)
 cd frontend && npm run test    # Vitest (vitest run)
 cd frontend && npm run test -- src/utils/__tests__/format.test.ts  # 단일 파일
-cd frontend && npm run test -- --watch                             # 워치 모드
+cd frontend && npm run test:watch                                  # 워치 모드
 cd frontend && npm run format  # Prettier (prettier --write src)
 ```
 
@@ -54,12 +54,18 @@ make build-android-release         # APK Release 빌드
 - `VITE_SUPABASE_ANON_KEY` — Supabase Anon Key (JWT)
 - `VITE_REDIRECT_URL` — OAuth/이메일 인증 후 리다이렉트 URL (예: https://yourdomain.com)
 - `VITE_API_DOMAIN` — API 서버 도메인 (Vite 프록시 설정에 사용, 예: localhost:8000)
+- `VITE_SENTRY_DSN` — Sentry 오류 추적 DSN (선택, 미설정 시 Sentry 비활성)
+- `VITE_SENTRY_RELEASE` — Sentry 릴리스 태그
 
 > `src/lib/supabase.ts`에서 import됨. `.env` 없으면 Supabase 클라이언트 초기화 실패.
+
+> **빌드 시 소스맵 업로드용** (CI/배포 환경 전용, `.env` 아님): `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_RELEASE`.
 
 ---
 
 ## Architecture (`frontend/src/`)
+
+> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨 — 현재 221개 파일이 `@/`, 9개만 상대경로 사용 중. 이 문서의 예시 코드 중 일부는 과거 상대경로(`"../utils/..."`) 스타일로 남아있을 수 있음.
 
 **페이지 구성** (실제 라우트는 `src/App.tsx` 참고 — 인증 필요 라우트는 `/` 하위 `PrivateRoute`로 감싸짐):
 - `/login` — 로그인 (LoginPage)
@@ -70,7 +76,7 @@ make build-android-release         # APK Release 빌드
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — KIS/키움 자격증명, 오픈뱅킹 연결, 투자/입금 목표 설정
+- `/settings` — KIS/키움 자격증명, 투자/입금 목표 설정
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
@@ -90,6 +96,11 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 `components/common/` 주요 파일: `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
+
+- **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동).
+- **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
+
+**Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
 
 **데이터 흐름:**
 ```
@@ -153,9 +164,23 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 **Zod 스키마 (`src/schemas/`):**
 - `assets.ts`, `auth.ts`, `portfolios.ts`, `settings.ts`, `transaction.ts` — 폼 입력값 런타임 유효성 검사 (Zod). 새 폼 추가 시 이 디렉토리에 스키마 파일 추가.
 
-**테스트 위치:** `src/utils/__tests__/*.test.ts` (Vitest). 유틸 함수 단위 테스트: `format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`.
+**테스트 위치 (Vitest):**
+- `src/utils/__tests__/*.test.ts` — 순수 유틸 함수 단위 테스트 (`format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`, `accounts.test.ts`, `diagnosisInsights.test.ts`, `platform.test.ts`, `toast.test.ts` 등)
+- `src/__tests__/components.*.test.tsx` — 컴포넌트 테스트 (10개)
+- `src/__tests__/pages.*.test.tsx` — 페이지 테스트 (9개)
+- `src/__tests__/hooks.*.test.ts(x)` — 커스텀 훅 테스트 (7개)
+- `src/__tests__/api.*.test.ts` — API 레이어 테스트 (7개)
+- 도메인별 개별 위치: 예) `src/components/rebalancing/__tests__/rebalancingTradeMath.test.ts`
 
-> 테스트 대상: 순수 유틸 함수 (`utils/`, `constants/`) — React 컴포넌트·React Query 훅은 테스트하지 않음. 새 유틸 추가 시 동일 디렉토리에 `*.test.ts` 작성.
+> 순수 유틸뿐 아니라 컴포넌트·훅·페이지·API 레이어 모두 테스트 대상. 새 유틸은 동일 디렉토리에 `*.test.ts`, 새 컴포넌트/훅/페이지는 `src/__tests__/`에 대응 파일 작성. `vite.config.ts`에 커버리지 임계값(lines/functions/branches/statements) 설정됨.
+
+**E2E 테스트 (Playwright):**
+```bash
+# dev 서버(localhost:5173)가 실행 중이어야 함 — package.json에 전용 npm 스크립트 없음
+cd frontend && npx playwright test
+```
+- 설정: `playwright.config.ts`
+- 위치: `e2e/` — `auth.setup.ts`(로그인 상태 저장), `auth.spec.ts`, `dashboard.spec.ts`, `asset-management.spec.ts`, `portfolio.spec.ts`, `transactions.spec.ts`
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 

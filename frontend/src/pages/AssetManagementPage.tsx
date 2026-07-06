@@ -73,11 +73,9 @@ export default function AssetManagementPage() {
     updateDepositMutation,
     updateNameMutation,
     updateRealEstateMutation,
-    handleSyncBank,
     handleSyncKisAccount,
     deletingId,
     setDeletingId,
-    syncingBankId,
     syncingStockIds,
   } = useAccountMutations({
     onBankModalClose: () => setShowBankModal(false),
@@ -240,9 +238,7 @@ export default function AssetManagementPage() {
                       if (acc) setEditingBankAccount(acc);
                     }}
                     onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
-                    onSync={handleSyncBank}
                     isDeleting={deletingId === account.id && deleteMutation.isPending}
-                    isSyncing={syncingBankId === account.id}
                   />
                 ))}
               </div>

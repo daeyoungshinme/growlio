@@ -98,7 +98,6 @@ vi.mock("@/api/invest", () => ({
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn().mockResolvedValue({
     has_dart: false,
-    has_open_banking: false,
     user_email: "test@example.com",
     annual_deposit_goal: null,
     retirement_target_year: null,
@@ -235,17 +234,6 @@ describe("SettingsPage", () => {
     );
     await waitFor(() => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeDefined();
-    });
-  });
-
-  it("renders open banking section", async () => {
-    renderWithProviders(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>,
-    );
-    await waitFor(() => {
-      expect(screen.getByText("금융결제원 오픈뱅킹")).toBeDefined();
     });
   });
 

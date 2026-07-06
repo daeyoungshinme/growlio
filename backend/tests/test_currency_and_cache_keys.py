@@ -24,7 +24,6 @@ from app.utils.cache_keys import (
     invalidate_rebalancing_strategy_cache,
     invalidate_user_caches,
     monthly_trend_key,
-    ob_state_key,
     portfolio_list_key,
     portfolio_overview_key,
     portfolio_overview_lite_key,
@@ -78,10 +77,6 @@ class TestCacheKeyBuilders:
         uid = uuid.uuid4()
         key = alloc_history_key(uid, 12)
         assert "12" in key
-
-    def test_ob_state_key(self, override_settings):
-        key = ob_state_key("random_state_xyz")
-        assert "random_state_xyz" in key
 
     def test_has_overseas_key(self, override_settings):
         key = has_overseas_key(42)

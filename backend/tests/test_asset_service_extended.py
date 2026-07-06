@@ -34,14 +34,6 @@ class TestGetProvider:
         provider = get_provider(account)
         assert isinstance(provider, ManualProvider)
 
-    def test_open_banking_returns_ob_provider(self, override_settings, make_account):
-        from app.providers.openbanking_provider import OpenBankingProvider
-        from app.services.asset_service import get_provider
-
-        account = make_account(data_source="OPEN_BANKING")
-        provider = get_provider(account)
-        assert isinstance(provider, OpenBankingProvider)
-
     def test_unknown_raises_credential_error(self, override_settings, make_account):
         from app.exceptions import ProviderCredentialError
         from app.services.asset_service import get_provider

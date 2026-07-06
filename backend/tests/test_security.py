@@ -95,7 +95,6 @@ class TestCrossUserAccess:
             sort_order=0,
             notes=None,
             created_at=datetime.now(UTC),
-            ob_fintech_use_no=None,
             kis_app_key=None,
             kis_app_secret=None,
             kiwoom_app_key=None,

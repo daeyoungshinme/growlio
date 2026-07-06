@@ -29,7 +29,7 @@ VALID_MARKETS: frozenset[str] = frozenset({"KOSPI", "KOSDAQ", "NYSE", "NASDAQ", 
 
 
 class AssetAccount(Base):
-    """자산 계좌 마스터 — 수동/KIS API/오픈뱅킹 계좌를 통합 관리"""
+    """자산 계좌 마스터 — 수동/KIS API/키움 API 계좌를 통합 관리"""
 
     __tablename__ = "asset_accounts"
 
@@ -40,14 +40,9 @@ class AssetAccount(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     # BANK_ACCOUNT | DEPOSIT | STOCK_KIS | STOCK_KIWOOM | STOCK_OTHER | CASH_OTHER | OTHER | REAL_ESTATE
     asset_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    # MANUAL | KIS_API | KIWOOM_API | OPEN_BANKING
+    # MANUAL | KIS_API | KIWOOM_API
     data_source: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     institution: Mapped[str | None] = mapped_column(String(100))
-
-    # 오픈뱅킹 연결 정보
-    ob_bank_code: Mapped[str | None] = mapped_column(String(10))
-    ob_account_no_encrypted: Mapped[str | None] = mapped_column(String(200))
-    ob_fintech_use_no: Mapped[str | None] = mapped_column(String(50), unique=True)
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))
@@ -122,7 +117,7 @@ class AssetSnapshot(Base):
     invested_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     unrealized_pnl: Mapped[float | None] = mapped_column(Numeric(18, 2))
 
-    # MANUAL | KIS_API | KIWOOM_API | OPEN_BANKING
+    # MANUAL | KIS_API | KIWOOM_API
     source: Mapped[str] = mapped_column(String(20), default="MANUAL", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

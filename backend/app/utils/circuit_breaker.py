@@ -113,6 +113,5 @@ kis_circuit = _make("KIS", _cfg().cb_default_fail_max, _cfg().cb_default_reset_t
 kiwoom_circuit = _make("Kiwoom", _cfg().cb_default_fail_max, _cfg().cb_default_reset_timeout)
 yahoo_circuit = _make("YahooFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
 dart_circuit = _make("DART", _cfg().cb_default_fail_max, _cfg().cb_ext_reset_timeout)
-openbanking_circuit = _make("OpenBanking", _cfg().cb_ext_fail_max, 90.0)
 naver_circuit = _make("NaverFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
 fdr_circuit = _make("FinanceDataReader", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)

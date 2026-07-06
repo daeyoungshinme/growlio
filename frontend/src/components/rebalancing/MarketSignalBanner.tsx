@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ShieldAlert, TrendingDown, TrendingUp } from "lucide-react";
+import { Bell, ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
@@ -376,33 +376,38 @@ export default function MarketSignalBanner({ signal }: Props) {
         </div>
       )}
 
-      {/* 시장/리스크 복합신호 알림 토글 — isOpen 상태와 무관하게 항상 표시 */}
+      {/* 시장 위험 신호 알림 설정 — isOpen 상태와 무관하게 항상 표시. 배너 상태색과 분리된 중립 배경으로 "설정 영역"임을 구분 */}
       {compositeStatus && (
-        <div className="flex flex-col gap-1 px-4 py-2.5 border-t border-inherit">
+        <div className="flex flex-col gap-1 px-4 py-2.5 border-t border-inherit bg-gray-50/80 dark:bg-gray-900/40 rounded-b-xl">
           <div className="flex items-center gap-2">
-            <ShieldAlert size={13} className="text-gray-400 shrink-0" />
+            <Bell size={13} className="text-gray-400 shrink-0" />
             <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
-              시장/리스크 알림
+              시장 위험 신호 알림 설정
             </span>
-            <p className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
-              {compositeStatus.triggered && compositeStatus.reason
-                ? compositeStatus.reason
-                : compositeStatus.enabled
-                  ? "이탈이 없어도 시장/리스크가 위험 수준이면 알림을 보내드려요"
-                  : "알림이 꺼져 있어 신호를 평가하지 않습니다"}
-            </p>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+            <span
+              className={`text-xs font-semibold shrink-0 ${compositeStatus.enabled ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+            >
+              {compositeStatus.enabled ? "받는 중" : "꺼짐"}
+            </span>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-auto">
               <input
                 type="checkbox"
                 checked={compositeStatus.enabled}
                 disabled={toggleMut.isPending}
                 onChange={(e) => toggleMut.mutate(e.target.checked)}
                 className="sr-only peer"
-                aria-label="시장/리스크 신호 알림 받기"
+                aria-label="시장 위험 신호 알림 설정 켜기/끄기"
               />
               <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 ml-5">
+            {compositeStatus.triggered && compositeStatus.reason
+              ? compositeStatus.reason
+              : compositeStatus.enabled
+                ? "이탈이 없어도 시장/리스크가 위험 수준이면 알림을 보내드려요"
+                : "알림이 꺼져 있어 신호를 평가하지 않습니다"}
+          </p>
           <Link
             to="/settings?atab=시장 신호 알림"
             className="text-xs text-blue-600 dark:text-blue-400 underline self-start ml-5"

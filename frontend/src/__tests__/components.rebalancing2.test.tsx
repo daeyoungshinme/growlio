@@ -174,7 +174,12 @@ describe("MarketSignalBanner", () => {
 
   it("shows composite signal alert toggle once loaded", async () => {
     renderBanner();
-    expect(await screen.findByLabelText("시장/리스크 신호 알림 받기")).toBeDefined();
+    expect(await screen.findByLabelText("시장 위험 신호 알림 설정 켜기/끄기")).toBeDefined();
+  });
+
+  it("shows the on/off state text next to the toggle", async () => {
+    renderBanner();
+    expect(await screen.findByText("받는 중")).toBeDefined();
   });
 
   it("shows a labeled link back to the settings page for full explanation", async () => {
@@ -185,7 +190,7 @@ describe("MarketSignalBanner", () => {
 
   it("labels the toggle row so it isn't a bare checkbox", async () => {
     renderBanner();
-    expect(await screen.findByText("시장/리스크 알림")).toBeDefined();
+    expect(await screen.findByText("시장 위험 신호 알림 설정")).toBeDefined();
   });
 });
 

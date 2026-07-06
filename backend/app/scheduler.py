@@ -49,7 +49,7 @@ def init_scheduler() -> None:
 
     scheduler.add_job(
         run_market_signal_alert_check,
-        IntervalTrigger(minutes=10),
+        IntervalTrigger(hours=1),
         id="market_signal_alert_check_interval",
         replace_existing=True,
     )

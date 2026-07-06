@@ -23,7 +23,6 @@ from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
-from app.providers.openbanking_provider import OpenBankingProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
     RedisType,
@@ -37,7 +36,6 @@ logger = structlog.get_logger()
 _PROVIDERS: dict[str, BrokerProvider] = {
     "KIS_API": KISProvider(),
     "KIWOOM_API": KiwoomProvider(),
-    "OPEN_BANKING": OpenBankingProvider(),
     "MANUAL": ManualProvider(),
 }
 

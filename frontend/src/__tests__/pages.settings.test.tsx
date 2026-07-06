@@ -79,8 +79,6 @@ import { fetchAlertHistory } from "@/api/alerts";
 
 const mockSettings = {
   has_dart: false,
-  has_open_banking: false,
-  ob_token_expires_at: null,
   user_email: "user@example.com",
 };
 
@@ -113,7 +111,6 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
     });
-    expect(screen.getByText("금융결제원 오픈뱅킹")).toBeInTheDocument();
     expect(screen.getByTestId("exchange-rate-alert-section")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "주가 알림" }));
     await waitFor(() => {
@@ -214,36 +211,6 @@ describe("SettingsPage", () => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
     });
     expect(screen.queryByRole("button", { name: "삭제" })).not.toBeInTheDocument();
-  });
-
-  it("has_open_banking가 true이면 연결 해제 버튼을 표시한다", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { ...mockSettings, has_open_banking: true } });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "연결 해제" })).toBeInTheDocument();
-    });
-  });
-
-  it("has_open_banking가 false이면 오픈뱅킹 연결 버튼을 표시한다", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: { ...mockSettings, has_open_banking: false } });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "오픈뱅킹 연결" })).toBeInTheDocument();
-    });
-  });
-
-  it("ob_token_expires_at이 있으면 토큰 만료 날짜를 표시한다", async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: {
-        ...mockSettings,
-        has_open_banking: true,
-        ob_token_expires_at: "2025-01-01T00:00:00Z",
-      },
-    });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByText(/토큰 만료/)).toBeInTheDocument();
-    });
   });
 
   it("DART API 키를 저장하면 성공 토스트를 표시한다", async () => {

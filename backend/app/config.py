@@ -52,11 +52,6 @@ class Settings(BaseSettings):
     fred_api_key: str = ""  # fred.stlouisfed.org — 미국 경제지표 (무료 API 키)
     fmp_api_key: str = ""  # financialmodelingprep.com — 증시 캘린더 (무료 API 키)
 
-    open_banking_client_id: str = ""
-    open_banking_client_secret: str = ""
-    open_banking_redirect_uri: str = "http://localhost:8000/api/v1/open-banking/callback"
-    open_banking_base_url: str = "https://testapi.openbanking.or.kr"
-
     # 이메일 알림 (Resend HTTP API)
     resend_api_key: str = ""
     email_from: str = "growlio@example.com"

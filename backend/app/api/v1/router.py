@@ -11,7 +11,6 @@ from app.api.v1 import (
     insights,
     invest,
     market_signals,
-    open_banking,
     portfolio_analysis,
     portfolios,
     rebalancing,
@@ -31,7 +30,6 @@ router.include_router(dashboard.router)
 router.include_router(portfolio_analysis.router)
 router.include_router(portfolios.router)
 router.include_router(settings.router)
-router.include_router(open_banking.router)
 router.include_router(stocks.router)
 router.include_router(transactions.router)
 router.include_router(dividends.router)

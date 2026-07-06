@@ -23,7 +23,6 @@ export function useAccountMutations({
 }: Options) {
   const queryClient = useQueryClient();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [syncingBankId, setSyncingBankId] = useState<string | null>(null);
   const [syncingStockIds, setSyncingStockIds] = useState<Set<string>>(new Set());
 
   const invalidateAll = useCallback(() => invalidateAccountData(queryClient), [queryClient]);
@@ -125,22 +124,6 @@ export function useAccountMutations({
     onError: (e) => toast(extractErrorMessage(e, "부동산 정보 수정에 실패했습니다"), "error"),
   });
 
-  const handleSyncBank = useCallback(
-    async (id: string) => {
-      setSyncingBankId(id);
-      try {
-        await syncAccount(id);
-        void invalidateAll();
-        toast("동기화 완료", "success");
-      } catch {
-        toast("동기화에 실패했습니다");
-      } finally {
-        setSyncingBankId(null);
-      }
-    },
-    [invalidateAll],
-  );
-
   const handleSyncKisAccount = useCallback(
     async (id: string, accounts: AssetAccount[]) => {
       const acc = accounts.find((a) => a.id === id);
@@ -171,11 +154,9 @@ export function useAccountMutations({
     updateDepositMutation,
     updateNameMutation,
     updateRealEstateMutation,
-    handleSyncBank,
     handleSyncKisAccount,
     deletingId,
     setDeletingId,
-    syncingBankId,
     syncingStockIds,
     invalidateAll,
   };

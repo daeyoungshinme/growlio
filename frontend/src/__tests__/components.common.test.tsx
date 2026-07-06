@@ -90,9 +90,7 @@ describe("BankAccountCard", () => {
     onDelete: vi.fn(),
     onEditModal: vi.fn(),
     onEditName: vi.fn(),
-    onSync: vi.fn(),
     isDeleting: false,
-    isSyncing: false,
   };
 
   it("계좌명과 기관명을 표시한다", () => {
@@ -145,16 +143,6 @@ describe("BankAccountCard", () => {
       <BankAccountCard account={makeAccount() as unknown as AssetAccount} {...defaultProps} />,
     );
     expect(screen.getByLabelText("금액 수정")).toBeInTheDocument();
-  });
-
-  it("OPEN_BANKING 데이터소스이면 새로고침 버튼이 나온다", () => {
-    renderWithProviders(
-      <BankAccountCard
-        account={makeAccount({ data_source: "OPEN_BANKING" }) as never}
-        {...defaultProps}
-      />,
-    );
-    expect(screen.getByLabelText("잔액 새로고침")).toBeInTheDocument();
   });
 
   it("계좌명 수정 버튼 클릭 시 편집 모드로 전환된다", () => {

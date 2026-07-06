@@ -29,7 +29,6 @@ TTL_ALLOC_HISTORY = 86400  # 포트폴리오 배분 이력 1일
 TTL_DIVIDEND_INFO = 86400  # 배당 정보 1일
 TTL_DART = 3600  # DART 공시 1시간
 TTL_DIVIDEND_MONTHS = 604800  # 배당 월별 데이터 7일
-TTL_OB_STATE = 600  # 오픈뱅킹 OAuth state 10분
 TTL_HAS_OVERSEAS_TRUE = 21600  # 해외 보유 중 6시간
 TTL_HAS_OVERSEAS_FALSE = 900  # 해외 없음 15분 (신규 매수 시 빠른 반영)
 TTL_DIVIDEND_SUMMARY = 3600  # 배당 집계 1시간
@@ -47,7 +46,6 @@ TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_DCA = 3600  # DCA 자동매수 분산 락
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
-TTL_OB_TOKEN = 90 * 24 * 3600  # 금융결제원 기본 토큰 유효기간 90일
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
@@ -101,10 +99,6 @@ def correlation_key(user_id: uuid.UUID, param_hash: str) -> str:
 
 def alloc_history_key(user_id: uuid.UUID, months: int) -> str:
     return f"{_env_prefix()}alloc_history_v2:{user_id}:{months}"
-
-
-def ob_state_key(state: str) -> str:
-    return f"{_env_prefix()}ob_state:{state}"
 
 
 def has_overseas_key(account_id: uuid.UUID) -> str:

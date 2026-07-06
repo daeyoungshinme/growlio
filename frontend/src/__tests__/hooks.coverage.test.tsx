@@ -663,7 +663,6 @@ describe("useAccountMutations", () => {
       wrapper: createWrapper(),
     });
     expect(result.current.deletingId).toBeNull();
-    expect(result.current.syncingBankId).toBeNull();
     expect(result.current.syncingStockIds.size).toBe(0);
   });
 
@@ -679,38 +678,6 @@ describe("useAccountMutations", () => {
     });
 
     expect(toast).toHaveBeenCalledWith("계좌가 삭제되었습니다", "success");
-  });
-
-  it("handleSyncBank 성공 시 toast를 호출한다", async () => {
-    const { toast } = await import("@/utils/toast");
-    vi.mocked(api.post).mockResolvedValue({ data: { synced: true } });
-
-    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await result.current.handleSyncBank("acc-1");
-    });
-
-    expect(toast).toHaveBeenCalledWith("동기화 완료", "success");
-    expect(result.current.syncingBankId).toBeNull();
-  });
-
-  it("handleSyncBank 실패 시 에러 toast를 호출한다", async () => {
-    const { toast } = await import("@/utils/toast");
-    vi.mocked(api.post).mockRejectedValue(new Error("sync failed"));
-
-    const { result } = renderHook(() => useAccountMutations(mockCallbacks), {
-      wrapper: createWrapper(),
-    });
-
-    await act(async () => {
-      await result.current.handleSyncBank("acc-1");
-    });
-
-    expect(toast).toHaveBeenCalledWith("동기화에 실패했습니다");
-    expect(result.current.syncingBankId).toBeNull();
   });
 
   it("createMutation 성공 시 (MANUAL) toast와 onBankModalClose를 호출한다", async () => {

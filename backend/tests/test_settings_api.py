@@ -85,8 +85,6 @@ class TestGetSettings:
         db = _make_mock_db()
         settings = SimpleNamespace(
             dart_api_key="encrypted_key",
-            ob_access_token=None,
-            ob_token_expires_at=None,
             goal_amount=100_000_000,
             goal_annual_return_pct=7.0,
             annual_deposit_goal=10_000_000,

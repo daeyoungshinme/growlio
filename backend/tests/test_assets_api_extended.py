@@ -36,7 +36,6 @@ def _make_account(user_id, account_id=None):
         manual_amount=None,
         manual_positions=None,
         manual_currency="KRW",
-        ob_fintech_use_no=None,
         kis_account_no=None,
         kis_app_key=None,
         kis_app_secret=None,

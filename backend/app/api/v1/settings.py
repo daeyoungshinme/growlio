@@ -95,8 +95,6 @@ class CompositeSignalAlertsUpdate(BaseModel):
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
-    has_open_banking: bool
-    ob_token_expires_at: str | None
     goal_amount: float | None
     goal_annual_return_pct: float | None
     annual_deposit_goal: float | None
@@ -130,8 +128,6 @@ async def get_settings(
         return SettingsResponse(
             has_kis=has_kis,
             has_dart=False,
-            has_open_banking=False,
-            ob_token_expires_at=None,
             goal_amount=None,
             goal_annual_return_pct=None,
             annual_deposit_goal=None,
@@ -141,8 +137,6 @@ async def get_settings(
     return SettingsResponse(
         has_kis=has_kis,
         has_dart=bool(row.dart_api_key),
-        has_open_banking=bool(row.ob_access_token),
-        ob_token_expires_at=row.ob_token_expires_at.isoformat() if row.ob_token_expires_at else None,
         goal_amount=float(row.goal_amount) if row.goal_amount else None,
         goal_annual_return_pct=float(row.goal_annual_return_pct) if row.goal_annual_return_pct else None,
         annual_deposit_goal=float(row.annual_deposit_goal) if row.annual_deposit_goal else None,

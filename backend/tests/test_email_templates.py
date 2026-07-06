@@ -149,7 +149,7 @@ class TestMarketSignalChangeTemplate:
     def test_footer_explains_frequency_and_settings_path(self):
         _, html = market_signal_change_template("GREEN", "RED", "시장 위험 신호가 높은 국면입니다")
         assert "등급이 바뀔 때마다" in html
-        assert "10분 간격" in html
+        assert "1시간 간격" in html
         assert "시장 신호 알림" in html
 
 

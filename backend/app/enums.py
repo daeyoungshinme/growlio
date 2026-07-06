@@ -19,7 +19,6 @@ class DataSource(StrEnum):
     MANUAL = "MANUAL"
     KIS_API = "KIS_API"
     KIWOOM_API = "KIWOOM_API"
-    OPEN_BANKING = "OPEN_BANKING"
 
 
 class TransactionType(StrEnum):

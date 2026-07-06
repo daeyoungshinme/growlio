@@ -162,8 +162,6 @@ class AssetAccountCreate(BaseModel):
     kiwoom_account_no: str | None = None
     kiwoom_app_key: str | None = None  # 키움 App Key (평문, 저장 시 암호화)
     kiwoom_app_secret: str | None = None  # 키움 App Secret (평문, 저장 시 암호화)
-    ob_fintech_use_no: str | None = None
-    ob_bank_code: str | None = None
     is_mock_mode: bool = True
     manual_amount: float | None = None
     manual_currency: str = "KRW"

@@ -513,7 +513,7 @@ def market_signal_change_template(old_level: str, new_level: str, reason: str | 
         "시장 위험 신호 변경 알림",
         new_color,
         body,
-        "이 알림은 시장 위험 신호 등급이 바뀔 때마다(10분 간격 점검) 발송됩니다.<br>"
+        "이 알림은 시장 위험 신호 등급이 바뀔 때마다(1시간 간격 점검) 발송됩니다.<br>"
         "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
         "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
     )

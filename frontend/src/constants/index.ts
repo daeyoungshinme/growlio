@@ -21,13 +21,11 @@ export const DATA_SOURCE_LABELS: Record<string, string> = {
   MANUAL: "수동",
   KIS_API: "KIS 자동",
   KIWOOM_API: "키움 자동",
-  OPEN_BANKING: "오픈뱅킹",
 };
 
 export const DATA_SOURCE_BADGE: Record<string, string> = {
   KIS_API: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400",
   KIWOOM_API: "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400",
-  OPEN_BANKING: "bg-green-50 dark:bg-green-950 text-green-600 dark:text-green-400",
   MANUAL: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 

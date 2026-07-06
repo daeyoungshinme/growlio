@@ -5,12 +5,11 @@ import type { AssetAccount } from "@/api/assets";
 import { syncAccount } from "@/api/assets";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 
-const SYNCABLE_SOURCES = ["KIS_API", "KIWOOM_API", "OPEN_BANKING"];
+const SYNCABLE_SOURCES = ["KIS_API", "KIWOOM_API"];
 
 const SOURCE_LABEL: Record<string, string> = {
   KIS_API: "KIS",
   KIWOOM_API: "키움",
-  OPEN_BANKING: "오픈뱅킹",
 };
 
 type SyncResult = "idle" | "syncing" | "done" | "error";

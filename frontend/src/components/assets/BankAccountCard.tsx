@@ -1,4 +1,4 @@
-import { Pencil, Trash2, RefreshCw } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -11,9 +11,7 @@ interface Props {
   onDelete: (id: string) => void;
   onEditModal: (id: string) => void;
   onEditName: (id: string, name: string) => void;
-  onSync: (id: string) => void;
   isDeleting: boolean;
-  isSyncing: boolean;
 }
 
 export default function BankAccountCard({
@@ -21,9 +19,7 @@ export default function BankAccountCard({
   onDelete,
   onEditModal,
   onEditName,
-  onSync,
   isDeleting,
-  isSyncing,
 }: Props) {
   const usdRate = useExchangeRate();
   const typeLabel = BANK_TYPE_LABELS[account.asset_type] ?? account.asset_type;
@@ -80,17 +76,6 @@ export default function BankAccountCard({
             className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
             <Pencil size={15} />
-          </button>
-        )}
-        {account.data_source === "OPEN_BANKING" && (
-          <button
-            onClick={() => onSync(account.id)}
-            disabled={isSyncing}
-            title="잔액 새로고침"
-            aria-label="잔액 새로고침"
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors disabled:opacity-40`}
-          >
-            <RefreshCw size={15} className={isSyncing ? "animate-spin" : ""} />
           </button>
         )}
         <button

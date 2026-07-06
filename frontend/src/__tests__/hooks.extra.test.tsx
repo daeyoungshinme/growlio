@@ -63,7 +63,6 @@ vi.mock("@/api/invest", () => ({
 vi.mock("@/api/settings", () => ({
   fetchSettings: vi.fn().mockResolvedValue({
     has_dart: false,
-    has_open_banking: false,
     user_email: "test@example.com",
     annual_deposit_goal: null,
     retirement_target_year: null,

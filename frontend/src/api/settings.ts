@@ -3,8 +3,6 @@ import { apiGet, apiPut } from "./client";
 export interface SettingsData {
   has_kis: boolean;
   has_dart: boolean;
-  has_open_banking: boolean;
-  ob_token_expires_at: string | null;
   goal_amount: number | null;
   goal_annual_return_pct: number | null;
   annual_deposit_goal: number | null;

@@ -32,14 +32,6 @@ services:
         sync: false
       - key: DART_API_KEY
         sync: false
-      - key: OPEN_BANKING_CLIENT_ID
-        sync: false
-      - key: OPEN_BANKING_CLIENT_SECRET
-        sync: false
-      - key: OPEN_BANKING_REDIRECT_URI
-        sync: false
-      - key: OPEN_BANKING_BASE_URL
-        sync: false
       - key: RESEND_API_KEY
         sync: false
       - key: EMAIL_FROM

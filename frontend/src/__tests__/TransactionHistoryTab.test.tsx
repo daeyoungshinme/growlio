@@ -62,7 +62,7 @@ const mockAccounts: AssetAccount[] = [
     id: "acc-2",
     name: "은행 계좌",
     asset_type: "BANK_ACCOUNT",
-    data_source: "OPEN_BANKING",
+    data_source: "MANUAL",
     institution: "국민은행",
     kis_account_no: null,
     kiwoom_account_no: null,
