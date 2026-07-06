@@ -43,15 +43,25 @@ from app.services.dividend_sync_sources import (
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
 )
-from app.services.goal_recommendation_service import get_goal_recommendation
+from app.services.goal_recommendation_service import (
+    existing_items_from_portfolio,
+    existing_items_from_positions,
+    get_goal_recommendation,
+)
 from app.services.portfolio_service import build_portfolio_overview
+from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import fetch_prices_batch, get_historical_returns
 from app.services.rebalancing_diagnosis_service import (
     build_diagnosis_context,
     check_composite_signal,
     fetch_market_and_risk_signal,
 )
-from app.services.rebalancing_service import _item_attr, analyze_rebalancing, compute_portfolio_drift_summary
+from app.services.rebalancing_service import (
+    _item_attr,
+    analyze_rebalancing,
+    compute_base_value_krw,
+    compute_portfolio_drift_summary,
+)
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
@@ -260,7 +270,27 @@ async def get_goal_recommendation_endpoint(
     overview = await build_portfolio_overview(current_user.id, db, account_ids=portfolio_acct_ids)
     settings_row = await get_settings_row(db, current_user.id)
 
-    return await get_goal_recommendation(redis, portfolio, overview, settings_row)
+    base_krw = compute_base_value_krw(portfolio, overview)
+    existing_items = existing_items_from_portfolio(portfolio)
+    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row)
+
+
+@router.get("/goal-recommendation", response_model=GoalRecommendation)
+@limiter.limit("5/minute")
+async def get_overall_goal_recommendation_endpoint(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
+    overview = await build_portfolio_overview(current_user.id, db, redis=redis)
+    settings_row = await get_settings_row(db, current_user.id)
+
+    base_krw = float(overview.get("total_assets_krw", 0))
+    pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
+    existing_items = existing_items_from_positions(pos_map)
+    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row)
 
 
 async def _fetch_broker_balance(

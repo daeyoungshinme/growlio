@@ -30,7 +30,7 @@ from app.services.dividend_sync_sources import (
 from app.services.goal_return_solver import solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.price_service import get_historical_returns
-from app.services.rebalancing_service import _item_attr, compute_base_value_krw
+from app.services.rebalancing_service import _item_attr
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import to_yf_symbol
 from app.utils.cache_keys import RedisType
@@ -165,13 +165,31 @@ def _optimize_goal_portfolio(
     return items, expected_return, None
 
 
+def existing_items_from_portfolio(portfolio: Portfolio) -> list[tuple[str, str, str]]:
+    """포트폴리오의 목표 종목 중 CASH/KR_PROPERTY를 제외해 추천 후보 시드로 사용."""
+    return [
+        (str(_item_attr(i, "ticker")), str(_item_attr(i, "name")), str(_item_attr(i, "market")))
+        for i in portfolio.items
+        if str(_item_attr(i, "ticker")) != "CASH" and str(_item_attr(i, "market")) != "KR_PROPERTY"
+    ]
+
+
+def existing_items_from_positions(pos_map: dict[str, dict]) -> list[tuple[str, str, str]]:
+    """전체 계좌 실제 보유 포지션(query_latest_position_map 결과)을 추천 후보 시드로 사용."""
+    return [
+        (p["ticker"], p.get("name") or p["ticker"], p["market"])
+        for p in pos_map.values()
+        if p["ticker"] != "CASH" and p["market"] != "KR_PROPERTY"
+    ]
+
+
 async def get_goal_recommendation(
     redis: RedisType,
-    portfolio: Portfolio,
-    overview: dict,
+    base_krw: float,
+    existing_items: list[tuple[str, str, str]],
     settings_row: UserSettings | None,
 ) -> GoalRecommendation:
-    """포트폴리오와 유저 목표를 받아 목표 역산 추천을 계산한다."""
+    """기준 자산총액과 유저 목표를 받아 목표 역산 추천을 계산한다."""
     if not settings_row or not settings_row.goal_amount or not settings_row.retirement_target_year:
         return _not_configured("목표금액·목표연도를 설정하면 추천을 받을 수 있습니다")
 
@@ -181,7 +199,7 @@ async def get_goal_recommendation(
     goal_amount = float(settings_row.goal_amount)
     target_year = int(settings_row.retirement_target_year)
 
-    pv = compute_base_value_krw(portfolio, overview)
+    pv = base_krw
     n_months = _months_until_year_end(target_year)
 
     required_dividend_yield_pct = (
@@ -204,13 +222,8 @@ async def get_goal_recommendation(
             required_dividend_yield_pct=required_dividend_yield_pct,
         )
 
-    existing = [
-        (str(_item_attr(i, "ticker")), str(_item_attr(i, "name")), str(_item_attr(i, "market")))
-        for i in portfolio.items
-        if str(_item_attr(i, "ticker")) != "CASH" and str(_item_attr(i, "market")) != "KR_PROPERTY"
-    ]
-    seen = {(t, m) for t, _, m in existing}
-    candidates = existing + [
+    seen = {(t, m) for t, _, m in existing_items}
+    candidates = existing_items + [
         (c["ticker"], c["name"], c["market"]) for c in RECOMMENDATION_UNIVERSE if (c["ticker"], c["market"]) not in seen
     ]
     tickers_only = [(t, m) for t, _, m in candidates]

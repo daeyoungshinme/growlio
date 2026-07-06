@@ -11,6 +11,8 @@ import pytest
 from app.services.goal_recommendation_service import (
     _months_until_year_end,
     _optimize_goal_portfolio,
+    existing_items_from_portfolio,
+    existing_items_from_positions,
     get_goal_recommendation,
 )
 from app.services.goal_return_solver import solve_required_annual_return_pct
@@ -94,14 +96,44 @@ class TestOptimizeGoalPortfolio:
         assert expected >= 8.0 - 0.01
 
 
+class TestExistingItemsHelpers:
+    def test_existing_items_from_portfolio_filters_cash_and_property(self):
+        portfolio = SimpleNamespace(
+            items=[
+                SimpleNamespace(ticker="SPY", name="SPDR S&P 500 ETF", market="NYSE"),
+                SimpleNamespace(ticker="CASH", name="현금", market="KRW"),
+                SimpleNamespace(ticker="APT1", name="아파트", market="KR_PROPERTY"),
+            ]
+        )
+        result = existing_items_from_portfolio(portfolio)
+        assert result == [("SPY", "SPDR S&P 500 ETF", "NYSE")]
+
+    def test_existing_items_from_positions_filters_cash_and_property(self):
+        pos_map = {
+            "SPY-NYSE": {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "value_krw": 1000.0},
+            "CASH-KRW": {"ticker": "CASH", "name": "현금", "market": "KRW", "value_krw": 500.0},
+            "APT1-KR_PROPERTY": {
+                "ticker": "APT1",
+                "name": "아파트",
+                "market": "KR_PROPERTY",
+                "value_krw": 300_000.0,
+            },
+        }
+        result = existing_items_from_positions(pos_map)
+        assert result == [("SPY", "SPDR S&P 500 ETF", "NYSE")]
+
+    def test_existing_items_from_positions_falls_back_to_ticker_when_name_missing(self):
+        pos_map = {"QQQ-NASDAQ": {"ticker": "QQQ", "market": "NASDAQ", "value_krw": 1000.0}}
+        result = existing_items_from_positions(pos_map)
+        assert result == [("QQQ", "QQQ", "NASDAQ")]
+
+
 @pytest.mark.asyncio
 class TestGetGoalRecommendation:
     async def test_not_configured_without_goal_amount(self):
         settings_row = SimpleNamespace(goal_amount=None, retirement_target_year=None)
-        portfolio = SimpleNamespace(items=[], base_type="TOTAL_ASSETS")
-        overview = {"total_assets_krw": 0}
 
-        result = await get_goal_recommendation(None, portfolio, overview, settings_row)
+        result = await get_goal_recommendation(None, 0.0, [], settings_row)
 
         assert result.is_configured is False
 
@@ -113,10 +145,8 @@ class TestGetGoalRecommendation:
             annual_deposit_goal=None,
             annual_dividend_goal=None,
         )
-        portfolio = SimpleNamespace(items=[], base_type="TOTAL_ASSETS")
-        overview = {"total_assets_krw": 2_000_000.0}
 
-        result = await get_goal_recommendation(None, portfolio, overview, settings_row)
+        result = await get_goal_recommendation(None, 2_000_000.0, [], settings_row)
 
         assert result.is_configured is True
         assert "이미" in result.note
@@ -129,10 +159,8 @@ class TestGetGoalRecommendation:
             annual_deposit_goal=None,
             annual_dividend_goal=None,
         )
-        portfolio = SimpleNamespace(items=[], base_type="TOTAL_ASSETS")
-        overview = {"total_assets_krw": 0.0}
 
-        result = await get_goal_recommendation(None, portfolio, overview, settings_row)
+        result = await get_goal_recommendation(None, 0.0, [], settings_row)
 
         assert result.is_configured is True
         assert "지났습니다" in result.note
@@ -145,8 +173,6 @@ class TestGetGoalRecommendation:
             annual_deposit_goal=None,
             annual_dividend_goal=2_000_000.0,
         )
-        portfolio = SimpleNamespace(items=[], base_type="TOTAL_ASSETS")
-        overview = {"total_assets_krw": 10_000_000.0}
 
         cagr_map = {
             ("SPY", "NYSE"): {"cagr_pct": 10.0},
@@ -181,7 +207,7 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(None, portfolio, overview, settings_row)
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row)
 
         assert result.is_configured is True
         assert result.required_return_pct is not None
@@ -199,9 +225,6 @@ class TestGetGoalRecommendation:
             annual_deposit_goal=None,
             annual_dividend_goal=None,
         )
-        portfolio = SimpleNamespace(items=[], base_type="TOTAL_ASSETS")
-        overview = {"total_assets_krw": 1_000_000.0}
-
         cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 12.0}}
         returns_map = {"SPY": [0.0005] * 252, "QQQ": [0.0006] * 252}
 
@@ -219,7 +242,7 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(None, portfolio, overview, settings_row)
+            result = await get_goal_recommendation(None, 1_000_000.0, [], settings_row)
 
         assert result.is_configured is True
         assert result.recommended_items == []

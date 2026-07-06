@@ -276,3 +276,6 @@ export interface GoalRecommendation {
 
 export const fetchGoalRecommendation = (portfolioId: string): Promise<GoalRecommendation> =>
   apiGet<GoalRecommendation>(`/rebalancing/portfolios/${portfolioId}/goal-recommendation`);
+
+export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
+  apiGet<GoalRecommendation>(`/rebalancing/goal-recommendation`);

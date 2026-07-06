@@ -149,6 +149,7 @@ interface Props {
   onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
   showAllInsights?: boolean;
   hideSignalBanner?: boolean;
+  showSignalBadge?: boolean;
   showDriftRows?: boolean;
   maxDriftRows?: number;
 }
@@ -168,6 +169,7 @@ export default function RebalancingStatusCard({
   onPortfolioSelect,
   showAllInsights = false,
   hideSignalBanner = false,
+  showSignalBadge = true,
   showDriftRows = false,
   maxDriftRows,
 }: Props) {
@@ -242,7 +244,7 @@ export default function RebalancingStatusCard({
           />
         </button>
         <div className="flex items-center gap-1.5 shrink-0">
-          {marketSignal && hideSignalBanner && (
+          {marketSignal && hideSignalBanner && showSignalBadge && (
             <span
               className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
             >

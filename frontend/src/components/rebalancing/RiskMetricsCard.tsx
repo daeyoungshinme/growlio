@@ -148,7 +148,7 @@ function RiskMetricRow({
 }
 
 export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMetrics }) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const metricList = buildMetrics(metrics);
 
@@ -201,16 +201,16 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
         </span>
       </div>
 
+      {/* 종합 위험 수준 배너 — 접힌 상태에서도 항상 노출 */}
+      <div
+        className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium mb-3 ${summary.cls}`}
+      >
+        <span className="font-bold">{summary.label}</span>
+        <span className="opacity-80">— {summaryText}</span>
+      </div>
+
       {isOpen && (
         <>
-          {/* 종합 위험 수준 배너 */}
-          <div
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium mb-3 ${summary.cls}`}
-          >
-            <span className="font-bold">{summary.label}</span>
-            <span className="opacity-80">— {summaryText}</span>
-          </div>
-
           {/* 개별 지표 — 탭하면 설명 표시 */}
           <div>
             {metricList.map((m) => (

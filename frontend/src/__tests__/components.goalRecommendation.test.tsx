@@ -4,9 +4,11 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import type { GoalRecommendation } from "@/api/rebalancing";
 
 const fetchGoalRecommendation = vi.fn();
+const fetchOverallGoalRecommendation = vi.fn();
 
 vi.mock("@/api/rebalancing", () => ({
   fetchGoalRecommendation: (...args: unknown[]) => fetchGoalRecommendation(...args),
+  fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
 }));
 
 import GoalRecommendationCard from "@/components/rebalancing/GoalRecommendationCard";
@@ -32,6 +34,7 @@ function makeRecommendation(overrides: Partial<GoalRecommendation> = {}): GoalRe
 describe("GoalRecommendationCard", () => {
   beforeEach(() => {
     fetchGoalRecommendation.mockReset();
+    fetchOverallGoalRecommendation.mockReset();
     usePendingRecommendationStore.getState().clearPending();
   });
 
@@ -77,6 +80,40 @@ describe("GoalRecommendationCard", () => {
         { ticker: "SCHD", name: "Schwab US Dividend Equity ETF", market: "NYSE", weight: 40 },
       ],
     });
+  });
+});
+
+describe("GoalRecommendationCard (전체 자산 기준, portfolioId 미전달)", () => {
+  beforeEach(() => {
+    fetchGoalRecommendation.mockReset();
+    fetchOverallGoalRecommendation.mockReset();
+    usePendingRecommendationStore.getState().clearPending();
+  });
+
+  it("fetches the overall recommendation and renders no apply button", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<GoalRecommendationCard />);
+
+    expect(await screen.findByText("목표 달성 추천 비중 (전체 자산 기준)")).toBeDefined();
+    expect(fetchOverallGoalRecommendation).toHaveBeenCalled();
+    expect(fetchGoalRecommendation).not.toHaveBeenCalled();
+    expect(screen.queryByText("편집기에 적용")).toBeNull();
+  });
+
+  it("renders nothing when there are no recommended items", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(
+      makeRecommendation({ recommended_items: [], note: "이미 목표 금액을 달성했습니다" }),
+    );
+    const { container } = renderWithProviders(<GoalRecommendationCard />);
+    await waitFor(() => expect(fetchOverallGoalRecommendation).toHaveBeenCalled());
+    expect(container.textContent).toBe("");
+  });
+
+  it("omits the mt-3 top margin class when noTopMargin is passed", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    const { container } = renderWithProviders(<GoalRecommendationCard noTopMargin />);
+    await screen.findByText("목표 달성 추천 비중 (전체 자산 기준)");
+    expect(container.firstChild).not.toHaveClass("mt-3");
   });
 });
 

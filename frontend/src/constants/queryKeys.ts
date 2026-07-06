@@ -32,4 +32,5 @@ export const QUERY_KEYS = {
   driftSummary: ["drift-summary"] as const,
   compositeSignalStatus: ["composite-signal-status"] as const,
   goalRecommendation: (portfolioId: string) => ["goal-recommendation", portfolioId] as const,
+  goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
 } as const;
