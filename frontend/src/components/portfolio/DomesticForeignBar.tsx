@@ -8,14 +8,15 @@ interface Item {
 
 interface Props {
   items: Item[];
+  bare?: boolean;
 }
 
-export default function DomesticForeignBar({ items }: Props) {
+export default function DomesticForeignBar({ items, bare = false }: Props) {
   const domestic = items.find((i) => i.name === "국내 주식");
   const foreign = items.find((i) => i.name === "해외 주식");
 
-  return (
-    <div className="card">
+  const content = (
+    <>
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4">
         국내/해외 비중
       </h3>
@@ -79,6 +80,9 @@ export default function DomesticForeignBar({ items }: Props) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (bare) return <div>{content}</div>;
+  return <div className="card">{content}</div>;
 }
