@@ -15,10 +15,11 @@ def _make_user(user_id=None):
     )
 
 
-def _make_settings(goal_amount=None, annual_deposit_goal=None, notification_email=None):
+def _make_settings(goal_amount=None, annual_deposit_goal=None, annual_dividend_goal=None, notification_email=None):
     return SimpleNamespace(
         goal_amount=goal_amount,
         annual_deposit_goal=annual_deposit_goal,
+        annual_dividend_goal=annual_dividend_goal,
         notification_email=notification_email,
     )
 
@@ -27,12 +28,14 @@ _MOCK_SUMMARY_ACHIEVED = {
     "total_assets_krw": 100_000_000.0,
     "goal_achievement_pct": 100.0,
     "deposit_achievement_pct": 100.0,
+    "dividend_goal_achievement_pct": 100.0,
 }
 
 _MOCK_SUMMARY_NOT_ACHIEVED = {
     "total_assets_krw": 50_000_000.0,
     "goal_achievement_pct": 50.0,
     "deposit_achievement_pct": 60.0,
+    "dividend_goal_achievement_pct": 40.0,
 }
 
 
@@ -181,6 +184,50 @@ class TestRunGoalAchievementCheck:
         assert mock_email.called
         kwargs = mock_email.call_args.kwargs
         assert kwargs["goal_type"] == "DEPOSIT"
+
+    @pytest.mark.asyncio
+    async def test_sends_dividend_goal_email_when_100pct_achieved(self):
+        """연간 배당 목표 100% 달성 시 이메일 발송."""
+        user = _make_user()
+        settings = _make_settings(annual_dividend_goal=5_000_000)
+
+        mock_session = AsyncMock()
+        list_result = MagicMock()
+        list_result.all.return_value = [(user, settings)]
+        history_result = MagicMock()
+        history_result.scalar.return_value = None
+
+        call_count = [0]
+
+        async def mock_execute(stmt):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return list_result
+            return history_result
+
+        mock_session.execute = AsyncMock(side_effect=mock_execute)
+        mock_session.add = MagicMock()
+        mock_session.commit = AsyncMock()
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch(
+                "app.jobs.goal_achievement.get_dashboard_summary",
+                new_callable=AsyncMock,
+                return_value=_MOCK_SUMMARY_ACHIEVED,
+            ),
+            patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
+        ):
+            from app.jobs.goal_achievement import run_goal_achievement_check
+
+            await run_goal_achievement_check()
+
+        assert mock_email.called
+        kwargs = mock_email.call_args.kwargs
+        assert kwargs["goal_type"] == "DIVIDEND"
 
     @pytest.mark.asyncio
     async def test_exception_does_not_stop_other_users(self):

@@ -125,7 +125,7 @@ async def _process_rebalancing_alert(
             mode = "NOTIFY"
 
     # AUTO 모드 실행은 rebalancing_auto_execution 인트라데이 잡이 전담한다.
-    # 08:30 daily job(check_rebalancing_alerts)에서는 이메일/FCM 리포트만 발송한다.
+    # 10분 간격 job(check_rebalancing_alerts)은 각 알림의 notify_time 창에서만 이메일/FCM 리포트를 발송한다.
 
     drift_count = len(drifting)
     if drift_count:

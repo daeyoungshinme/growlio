@@ -331,6 +331,32 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
     assert "연간 입금 목표" in captured.get("subject", "")
 
 
+@pytest.mark.asyncio
+async def test_send_goal_achievement_email_dividend_type(monkeypatch):
+    """연간 배당 목표 달성 이메일 제목에 '연간 배당 목표'가 포함된다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+
+    captured = {}
+
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        return _ok_response(url)
+
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_goal_achievement_email
+
+        await send_goal_achievement_email(
+            to_email="user@example.com",
+            goal_type="DIVIDEND",
+            goal_amount=5_000_000.0,
+            current_amount=5_200_000.0,
+            achievement_pct=104.0,
+        )
+
+    assert "연간 배당 목표" in captured.get("subject", "")
+
+
 # ── send_test_email ─────────────────────────────────────────
 
 

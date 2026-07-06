@@ -10,15 +10,16 @@ function pctColor(pct: number) {
 
 interface Props {
   data: DCAProjectionPoint[];
+  flat?: boolean;
 }
 
-export default function MonthlyAchievementTable({ data }: Props) {
+export default function MonthlyAchievementTable({ data, flat }: Props) {
   const today = new Date().toISOString().slice(0, 7);
   const past = data.filter((d) => d.month <= today && d.has_data).slice(-24);
 
   if (past.length === 0) {
     return (
-      <div className="card">
+      <div className={flat ? undefined : "card"}>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
           월별 달성율
         </h3>
@@ -28,7 +29,7 @@ export default function MonthlyAchievementTable({ data }: Props) {
   }
 
   return (
-    <div className="card">
+    <div className={flat ? undefined : "card"}>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
         월별 달성율 (최근 24개월)
       </h3>

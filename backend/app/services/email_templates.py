@@ -394,6 +394,10 @@ def goal_achievement_template(
         subject = f"[Growlio] 목표 자산 달성! — {achievement_pct:.1f}% 달성"
         heading = "총 자산 목표 달성"
         goal_label, current_label = "총 자산 목표", "현재 총 자산"
+    elif goal_type == "DIVIDEND":
+        subject = f"[Growlio] 연간 배당 목표 달성! — {achievement_pct:.1f}% 달성"
+        heading = "연간 배당 목표 달성"
+        goal_label, current_label = "연간 배당 목표", "예상 연간 배당금"
     else:
         subject = f"[Growlio] 연간 입금 목표 달성! — {achievement_pct:.1f}% 달성"
         heading = "연간 입금 목표 달성"

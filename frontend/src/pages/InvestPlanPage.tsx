@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Settings2 } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
@@ -132,7 +132,7 @@ export default function InvestPlanPage() {
             <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
               적립 계획 설정
             </h2>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
               <div>
                 <p className="text-xs text-gray-400 dark:text-gray-500">월 적립액</p>
                 <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
@@ -181,11 +181,37 @@ export default function InvestPlanPage() {
                   )}
                 </p>
               </div>
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">연간 입금 목표</p>
+                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+                  {settingsData?.annual_deposit_goal ? (
+                    fmtKrw(settingsData.annual_deposit_goal)
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 dark:text-gray-500">은퇴 목표시점</p>
+                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+                  {settingsData?.retirement_target_year ? (
+                    `${settingsData.retirement_target_year}년`
+                  ) : (
+                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
+                  )}
+                </p>
+              </div>
             </div>
             <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-              연간 입금 목표·은퇴 목표는 대시보드에 반영됩니다. 자동 정기매수 설정은 아래 설정
-              편집에서 변경할 수 있습니다.
+              연간 입금 목표·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다. 자동 정기매수
+              설정은 아래 설정 편집에서 변경할 수 있습니다.
             </p>
+            <Link
+              to="/rebalancing?rtab=진단"
+              className="mt-2 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              목표 대비 포트폴리오 진단 보기 →
+            </Link>
             {data && !isConfigured && (
               <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                 월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
@@ -203,13 +229,20 @@ export default function InvestPlanPage() {
                 <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
                   <DCAProjectionChart data={data.projection_months} />
                 </Suspense>
-                <div className="space-y-5">
-                  <GoalTimelineCard
-                    timeline={data.goal_timeline}
-                    goalAmount={s?.goal_amount ?? null}
-                  />
-                  <YearlyAchievementTable data={data.yearly_achievements} />
-                  <MonthlyAchievementTable data={data.projection_months} />
+                <div className="card divide-y divide-gray-100 dark:divide-gray-700">
+                  <div className="pb-4">
+                    <GoalTimelineCard
+                      flat
+                      timeline={data.goal_timeline}
+                      goalAmount={s?.goal_amount ?? null}
+                    />
+                  </div>
+                  <div className="py-4">
+                    <YearlyAchievementTable flat data={data.yearly_achievements} />
+                  </div>
+                  <div className="pt-4">
+                    <MonthlyAchievementTable flat data={data.projection_months} />
+                  </div>
                 </div>
               </div>
             </ErrorBoundary>
@@ -220,6 +253,14 @@ export default function InvestPlanPage() {
       {/* 배당 계획 탭 */}
       {activeTab === "배당 계획" && (
         <ErrorBoundary variant="section">
+          <div className="flex justify-end">
+            <Link
+              to="/rebalancing?rtab=진단"
+              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              목표 대비 포트폴리오 진단 보기 →
+            </Link>
+          </div>
           <Suspense fallback={<SkeletonCard rows={5} height="h-5" />}>
             <DividendPlanSection onOpenSettings={openEdit} />
           </Suspense>

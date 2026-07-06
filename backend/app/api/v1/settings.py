@@ -12,8 +12,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.limiter import limiter
 from app.models.user import User
+from app.redis_client import get_redis
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
+from app.utils.cache_keys import dashboard_summary_key, invalidate_user_caches
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -214,6 +216,8 @@ async def update_goal(
     if req.annual_dividend_goal is not None:
         row.annual_dividend_goal = req.annual_dividend_goal
     await db.commit()
+    redis = await get_redis()
+    await invalidate_user_caches(redis, dashboard_summary_key(current_user.id))
     return {"detail": "목표가 저장되었습니다"}
 
 

@@ -132,6 +132,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글 (MarketSignalBanner/MarketSignalAlertSection 공용)
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)

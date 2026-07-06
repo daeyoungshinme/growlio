@@ -66,6 +66,8 @@ export interface DiagnosisContext {
   estimated_fee_krw: number;
   tax_notes: string[];
   tax_detail_items: TaxImpactItem[];
+  goal_annual_return_pct: number | null;
+  goal_annual_dividend_krw: number | null;
 }
 
 export interface RebalancingAnalysis {

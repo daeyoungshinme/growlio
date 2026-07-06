@@ -50,6 +50,7 @@ async def check_market_signal_level_change(db: AsyncSession, redis: RedisType) -
     """
     from app.services.email_service import send_market_signal_change_alert
     from app.services.push_service import send_push_to_user
+    from app.services.rebalancing_alert_service import _mark_composite_alert_sent_today
 
     try:
         signal = await get_market_signal(redis)
@@ -95,6 +96,8 @@ async def check_market_signal_level_change(db: AsyncSession, redis: RedisType) -
 
         if email_sent or push_sent:
             await save_alert_history(db, user.id, "MARKET_SIGNAL", f"시장 위험 신호: {old_level} → {new_level}")
+            # 같은 날 rebalancing_alert_service의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
+            await _mark_composite_alert_sent_today(redis, user.id)
             sent_count += 1
 
     if sent_count:

@@ -5,9 +5,10 @@ import { fmtKrw, fmtMonth } from "@/utils/format";
 interface Props {
   timeline: GoalTimeline;
   goalAmount: number | null;
+  flat?: boolean;
 }
 
-export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
+export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) {
   const {
     months_to_goal,
     expected_goal_date,
@@ -51,7 +52,7 @@ export default function GoalTimelineCard({ timeline, goalAmount }: Props) {
   };
 
   return (
-    <div className="card">
+    <div className={flat ? undefined : "card"}>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
         목표 달성 전망
       </h3>

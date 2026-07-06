@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
 from app.services.risk_service import get_portfolio_risk_metrics
@@ -231,6 +232,7 @@ async def build_diagnosis_context(
     analysis: RebalancingAnalysis,
     overview: dict,
     enable_composite_signals: bool = True,
+    settings_row: UserSettings | None = None,
 ) -> DiagnosisContext:
     """시장상황·리스크·세금영향을 조합한 진단 부가 설명을 생성한다.
 
@@ -287,4 +289,6 @@ async def build_diagnosis_context(
         estimated_fee_krw=round(total_fee, 0),
         tax_notes=tax_notes,
         tax_detail_items=tax_items,
+        goal_annual_return_pct=settings_row.goal_annual_return_pct if settings_row else None,
+        goal_annual_dividend_krw=settings_row.annual_dividend_goal if settings_row else None,
     )

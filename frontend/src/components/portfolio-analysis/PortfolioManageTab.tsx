@@ -81,6 +81,10 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     () => new Set(rebalancingAlerts.map((a) => a.portfolio_id)),
     [rebalancingAlerts],
   );
+  const autoAlertCount = useMemo(
+    () => rebalancingAlerts.filter((a) => a.mode === "AUTO").length,
+    [rebalancingAlerts],
+  );
   const alertByPortfolioId = useMemo(
     () => Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a])),
     [rebalancingAlerts],
@@ -236,6 +240,7 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
         selectedIds={selectedIds}
         stockAccounts={stockAccounts}
         alertPortfolioIds={alertPortfolioIds}
+        autoAlertCount={autoAlertCount}
         alertByPortfolioId={alertByPortfolioId}
         driftByPortfolioId={driftByPortfolioId}
         isTargetPending={batchTargetMut.isPending}

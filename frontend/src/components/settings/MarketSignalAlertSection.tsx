@@ -1,30 +1,10 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
-import { fetchCompositeSignalStatus } from "@/api/rebalancing";
-import { updateCompositeSignalAlerts } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { invalidateCompositeSignalData } from "@/utils/queryInvalidation";
-import { extractErrorMessage } from "@/utils/error";
-import { toast } from "@/utils/toast";
+import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import { SectionCard } from "./shared";
 
 export function MarketSignalAlertSection() {
-  const qc = useQueryClient();
-  const { data: status } = useQuery({
-    queryKey: QUERY_KEYS.compositeSignalStatus,
-    queryFn: fetchCompositeSignalStatus,
-    staleTime: STALE_TIME.LONG,
-  });
-
-  const toggleMut = useMutation({
-    mutationFn: (enabled: boolean) => updateCompositeSignalAlerts(enabled),
-    onSuccess: () => {
-      void invalidateCompositeSignalData(qc);
-    },
-    onError: (e) => toast(extractErrorMessage(e, "설정 저장에 실패했습니다"), "error"),
-  });
+  const { status, toggle, isPending } = useCompositeSignalToggle();
 
   return (
     <SectionCard title="시장 신호 알림">
@@ -51,8 +31,8 @@ export function MarketSignalAlertSection() {
               <input
                 type="checkbox"
                 checked={status.enabled}
-                disabled={toggleMut.isPending}
-                onChange={(e) => toggleMut.mutate(e.target.checked)}
+                disabled={isPending}
+                onChange={(e) => toggle(e.target.checked)}
                 className="sr-only peer"
                 aria-label="시장/리스크 신호 알림 받기"
               />

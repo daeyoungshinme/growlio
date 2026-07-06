@@ -221,7 +221,13 @@ async def analyze_portfolio(
         settings_row = await get_settings_row(db, current_user.id)
         enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
         analysis.diagnosis_context = await build_diagnosis_context(
-            current_user.id, db, redis, analysis, overview, enable_composite_signals=enable_composite_signals
+            current_user.id,
+            db,
+            redis,
+            analysis,
+            overview,
+            enable_composite_signals=enable_composite_signals,
+            settings_row=settings_row,
         )
     except Exception as e:
         logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))

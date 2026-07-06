@@ -237,7 +237,7 @@ describe("MarketSignalAlertSection", () => {
 
   it("explains both trigger conditions in plain language", async () => {
     renderSection();
-    expect(await screen.findByText(/10분마다 점검/)).toBeDefined();
+    expect(await screen.findByText(/1시간마다 점검/)).toBeDefined();
     expect(screen.getByText(/하루 최대 1회/)).toBeDefined();
   });
 

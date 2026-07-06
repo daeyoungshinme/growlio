@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Bell, ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   MarketSignalResponse,
   MarketRiskLevel,
@@ -12,13 +11,7 @@ import type {
   DollarIndexLevel,
   RateCutExpectationLevel,
 } from "@/api/marketSignals";
-import { fetchCompositeSignalStatus } from "@/api/rebalancing";
-import { updateCompositeSignalAlerts } from "@/api/settings";
-import { QUERY_KEYS } from "@/constants/queryKeys";
-import { STALE_TIME } from "@/constants/queryConfig";
-import { invalidateCompositeSignalData } from "@/utils/queryInvalidation";
-import { extractErrorMessage } from "@/utils/error";
-import { toast } from "@/utils/toast";
+import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
 
 interface Props {
@@ -176,19 +169,7 @@ export default function MarketSignalBanner({ signal }: Props) {
   } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
-  const qc = useQueryClient();
-  const { data: compositeStatus } = useQuery({
-    queryKey: QUERY_KEYS.compositeSignalStatus,
-    queryFn: fetchCompositeSignalStatus,
-    staleTime: STALE_TIME.LONG,
-  });
-  const toggleMut = useMutation({
-    mutationFn: (enabled: boolean) => updateCompositeSignalAlerts(enabled),
-    onSuccess: () => {
-      void invalidateCompositeSignalData(qc);
-    },
-    onError: (e) => toast(extractErrorMessage(e, "설정 저장에 실패했습니다")),
-  });
+  const { status: compositeStatus, toggle, isPending } = useCompositeSignalToggle();
 
   return (
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
@@ -393,8 +374,8 @@ export default function MarketSignalBanner({ signal }: Props) {
               <input
                 type="checkbox"
                 checked={compositeStatus.enabled}
-                disabled={toggleMut.isPending}
-                onChange={(e) => toggleMut.mutate(e.target.checked)}
+                disabled={isPending}
+                onChange={(e) => toggle(e.target.checked)}
                 className="sr-only peer"
                 aria-label="시장 위험 신호 알림 설정 켜기/끄기"
               />

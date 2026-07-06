@@ -126,7 +126,11 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
             </div>
           )}
 
-          <DiagnosisInsightList context={analysis.diagnosis_context} />
+          <DiagnosisInsightList
+            context={analysis.diagnosis_context}
+            targetCagrPct={analysis.target_weighted_cagr_10y_pct}
+            targetDividendKrw={analysis.target_portfolio_annual_dividend}
+          />
 
           {/* CRITICAL: 실행 CTA 버튼 */}
           {status === "critical" && onExecute && (

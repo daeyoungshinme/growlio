@@ -34,7 +34,7 @@ async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
 
 
 async def run_goal_achievement_check() -> None:
-    """매일 18:45 KST — 총 자산 및 연간 입금 목표 달성 시 이메일 알림."""
+    """매일 18:45 KST — 총 자산·연간 입금·연간 배당 목표 달성 시 이메일 알림."""
     redis = await get_redis()
 
     async with AsyncSessionLocal() as db:
@@ -43,7 +43,9 @@ async def run_goal_achievement_check() -> None:
             .join(UserSettings, User.id == UserSettings.user_id)
             .where(
                 User.is_active == True,  # noqa: E712
-                UserSettings.goal_amount.isnot(None) | UserSettings.annual_deposit_goal.isnot(None),
+                UserSettings.goal_amount.isnot(None)
+                | UserSettings.annual_deposit_goal.isnot(None)
+                | UserSettings.annual_dividend_goal.isnot(None),
             )
         )
         users = result.all()
@@ -57,6 +59,7 @@ async def run_goal_achievement_check() -> None:
                 total_assets = float(summary.get("total_assets_krw") or 0)
                 goal_pct: float | None = summary.get("goal_achievement_pct")
                 deposit_pct: float | None = summary.get("deposit_achievement_pct")
+                dividend_pct: float | None = summary.get("dividend_goal_achievement_pct")
 
                 if (
                     settings_row.goal_amount
@@ -112,6 +115,36 @@ async def run_goal_achievement_check() -> None:
                         )
                         await db.commit()
                         logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
+
+                if (
+                    settings_row.annual_dividend_goal
+                    and dividend_pct is not None
+                    and dividend_pct >= 100
+                    and not await _already_notified_this_month(db, user.id, "GOAL_DIVIDEND")
+                ):
+                    dividend_goal = float(settings_row.annual_dividend_goal)
+                    current_dividend = dividend_goal * dividend_pct / 100
+                    sent = await send_goal_achievement_email(
+                        to_email=to_email,
+                        goal_type="DIVIDEND",
+                        goal_amount=dividend_goal,
+                        current_amount=current_dividend,
+                        achievement_pct=dividend_pct,
+                    )
+                    if sent:
+                        msg = (
+                            f"연간 배당 목표 달성 {dividend_pct:.1f}% — "
+                            f"{current_dividend:,.0f}원 / {dividend_goal:,.0f}원"
+                        )
+                        db.add(
+                            AlertHistory(
+                                user_id=user.id,
+                                alert_type="GOAL_DIVIDEND",
+                                message=msg,
+                            )
+                        )
+                        await db.commit()
+                        logger.info("goal_dividend_alert_sent", user_id=str(user.id), pct=dividend_pct)
 
         except Exception as e:
             logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))

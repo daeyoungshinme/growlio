@@ -42,7 +42,7 @@ function OnboardingChecklist() {
               </p>
             </div>
             <Link
-              to="/settings?tab=계좌"
+              to="/assets?tab=계좌관리"
               className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
             >
               등록하기 →

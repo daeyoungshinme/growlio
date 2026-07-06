@@ -19,6 +19,8 @@ function makeContext(overrides: Partial<DiagnosisContext> = {}): DiagnosisContex
     estimated_fee_krw: 0,
     tax_notes: [],
     tax_detail_items: [],
+    goal_annual_return_pct: null,
+    goal_annual_dividend_krw: null,
     ...overrides,
   };
 }
@@ -79,6 +81,40 @@ describe("buildDiagnosisNotes", () => {
     );
     expect(notes).toHaveLength(3);
     expect(notes.map((n) => n.icon)).toEqual(["market", "risk", "tax"]);
+  });
+
+  it("목표 수익률이 미설정이면 목표 인사이트를 생략한다", () => {
+    const notes = buildDiagnosisNotes(
+      makeContext({ goal_annual_return_pct: null }),
+      6.5,
+      2_000_000,
+    );
+    expect(notes.some((n) => n.icon === "goal")).toBe(false);
+  });
+
+  it("목표 수익률이 설정되어 있으면 목표 대비 기대수익률 인사이트를 포함한다", () => {
+    const notes = buildDiagnosisNotes(makeContext({ goal_annual_return_pct: 8 }), 6.5, null);
+    const note = notes.find((n) => n.icon === "goal");
+    expect(note).toBeDefined();
+    expect(note?.text).toContain("목표 연 수익률 8.0%");
+    expect(note?.text).toContain("6.5%");
+    expect(note?.text).toContain("-1.5%p");
+  });
+
+  it("목표 배당이 설정되어 있으면 목표 대비 예상 배당 인사이트를 포함한다", () => {
+    const notes = buildDiagnosisNotes(
+      makeContext({ goal_annual_dividend_krw: 3_000_000 }),
+      null,
+      2_500_000,
+    );
+    const note = notes.find((n) => n.icon === "goal");
+    expect(note).toBeDefined();
+    expect(note?.text).toContain("목표 연간배당");
+  });
+
+  it("targetCagrPct가 없으면(analysis 계산 실패) 목표가 설정돼 있어도 생략한다", () => {
+    const notes = buildDiagnosisNotes(makeContext({ goal_annual_return_pct: 8 }), null, null);
+    expect(notes.some((n) => n.icon === "goal")).toBe(false);
   });
 });
 

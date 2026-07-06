@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -435,3 +436,48 @@ class TestBuildDiagnosisContext:
         assert ctx.market_level is None
         assert ctx.risk_available is False
         assert ctx.estimated_sell_realized_gain_krw == pytest.approx(50_000.0)
+
+    @pytest.mark.asyncio
+    async def test_settings_row_none_leaves_goal_fields_none(self, mock_db, mock_redis):
+        """목표를 아예 설정하지 않은 유저(settings_row=None)는 목표 비교 필드가 조용히 생략된다."""
+        analysis = _make_analysis([])
+        overview = _make_overview([])
+
+        with (
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                new=AsyncMock(return_value={"data_available": False}),
+            ),
+        ):
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+
+        assert ctx.goal_annual_return_pct is None
+        assert ctx.goal_annual_dividend_krw is None
+
+    @pytest.mark.asyncio
+    async def test_settings_row_provided_populates_goal_fields(self, mock_db, mock_redis):
+        """settings_row가 전달되면 신규 DB 쿼리 없이 UserSettings의 목표 필드를 그대로 반영한다."""
+        analysis = _make_analysis([])
+        overview = _make_overview([])
+        settings_row = SimpleNamespace(goal_annual_return_pct=8.0, annual_dividend_goal=3_000_000.0)
+
+        with (
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                new=AsyncMock(return_value={"data_available": False}),
+            ),
+        ):
+            ctx = await build_diagnosis_context(
+                uuid.uuid4(), mock_db, mock_redis, analysis, overview, settings_row=settings_row
+            )
+
+        assert ctx.goal_annual_return_pct == pytest.approx(8.0)
+        assert ctx.goal_annual_dividend_krw == pytest.approx(3_000_000.0)

@@ -96,6 +96,10 @@ class DiagnosisContext(BaseModel):
     tax_notes: list[str] = []
     tax_detail_items: list[TaxImpactItem] = []  # 절대값 기준 상위 5개
 
+    # 투자 목표 대비 비교 (UserSettings 미설정 시 None)
+    goal_annual_return_pct: float | None = None
+    goal_annual_dividend_krw: float | None = None
+
 
 class RebalancingAnalysis(BaseModel):
     portfolio_id: uuid.UUID

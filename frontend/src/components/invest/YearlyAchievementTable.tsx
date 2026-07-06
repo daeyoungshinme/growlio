@@ -10,14 +10,15 @@ function pctColor(pct: number) {
 
 interface Props {
   data: YearlyAchievement[];
+  flat?: boolean;
 }
 
-export default function YearlyAchievementTable({ data }: Props) {
+export default function YearlyAchievementTable({ data, flat }: Props) {
   const past = data.filter((d) => d.has_data);
 
   if (past.length === 0) {
     return (
-      <div className="card">
+      <div className={flat ? undefined : "card"}>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
           연별 달성율
         </h3>
@@ -27,7 +28,7 @@ export default function YearlyAchievementTable({ data }: Props) {
   }
 
   return (
-    <div className="card">
+    <div className={flat ? undefined : "card"}>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">연별 달성율</h3>
       {/* 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">

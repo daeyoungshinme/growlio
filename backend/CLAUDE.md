@@ -202,7 +202,7 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
-  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing_alert_service.py/rebalancing_diagnosis_service.py와 공유
+  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing_alert_service.py/rebalancing_diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing_alert_service.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송

@@ -246,6 +246,7 @@ interface PortfolioListSectionProps {
   selectedIds: Set<string>;
   stockAccounts: AssetAccount[];
   alertPortfolioIds: Set<string>;
+  autoAlertCount: number;
   alertByPortfolioId: Record<string, RebalancingAlert>;
   driftByPortfolioId?: Record<string, PortfolioDriftSummary>;
   isTargetPending: boolean;
@@ -263,6 +264,7 @@ export default function PortfolioListSection({
   selectedIds,
   stockAccounts,
   alertPortfolioIds,
+  autoAlertCount,
   alertByPortfolioId,
   driftByPortfolioId,
   isTargetPending,
@@ -378,10 +380,18 @@ export default function PortfolioListSection({
           {alertPortfolioIds.size > 0 ? (
             <span>
               {portfolios.length}개 중{" "}
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {alertPortfolioIds.size}개
-              </span>
-              에 자동화 설정됨
+              {autoAlertCount > 0 && (
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  자동 실행 {autoAlertCount}개
+                </span>
+              )}
+              {autoAlertCount > 0 && alertPortfolioIds.size - autoAlertCount > 0 && ", "}
+              {alertPortfolioIds.size - autoAlertCount > 0 && (
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  알림 {alertPortfolioIds.size - autoAlertCount}개
+                </span>
+              )}{" "}
+              설정됨
             </span>
           ) : (
             <span>자동화 설정된 포트폴리오가 없습니다. 🔔 버튼으로 설정하세요.</span>

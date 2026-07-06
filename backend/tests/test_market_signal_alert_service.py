@@ -104,7 +104,11 @@ class TestCheckMarketSignalLevelChange:
 
         mock_push.assert_called_once()
         mock_db.commit.assert_called_once()
-        mock_redis.setex.assert_called_once()
+        # setex 2회: (1) 마지막 관측 레벨 저장 (2) rebalancing_alert_service와 공유하는
+        # 복합신호 dedup 키 — 같은 날 두 서비스가 중복 발송하지 않도록 함
+        assert mock_redis.setex.call_count == 2
+        dedup_keys = [call.args[0] for call in mock_redis.setex.call_args_list]
+        assert any(f"composite_sent:{user.id}:" in key for key in dedup_keys)
 
     @pytest.mark.asyncio
     async def test_no_subscribers_still_updates_last_level(self, mock_db, mock_redis):

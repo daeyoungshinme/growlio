@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -90,6 +90,15 @@ export default function SettingsPage() {
       ? (initialAlertTab as AlertTab)
       : "환율 알림",
   );
+  const alertSectionRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!initialAlertTab) return;
+    const timer = setTimeout(() => {
+      alertSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [initialAlertTab]);
+
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
   const qc = useQueryClient();
@@ -164,7 +173,7 @@ export default function SettingsPage() {
       </SectionCard>
 
       {/* 알림 설정 그룹 */}
-      <div>
+      <div ref={alertSectionRef}>
         <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
           알림 설정
         </h2>

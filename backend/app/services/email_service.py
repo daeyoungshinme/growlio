@@ -219,7 +219,7 @@ async def send_goal_achievement_email(
     current_amount: float,
     achievement_pct: float,
 ) -> bool:
-    """투자 목표 달성 알림 이메일 발송. goal_type: 'ASSET' | 'DEPOSIT'.
+    """투자 목표 달성 알림 이메일 발송. goal_type: 'ASSET' | 'DEPOSIT' | 'DIVIDEND'.
 
     발송 성공 시 True, 이메일 미설정/실패 시 False 반환.
     """
