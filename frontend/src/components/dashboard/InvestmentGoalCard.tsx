@@ -235,13 +235,10 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         </Link>
       </div>
 
-      {/* 목표 항목 — 2열 그리드 (4개 항목, 각 목표/현재 값 텍스트 포함) */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* 목표 항목 — 2열 그리드, 파티션(hairline)으로만 구분 (4개 항목, 각 목표/현재 값 텍스트 포함) */}
+      <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
         {goalChips.map((chip) => (
-          <div
-            key={chip.key}
-            className="min-w-0 rounded-xl border border-gray-100 dark:border-gray-700 p-2"
-          >
+          <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
             <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
               {chip.label}
             </p>

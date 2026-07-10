@@ -1,6 +1,10 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, fireEvent, getAllByRole } from "@testing-library/react";
 import Modal from "@/components/common/Modal";
+
+afterEach(() => {
+  document.body.style.overflow = "";
+});
 
 describe("Modal", () => {
   it("children과 title을 렌더링한다", () => {
@@ -49,5 +53,58 @@ describe("Modal", () => {
     );
     fireEvent.click(getByRole("dialog").parentElement!);
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("열려 있는 동안 body 스크롤을 잠그고 닫히면 복원한다", () => {
+    expect(document.body.style.overflow).toBe("");
+
+    const { unmount } = render(
+      <Modal onClose={vi.fn()}>
+        <p>내용</p>
+      </Modal>,
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+
+    unmount();
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("모달이 중첩되어도 하나가 남아있으면 body 스크롤 잠금이 유지된다", () => {
+    const outer = render(
+      <Modal onClose={vi.fn()}>
+        <p>바깥 모달</p>
+      </Modal>,
+    );
+    const inner = render(
+      <Modal onClose={vi.fn()}>
+        <p>안쪽 모달</p>
+      </Modal>,
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+
+    inner.unmount();
+    expect(document.body.style.overflow).toBe("hidden");
+
+    outer.unmount();
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("모달 영역의 터치 이벤트는 상위(예: mainRef)로 전파되지 않는다", () => {
+    const { getByRole } = render(
+      <Modal onClose={vi.fn()}>
+        <p>내용</p>
+      </Modal>,
+    );
+    const dialog = getByRole("dialog");
+
+    for (const type of ["touchstart", "touchmove", "touchend"]) {
+      const parentHandler = vi.fn();
+      document.addEventListener(type, parentHandler);
+
+      dialog.dispatchEvent(new Event(type, { bubbles: true, cancelable: true }));
+      expect(parentHandler).not.toHaveBeenCalled();
+
+      document.removeEventListener(type, parentHandler);
+    }
   });
 });

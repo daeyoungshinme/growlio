@@ -175,27 +175,26 @@ export default function PortfolioPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handleSyncAll}
-            disabled={isSyncingAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
-          >
-            <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
-            {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
-          </button>
-          <span className="text-xs text-gray-400 dark:text-gray-500">
-            {stockAccounts.length}개 증권사 계좌
-          </span>
-        </div>
-      </div>
-
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
-        <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
-          주식 총평가액
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
+            주식 총평가액
+          </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              {stockAccounts.length}개 증권사 계좌
+            </span>
+            <button
+              onClick={handleSyncAll}
+              disabled={isSyncingAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
+              {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
+            </button>
+          </div>
+        </div>
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">
           {fmtKrwPrice(data.total_stock_krw)}
         </p>

@@ -19,6 +19,10 @@ interface Props {
   closeOnBackdrop?: boolean;
 }
 
+// 모달이 겹쳐 열릴 수 있으므로(예: 계좌별 자동화 목록 위에 편집 모달) 참조 카운트로 body 스크롤 잠금 관리
+let bodyLockCount = 0;
+let savedBodyOverflow = "";
+
 export default function Modal({
   children,
   onClose,
@@ -27,11 +31,41 @@ export default function Modal({
   closeOnBackdrop = false,
 }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   const titleId = useId();
   useEffect(() => {
     onCloseRef.current = onClose;
   });
+
+  useEffect(() => {
+    if (bodyLockCount === 0) {
+      savedBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    bodyLockCount++;
+    return () => {
+      bodyLockCount--;
+      if (bodyLockCount === 0) {
+        document.body.style.overflow = savedBodyOverflow;
+      }
+    };
+  }, []);
+
+  // 상위 mainRef의 pull-to-refresh/스와이프 탭전환 리스너로 터치가 새어나가지 않도록 여기서 소비함
+  useEffect(() => {
+    const el = overlayRef.current;
+    if (!el) return;
+    const stopPropagation = (e: TouchEvent) => e.stopPropagation();
+    el.addEventListener("touchstart", stopPropagation, { passive: true });
+    el.addEventListener("touchmove", stopPropagation, { passive: true });
+    el.addEventListener("touchend", stopPropagation, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", stopPropagation);
+      el.removeEventListener("touchmove", stopPropagation);
+      el.removeEventListener("touchend", stopPropagation);
+    };
+  }, []);
 
   useEffect(() => {
     const prevFocus = document.activeElement as HTMLElement | null;
@@ -71,6 +105,7 @@ export default function Modal({
 
   return (
     <div
+      ref={overlayRef}
       className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-[env(safe-area-inset-bottom)]"
       onClick={closeOnBackdrop ? onClose : undefined}
     >
