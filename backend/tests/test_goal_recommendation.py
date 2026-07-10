@@ -121,7 +121,7 @@ class TestGetGoalRecommendation:
     async def test_not_configured_without_goal_amount(self):
         settings_row = SimpleNamespace(goal_amount=None, retirement_target_year=None)
 
-        result = await get_goal_recommendation(None, 0.0, [], settings_row)
+        result = await get_goal_recommendation(None, 0.0, [], settings_row, AsyncMock())
 
         assert result.is_configured is False
 
@@ -134,7 +134,7 @@ class TestGetGoalRecommendation:
             annual_dividend_goal=None,
         )
 
-        result = await get_goal_recommendation(None, 2_000_000.0, [], settings_row)
+        result = await get_goal_recommendation(None, 2_000_000.0, [], settings_row, AsyncMock())
 
         assert result.is_configured is True
         assert "이미" in result.note
@@ -148,18 +148,20 @@ class TestGetGoalRecommendation:
             annual_dividend_goal=None,
         )
 
-        result = await get_goal_recommendation(None, 0.0, [], settings_row)
+        result = await get_goal_recommendation(None, 0.0, [], settings_row, AsyncMock())
 
         assert result.is_configured is True
         assert "지났습니다" in result.note
 
     async def test_full_happy_path_returns_recommended_items(self):
+        """후보를 한 번도 등록한 적 없으면(goal_candidate_tickers=None) 큐레이션 유니버스로 시드되어 계산된다."""
         settings_row = SimpleNamespace(
             goal_amount=100_000_000.0,
             retirement_target_year=9999,
             monthly_deposit_amount=1_000_000.0,
             annual_deposit_goal=None,
             annual_dividend_goal=2_000_000.0,
+            goal_candidate_tickers=None,
         )
 
         cagr_map = {
@@ -195,12 +197,16 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row)
+            mock_db = AsyncMock()
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
 
         assert result.is_configured is True
         assert result.required_return_pct is not None
         assert result.recommended_items
         assert sum(i.weight for i in result.recommended_items) == pytest.approx(100.0, abs=0.5)
+        # 최초 시드가 settings_row에 반영되어 커밋됨
+        assert settings_row.goal_candidate_tickers is not None
+        mock_db.commit.assert_awaited()
 
     async def test_infeasible_required_return_reports_note(self):
         """필요수익률(연 60%)이 해석 가능한 범위 내지만 모든 후보 CAGR을 초과하면 추천 없이 note만 채워진다."""
@@ -212,6 +218,7 @@ class TestGetGoalRecommendation:
             monthly_deposit_amount=0.0,
             annual_deposit_goal=None,
             annual_dividend_goal=None,
+            goal_candidate_tickers=None,
         )
         cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 12.0}}
         returns_map = {"SPY": [0.0005] * 252, "QQQ": [0.0006] * 252}
@@ -230,14 +237,14 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(None, 1_000_000.0, [], settings_row)
+            result = await get_goal_recommendation(None, 1_000_000.0, [], settings_row, AsyncMock())
 
         assert result.is_configured is True
         assert result.recommended_items == []
         assert result.note is not None
 
-    async def test_user_candidate_tickers_merged_into_universe(self):
-        """settings_row.goal_candidate_tickers에 등록된 티커가 후보 목록에 병합되어 조회 대상에 포함된다."""
+    async def test_user_candidate_tickers_replace_universe_when_set(self):
+        """settings_row.goal_candidate_tickers가 저장되어 있으면 그 목록만 후보로 조회된다(병합 아님)."""
         settings_row = SimpleNamespace(
             goal_amount=100_000_000.0,
             retirement_target_year=9999,
@@ -246,11 +253,8 @@ class TestGetGoalRecommendation:
             annual_dividend_goal=None,
             goal_candidate_tickers=[{"ticker": "TLT", "name": "iShares 20+ Year Treasury Bond ETF", "market": "NYSE"}],
         )
-        cagr_map = {
-            ("TLT", "NYSE"): {"cagr_pct": 4.0},
-            ("SPY", "NYSE"): {"cagr_pct": 10.0},
-        }
-        returns_map = {"TLT": [0.0002] * 252, "SPY": [0.0005] * 252}
+        cagr_map = {("TLT", "NYSE"): {"cagr_pct": 4.0}}
+        returns_map = {"TLT": [0.0002] * 252}
 
         get_historical_returns_mock = AsyncMock(return_value=cagr_map)
         with (
@@ -267,13 +271,13 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            await get_goal_recommendation(None, 10_000_000.0, [], settings_row)
+            await get_goal_recommendation(None, 10_000_000.0, [], settings_row, AsyncMock())
 
         queried_tickers = get_historical_returns_mock.call_args.args[0]
-        assert ("TLT", "NYSE") in queried_tickers
+        assert queried_tickers == [("TLT", "NYSE")]
 
-    async def test_user_candidate_ticker_deduped_against_existing_items(self):
-        """이미 existing_items에 있는 종목을 사용자가 후보로 다시 등록해도 중복되지 않는다."""
+    async def test_existing_items_ignored_when_user_candidates_already_saved(self):
+        """사용자가 이미 후보를 저장한 상태에서는 보유 종목(existing_items)이 자동 병합되지 않는다."""
         settings_row = SimpleNamespace(
             goal_amount=100_000_000.0,
             retirement_target_year=9999,
@@ -282,8 +286,8 @@ class TestGetGoalRecommendation:
             annual_dividend_goal=None,
             goal_candidate_tickers=[{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"}],
         )
-        cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}}
-        returns_map = {"SPY": [0.0005] * 252}
+        cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}
+        returns_map = {"SPY": [0.0005] * 252, "QQQ": [0.0006] * 252}
 
         get_historical_returns_mock = AsyncMock(return_value=cagr_map)
         with (
@@ -300,7 +304,93 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            await get_goal_recommendation(None, 10_000_000.0, [("SPY", "SPDR S&P 500 ETF", "NYSE")], settings_row)
+            await get_goal_recommendation(
+                None, 10_000_000.0, [("QQQ", "Invesco QQQ Trust", "NASDAQ")], settings_row, AsyncMock()
+            )
 
         queried_tickers = get_historical_returns_mock.call_args.args[0]
-        assert queried_tickers.count(("SPY", "NYSE")) == 1
+        assert queried_tickers == [("SPY", "NYSE")]
+
+    async def test_seeds_and_persists_candidates_when_never_configured(self):
+        """goal_candidate_tickers가 None(최초 상태)이면 보유종목+큐레이션 유니버스로 시드해 DB에 커밋한다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=None,
+        )
+        existing_items = [("SPY", "SPDR S&P 500 ETF", "NYSE")]
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+        ):
+            mock_db = AsyncMock()
+            result = await get_goal_recommendation(None, 10_000_000.0, existing_items, settings_row, mock_db)
+
+        assert settings_row.goal_candidate_tickers is not None
+        assert {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"} in settings_row.goal_candidate_tickers
+        assert len(settings_row.goal_candidate_tickers) <= 10
+        mock_db.commit.assert_awaited_once()
+        # 시드된 후보의 시세 데이터가 하나도 없으므로(cagr_map={}) 추천 없이 note만 채워짐
+        assert result.recommended_items == []
+
+    async def test_empty_saved_candidates_skips_optimizer(self):
+        """사용자가 후보를 전부 제거하고 저장한 경우(빈 리스트)는 옵티마이저 호출 없이 안내 메시지만 반환한다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[],
+        )
+
+        get_historical_returns_mock = AsyncMock(return_value={})
+        with patch(
+            "app.services.goal_recommendation_service.get_historical_returns",
+            get_historical_returns_mock,
+        ):
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, AsyncMock())
+
+        assert result.is_configured is True
+        assert result.recommended_items == []
+        assert "등록된 후보 종목이 없습니다" in result.note
+        get_historical_returns_mock.assert_not_called()
+
+    async def test_seed_capped_at_max_candidates(self):
+        """보유 종목이 많아도 시드는 MAX_GOAL_CANDIDATE_TICKERS(10)개를 넘지 않는다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=None,
+        )
+        existing_items = [(f"T{i}", f"Ticker {i}", "NASDAQ") for i in range(15)]
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+        ):
+            mock_db = AsyncMock()
+            await get_goal_recommendation(None, 10_000_000.0, existing_items, settings_row, mock_db)
+
+        assert len(settings_row.goal_candidate_tickers) == 10
+        # 보유 종목이 이미 상한을 채우므로 큐레이션 유니버스는 하나도 섞이지 않는다
+        assert all(t["ticker"].startswith("T") for t in settings_row.goal_candidate_tickers)

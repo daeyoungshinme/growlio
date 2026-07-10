@@ -157,13 +157,35 @@ describe("GoalRecommendationCard", () => {
     expect(container.textContent).toBe("");
   });
 
-  it("renders nothing when there are no recommended items", async () => {
+  it("shows the note and a candidate-manager entry point when there are no recommended items", async () => {
     fetchOverallGoalRecommendation.mockResolvedValue(
       makeRecommendation({ recommended_items: [], note: "이미 목표 금액을 달성했습니다" }),
     );
-    const { container } = renderWithProviders(<GoalRecommendationCard />);
-    await waitFor(() => expect(fetchOverallGoalRecommendation).toHaveBeenCalled());
-    expect(container.textContent).toBe("");
+    renderWithProviders(<GoalRecommendationCard />);
+
+    expect(await screen.findByText("목표 달성 추천 비중 (전체 자산 기준)")).toBeDefined();
+    expect(screen.getByText("이미 목표 금액을 달성했습니다")).toBeDefined();
+    expect(screen.getByText(/후보 ETF 관리/)).toBeDefined();
+    expect(screen.queryByText(/에 적용/)).toBeNull();
+  });
+
+  it("still exposes the candidate-manager button when there are no candidate ETFs registered", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(
+      makeRecommendation({
+        recommended_items: [],
+        note: "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
+      }),
+    );
+    renderWithProviders(<GoalRecommendationCard />);
+
+    expect(
+      await screen.findByText("등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요"),
+    ).toBeDefined();
+
+    fireEvent.click(screen.getByText(/후보 ETF 관리/));
+    expect(
+      await screen.findByText("목표 달성 추천 비중 계산에 함께 고려할 ETF 후보를 등록합니다."),
+    ).toBeDefined();
   });
 
   it("renders recommended items and required/expected return", async () => {

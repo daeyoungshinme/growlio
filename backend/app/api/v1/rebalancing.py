@@ -260,7 +260,7 @@ async def get_overall_goal_recommendation_endpoint(
     base_krw = float(overview.get("total_assets_krw", 0))
     pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
     existing_items = existing_items_from_positions(pos_map)
-    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row)
+    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row, db)
 
 
 async def _fetch_broker_balance(

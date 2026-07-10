@@ -15,6 +15,7 @@ from app.models.user import User
 from app.redis_client import get_redis
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
+from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import dashboard_summary_key, invalidate_user_caches
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -70,8 +71,8 @@ class GoalCandidateTickersUpdate(BaseModel):
     @field_validator("tickers")
     @classmethod
     def validate_max_count(cls, v: list[GoalCandidateTicker]) -> list[GoalCandidateTicker]:
-        if len(v) > 10:
-            raise ValueError("후보 ETF는 최대 10개까지 등록할 수 있습니다")
+        if len(v) > MAX_GOAL_CANDIDATE_TICKERS:
+            raise ValueError(f"후보 ETF는 최대 {MAX_GOAL_CANDIDATE_TICKERS}개까지 등록할 수 있습니다")
         return v
 
 

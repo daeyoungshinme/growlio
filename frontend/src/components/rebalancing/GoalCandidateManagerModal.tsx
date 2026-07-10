@@ -15,6 +15,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
 
+// backend app/services/recommendation_universe.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
 const MAX_CANDIDATE_TICKERS = 10;
 
 interface Props {

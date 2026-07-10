@@ -4,6 +4,9 @@
 (`price_service.get_historical_returns`, `dividend_sync_sources.*`) — 데이터 신선도 유지 목적.
 """
 
+MAX_GOAL_CANDIDATE_TICKERS = 10
+"""사용자가 등록 가능한 목표 역산 추천 후보 종목 최대 개수 (`api/v1/settings.py` 검증에서 공유)."""
+
 RECOMMENDATION_UNIVERSE: list[dict[str, str]] = [
     {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"},
     {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE"},

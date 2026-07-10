@@ -1,10 +1,14 @@
 """목표 역산 포트폴리오 추천 서비스 (로드맵 A 3단계).
 
 투자 목표(목표금액/월적립액/목표연도)를 역산해 필요 연평균 수익률을 구하고,
-기존 포트폴리오 종목 + 큐레이션 ETF 후보(`recommendation_universe.py`) 중에서
+사용자가 "후보 ETF 관리"에서 등록한 후보 종목(`UserSettings.goal_candidate_tickers`) 중에서
 그 수익률 이상을 만족하는 최소분산 포트폴리오를 Mean-Variance Optimization으로 추천한다.
 `portfolio_optimizer.py`의 SLSQP 골격을 재사용하되, 기대수익률은 10년 CAGR(진단화면에 이미
 노출되는 target_weighted_cagr_10y_pct와 동일 소스)을 사용하고 목표수익률 이상을 제약으로 둔다.
+
+후보 종목을 한 번도 등록한 적 없으면(`goal_candidate_tickers is None`) 보유 종목 + 큐레이션
+ETF 후보(`recommendation_universe.py`)로 초기 후보 목록을 구성해 DB에 저장한 뒤 사용한다 —
+이후에는 사용자가 "후보 ETF 관리"에서 편집한 목록만이 유일한 계산 대상이다(자동 병합 없음).
 
 자동 반영되지 않음 — 프론트엔드에서 사용자가 확인 후 수동으로 포트폴리오 편집기에 적용한다.
 """
@@ -16,6 +20,7 @@ from datetime import UTC, date, datetime
 
 import structlog
 from dateutil.relativedelta import relativedelta
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS
 from app.models.user import UserSettings
@@ -29,7 +34,7 @@ from app.services.dividend_sync_sources import (
 from app.services.goal_return_solver import solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.price_service import get_historical_returns
-from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
+from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS, RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import to_yf_symbol
 from app.utils.cache_keys import RedisType
 
@@ -172,11 +177,37 @@ def existing_items_from_positions(pos_map: dict[str, dict]) -> list[tuple[str, s
     ]
 
 
+def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[dict[str, str]]:
+    """후보를 한 번도 등록한 적 없을 때 초기 후보(보유종목 + 큐레이션 ETF)를 구성한다.
+
+    보유 종목을 우선 채우고 남는 자리를 큐레이션 ETF로 채우되, `MAX_GOAL_CANDIDATE_TICKERS`를
+    넘지 않는다 — 저장 시 `GoalCandidateTickersUpdate` 검증(최대 개수)을 통과해야 하기 때문.
+    """
+    seen: set[tuple[str, str]] = set()
+    seed: list[dict[str, str]] = []
+    for t, name, m in existing_items:
+        if len(seed) >= MAX_GOAL_CANDIDATE_TICKERS:
+            break
+        if (t, m) in seen:
+            continue
+        seen.add((t, m))
+        seed.append({"ticker": t, "name": name, "market": m})
+    for c in RECOMMENDATION_UNIVERSE:
+        if len(seed) >= MAX_GOAL_CANDIDATE_TICKERS:
+            break
+        if (c["ticker"], c["market"]) in seen:
+            continue
+        seen.add((c["ticker"], c["market"]))
+        seed.append(c)
+    return seed
+
+
 async def get_goal_recommendation(
     redis: RedisType,
     base_krw: float,
     existing_items: list[tuple[str, str, str]],
     settings_row: UserSettings | None,
+    db: AsyncSession,
 ) -> GoalRecommendation:
     """기준 자산총액과 유저 목표를 받아 목표 역산 추천을 계산한다."""
     if not settings_row or not settings_row.goal_amount or not settings_row.retirement_target_year:
@@ -211,22 +242,20 @@ async def get_goal_recommendation(
             required_dividend_yield_pct=required_dividend_yield_pct,
         )
 
-    seen = {(t, m) for t, _, m in existing_items}
-    user_candidates = [
-        (c["ticker"], c["name"], c["market"])
-        for c in (getattr(settings_row, "goal_candidate_tickers", None) or [])
-        if (c["ticker"], c["market"]) not in seen
-    ]
-    seen |= {(t, m) for t, _, m in user_candidates}
-    candidates = (
-        existing_items
-        + user_candidates
-        + [
-            (c["ticker"], c["name"], c["market"])
-            for c in RECOMMENDATION_UNIVERSE
-            if (c["ticker"], c["market"]) not in seen
-        ]
-    )
+    candidate_dicts = getattr(settings_row, "goal_candidate_tickers", None)
+    if candidate_dicts is None:
+        candidate_dicts = _seed_candidate_tickers(existing_items)
+        settings_row.goal_candidate_tickers = candidate_dicts
+        await db.commit()
+
+    if not candidate_dicts:
+        return _no_recommendation(
+            "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
+            required_return_pct,
+            required_dividend_yield_pct,
+        )
+
+    candidates = [(c["ticker"], c["name"], c["market"]) for c in candidate_dicts]
     tickers_only = [(t, m) for t, _, m in candidates]
 
     cagr_map, dividend_map = await asyncio.gather(

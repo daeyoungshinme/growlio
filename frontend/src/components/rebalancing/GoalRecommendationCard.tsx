@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Plus, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchOverallGoalRecommendation, type GoalRecommendationItem } from "@/api/rebalancing";
@@ -29,7 +29,8 @@ interface Props {
   onApplied?: (portfolioId: string) => void;
 }
 
-/** 목표 역산 추천(로드맵 A 3단계) — 전체 자산 기준으로 추천 비중이 있을 때만 카드를 표시한다. */
+/** 목표 역산 추천(로드맵 A 3단계) — 전체 자산 기준 목표(금액·연도)가 설정된 경우에만 카드를 표시한다.
+ * 추천 후보가 없거나 계산 불가한 경우에도 "후보 ETF 관리" 진입점은 유지된다. */
 export default function GoalRecommendationCard({ noTopMargin = false, onApplied }: Props) {
   const queryClient = useQueryClient();
   const { data } = useQuery({
@@ -85,7 +86,19 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
   });
   const candidateCount = settingsData?.goal_candidate_tickers?.length ?? 0;
 
-  if (!data || !data.is_configured || data.recommended_items.length === 0) return null;
+  // 최초 방문 시 백엔드가 후보를 시드해 DB에 커밋할 수 있으므로, 이미 캐시된 settings 쿼리가
+  // 시드 이전 값을 들고 있을 수 있다 — 추천 조회가 끝나면 한 번 settings를 재조회해 동기화한다.
+  const settingsSyncedRef = useRef(false);
+  useEffect(() => {
+    if (data && !settingsSyncedRef.current) {
+      settingsSyncedRef.current = true;
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+    }
+  }, [data, queryClient]);
+
+  if (!data || !data.is_configured) return null;
+
+  const hasRecommendation = data.recommended_items.length > 0;
 
   return (
     <>
@@ -99,75 +112,83 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
           </span>
         </div>
 
-        <p className="text-xs text-gray-600 dark:text-gray-300">
-          목표 달성에 필요한 연 수익률 {data.required_return_pct?.toFixed(1)}% — 아래 비중으로
-          조정하면 기대수익률 {data.expected_return_pct?.toFixed(1)}%
-          {data.expected_dividend_yield_pct != null &&
-            ` (배당수익률 약 ${data.expected_dividend_yield_pct.toFixed(1)}%)`}
-          를 기대할 수 있습니다.
-        </p>
-
-        <ul className="space-y-1">
-          {data.recommended_items.map((item) => (
-            <li
-              key={`${item.ticker}-${item.market}`}
-              className="flex items-center justify-between text-xs"
-            >
-              <span className="text-gray-700 dark:text-gray-300">
-                {item.name} <span className="text-gray-400">({item.ticker})</span>
-              </span>
-              <span className="font-medium text-purple-600 dark:text-purple-400">
-                {item.weight.toFixed(1)}%
-              </span>
-            </li>
-          ))}
-        </ul>
-
-        <p className="text-xs text-purple-500 dark:text-purple-500 pt-1">
-          큐레이션 ETF 포함 참고용 제안 — 자동 반영되지 않습니다.
-        </p>
-
-        <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50">
-          {targetPortfolios.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              포트폴리오 탭에서 목표 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.
+        {hasRecommendation ? (
+          <>
+            <p className="text-xs text-gray-600 dark:text-gray-300">
+              목표 달성에 필요한 연 수익률 {data.required_return_pct?.toFixed(1)}% — 아래 비중으로
+              조정하면 기대수익률 {data.expected_return_pct?.toFixed(1)}%
+              {data.expected_dividend_yield_pct != null &&
+                ` (배당수익률 약 ${data.expected_dividend_yield_pct.toFixed(1)}%)`}
+              를 기대할 수 있습니다.
             </p>
-          ) : (
-            <div className="flex items-center gap-2 flex-wrap">
-              {targetPortfolios.length > 1 && (
-                <select
-                  value={selectedTargetId}
-                  onChange={(e) => setSelectedTargetId(e.target.value)}
-                  className="text-xs border border-purple-200 dark:border-purple-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+
+            <ul className="space-y-1">
+              {data.recommended_items.map((item) => (
+                <li
+                  key={`${item.ticker}-${item.market}`}
+                  className="flex items-center justify-between text-xs"
                 >
-                  <option value="">포트폴리오 선택</option>
-                  {targetPortfolios.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {item.name} <span className="text-gray-400">({item.ticker})</span>
+                  </span>
+                  <span className="font-medium text-purple-600 dark:text-purple-400">
+                    {item.weight.toFixed(1)}%
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <p className="text-xs text-purple-500 dark:text-purple-500 pt-1">
+              등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
+            </p>
+
+            <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50">
+              {targetPortfolios.length === 0 ? (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  포트폴리오 탭에서 목표 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.
+                </p>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {targetPortfolios.length > 1 && (
+                    <select
+                      value={selectedTargetId}
+                      onChange={(e) => setSelectedTargetId(e.target.value)}
+                      className="text-xs border border-purple-200 dark:border-purple-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="">포트폴리오 선택</option>
+                      {targetPortfolios.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    disabled={
+                      (targetPortfolios.length > 1 && !selectedTargetId) || applyMutation.isPending
+                    }
+                    onClick={() => setConfirmOpen(true)}
+                    className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
+                  >
+                    {applyMutation.isPending ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Target size={12} />
+                    )}
+                    {targetPortfolios.length === 1
+                      ? `${targetPortfolios[0].name}에 적용`
+                      : "목표 포트폴리오에 적용"}
+                  </button>
+                </div>
               )}
-              <button
-                type="button"
-                disabled={
-                  (targetPortfolios.length > 1 && !selectedTargetId) || applyMutation.isPending
-                }
-                onClick={() => setConfirmOpen(true)}
-                className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
-              >
-                {applyMutation.isPending ? (
-                  <Loader2 size={12} className="animate-spin" />
-                ) : (
-                  <Target size={12} />
-                )}
-                {targetPortfolios.length === 1
-                  ? `${targetPortfolios[0].name}에 적용`
-                  : "목표 포트폴리오에 적용"}
-              </button>
             </div>
-          )}
-        </div>
+          </>
+        ) : (
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {data.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
+          </p>
+        )}
 
         <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50">
           <button
