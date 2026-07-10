@@ -65,7 +65,7 @@ make build-android-release         # APK Release 빌드
 
 ## Architecture (`frontend/src/`)
 
-> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨 — 현재 233개 파일이 `@/`, 9개만 상대경로 사용 중. 이 문서의 예시 코드 중 일부는 과거 상대경로(`"../utils/..."`) 스타일로 남아있을 수 있음.
+> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨.
 
 **페이지 구성** (실제 라우트는 `src/App.tsx` 참고 — 인증 필요 라우트는 `/` 하위 `PrivateRoute`로 감싸짐):
 - `/login` — 로그인 (LoginPage)
@@ -246,7 +246,7 @@ cd frontend && npx playwright test
 **포맷팅 유틸리티 (`src/utils/format.ts`)**
 - 모든 포맷 함수는 `src/utils/format.ts`에서 import. 로컬 재정의 금지.
   ```ts
-  import { fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "../utils/format";
+  import { fmtKrw, fmtKrwNullable, fmtKrwShort, fmtMonth, fmtPct } from "@/utils/format";
   ```
 - `fmtKrw(n)` — 억원/만원/원 (음수 포함). 일반 텍스트 표시용.
 - `fmtKrwNullable(n)` — null/undefined이면 "—" 반환. 테이블 셀 등.
@@ -261,14 +261,14 @@ cd frontend && npx playwright test
 **에러 유틸리티 (`src/utils/error.ts`)**
 - `extractErrorMessage(error, fallback?)` — Axios 에러에서 `response.data.detail` 추출. API 에러 메시지 수동 파싱 금지.
   ```ts
-  import { extractErrorMessage } from "../utils/error";
+  import { extractErrorMessage } from "@/utils/error";
   // catch (e) { toast(extractErrorMessage(e)); }
   ```
 
 **토스트 (`src/utils/toast.ts`)**
 - `toast(message, type?)` — `window.dispatchEvent("growlio:toast")` 이벤트 발행. `useToast()` 훅 외부(비React 코드)에서도 직접 호출 가능.
   ```ts
-  import { toast } from "../utils/toast";
+  import { toast } from "@/utils/toast";
   toast("저장되었습니다", "success");
   ```
 
@@ -290,7 +290,7 @@ cd frontend && npx playwright test
 **색상 유틸리티 (`src/utils/colors.ts`)**
 - P&L 색상은 `pnlColor(value)` 함수 사용 — `PROFIT_COLOR`(`text-red-500`) / `LOSS_COLOR`(`text-blue-500`) 상수도 export됨.
   ```ts
-  import { pnlColor } from "../utils/colors";
+  import { pnlColor } from "@/utils/colors";
   // <span className={pnlColor(profit)}>
   ```
 - 직접 `text-red-500` / `text-blue-500` 인라인 작성 금지 (색상 관례 변경 시 일괄 교체 불가).
