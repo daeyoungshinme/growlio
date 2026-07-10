@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 import uuid
 from datetime import UTC, date, datetime
@@ -23,6 +24,8 @@ from app.utils.cache_keys import TTL_JOB_LOCK_DCA
 from app.utils.redis_lock import redis_lock
 
 logger = structlog.get_logger()
+
+_DCA_EXECUTION_CONCURRENCY = 3
 
 
 async def run_dca_auto_execution() -> None:
@@ -50,17 +53,22 @@ async def _run_dca_auto_execution(today: date, redis) -> None:
         )
         settings_list = result.scalars().all()
 
-    for settings in settings_list:
-        try:
-            async with AsyncSessionLocal() as db:
-                await _execute_dca_for_user(settings, db, redis)
-                settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == settings.user_id))
-                if settings_row:
-                    settings_row.auto_dca_last_executed_at = datetime.now(UTC)
-                    await db.commit()
-            logger.info("dca_auto_executed", user_id=str(settings.user_id), day=today.day)
-        except Exception as e:
-            logger.error("dca_auto_buy_failed", user_id=str(settings.user_id), error=str(e))
+    sem = asyncio.Semaphore(_DCA_EXECUTION_CONCURRENCY)
+
+    async def _run_one(settings: UserSettings) -> None:
+        async with sem:
+            try:
+                async with AsyncSessionLocal() as db:
+                    await _execute_dca_for_user(settings, db, redis)
+                    settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == settings.user_id))
+                    if settings_row:
+                        settings_row.auto_dca_last_executed_at = datetime.now(UTC)
+                        await db.commit()
+                logger.info("dca_auto_executed", user_id=str(settings.user_id), day=today.day)
+            except Exception as e:
+                logger.error("dca_auto_buy_failed", user_id=str(settings.user_id), error=str(e))
+
+    await asyncio.gather(*(_run_one(settings) for settings in settings_list))
 
 
 async def _execute_dca_for_user(settings: UserSettings, db: AsyncSession, redis) -> None:

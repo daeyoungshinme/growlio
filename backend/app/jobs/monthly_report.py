@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
 
 import structlog
@@ -15,6 +16,8 @@ from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_monthly_report_email
 
 logger = structlog.get_logger()
+
+_MONTHLY_REPORT_CONCURRENCY = 3
 
 
 def _prev_month_label(today: date) -> str:
@@ -34,11 +37,20 @@ async def run_monthly_report() -> None:
         )
         users = result.all()
 
-    for user, settings_row in users:
+    sem = asyncio.Semaphore(_MONTHLY_REPORT_CONCURRENCY)
+    await asyncio.gather(
+        *(_send_report_for_user(user, settings_row, redis, report_month, sem) for user, settings_row in users)
+    )
+
+
+async def _send_report_for_user(
+    user: User, settings_row: UserSettings, redis, report_month: str, sem: asyncio.Semaphore
+) -> None:
+    async with sem:
         # monthly_report_enabled=False이면 이메일 및 인앱 알림 건너뜀
         if not getattr(settings_row, "monthly_report_enabled", True):
             logger.info("monthly_report_skipped_disabled", user_id=str(user.id))
-            continue
+            return
 
         to_email = settings_row.notification_email or user.email
         try:
@@ -70,7 +82,7 @@ async def run_monthly_report() -> None:
                 asset_allocation=summary.get("asset_allocation") or [],
             )
             if not sent:
-                continue
+                return
 
             # 이메일 발송 성공 후 인앱 AlertHistory 저장
             async with AsyncSessionLocal() as db:

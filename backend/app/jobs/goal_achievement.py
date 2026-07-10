@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime
 
 import structlog
@@ -15,6 +16,8 @@ from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
 
 logger = structlog.get_logger()
+
+_GOAL_CHECK_CONCURRENCY = 3
 
 
 async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
@@ -50,7 +53,12 @@ async def run_goal_achievement_check() -> None:
         )
         users = result.all()
 
-    for user, settings_row in users:
+    sem = asyncio.Semaphore(_GOAL_CHECK_CONCURRENCY)
+    await asyncio.gather(*(_check_user_goals(user, settings_row, redis, sem) for user, settings_row in users))
+
+
+async def _check_user_goals(user: User, settings_row: UserSettings, redis, sem: asyncio.Semaphore) -> None:
+    async with sem:
         to_email = settings_row.notification_email or user.email
         try:
             async with AsyncSessionLocal() as db:
