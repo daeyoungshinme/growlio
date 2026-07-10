@@ -216,9 +216,9 @@ export default function PortfolioPage() {
           <ErrorBoundary variant="section">
             {chartsOpen && (
               <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-                <div className="card space-y-6">
+                <div className="card space-y-3 sm:space-y-6">
                   <DomesticForeignBar items={marketChartData} bare />
-                  <div className="border-t border-gray-100 dark:border-gray-700 pt-6">
+                  <div className="border-t border-gray-100 dark:border-gray-700 pt-3 sm:pt-6">
                     <TreemapChart data={stockChartData} title="종목별 비중" bare />
                   </div>
                 </div>
