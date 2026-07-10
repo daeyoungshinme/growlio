@@ -34,6 +34,7 @@ export interface DashboardData {
   xirr_is_estimated: boolean;
   benchmark_sp500_pct: number | null;
   goal_annual_return_pct: number | null;
+  return_goal_gap_pct: number | null;
   retirement_target_year: number | null;
   annual_dividend_goal: number | null;
   dividend_goal_achievement_pct: number | null;

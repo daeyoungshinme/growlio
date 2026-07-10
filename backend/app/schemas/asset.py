@@ -340,6 +340,7 @@ class DashboardResponse(BaseModel):
     xirr_pct: float | None = Field(None, ge=-99, le=1000)
     xirr_is_estimated: bool = False
     goal_annual_return_pct: float | None = None
+    return_goal_gap_pct: float | None = None
     retirement_target_year: int | None = None
     annual_dividend_goal: float | None = None
     dividend_goal_achievement_pct: float | None = None

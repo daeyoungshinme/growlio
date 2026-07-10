@@ -6,6 +6,7 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import DividendSection from "@/components/dashboard/DividendSection";
 import type { DashboardData } from "@/api/dashboard";
+import type { DCAAnalysisData } from "@/api/invest";
 
 function renderGoalCard(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -35,9 +36,33 @@ const baseDashboard: DashboardData = {
   xirr_is_estimated: false,
   benchmark_sp500_pct: null,
   goal_annual_return_pct: null,
+  return_goal_gap_pct: null,
   annual_dividend_goal: null,
   dividend_goal_achievement_pct: null,
 };
+
+function makeDcaData(expectedGoalDate: string | null): DCAAnalysisData {
+  return {
+    settings: {
+      monthly_deposit_amount: 500_000,
+      goal_annual_return_pct: 8,
+      goal_amount: 1_000_000_000,
+      goal_start_date: "2024-01-01",
+      goal_initial_amount: null,
+    },
+    projection_months: [],
+    yearly_achievements: [],
+    goal_timeline: {
+      months_to_goal: 120,
+      expected_goal_date: expectedGoalDate,
+      actual_expected_goal_date: expectedGoalDate,
+      current_progress_pct: 15.0,
+      on_track: true,
+      lead_lag_months: 0,
+    },
+    is_configured: true,
+  };
+}
 
 describe("InvestmentGoalCard", () => {
   it("목표가 없으면 설정 안내 메시지를 표시한다", () => {
@@ -47,6 +72,7 @@ describe("InvestmentGoalCard", () => {
       deposit_achievement_pct: null,
       goal_amount: null,
       goal_achievement_pct: null,
+      retirement_target_year: null,
     };
     renderGoalCard(<InvestmentGoalCard data={data} />);
     expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
@@ -74,9 +100,80 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
   });
 
-  it("은퇴 목표 연도를 현재 자산 섹션에 표시한다", () => {
+  it("DCA 타임라인이 없으면 은퇴 목표까지 남은 기간을 카운트다운으로 표시한다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    expect(screen.getByText(/2050년 목표/)).toBeInTheDocument();
+    const yearsLeft = 2050 - new Date().getFullYear();
+    expect(screen.getAllByText(`${yearsLeft}년 후`)[0]).toBeInTheDocument();
+  });
+
+  it("목표금액 도달 예상 시점이 은퇴 목표보다 빠르면 앞서 달성 배지를 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
+    expect(screen.getAllByText("5년 앞서 달성")[0]).toBeInTheDocument();
+  });
+
+  it("목표금액 도달 예상 시점이 은퇴 목표보다 늦으면 지연 예상 배지를 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2055-03")} />);
+    expect(screen.getAllByText("5년 지연 예상")[0]).toBeInTheDocument();
+  });
+
+  it("목표 연수익률을 초과 달성하면 초과달성 배지를 표시한다", () => {
+    const data = {
+      ...baseDashboard,
+      goal_annual_return_pct: 7.0,
+      xirr_pct: 8.5,
+      return_goal_gap_pct: 1.5,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.getAllByText("+1.5%p")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("초과달성")[0]).toBeInTheDocument();
+  });
+
+  it("목표 연수익률에 미달하면 미달 배지를 표시한다", () => {
+    const data = {
+      ...baseDashboard,
+      goal_annual_return_pct: 7.0,
+      xirr_pct: 5.0,
+      return_goal_gap_pct: -2.0,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.getAllByText("-2.0%p")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("미달")[0]).toBeInTheDocument();
+  });
+
+  it("목표 연수익률이 미설정이면 연수익률 패널에 미설정을 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    expect(screen.getAllByText("연수익률 목표")[0]).toBeInTheDocument();
+  });
+
+  it("목표 연수익률은 설정됐지만 실제 수익률 데이터가 없으면 미설정 대신 목표값을 표시한다", () => {
+    const data = {
+      ...baseDashboard,
+      goal_annual_return_pct: 13,
+      xirr_pct: null,
+      annual_return_pct: null,
+      return_goal_gap_pct: null,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.getAllByText("목표 13%")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("실제 수익률 계산 중")[0]).toBeInTheDocument();
+  });
+
+  it("연수익률 목표만 설정되고 다른 목표가 없어도 목표 미설정 안내가 뜨지 않는다", () => {
+    const data = {
+      ...baseDashboard,
+      annual_deposit_goal: null,
+      deposit_achievement_pct: null,
+      goal_amount: null,
+      goal_achievement_pct: null,
+      retirement_target_year: null,
+      goal_annual_return_pct: 13,
+      xirr_pct: null,
+      annual_return_pct: null,
+      return_goal_gap_pct: null,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.queryByText(/투자 목표가 설정되지 않았습니다/)).not.toBeInTheDocument();
+    expect(screen.getAllByText("목표 13%")[0]).toBeInTheDocument();
   });
 });
 

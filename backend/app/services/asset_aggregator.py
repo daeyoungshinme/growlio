@@ -175,6 +175,12 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     goal_annual_return_pct = (
         float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
     )
+    actual_return_for_goal = xirr_pct if xirr_pct is not None else annualized_return
+    return_goal_gap_pct = (
+        round(actual_return_for_goal - goal_annual_return_pct, 2)
+        if goal_annual_return_pct is not None and actual_return_for_goal is not None
+        else None
+    )
     retirement_target_year = settings_row.retirement_target_year if settings_row else None
     annual_dividend_goal = (
         float(settings_row.annual_dividend_goal) if settings_row and settings_row.annual_dividend_goal else None
@@ -198,6 +204,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         "xirr_pct": xirr_pct,
         "xirr_is_estimated": xirr_is_estimated,
         "goal_annual_return_pct": goal_annual_return_pct,
+        "return_goal_gap_pct": return_goal_gap_pct,
         "retirement_target_year": retirement_target_year,
         "monthly_trend": monthly_trend,
         "annual_deposit_goal": annual_deposit_goal,

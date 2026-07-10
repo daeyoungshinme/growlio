@@ -211,8 +211,8 @@ export default function InvestPlanPage() {
               )}
             </button>
             <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-              연간 입금 목표·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다. 자동 정기매수
-              설정은 아래 설정 편집에서 변경할 수 있습니다.
+              연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
+              자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
             </p>
             <Link
               to="/rebalancing?rtab=진단"
@@ -284,7 +284,12 @@ export default function InvestPlanPage() {
             </p>
             {[
               { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
-              { label: "목표 연수익률 (%)", key: "goal_annual_return_pct", placeholder: "8" },
+              {
+                label: "목표 연수익률 (%)",
+                key: "goal_annual_return_pct",
+                placeholder: "8",
+                hint: "대시보드 투자 목표 카드에 표시",
+              },
               { label: "목표 금액 (원)", key: "goal_amount", placeholder: "500000000" },
               {
                 label: "투자 시작일",
@@ -308,7 +313,7 @@ export default function InvestPlanPage() {
                 label: "은퇴 목표시점 (연도)",
                 key: "retirement_target_year",
                 placeholder: "2045",
-                hint: "대시보드 은퇴 카운트다운에 표시",
+                hint: "대시보드 투자 목표 카드에 표시",
               },
             ].map(({ label, key, placeholder, type, hint }) => (
               <FormInput

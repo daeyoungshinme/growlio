@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
-import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
+import { fmtKrw, fmtMonth } from "@/utils/format";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
 
@@ -16,6 +17,35 @@ interface Props {
   isLoading?: boolean;
 }
 
+interface GapBadgeOptions {
+  unit: string;
+  decimals?: number;
+  aheadLabel: string;
+  behindLabel: string;
+}
+
+function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: GapBadgeOptions) {
+  const isAhead = gap > 0;
+  const isEven = gap === 0;
+  return (
+    <>
+      <span
+        className={`inline-flex items-center gap-0.5 text-sm font-bold ${
+          isEven ? "text-gray-500 dark:text-gray-400" : isAhead ? "text-red-500" : "text-blue-500"
+        }`}
+      >
+        {!isEven && (isAhead ? <TrendingUp size={12} /> : <TrendingDown size={12} />)}
+        {isAhead && !isEven ? "+" : ""}
+        {gap.toFixed(decimals)}
+        {unit}
+      </span>
+      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+        {isEven ? "목표 일치" : isAhead ? aheadLabel : behindLabel}
+      </p>
+    </>
+  );
+}
+
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
   const timeline = dcaData?.goal_timeline;
   const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
@@ -24,8 +54,141 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const hasAssetGoal = data?.goal_amount != null && data.goal_achievement_pct != null;
   const hasDividendGoal =
     data?.annual_dividend_goal != null && data.dividend_goal_achievement_pct != null;
+  const actualReturnPct = data?.xirr_pct ?? data?.annual_return_pct ?? null;
+  const hasReturnGoal = data?.goal_annual_return_pct != null;
+  const canShowReturnGap =
+    hasReturnGoal && actualReturnPct != null && data?.return_goal_gap_pct != null;
 
-  if (!isLoading && !hasDepositGoal && !hasAssetGoal && !hasDividendGoal) {
+  const expectedGoalDateStr =
+    timeline?.actual_expected_goal_date ?? timeline?.expected_goal_date ?? null;
+  const expectedGoalYear = expectedGoalDateStr ? Number(expectedGoalDateStr.slice(0, 4)) : null;
+  const retirementGapYears =
+    data?.retirement_target_year != null && expectedGoalYear != null
+      ? data.retirement_target_year - expectedGoalYear
+      : null;
+  const yearsUntilRetirement =
+    data?.retirement_target_year != null
+      ? data.retirement_target_year - new Date().getFullYear()
+      : null;
+  const hasRetirementGoal = data?.retirement_target_year != null;
+
+  const goalChips: {
+    key: string;
+    label: string;
+    isSet: boolean;
+    content: ReactNode;
+    barPct?: number;
+    barColorClass?: string;
+  }[] = [
+    {
+      key: "deposit",
+      label: "연간 입금",
+      isSet: hasDepositGoal,
+      content: (
+        <span
+          className={`text-sm font-bold ${achievementColor(data?.deposit_achievement_pct ?? 0)}`}
+        >
+          {Math.min(data?.deposit_achievement_pct ?? 0, 100).toFixed(1)}%
+        </span>
+      ),
+      barPct: data?.deposit_achievement_pct ?? undefined,
+      barColorClass: "bg-blue-500",
+    },
+    {
+      key: "asset",
+      label: "자산 목표",
+      isSet: hasAssetGoal,
+      content: (
+        <span className={`text-sm font-bold ${achievementColor(data?.goal_achievement_pct ?? 0)}`}>
+          {Math.min(data?.goal_achievement_pct ?? 0, 100).toFixed(1)}%
+        </span>
+      ),
+      barPct: data?.goal_achievement_pct ?? undefined,
+      barColorClass: "bg-blue-500",
+    },
+    {
+      key: "dividend",
+      label: "배당 목표",
+      isSet: hasDividendGoal,
+      content: (
+        <span
+          className={`text-sm font-bold ${achievementColor(data?.dividend_goal_achievement_pct ?? 0)}`}
+        >
+          {Math.min(data?.dividend_goal_achievement_pct ?? 0, 100).toFixed(1)}%
+        </span>
+      ),
+      barPct: data?.dividend_goal_achievement_pct ?? undefined,
+      barColorClass: "bg-emerald-500",
+    },
+    {
+      key: "return",
+      label: "연수익률 목표",
+      isSet: hasReturnGoal,
+      content: canShowReturnGap ? (
+        gapBadge(data!.return_goal_gap_pct!, {
+          unit: "%p",
+          aheadLabel: "초과달성",
+          behindLabel: "미달",
+        })
+      ) : hasReturnGoal ? (
+        <>
+          <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
+            목표 {data!.goal_annual_return_pct}%
+          </span>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">실제 수익률 계산 중</p>
+        </>
+      ) : null,
+    },
+    {
+      key: "retirement",
+      label: "은퇴 목표",
+      isSet: hasRetirementGoal,
+      content:
+        retirementGapYears != null ? (
+          retirementGapYears === 0 ? (
+            <span className="text-sm font-bold text-gray-500 dark:text-gray-400">
+              목표 시점 일치
+            </span>
+          ) : retirementGapYears > 0 ? (
+            <>
+              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-red-500">
+                <TrendingUp size={12} />
+                {retirementGapYears}년 앞서 달성
+              </span>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                은퇴 전 목표 도달
+              </p>
+            </>
+          ) : (
+            <>
+              <span className="inline-flex items-center gap-0.5 text-sm font-bold text-blue-500">
+                <TrendingDown size={12} />
+                {Math.abs(retirementGapYears)}년 지연 예상
+              </span>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                은퇴 후 도달 예상
+              </p>
+            </>
+          )
+        ) : yearsUntilRetirement != null ? (
+          <>
+            <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
+              {yearsUntilRetirement}년 후
+            </span>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">DCA 설정 시 예측</p>
+          </>
+        ) : null,
+    },
+  ];
+
+  if (
+    !isLoading &&
+    !hasDepositGoal &&
+    !hasAssetGoal &&
+    !hasDividendGoal &&
+    !hasReturnGoal &&
+    !hasRetirementGoal
+  ) {
     return (
       <div className="card">
         <div className="flex items-center justify-between mb-2 sm:mb-4">
@@ -62,98 +225,33 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         </Link>
       </div>
 
-      {/* 모바일 컴팩트 목표 2열 */}
-      <div className="sm:hidden flex gap-4">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">연간 입금</p>
-          {hasDepositGoal ? (
-            <>
-              <p
-                className={`text-sm font-semibold ${achievementColor(data!.deposit_achievement_pct!)}`}
-              >
-                {Math.min(data!.deposit_achievement_pct!, 100).toFixed(1)}%
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">
-                  달성
-                </span>
-              </p>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                {fmtKrwShort(
-                  Math.round((data!.annual_deposit_goal! * data!.deposit_achievement_pct!) / 100),
+      {/* 목표 항목 — 가로 스크롤 칩 한 줄 (항목 수가 늘어도 세로로 자라지 않음) */}
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {goalChips.map((chip) => (
+          <div
+            key={chip.key}
+            className="min-w-[104px] flex-shrink-0 rounded-xl border border-gray-100 dark:border-gray-700 p-2.5"
+          >
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-1 truncate">
+              {chip.label}
+            </p>
+            {chip.isSet ? (
+              <>
+                {chip.content}
+                {chip.barPct != null && (
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1.5">
+                    <div
+                      className={`h-full rounded-full ${chip.barColorClass}`}
+                      style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
+                    />
+                  </div>
                 )}
-                <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
-                {fmtKrwShort(data!.annual_deposit_goal!)}원
-              </p>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.deposit_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
-
-        <div className="w-px bg-gray-100 dark:bg-gray-700 self-stretch" />
-
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">자산 목표</p>
-          {hasAssetGoal ? (
-            <>
-              <p
-                className={`text-sm font-semibold ${achievementColor(data!.goal_achievement_pct!)}`}
-              >
-                {Math.min(data!.goal_achievement_pct!, 100).toFixed(1)}%
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">
-                  달성
-                </span>
-              </p>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                {fmtKrwShort(Math.floor(data!.total_assets_krw))}
-                <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
-                {fmtKrwShort(data!.goal_amount!)}원
-              </p>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.goal_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
-
-        <div className="w-px bg-gray-100 dark:bg-gray-700 self-stretch" />
-
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">배당 목표</p>
-          {hasDividendGoal ? (
-            <>
-              <p
-                className={`text-sm font-semibold ${achievementColor(data!.dividend_goal_achievement_pct!)}`}
-              >
-                {Math.min(data!.dividend_goal_achievement_pct!, 100).toFixed(1)}%
-                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">
-                  달성
-                </span>
-              </p>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                {fmtKrwShort(data!.annual_dividend_goal!)}원 목표
-              </p>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5 mt-1">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.dividend_goal_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-300 dark:text-gray-600">미설정</p>
+            )}
+          </div>
+        ))}
       </div>
 
       {/* 모바일 DCA 달성 전망 — 2행 부각 */}
@@ -225,117 +323,6 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             DCA 투자 계획 설정하기 →
           </Link>
         )}
-      </div>
-
-      {/* 데스크탑 목표 3열 — compact secondary */}
-      <div className="hidden sm:grid sm:grid-cols-3 sm:gap-3">
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>연간 입금 달성률</span>
-            {hasDepositGoal && (
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                목표 {fmtKrw(data!.annual_deposit_goal!)}
-              </span>
-            )}
-          </div>
-          {hasDepositGoal ? (
-            <>
-              <div className="flex items-end gap-1.5">
-                <span
-                  className={`text-sm font-semibold ${achievementColor(data!.deposit_achievement_pct!)}`}
-                >
-                  {Math.min(data!.deposit_achievement_pct!, 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
-                  {fmtKrwShort(
-                    Math.round((data!.annual_deposit_goal! * data!.deposit_achievement_pct!) / 100),
-                  )}
-                  <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
-                  {fmtKrwShort(data!.annual_deposit_goal!)}원
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.deposit_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>자산 목표 달성률</span>
-            {hasAssetGoal && data!.retirement_target_year != null && (
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {data!.retirement_target_year}년 목표
-              </span>
-            )}
-          </div>
-          {hasAssetGoal ? (
-            <>
-              <div className="flex items-end gap-1.5">
-                <span
-                  className={`text-sm font-semibold ${achievementColor(data!.goal_achievement_pct!)}`}
-                >
-                  {Math.min(data!.goal_achievement_pct!, 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
-                  {fmtKrwShort(Math.floor(data!.total_assets_krw))}
-                  <span className="text-gray-300 dark:text-gray-600 mx-0.5">/</span>
-                  {fmtKrwShort(data!.goal_amount!)}원
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="h-full rounded-full bg-blue-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.goal_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
-
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>배당 목표 달성률</span>
-            {hasDividendGoal && (
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                목표 {fmtKrw(data!.annual_dividend_goal!)}
-              </span>
-            )}
-          </div>
-          {hasDividendGoal ? (
-            <>
-              <div className="flex items-end gap-1.5">
-                <span
-                  className={`text-sm font-semibold ${achievementColor(data!.dividend_goal_achievement_pct!)}`}
-                >
-                  {Math.min(data!.dividend_goal_achievement_pct!, 100).toFixed(1)}%
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">달성</span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 mb-0.5 ml-auto">
-                  예상 {fmtKrwShort(data!.estimated_annual_dividends ?? 0)}원
-                </span>
-              </div>
-              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2.5">
-                <div
-                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${Math.min(data!.dividend_goal_achievement_pct!, 100)}%` }}
-                />
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-gray-400 dark:text-gray-500">미설정</p>
-          )}
-        </div>
       </div>
 
       {/* 데스크탑 DCA 달성 전망 — 부각 PRIMARY */}
