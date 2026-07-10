@@ -29,7 +29,7 @@ vi.mock("@/api/client", () => {
 });
 
 vi.mock("@/api/assets", () => ({
-  syncAccount: vi.fn().mockResolvedValue({}),
+  syncAllAccounts: vi.fn().mockResolvedValue({ total: 2, status: "started" }),
 }));
 
 vi.mock("@/hooks/useRegisterRefresh", () => ({
@@ -74,7 +74,8 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 import PortfolioPage from "@/pages/PortfolioPage";
 import { api } from "@/api/client";
 import { toast } from "@/utils/toast";
-import { syncAccount } from "@/api/assets";
+import { syncAllAccounts } from "@/api/assets";
+import { useSyncStore } from "@/stores/syncStore";
 
 const mockPortfolioData = {
   total_stock_krw: 50_000_000,
@@ -129,6 +130,7 @@ function renderPortfolio(search = "") {
 describe("PortfolioPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useSyncStore.getState().reset();
   });
 
   it("로딩 중일 때 스켈레톤을 렌더링한다", async () => {
@@ -271,75 +273,40 @@ describe("PortfolioPage", () => {
     });
   });
 
-  it("전체 갱신 버튼을 클릭하면 각 계좌를 동기화한다", async () => {
+  it("전체 갱신 버튼을 클릭하면 백그라운드 동기화를 시작하고 진행 상태를 표시한다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    vi.mocked(syncAccount).mockResolvedValue({} as never);
+    vi.mocked(syncAllAccounts).mockResolvedValue({ total: 2, status: "started" });
     renderPortfolio();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /전체 갱신/ })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: /전체 갱신/ }));
     await waitFor(() => {
-      expect(syncAccount).toHaveBeenCalled();
+      expect(syncAllAccounts).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /0\/2 갱신 중/ })).toBeInTheDocument();
     });
   });
 
-  it("동기화 실패 시 에러 토스트를 표시한다", async () => {
+  it("동기화 시작 요청이 실패하면 에러 토스트를 표시한다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    vi.mocked(syncAccount).mockRejectedValue(new Error("sync failed"));
+    vi.mocked(syncAllAccounts).mockRejectedValue(new Error("sync failed"));
     renderPortfolio();
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /전체 갱신/ })).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: /전체 갱신/ }));
     await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith(expect.stringContaining("실패"), "error");
-    });
-  });
-
-  it("동기화 성공 시 완료 토스트를 표시한다", async () => {
-    vi.mocked(api.get).mockImplementation((url: string) => {
-      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
-      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: {} });
-    });
-    vi.mocked(syncAccount).mockResolvedValue({} as never);
-    renderPortfolio();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /전체 갱신/ })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /전체 갱신/ }));
-    await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith("전체 동기화 완료", "success");
-    });
-  });
-
-  it("CASH_OTHER 타입 계좌도 동기화 대상이다", async () => {
-    const dataWithCash = {
-      ...mockPortfolioData,
-      accounts: [{ id: "acc-1", asset_type: "CASH_OTHER", name: "현금 계좌" }],
-    };
-    vi.mocked(api.get).mockImplementation((url: string) => {
-      if (url === "/portfolio/overview") return Promise.resolve({ data: dataWithCash });
-      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
-      return Promise.resolve({ data: {} });
-    });
-    vi.mocked(syncAccount).mockResolvedValue({} as never);
-    renderPortfolio();
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: /전체 갱신/ })).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /전체 갱신/ }));
-    await waitFor(() => {
-      expect(syncAccount).toHaveBeenCalledWith("acc-1");
+      expect(toast).toHaveBeenCalledWith(expect.any(String), "error");
     });
   });
 });

@@ -91,6 +91,11 @@ class Settings(BaseSettings):
                 'generate with: python3 -c "import secrets; print(secrets.token_hex(32))"'
             )
         # supabase_jwt_secret은 RS256 JWKS 방식 사용 시 불필요 (선택적)
+        if self.app_env == "production" and not self.frontend_url.startswith("https://"):
+            raise ValueError(
+                "FRONTEND_URL must be set to the production HTTPS frontend URL when "
+                "APP_ENV=production (e.g. https://your-app.vercel.app) — used for email action links"
+            )
         return self
 
 

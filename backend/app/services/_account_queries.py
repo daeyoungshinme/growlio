@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount
@@ -27,6 +27,17 @@ def active_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
 def active_broker_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
     """user_id의 활성 KIS/키움 연동 계좌를 조회하는 SELECT 구문 반환."""
     return active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(_BROKER_ASSET_TYPES))
+
+
+def portfolio_accounts_stmt(user_id: uuid.UUID) -> Select[tuple[AssetAccount]]:
+    """user_id의 "전체 갱신" 대상 계좌(주식형 + 기타현금)를 조회하는 SELECT 구문 반환.
+
+    프론트 isPortfolioAccount(frontend/src/utils/accounts.ts)와 동일한 기준
+    (asset_type이 STOCK로 시작하거나 CASH_OTHER)을 서버에서 재현한다.
+    """
+    return active_accounts_stmt(user_id).where(
+        or_(AssetAccount.asset_type.like("STOCK%"), AssetAccount.asset_type == "CASH_OTHER")
+    )
 
 
 async def get_account_including_inactive(

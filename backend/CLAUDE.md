@@ -152,6 +152,7 @@ API Request
 services/
 > 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
+  ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, Redis로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
   ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH) (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). 주문 생성 헬퍼(`build_rebalancing_orders`/`refresh_live_prices`)는 rebalancing_order_builder.py에서 import해 재노출(하위호환) — 실제 구현은 그쪽에 있음

@@ -332,6 +332,7 @@ class DashboardResponse(BaseModel):
     annual_return_pct: float | None
     monthly_trend: list[dict]
     annual_deposit_goal: float | None = None
+    annual_deposit_current: float = 0.0
     deposit_achievement_pct: float | None = None
     annual_dividends_received: float | None = None
     estimated_annual_dividends: float | None = None

@@ -246,6 +246,7 @@ vi.mock("@/api/assets", () => ({
   fetchAccounts: vi.fn().mockResolvedValue([]),
   fetchPortfolioOverview: vi.fn(),
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
+  syncAllAccounts: vi.fn().mockResolvedValue({ total: 0, status: "started" }),
 }));
 
 vi.mock("@/api/portfolios", () => ({

@@ -17,6 +17,7 @@ const baseDashboard: DashboardData = {
   ],
   deposit_achievement_pct: 75.0,
   annual_deposit_goal: 24_000_000,
+  annual_deposit_current: 18_000_000,
   retirement_target_year: 2050,
   goal_amount: 1_000_000_000,
   goal_achievement_pct: 15.0,

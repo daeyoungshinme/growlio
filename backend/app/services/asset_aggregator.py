@@ -208,6 +208,7 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         "retirement_target_year": retirement_target_year,
         "monthly_trend": monthly_trend,
         "annual_deposit_goal": annual_deposit_goal,
+        "annual_deposit_current": net_deposits_ytd,
         "deposit_achievement_pct": deposit_achievement_pct,
         "annual_dividends_received": div_summary["annual_received"],
         "estimated_annual_dividends": div_summary["estimated_annual"],

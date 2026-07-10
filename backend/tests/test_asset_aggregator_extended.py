@@ -478,6 +478,7 @@ class TestGetDashboardSummary:
 
         assert result["goal_achievement_pct"] == pytest.approx(50.0)
         assert result["deposit_achievement_pct"] == pytest.approx(50.0)
+        assert result["annual_deposit_current"] == pytest.approx(12_000_000.0)
         assert result["goal_annual_return_pct"] == 7.0
         assert result["retirement_target_year"] == 2040
         assert result["xirr_pct"] == 8.5

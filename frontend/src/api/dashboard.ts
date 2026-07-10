@@ -25,6 +25,7 @@ export interface DashboardData {
   annual_return_pct: number | null;
   monthly_trend: MonthlyTrend[];
   annual_deposit_goal: number | null;
+  annual_deposit_current: number;
   deposit_achievement_pct: number | null;
   annual_dividends_received: number | null;
   estimated_annual_dividends: number | null;

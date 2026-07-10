@@ -9,6 +9,7 @@ import Toaster from "./components/Toaster";
 import { useAuthStore, AUTH_ME_CACHE_KEY } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { usePushNotifications } from "./hooks/usePushNotifications";
+import { useSyncAllWatcher } from "./hooks/useSyncAllWatcher";
 import { useWidget } from "./hooks/useWidget";
 import { useMainPageFetching } from "./hooks/usePortfolioTabFetching";
 import BiometricGuard from "./components/common/BiometricGuard";
@@ -51,6 +52,7 @@ function AppRoutes() {
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
   const isPageLoading = useMainPageFetching();
   usePushNotifications();
+  useSyncAllWatcher();
 
   return (
     <>

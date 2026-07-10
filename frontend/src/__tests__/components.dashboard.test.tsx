@@ -23,6 +23,7 @@ const baseDashboard: DashboardData = {
   asset_allocation: [],
   deposit_achievement_pct: 75.0,
   annual_deposit_goal: 24_000_000,
+  annual_deposit_current: 18_000_000,
   retirement_target_year: 2050,
   goal_amount: 1_000_000_000,
   goal_achievement_pct: 15.0,
@@ -90,9 +91,16 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("100.0%")[0]).toBeInTheDocument();
   });
 
-  it("자산 목표 달성률을 표시한다", () => {
+  it("전체 진행율 섹션에 자산 목표 달성률과 현재/목표 금액을 표시한다 (자산 목표 칩은 제거됨)", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
     expect(screen.getAllByText("15.0%")[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/현재 1\.50억원/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/목표 10\.00억원/)[0]).toBeInTheDocument();
+  });
+
+  it("연간 입금 항목에 현재/목표 금액 텍스트를 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    expect(screen.getAllByText("1,800만 / 2,400만원")[0]).toBeInTheDocument();
   });
 
   it("data가 undefined면 목표 미설정 안내를 표시한다", () => {

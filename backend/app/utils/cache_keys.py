@@ -51,6 +51,7 @@ TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
+TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -124,6 +125,11 @@ def portfolio_list_key(user_id: uuid.UUID) -> str:
 
 def account_detail_key(user_id: uuid.UUID, account_id: uuid.UUID) -> str:
     return f"{_env_prefix()}account_detail:{user_id}:{account_id}"
+
+
+def sync_all_status_key(user_id: uuid.UUID) -> str:
+    """ "전체 갱신" 백그라운드 진행 상태(JSON) 저장 키."""
+    return f"{_env_prefix()}sync_all:status:{user_id}"
 
 
 def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:

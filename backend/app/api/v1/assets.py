@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,6 +22,7 @@ from app.schemas.asset import (
     KisCredentialVerifyRequest,
     SetTargetPortfolioRequest,
 )
+from app.services._account_queries import portfolio_accounts_stmt
 from app.services.asset_service import (
     list_accounts as _list_accounts,
 )
@@ -36,6 +37,7 @@ from app.services.asset_service import (
 )
 from app.services.credential_service import encrypt, encrypt_if_present
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions, sync_snapshot_positions
+from app.services.sync_all_service import get_sync_all_status, is_sync_all_running, run_sync_all
 from app.utils.cache_keys import (
     TTL_ACCOUNT_DETAIL,
     account_detail_key,
@@ -409,6 +411,41 @@ async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis)
         "snapshot_date": str(snapshot.snapshot_date),
         "amount_krw": float(snapshot.amount_krw),
     }
+
+
+@router.post("/sync-all")
+@limiter.limit("3/minute")
+async def sync_all_accounts(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """전체 계좌("투자현황" 대상)를 백그라운드로 동기화한다.
+
+    요청은 즉시 반환하고, 실제 동기화는 세마포어 기반 배치 로직으로 처리된다
+    (요청 DB 커넥션을 오래 붙잡지 않아 다른 화면 조회를 막지 않음).
+    """
+    if await is_sync_all_running(current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 전체 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
+        )
+
+    result = await db.execute(portfolio_accounts_stmt(current_user.id))
+    accounts = result.scalars().all()
+
+    background_tasks.add_task(run_sync_all, current_user.id, list(accounts))
+
+    return {"total": len(accounts), "status": "started"}
+
+
+@router.get("/sync-all/status")
+async def get_sync_all_status_endpoint(
+    current_user: User = Depends(get_current_user),
+):
+    """ "전체 갱신" 진행 상태를 조회한다 (프론트 폴링용)."""
+    return await get_sync_all_status(current_user.id)
 
 
 @router.patch("/batch-target-portfolio", response_model=list[AssetAccountResponse])

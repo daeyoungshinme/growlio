@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } fro
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
-import { syncAccount } from "@/api/assets";
+import { syncAllAccounts } from "@/api/assets";
+import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
@@ -12,6 +13,7 @@ import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
 import { pnlColor } from "@/utils/colors";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
@@ -71,8 +73,10 @@ export default function PortfolioPage() {
     },
     [setSearchParams],
   );
-  const [syncingAll, setSyncingAll] = useState(false);
-  const [syncProgress, setSyncProgress] = useState({ done: 0, total: 0 });
+  const isSyncingAll = useSyncStore((s) => s.isSyncingAll);
+  const syncDone = useSyncStore((s) => s.done);
+  const syncTotal = useSyncStore((s) => s.total);
+  const startSyncAll = useSyncStore((s) => s.startSyncAll);
   const [chartsOpen, setChartsOpen] = useState(
     () => localStorage.getItem(CHARTS_OPEN_KEY) !== "false",
   );
@@ -104,30 +108,11 @@ export default function PortfolioPage() {
   } = useDividendData(!isLoading && !!data);
 
   const handleSyncAll = async () => {
-    if (!data) return;
-    const accounts = data.accounts.filter((a) => isPortfolioAccount(a.asset_type));
-    setSyncingAll(true);
-    setSyncProgress({ done: 0, total: accounts.length });
     try {
-      const results = await Promise.allSettled(
-        accounts.map(async (acc) => {
-          try {
-            await syncAccount(acc.id);
-          } finally {
-            setSyncProgress((p) => ({ ...p, done: p.done + 1 }));
-          }
-        }),
-      );
-      await invalidateSyncData(qc);
-      const failed = results.filter((r) => r.status === "rejected").length;
-      if (failed > 0) {
-        toast(`${failed}개 계좌 동기화에 실패했습니다`, "error");
-      } else {
-        toast("전체 동기화 완료", "success");
-      }
-    } finally {
-      setSyncingAll(false);
-      setSyncProgress({ done: 0, total: 0 });
+      const { total } = await syncAllAccounts();
+      startSyncAll(total);
+    } catch (e) {
+      toast(extractErrorMessage(e, "전체 동기화를 시작하지 못했습니다"), "error");
     }
   };
 
@@ -194,11 +179,11 @@ export default function PortfolioPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleSyncAll}
-            disabled={syncingAll}
+            disabled={isSyncingAll}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
           >
-            <RefreshCw size={14} className={syncingAll ? "animate-spin" : ""} />
-            {syncingAll ? `${syncProgress.done}/${syncProgress.total} 갱신 중...` : "전체 갱신"}
+            <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
+            {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
           </button>
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {stockAccounts.length}개 증권사 계좌

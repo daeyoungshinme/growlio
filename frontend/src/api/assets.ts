@@ -74,6 +74,17 @@ export const deleteAccount = (id: string) => apiDelete(`/assets/${id}`);
 
 export const syncAccount = (id: string) => apiPost(`/assets/${id}/sync`);
 
+export interface SyncAllStatus {
+  status: "idle" | "running" | "done" | "error";
+  total?: number;
+  done?: number;
+  failed?: number;
+}
+
+export const syncAllAccounts = () => apiPost<{ total: number; status: string }>("/assets/sync-all");
+
+export const getSyncAllStatus = () => apiGet<SyncAllStatus>("/assets/sync-all/status");
+
 export const setAccountTargetPortfolio = (accountId: string, portfolioId: string | null) =>
   apiPatch<AssetAccount>(`/assets/${accountId}/target-portfolio`, {
     target_portfolio_id: portfolioId,

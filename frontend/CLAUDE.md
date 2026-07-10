@@ -143,6 +143,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useLogout.ts` — 로그아웃 로직, `useOnlineStatus.ts` — 온라인/오프라인 감지
 - `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
 - `usePushNotifications.ts` / `useRegisterRefresh.ts` / `useWidget.ts` — FCM 푸시·홈 위젯 (Android)
+- `useSyncAllWatcher.ts` — "전체 갱신"(계좌 전체 동기화) 백그라운드 진행 상태 폴링. `App.tsx`의 `AppRoutes()` 최상단에서 한 번만 마운트되어 탭 이동과 무관하게 계속 폴링 — 진행 상태는 `stores/syncStore.ts`(Zustand)로 관리
 - `useTransactionFormState.ts` — 거래내역 입력 폼 상태
 
 새 커스텀 훅은 이 디렉토리에 추가/삭제 시 위 목록도 갱신.
@@ -198,7 +199,7 @@ cd frontend && npx playwright test
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리 원칙:** 서버에서 오는 데이터 → React Query. 순수 클라이언트 전역 상태 → Zustand.
-- Zustand (`src/stores/`): `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글)
+- Zustand (`src/stores/`): `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글), `syncStore.ts`("전체 갱신" 백그라운드 진행 상태 — `useSyncAllWatcher.ts`가 갱신)
 - 새 전역 상태 추가 시: 서버 fetch가 필요하면 React Query 훅, 그렇지 않으면 Zustand store.
 
 **포트폴리오와 대시보드의 관계:** `DashboardPage`가 `/portfolio/overview`를 추가 조회해 `PortfolioSummaryCard`에 전달. 양쪽이 같은 queryKey(`"portfolio-overview"`)를 공유하므로 포트폴리오 sync 후 대시보드도 자동 갱신됨.
