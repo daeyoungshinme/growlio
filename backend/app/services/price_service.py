@@ -105,6 +105,35 @@ async def fetch_current_price(
     return price
 
 
+async def _read_cached_prices(redis: RedisType, tickers: list[tuple[str, str]]) -> dict[str, float]:
+    """배치 대상 티커의 Redis 현재가 캐시를 일괄 조회."""
+    price_map: dict[str, float] = {}
+    if not redis:
+        return price_map
+    with contextlib.suppress(RedisError):
+        cached_values = await redis.mget([current_price_key(t, m) for t, m in tickers])
+        for (ticker, _), cached in zip(tickers, cached_values, strict=False):
+            if cached:
+                price_map[ticker] = float(cached)
+    return price_map
+
+
+async def _write_cached_prices(redis: RedisType, tickers: list[tuple[str, str]], price_map: dict[str, float]) -> None:
+    """새로 조회된 가격을 Redis 현재가 캐시에 저장."""
+    if not redis:
+        return
+    newly_fetched = [(t, m) for t, m in tickers if price_map.get(t)]
+    if not newly_fetched:
+        return
+    with contextlib.suppress(RedisError):
+        await asyncio.gather(
+            *(
+                redis.set(current_price_key(ticker, market), str(price_map[ticker]), ex=TTL_PRICE_CURRENT)
+                for ticker, market in newly_fetched
+            )
+        )
+
+
 async def fetch_prices_batch(
     user_id: uuid.UUID,
     tickers: list[tuple[str, str]],
@@ -114,15 +143,16 @@ async def fetch_prices_batch(
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
     국내 종목은 Naver/pykrx로 먼저 채우고, 남은 종목만 Yahoo Finance 배치 조회 →
-    그래도 실패한 종목은 KIS로 보완한다.
+    그래도 실패한 종목은 KIS로 보완한다. Redis 15분 캐시를 우선 조회하고, 새로 조회한 가격은 캐시에 반영한다.
     """
     if not tickers:
         return {}
 
     loop = asyncio.get_running_loop()
-    price_map: dict[str, float] = {}
+    price_map: dict[str, float] = await _read_cached_prices(redis, tickers)
+    remaining = [(t, m) for t, m in tickers if t not in price_map]
 
-    domestic = [(t, m) for t, m in tickers if m.upper() in DOMESTIC_MARKETS]
+    domestic = [(t, m) for t, m in remaining if m.upper() in DOMESTIC_MARKETS]
     if domestic:
         domestic_results = await asyncio.gather(
             *(_domestic_price_fallback(t, loop) for t, _ in domestic), return_exceptions=True
@@ -131,7 +161,7 @@ async def fetch_prices_batch(
             if isinstance(result, (int, float)) and result > 0:
                 price_map[ticker] = float(result)
 
-    yahoo_targets = [(t, m) for t, m in tickers if t not in price_map]
+    yahoo_targets = [(t, m) for t, m in remaining if t not in price_map]
     if yahoo_targets and yahoo_circuit.is_available():
         async with _yfinance_sem:
             yahoo_map = await loop.run_in_executor(None, partial(_sync_yahoo_batch, yahoo_targets))
@@ -141,7 +171,7 @@ async def fetch_prices_batch(
             yahoo_circuit.record_failure()
         price_map.update(yahoo_map)
 
-    missing = [(t, m) for t, m in tickers if t not in price_map or price_map[t] == 0]
+    missing = [(t, m) for t, m in remaining if t not in price_map or price_map[t] == 0]
     if missing:
         account = await _get_any_kis_account(user_id, db)
         if account:
@@ -150,6 +180,8 @@ async def fetch_prices_batch(
             for (ticker, _), result in zip(missing, results, strict=False):
                 if isinstance(result, (int, float)) and result > 0:
                     price_map[ticker] = float(result)
+
+    await _write_cached_prices(redis, remaining, price_map)
 
     return price_map
 

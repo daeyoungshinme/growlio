@@ -211,7 +211,7 @@ export default function PortfolioPage() {
         <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
           주식 총평가액
         </p>
-        <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600">
+        <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">
           {fmtKrwPrice(data.total_stock_krw)}
         </p>
         <div className="mt-2">

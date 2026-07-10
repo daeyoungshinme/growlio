@@ -9,7 +9,8 @@ from app.providers.http_client import AsyncRateLimiter, broker_request
 
 logger = structlog.get_logger()
 
-_semaphore = asyncio.Semaphore(1)
+_KIS_CONCURRENCY = 1  # KIS API는 초당 호출 제한이 엄격해 완전 직렬화(의도적으로 다른 세마포어보다 낮음)
+_semaphore = asyncio.Semaphore(_KIS_CONCURRENCY)
 _rate_limiter = AsyncRateLimiter(rate=settings.kis_rate_per_second)
 
 

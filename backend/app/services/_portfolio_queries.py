@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -36,11 +36,17 @@ async def get_linked_portfolios(db: AsyncSession, user_id: uuid.UUID) -> list[Po
 
 
 async def get_active_alert_thresholds(db: AsyncSession, user_id: uuid.UUID) -> dict[str, float]:
-    """활성 리밸런싱 알림의 portfolio_id → threshold_pct 매핑을 반환한다."""
-    alerts_result = await db.execute(
-        select(RebalancingAlert).where(
+    """활성 리밸런싱 알림의 portfolio_id → threshold_pct(최솟값) 매핑을 반환한다.
+
+    PER_ACCOUNT 스코프 포트폴리오는 계좌별로 서로 다른 threshold_pct를 가진 여러 행을
+    가질 수 있으므로, 가장 보수적인(가장 먼저 트리거되는) 값을 대표값으로 사용한다.
+    """
+    result = await db.execute(
+        select(RebalancingAlert.portfolio_id, func.min(RebalancingAlert.threshold_pct))
+        .where(
             RebalancingAlert.user_id == user_id,
             RebalancingAlert.is_active == True,  # noqa: E712
         )
+        .group_by(RebalancingAlert.portfolio_id)
     )
-    return {str(a.portfolio_id): float(a.threshold_pct) for a in alerts_result.scalars().all()}
+    return {str(portfolio_id): float(min_threshold) for portfolio_id, min_threshold in result.all()}

@@ -11,12 +11,13 @@ from app.services.asset_service import sync_account
 logger = structlog.get_logger()
 
 _STOCK_SOURCES = ("KIS_API", "KIWOOM_API")
+_ACCOUNT_SYNC_CONCURRENCY = 3
 
 
 async def _sync_accounts(accounts: list[AssetAccount], job_name: str) -> None:
     redis = await get_redis()
     failed: list[tuple[str, str, str]] = []
-    sem = asyncio.Semaphore(3)
+    sem = asyncio.Semaphore(_ACCOUNT_SYNC_CONCURRENCY)
 
     async def sync_one(account: AssetAccount) -> None:
         async with sem:

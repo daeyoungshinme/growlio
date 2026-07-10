@@ -62,7 +62,7 @@ cd backend && uv run pytest --cov=app --cov-report=term-missing
 
 ### Lint & Type Check
 ```bash
-# Ruff 린터 (E/F/I/UP/B/SIM 규칙, E712 제외)
+# Ruff 린터 (E/F/I/UP/B/SIM/C90/ASYNC/PT 규칙, E712·B008·SIM108·PT001 제외)
 cd backend && uv run ruff check .
 
 # Mypy 타입 체크
@@ -81,6 +81,7 @@ cd backend && uv run mypy app/
 - `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
 - `API_SEMAPHORE_LIMIT` — 외부 API 동시 호출 제한 세마포어 크기
 - `REDIS_CACHE_TTL_SECONDS` — 환율 등 Redis 캐시 기본 TTL
+- 기타 튜닝용 env var(환율 fallback, KIS/Kiwoom rate limit, circuit breaker 임계값, DB pool 설정 등)는 `app/config.py`의 `Settings` 클래스 참고 — 전부 기본값 있어 운영 필수 아님
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -89,7 +90,7 @@ cd backend && uv run mypy app/
 **외부 API**:
 - `DART_API_KEY` — opendart.fss.or.kr
 - `FRED_API_KEY` — fred.stlouisfed.org (미국 경제지표)
-- `FMP_API_KEY` — financialmodelingprep.com (증시 캘린더)
+- `FMP_API_KEY` — financialmodelingprep.com (증시 캘린더, 현재 코드에서 미사용 — 예약된 설정)
 
 **이메일 알림** (Resend HTTP API — Render 등 클라우드의 outbound SMTP 포트 차단을 피하기 위해 SMTP 대신 HTTPS API 사용):
 - `RESEND_API_KEY`, `EMAIL_FROM`, `EMAIL_TIMEOUT`
@@ -126,15 +127,17 @@ API Request
         ├── dividends.py      # 배당금 요약 + 예상 배당금 + 월별 균등화 제안
         ├── invest.py         # DCA 분석
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
-        ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk, /risk/{id}, /rebalancing-strategy
+        ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk(?portfolio_id=), /rebalancing-strategy
         ├── rebalancing.py    # 리밸런싱 추천
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
+        ├── rebalancing_plan.py       # 리밸런싱 대기 플랜 조회/취소/승인 (인증 필요, 앱 내 사용)
+        ├── rebalancing_plan_public.py  # 리밸런싱 대기 플랜 토큰 기반 액션 (인증 없음, 이메일 링크 전용 — `Depends(get_current_user)` 사용 금지)
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
         ├── stocks.py         # 종목 검색
         ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
         ├── transactions.py   # 입출금/배당 내역 CRUD
         ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
-        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — 프론트 미연동, API만 존재 (구독/알림 job은 동작)
+        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — CPI/Core CPI 요약(`/inflation-summary`)은 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 그 외 전체 지표 목록/구독/알림 job은 프론트 미연동
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
@@ -151,12 +154,17 @@ services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
-  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH)·AUTO 자동실행 주문 생성 (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`)
+  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH) (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). 주문 생성 헬퍼(`build_rebalancing_orders`/`refresh_live_prices`)는 rebalancing_order_builder.py에서 import해 재노출(하위호환) — 실제 구현은 그쪽에 있음
+  ├── rebalancing_order_builder.py  # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices) — rebalancing_alert_service.py에서 분리(알림 발송과 주문 생성 책임 분리)
+  ├── rebalancing_plan_service.py  # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지
   ├── rebalancing_diagnosis_service.py  # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직 (alert 아님)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend_fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
+  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 (목표금액/월적립액/목표연도 → 필요 수익률 역산 → 기존 종목+큐레이션 ETF 중 MVO로 최소분산 포트폴리오 추천). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률을 구하는 순수 계산 함수 (goal_recommendation_service.py 서브모듈)
+  ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 상수
   ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
   ├── dividend_sync_sources.py # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — dividend_fetcher.py 체인이 호출
   ├── dividend_plan_service.py # 연배당/월배당 계획 및 목표 달성 현황 서비스
@@ -244,7 +252,9 @@ jobs/                         # APScheduler 정기 작업
   ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
   ├── rebalancing_alert.py    # 매일 08:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
   ├── market_signal_alert.py  # 10분 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
-  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 자동 실행
+  ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함)
+  ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행
+  ├── rebalancing_plan_sell_expiry.py  # 매일 15:31 KST — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티

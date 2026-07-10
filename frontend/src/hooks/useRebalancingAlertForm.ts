@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  deleteAccountRebalancingAlert,
   deleteRebalancingAlert,
+  fetchAccountRebalancingAlert,
   fetchRebalancingAlert,
+  upsertAccountRebalancingAlert,
   upsertRebalancingAlert,
   type MarketConditionMode,
   type RebalancingAlert,
@@ -22,15 +25,23 @@ const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL"
 interface UseRebalancingAlertFormOpts {
   portfolioId: string;
   accountIds?: string[] | null;
+  /** 지정 시 이 계좌 전용 알림(PER_ACCOUNT 스코프)을 조회/저장한다 (실행계좌 선택과는 별개 개념). */
+  targetAccountId?: string;
 }
 
 export function useRebalancingAlertQueries({
   portfolioId,
   accountIds,
+  targetAccountId,
 }: UseRebalancingAlertFormOpts) {
   const { data: alert, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.rebalancingAlert(portfolioId),
-    queryFn: () => fetchRebalancingAlert(portfolioId),
+    queryKey: targetAccountId
+      ? QUERY_KEYS.rebalancingAlertByAccount(portfolioId, targetAccountId)
+      : QUERY_KEYS.rebalancingAlert(portfolioId),
+    queryFn: () =>
+      targetAccountId
+        ? fetchAccountRebalancingAlert(portfolioId, targetAccountId)
+        : fetchRebalancingAlert(portfolioId),
     staleTime: STALE_TIME.MEDIUM,
     retry: (failureCount, error: unknown) => {
       const status = getHttpStatus(error);
@@ -38,7 +49,7 @@ export function useRebalancingAlertQueries({
     },
   });
 
-  const { data: accounts = [] } = useQuery({
+  const { data: accounts = [], isLoading: accountsLoading } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
     staleTime: STALE_TIME.MEDIUM,
@@ -65,12 +76,17 @@ export function useRebalancingAlertQueries({
       (accountIds == null || accountIds.includes(a.id)),
   );
 
+  const targetAccountIsKis = targetAccountId
+    ? accounts.find((a) => a.id === targetAccountId)?.asset_type === "STOCK_KIS"
+    : true;
+
   return {
     alert: alert ?? null,
-    isLoading,
+    isLoading: isLoading || (targetAccountId ? accountsLoading : false),
     brokerAccounts,
     kisAccounts,
     kisExecutionAccounts,
+    targetAccountIsKis,
     marketSignal,
   };
 }
@@ -78,12 +94,15 @@ export function useRebalancingAlertQueries({
 interface UseRebalancingAlertFormStateOpts {
   alert: RebalancingAlert | null;
   portfolioId: string;
+  /** 지정 시 계좌별 독립 설정(PER_ACCOUNT) API로 저장/삭제한다. */
+  targetAccountId?: string;
   onClose: () => void;
 }
 
 export function useRebalancingAlertFormState({
   alert,
   portfolioId,
+  targetAccountId,
   onClose,
 }: UseRebalancingAlertFormStateOpts) {
   const qc = useQueryClient();
@@ -99,7 +118,7 @@ export function useRebalancingAlertFormState({
   const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY" | "TWO_PHASE">(
     alert?.strategy ?? "BUY_ONLY",
   );
-  const [accountId, setAccountId] = useState<string>(alert?.account_id ?? "");
+  const [accountId, setAccountId] = useState<string>(alert?.account_id ?? targetAccountId ?? "");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">(alert?.order_type ?? "MARKET");
   const [marketConditionMode, setMarketConditionMode] = useState<MarketConditionMode>(
     alert?.market_condition_mode ?? "DISABLED",
@@ -108,10 +127,11 @@ export function useRebalancingAlertFormState({
     alert?.auto_execution_time ?? "09:05",
   );
   const [notifyTime, setNotifyTime] = useState<string>(alert?.notify_time ?? "08:30");
+  const [buyWaitMinutes, setBuyWaitMinutes] = useState<number>(alert?.buy_wait_minutes ?? 10);
 
   const upsertMut = useMutation({
-    mutationFn: () =>
-      upsertRebalancingAlert(portfolioId, {
+    mutationFn: () => {
+      const body = {
         threshold_pct: threshold,
         schedule_type: scheduleType,
         schedule_day_of_week: scheduleType === "WEEKLY" ? dayOfWeek : null,
@@ -124,7 +144,12 @@ export function useRebalancingAlertFormState({
         market_condition_mode: mode === "AUTO" ? marketConditionMode : "DISABLED",
         auto_execution_time: mode === "AUTO" && autoExecutionTime ? autoExecutionTime : null,
         notify_time: notifyTime,
-      }),
+        buy_wait_minutes: buyWaitMinutes,
+      };
+      return targetAccountId
+        ? upsertAccountRebalancingAlert(portfolioId, targetAccountId, body)
+        : upsertRebalancingAlert(portfolioId, body);
+    },
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
       toast("설정이 저장되었습니다", "success");
@@ -134,7 +159,10 @@ export function useRebalancingAlertFormState({
   });
 
   const deleteMut = useMutation({
-    mutationFn: () => deleteRebalancingAlert(portfolioId),
+    mutationFn: () =>
+      targetAccountId
+        ? deleteAccountRebalancingAlert(portfolioId, targetAccountId)
+        : deleteRebalancingAlert(portfolioId),
     onSuccess: () => {
       void invalidateRebalancingAlertData(qc, portfolioId);
       toast("설정이 해제되었습니다", "success");
@@ -169,6 +197,8 @@ export function useRebalancingAlertFormState({
     setAutoExecutionTime,
     notifyTime,
     setNotifyTime,
+    buyWaitMinutes,
+    setBuyWaitMinutes,
     // mutations
     upsertMut,
     deleteMut,

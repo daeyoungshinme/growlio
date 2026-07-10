@@ -16,6 +16,7 @@ from app.models.asset import (
 from app.models.backtest import BacktestPortfolio
 from app.models.indicator_subscription import IndicatorSubscription
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
+from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.models.token import KisToken, KiwoomToken
 from app.models.user import User, UserSettings
 
@@ -40,4 +41,7 @@ __all__ = [
     "StockPriceAlert",
     "AlertHistory",
     "IndicatorSubscription",
+    "RebalancingPlan",
+    "RebalancingPlanLeg",
+    "RebalancingPlanItem",
 ]

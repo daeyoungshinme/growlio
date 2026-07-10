@@ -116,6 +116,7 @@ describe("api/alerts — rebalancing alerts", () => {
     market_condition_mode: "DISABLED" as const,
     auto_execution_time: null,
     notify_time: "08:30",
+    buy_wait_minutes: 10,
     last_triggered_at: null,
     created_at: "2024-01-01T00:00:00Z",
     updated_at: "2024-01-01T00:00:00Z",
@@ -134,6 +135,16 @@ describe("api/alerts — rebalancing alerts", () => {
     expect(api.get).toHaveBeenCalledWith("/alerts/rebalancing/port-1");
   });
 
+  it("fetchRebalancingAlert resolves null on 404 instead of throwing (no stale-cache on delete)", async () => {
+    vi.mocked(api.get).mockRejectedValue({ response: { status: 404 } });
+    await expect(fetchRebalancingAlert("port-1")).resolves.toBeNull();
+  });
+
+  it("fetchRebalancingAlert rethrows non-404 errors", async () => {
+    vi.mocked(api.get).mockRejectedValue({ response: { status: 500 } });
+    await expect(fetchRebalancingAlert("port-1")).rejects.toEqual({ response: { status: 500 } });
+  });
+
   it("upsertRebalancingAlert calls PUT /alerts/rebalancing/:portfolioId", async () => {
     vi.mocked(api.put).mockResolvedValue({ data: mockRebalancingAlert });
     await upsertRebalancingAlert("port-1", {
@@ -149,6 +160,7 @@ describe("api/alerts — rebalancing alerts", () => {
       market_condition_mode: "DISABLED",
       auto_execution_time: null,
       notify_time: "08:30",
+      buy_wait_minutes: 10,
     });
     expect(api.put).toHaveBeenCalledWith(
       "/alerts/rebalancing/port-1",

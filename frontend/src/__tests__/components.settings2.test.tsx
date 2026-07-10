@@ -45,6 +45,7 @@ vi.mock("@/api/settings", () => ({
   updateAutoDca: vi.fn().mockResolvedValue({}),
   fetchSettings: vi.fn().mockResolvedValue({ has_dart: false }),
   updateCompositeSignalAlerts: vi.fn().mockResolvedValue(undefined),
+  updateGoalCandidateTickers: vi.fn().mockResolvedValue({}),
 }));
 
 vi.mock("@/api/rebalancing", () => ({

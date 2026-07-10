@@ -54,6 +54,70 @@ def exchange_rate_alert_template(
     return subject, html
 
 
+def _order_preview_table(items: list) -> str:
+    """NOTIFY 리포트용 예상 매수/매도 수량 표 (참고용, 링크/버튼 없음). items: ExecutionOrderItem 목록."""
+    td = "padding:8px;border-bottom:1px solid #e2e8f0;font-size:13px;"
+    rows_html = ""
+    for item in items:
+        side = getattr(item, "side", None)
+        side_label = "매수" if side == "BUY" else ("매도" if side == "SELL" else "—")
+        side_color = "#ef4444" if side == "BUY" else "#3b82f6"
+        ticker = getattr(item, "ticker", "") or ""
+        name = getattr(item, "name", "") or ticker
+        qty = getattr(item, "quantity", 0) or 0
+        price = getattr(item, "limit_price", None) or getattr(item, "reference_price", None)
+        price_str = f"{float(price):,.0f}" if price else "—"
+        rows_html += (
+            f"<tr>"
+            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"<td style='{td}text-align:center;color:{side_color};font-weight:bold;'>{side_label}</td>"
+            f"<td style='{td}text-align:right;'>{qty:,}주</td>"
+            f"<td style='{td}text-align:right;'>{price_str}</td>"
+            f"</tr>"
+        )
+    return (
+        f"<p style='color:#374151;margin-top:16px;font-weight:bold;'>예상 매수/매도 수량 (참고용)</p>"
+        f"<table style='width:100%;border-collapse:collapse;margin-top:4px;'>"
+        f"<thead><tr style='background:#f1f5f9;'>"
+        f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
+        f"<th style='padding:8px;text-align:center;font-size:13px;'>구분</th>"
+        f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
+        f"<th style='padding:8px;text-align:right;font-size:13px;'>참고가</th>"
+        f"</tr></thead><tbody>{rows_html}</tbody></table>"
+    )
+
+
+def _plan_items_table(items: list) -> str:
+    """플랜 대기 이메일용 leg 내 종목 표 (side는 섹션 제목으로 이미 표시되므로 열에 포함 안 함)."""
+    td = "padding:8px;border-bottom:1px solid #e2e8f0;font-size:13px;"
+    rows_html = ""
+    for item in items:
+        ticker = getattr(item, "ticker", "") or ""
+        name = getattr(item, "name", "") or ticker
+        qty = getattr(item, "quantity", 0) or 0
+        order_type = getattr(item, "order_type", "MARKET")
+        type_label = "지정가" if order_type == "LIMIT" else "시장가"
+        price = getattr(item, "limit_price", None) or getattr(item, "reference_price", None)
+        price_str = f"{float(price):,.0f}" if price else "—"
+        rows_html += (
+            f"<tr>"
+            f"<td style='{td}'>{name}<br><span style='color:#6b7280;font-size:11px;'>{ticker}</span></td>"
+            f"<td style='{td}text-align:right;'>{qty:,}주</td>"
+            f"<td style='{td}text-align:center;'>{type_label}</td>"
+            f"<td style='{td}text-align:right;'>{price_str}</td>"
+            f"</tr>"
+        )
+    return (
+        f"<table style='width:100%;border-collapse:collapse;margin-top:8px;'>"
+        f"<thead><tr style='background:#f1f5f9;'>"
+        f"<th style='padding:8px;text-align:left;font-size:13px;'>종목</th>"
+        f"<th style='padding:8px;text-align:right;font-size:13px;'>수량</th>"
+        f"<th style='padding:8px;text-align:center;font-size:13px;'>주문유형</th>"
+        f"<th style='padding:8px;text-align:right;font-size:13px;'>참고가</th>"
+        f"</tr></thead><tbody>{rows_html}</tbody></table>"
+    )
+
+
 def rebalancing_alert_template(
     portfolio_name: str,
     threshold_pct: float,
@@ -64,6 +128,8 @@ def rebalancing_alert_template(
     is_test: bool = False,
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
+    order_preview_items: list | None = None,
+    app_link: str | None = None,
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
         "DAILY": "매일",
@@ -140,6 +206,14 @@ def rebalancing_alert_template(
         footer = (
             f"Growlio 앱에서 리밸런싱 분석을 실행하여 상세 내역을 확인하세요.<br>이 알림은 {schedule_label} 발송됩니다."
         )
+    order_preview_html = _order_preview_table(order_preview_items) if order_preview_items else ""
+    cta_html = (
+        f"<a href='{app_link}' style='display:inline-block;padding:10px 20px;border-radius:8px;"
+        f"font-weight:bold;font-size:14px;text-decoration:none;margin-top:16px;"
+        f"background:#1d4ed8;color:#ffffff;'>앱에서 확인하기</a>"
+        if app_link
+        else ""
+    )
     body = (
         f"{test_banner}"
         f"<p style='color:#374151;margin-top:8px;'>{subheading}</p>"
@@ -153,6 +227,8 @@ def rebalancing_alert_template(
         f"<th style='padding:8px;text-align:right;'>조치</th>"
         f"</tr></thead>"
         f"<tbody>{rows_html}</tbody></table>"
+        f"{order_preview_html}"
+        f"{cta_html}"
     )
     html = _email_div(heading, "#1d4ed8", body, footer)
     return subject, html
@@ -237,6 +313,83 @@ def rebalancing_execution_template(
         heading_color,
         body,
         "Growlio 앱 > 리밸런싱 > 실행 이력에서 상세 내역을 확인하세요.",
+    )
+    return subject, html
+
+
+def rebalancing_plan_pending_template(
+    portfolio_name: str,
+    account_name: str | None,
+    buy_items: list,
+    buy_deadline_at: datetime | None,
+    buy_cancel_link: str | None,
+    sell_items: list,
+    sell_deadline_at: datetime | None,
+    sell_action_link: str | None,
+) -> tuple[str, str]:
+    """AUTO 모드 플랜 생성 직후 발송하는 실행 전 계획 안내 이메일.
+
+    매수: 대기시간 후 자동 실행(취소 가능). 매도: 이메일 승인 필요(당일 장마감 미응답 시 자동 취소).
+    매수/매도 leg는 서로 독립적으로 존재할 수 있다(매도 전용 플랜도 유효) — 각 섹션은 해당 leg가
+    실제로 있을 때만 렌더링한다.
+    """
+    has_buy = bool(buy_items) and buy_deadline_at is not None and buy_cancel_link is not None
+    has_sell = bool(sell_items)
+
+    subject_action = (
+        "/".join(label for label, present in (("매수", has_buy), ("매도", has_sell)) if present) or "리밸런싱"
+    )
+    subject = f"[Growlio] 리밸런싱 자동화 — {portfolio_name} {subject_action} 대기"
+
+    _KST_OFFSET = 9 * 3600
+    account_note = f" (실행 계좌: {account_name})" if account_name else ""
+
+    btn_style = (
+        "display:inline-block;padding:10px 20px;border-radius:8px;font-weight:bold;"
+        "font-size:14px;text-decoration:none;margin-top:12px;"
+    )
+
+    buy_section = ""
+    if has_buy and buy_deadline_at is not None and buy_cancel_link is not None:
+        buy_time_str = datetime.fromtimestamp(buy_deadline_at.timestamp() + _KST_OFFSET).strftime("%H:%M")
+        buy_section = (
+            f"<div style='margin-top:20px;padding:16px;background:#eff6ff;border-radius:8px;'>"
+            f"<h3 style='margin:0;color:#1d4ed8;font-size:15px;'>매수 주문{account_note}</h3>"
+            f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
+            f"<strong>{buy_time_str} KST</strong>에 아래 수량대로 자동 실행됩니다. "
+            f"그 전까지 취소할 수 있습니다.</p>"
+            f"{_plan_items_table(buy_items)}"
+            f"<a href='{buy_cancel_link}' style='{btn_style}background:#ffffff;color:#1d4ed8;"
+            f"border:1px solid #1d4ed8;'>매수 취소하기</a>"
+            f"</div>"
+        )
+
+    sell_section = ""
+    if has_sell and sell_action_link and sell_deadline_at is not None:
+        sell_time_str = datetime.fromtimestamp(sell_deadline_at.timestamp() + _KST_OFFSET).strftime("%Y-%m-%d %H:%M")
+        sell_section = (
+            f"<div style='margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px;'>"
+            f"<h3 style='margin:0;color:#dc2626;font-size:15px;'>매도 주문{account_note} — 승인 필요</h3>"
+            f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
+            f"매도는 실현손익·세금에 영향을 주므로 승인이 필요합니다. "
+            f"<strong>{sell_time_str} KST(당일 장마감)</strong>까지 응답이 없으면 자동으로 취소됩니다.</p>"
+            f"{_plan_items_table(sell_items)}"
+            f"<a href='{sell_action_link}' style='{btn_style}background:#dc2626;color:#ffffff;'>"
+            f"매도 확인하러 가기</a>"
+            f"</div>"
+        )
+
+    body = (
+        f"<p style='color:#374151;'>포트폴리오 <strong>{portfolio_name}</strong>의 리밸런싱 자동화 조건이 "
+        f"충족되어 아래 계획이 생성되었습니다.</p>"
+        f"{buy_section}"
+        f"{sell_section}"
+    )
+    html = _email_div(
+        "리밸런싱 자동화 계획 생성",
+        "#1d4ed8",
+        body,
+        "Growlio 앱 > 리밸런싱 > 실행 이력에서도 대기중인 계획을 확인·취소할 수 있습니다.",
     )
     return subject, html
 

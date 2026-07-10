@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,6 +44,8 @@ class UserSettings(Base):
     monthly_deposit_amount: Mapped[float | None] = mapped_column(Numeric(18, 2))
     retirement_target_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     annual_dividend_goal: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
+    # 목표 역산 추천 엔진에 병합할 사용자 등록 후보 ETF (RECOMMENDATION_UNIVERSE 외 추가분, 최대 10개)
+    goal_candidate_tickers: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 알림 설정

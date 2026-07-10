@@ -1,10 +1,12 @@
-"""economic_indicator_service._parse_fred_obs 단위 테스트."""
+"""economic_indicator_service._parse_fred_obs / fetch_inflation_summary 단위 테스트."""
 
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
-from app.services.economic_indicator_service import _parse_fred_obs
+from app.services.economic_indicator_service import _parse_fred_obs, fetch_inflation_summary
 
 
 class TestParseFredObs:
@@ -60,3 +62,75 @@ class TestParseFredObs:
         result = _parse_fred_obs(obs)
         dates = [r["date"] for r in result]
         assert dates == sorted(dates)
+
+
+def _monthly_points(start_value: float, months: int, monthly_step: float = 0.5) -> list[dict]:
+    """2024-01-01부터 매월 monthly_step씩 증가하는 시계열 fixture."""
+    points = []
+    for i in range(months):
+        year = 2024 + (i // 12)
+        month = (i % 12) + 1
+        points.append({"date": f"{year}-{month:02d}-01", "value": start_value + i * monthly_step})
+    return points
+
+
+class TestFetchInflationSummary:
+    async def test_computes_mom_and_yoy_change(self):
+        points = _monthly_points(300.0, 13)  # 13개월치 → YoY 계산 가능
+        calendar_events = [
+            {"event": "미국 CPI", "date": "2025-02-13"},
+            {"event": "미국 Core CPI", "date": "2025-02-13"},
+        ]
+        with (
+            patch(
+                "app.services.economic_indicator_service.fetch_indicator_history",
+                new=AsyncMock(return_value=points),
+            ),
+            patch(
+                "app.services.economic_calendar_service.get_calendar_events",
+                new=AsyncMock(return_value=calendar_events),
+            ),
+        ):
+            result = await fetch_inflation_summary(redis=None)
+
+        assert len(result) == 2  # CPI_US + CORE_CPI_US
+        cpi = result[0]
+        assert cpi["code"] == "CPI_US"
+        assert cpi["latest_value"] == pytest.approx(306.0)
+        assert cpi["mom_change_pct"] == pytest.approx((306.0 - 305.5) / 305.5 * 100)
+        assert cpi["yoy_change_pct"] == pytest.approx((306.0 - 300.0) / 300.0 * 100)
+        assert cpi["next_release_date"] == "2025-02-13"
+
+    async def test_fewer_than_13_months_yoy_is_none(self):
+        points = _monthly_points(300.0, 6)
+        with (
+            patch(
+                "app.services.economic_indicator_service.fetch_indicator_history",
+                new=AsyncMock(return_value=points),
+            ),
+            patch(
+                "app.services.economic_calendar_service.get_calendar_events",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            result = await fetch_inflation_summary(redis=None)
+
+        for item in result:
+            assert item["yoy_change_pct"] is None
+            assert item["mom_change_pct"] is not None
+            assert item["next_release_date"] is None
+
+    async def test_no_history_skips_indicator(self):
+        with (
+            patch(
+                "app.services.economic_indicator_service.fetch_indicator_history",
+                new=AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.economic_calendar_service.get_calendar_events",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            result = await fetch_inflation_summary(redis=None)
+
+        assert result == []

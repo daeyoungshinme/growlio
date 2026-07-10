@@ -27,6 +27,7 @@ import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
+import { getPortfolioTargetState } from "@/utils/portfolio";
 
 function SortablePortfolioItem({
   id,
@@ -222,8 +223,8 @@ const PortfolioCard = memo(function PortfolioCard({
             e.stopPropagation();
             onOpenAlertModal(p.id);
           }}
-          title="리밸런싱 알림 설정"
-          aria-label="리밸런싱 알림 설정"
+          title="리밸런싱 자동화 설정"
+          aria-label="리밸런싱 자동화 설정"
           className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
             alertMode === "AUTO"
               ? "bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900"
@@ -233,7 +234,7 @@ const PortfolioCard = memo(function PortfolioCard({
           }`}
         >
           {alertMode === "AUTO" ? <Zap size={11} /> : <Bell size={11} />}
-          <span>{alertMode === "AUTO" ? "자동" : hasAlert ? "알림" : "알림 설정"}</span>
+          <span>{alertMode === "AUTO" ? "자동" : hasAlert ? "알림" : "자동화 설정"}</span>
         </button>
       </div>
     </div>
@@ -282,15 +283,6 @@ export default function PortfolioListSection({
 
   const unassignedAccounts = stockAccounts.filter((a) => !a.target_portfolio_id);
 
-  function getPortfolioTargetState(p: Portfolio): "full" | "partial" | "none" {
-    const linkedIds = p.account_ids?.length ? p.account_ids : stockAccounts.map((a) => a.id);
-    const relevant = stockAccounts.filter((a) => linkedIds.includes(a.id));
-    if (relevant.length === 0) return "none";
-    const assigned = relevant.filter((a) => a.target_portfolio_id === p.id).length;
-    if (assigned === 0) return "none";
-    return assigned === relevant.length ? "full" : "partial";
-  }
-
   function getAccountLabel(p: Portfolio): string {
     if (!p.account_ids?.length) return "모든 주식 계좌";
     const names = p.account_ids
@@ -306,7 +298,7 @@ export default function PortfolioListSection({
     const linkedIds = p.account_ids?.length ? p.account_ids : stockAccounts.map((a) => a.id);
     const relevant = stockAccounts.filter((a) => linkedIds.includes(a.id));
     if (relevant.length === 0) return;
-    const currentState = getPortfolioTargetState(p);
+    const currentState = getPortfolioTargetState(p, stockAccounts);
     if (currentState === "full") {
       onBatchSetTarget(
         null,
@@ -446,7 +438,7 @@ export default function PortfolioListSection({
                   <PortfolioCard
                     portfolio={p}
                     selected={selectedIds.has(p.id)}
-                    targetState={getPortfolioTargetState(p)}
+                    targetState={getPortfolioTargetState(p, stockAccounts)}
                     accountLabel={getAccountLabel(p)}
                     showAccountLabel={stockAccounts.length > 1}
                     drift={driftByPortfolioId?.[p.id]}

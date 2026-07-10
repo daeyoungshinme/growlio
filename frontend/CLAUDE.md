@@ -65,7 +65,7 @@ make build-android-release         # APK Release 빌드
 
 ## Architecture (`frontend/src/`)
 
-> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨 — 현재 221개 파일이 `@/`, 9개만 상대경로 사용 중. 이 문서의 예시 코드 중 일부는 과거 상대경로(`"../utils/..."`) 스타일로 남아있을 수 있음.
+> **Import 규칙:** 새 코드는 `@/` alias 사용 (예: `import { fmtKrw } from "@/utils/format"`). `vite.config.ts`/`tsconfig.app.json`에 `@/* → src/*` 설정됨 — 현재 233개 파일이 `@/`, 9개만 상대경로 사용 중. 이 문서의 예시 코드 중 일부는 과거 상대경로(`"../utils/..."`) 스타일로 남아있을 수 있음.
 
 **페이지 구성** (실제 라우트는 `src/App.tsx` 참고 — 인증 필요 라우트는 `/` 하위 `PrivateRoute`로 감싸짐):
 - `/login` — 로그인 (LoginPage)
@@ -73,6 +73,7 @@ make build-android-release         # APK Release 빌드
 - `/find-account` — 계정 찾기 (FindAccountPage)
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
+- `/rebalancing/plan-confirm?token=` — 리밸런싱 자동화 매수 취소/매도 승인 (RebalancingPlanConfirmPage, 이메일 링크 전용, 인증 불필요)
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
@@ -105,13 +106,13 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **데이터 흐름:**
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
-  └── api/{alerts,assets,backtest,dashboard,dividends,
+  └── api/{alerts,assets,backtest,dashboard,dividends,economicIndicators,
            insights,invest,marketSignals,portfolios,rebalancing,risk,settings,tax,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
 
-> 백엔드 `/economic-indicators` 라우터는 존재하지만 이를 호출하는 프론트 API 모듈이 없음(프론트 미연동).
+> `api/economicIndicators.ts`는 백엔드 `/economic-indicators` 라우터 중 `/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage`의 `InflationSummaryCard`가 소비. 그 외 전체 지표 목록·구독·캘린더 엔드포인트는 여전히 프론트 미연동.
 
 **hooks/**
 - `useExchangeRate.ts` — 환율 조회
@@ -158,6 +159,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`)
 - `nav.ts` — `BottomNav` 탭 정의 (홈/자산/리밸런싱/계획/설정 5탭)
+- `markets.ts` — 해외거래소 판별 상수 (상세는 하단 "마켓 유틸리티" 참고)
+- `inputStyles.ts` — 공통 입력 필드 Tailwind 스타일 상수 (상세는 하단 "입력 스타일 상수" 참고)
 - `index.ts` — 상수 re-export
 
 **타입 정의:** `src/types/index.ts` — 포트폴리오 포지션, 계좌 등 공통 TypeScript interface 정의.
@@ -270,6 +273,15 @@ cd frontend && npx playwright test
 
 **포트폴리오 유틸리티 (`src/utils/portfolio.ts`)**
 - `groupPositionsByTicker(positions)` — 종목 배열을 ticker+market 기준으로 집계. 여러 계좌 보유 종목 합산 표시 시 사용.
+- `getPortfolioTargetState(portfolio, stockAccounts)` — 포트폴리오의 연결 계좌가 "목표 포트폴리오"로 전부/일부/전혀 지정 안 됐는지 판별 ("full"/"partial"/"none").
+- `mergeAlertsByPortfolio(alerts)` — PER_ACCOUNT 스코프 포트폴리오의 계좌별 알림을 portfolio_id 기준으로 병합 (하나라도 AUTO면 병합 결과도 AUTO 표시).
+
+**리밸런싱 알림 설명 유틸리티 (`src/utils/rebalancingAlertDescription.ts`)**
+- `buildAlertDescription(...)` — 알림 스케줄/트리거 조건/모드 설정을 사람이 읽는 한글 설명 문장으로 조합.
+
+**진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
+- `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.
+- `buildCombinedStatusNote(needsCount, marketLevel)` — "이탈 종목 발견 + 시장상황"을 결합한 한 줄 설명 생성.
 
 **계좌 유틸리티 (`src/utils/accounts.ts`)**
 - `isPortfolioAccount(account)` / `isStockAccount(account)` / `isBankAccount(account)` — 계좌 유형 판별. 인라인 `asset_type` 비교 금지.
@@ -330,6 +342,9 @@ cd frontend && npx playwright test
 - 배당 계획 변경 후: `invalidateDividendPlanData(queryClient)`.
 - 주가 알림 CUD 후: `invalidateStockPriceAlertData(queryClient)`.
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
+- 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient)` — 대기 플랜 목록 + 실행 이력 무효화.
+- 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
+- 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 > **새 invalidation 함수 추가 시:** 이 파일에 `invalidate<Domain>Data(queryClient)` 형태로 추가하고, 관련 mutation의 `onSuccess`에서 호출. 컴포넌트·훅 내부에서 직접 `queryClient.invalidateQueries()` 호출 금지.

@@ -3,7 +3,6 @@ import { AlertTriangle, CheckCircle, ChevronDown, Info } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
-import GoalRecommendationCard from "./GoalRecommendationCard";
 
 const DEFAULT_THRESHOLD = 5.0;
 
@@ -127,13 +126,7 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
             </div>
           )}
 
-          <DiagnosisInsightList
-            context={analysis.diagnosis_context}
-            targetCagrPct={analysis.target_weighted_cagr_10y_pct}
-            targetDividendKrw={analysis.target_portfolio_annual_dividend}
-          />
-
-          <GoalRecommendationCard portfolioId={analysis.portfolio_id} />
+          <DiagnosisInsightList context={analysis.diagnosis_context} />
 
           {/* CRITICAL: 실행 CTA 버튼 */}
           {status === "critical" && onExecute && (

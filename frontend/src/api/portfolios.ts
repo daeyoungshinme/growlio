@@ -35,6 +35,7 @@ export interface Portfolio {
   items: PortfolioItem[];
   base_type: string; // "STOCK_ONLY" | "TOTAL_ASSETS"
   account_ids?: string[] | null; // null이면 모든 활성 주식 계좌 사용
+  alert_scope?: "AGGREGATE" | "PER_ACCOUNT"; // 리밸런싱 알림/AUTO 설정 스코프 (기본 AGGREGATE)
   sort_order: number;
   created_at: string;
   updated_at: string;

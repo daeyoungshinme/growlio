@@ -52,23 +52,11 @@ async def portfolio_overview(
 @limiter.limit("5/minute")
 async def portfolio_risk(
     request: Request,
+    portfolio_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """전체 포트폴리오 위험 지표 — VaR, 베타, 변동성, 분산도."""
-    redis = await get_redis()
-    return await get_portfolio_risk_metrics(current_user.id, db, redis)
-
-
-@router.get("/risk/{portfolio_id}")
-@limiter.limit("5/minute")
-async def portfolio_risk_by_id(
-    request: Request,
-    portfolio_id: str,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """특정 포트폴리오 위험 지표."""
+    """포트폴리오 위험 지표 — VaR, 베타, 변동성, 분산도. portfolio_id 미지정 시 전체 계좌 통합 기준."""
     redis = await get_redis()
     return await get_portfolio_risk_metrics(current_user.id, db, redis, portfolio_id=portfolio_id)
 

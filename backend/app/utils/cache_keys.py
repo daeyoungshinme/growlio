@@ -46,6 +46,7 @@ TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_DCA = 3600  # DCA 자동매수 분산 락
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
+TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)

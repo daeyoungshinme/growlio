@@ -281,6 +281,55 @@ async def fetch_all_indicators(redis=None) -> list[dict[str, Any]]:
     return [r for r in results if isinstance(r, dict)]
 
 
+_INFLATION_CODES = ("CPI_US", "CORE_CPI_US")
+
+
+async def fetch_inflation_summary(redis=None) -> list[dict[str, Any]]:
+    """CPI·Core CPI 요약 반환: 최신값, 전월/전년 대비 변화율, 다음 발표일.
+
+    리밸런싱 화면 참고용 — history/calendar 캐시를 그대로 재사용하므로 신규 FRED 호출이 없다.
+    """
+    from .economic_calendar_service import get_calendar_events  # 순환 임포트 회피
+
+    calendar_events = await get_calendar_events(redis)
+    next_release_by_name: dict[str, str] = {}
+    for event in calendar_events:
+        name = event.get("event")
+        event_date = event.get("date")
+        if name and event_date and name not in next_release_by_name:
+            next_release_by_name[name] = event_date
+
+    summaries: list[dict[str, Any]] = []
+    for code in _INFLATION_CODES:
+        meta = INDICATORS[code]
+        points = await fetch_indicator_history(code, months=13, redis=redis)
+        if not points:
+            continue
+
+        latest = points[-1]
+        mom_change_pct = None
+        if len(points) >= 2 and points[-2]["value"]:
+            mom_change_pct = (latest["value"] - points[-2]["value"]) / points[-2]["value"] * 100
+
+        yoy_change_pct = None
+        if len(points) >= 13 and points[-13]["value"]:
+            yoy_change_pct = (latest["value"] - points[-13]["value"]) / points[-13]["value"] * 100
+
+        summaries.append(
+            {
+                "code": code,
+                "name": meta["name"],
+                "latest_value": latest["value"],
+                "latest_date": latest["date"],
+                "mom_change_pct": mom_change_pct,
+                "yoy_change_pct": yoy_change_pct,
+                "next_release_date": next_release_by_name.get(meta["name"]),
+            }
+        )
+
+    return summaries
+
+
 async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> list[dict[str, Any]]:
     """지표의 최근 N개월 시계열 반환, Redis 6시간 캐시."""
     meta = INDICATORS.get(code)

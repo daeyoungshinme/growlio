@@ -5,14 +5,40 @@
  * 웹/PWA 환경에서는 아무 동작 없이 종료.
  */
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import type { PluginListenerHandle } from "@capacitor/core";
 import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import { isNativePlatform } from "@/utils/platform";
 import { registerPushToken } from "@/api/settings";
 
+/** 백엔드 push_service.py의 data.type 값 → 앱 내 딥링크 경로 매핑 (data가 없거나 알 수 없는 type이면 null). */
+export function resolvePushDeepLink(
+  data: Record<string, string> | undefined | null,
+): string | null {
+  const type = data?.type;
+  if (!type) return null;
+
+  switch (type) {
+    case "REBALANCING": {
+      const portfolioId = data.portfolio_id;
+      return portfolioId
+        ? `/rebalancing?rtab=포트폴리오&portfolioId=${portfolioId}&openExecution=1`
+        : "/rebalancing?rtab=진단";
+    }
+    case "REBALANCING_PLAN_PENDING":
+    case "REBALANCING_EXECUTED":
+      return "/rebalancing?rtab=이력";
+    case "MARKET_SIGNAL":
+      return "/rebalancing?rtab=진단";
+    default:
+      return null;
+  }
+}
+
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!isNativePlatform() || !isAuthenticated) return;
@@ -44,11 +70,22 @@ export function usePushNotifications() {
         toast(notification.body ?? notification.title ?? "새 알림이 도착했습니다");
       });
 
+      // 알림 탭(백그라운드/종료 상태에서 열람) → 관련 화면으로 딥링크 이동
+      const h3 = await PushNotifications.addListener(
+        "pushNotificationActionPerformed",
+        (action) => {
+          if (cancelled) return;
+          const path = resolvePushDeepLink(action.notification.data);
+          if (path) navigate(path);
+        },
+      );
+
       if (!cancelled) {
-        handles.push(h1, h2);
+        handles.push(h1, h2, h3);
       } else {
         await h1.remove();
         await h2.remove();
+        await h3.remove();
       }
     }
 
@@ -58,5 +95,5 @@ export function usePushNotifications() {
       cancelled = true;
       handles.forEach((h) => h.remove());
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 }

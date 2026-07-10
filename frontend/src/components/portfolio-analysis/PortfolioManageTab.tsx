@@ -19,12 +19,13 @@ import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import PortfolioListSection from "./PortfolioListSection";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import ConfirmModal from "@/components/common/ConfirmModal";
-import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
+import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAlertModalRouter";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidatePortfolioData, invalidateAccountData } from "@/utils/queryInvalidation";
+import { mergeAlertsByPortfolio } from "@/utils/portfolio";
+import { isStockAccount } from "@/utils/accounts";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
-import { usePendingRecommendationStore } from "@/stores/pendingRecommendationStore";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
@@ -65,9 +66,7 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
   });
   const accounts = Array.isArray(accountsRaw) ? accountsRaw : [];
   const activeAccounts = accounts.filter((a) => a.is_active);
-  const stockAccounts = activeAccounts.filter((a) =>
-    ["STOCK_KIS", "STOCK_OTHER"].includes(a.asset_type),
-  );
+  const stockAccounts = activeAccounts.filter((a) => isStockAccount(a.asset_type));
 
   const { data: rebalancingAlertsRaw } = useQuery({
     queryKey: QUERY_KEYS.rebalancingAlerts,
@@ -78,17 +77,17 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     () => (Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : []),
     [rebalancingAlertsRaw],
   );
-  const alertPortfolioIds = useMemo(
-    () => new Set(rebalancingAlerts.map((a) => a.portfolio_id)),
+  const alertByPortfolioId = useMemo(
+    () => mergeAlertsByPortfolio(rebalancingAlerts),
     [rebalancingAlerts],
+  );
+  const alertPortfolioIds = useMemo(
+    () => new Set(Object.keys(alertByPortfolioId)),
+    [alertByPortfolioId],
   );
   const autoAlertCount = useMemo(
-    () => rebalancingAlerts.filter((a) => a.mode === "AUTO").length,
-    [rebalancingAlerts],
-  );
-  const alertByPortfolioId = useMemo(
-    () => Object.fromEntries(rebalancingAlerts.map((a) => [a.portfolio_id, a])),
-    [rebalancingAlerts],
+    () => Object.values(alertByPortfolioId).filter((a) => a.mode === "AUTO").length,
+    [alertByPortfolioId],
   );
 
   const { data: driftSummaryRaw } = useQuery({
@@ -106,7 +105,7 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // 진단 탭의 "알림 설정" CTA에서 넘어온 경우 알림 설정 모달을 마운트 시점에 자동으로 연다.
+  // 진단 탭의 "자동화 설정" CTA에서 넘어온 경우 자동화 설정 모달을 마운트 시점에 자동으로 연다.
   const [searchParams, setSearchParams] = useSearchParams();
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(() =>
     searchParams.get("openAlert") === "1" && selectedPortfolioId ? selectedPortfolioId : null,
@@ -123,20 +122,6 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
       { replace: true },
     );
   }, [searchParams, setSearchParams]);
-
-  // GoalRecommendationCard의 "적용" 클릭을 받아 해당 포트폴리오 편집기를 추천 비중으로 미리 채워 연다.
-  const pendingRecommendation = usePendingRecommendationStore((s) => s.pending);
-  const clearPendingRecommendation = usePendingRecommendationStore((s) => s.clearPending);
-  useEffect(() => {
-    if (!pendingRecommendation) return;
-    const portfolio = portfolios.find((p) => p.id === pendingRecommendation.portfolioId);
-    if (!portfolio) return;
-    // 다른 컴포넌트(GoalRecommendationCard)가 발행한 외부 스토어 신호를 편집기 상태로 반영 — 1회성 소비 후 즉시 clear.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setEditingPortfolio({ ...portfolio, items: pendingRecommendation.items });
-    setEditorOpen(true);
-    clearPendingRecommendation();
-  }, [pendingRecommendation, portfolios, clearPendingRecommendation]);
 
   const selectedIds = useMemo(
     () => (selectedPortfolioId ? new Set([selectedPortfolioId]) : new Set<string>()),
@@ -219,10 +204,10 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     onSuccess: (_, { portfolioId: pid, accountIds }) => {
       void invalidateAccountData(qc);
       if (pid === null) {
-        toast("목표 포트폴리오 지정이 해제되었습니다");
+        toast("목표 포트폴리오 지정이 해제되었습니다", "success");
       } else {
         const pName = sortedPortfolios.find((p) => p.id === pid)?.name ?? "";
-        toast(`${pName}가 ${accountIds.length}개 계좌의 목표로 지정되었습니다`);
+        toast(`${pName}가 ${accountIds.length}개 계좌의 목표로 지정되었습니다`, "success");
       }
     },
     onError: (e) => toast(extractErrorMessage(e, "목표 포트폴리오 설정에 실패했습니다"), "error"),
@@ -295,17 +280,21 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
           onCancel={() => setConfirmDeleteId(null)}
         />
       )}
-      {alertModalPortfolioId && (
-        <RebalancingAlertModal
-          key={alertModalPortfolioId}
-          portfolioId={alertModalPortfolioId}
-          portfolioName={sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
-          accountIds={
-            sortedPortfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null
-          }
-          onClose={() => setAlertModalPortfolioId(null)}
-        />
-      )}
+      {alertModalPortfolioId &&
+        (() => {
+          const alertPortfolio = sortedPortfolios.find((p) => p.id === alertModalPortfolioId);
+          return (
+            <RebalancingAlertModalRouter
+              key={alertModalPortfolioId}
+              portfolioId={alertModalPortfolioId}
+              portfolioName={alertPortfolio?.name ?? ""}
+              alertScope={alertPortfolio?.alert_scope}
+              accountIds={alertPortfolio?.account_ids ?? null}
+              accounts={accounts}
+              onClose={() => setAlertModalPortfolioId(null)}
+            />
+          );
+        })()}
     </ErrorBoundary>
   );
 }

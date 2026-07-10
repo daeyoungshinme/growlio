@@ -21,7 +21,7 @@ export default function MonthlyAchievementTable({ data, flat }: Props) {
     return (
       <div className={flat ? undefined : "card"}>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
-          월별 달성율
+          월별 계획 대비 달성율
         </h3>
         <EmptyState title="스냅샷 데이터가 없습니다." compact />
       </div>
@@ -30,9 +30,12 @@ export default function MonthlyAchievementTable({ data, flat }: Props) {
 
   return (
     <div className={flat ? undefined : "card"}>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-3">
-        월별 달성율 (최근 24개월)
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
+        월별 계획 대비 달성율 (최근 24개월)
       </h3>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+        이론값(복리 계획 곡선) 대비 실제 자산 비율입니다
+      </p>
       {/* 모바일 카드 뷰 */}
       <div className="sm:hidden divide-y divide-gray-100 dark:divide-gray-700">
         {[...past].reverse().map((row) => {
@@ -70,7 +73,7 @@ export default function MonthlyAchievementTable({ data, flat }: Props) {
               <th className="text-left py-2 pr-3 font-medium">월</th>
               <th className="text-right py-2 px-3 font-medium">이론값</th>
               <th className="text-right py-2 px-3 font-medium">실제값</th>
-              <th className="text-right py-2 px-3 font-medium">달성율</th>
+              <th className="text-right py-2 px-3 font-medium">계획 대비 달성율</th>
               <th className="text-right py-2 pl-3 font-medium">차이</th>
             </tr>
           </thead>

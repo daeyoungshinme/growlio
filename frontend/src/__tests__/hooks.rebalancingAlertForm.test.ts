@@ -24,6 +24,7 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/alerts", () => ({
   fetchRebalancingAlert: vi.fn(),
+  fetchAccountRebalancingAlert: vi.fn(),
   upsertRebalancingAlert: vi.fn(),
   deleteRebalancingAlert: vi.fn(),
 }));
@@ -62,6 +63,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
 import { fetchAccounts } from "@/api/assets";
 import {
   fetchRebalancingAlert,
+  fetchAccountRebalancingAlert,
   upsertRebalancingAlert,
   deleteRebalancingAlert,
 } from "@/api/alerts";
@@ -96,6 +98,7 @@ const mockAlert: RebalancingAlert = {
   market_condition_mode: "DISABLED",
   auto_execution_time: null,
   notify_time: "08:30",
+  buy_wait_minutes: 10,
   is_active: true,
   last_triggered_at: null,
   created_at: "2024-01-01T00:00:00Z",
@@ -188,6 +191,61 @@ describe("useRebalancingAlertQueries", () => {
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.kisAccounts).toHaveLength(2);
+  });
+
+  it("targetAccountId가 없으면 targetAccountIsKis는 true다", async () => {
+    vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
+    vi.mocked(fetchAccounts).mockResolvedValue([]);
+
+    const { result } = renderHook(() => useRebalancingAlertQueries({ portfolioId: "port-1" }), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.targetAccountIsKis).toBe(true);
+  });
+
+  it("targetAccountId가 KIS 계좌면 targetAccountIsKis는 true다", async () => {
+    vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS" } as never,
+    ]);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertQueries({ portfolioId: "port-1", targetAccountId: "a1" }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.targetAccountIsKis).toBe(true);
+  });
+
+  it("targetAccountId가 키움 계좌면 targetAccountIsKis는 false다", async () => {
+    vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
+    vi.mocked(fetchAccounts).mockResolvedValue([
+      { id: "a2", asset_type: "STOCK_KIWOOM", is_active: true, name: "키움" } as never,
+    ]);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertQueries({ portfolioId: "port-1", targetAccountId: "a2" }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.targetAccountIsKis).toBe(false);
+  });
+
+  it("targetAccountId에 해당하는 계좌가 없으면 targetAccountIsKis는 false다", async () => {
+    vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
+    vi.mocked(fetchAccounts).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertQueries({ portfolioId: "port-1", targetAccountId: "missing" }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.targetAccountIsKis).toBe(false);
   });
 });
 

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { chartTooltipStyle } from "@/utils/chart";
 import { fmtKrwShort } from "@/utils/format";
@@ -19,7 +20,7 @@ interface Props {
   onMonthSelect: (month: number) => void;
 }
 
-export default function MonthlyDividendChart({
+function MonthlyDividendChart({
   barData,
   currentYear,
   selectedMonth,
@@ -104,6 +105,8 @@ export default function MonthlyDividendChart({
     </div>
   );
 }
+
+export default memo(MonthlyDividendChart);
 
 // Re-export for convenience
 export { MONTH_LABELS };

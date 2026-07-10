@@ -1,5 +1,11 @@
 import { apiGet, apiPut } from "./client";
 
+export interface GoalCandidateTicker {
+  ticker: string;
+  name: string;
+  market: string;
+}
+
 export interface SettingsData {
   has_kis: boolean;
   has_dart: boolean;
@@ -19,6 +25,7 @@ export interface SettingsData {
   annual_dividend_goal: number | null;
   fcm_token_stored: boolean;
   composite_signal_alerts_enabled: boolean;
+  goal_candidate_tickers: GoalCandidateTicker[];
 }
 
 export interface AutoDcaPayload {
@@ -38,3 +45,6 @@ export const registerPushToken = (fcm_token: string | null) =>
 
 export const updateCompositeSignalAlerts = (enabled: boolean) =>
   apiPut("/settings/composite-signal-alerts", { enabled });
+
+export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
+  apiPut("/settings/goal-candidate-tickers", { tickers });

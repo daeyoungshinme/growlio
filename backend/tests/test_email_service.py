@@ -484,6 +484,34 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_send_rebalancing_alert_includes_app_cta_link(monkeypatch):
+    """알림 이메일에는 앱으로 돌아가는 CTA 링크가 항상 포함되어야 한다."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.frontend_url", "https://app.growlio.example")
+
+    captured = {}
+
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["html"] = json["html"]
+        return _ok_response(url)
+
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_rebalancing_alert
+
+        await send_rebalancing_alert(
+            to_email="user@example.com",
+            portfolio_name="성장 포트폴리오",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=0,
+        )
+
+    assert "앱에서 확인하기" in captured["html"]
+    assert "https://app.growlio.example/rebalancing?rtab=" in captured["html"]
+
+
+@pytest.mark.asyncio
 async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     """is_scheduled_report=False이면 제목에 '알림'이 포함된다."""
     monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
@@ -689,3 +717,50 @@ async def test_send_password_reset_exception_returns_false(monkeypatch):
         result = await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")
 
     assert result is False
+
+
+# ── send_rebalancing_plan_pending_email ──────────────────────
+
+
+@pytest.mark.asyncio
+async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkeypatch):
+    """매도 전용 플랜(buy_cancel_token=None)도 예외 없이 발송되고, 매수 취소 링크는 만들어지지
+    않아야 한다 — 매수 leg가 없다는 이유로 이메일 자체가 스킵되던 회귀 버그 방지."""
+    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.config.settings.frontend_url", "https://growlio.app")
+
+    from datetime import UTC, datetime
+    from types import SimpleNamespace
+
+    sell_item = SimpleNamespace(
+        ticker="005930", name="삼성전자", market="KOSPI", quantity=5, order_type="MARKET", limit_price=None
+    )
+
+    captured = {}
+
+    async def fake_post(self, url, headers=None, json=None, **kwargs):
+        captured["subject"] = json["subject"]
+        captured["html"] = json["html"]
+        return _ok_response(url)
+
+    with patch("httpx.AsyncClient.post", new=fake_post):
+        from app.services.email_service import send_rebalancing_plan_pending_email
+
+        result = await send_rebalancing_plan_pending_email(
+            to_email="user@example.com",
+            portfolio_name="성장 포트폴리오",
+            account_name="증권계좌",
+            buy_items=[],
+            buy_deadline_at=None,
+            buy_cancel_token=None,
+            sell_items=[sell_item],
+            sell_deadline_at=datetime.now(UTC),
+            sell_action_token="sell-token",
+        )
+
+    assert result is True
+    assert "매도" in captured["subject"]
+    assert "매수" not in captured["subject"]
+    assert "token=None" not in captured["html"]
+    assert "sell-token" in captured["html"]

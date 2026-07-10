@@ -13,6 +13,7 @@ from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Literal, cast
 
 import structlog
+from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -20,12 +21,14 @@ from sqlalchemy.orm import selectinload
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
+from app.services._rebalancing_alert_queries import get_alert_by_portfolio, list_alerts_by_portfolio_accounts
 from app.services.alert_calculator import (
     already_fired_today,
     should_fire_today,
 )
 from app.services.alert_service import save_alert_history
 from app.services.rebalancing_diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
+from app.services.rebalancing_order_builder import build_rebalancing_orders, refresh_live_prices
 from app.utils.cache_keys import (
     TTL_COMPOSITE_ALERT_SENT,
     composite_alert_sent_key,
@@ -35,9 +38,70 @@ from app.utils.cache_keys import (
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
+__all__ = [
+    "build_rebalancing_orders",
+    "check_rebalancing_alerts",
+    "refresh_live_prices",
+    "resolve_effective_account_ids",
+    "send_test_rebalancing_alert",
+    "switch_alert_scope",
+]
+
 logger = structlog.get_logger()
 
 _KST = timezone(timedelta(hours=9))
+
+
+def resolve_effective_account_ids(alert: RebalancingAlert, portfolio: Portfolio) -> list[uuid.UUID] | None:
+    """알림이 분석 대상으로 삼을 계좌 범위를 결정한다.
+
+    portfolio.alert_scope로만 분기한다 — alert.account_id의 NULL 여부로 분기하면 안 된다
+    (AGGREGATE 스코프의 AUTO 알림도 이미 account_id가 NOT NULL이라 오판 위험).
+    """
+    if getattr(portfolio, "alert_scope", "AGGREGATE") == "PER_ACCOUNT" and alert.account_id is not None:
+        return [alert.account_id]
+    saved_ids = getattr(portfolio, "account_ids", None)
+    return [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+
+
+async def switch_alert_scope(db: AsyncSession, portfolio: Portfolio, target_scope: str) -> None:
+    """포트폴리오의 alert_scope를 AGGREGATE ↔ PER_ACCOUNT로 전환한다.
+
+    AGGREGATE→PER_ACCOUNT: 기존 AGGREGATE 행이 있고 그 account_id(AUTO 모드였던 경우의 실행계좌)가
+    연결 계좌에 속하면 그대로 승계해 그 계좌 전용 PER_ACCOUNT 행이 되도록 alert_scope를 갱신한다.
+    그 외(NOTIFY라 account_id가 없거나 연결 계좌 밖)면 행을 삭제한다 — 나머지 계좌는 사용자가
+    화면에서 개별로 추가해야 한다.
+    PER_ACCOUNT→AGGREGATE: 기존 PER_ACCOUNT 행을 전부 삭제한다(어느 계좌 설정을 aggregate로
+    승격할지 모호하므로 승계하지 않음) — 새 AGGREGATE 설정은 사용자가 처음부터 구성한다.
+    `portfolio.linked_accounts`가 selectinload되어 있어야 한다.
+    """
+    if target_scope not in ("AGGREGATE", "PER_ACCOUNT"):
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="알 수 없는 alert_scope입니다")
+
+    current_scope = getattr(portfolio, "alert_scope", "AGGREGATE")
+    if current_scope == target_scope:
+        return
+
+    linked_account_ids = {pa.account_id for pa in portfolio.linked_accounts}
+
+    if target_scope == "PER_ACCOUNT":
+        if len(linked_account_ids) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="계좌별 독립 설정은 연결된 계좌가 2개 이상이어야 합니다",
+            )
+        aggregate_alert = await get_alert_by_portfolio(db, portfolio.id, portfolio.user_id)
+        if aggregate_alert and aggregate_alert.account_id in linked_account_ids:
+            aggregate_alert.alert_scope = "PER_ACCOUNT"  # 연결 계좌 소속 실행계좌 — 그 계좌 전용 행으로 승계
+        elif aggregate_alert:
+            await db.delete(aggregate_alert)
+    else:
+        per_account_alerts = await list_alerts_by_portfolio_accounts(db, portfolio.id, portfolio.user_id)
+        for alert in per_account_alerts:
+            await db.delete(alert)
+
+    portfolio.alert_scope = target_scope
+    await db.commit()
 
 
 async def _composite_alert_sent_today(redis: Any, user_id: uuid.UUID) -> bool:
@@ -99,6 +163,7 @@ async def _process_rebalancing_alert(
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
     redis: Any = None,
+    ticker_account_map: dict[str, list] | None = None,
 ) -> bool:
     """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일/FCM 발송).
 
@@ -106,6 +171,16 @@ async def _process_rebalancing_alert(
     """
     from app.services.email_service import send_rebalancing_alert
     from app.services.push_service import send_push_to_user
+
+    # 실제 매수/매도 수량 미리보기 — drift가 있을 때만 계산(실행/저장은 하지 않음, 표시 전용).
+    order_preview_items: list = []
+    if drifting:
+        strategy = getattr(alert, "strategy", "BUY_ONLY")
+        order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+        buy_account_id = str(alert.account_id) if alert.account_id else ""
+        order_preview_items = build_rebalancing_orders(
+            drifting, ticker_account_map or {}, strategy, order_type, buy_account_id, alert_id=str(alert.id)
+        )
 
     mode = getattr(alert, "mode", "NOTIFY")
 
@@ -152,6 +227,7 @@ async def _process_rebalancing_alert(
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
             is_composite_triggered=is_composite_triggered,
             composite_reason=composite_reason,
+            order_preview_items=order_preview_items,
         )
     except Exception as exc:
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
@@ -181,252 +257,17 @@ async def _process_rebalancing_alert(
     return any_sent
 
 
-_BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
-
-
-async def execute_auto_rebalancing_for_alert(
-    alert: RebalancingAlert,
-    portfolio: Portfolio,
-    drifting: list,
-    db: AsyncSession,
-    ticker_account_map: dict[str, list] | None = None,
-) -> bool:
-    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다.
-
-    장 중 여부 확인 후 실행. 성공 시 True, 오류/건너뜀 시 False 반환.
-    신규 AUTO 전용 Job(rebalancing_auto_execution.py)에서도 직접 호출한다.
-    """
-    from app.utils.market_hours import is_korean_market_open
-
-    if not is_korean_market_open():
-        logger.info(
-            "rebalancing_auto_skipped_market_closed",
-            alert_id=str(alert.id),
-        )
-        return False
-
-    return await _execute_auto_rebalancing(alert, portfolio, drifting, db, ticker_account_map or {})
-
-
-def _build_sell_orders(
-    item: Any,
-    qty: int,
-    ticker_account_map: dict[str, list],
-    effective_order_type: str,
-    limit_price: float | None,
-    reference_price: float | None = None,
-) -> list[Any]:
-    """매도 주문을 실제 종목을 보유한 브로커 연동 계좌(들)로 분산 생성한다.
-
-    포트폴리오 전체 합산 기준으로 계산된 매도 수량을, 종목을 실제로 보유한 계좌들 중
-    보유수량이 큰 순서로 채워나간다. 배분 후에도 부족분이 남으면 억지로 다른 계좌에 밀어넣지 않고
-    건너뛴다(계좌 실행 시점의 실시간 잔고 clamp가 최종 안전망 역할을 한다).
-    """
-    from app.schemas.rebalancing import ExecutionOrderItem
-
-    holders = [
-        a for a in ticker_account_map.get(item.ticker, []) if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
-    ]
-    holders.sort(key=lambda a: a.quantity, reverse=True)
-
-    orders: list[Any] = []
-    remaining = qty
-    for acc in holders:
-        if remaining <= 0:
-            break
-        take = min(remaining, int(acc.quantity))
-        if take <= 0:
-            continue
-        orders.append(
-            ExecutionOrderItem(
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                side="SELL",
-                quantity=take,
-                account_id=acc.account_id,
-                order_type=effective_order_type,
-                limit_price=limit_price,
-                reference_price=reference_price,
-            )
-        )
-        remaining -= take
-
-    if remaining > 0:
-        logger.info(
-            "rebalancing_auto_sell_unallocated",
-            ticker=item.ticker,
-            requested_qty=qty,
-            unallocated_qty=remaining,
-            holder_accounts=len(holders),
-        )
-    return orders
-
-
-async def refresh_live_prices(
-    items: list,
-    user_id: uuid.UUID,
-    db: AsyncSession,
-    redis: Any = None,
-) -> None:
-    """드리프트 항목의 `current_price_krw`를 실시간 시세로 갱신한다 (in-place).
-
-    `analyze_rebalancing()`이 채운 `current_price_krw`는 계좌 동기화 시점의 DB 스냅샷 값이라
-    자동실행·원클릭실행 시점에는 이미 낡았을 수 있다. 수동 실행 모달(`/stocks/prices-batch`)과
-    동일하게 `price_service.fetch_prices_batch()`로 실시간 시세를 조회해 지정가 산정에 반영한다.
-    조회 실패 종목은 기존 값을 그대로 둔다(폴백).
-    """
-    from app.services.price_service import fetch_prices_batch
-
-    tickers = [(item.ticker, item.market) for item in items if item.ticker not in ("CASH", "REAL_ESTATE")]
-    if not tickers:
-        return
-
-    try:
-        price_map = await fetch_prices_batch(user_id, tickers, db, redis)
-    except Exception as exc:
-        logger.warning("rebalancing_live_price_refresh_failed", error=str(exc))
-        return
-
-    for item in items:
-        price = price_map.get(item.ticker)
-        if price and price > 0:
-            item.current_price_krw = float(price)
-
-
-def build_rebalancing_orders(
-    drifting: list,
-    ticker_account_map: dict[str, list],
-    strategy: str,
-    order_type: Literal["MARKET", "LIMIT"],
-    buy_account_id: str,
-    alert_id: str | None = None,
-) -> list[Any]:
-    """드리프트 항목 목록으로부터 실행 주문 목록을 생성한다.
-
-    매도 주문은 `ticker_account_map`을 사용해 실제 종목을 보유한 브로커 연동 계좌(들)로
-    분산 생성하고, 매수 주문은 `buy_account_id` 단일 계좌로 생성한다.
-    AUTO 자동실행(`_execute_auto_rebalancing`)과 원클릭 실행(`quick_execute_rebalancing`)이
-    공유하는 주문 생성 로직 — 두 경로가 서로 다른 동작을 하지 않도록 여기서 단일화한다.
-    """
-    from app.schemas.rebalancing import ExecutionOrderItem
-
-    ticker_account_map = ticker_account_map or {}
-    orders: list[ExecutionOrderItem] = []
-    for item in drifting:
-        if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
-            logger.info(
-                "rebalancing_auto_item_skipped",
-                alert_id=alert_id,
-                ticker=item.ticker,
-                reason="cash_or_no_shares_to_trade",
-            )
-            continue
-        qty = abs(int(item.shares_to_trade))
-        if qty <= 0:
-            logger.info(
-                "rebalancing_auto_item_skipped",
-                alert_id=alert_id,
-                ticker=item.ticker,
-                reason="zero_qty",
-                shares_to_trade=item.shares_to_trade,
-            )
-            continue
-        side = "BUY" if item.diff_krw > 0 else "SELL"
-        if strategy == "BUY_ONLY" and side == "SELL":
-            logger.info(
-                "rebalancing_auto_item_skipped",
-                alert_id=alert_id,
-                ticker=item.ticker,
-                reason="buy_only_strategy",
-            )
-            continue
-
-        # LIMIT 주문 시 현재가를 지정가로 사용 (None이면 MARKET으로 fallback)
-        effective_order_type = order_type
-        current_price = getattr(item, "current_price_krw", None)
-        reference_price: float | None = float(current_price) if current_price and current_price > 0 else None
-        limit_price: float | None = None
-        if order_type == "LIMIT":
-            if reference_price is not None:
-                limit_price = reference_price
-            else:
-                effective_order_type = "MARKET"
-
-        if side == "SELL":
-            orders.extend(
-                _build_sell_orders(item, qty, ticker_account_map, effective_order_type, limit_price, reference_price)
-            )
-            continue
-
-        orders.append(
-            ExecutionOrderItem(
-                ticker=item.ticker,
-                name=item.name,
-                market=item.market,
-                side=side,
-                quantity=qty,
-                account_id=buy_account_id,
-                order_type=effective_order_type,
-                limit_price=limit_price,
-                reference_price=reference_price,
-            )
-        )
-
-    return orders
-
-
-async def _execute_auto_rebalancing(
-    alert,
-    portfolio: Portfolio,
-    drifting: list,
-    db: AsyncSession,
-    ticker_account_map: dict[str, list] | None = None,
-) -> bool:
-    """AUTO 모드 리밸런싱 주문을 생성하고 실행한다 (내부용, 장 중 체크 없음).
-
-    성공 시 True, 오류 시 False 반환.
-    """
-    from app.redis_client import get_redis
-    from app.services.rebalancing_execution_service import execute_rebalancing
-
-    strategy = getattr(alert, "strategy", "BUY_ONLY")
-    order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
-
-    redis = await get_redis()
-    await refresh_live_prices(drifting, alert.user_id, db, redis)
-
-    orders = build_rebalancing_orders(
-        drifting, ticker_account_map or {}, strategy, order_type, str(alert.account_id), alert_id=str(alert.id)
-    )
-
-    if orders:
-        try:
-            await execute_rebalancing(
-                user_id=alert.user_id,
-                account_id=alert.account_id,
-                orders=orders,
-                db=db,
-                redis=redis,
-                portfolio_id=portfolio.id,
-                triggered_by="AUTO",
-                strategy=strategy,
-            )
-        except Exception as exc:
-            logger.error("rebalancing_auto_execute_failed", alert_id=str(alert.id), error=str(exc))
-            return False
-
-    return True
-
-
 async def send_test_rebalancing_alert(
     portfolio_id: uuid.UUID,
     user_id: uuid.UUID,
     db: AsyncSession,
+    account_id: uuid.UUID | None = None,
 ) -> dict[str, bool]:
     """리밸런싱 자동화 알림을 즉시 테스트 발송한다.
 
     스케줄/드리프트 조건 및 시장 신호 게이트를 무시하고 현재 포트폴리오 데이터로 발송.
+    `account_id`는 portfolio.alert_scope == PER_ACCOUNT일 때 어느 계좌 전용 알림 행을
+    테스트할지 지정한다(AGGREGATE면 무시하고 alert_scope == "AGGREGATE" 행을 조회).
     반환: {"email_sent": bool, "push_sent": bool}
     """
     from app.services.email_service import send_rebalancing_alert
@@ -434,6 +275,11 @@ async def send_test_rebalancing_alert(
     from app.services.push_service import send_push_to_user
     from app.services.rebalancing_service import analyze_rebalancing
 
+    account_filter = (
+        (RebalancingAlert.alert_scope == "PER_ACCOUNT") & (RebalancingAlert.account_id == account_id)
+        if account_id is not None
+        else RebalancingAlert.alert_scope == "AGGREGATE"
+    )
     result = await db.execute(
         select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
         .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)
@@ -443,6 +289,7 @@ async def send_test_rebalancing_alert(
         .where(
             RebalancingAlert.portfolio_id == portfolio_id,
             RebalancingAlert.user_id == user_id,
+            account_filter,
         )
     )
     row = result.first()
@@ -453,18 +300,28 @@ async def send_test_rebalancing_alert(
     email = notification_email or user_email
     threshold = float(alert.threshold_pct)
 
-    saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
     items_to_show: list = []
     drifting: list = []
+    ticker_account_map: dict[str, list] = {}
     try:
         overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids)
         analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
         drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
         items_to_show = analysis.items
+        ticker_account_map = analysis.ticker_account_map
     except Exception as exc:
         logger.error("test_rebalancing_alert_analysis_failed", portfolio_id=str(portfolio_id), error=str(exc))
+
+    order_preview_items: list = []
+    if drifting:
+        strategy = getattr(alert, "strategy", "BUY_ONLY")
+        order_type = cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
+        buy_account_id = str(alert.account_id) if alert.account_id else ""
+        order_preview_items = build_rebalancing_orders(
+            drifting, ticker_account_map, strategy, order_type, buy_account_id, alert_id=str(alert.id)
+        )
 
     email_sent = False
     try:
@@ -477,6 +334,7 @@ async def send_test_rebalancing_alert(
             is_scheduled_report=False,
             schedule_type=getattr(alert, "schedule_type", "DAILY"),
             is_test=True,
+            order_preview_items=order_preview_items,
         )
     except Exception as exc:
         logger.error("test_rebalancing_alert_email_failed", portfolio_id=str(portfolio_id), error=str(exc))
@@ -536,8 +394,7 @@ async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing_service import analyze_rebalancing
 
-    saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
+    effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
     try:
         overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
@@ -669,6 +526,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             is_composite_triggered=is_composite_triggered,
             composite_reason=composite_reason,
             redis=_redis,
+            ticker_account_map=analysis.ticker_account_map,
         )
         if not triggered:
             continue

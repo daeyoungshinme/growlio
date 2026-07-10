@@ -3,16 +3,20 @@ import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { INPUT_SM } from "@/constants/inputStyles";
 import Modal from "@/components/common/Modal";
-import { type ScheduleType, type TriggerCondition, sendTestRebalancingAlert } from "@/api/alerts";
-import { quickExecuteRebalancing, type ExecutionResult } from "@/api/rebalancing";
-import { RebalancingResultSection } from "@/components/rebalancing/RebalancingResultSection";
+import {
+  sendTestAccountRebalancingAlert,
+  sendTestRebalancingAlert,
+  updateAlertScope,
+} from "@/api/alerts";
+import { quickExecuteRebalancing } from "@/api/rebalancing";
+import { buildAlertDescription } from "@/utils/rebalancingAlertDescription";
 import {
   useRebalancingAlertQueries,
   useRebalancingAlertFormState,
 } from "@/hooks/useRebalancingAlertForm";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
-import { invalidateRebalancingHistoryData } from "@/utils/queryInvalidation";
+import { invalidatePortfolioData, invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import {
   SCHEDULE_OPTIONS,
@@ -24,48 +28,21 @@ import {
   STRATEGY_OPTIONS,
   MARKET_CONDITION_OPTIONS,
   NOTIFY_TIME_OPTIONS,
+  BUY_WAIT_MINUTES_OPTIONS,
 } from "@/constants/rebalancingConfig";
 
 interface Props {
   portfolioId: string;
   portfolioName: string;
   accountIds?: string[] | null;
+  /** 지정 시 이 계좌 전용 알림(PER_ACCOUNT 스코프)을 편집한다. */
+  targetAccountId?: string;
+  targetAccountName?: string;
+  /** 연결 계좌가 2개 이상이라 계좌별 독립 설정(PER_ACCOUNT)으로 전환 가능한지 여부. */
+  canSwitchToPerAccount?: boolean;
+  /** "계좌별로 독립 설정하기" 클릭 후 스코프 전환 성공 시 호출 — 부모가 계좌별 목록 화면으로 전환한다. */
+  onSwitchToPerAccount?: () => void;
   onClose: () => void;
-}
-
-function buildDescription(
-  scheduleType: ScheduleType,
-  dayOfWeek: number,
-  dayOfMonth: number,
-  triggerCondition: TriggerCondition,
-  threshold: number,
-  mode: "NOTIFY" | "AUTO",
-  autoExecutionTime?: string,
-  notifyTime?: string,
-): string {
-  const timeLabel = mode === "AUTO" ? (autoExecutionTime ?? "09:00") : (notifyTime ?? "08:30");
-  const when =
-    scheduleType === "DAILY"
-      ? `매일 ${timeLabel}에`
-      : scheduleType === "WEEKLY"
-        ? `매주 ${DAYS_KO[dayOfWeek]}요일 ${timeLabel}에`
-        : scheduleType === "MONTHLY"
-          ? `매월 ${dayOfMonth}일 ${timeLabel}에`
-          : scheduleType === "QUARTERLY"
-            ? `매 3개월 ${dayOfMonth}일 ${timeLabel}에`
-            : scheduleType === "SEMIANNUAL"
-              ? `매 6개월 ${dayOfMonth}일 ${timeLabel}에`
-              : `매년 ${dayOfMonth}일 ${timeLabel}에`;
-
-  const action = mode === "AUTO" ? "자동으로 리밸런싱을 실행합니다." : "알림을 받습니다.";
-
-  if (triggerCondition === "DRIFT_ONLY") {
-    return `비중이 ±${threshold.toFixed(1)}% 이상 이탈 시 ${when} ${action}`;
-  }
-  if (triggerCondition === "SCHEDULE_ONLY") {
-    return `${when} 리밸런싱 현황 리포트를 받습니다.`;
-  }
-  return `${when} 정기 리포트를 받으며, 비중이 ±${threshold.toFixed(1)}% 이탈 시 즉시 ${action}`;
 }
 
 const inputClass = `w-full ${INPUT_SM}`;
@@ -74,15 +51,25 @@ export default function RebalancingAlertModal({
   portfolioId,
   portfolioName,
   accountIds,
+  targetAccountId,
+  targetAccountName,
+  canSwitchToPerAccount,
+  onSwitchToPerAccount,
   onClose,
 }: Props) {
-  const { alert, isLoading, kisExecutionAccounts, marketSignal } = useRebalancingAlertQueries({
-    portfolioId,
-    accountIds,
-  });
+  const { alert, isLoading, kisExecutionAccounts, targetAccountIsKis, marketSignal } =
+    useRebalancingAlertQueries({
+      portfolioId,
+      accountIds,
+      targetAccountId,
+    });
+
+  const title = targetAccountName
+    ? `리밸런싱 자동화 — ${portfolioName} · ${targetAccountName}`
+    : `리밸런싱 자동화 — ${portfolioName}`;
 
   return (
-    <Modal title={`리밸런싱 자동화 — ${portfolioName}`} onClose={onClose} size="md" closeOnBackdrop>
+    <Modal title={title} onClose={onClose} size="md" closeOnBackdrop>
       <div className="flex-1 overflow-y-auto overscroll-contain">
         {isLoading ? (
           <div className="flex justify-center py-4">
@@ -93,7 +80,12 @@ export default function RebalancingAlertModal({
             key={alert?.id ?? "new"}
             alert={alert}
             kisExecutionAccounts={kisExecutionAccounts}
+            targetAccountIsKis={targetAccountIsKis}
             portfolioId={portfolioId}
+            targetAccountId={targetAccountId}
+            targetAccountName={targetAccountName}
+            canSwitchToPerAccount={canSwitchToPerAccount}
+            onSwitchToPerAccount={onSwitchToPerAccount}
             onClose={onClose}
             marketSignal={marketSignal}
           />
@@ -110,35 +102,54 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 function AlertFormBody({
   alert,
   kisExecutionAccounts,
+  targetAccountIsKis,
   portfolioId,
+  targetAccountId,
+  targetAccountName,
+  canSwitchToPerAccount,
+  onSwitchToPerAccount,
   onClose,
   marketSignal,
 }: {
   alert: RebalancingAlert | null;
   kisExecutionAccounts: AssetAccount[];
+  targetAccountIsKis: boolean;
   portfolioId: string;
+  targetAccountId?: string;
+  targetAccountName?: string;
+  canSwitchToPerAccount?: boolean;
+  onSwitchToPerAccount?: () => void;
   onClose: () => void;
   marketSignal?: MarketSignalResponse;
 }) {
   const form = useRebalancingAlertFormState({
     alert,
     portfolioId,
+    targetAccountId,
     onClose,
   });
 
   const { mode, setAccountId } = form;
   useEffect(() => {
-    if (mode !== "AUTO" || kisExecutionAccounts.length !== 1) return;
+    if (mode !== "AUTO") return;
+    // 계좌별 독립 설정(PER_ACCOUNT)은 실행 계좌가 이 화면의 대상 계좌로 고정된다.
+    if (targetAccountId) {
+      setAccountId(targetAccountId);
+      return;
+    }
+    if (kisExecutionAccounts.length !== 1) return;
     setAccountId(kisExecutionAccounts[0].id);
-  }, [mode, setAccountId, kisExecutionAccounts]);
+  }, [mode, setAccountId, kisExecutionAccounts, targetAccountId]);
 
   const hasAlert = !!alert;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [executionResults, setExecutionResults] = useState<ExecutionResult[] | null>(null);
   const queryClient = useQueryClient();
 
   const testMut = useMutation({
-    mutationFn: () => sendTestRebalancingAlert(portfolioId),
+    mutationFn: () =>
+      targetAccountId
+        ? sendTestAccountRebalancingAlert(portfolioId, targetAccountId)
+        : sendTestRebalancingAlert(portfolioId),
     onSuccess: (data) => {
       toast(data.message, data.email_sent || data.push_sent ? "success" : "error");
     },
@@ -147,27 +158,39 @@ function AlertFormBody({
     },
   });
 
-  // "지금 테스트 실행" — 저장된(또는 화면에 입력된 미저장) 자동화 설정값으로 실제 스케줄 AUTO
-  // 실행과 동일한 로직(실시간 시세 반영, 매도 보유계좌 라우팅, 실시간 잔고 clamp)을 원클릭으로 실행한다.
+  const switchToPerAccountMut = useMutation({
+    mutationFn: () => updateAlertScope(portfolioId, "PER_ACCOUNT"),
+    onSuccess: () => {
+      void invalidatePortfolioData(queryClient);
+      toast("계좌별 독립 설정으로 전환되었습니다", "success");
+      onSwitchToPerAccount?.();
+    },
+    onError: (e) => toast(extractErrorMessage(e, "전환에 실패했습니다"), "error"),
+  });
+
+  // "지금 테스트 실행" — 저장된(또는 화면에 입력된 미저장) 자동화 설정값으로 실제 스케줄 AUTO와
+  // 동일한 파이프라인(드리프트 분석 → 대기 플랜 생성 → 계획 안내 이메일 발송)을 지금 바로 태운다.
+  // 즉시 체결이 아니라 매수는 대기시간 후 자동 실행, 매도는 이메일 승인이 필요하다.
   const quickExecuteMut = useMutation({
     mutationFn: () =>
-      quickExecuteRebalancing(portfolioId, {
-        account_id: form.accountId || undefined,
-        strategy: form.strategy,
-        order_type: form.orderType,
-      }),
-    onSuccess: (results) => {
-      setExecutionResults(results);
-      const successCount = results.reduce((sum, r) => sum + r.success_count, 0);
-      const failCount = results.reduce((sum, r) => sum + r.fail_count, 0);
-      toast(
-        `실행 완료 — 성공 ${successCount}건 · 실패 ${failCount}건`,
-        failCount ? "error" : "success",
-      );
-      void invalidateRebalancingHistoryData(queryClient);
+      quickExecuteRebalancing(
+        portfolioId,
+        {
+          account_id: form.accountId || undefined,
+          strategy: form.strategy,
+          order_type: form.orderType,
+        },
+        targetAccountId,
+      ),
+    onSuccess: (result) => {
+      const toastType = result.status === "MARKET_BLOCKED" ? "error" : "success";
+      toast(result.message, toastType);
+      if (result.status === "PLAN_GENERATED") {
+        void invalidateRebalancingPlanData(queryClient);
+      }
     },
     onError: (e) => {
-      toast(extractErrorMessage(e, "리밸런싱 실행에 실패했습니다"), "error");
+      toast(extractErrorMessage(e, "계획 생성에 실패했습니다"), "error");
     },
   });
 
@@ -308,31 +331,48 @@ function AlertFormBody({
         <div>
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">실행 모드</p>
           <div className="grid grid-cols-2 gap-2">
-            {MODE_OPTIONS.map(({ value: m, label, desc }) => (
-              <label
-                key={m}
-                className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                  form.mode === m
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                    : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="mode"
-                  value={m}
-                  checked={form.mode === m}
-                  onChange={() => form.setMode(m)}
-                  className="mt-0.5 accent-blue-600"
-                />
-                <div>
-                  <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
-                    {label}
+            {MODE_OPTIONS.map(({ value: m, label, desc }) => {
+              const isAutoDisabled =
+                m === "AUTO" &&
+                (targetAccountId ? !targetAccountIsKis : kisExecutionAccounts.length === 0);
+              return (
+                <label
+                  key={m}
+                  className={`flex items-start gap-2 p-3 rounded-lg border transition-colors ${
+                    isAutoDisabled
+                      ? "opacity-50 cursor-not-allowed border-gray-300 dark:border-gray-600"
+                      : `cursor-pointer ${
+                          form.mode === m
+                            ? "border-blue-500 bg-blue-50 dark:bg-blue-950"
+                            : "border-gray-300 dark:border-gray-600 hover:border-gray-400"
+                        }`
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="mode"
+                    value={m}
+                    checked={form.mode === m}
+                    disabled={isAutoDisabled}
+                    onChange={() => form.setMode(m)}
+                    className="mt-0.5 accent-blue-600"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                      {label}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{desc}</div>
+                    {isAutoDisabled && (
+                      <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                        {targetAccountId
+                          ? "KIS 연동 계좌만 자동 실행 가능"
+                          : "연동된 KIS 계좌가 없어 자동 실행을 사용할 수 없습니다"}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{desc}</div>
-                </div>
-              </label>
-            ))}
+                </label>
+              );
+            })}
           </div>
         </div>
 
@@ -363,14 +403,23 @@ function AlertFormBody({
         {form.mode === "AUTO" && (
           <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
             <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-              ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다.
+              ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다. 조건 충족 시 계획을 이메일로 먼저
+              알려드립니다 — 매수는 대기시간 후 자동 실행(취소 가능), 매도는 이메일 승인이 필요하며
+              당일 장마감까지 미응답 시 자동 취소됩니다.
             </p>
 
             <div>
               <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
                 실행 계좌 (KIS)
               </label>
-              {kisExecutionAccounts.length === 0 ? (
+              {targetAccountId ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
+                  <span>{targetAccountName ?? "이 계좌"}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    (계좌별 독립 설정 대상)
+                  </span>
+                </div>
+              ) : kisExecutionAccounts.length === 0 ? (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
                   KIS 연동 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
                 </p>
@@ -394,6 +443,17 @@ function AlertFormBody({
                 </select>
               )}
             </div>
+
+            {!targetAccountId && canSwitchToPerAccount && (
+              <button
+                onClick={() => switchToPerAccountMut.mutate()}
+                disabled={switchToPerAccountMut.isPending}
+                className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+              >
+                {switchToPerAccountMut.isPending && <Loader2 size={12} className="animate-spin" />}
+                여러 계좌에 각각 자동 실행 설정하기 →
+              </button>
+            )}
 
             <div className="space-y-2">
               {STRATEGY_OPTIONS.map(({ value: s, label, desc }) => (
@@ -438,6 +498,27 @@ function AlertFormBody({
               />
               <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                 장 중(09:00~15:00 KST) 지정 시각에 자동 실행됩니다.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                매수 대기시간
+              </label>
+              <select
+                className={inputClass}
+                value={form.buyWaitMinutes}
+                onChange={(e) => form.setBuyWaitMinutes(Number(e.target.value))}
+              >
+                {BUY_WAIT_MINUTES_OPTIONS.map(({ value, label }) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                매수 계획을 이메일로 알린 뒤 이 시간만큼 대기 후 자동 실행됩니다. 그동안 앱이나
+                이메일에서 취소할 수 있습니다.
               </p>
             </div>
 
@@ -492,7 +573,7 @@ function AlertFormBody({
 
         {/* ── 설명 텍스트 ── */}
         <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-          {buildDescription(
+          {buildAlertDescription(
             form.scheduleType,
             form.dayOfWeek,
             form.dayOfMonth,
@@ -510,7 +591,7 @@ function AlertFormBody({
             현재 설정이 활성화되어 있습니다.
             {alert.last_triggered_at && (
               <span className="block mt-0.5 text-blue-500">
-                마지막 실행: {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
+                마지막 트리거: {new Date(alert.last_triggered_at).toLocaleString("ko-KR")}
               </span>
             )}
           </div>
@@ -532,7 +613,8 @@ function AlertFormBody({
           </button>
         )}
 
-        {/* ── 지금 테스트 실행 (AUTO 모드 전용, 실제 매매 발생) ── */}
+        {/* ── 지금 테스트 실행 (AUTO 모드 전용) — 지금 바로 계획을 생성해 이메일로 보낸다.
+             매수는 대기 후 자동 실행, 매도는 이메일 승인이 필요하다 (즉시 체결 아님). ── */}
         {hasAlert && form.mode === "AUTO" && form.accountId && (
           <button
             onClick={() => quickExecuteMut.mutate()}
@@ -549,19 +631,6 @@ function AlertFormBody({
         )}
       </div>
       {/* end p-6 form fields */}
-
-      {executionResults && (
-        <Modal
-          title="실행 결과"
-          onClose={() => setExecutionResults(null)}
-          size="md"
-          closeOnBackdrop
-        >
-          <div className="p-4 space-y-4 overflow-y-auto">
-            <RebalancingResultSection results={executionResults} />
-          </div>
-        </Modal>
-      )}
 
       {/* ── 버튼 ── */}
       <div className="sticky bottom-0 bg-white dark:bg-gray-900 px-6 py-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">

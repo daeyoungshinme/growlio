@@ -224,7 +224,7 @@ export default function SettingsPage() {
         <SectionCard title="앱 설정">
           <button
             onClick={toggle}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px]"
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
             {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
@@ -232,7 +232,7 @@ export default function SettingsPage() {
           {isNativePlatform() && isAvailable && (
             <button
               onClick={() => setEnabled(!isEnabled)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px]"
               aria-pressed={isEnabled}
             >
               <Fingerprint size={18} className={isEnabled ? "text-blue-500" : undefined} />
@@ -246,7 +246,7 @@ export default function SettingsPage() {
           )}
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors min-h-[44px]"
           >
             <LogOut size={18} />
             로그아웃

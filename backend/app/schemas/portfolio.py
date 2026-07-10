@@ -65,6 +65,7 @@ class PortfolioResponse(BaseModel):
     items: list[PortfolioItem]
     base_type: str
     account_ids: list[str] | None = None  # Portfolio.account_ids property에서 자동 변환
+    alert_scope: str = "AGGREGATE"  # AGGREGATE | PER_ACCOUNT
     sort_order: int = 0
     created_at: datetime
     updated_at: datetime

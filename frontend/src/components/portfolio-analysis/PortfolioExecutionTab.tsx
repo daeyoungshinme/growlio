@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchPortfolios } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import { AnalysisPanel } from "./AnalysisPanel";
-import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
+import RebalancingAlertModalRouter from "@/components/rebalancing/RebalancingAlertModalRouter";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { mergeAlertsByPortfolio } from "@/utils/portfolio";
 
 interface Props {
   portfolioId?: string;
@@ -15,6 +17,22 @@ interface Props {
 
 export default function PortfolioExecutionTab({ portfolioId }: Props) {
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
+
+  // 진단 탭의 "목표 포트폴리오에 적용" CTA에서 넘어온 경우 실행 모달을 자동으로 연다.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [autoOpenExecution] = useState(() => searchParams.get("openExecution") === "1");
+
+  useEffect(() => {
+    if (searchParams.get("openExecution") !== "1") return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("openExecution");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
 
   const { data: portfoliosRaw, isLoading: portfoliosLoading } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
@@ -39,7 +57,7 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
   });
   const alertByPortfolioId = useMemo(() => {
     const alerts = Array.isArray(rebalancingAlertsRaw) ? rebalancingAlertsRaw : [];
-    return Object.fromEntries(alerts.map((a) => [a.portfolio_id, a]));
+    return mergeAlertsByPortfolio(alerts);
   }, [rebalancingAlertsRaw]);
 
   const selectedIds = useMemo(
@@ -73,18 +91,25 @@ export default function PortfolioExecutionTab({ portfolioId }: Props) {
           onOpenAlertModal={setAlertModalPortfolioId}
           autoAnalyzeId={portfolioId}
           alertByPortfolioId={alertByPortfolioId}
+          autoOpenExecution={autoOpenExecution}
         />
       </ErrorBoundary>
 
-      {alertModalPortfolioId && (
-        <RebalancingAlertModal
-          key={alertModalPortfolioId}
-          portfolioId={alertModalPortfolioId}
-          portfolioName={portfolios.find((p) => p.id === alertModalPortfolioId)?.name ?? ""}
-          accountIds={portfolios.find((p) => p.id === alertModalPortfolioId)?.account_ids ?? null}
-          onClose={() => setAlertModalPortfolioId(null)}
-        />
-      )}
+      {alertModalPortfolioId &&
+        (() => {
+          const alertPortfolio = portfolios.find((p) => p.id === alertModalPortfolioId);
+          return (
+            <RebalancingAlertModalRouter
+              key={alertModalPortfolioId}
+              portfolioId={alertModalPortfolioId}
+              portfolioName={alertPortfolio?.name ?? ""}
+              alertScope={alertPortfolio?.alert_scope}
+              accountIds={alertPortfolio?.account_ids ?? null}
+              accounts={accounts}
+              onClose={() => setAlertModalPortfolioId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }

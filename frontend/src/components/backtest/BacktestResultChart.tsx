@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import {
   Area,
   AreaChart,
@@ -109,7 +109,7 @@ function computeAnnualReturns(dates: string[], series: SeriesData[]): AnnualRow[
   return rows;
 }
 
-export default function BacktestResultChart({ dates, series }: Props) {
+function BacktestResultChart({ dates, series }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [view, setView] = useState<ChartView>("cumulative");
 
@@ -283,3 +283,5 @@ export default function BacktestResultChart({ dates, series }: Props) {
     </div>
   );
 }
+
+export default memo(BacktestResultChart);

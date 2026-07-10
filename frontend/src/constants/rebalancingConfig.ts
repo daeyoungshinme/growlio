@@ -45,7 +45,7 @@ export const TRIGGER_CONDITION_OPTIONS: { value: TriggerCondition; label: string
 
 export const MODE_OPTIONS: { value: "NOTIFY" | "AUTO"; label: string; desc: string }[] = [
   { value: "NOTIFY", label: "알림만 (권장)", desc: "이메일로 알림 수신" },
-  { value: "AUTO", label: "자동 실행", desc: "조건 충족 시 주문 자동 실행" },
+  { value: "AUTO", label: "자동 실행", desc: "매수는 대기 후 자동 실행, 매도는 이메일 승인 필요" },
 ];
 
 export const STRATEGY_OPTIONS: {
@@ -72,6 +72,10 @@ export const NOTIFY_TIME_OPTIONS: { value: string; label: string }[] = Array.fro
     return { value, label: value };
   },
 );
+
+export const BUY_WAIT_MINUTES_OPTIONS: { value: number; label: string }[] = [
+  5, 10, 15, 20, 30, 60,
+].map((v) => ({ value: v, label: `${v}분` }));
 
 export const MARKET_CONDITION_OPTIONS: {
   value: MarketConditionMode;

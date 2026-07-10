@@ -61,7 +61,7 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         diff_krw=500_000,
         shares_to_trade=5.0,
     )
-    analysis = SimpleNamespace(items=[drifting_item])
+    analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -109,7 +109,7 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
         diff_krw=100_000,
         shares_to_trade=1.0,
     )
-    analysis = SimpleNamespace(items=[item])
+    analysis = SimpleNamespace(items=[item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -197,7 +197,7 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         diff_krw=100_000,
         shares_to_trade=1.0,
     )
-    analysis = SimpleNamespace(items=[item])
+    analysis = SimpleNamespace(items=[item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -302,7 +302,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -336,7 +336,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -370,7 +370,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         drifting_item = SimpleNamespace(
             ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
         )
-        analysis = SimpleNamespace(items=[drifting_item])
+        analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -398,7 +398,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -441,7 +441,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         ]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         composite_flag_store: dict[str, bool] = {}
@@ -503,7 +503,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         drifting_item = SimpleNamespace(
             ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
         )
-        analysis = SimpleNamespace(items=[drifting_item])
+        analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         # 이미 오늘 이 유저에게 복합신호 알림이 발송된 것처럼 플래그를 세팅해도 drift 알림엔 영향 없어야 함.
@@ -536,7 +536,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, False)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -565,7 +565,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, None)]
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        analysis = SimpleNamespace(items=[_make_no_drift_item()])
+        analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -621,7 +621,7 @@ class TestAutoModeUnaffectedByCompositeTrigger:
         drifting_item = SimpleNamespace(
             ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
         )
-        analysis = SimpleNamespace(items=[drifting_item])
+        analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
         with (
@@ -690,7 +690,7 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
         diff_krw=100_000,
         shares_to_trade=1.0,
     )
-    analysis = SimpleNamespace(items=[item])
+    analysis = SimpleNamespace(items=[item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -733,7 +733,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
         diff_krw=500_000,
         shares_to_trade=5.0,
     )
-    analysis = SimpleNamespace(items=[drifting_item])
+    analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -776,7 +776,7 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
         diff_krw=100_000,
         shares_to_trade=1.0,
     )
-    analysis = SimpleNamespace(items=[item])
+    analysis = SimpleNamespace(items=[item], ticker_account_map={})
     overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
     with (
@@ -961,7 +961,7 @@ def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_n
 
 class TestBuildSellOrders:
     def test_distributes_across_holding_accounts_largest_first(self):
-        from app.services.rebalancing_alert_service import _build_sell_orders
+        from app.services.rebalancing_order_builder import _build_sell_orders
 
         acc_small = uuid.uuid4()
         acc_large = uuid.uuid4()
@@ -980,7 +980,7 @@ class TestBuildSellOrders:
         assert orders[0].quantity == 5
 
     def test_splits_across_multiple_accounts_when_needed(self):
-        from app.services.rebalancing_alert_service import _build_sell_orders
+        from app.services.rebalancing_order_builder import _build_sell_orders
 
         acc_a = uuid.uuid4()
         acc_b = uuid.uuid4()
@@ -997,7 +997,7 @@ class TestBuildSellOrders:
         assert {o.account_id: o.quantity for o in orders} == {str(acc_b): 4, str(acc_a): 2}
 
     def test_unallocated_remainder_is_skipped_not_forced(self):
-        from app.services.rebalancing_alert_service import _build_sell_orders
+        from app.services.rebalancing_order_builder import _build_sell_orders
 
         acc = uuid.uuid4()
         item = _make_drift_item()
@@ -1009,7 +1009,7 @@ class TestBuildSellOrders:
         assert orders[0].quantity == 2
 
     def test_no_holding_accounts_returns_empty(self):
-        from app.services.rebalancing_alert_service import _build_sell_orders
+        from app.services.rebalancing_order_builder import _build_sell_orders
 
         item = _make_drift_item()
         orders = _build_sell_orders(item, 5, {}, "MARKET", None)
@@ -1017,7 +1017,7 @@ class TestBuildSellOrders:
         assert orders == []
 
     def test_manual_asset_type_account_excluded(self):
-        from app.services.rebalancing_alert_service import _build_sell_orders
+        from app.services.rebalancing_order_builder import _build_sell_orders
 
         acc_manual = uuid.uuid4()
         acc_kis = uuid.uuid4()
@@ -1120,93 +1120,6 @@ class TestBuildRebalancingOrders:
         assert sell.reference_price == 70000.0
 
 
-class TestExecuteAutoRebalancing:
-    @pytest.mark.asyncio
-    async def test_sell_orders_routed_to_actual_holding_account(self, mock_db):
-        """SELL 주문은 alert.account_id가 아니라 실제 보유 계좌로 생성돼야 한다."""
-        from app.services.rebalancing_alert_service import _execute_auto_rebalancing
-
-        exec_account_id = uuid.uuid4()  # AUTO 실행(매수) 계좌 — 이 종목 보유는 없음
-        holder_account_id = uuid.uuid4()  # 실제 이 종목을 보유한 다른 연결 계좌
-        alert = _make_auto_alert(account_id=exec_account_id, strategy="FULL")
-        portfolio = SimpleNamespace(id=uuid.uuid4())
-        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
-        ticker_account_map = {"005930": [_make_ticker_account(holder_account_id, quantity=10)]}
-
-        captured_orders = []
-
-        async def fake_execute_rebalancing(**kwargs):
-            captured_orders.extend(kwargs["orders"])
-            return []
-
-        with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
-            patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
-                new=AsyncMock(side_effect=fake_execute_rebalancing),
-            ),
-        ):
-            result = await _execute_auto_rebalancing(
-                alert, portfolio, drifting, mock_db, ticker_account_map=ticker_account_map
-            )
-
-        assert result is True
-        assert len(captured_orders) == 1
-        assert captured_orders[0].side == "SELL"
-        assert captured_orders[0].account_id == str(holder_account_id)
-        assert captured_orders[0].quantity == 5
-
-    @pytest.mark.asyncio
-    async def test_buy_orders_still_use_alert_account_id(self, mock_db):
-        from app.services.rebalancing_alert_service import _execute_auto_rebalancing
-
-        exec_account_id = uuid.uuid4()
-        alert = _make_auto_alert(account_id=exec_account_id, strategy="FULL")
-        portfolio = SimpleNamespace(id=uuid.uuid4())
-        drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
-
-        captured_orders = []
-
-        async def fake_execute_rebalancing(**kwargs):
-            captured_orders.extend(kwargs["orders"])
-            return []
-
-        with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
-            patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
-                new=AsyncMock(side_effect=fake_execute_rebalancing),
-            ),
-        ):
-            result = await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
-
-        assert result is True
-        assert len(captured_orders) == 1
-        assert captured_orders[0].side == "BUY"
-        assert captured_orders[0].account_id == str(exec_account_id)
-
-    @pytest.mark.asyncio
-    async def test_sell_with_no_holding_account_produces_no_order(self, mock_db):
-        """보유 계좌 정보가 없으면(ticker_account_map에 없음) 매도 주문 자체를 생성하지 않는다."""
-        from app.services.rebalancing_alert_service import _execute_auto_rebalancing
-
-        alert = _make_auto_alert(strategy="FULL")
-        portfolio = SimpleNamespace(id=uuid.uuid4())
-        drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
-
-        with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
-            patch("app.services.rebalancing_execution_service.execute_rebalancing", new=AsyncMock()) as mock_exec,
-        ):
-            result = await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
-
-        assert result is True
-        mock_exec.assert_not_called()
-
-
 class TestRefreshLivePrices:
     """refresh_live_prices() — 자동/원클릭 실행이 수동 실행 모달과 동일하게 실시간 시세를 지정가에 반영하는지 검증."""
 
@@ -1268,35 +1181,246 @@ class TestRefreshLivePrices:
         assert cash_item.current_price_krw is None
 
     @pytest.mark.asyncio
-    async def test_limit_order_uses_refreshed_live_price(self, mock_db):
-        """자동 실행 전체 경로 — LIMIT 주문의 limit_price가 실시간 시세로 갱신되는지 검증."""
-        from app.services.rebalancing_alert_service import _execute_auto_rebalancing
+    async def test_recomputes_shares_to_trade_when_none_and_live_price_found(self, mock_db):
+        """분석 시점엔 가격이 없어 shares_to_trade=None이었던 종목도, 실시간 가격을 새로
+        확보하면 수량을 재계산해야 한다 — 그러지 않으면 build_rebalancing_orders()가
+        이 항목을 영구히 스킵해 실제 드리프트가 조용히 누락된다."""
+        from app.services.rebalancing_alert_service import refresh_live_prices
 
-        alert = _make_auto_alert(strategy="FULL", order_type="LIMIT")
-        portfolio = SimpleNamespace(id=uuid.uuid4())
-        drifting = [
-            _make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0, current_price_krw=70000.0)
-        ]
+        item = _make_drift_item(
+            ticker="367380",
+            shares_to_trade=None,
+            current_price_krw=None,
+            target_value_krw=1_000_000.0,
+            current_qty=0.0,
+        )
 
-        captured_orders = []
-
-        async def fake_execute_rebalancing(**kwargs):
-            captured_orders.extend(kwargs["orders"])
-            return []
-
-        with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch(
-                "app.services.price_service.fetch_prices_batch",
-                new=AsyncMock(return_value={"005930": 72300.0}),
-            ),
-            patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
-                new=AsyncMock(side_effect=fake_execute_rebalancing),
-            ),
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"367380": 50000.0}),
         ):
-            await _execute_auto_rebalancing(alert, portfolio, drifting, mock_db, ticker_account_map={})
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
 
-        assert len(captured_orders) == 1
-        assert captured_orders[0].order_type == "LIMIT"
-        assert captured_orders[0].limit_price == 72300.0
+        assert item.current_price_krw == 50000.0
+        assert item.shares_to_trade == 20  # floor(1,000,000 / 50,000) - 0
+
+    @pytest.mark.asyncio
+    async def test_recomputed_shares_to_trade_subtracts_current_qty(self, mock_db):
+        from app.services.rebalancing_alert_service import refresh_live_prices
+
+        item = _make_drift_item(
+            ticker="367380",
+            shares_to_trade=None,
+            current_price_krw=None,
+            target_value_krw=1_000_000.0,
+            current_qty=5.0,
+        )
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"367380": 50000.0}),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.shares_to_trade == 15  # floor(1,000,000 / 50,000) - 5
+
+    @pytest.mark.asyncio
+    async def test_shares_to_trade_stays_none_when_price_still_unavailable(self, mock_db):
+        from app.services.rebalancing_alert_service import refresh_live_prices
+
+        item = _make_drift_item(
+            ticker="367380",
+            shares_to_trade=None,
+            current_price_krw=None,
+            target_value_krw=1_000_000.0,
+            current_qty=0.0,
+        )
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={}),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.shares_to_trade is None
+
+    @pytest.mark.asyncio
+    async def test_does_not_touch_already_computed_shares_to_trade(self, mock_db):
+        """이미 shares_to_trade가 계산돼 있던 항목은 실시간 가격 갱신 후에도 재계산하지 않는다
+        (기존 동작 회귀 방지 — 재계산 범위는 '분석 시점에 None이었던 경우'로 한정)."""
+        from app.services.rebalancing_alert_service import refresh_live_prices
+
+        item = _make_drift_item(
+            ticker="005930",
+            shares_to_trade=-5.0,
+            current_price_krw=70000.0,
+            target_value_krw=1_000_000.0,
+            current_qty=10.0,
+        )
+
+        with patch(
+            "app.services.price_service.fetch_prices_batch",
+            new=AsyncMock(return_value={"005930": 71500.0}),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        assert item.shares_to_trade == -5.0
+
+
+# ── resolve_effective_account_ids ─────────────────────────────
+
+
+class TestResolveEffectiveAccountIds:
+    def test_aggregate_scope_uses_portfolio_account_ids(self):
+        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+
+        acc1, acc2 = uuid.uuid4(), uuid.uuid4()
+        portfolio = SimpleNamespace(alert_scope="AGGREGATE", account_ids=[str(acc1), str(acc2)])
+        alert = SimpleNamespace(account_id=uuid.uuid4())
+
+        result = resolve_effective_account_ids(alert, portfolio)
+
+        assert result == [acc1, acc2]
+
+    def test_aggregate_scope_with_no_linked_accounts_returns_none(self):
+        """AGGREGATE + account_ids=None(전체 계좌)은 alert.account_id(AUTO 실행계좌)가 있어도 전체로 취급."""
+        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+
+        portfolio = SimpleNamespace(alert_scope="AGGREGATE", account_ids=None)
+        alert = SimpleNamespace(account_id=uuid.uuid4())
+
+        result = resolve_effective_account_ids(alert, portfolio)
+
+        assert result is None
+
+    def test_per_account_scope_returns_single_target_account(self):
+        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+
+        target_acc = uuid.uuid4()
+        other_acc = uuid.uuid4()
+        portfolio = SimpleNamespace(alert_scope="PER_ACCOUNT", account_ids=[str(target_acc), str(other_acc)])
+        alert = SimpleNamespace(account_id=target_acc)
+
+        result = resolve_effective_account_ids(alert, portfolio)
+
+        assert result == [target_acc]
+
+    def test_missing_alert_scope_attribute_defaults_to_aggregate(self):
+        """alert_scope 컬럼이 없는 낡은 테스트 더블/객체도 AGGREGATE로 안전하게 폴백해야 한다."""
+        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+
+        portfolio = SimpleNamespace(account_ids=None)  # alert_scope 속성 자체가 없음
+        alert = SimpleNamespace(account_id=uuid.uuid4())
+
+        result = resolve_effective_account_ids(alert, portfolio)
+
+        assert result is None
+
+
+# ── switch_alert_scope ─────────────────────────────────────────
+
+
+def _make_linked_portfolio(alert_scope: str, linked_account_ids: list) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        alert_scope=alert_scope,
+        linked_accounts=[SimpleNamespace(account_id=aid) for aid in linked_account_ids],
+    )
+
+
+class TestSwitchAlertScope:
+    @pytest.mark.asyncio
+    async def test_rejects_unknown_scope(self, mock_db):
+        from fastapi import HTTPException
+
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
+
+        with pytest.raises(HTTPException) as exc:
+            await switch_alert_scope(mock_db, portfolio, "BOGUS")
+        assert exc.value.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_noop_when_target_equals_current_scope(self, mock_db):
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
+
+        await switch_alert_scope(mock_db, portfolio, "AGGREGATE")
+
+        mock_db.commit.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_to_per_account_rejects_fewer_than_two_linked_accounts(self, mock_db):
+        from fastapi import HTTPException
+
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4()])
+
+        with pytest.raises(HTTPException) as exc:
+            await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
+        assert exc.value.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_to_per_account_with_no_existing_alert_just_flips_scope(self, mock_db):
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
+
+        assert portfolio.alert_scope == "PER_ACCOUNT"
+        mock_db.delete.assert_not_called()
+        mock_db.commit.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_to_per_account_converts_existing_auto_alert_in_place(self, mock_db):
+        """기존 AGGREGATE AUTO 행의 account_id가 연결 계좌 소속이면 삭제하지 않고 그대로 승계한다."""
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        acc1, acc2 = uuid.uuid4(), uuid.uuid4()
+        portfolio = _make_linked_portfolio("AGGREGATE", [acc1, acc2])
+        existing_alert = SimpleNamespace(account_id=acc1, alert_scope="AGGREGATE")
+        mock_db.scalar = AsyncMock(return_value=existing_alert)
+
+        await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
+
+        mock_db.delete.assert_not_called()
+        assert portfolio.alert_scope == "PER_ACCOUNT"
+        # 회귀 테스트: 승계된 행의 alert_scope 컬럼도 갱신되어야 get_alert_by_portfolio_and_account로
+        # 다시 조회 가능해진다 (컬럼을 안 바꾸면 AGGREGATE로 남아 이후 PER_ACCOUNT 조회에서 못 찾음).
+        assert existing_alert.alert_scope == "PER_ACCOUNT"
+
+    @pytest.mark.asyncio
+    async def test_to_per_account_deletes_existing_notify_alert(self, mock_db):
+        """기존 AGGREGATE 행이 NOTIFY라 account_id가 없으면(연결 계좌 밖 포함) 삭제한다."""
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
+        existing_alert = SimpleNamespace(account_id=None)
+        mock_db.scalar = AsyncMock(return_value=existing_alert)
+
+        await switch_alert_scope(mock_db, portfolio, "PER_ACCOUNT")
+
+        mock_db.delete.assert_awaited_once_with(existing_alert)
+        assert portfolio.alert_scope == "PER_ACCOUNT"
+
+    @pytest.mark.asyncio
+    async def test_to_aggregate_deletes_all_per_account_rows(self, mock_db):
+        from app.services.rebalancing_alert_service import switch_alert_scope
+
+        portfolio = _make_linked_portfolio("PER_ACCOUNT", [uuid.uuid4(), uuid.uuid4()])
+        row1, row2 = SimpleNamespace(id=uuid.uuid4()), SimpleNamespace(id=uuid.uuid4())
+        exec_result = MagicMock()
+        exec_result.scalars.return_value.all.return_value = [row1, row2]
+        mock_db.execute = AsyncMock(return_value=exec_result)
+
+        await switch_alert_scope(mock_db, portfolio, "AGGREGATE")
+
+        assert mock_db.delete.await_count == 2
+        assert portfolio.alert_scope == "AGGREGATE"
+        mock_db.commit.assert_awaited_once()

@@ -303,6 +303,84 @@ class TestRebalancingAlertExtended:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
         assert resp.status_code in (200, 201)
 
+    def test_upsert_rebalancing_alert_auto_mode_sets_aggregate_scope(self, override_settings):
+        """회귀 테스트: AGGREGATE 포트폴리오에서 AUTO 모드로 저장해도 alert_scope는 AGGREGATE로
+
+        저장되어야 한다. account_id(실행계좌)는 AUTO 모드면 NOT NULL이 되므로, 과거에는 이
+        NOT NULL 여부로 스코프를 판별해 저장 직후 재조회(GET)가 항상 404를 내는 버그가 있었다.
+        """
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        exec_account_id = uuid.uuid4()
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        exec_account = SimpleNamespace(id=exec_account_id, user_id=user.id, asset_type="STOCK_KIS")
+        now = datetime.now(UTC)
+        # 1st scalar: portfolio, 2nd: AUTO 실행계좌 검증, 3rd: get_alert_by_portfolio(기존 알림 없음)
+        db.scalar = AsyncMock(side_effect=[portfolio_orm, exec_account, None])
+
+        created_alert = {}
+
+        def _capture_add(obj):
+            created_alert["obj"] = obj
+
+        db.add = MagicMock(side_effect=_capture_add)
+
+        def _refresh(obj):
+            obj.id = uuid.uuid4()
+            obj.is_active = True
+            obj.last_triggered_at = None
+            obj.deposit_accounts = []
+            obj.created_at = now
+            obj.updated_at = now
+
+        db.refresh = AsyncMock(side_effect=_refresh)
+        app = _setup_app(user, db)
+        payload = {
+            "portfolio_id": str(portfolio_id),
+            "threshold_pct": 5.0,
+            "mode": "AUTO",
+            "account_id": str(exec_account_id),
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
+        assert resp.status_code in (200, 201)
+        assert created_alert["obj"].account_id == exec_account_id
+        assert created_alert["obj"].alert_scope == "AGGREGATE"
+
+    def test_upsert_rebalancing_alert_auto_to_notify_disables_auto_and_stays_gettable(self, override_settings):
+        """회귀 테스트: AGGREGATE+AUTO 알림을 NOTIFY로 전환(자동 리밸런싱 해제)해도
+
+        alert_scope는 AGGREGATE로 유지되고 account_id는 비워지며, 저장 직후 GET이 여전히
+        200으로 정상 조회되어야 한다 (스코프 드리프트로 알림이 사라진 것처럼 보이는 회귀 방지 —
+        as1의 잘못된 백필로 발견된 좀비 알림 버그와 같은 계열).
+        """
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        alert_orm = self._make_rebalancing_alert_orm(user.id, portfolio_id)
+        alert_orm.alert_scope = "AGGREGATE"
+        alert_orm.mode = "AUTO"
+        alert_orm.account_id = uuid.uuid4()
+
+        # PUT: 1st scalar portfolio, 2nd get_alert_by_portfolio(기존 알림)
+        # GET: 3rd scalar portfolio, 4th get_alert_by_portfolio(방금 수정된 알림)
+        db.scalar = AsyncMock(side_effect=[portfolio_orm, alert_orm, portfolio_orm, alert_orm])
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        payload = {"portfolio_id": str(portfolio_id), "threshold_pct": 5.0, "mode": "NOTIFY"}
+        with TestClient(app, raise_server_exceptions=False) as client:
+            put_resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
+            get_resp = client.get(f"/api/v1/alerts/rebalancing/{portfolio_id}")
+
+        assert put_resp.status_code in (200, 201)
+        assert alert_orm.mode == "NOTIFY"
+        assert alert_orm.account_id is None
+        assert alert_orm.alert_scope == "AGGREGATE"
+        assert get_resp.status_code == 200
+        assert get_resp.json()["mode"] == "NOTIFY"
+
     def test_upsert_rebalancing_alert_update_existing(self, override_settings):
         user = _make_user()
         db = _make_mock_db()

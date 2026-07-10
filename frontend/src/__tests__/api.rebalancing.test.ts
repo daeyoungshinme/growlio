@@ -89,6 +89,17 @@ describe("api/rebalancing", () => {
     expect(api.post).toHaveBeenCalledWith(
       "/rebalancing/portfolios/port-1/quick-execute",
       undefined,
+      { params: undefined },
+    );
+  });
+
+  it("quickExecuteRebalancing passes scope account_id as query param when given", async () => {
+    vi.mocked(api.post).mockResolvedValue({ data: [] });
+    await quickExecuteRebalancing("port-1", undefined, "acc-1");
+    expect(api.post).toHaveBeenCalledWith(
+      "/rebalancing/portfolios/port-1/quick-execute",
+      undefined,
+      { params: { account_id: "acc-1" } },
     );
   });
 

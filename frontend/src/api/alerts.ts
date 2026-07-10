@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
+import { getHttpStatus } from "@/utils/error";
 
 export interface ExchangeRateAlert {
   id: string;
@@ -51,6 +52,7 @@ export interface RebalancingAlert {
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
   notify_time: string;
+  buy_wait_minutes: number;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -70,12 +72,16 @@ export interface RebalancingAlertUpsert {
   market_condition_mode: MarketConditionMode;
   auto_execution_time: string | null;
   notify_time: string;
+  buy_wait_minutes: number;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");
 
-export const fetchRebalancingAlert = (portfolioId: string) =>
-  apiGet<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`);
+export const fetchRebalancingAlert = (portfolioId: string): Promise<RebalancingAlert | null> =>
+  apiGet<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}`).catch((e) => {
+    if (getHttpStatus(e) === 404) return null;
+    throw e;
+  });
 
 export const upsertRebalancingAlert = (
   portfolioId: string,
@@ -97,6 +103,37 @@ export interface TestAlertResult {
 
 export const sendTestRebalancingAlert = (portfolioId: string) =>
   apiPost<TestAlertResult>(`/alerts/rebalancing/${portfolioId}/test`, {});
+
+export type AlertScope = "AGGREGATE" | "PER_ACCOUNT";
+
+export const updateAlertScope = (portfolioId: string, alertScope: AlertScope) =>
+  apiPut<void>(`/alerts/rebalancing/${portfolioId}/scope`, { alert_scope: alertScope });
+
+// ── 계좌별 독립 리밸런싱 알림 (PER_ACCOUNT 스코프) ─────────────────────────
+
+export const fetchAccountRebalancingAlerts = (portfolioId: string) =>
+  apiGet<RebalancingAlert[]>(`/alerts/rebalancing/${portfolioId}/accounts`);
+
+export const fetchAccountRebalancingAlert = (portfolioId: string, accountId: string) =>
+  fetchAccountRebalancingAlerts(portfolioId).then(
+    (alerts) => alerts.find((a) => a.account_id === accountId) ?? null,
+  );
+
+export const upsertAccountRebalancingAlert = (
+  portfolioId: string,
+  accountId: string,
+  body: Omit<RebalancingAlertUpsert, "portfolio_id">,
+) =>
+  apiPut<RebalancingAlert>(`/alerts/rebalancing/${portfolioId}/accounts/${accountId}`, {
+    portfolio_id: portfolioId,
+    ...body,
+  });
+
+export const deleteAccountRebalancingAlert = (portfolioId: string, accountId: string) =>
+  apiDelete(`/alerts/rebalancing/${portfolioId}/accounts/${accountId}`);
+
+export const sendTestAccountRebalancingAlert = (portfolioId: string, accountId: string) =>
+  apiPost<TestAlertResult>(`/alerts/rebalancing/${portfolioId}/accounts/${accountId}/test`, {});
 
 // ── 주가 목표 알림 ──────────────────────────────────────────────────────────
 

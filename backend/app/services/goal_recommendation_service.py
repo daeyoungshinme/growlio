@@ -18,7 +18,6 @@ import structlog
 from dateutil.relativedelta import relativedelta
 
 from app.constants import DOMESTIC_MARKETS
-from app.models.portfolio import Portfolio
 from app.models.user import UserSettings
 from app.schemas.rebalancing import GoalRecommendation, GoalRecommendationItem
 from app.services.dividend_constants import is_korean_etf
@@ -30,7 +29,6 @@ from app.services.dividend_sync_sources import (
 from app.services.goal_return_solver import solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.price_service import get_historical_returns
-from app.services.rebalancing_service import _item_attr
 from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import to_yf_symbol
 from app.utils.cache_keys import RedisType
@@ -165,15 +163,6 @@ def _optimize_goal_portfolio(
     return items, expected_return, None
 
 
-def existing_items_from_portfolio(portfolio: Portfolio) -> list[tuple[str, str, str]]:
-    """포트폴리오의 목표 종목 중 CASH/KR_PROPERTY를 제외해 추천 후보 시드로 사용."""
-    return [
-        (str(_item_attr(i, "ticker")), str(_item_attr(i, "name")), str(_item_attr(i, "market")))
-        for i in portfolio.items
-        if str(_item_attr(i, "ticker")) != "CASH" and str(_item_attr(i, "market")) != "KR_PROPERTY"
-    ]
-
-
 def existing_items_from_positions(pos_map: dict[str, dict]) -> list[tuple[str, str, str]]:
     """전체 계좌 실제 보유 포지션(query_latest_position_map 결과)을 추천 후보 시드로 사용."""
     return [
@@ -223,9 +212,21 @@ async def get_goal_recommendation(
         )
 
     seen = {(t, m) for t, _, m in existing_items}
-    candidates = existing_items + [
-        (c["ticker"], c["name"], c["market"]) for c in RECOMMENDATION_UNIVERSE if (c["ticker"], c["market"]) not in seen
+    user_candidates = [
+        (c["ticker"], c["name"], c["market"])
+        for c in (getattr(settings_row, "goal_candidate_tickers", None) or [])
+        if (c["ticker"], c["market"]) not in seen
     ]
+    seen |= {(t, m) for t, _, m in user_candidates}
+    candidates = (
+        existing_items
+        + user_candidates
+        + [
+            (c["ticker"], c["name"], c["market"])
+            for c in RECOMMENDATION_UNIVERSE
+            if (c["ticker"], c["market"]) not in seen
+        ]
+    )
     tickers_only = [(t, m) for t, _, m in candidates]
 
     cagr_map, dividend_map = await asyncio.gather(

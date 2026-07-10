@@ -19,7 +19,12 @@ export const QUERY_KEYS = {
   stockPriceAlerts: ["stock-price-alerts"] as const,
   rebalancingAlerts: ["rebalancing-alerts"] as const,
   rebalancingAlert: (portfolioId: string) => ["rebalancing-alert", portfolioId] as const,
+  rebalancingAlertsByAccount: (portfolioId: string) =>
+    ["rebalancing-alert", portfolioId, "accounts"] as const,
+  rebalancingAlertByAccount: (portfolioId: string, accountId: string) =>
+    ["rebalancing-alert", portfolioId, "accounts", accountId] as const,
   rebalancingHistory: ["rebalancing-history"] as const,
+  rebalancingPlans: ["rebalancing-plans"] as const,
   taxSummary: (year: number) => ["tax-summary", year] as const,
   overseasPositionsTax: ["overseas-positions-tax"] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
@@ -31,6 +36,6 @@ export const QUERY_KEYS = {
   rebalancingStrategy: (portfolioId: string) => ["rebalancing-strategy", portfolioId] as const,
   driftSummary: ["drift-summary"] as const,
   compositeSignalStatus: ["composite-signal-status"] as const,
-  goalRecommendation: (portfolioId: string) => ["goal-recommendation", portfolioId] as const,
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
+  inflationSummary: ["inflation-summary"] as const,
 } as const;

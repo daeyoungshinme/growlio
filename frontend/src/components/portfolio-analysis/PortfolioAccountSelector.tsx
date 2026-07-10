@@ -50,7 +50,8 @@ export default function PortfolioAccountSelector({
       <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
         {isAllSelected
           ? "모든 주식 계좌가 리밸런싱 분석에 포함됩니다."
-          : `${selectedAccountIds.size}개 계좌만 분석에 포함됩니다.`}
+          : `${selectedAccountIds.size}개 계좌만 분석에 포함됩니다.`}{" "}
+        동일 계좌를 여러 포트폴리오에 동시에 포함할 수 있습니다.
       </p>
     </div>
   );

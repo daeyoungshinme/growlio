@@ -201,7 +201,7 @@ class RebalancingExecution(Base):
     portfolio_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="SET NULL"), nullable=True
     )
-    # MANUAL | AUTO | ONE_CLICK
+    # MANUAL | AUTO
     triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     # FULL | BUY_ONLY
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="FULL")

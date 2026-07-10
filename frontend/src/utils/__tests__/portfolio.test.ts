@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { groupPositionsByTicker } from "../portfolio";
+import { groupPositionsByTicker, mergeAlertsByPortfolio } from "../portfolio";
 import type { PortfolioPosition } from "@/types";
+import type { RebalancingAlert } from "@/api/alerts";
 
 function makePos(overrides: Partial<PortfolioPosition> = {}): PortfolioPosition {
   return {
@@ -93,5 +94,68 @@ describe("groupPositionsByTicker", () => {
     const positions = [makePos({ invested_krw: 0, pnl: 0 })];
     const result = groupPositionsByTicker(positions);
     expect(result[0].pnl_pct).toBe(0);
+  });
+});
+
+function makeAlert(overrides: Partial<RebalancingAlert> = {}): RebalancingAlert {
+  return {
+    id: "alert-1",
+    portfolio_id: "portfolio-1",
+    is_active: true,
+    threshold_pct: 5,
+    schedule_type: "DAILY",
+    schedule_day_of_week: null,
+    schedule_day_of_month: null,
+    trigger_condition: "SCHEDULE",
+    mode: "NOTIFY",
+    strategy: "FULL",
+    account_id: null,
+    order_type: "MARKET",
+    market_condition_mode: "IGNORE",
+    auto_execution_time: null,
+    notify_time: "08:30",
+    ...overrides,
+  } as RebalancingAlert;
+}
+
+describe("mergeAlertsByPortfolio", () => {
+  it("빈 배열이면 빈 객체 반환", () => {
+    expect(mergeAlertsByPortfolio([])).toEqual({});
+  });
+
+  it("포트폴리오별로 1개 행이면 그대로 반환", () => {
+    const alert = makeAlert({ portfolio_id: "p1", mode: "NOTIFY" });
+    const result = mergeAlertsByPortfolio([alert]);
+    expect(result["p1"].mode).toBe("NOTIFY");
+  });
+
+  it("같은 포트폴리오에 AUTO 계좌가 하나라도 있으면 병합 결과는 AUTO", () => {
+    const alerts = [
+      makeAlert({ id: "a1", portfolio_id: "p1", account_id: "acc-1", mode: "NOTIFY" }),
+      makeAlert({ id: "a2", portfolio_id: "p1", account_id: "acc-2", mode: "AUTO" }),
+    ];
+    const result = mergeAlertsByPortfolio(alerts);
+    expect(Object.keys(result)).toHaveLength(1);
+    expect(result["p1"].mode).toBe("AUTO");
+  });
+
+  it("모든 계좌가 NOTIFY면 병합 결과도 NOTIFY", () => {
+    const alerts = [
+      makeAlert({ id: "a1", portfolio_id: "p1", account_id: "acc-1", mode: "NOTIFY" }),
+      makeAlert({ id: "a2", portfolio_id: "p1", account_id: "acc-2", mode: "NOTIFY" }),
+    ];
+    const result = mergeAlertsByPortfolio(alerts);
+    expect(result["p1"].mode).toBe("NOTIFY");
+  });
+
+  it("서로 다른 포트폴리오는 각각 별도로 집계", () => {
+    const alerts = [
+      makeAlert({ id: "a1", portfolio_id: "p1", mode: "AUTO" }),
+      makeAlert({ id: "a2", portfolio_id: "p2", mode: "NOTIFY" }),
+    ];
+    const result = mergeAlertsByPortfolio(alerts);
+    expect(Object.keys(result)).toHaveLength(2);
+    expect(result["p1"].mode).toBe("AUTO");
+    expect(result["p2"].mode).toBe("NOTIFY");
   });
 });

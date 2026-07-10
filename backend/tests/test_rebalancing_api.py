@@ -306,9 +306,8 @@ class TestCompositeSignalStatus:
         user = _make_user()
         db = _make_mock_db()
         db.scalar = AsyncMock(return_value=SimpleNamespace(composite_signal_alerts_enabled=True))
-        active_alert = SimpleNamespace(portfolio_id=uuid.uuid4(), threshold_pct=5.0)
         execute_result = MagicMock()
-        execute_result.scalars.return_value.all.return_value = [active_alert]
+        execute_result.all.return_value = [(uuid.uuid4(), 5.0)]
         db.execute = AsyncMock(return_value=execute_result)
 
         app = _setup_app(user, db)

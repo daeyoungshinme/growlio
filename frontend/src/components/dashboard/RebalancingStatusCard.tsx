@@ -82,10 +82,10 @@ function PortfolioDriftRow({
               onClick?.(summary.portfolio_id, true);
             }}
             className="flex items-center gap-1 text-xs font-medium text-gray-400 hover:text-blue-600 dark:text-gray-500 dark:hover:text-blue-400 rounded-full px-1.5 py-0.5 shrink-0 transition-colors"
-            aria-label={`${summary.portfolio_name} 알림 설정하기`}
+            aria-label={`${summary.portfolio_name} 자동화 설정하기`}
           >
             <BellOff size={11} />
-            알림 설정
+            자동화 설정
           </button>
         )}
       </div>

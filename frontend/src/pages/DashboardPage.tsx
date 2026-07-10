@@ -7,6 +7,7 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
+import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -146,6 +147,10 @@ export default function DashboardPage() {
         </button>
       </div>
       <div className="space-y-6">
+        <ErrorBoundary variant="section">
+          <SetupTargetPortfolioBanner />
+        </ErrorBoundary>
+
         {/* Row 1: Hero Card — 자산 현황 */}
         <ErrorBoundary variant="section">
           <HeroSummaryCard

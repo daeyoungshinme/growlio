@@ -21,7 +21,8 @@ async def get_dca_analysis(
     db: AsyncSession = Depends(get_db),
 ):
     """적립식 투자 복리계산 및 월/년 목표달성율 분석."""
-    result = await dca_service.get_dca_analysis(current_user.id, db)
+    redis = await get_redis()
+    result = await dca_service.get_dca_analysis(current_user.id, db, redis)
     return result
 
 

@@ -175,7 +175,7 @@ describe("MonthlyAchievementTable", () => {
       },
     ];
     renderWithProviders(<MonthlyAchievementTable data={pastData} />);
-    expect(screen.getByText(/월별 달성율/)).toBeDefined();
+    expect(screen.getByText(/월별 계획 대비 달성율/)).toBeDefined();
   });
 });
 
@@ -204,7 +204,7 @@ describe("YearlyAchievementTable", () => {
       },
     ];
     renderWithProviders(<YearlyAchievementTable data={yearlyData} />);
-    expect(screen.getAllByText("연별 달성율").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("연별 계획 대비 달성율").length).toBeGreaterThan(0);
     expect(screen.getAllByText("2023년").length).toBeGreaterThan(0);
   });
 });

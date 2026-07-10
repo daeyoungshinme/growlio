@@ -23,6 +23,7 @@ const RegisterPage = lazy(() => import("./pages/RegisterPage"));
 const FindAccountPage = lazy(() => import("./pages/FindAccountPage"));
 const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage"));
 const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage"));
+const RebalancingPlanConfirmPage = lazy(() => import("./pages/RebalancingPlanConfirmPage"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AssetsPage = lazy(() => import("./pages/AssetsPage"));
 const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
@@ -49,6 +50,7 @@ function LazyRoute({ Component }: { Component: LazyExoticComponent<() => React.J
 function AppRoutes() {
   const isAuthChecking = useAuthStore((s) => s.isAuthChecking);
   const isPageLoading = useMainPageFetching();
+  usePushNotifications();
 
   return (
     <>
@@ -59,6 +61,10 @@ function AppRoutes() {
         <Route path="/find-account" element={<LazyRoute Component={FindAccountPage} />} />
         <Route path="/forgot-password" element={<LazyRoute Component={ForgotPasswordPage} />} />
         <Route path="/reset-password" element={<LazyRoute Component={ResetPasswordPage} />} />
+        <Route
+          path="/rebalancing/plan-confirm"
+          element={<LazyRoute Component={RebalancingPlanConfirmPage} />}
+        />
         <Route
           path="/"
           element={
@@ -88,7 +94,6 @@ export default function App() {
   const checkAuth = useAuthStore((s) => s.checkAuth);
   const logout = useAuthStore((s) => s.logout);
   const queryClient = useQueryClient();
-  usePushNotifications();
   useWidget();
 
   useEffect(() => {

@@ -64,7 +64,6 @@ __all__ = [  # noqa: F822
     "check_and_trigger_alerts",
     "check_and_trigger_stock_price_alerts",
     "check_rebalancing_alerts",
-    "execute_auto_rebalancing_for_alert",
     "send_test_rebalancing_alert",
     "build_rebalancing_orders",
     "refresh_live_prices",
@@ -82,7 +81,6 @@ def __getattr__(name: str):
         return check_and_trigger_stock_price_alerts
     if name in (
         "check_rebalancing_alerts",
-        "execute_auto_rebalancing_for_alert",
         "send_test_rebalancing_alert",
         "build_rebalancing_orders",
         "refresh_live_prices",

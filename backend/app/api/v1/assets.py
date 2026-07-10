@@ -419,7 +419,12 @@ async def batch_set_target_portfolio(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """여러 계좌의 목표 포트폴리오를 일괄 지정하거나 해제한다."""
+    """여러 계좌의 목표 포트폴리오를 일괄 지정하거나 해제한다.
+
+    target_portfolio_id는 계좌 1개당 1개만 가리키는 단순 UI 라벨이다 — 실제 리밸런싱 분석
+    대상 계좌 집합은 PortfolioAccount(M:N, Portfolio.account_ids)가 결정하며, 계좌 하나가
+    여러 포트폴리오의 account_ids에 동시에 포함될 수 있으므로 두 값은 서로 독립적이다.
+    """
     if not body.account_ids:
         return []
     accounts = await _list_accounts_by_ids(body.account_ids, current_user.id, db)

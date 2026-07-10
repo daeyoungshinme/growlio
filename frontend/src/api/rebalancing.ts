@@ -181,7 +181,7 @@ export const fetchBrokerBalance = (accountId: string): Promise<KisBalanceRespons
 export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
   apiGet<KisBalanceResponse[]>(`/rebalancing/broker-balance-all`);
 
-// ── 원클릭 실행 ──────────────────────────────────────────────
+// ── 지금 테스트 실행 (대기 플랜 생성 + 이메일 발송, AUTO와 동일 파이프라인) ──────────
 
 export interface QuickExecuteOverride {
   account_id?: string | null;
@@ -189,18 +189,31 @@ export interface QuickExecuteOverride {
   order_type?: "MARKET" | "LIMIT";
 }
 
+export interface QuickExecuteResult {
+  status: "PLAN_GENERATED" | "NO_DRIFT" | "ALREADY_PENDING" | "MARKET_BLOCKED";
+  message: string;
+  email_sent: boolean;
+  plan_id: string | null;
+  buy_count: number;
+  sell_count: number;
+}
+
 export const quickExecuteRebalancing = (
   portfolioId: string,
   override?: QuickExecuteOverride,
-): Promise<ExecutionResult[]> =>
-  apiPost<ExecutionResult[]>(`/rebalancing/portfolios/${portfolioId}/quick-execute`, override);
+  /** PER_ACCOUNT 스코프 포트폴리오는 어느 계좌 전용 알림 행을 실행할지 지정해야 한다. */
+  scopeAccountId?: string,
+): Promise<QuickExecuteResult> =>
+  apiPost<QuickExecuteResult>(`/rebalancing/portfolios/${portfolioId}/quick-execute`, override, {
+    params: scopeAccountId ? { account_id: scopeAccountId } : undefined,
+  });
 
 // ── 실행 이력 ──────────────────────────────────────────────
 
 export interface RebalancingExecutionSummary {
   id: string;
   portfolio_id: string | null;
-  triggered_by: "MANUAL" | "AUTO" | "ONE_CLICK";
+  triggered_by: "MANUAL" | "AUTO";
   strategy: "FULL" | "BUY_ONLY" | "TWO_PHASE";
   total_success: number;
   total_fail: number;
@@ -273,9 +286,6 @@ export interface GoalRecommendation {
   expected_dividend_yield_pct: number | null;
   note: string | null;
 }
-
-export const fetchGoalRecommendation = (portfolioId: string): Promise<GoalRecommendation> =>
-  apiGet<GoalRecommendation>(`/rebalancing/portfolios/${portfolioId}/goal-recommendation`);
 
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
   apiGet<GoalRecommendation>(`/rebalancing/goal-recommendation`);

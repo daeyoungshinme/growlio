@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
@@ -18,6 +18,8 @@ interface Props {
   accounts: AssetAccount[];
   alertThreshold?: number;
   onExecuted?: (results: ExecutionResult[]) => void;
+  /** 진단 탭에서 목표 포트폴리오에 추천 비중을 적용한 직후 마운트된 경우, 분석 결과가 준비되면 실행 모달을 자동으로 연다. */
+  autoOpenExecution?: boolean;
 }
 
 export default function RebalancingTable({
@@ -26,11 +28,20 @@ export default function RebalancingTable({
   accounts,
   alertThreshold,
   onExecuted,
+  autoOpenExecution,
 }: Props) {
   const kisAccounts = accounts.filter(
     (a) => a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM",
   );
   const [executionOpen, setExecutionOpen] = useState(false);
+
+  const autoOpenRef = useRef(autoOpenExecution);
+  useEffect(() => {
+    if (autoOpenRef.current && analysis) {
+      autoOpenRef.current = false;
+      setExecutionOpen(true);
+    }
+  }, [analysis]);
 
   const [now] = useState(() => Date.now());
   const minutesOld = (now - new Date(analysis.analyzed_at).getTime()) / 60000;

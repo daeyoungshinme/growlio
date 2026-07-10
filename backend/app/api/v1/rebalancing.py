@@ -44,7 +44,6 @@ from app.services.dividend_sync_sources import (
     sync_yahoo_dividend_info,
 )
 from app.services.goal_recommendation_service import (
-    existing_items_from_portfolio,
     existing_items_from_positions,
     get_goal_recommendation,
 )
@@ -59,7 +58,6 @@ from app.services.rebalancing_diagnosis_service import (
 from app.services.rebalancing_service import (
     _item_attr,
     analyze_rebalancing,
-    compute_base_value_krw,
     compute_portfolio_drift_summary,
 )
 from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
@@ -67,18 +65,17 @@ from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
 
+_DIVIDEND_FETCH_CONCURRENCY = 8  # yfinance 가격 조회와 별개 I/O이므로 더 높은 동시성 허용
+
 
 async def _collect_dividend_map(
     portfolio: Portfolio,
     base_dividend_map: dict,
 ) -> dict:
-    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Naver/Yahoo에서 보완한다.
-
-    배당 fetcher는 yfinance 가격 조회와 별개 I/O이므로 Semaphore(8)로 더 높은 동시성을 허용한다.
-    """
+    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Naver/Yahoo에서 보완한다."""
     dividend_map = dict(base_dividend_map)
     loop = asyncio.get_running_loop()
-    sem = asyncio.Semaphore(8)
+    sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
 
     async def _fetch_one(raw_item) -> None:
         ticker = str(_item_attr(raw_item, "ticker"))
@@ -246,33 +243,6 @@ async def analyze_portfolio(
         analysis.diagnosis_context = None
 
     return analysis
-
-
-@router.get("/portfolios/{portfolio_id}/goal-recommendation", response_model=GoalRecommendation)
-@limiter.limit("5/minute")
-async def get_goal_recommendation_endpoint(
-    request: Request,
-    portfolio_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
-):
-    """투자 목표를 역산해 목표 달성에 필요한 포트폴리오 비중을 추천한다 (자동 적용 아님)."""
-    portfolio = await db.scalar(
-        select(Portfolio)
-        .options(selectinload(Portfolio.linked_accounts), selectinload(Portfolio.items))
-        .where(Portfolio.id == portfolio_id, Portfolio.user_id == current_user.id)
-    )
-    if not portfolio:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
-
-    portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=portfolio_acct_ids)
-    settings_row = await get_settings_row(db, current_user.id)
-
-    base_krw = compute_base_value_krw(portfolio, overview)
-    existing_items = existing_items_from_portfolio(portfolio)
-    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row)
 
 
 @router.get("/goal-recommendation", response_model=GoalRecommendation)

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { screen, within, fireEvent, waitFor } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -14,6 +14,16 @@ vi.mock("@/api/rebalancing", () => ({
     reason: null,
     has_active_alert: true,
   }),
+}));
+
+const mockFetchRecentPlanLegs = vi.fn();
+const mockCancelPlanLeg = vi.fn();
+const mockApprovePlanLeg = vi.fn();
+
+vi.mock("@/api/rebalancingPlan", () => ({
+  fetchRecentPlanLegs: (...args: unknown[]) => mockFetchRecentPlanLegs(...args),
+  cancelPlanLeg: (...args: unknown[]) => mockCancelPlanLeg(...args),
+  approvePlanLeg: (...args: unknown[]) => mockApprovePlanLeg(...args),
 }));
 
 vi.mock("@/api/marketSignals", () => ({
@@ -31,6 +41,7 @@ vi.mock("@/hooks/useRebalancingExecution", () => ({
 import { SideBadge, StatusBadge } from "@/components/rebalancing/RebalancingBadges";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import MarketSignalBanner from "@/components/rebalancing/MarketSignalBanner";
+import InflationSummaryCard from "@/components/rebalancing/InflationSummaryCard";
 import { PriceCell } from "@/components/rebalancing/RebalancingPriceCell";
 import {
   DiffCell,
@@ -43,6 +54,7 @@ import {
 } from "@/components/rebalancing/RebalancingCells";
 import RebalancingHistoryTab from "@/components/rebalancing/RebalancingHistoryTab";
 import type { MarketSignalResponse } from "@/api/marketSignals";
+import type { InflationIndicatorSummary } from "@/api/economicIndicators";
 import type { RebalancingItem } from "@/api/rebalancing";
 
 // ------- SideBadge -------
@@ -191,6 +203,61 @@ describe("MarketSignalBanner", () => {
   it("labels the toggle row so it isn't a bare checkbox", async () => {
     renderBanner();
     expect(await screen.findByText("시장 위험 신호 알림 설정")).toBeDefined();
+  });
+});
+
+// ------- InflationSummaryCard -------
+const mockInflationSummary: InflationIndicatorSummary[] = [
+  {
+    code: "CPI_US",
+    name: "미국 CPI",
+    latest_value: 306.0,
+    latest_date: "2025-01-01",
+    mom_change_pct: 0.16,
+    yoy_change_pct: 2.0,
+    next_release_date: "2025-02-13",
+  },
+  {
+    code: "CORE_CPI_US",
+    name: "미국 Core CPI",
+    latest_value: 312.0,
+    latest_date: "2025-01-01",
+    mom_change_pct: 0.2,
+    yoy_change_pct: null,
+    next_release_date: null,
+  },
+];
+
+describe("InflationSummaryCard", () => {
+  it("renders the card title", () => {
+    render(<InflationSummaryCard data={mockInflationSummary} />);
+    expect(screen.getByText("물가 지표 (미국)")).toBeDefined();
+  });
+
+  it("renders each indicator name and YoY change", () => {
+    render(<InflationSummaryCard data={mockInflationSummary} />);
+    expect(screen.getByText("미국 CPI")).toBeDefined();
+    expect(screen.getByText("+2.0% (전년比)")).toBeDefined();
+  });
+
+  it("shows next release date when available", () => {
+    render(<InflationSummaryCard data={mockInflationSummary} />);
+    expect(screen.getByText("2월 13일 발표 예정")).toBeDefined();
+  });
+
+  it("falls back to a placeholder when release date is unknown", () => {
+    render(<InflationSummaryCard data={mockInflationSummary} />);
+    expect(screen.getByText("발표일 미정")).toBeDefined();
+  });
+
+  it("shows a placeholder dash when yoy change is null", () => {
+    render(<InflationSummaryCard data={mockInflationSummary} />);
+    expect(screen.getByText("— (전년比)")).toBeDefined();
+  });
+
+  it("renders nothing when data is empty", () => {
+    const { container } = render(<InflationSummaryCard data={[]} />);
+    expect(container.firstChild).toBeNull();
   });
 });
 
@@ -370,9 +437,92 @@ describe("CagrCard", () => {
 
 // ------- RebalancingHistoryTab -------
 describe("RebalancingHistoryTab", () => {
+  beforeEach(() => {
+    mockFetchRecentPlanLegs.mockReset();
+    mockCancelPlanLeg.mockReset();
+    mockApprovePlanLeg.mockReset();
+  });
+
   it("renders without crash", () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([]);
     renderWithProviders(<RebalancingHistoryTab />);
     // Shows loading or empty state
     expect(document.body).toBeDefined();
+  });
+
+  const buyLeg = {
+    plan_id: "plan-1",
+    leg_id: "leg-1",
+    portfolio_id: "portfolio-1",
+    portfolio_name: "성장 포트폴리오",
+    account_id: "account-1",
+    account_name: "증권계좌",
+    side: "BUY" as const,
+    status: "PENDING" as const,
+    deadline_at: new Date(Date.now() + 10 * 60_000).toISOString(),
+    decided_at: null,
+    execution_id: null,
+    error_message: null,
+    actionable: true,
+    items: [
+      {
+        ticker: "005930",
+        name: "삼성전자",
+        market: "KOSPI",
+        quantity: 5,
+        account_id: "account-1",
+        order_type: "MARKET" as const,
+        limit_price: null,
+        reference_price: 70000,
+      },
+    ],
+  };
+
+  it("expands a pending plan row to show item detail", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
+    renderWithProviders(<RebalancingHistoryTab />);
+
+    const toggle = await screen.findByText("매수 대기");
+    expect(screen.queryByText("70,000")).toBeNull();
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findAllByText(/삼성전자/)).not.toHaveLength(0);
+    expect(await screen.findAllByText("70,000")).not.toHaveLength(0);
+  });
+
+  it("shows a confirm modal before executing a pending buy leg, then calls approvePlanLeg", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
+    mockApprovePlanLeg.mockResolvedValue({
+      status: "EXECUTED",
+      message: "매수 주문이 실행되었습니다",
+    });
+    renderWithProviders(<RebalancingHistoryTab />);
+
+    const executeButton = await screen.findByText("지금 매수 실행");
+    fireEvent.click(executeButton);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/매수 1건을 실행하시겠습니까/)).toBeDefined();
+    expect(mockApprovePlanLeg).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByText("실행"));
+
+    await waitFor(() => expect(mockApprovePlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
+  });
+
+  it("cancels a pending buy leg immediately without a confirm modal", async () => {
+    mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
+    mockCancelPlanLeg.mockResolvedValue({
+      status: "CANCELED",
+      message: "매수 대기가 취소되었습니다",
+    });
+    renderWithProviders(<RebalancingHistoryTab />);
+
+    const cancelButton = await screen.findByText("매수 취소");
+    fireEvent.click(cancelButton);
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(mockCancelPlanLeg).toHaveBeenCalledWith("plan-1", "leg-1"));
   });
 });

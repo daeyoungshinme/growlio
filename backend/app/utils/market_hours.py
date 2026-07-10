@@ -23,6 +23,15 @@ def is_korean_market_open(now: datetime | None = None) -> bool:
     return _KRX_OPEN <= t.time() <= _KRX_CLOSE
 
 
+def korean_market_close_datetime(now: datetime | None = None) -> datetime:
+    """오늘(KST) KRX 정규장 마감 시각(15:30 KST)을 timezone-aware datetime으로 반환한다.
+
+    리밸런싱 매도 승인 만료 시각(당일 장마감) 계산에 사용한다.
+    """
+    t = (now or datetime.now(_KST)).astimezone(_KST)
+    return t.replace(hour=_KRX_CLOSE.hour, minute=_KRX_CLOSE.minute, second=0, microsecond=0)
+
+
 def is_us_market_open(now: datetime | None = None) -> bool:
     """NYSE/NASDAQ 정규 장 여부: 평일 09:30~16:00 ET (DST 자동 반영)."""
     t = (now or datetime.now(_EST)).astimezone(_EST)

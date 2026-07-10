@@ -74,6 +74,7 @@ export function invalidateRebalancingAlertData(qc: QueryClient, portfolioId: str
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlerts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlert(portfolioId) }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingAlertsByAccount(portfolioId) }),
   ]);
 }
 
@@ -82,10 +83,26 @@ export function invalidateRebalancingHistoryData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory });
 }
 
+/** 리밸런싱 대기 플랜 취소/승인 후 — 대기 플랜 목록 + 실행 이력(승인 시 새 이력 생성) */
+export function invalidateRebalancingPlanData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingPlans }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingHistory }),
+  ]);
+}
+
 /** 복합신호(시장/리스크) 알림 수신 여부 설정 변경 후 */
 export function invalidateCompositeSignalData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.compositeSignalStatus }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
+  ]);
+}
+
+/** 목표 역산 추천 후보 ETF 목록 변경 후 — 포트폴리오별/전체 추천 전부(접두사 매칭) + settings 무효화 */
+export function invalidateGoalCandidateData(qc: QueryClient) {
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: ["goal-recommendation"] }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),
   ]);
 }

@@ -58,6 +58,23 @@ class GoalUpdate(BaseModel):
         return v
 
 
+class GoalCandidateTicker(BaseModel):
+    ticker: str
+    name: str
+    market: str
+
+
+class GoalCandidateTickersUpdate(BaseModel):
+    tickers: list[GoalCandidateTicker]
+
+    @field_validator("tickers")
+    @classmethod
+    def validate_max_count(cls, v: list[GoalCandidateTicker]) -> list[GoalCandidateTicker]:
+        if len(v) > 10:
+            raise ValueError("후보 ETF는 최대 10개까지 등록할 수 있습니다")
+        return v
+
+
 class NotificationEmailUpdate(BaseModel):
     notification_email: EmailStr | None = None
 
@@ -113,6 +130,7 @@ class SettingsResponse(BaseModel):
     annual_dividend_goal: float | None = None
     fcm_token_stored: bool = False
     composite_signal_alerts_enabled: bool = True
+    goal_candidate_tickers: list[GoalCandidateTicker] = []
 
 
 @router.get("", response_model=SettingsResponse)
@@ -155,6 +173,7 @@ async def get_settings(
         annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal else None,
         fcm_token_stored=bool(row.fcm_token),
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
+        goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
     )
 
 
@@ -219,6 +238,21 @@ async def update_goal(
     redis = await get_redis()
     await invalidate_user_caches(redis, dashboard_summary_key(current_user.id))
     return {"detail": "목표가 저장되었습니다"}
+
+
+@router.put("/goal-candidate-tickers")
+@limiter.limit("20/minute")
+async def update_goal_candidate_tickers(
+    request: Request,
+    req: GoalCandidateTickersUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """목표 역산 추천에 사용할 사용자 등록 후보 ETF 목록 저장(전체 교체)."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.goal_candidate_tickers = [t.model_dump() for t in req.tickers]
+    await db.commit()
+    return {"detail": "후보 ETF 목록이 저장되었습니다"}
 
 
 @router.put("/notification-email")

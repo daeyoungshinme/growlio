@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -410,8 +410,9 @@ class TestGetDcaAnalysisConfigured:
         assert result["projection_months"] == []
 
     @pytest.mark.asyncio
-    async def test_configured_with_historical_actuals_no_current_month(self, mock_db, override_settings):
-        """이번 달 스냅샷 없고 과거 월 데이터 있을 때 최근 월 값 사용 (lines 78-79)."""
+    async def test_current_progress_pct_uses_unified_asset_total(self, mock_db, override_settings):
+        """current_progress_pct는 월별 스냅샷 CTE가 아니라 대시보드와 동일한
+        build_asset_totals(총자산) 값을 사용해야 두 화면의 진행율이 일치한다."""
         from types import SimpleNamespace
         from unittest.mock import MagicMock
 
@@ -424,13 +425,18 @@ class TestGetDcaAnalysisConfigured:
         )
         mock_db.scalar = AsyncMock(return_value=settings_obj)
 
-        past_row = SimpleNamespace(month="2024-01", total=12_000_000.0)
+        # 월별 스냅샷 CTE 쪽 데이터는 일부러 비워도(이번 달 미동기화 등) current_progress_pct에는
+        # 영향을 주지 않아야 함 — build_asset_totals가 유일한 소스여야 함.
         execute_result = MagicMock()
         execute_result.first.return_value = None
-        execute_result.all.return_value = [past_row]
+        execute_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=execute_result)
 
-        result = await get_dca_analysis(uuid.uuid4(), mock_db)
+        with patch(
+            "app.services.dca_service.build_asset_totals",
+            AsyncMock(return_value=(25_000_000.0, 0.0, 0.0, {})),
+        ):
+            result = await get_dca_analysis(uuid.uuid4(), mock_db)
 
         assert result["is_configured"] is True
-        assert isinstance(result["goal_timeline"], dict)
+        assert result["goal_timeline"]["current_progress_pct"] == 50.0

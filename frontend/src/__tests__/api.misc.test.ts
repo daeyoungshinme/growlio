@@ -24,7 +24,12 @@ vi.mock("@/api/client", () => {
 });
 
 import { api } from "@/api/client";
-import { fetchSettings, updateAutoDca, registerPushToken } from "@/api/settings";
+import {
+  fetchSettings,
+  updateAutoDca,
+  registerPushToken,
+  updateGoalCandidateTickers,
+} from "@/api/settings";
 import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
 import {
@@ -38,6 +43,7 @@ import {
 import { fetchMonthlyOptimization } from "@/api/dividends";
 import { fetchInsights } from "@/api/insights";
 import { fetchPortfolioRisk, fetchRebalancingStrategy } from "@/api/risk";
+import { fetchInflationSummary } from "@/api/economicIndicators";
 
 describe("api/settings", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -71,6 +77,13 @@ describe("api/settings", () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     await registerPushToken(null);
     expect(api.put).toHaveBeenCalledWith("/settings/push-token", { fcm_token: null });
+  });
+
+  it("updateGoalCandidateTickers calls PUT /settings/goal-candidate-tickers", async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+    const tickers = [{ ticker: "TLT", name: "iShares 20+ Year Treasury Bond ETF", market: "NYSE" }];
+    await updateGoalCandidateTickers(tickers);
+    expect(api.put).toHaveBeenCalledWith("/settings/goal-candidate-tickers", { tickers });
   });
 });
 
@@ -191,15 +204,25 @@ describe("api/risk", () => {
     expect(api.get).toHaveBeenCalledWith("/portfolio/risk");
   });
 
-  it("fetchPortfolioRisk calls GET /portfolio/risk/:id with portfolioId", async () => {
+  it("fetchPortfolioRisk calls GET /portfolio/risk with portfolio_id param when portfolioId given", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchPortfolioRisk("port-1");
-    expect(api.get).toHaveBeenCalledWith("/portfolio/risk/port-1");
+    expect(api.get).toHaveBeenCalledWith("/portfolio/risk", { params: { portfolio_id: "port-1" } });
   });
 
   it("fetchRebalancingStrategy calls GET /portfolio/rebalancing-strategy", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchRebalancingStrategy("port-1");
     expect(api.get).toHaveBeenCalledWith("/portfolio/rebalancing-strategy?portfolio_id=port-1");
+  });
+});
+
+describe("api/economicIndicators", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("fetchInflationSummary calls GET /economic-indicators/inflation-summary", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: [] });
+    await fetchInflationSummary();
+    expect(api.get).toHaveBeenCalledWith("/economic-indicators/inflation-summary");
   });
 });

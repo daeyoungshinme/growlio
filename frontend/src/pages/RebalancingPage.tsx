@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMarketSignal } from "@/api/marketSignals";
+import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -12,6 +13,7 @@ import { STALE_TIME } from "@/constants/queryConfig";
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
+const InflationSummaryCard = lazy(() => import("../components/rebalancing/InflationSummaryCard"));
 const GoalRecommendationCard = lazy(
   () => import("../components/rebalancing/GoalRecommendationCard"),
 );
@@ -67,7 +69,7 @@ export default function RebalancingPage() {
   );
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
-    (id: string, openAlert?: boolean) => {
+    (id: string, openAlert?: boolean, openExecution?: boolean) => {
       setLocalTab("포트폴리오");
       setSearchParams(
         (prev) => {
@@ -76,6 +78,9 @@ export default function RebalancingPage() {
           next.set("rtab", "포트폴리오");
           if (openAlert) {
             next.set("openAlert", "1");
+          }
+          if (openExecution) {
+            next.set("openExecution", "1");
           }
           return next;
         },
@@ -107,6 +112,13 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
+  const { data: inflationSummary } = useQuery({
+    queryKey: QUERY_KEYS.inflationSummary,
+    queryFn: fetchInflationSummary,
+    staleTime: STALE_TIME.LONG,
+    enabled: localTab === "진단",
+  });
+
   return (
     <div className="flex flex-col min-h-full gap-4">
       <div className="px-1">
@@ -124,7 +136,10 @@ export default function RebalancingPage() {
           <>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
-                <GoalRecommendationCard noTopMargin />
+                <GoalRecommendationCard
+                  noTopMargin
+                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
+                />
               </Suspense>
             </ErrorBoundary>
             <ErrorBoundary variant="section">
@@ -142,6 +157,13 @@ export default function RebalancingPage() {
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={1} />}>
                   <MarketSignalBanner signal={signal} />
+                </Suspense>
+              </ErrorBoundary>
+            )}
+            {inflationSummary && inflationSummary.length > 0 && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={1} />}>
+                  <InflationSummaryCard data={inflationSummary} />
                 </Suspense>
               </ErrorBoundary>
             )}

@@ -100,6 +100,7 @@ class TestGetSettings:
             auto_dca_last_executed_at=None,
             fcm_token=None,
             composite_signal_alerts_enabled=True,
+            goal_candidate_tickers=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -111,6 +112,7 @@ class TestGetSettings:
             data = resp.json()
             assert data["has_dart"] is True
             assert data["goal_amount"] == 100_000_000
+            assert data["goal_candidate_tickers"] == []
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
@@ -247,6 +249,66 @@ class TestUpdateCompositeSignalAlerts:
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/composite-signal-alerts", json={"enabled": True})
+        assert resp.status_code == 401
+
+
+class TestUpdateGoalCandidateTickers:
+    def test_put_goal_candidate_tickers_returns_200_and_saves_list(self, override_settings):
+        """목표 역산 추천용 사용자 등록 후보 ETF 목록을 저장한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(goal_candidate_tickers=None)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-candidate-tickers",
+                    json={
+                        "tickers": [{"ticker": "TLT", "name": "iShares 20+ Year Treasury Bond ETF", "market": "NYSE"}]
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.goal_candidate_tickers == [
+                {"ticker": "TLT", "name": "iShares 20+ Year Treasury Bond ETF", "market": "NYSE"}
+            ]
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_candidate_tickers_rejects_over_ten(self, override_settings):
+        """후보 ETF가 10개를 초과하면 422를 반환한다."""
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-candidate-tickers",
+                    json={"tickers": [{"ticker": f"T{i}", "name": f"ETF {i}", "market": "NYSE"} for i in range(11)]},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_candidate_tickers_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/goal-candidate-tickers", json={"tickers": []})
         assert resp.status_code == 401
 
 

@@ -1,4 +1,5 @@
-import { Cell, Pie, PieChart, Tooltip } from "recharts";
+import { memo } from "react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { PortfolioItem } from "@/api/portfolios";
 
 const PIE_COLORS = [
@@ -16,7 +17,7 @@ interface Props {
   items: PortfolioItem[];
 }
 
-export default function PortfolioWeightChart({ items }: Props) {
+function PortfolioWeightChart({ items }: Props) {
   const validItems = items.filter((i) => (Number(i.weight) || 0) > 0 && i.ticker);
   if (!validItems.length) return null;
 
@@ -35,36 +36,42 @@ export default function PortfolioWeightChart({ items }: Props) {
           단일 종목 비중 {maxWeight.toFixed(1)}% — 집중 투자 위험이 있습니다
         </div>
       )}
-      <PieChart width={130} height={130}>
-        <Pie
-          data={pieData}
-          cx={60}
-          cy={60}
-          innerRadius={38}
-          outerRadius={58}
-          paddingAngle={2}
-          dataKey="value"
-          startAngle={90}
-          endAngle={-270}
-        >
-          {pieData.map((_, i) => {
-            const isRemainder = remaining > 0.1 && i === pieData.length - 1;
-            return (
-              <Cell
-                key={i}
-                fill={isRemainder ? "#9CA3AF" : PIE_COLORS[i % PIE_COLORS.length]}
-                opacity={isRemainder ? 0.4 : 1}
-              />
-            );
-          })}
-        </Pie>
-        <Tooltip
-          formatter={(value: unknown, name: string) =>
-            typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name]
-          }
-          contentStyle={{ fontSize: 11, padding: "4px 8px", borderRadius: 6 }}
-        />
-      </PieChart>
+      <div className="w-full max-w-[180px]">
+        <ResponsiveContainer width="100%" aspect={1}>
+          <PieChart>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              innerRadius="58%"
+              outerRadius="89%"
+              paddingAngle={2}
+              dataKey="value"
+              startAngle={90}
+              endAngle={-270}
+            >
+              {pieData.map((_, i) => {
+                const isRemainder = remaining > 0.1 && i === pieData.length - 1;
+                return (
+                  <Cell
+                    key={i}
+                    fill={isRemainder ? "#9CA3AF" : PIE_COLORS[i % PIE_COLORS.length]}
+                    opacity={isRemainder ? 0.4 : 1}
+                  />
+                );
+              })}
+            </Pie>
+            <Tooltip
+              formatter={(value: unknown, name: string) =>
+                typeof value === "number" ? [`${value.toFixed(1)}%`, name] : ["-", name]
+              }
+              contentStyle={{ fontSize: 11, padding: "4px 8px", borderRadius: 6 }}
+            />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
+
+export default memo(PortfolioWeightChart);

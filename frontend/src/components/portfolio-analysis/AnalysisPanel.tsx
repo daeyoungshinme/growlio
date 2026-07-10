@@ -62,6 +62,7 @@ interface Props {
   onOpenAlertModal: (portfolioId: string) => void;
   autoAnalyzeId?: string;
   alertByPortfolioId: Record<string, RebalancingAlert>;
+  autoOpenExecution?: boolean;
 }
 
 export function AnalysisPanel({
@@ -72,6 +73,7 @@ export function AnalysisPanel({
   onOpenAlertModal,
   autoAnalyzeId,
   alertByPortfolioId,
+  autoOpenExecution,
 }: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
   const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
@@ -191,6 +193,7 @@ export function AnalysisPanel({
                   alertThreshold={
                     alertByPortfolioId[analysis.portfolio_id.toString()]?.threshold_pct
                   }
+                  autoOpenExecution={autoOpenExecution}
                 />
                 <RebalancingAccountSyncSection
                   accounts={analysisAccounts}

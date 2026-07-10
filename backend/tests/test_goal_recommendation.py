@@ -11,7 +11,6 @@ import pytest
 from app.services.goal_recommendation_service import (
     _months_until_year_end,
     _optimize_goal_portfolio,
-    existing_items_from_portfolio,
     existing_items_from_positions,
     get_goal_recommendation,
 )
@@ -97,17 +96,6 @@ class TestOptimizeGoalPortfolio:
 
 
 class TestExistingItemsHelpers:
-    def test_existing_items_from_portfolio_filters_cash_and_property(self):
-        portfolio = SimpleNamespace(
-            items=[
-                SimpleNamespace(ticker="SPY", name="SPDR S&P 500 ETF", market="NYSE"),
-                SimpleNamespace(ticker="CASH", name="현금", market="KRW"),
-                SimpleNamespace(ticker="APT1", name="아파트", market="KR_PROPERTY"),
-            ]
-        )
-        result = existing_items_from_portfolio(portfolio)
-        assert result == [("SPY", "SPDR S&P 500 ETF", "NYSE")]
-
     def test_existing_items_from_positions_filters_cash_and_property(self):
         pos_map = {
             "SPY-NYSE": {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "value_krw": 1000.0},
@@ -247,3 +235,72 @@ class TestGetGoalRecommendation:
         assert result.is_configured is True
         assert result.recommended_items == []
         assert result.note is not None
+
+    async def test_user_candidate_tickers_merged_into_universe(self):
+        """settings_row.goal_candidate_tickers에 등록된 티커가 후보 목록에 병합되어 조회 대상에 포함된다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[{"ticker": "TLT", "name": "iShares 20+ Year Treasury Bond ETF", "market": "NYSE"}],
+        )
+        cagr_map = {
+            ("TLT", "NYSE"): {"cagr_pct": 4.0},
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+        }
+        returns_map = {"TLT": [0.0002] * 252, "SPY": [0.0005] * 252}
+
+        get_historical_returns_mock = AsyncMock(return_value=cagr_map)
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                get_historical_returns_mock,
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            await get_goal_recommendation(None, 10_000_000.0, [], settings_row)
+
+        queried_tickers = get_historical_returns_mock.call_args.args[0]
+        assert ("TLT", "NYSE") in queried_tickers
+
+    async def test_user_candidate_ticker_deduped_against_existing_items(self):
+        """이미 existing_items에 있는 종목을 사용자가 후보로 다시 등록해도 중복되지 않는다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"}],
+        )
+        cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}}
+        returns_map = {"SPY": [0.0005] * 252}
+
+        get_historical_returns_mock = AsyncMock(return_value=cagr_map)
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                get_historical_returns_mock,
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            await get_goal_recommendation(None, 10_000_000.0, [("SPY", "SPDR S&P 500 ETF", "NYSE")], settings_row)
+
+        queried_tickers = get_historical_returns_mock.call_args.args[0]
+        assert queried_tickers.count(("SPY", "NYSE")) == 1

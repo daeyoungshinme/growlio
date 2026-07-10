@@ -15,6 +15,8 @@ from app.api.v1 import (
     portfolios,
     rebalancing,
     rebalancing_execution,
+    rebalancing_plan,
+    rebalancing_plan_public,
     settings,
     stocks,
     tax,
@@ -38,6 +40,8 @@ router.include_router(invest.router)
 router.include_router(backtest.router)
 router.include_router(rebalancing.router)
 router.include_router(rebalancing_execution.router)
+router.include_router(rebalancing_plan.router)
+router.include_router(rebalancing_plan_public.router)
 router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(ws_prices.router)

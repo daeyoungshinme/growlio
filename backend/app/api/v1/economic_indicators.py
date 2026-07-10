@@ -16,6 +16,7 @@ from app.services.economic_indicator_service import (
     _fred_get_observations,
     fetch_all_indicators,
     fetch_indicator_history,
+    fetch_inflation_summary,
     get_user_subscriptions,
     subscribe_indicator,
     unsubscribe_indicator,
@@ -65,6 +66,17 @@ async def list_indicators(
     for item in indicators:
         item["subscribed"] = item["code"] in subscriptions
     return indicators
+
+
+@router.get("/inflation-summary")
+@limiter.limit("30/minute")
+async def get_inflation_summary(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    """CPI·Core CPI 최신값과 전월/전년 대비 변화율, 다음 발표일을 요약해 반환한다 (리밸런싱 참고용)."""
+    redis = await get_redis()
+    return await fetch_inflation_summary(redis)
 
 
 @router.get("/calendar")

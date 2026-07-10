@@ -66,6 +66,8 @@ class Portfolio(Base):
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     # STOCK_ONLY | TOTAL_ASSETS — 리밸런싱 기준 자산 (백테스팅에서는 무시)
     base_type: Mapped[str] = mapped_column(String(20), nullable=False, default="STOCK_ONLY")
+    # AGGREGATE(연결 계좌 전체 합산 1개 알림) | PER_ACCOUNT(연결 계좌마다 독립 알림/AUTO 설정)
+    alert_scope: Mapped[str] = mapped_column(String(20), nullable=False, server_default="AGGREGATE")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   CartesianGrid,
   Line,
@@ -16,7 +17,7 @@ interface Props {
   data: DCAProjectionPoint[];
 }
 
-export default function DCAProjectionChart({ data }: Props) {
+function DCAProjectionChart({ data }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const today = new Date().toISOString().slice(0, 7);
   const pastPoints = data.filter((d) => d.month <= today);
@@ -143,3 +144,5 @@ export default function DCAProjectionChart({ data }: Props) {
     </div>
   );
 }
+
+export default memo(DCAProjectionChart);

@@ -120,10 +120,13 @@ async def _save_execution_history(
     total_success: int,
     total_fail: int,
     total_skipped: int,
-) -> None:
+) -> uuid.UUID | None:
     """실행 결과를 RebalancingExecution/RebalancingExecutionResult로 저장한다.
 
     저장 실패는 경고 로그만 남기고 삼킨다 — 이미 완료된 주문 실행 결과 자체는 영향받지 않아야 한다.
+    반환값(생성된 execution.id, 저장 실패 시 None)은 AUTO 실행 후 "방금 이 실행이 만든" 기록을
+    정확히 재조회하는 데 쓰인다 — "가장 최근 것"으로 재조회하면 같은 포트폴리오의 다른 실행(다른
+    계좌 등) 결과를 잘못 집어올 수 있다.
     """
     try:
         execution = RebalancingExecution(
@@ -159,8 +162,10 @@ async def _save_execution_history(
                 )
 
         await db.commit()
+        return execution.id
     except Exception as e:
         logger.warning("rebalancing_history_save_failed", user_id=str(user_id), error=str(e))
+        return None
 
 
 async def execute_rebalancing(
@@ -172,14 +177,14 @@ async def execute_rebalancing(
     portfolio_id: uuid.UUID | None = None,
     triggered_by: str = "MANUAL",
     strategy: str = "FULL",
-) -> list[ExecutionResult]:
+) -> tuple[list[ExecutionResult], uuid.UUID | None]:
     """선택된 리밸런싱 주문 항목을 KIS API를 통해 순차 실행한다.
 
     주문별 account_id로 계좌를 그룹화해 각 계좌별 독립 실행한다.
     account_id가 없는 주문은 인자로 전달된 account_id(기본 계좌)를 사용한다.
     매도 주문을 먼저 처리해 현금을 확보한 뒤 매수 주문을 실행한다.
     개별 주문 실패 시 나머지 주문은 계속 진행된다.
-    계좌별 ExecutionResult 목록을 반환하고 실행 이력을 DB에 저장한다.
+    (계좌별 ExecutionResult 목록, 저장된 실행 이력의 id)를 반환한다 — 실행 이력은 DB에 저장된다.
     """
     groups = _group_orders_by_account(orders, account_id)
     if not groups:
@@ -204,7 +209,7 @@ async def execute_rebalancing(
         skipped=total_skipped,
     )
 
-    await _save_execution_history(
+    execution_id = await _save_execution_history(
         db, user_id, portfolio_id, triggered_by, strategy, results, total_success, total_fail, total_skipped
     )
 
@@ -213,7 +218,7 @@ async def execute_rebalancing(
         await invalidate_rebalancing_strategy_cache(redis, user_id, portfolio_id)
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
-    return results
+    return results, execution_id
 
 
 async def _execute_kiwoom_account_orders(

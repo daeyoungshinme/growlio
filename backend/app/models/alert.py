@@ -11,8 +11,8 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
@@ -69,7 +69,12 @@ class RebalancingAlert(_AlertMixin, Base):
     mode: Mapped[str] = mapped_column(String(10), nullable=False, default="NOTIFY")
     # 자동 실행 전략: BUY_ONLY | FULL
     strategy: Mapped[str] = mapped_column(String(20), nullable=False, default="BUY_ONLY")
-    # AUTO 모드 실행 계좌 (KIS/키움)
+    # 이 알림 행 자체의 스코프. portfolio.alert_scope와 동기화되지만 별도 컬럼으로 저장한다 —
+    # account_id는 AGGREGATE 스코프에서도 AUTO 모드면 NOT NULL이 되므로(아래 참고),
+    # account_id의 NULL 여부로는 이 행이 AGGREGATE인지 PER_ACCOUNT인지 판별할 수 없다.
+    alert_scope: Mapped[str] = mapped_column(String(20), nullable=False, default="AGGREGATE")
+    # portfolio.alert_scope == AGGREGATE: AUTO 모드 실행 계좌(매수 주문 대상, 분석은 연결 계좌 전체 합산).
+    # portfolio.alert_scope == PER_ACCOUNT: 분석 스코프 + AUTO 실행 계좌(동일 계좌, 이 행이 그 계좌 전용).
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("asset_accounts.id", ondelete="SET NULL"), nullable=True
     )
@@ -81,13 +86,32 @@ class RebalancingAlert(_AlertMixin, Base):
     auto_execution_time: Mapped[str | None] = mapped_column(String(5), nullable=True)
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: Mapped[str] = mapped_column(String(5), nullable=False, server_default="08:30")
+    # AUTO 모드 매수 주문 대기시간(분) — 플랜 이메일 발송 후 이 시간 뒤 자동 실행(그 사이 취소 가능).
+    # 매도는 대기시간이 아닌 이메일 승인 필요(당일 장마감 미응답 시 자동 만료).
+    buy_wait_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
     __table_args__ = (
-        UniqueConstraint("user_id", "portfolio_id", name="uq_rebalancing_alert_user_portfolio"),
+        # plain UniqueConstraint는 NULL을 서로 다른 값으로 취급해 중복을 막지 못하므로,
+        # AGGREGATE / PER_ACCOUNT를 alert_scope 컬럼 기준 partial unique index로 분리해 보호한다.
+        Index(
+            "uq_rebalancing_alert_aggregate",
+            "user_id",
+            "portfolio_id",
+            unique=True,
+            postgresql_where=text("alert_scope = 'AGGREGATE'"),
+        ),
+        Index(
+            "uq_rebalancing_alert_per_account",
+            "user_id",
+            "portfolio_id",
+            "account_id",
+            unique=True,
+            postgresql_where=text("alert_scope = 'PER_ACCOUNT'"),
+        ),
         Index("idx_rebalancing_alerts_user_active", "user_id", "is_active"),
     )
 

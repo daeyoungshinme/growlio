@@ -69,6 +69,22 @@ def init_scheduler() -> None:
         id="rebalancing_auto_execution_intraday",
         replace_existing=True,
     )
+    from app.jobs.rebalancing_plan_buy_execution import run_rebalancing_plan_buy_execution
+
+    scheduler.add_job(
+        run_rebalancing_plan_buy_execution,
+        IntervalTrigger(minutes=1),
+        id="rebalancing_plan_buy_execution",
+        replace_existing=True,
+    )
+    from app.jobs.rebalancing_plan_sell_expiry import run_rebalancing_plan_sell_expiry
+
+    scheduler.add_job(
+        run_rebalancing_plan_sell_expiry,
+        CronTrigger(hour=15, minute=31, timezone="Asia/Seoul"),
+        id="rebalancing_plan_sell_expiry_daily",
+        replace_existing=True,
+    )
     from app.jobs.stock_price_alert import run_stock_price_alert_check
 
     scheduler.add_job(

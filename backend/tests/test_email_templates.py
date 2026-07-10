@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+from types import SimpleNamespace
+
 from app.services.email_templates import (
     exchange_rate_alert_template,
     market_signal_change_template,
     password_reset_template,
     rebalancing_alert_template,
+    rebalancing_plan_pending_template,
     stock_price_alert_template,
 )
 
@@ -137,6 +141,21 @@ class TestRebalancingAlertTemplate:
         )
         assert "이 알림은 매주 발송됩니다" in html
 
+    def test_no_app_link_renders_no_cta_button(self):
+        _, html = rebalancing_alert_template("P", 5.0, [], 0)
+        assert "앱에서 확인하기" not in html
+
+    def test_app_link_renders_cta_button(self):
+        _, html = rebalancing_alert_template(
+            portfolio_name="P",
+            threshold_pct=5.0,
+            items_to_show=[],
+            drifting_count=2,
+            app_link="https://app.growlio.example/rebalancing?rtab=%EC%A7%84%EB%8B%A8",
+        )
+        assert "앱에서 확인하기" in html
+        assert "https://app.growlio.example/rebalancing?rtab=%EC%A7%84%EB%8B%A8" in html
+
 
 class TestMarketSignalChangeTemplate:
     def test_returns_subject_and_html_tuple(self):
@@ -201,3 +220,65 @@ class TestPasswordResetTemplate:
     def test_subject_nonempty(self):
         subject, _ = password_reset_template("https://example.com/reset")
         assert len(subject) > 0
+
+
+class TestRebalancingPlanPendingTemplate:
+    """매수/매도 leg가 서로 독립적으로 존재할 수 있음(둘 중 하나만 있는 플랜도 유효) — 각 섹션은
+    해당 leg가 있을 때만 렌더링되어야 한다. buy leg가 없을 때 buy_deadline_at=None으로 인한
+    크래시가 없는지가 핵심 회귀 방지 포인트."""
+
+    def _item(self, ticker="005930"):
+        return SimpleNamespace(
+            ticker=ticker, name="삼성전자", market="KOSPI", quantity=5, order_type="MARKET", limit_price=None
+        )
+
+    def test_sell_only_plan_renders_without_buy_section(self):
+        subject, html = rebalancing_plan_pending_template(
+            portfolio_name="성장 포트폴리오",
+            account_name="증권계좌",
+            buy_items=[],
+            buy_deadline_at=None,
+            buy_cancel_link=None,
+            sell_items=[self._item()],
+            sell_deadline_at=datetime.now(UTC),
+            sell_action_link="https://growlio.app/rebalancing/plan-confirm?token=sell-token",
+        )
+
+        assert "매도" in subject
+        assert "매수" not in subject
+        assert "매수 주문" not in html
+        assert "매수 취소하기" not in html
+        assert "매도 확인하러 가기" in html
+
+    def test_buy_only_plan_renders_without_sell_section(self):
+        subject, html = rebalancing_plan_pending_template(
+            portfolio_name="성장 포트폴리오",
+            account_name=None,
+            buy_items=[self._item()],
+            buy_deadline_at=datetime.now(UTC),
+            buy_cancel_link="https://growlio.app/rebalancing/plan-confirm?token=buy-token",
+            sell_items=[],
+            sell_deadline_at=None,
+            sell_action_link=None,
+        )
+
+        assert "매수" in subject
+        assert "매도" not in subject
+        assert "매수 취소하기" in html
+        assert "매도 확인하러 가기" not in html
+
+    def test_both_legs_present_renders_both_sections(self):
+        subject, html = rebalancing_plan_pending_template(
+            portfolio_name="성장 포트폴리오",
+            account_name=None,
+            buy_items=[self._item("005930")],
+            buy_deadline_at=datetime.now(UTC),
+            buy_cancel_link="https://growlio.app/rebalancing/plan-confirm?token=buy-token",
+            sell_items=[self._item("000660")],
+            sell_deadline_at=datetime.now(UTC),
+            sell_action_link="https://growlio.app/rebalancing/plan-confirm?token=sell-token",
+        )
+
+        assert "매수/매도" in subject
+        assert "매수 취소하기" in html
+        assert "매도 확인하러 가기" in html

@@ -161,6 +161,17 @@ class QuickExecuteOverride(BaseModel):
     order_type: Literal["MARKET", "LIMIT"] | None = None
 
 
+class QuickExecuteResult(BaseModel):
+    """ "지금 테스트 실행" 결과 — AUTO와 동일하게 대기 플랜을 생성하고 이메일로 안내한다 (즉시 체결 아님)."""
+
+    status: Literal["PLAN_GENERATED", "NO_DRIFT", "ALREADY_PENDING", "MARKET_BLOCKED"]
+    message: str
+    email_sent: bool = False
+    plan_id: uuid.UUID | None = None
+    buy_count: int = 0
+    sell_count: int = 0
+
+
 class KisBalancePosition(BaseModel):
     ticker: str
     name: str
@@ -236,7 +247,7 @@ class PortfolioDriftSummary(BaseModel):
 class RebalancingExecutionSummary(BaseModel):
     id: uuid.UUID
     portfolio_id: uuid.UUID | None
-    triggered_by: str  # "MANUAL" | "AUTO" | "ONE_CLICK"
+    triggered_by: str  # "MANUAL" | "AUTO"
     strategy: str  # "FULL" | "BUY_ONLY" | "TWO_PHASE"
     total_success: int
     total_fail: int
@@ -269,6 +280,8 @@ class RebalancingAlertCreate(BaseModel):
     auto_execution_time: str | None = None
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: str = "08:30"
+    # AUTO 모드 매수 대기시간(분) — 플랜 이메일 발송 후 이 시간 뒤 자동 실행(취소 가능)
+    buy_wait_minutes: int = 10
 
     @field_validator("threshold_pct")
     @classmethod
@@ -317,6 +330,17 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("알림 시각은 00:00~23:59 범위여야 합니다")
         return f"{hour:02d}:{minute:02d}"
 
+    @field_validator("buy_wait_minutes")
+    @classmethod
+    def validate_buy_wait_minutes(cls, v: int) -> int:
+        if not (1 <= v <= 120):
+            raise ValueError("매수 대기시간은 1~120분 사이여야 합니다")
+        return v
+
+
+class AlertScopeUpdate(BaseModel):
+    alert_scope: Literal["AGGREGATE", "PER_ACCOUNT"]
+
 
 class TestAlertResponse(BaseModel):
     email_sent: bool
@@ -340,9 +364,59 @@ class RebalancingAlertResponse(BaseModel):
     market_condition_mode: str
     auto_execution_time: str | None
     notify_time: str
+    buy_wait_minutes: int
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime
+
+
+# ── 리밸런싱 대기 플랜 (AUTO 모드: 계획 생성 → 매수 대기/매도 승인) ──────────
+
+
+class RebalancingPlanItemOut(BaseModel):
+    ticker: str | None
+    name: str | None
+    market: str | None
+    quantity: int
+    account_id: str | None
+    order_type: str
+    limit_price: float | None
+    reference_price: float | None
+
+    model_config = {"from_attributes": True}
+
+
+class RebalancingPlanLegSummary(BaseModel):
+    plan_id: uuid.UUID
+    leg_id: uuid.UUID
+    portfolio_id: uuid.UUID | None
+    portfolio_name: str | None
+    account_id: uuid.UUID | None
+    account_name: str | None
+    side: Literal["BUY", "SELL"]
+    status: Literal["PENDING", "EXECUTED", "CANCELED", "REJECTED", "EXPIRED", "FAILED"]
+    deadline_at: datetime
+    decided_at: datetime | None
+    execution_id: uuid.UUID | None
+    error_message: str | None
+    actionable: bool  # status == PENDING and now < deadline_at
+    items: list[RebalancingPlanItemOut]
+
+
+class PlanActionResponse(BaseModel):
+    status: str
+    message: str
+
+
+class SellDecisionRequest(BaseModel):
+    decision: Literal["APPROVE", "REJECT"]
+
+
+class PlanTokenPreview(BaseModel):
+    valid: bool
+    reason: str | None = None  # "NOT_FOUND" | "ALREADY_DECIDED" | "EXPIRED"
+    actionable: bool = False
+    leg: RebalancingPlanLegSummary | None = None
 
 
 class GoalRecommendationItem(BaseModel):

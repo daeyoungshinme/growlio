@@ -12,11 +12,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
+from app.services.composition_calculator import build_asset_totals
+from app.utils.cache_keys import RedisType
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
 
 
-async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
+async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
     """DCA 복리 이론 곡선과 실제 자산을 비교한 분석 결과 반환."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
@@ -82,14 +84,12 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession) -> dict[str, An
     projection_months = _build_projection_curve(initial_value, pmt, r, start_date, total_months, monthly_actuals)
     yearly_achievements = _build_yearly_achievements(projection_months)
 
-    current_actual = monthly_actuals.get(_month_key(today))
-    if not current_actual and monthly_actuals:
-        # 이번 달 스냅샷이 없으면 최근 월 값 사용
-        latest_key = max(monthly_actuals.keys())
-        current_actual = monthly_actuals[latest_key]
+    # 대시보드 "자산 목표 달성률"과 동일한 소스(build_asset_totals)를 사용해
+    # 두 화면의 진행율이 항상 일치하도록 함 — 월별 스냅샷 CTE와는 별도 계산.
+    total_assets_krw, *_rest = await build_asset_totals(user_id, db, redis)
 
     goal_timeline = _calc_goal_timeline(
-        initial_value, pmt, r, goal_amount, current_actual or 0.0, start_date, months_to_goal
+        initial_value, pmt, r, goal_amount, total_assets_krw, start_date, months_to_goal
     )
 
     return {

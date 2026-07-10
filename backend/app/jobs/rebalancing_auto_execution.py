@@ -1,9 +1,10 @@
-"""리밸런싱 AUTO 실행 전용 Job — 장 중 5분 간격, 사용자 지정 시각에 실행."""
+"""리밸런싱 AUTO 플랜 생성 전용 Job — 장 중 5분 간격, 사용자 지정 시각에 계획을 생성한다.
+
+실제 주문 실행은 여기서 하지 않는다 — 매수는 rebalancing_plan_buy_execution.py(1분 간격)가
+대기시간 경과 후 실행하고, 매도는 사용자가 이메일 링크로 승인해야 실행된다.
+"""
 
 from __future__ import annotations
-
-import uuid
-from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy import select
@@ -11,13 +12,15 @@ from sqlalchemy.orm import selectinload
 
 from app.database import AsyncSessionLocal
 from app.models.alert import RebalancingAlert
-from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.alert_calculator import already_fired_today
-from app.services.alert_service import save_alert_history
-from app.services.email_service import send_rebalancing_execution_email
+from app.services.rebalancing_plan_service import (
+    build_pending_plan_for_alert,
+    has_pending_plan_for_alert,
+    notify_plan_generated,
+)
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
 from app.utils.metrics import alert_trigger_count
@@ -27,7 +30,7 @@ logger = structlog.get_logger()
 
 
 async def run_rebalancing_auto_execution() -> None:
-    """장 중 5분 간격 실행 — AUTO 모드 알림의 지정 시각에 리밸런싱을 자동 실행한다."""
+    """장 중 5분 간격 실행 — AUTO 모드 알림의 지정 시각에 리밸런싱 대기 플랜을 생성한다."""
     if not is_korean_market_open():
         return
 
@@ -65,133 +68,46 @@ async def _run_auto_execution() -> None:
         )
         rows = result.all()
 
-    triggered_count = 0
-    for alert, portfolio, _user_email, _notification_email, _fcm_token in rows:
-        if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
-            continue
-        if already_fired_today(alert):
-            continue
+        triggered_count = 0
+        for alert, portfolio, user_email, notification_email, fcm_token in rows:
+            if not is_alert_execution_time(getattr(alert, "auto_execution_time", None)):
+                continue
+            if already_fired_today(alert):
+                continue
 
-        # 시장 신호 게이트
-        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
-            market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
-        )
-        if blocked:
-            logger.info(
-                "rebalancing_auto_skipped_market_signal",
-                alert_id=str(alert.id),
-                composite_level=composite_level,
+            # 시장 신호 게이트 — 계획 생성 시점에만 확인한다(실행/승인 시점 재확인 안 함).
+            market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+            blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
+                market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
             )
-            continue
-
-        triggered = await _execute_for_alert(alert, portfolio)
-        if not triggered:
-            continue
-
-        # 실행 결과 조회 (알림 발송용)
-        exec_result: RebalancingExecution | None = None
-        async with AsyncSessionLocal() as db_exec:
-            exec_result = await db_exec.scalar(
-                select(RebalancingExecution)
-                .options(selectinload(RebalancingExecution.result_items))
-                .where(
-                    RebalancingExecution.user_id == alert.user_id,
-                    RebalancingExecution.portfolio_id == portfolio.id,
-                    RebalancingExecution.triggered_by == "AUTO",
+            if blocked:
+                logger.info(
+                    "rebalancing_auto_skipped_market_signal",
+                    alert_id=str(alert.id),
+                    composite_level=composite_level,
                 )
-                .order_by(RebalancingExecution.executed_at.desc())
-            )
+                continue
 
-        # 이메일 알림
-        _email = _notification_email or _user_email
-        if _email and exec_result:
+            # 이미 대기 중인 플랜이 있으면(취소/승인 대기) 중복 생성하지 않는다.
+            if await has_pending_plan_for_alert(alert.id, db):
+                continue
+
             try:
-                await send_rebalancing_execution_email(
-                    to_email=_email,
-                    portfolio_name=portfolio.name,
-                    executed_at=exec_result.executed_at,
-                    result_items=exec_result.result_items,
-                    total_success=exec_result.total_success,
-                    total_fail=exec_result.total_fail,
-                    total_skipped=exec_result.total_skipped,
-                )
+                generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level)
             except Exception as exc:
-                logger.error("rebalancing_auto_execution_email_failed", alert_id=str(alert.id), error=str(exc))
+                logger.error("rebalancing_auto_plan_generation_failed", alert_id=str(alert.id), error=str(exc))
+                continue
+            if generated is None:
+                continue
+            plan_obj, buy_token, sell_token = generated
 
-        # FCM 푸시 알림
-        if exec_result:
-            from app.services.push_service import send_push_to_user
-
-            success_n = exec_result.total_success
-            fail_n = exec_result.total_fail
-            push_body = f"{success_n}건 완료"
-            if fail_n:
-                push_body += f", {fail_n}건 실패"
-            try:
-                await send_push_to_user(
-                    user_id=alert.user_id,
-                    title=f"리밸런싱 자동 실행 완료 — {portfolio.name}",
-                    body=push_body,
-                    fcm_token=_fcm_token,
-                    data={"type": "REBALANCING_EXECUTED", "portfolio_id": str(portfolio.id)},
-                )
-            except Exception as exc:
-                logger.error("rebalancing_auto_execution_push_failed", alert_id=str(alert.id), error=str(exc))
-
-        async with AsyncSessionLocal() as db_save:
-            success_n = exec_result.total_success if exec_result else 0
-            fail_n = exec_result.total_fail if exec_result else 0
-            history_msg = (
-                f"리밸런싱 자동 실행: {portfolio.name} — "
-                f"성공 {success_n}건, 실패 {fail_n}건 [시장신호: {composite_level}]"
+            email = notification_email or user_email
+            await notify_plan_generated(
+                plan_obj, alert, portfolio, buy_token, sell_token, email, fcm_token, composite_level, db
             )
-            await save_alert_history(db_save, alert.user_id, "REBALANCING", history_msg)
-            # last_triggered_at 갱신
-            alert_row = await db_save.scalar(select(RebalancingAlert).where(RebalancingAlert.id == alert.id))
-            if alert_row:
-                alert_row.last_triggered_at = datetime.now(tz=UTC)
-            await db_save.commit()
+            triggered_count += 1
 
-        triggered_count += 1
-
-    if triggered_count:
-        alert_trigger_count.labels(alert_type="rebalancing_auto").inc(triggered_count)
-        logger.info("rebalancing_auto_executed", count=triggered_count)
-
-
-async def _execute_for_alert(
-    alert: RebalancingAlert,
-    portfolio: Portfolio,
-) -> bool:
-    """개별 알림에 대해 드리프트 분석 후 자동 실행한다."""
-    from app.services.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing_alert_service import execute_auto_rebalancing_for_alert
-    from app.services.rebalancing_service import analyze_rebalancing
-
-    saved_ids = getattr(portfolio, "account_ids", None)
-    effective_account_ids: list[uuid.UUID] | None = [uuid.UUID(aid) for aid in saved_ids] if saved_ids else None
-
-    async with AsyncSessionLocal() as db:
-        try:
-            overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
-        except Exception as exc:
-            logger.error("rebalancing_auto_overview_failed", alert_id=str(alert.id), error=str(exc))
-            return False
-
-        try:
-            analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
-        except Exception as exc:
-            logger.error("rebalancing_auto_analysis_failed", alert_id=str(alert.id), error=str(exc))
-            return False
-
-        threshold = float(alert.threshold_pct)
-        drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
-
-        if not drifting:
-            logger.info("rebalancing_auto_no_drift", alert_id=str(alert.id))
-            return False
-
-        return await execute_auto_rebalancing_for_alert(
-            alert, portfolio, drifting, db, ticker_account_map=analysis.ticker_account_map
-        )
+        if triggered_count:
+            await db.commit()
+            alert_trigger_count.labels(alert_type="rebalancing_auto").inc(triggered_count)
+            logger.info("rebalancing_auto_plan_generated", count=triggered_count)

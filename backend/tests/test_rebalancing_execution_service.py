@@ -433,7 +433,7 @@ class TestExecuteRebalancing:
             ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
-            results = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_redis)
+            results, _execution_id = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_redis)
 
         # 두 주문 모두 실행 시도됨
         assert call_count == 2
@@ -478,7 +478,9 @@ class TestExecuteRebalancing:
             ),
             patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
-            results = await execute_rebalancing(user_id, None, [valid_order, broken_order], mock_db, mock_redis)
+            results, _execution_id = await execute_rebalancing(
+                user_id, None, [valid_order, broken_order], mock_db, mock_redis
+            )
 
         assert len(results) == 2
         valid_result = next(r for r in results if r.account_id == str(valid_account.id))

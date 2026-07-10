@@ -112,6 +112,7 @@ function AllocationHistoryChart() {
                   tick={{ fontSize: 11, fill: isDark ? "#9CA3AF" : "#6B7280" }}
                   tickLine={false}
                   axisLine={false}
+                  interval="preserveStartEnd"
                 />
                 <YAxis
                   tickFormatter={(v: number) => fmtKrwShort(v)}
