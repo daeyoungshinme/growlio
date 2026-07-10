@@ -163,9 +163,9 @@ describe("InvestPlanPage", () => {
 
   it("shows loading state", async () => {
     vi.mocked(fetchDCAAnalysis).mockReturnValue(new Promise(() => {}));
-    renderPage();
+    const { container } = renderPage();
     await waitFor(() => {
-      expect(screen.getByText(/불러오는 중/)).toBeInTheDocument();
+      expect(container.querySelectorAll('[data-testid="skeleton-card"]').length).toBeGreaterThan(0);
     });
   });
 

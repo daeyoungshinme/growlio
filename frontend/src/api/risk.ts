@@ -63,10 +63,9 @@ export interface RebalancingStrategy {
 // ---------------------------------------------------------------------------
 
 export const fetchPortfolioRisk = (portfolioId?: string) =>
-  apiGet<PortfolioRiskMetrics>(
-    "/portfolio/risk",
-    portfolioId ? { params: { portfolio_id: portfolioId } } : undefined,
-  );
+  portfolioId
+    ? apiGet<PortfolioRiskMetrics>("/portfolio/risk", { params: { portfolio_id: portfolioId } })
+    : apiGet<PortfolioRiskMetrics>("/portfolio/risk");
 
 export const fetchRebalancingStrategy = (portfolioId: string) =>
   apiGet<RebalancingStrategy>(`/portfolio/rebalancing-strategy?portfolio_id=${portfolioId}`);

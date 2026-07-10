@@ -340,7 +340,7 @@ describe("InvestPlanPage", () => {
     expect(screen.getByText(/월 적립액, 목표 수익률/)).toBeInTheDocument();
   });
 
-  it("isLoading 상태에서 로딩 텍스트를 표시한다", async () => {
+  it("isLoading 상태에서 스켈레톤을 표시한다", async () => {
     const { useGoalSettings } = await import("@/hooks/useGoalSettings");
     vi.mocked(useGoalSettings).mockReturnValueOnce({
       data: undefined,
@@ -367,8 +367,9 @@ describe("InvestPlanPage", () => {
       openEdit: vi.fn(),
       saveSettings: vi.fn(),
     });
-    renderPage(<InvestPlanPage />);
-    expect(screen.getByText("불러오는 중…")).toBeInTheDocument();
+    const { container } = renderPage(<InvestPlanPage />);
+    expect(screen.queryByText("적립식 DCA 복리계산 및 배당 목표 관리")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
 });
 

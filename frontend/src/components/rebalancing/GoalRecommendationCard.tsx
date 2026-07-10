@@ -1,26 +1,19 @@
 import { useState } from "react";
-import { Loader2, Plus, Target, X } from "lucide-react";
+import { Loader2, Plus, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchOverallGoalRecommendation, type GoalRecommendationItem } from "@/api/rebalancing";
-import {
-  fetchSettings,
-  updateGoalCandidateTickers,
-  type GoalCandidateTicker,
-} from "@/api/settings";
+import { fetchSettings } from "@/api/settings";
 import { fetchPortfolios, updatePortfolio } from "@/api/portfolios";
 import { fetchAccounts } from "@/api/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
-import { useStockSearch } from "@/hooks/useStockSearch";
-import { invalidateGoalCandidateData, invalidatePortfolioData } from "@/utils/queryInvalidation";
+import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import { isStockAccount } from "@/utils/accounts";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import ConfirmModal from "@/components/common/ConfirmModal";
-
-const MAX_CANDIDATE_TICKERS = 10;
+import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 
 function normalizeWeights(items: GoalRecommendationItem[]) {
   const normalized = items.map((i) => ({ ...i, weight: Math.round(i.weight * 10) / 10 }));
@@ -84,45 +77,13 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
     targetPortfolios.find((p) => p.id === selectedTargetId) ?? targetPortfolios[0];
 
   const [managerOpen, setManagerOpen] = useState(false);
-  const [candidateQuery, setCandidateQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [pendingCandidates, setPendingCandidates] = useState<GoalCandidateTicker[] | null>(null);
-  const { suggestions, isSearching, search, clearSuggestions } = useStockSearch();
 
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
     queryFn: fetchSettings,
     staleTime: STALE_TIME.LONG,
   });
-
-  const savedCandidates = settingsData?.goal_candidate_tickers ?? [];
-  const candidates = pendingCandidates ?? savedCandidates;
-
-  const saveMutation = useMutation({
-    mutationFn: updateGoalCandidateTickers,
-    onSuccess: async () => {
-      toast("후보 ETF 목록이 저장되었습니다", "success");
-      setPendingCandidates(null);
-      await invalidateGoalCandidateData(queryClient);
-    },
-    onError: (e) => toast(extractErrorMessage(e), "error"),
-  });
-
-  const addCandidate = (s: { ticker: string; name: string; market: string }) => {
-    setCandidateQuery("");
-    clearSuggestions();
-    setShowSuggestions(false);
-    if (candidates.some((c) => c.ticker === s.ticker && c.market === s.market)) return;
-    if (candidates.length >= MAX_CANDIDATE_TICKERS) {
-      toast(`후보 ETF는 최대 ${MAX_CANDIDATE_TICKERS}개까지 등록할 수 있습니다`, "error");
-      return;
-    }
-    setPendingCandidates([...candidates, { ticker: s.ticker, name: s.name, market: s.market }]);
-  };
-
-  const removeCandidate = (ticker: string, market: string) => {
-    setPendingCandidates(candidates.filter((c) => !(c.ticker === ticker && c.market === market)));
-  };
+  const candidateCount = settingsData?.goal_candidate_tickers?.length ?? 0;
 
   if (!data || !data.is_configured || data.recommended_items.length === 0) return null;
 
@@ -211,112 +172,16 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
         <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50">
           <button
             type="button"
-            onClick={() => setManagerOpen((v) => !v)}
+            onClick={() => setManagerOpen(true)}
             className="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700"
           >
             <Plus size={12} />
-            후보 ETF 관리{candidates.length > 0 && ` (${candidates.length})`}
+            후보 ETF 관리{candidateCount > 0 && ` (${candidateCount})`}
           </button>
-
-          {managerOpen && (
-            <div className="mt-2 space-y-2">
-              {candidates.length > 0 && (
-                <ul className="flex flex-wrap gap-1.5">
-                  {candidates.map((c) => (
-                    <li
-                      key={`${c.ticker}-${c.market}`}
-                      className="flex items-center gap-1 text-xs bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-800/50 rounded-full pl-2 pr-1 py-0.5"
-                    >
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {c.name} <span className="text-gray-400">({c.ticker})</span>
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removeCandidate(c.ticker, c.market)}
-                        className="p-0.5 text-gray-400 hover:text-red-500 rounded-full"
-                        aria-label={`${c.name} 제거`}
-                      >
-                        <X size={10} />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              <div className="relative">
-                <input
-                  value={candidateQuery}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setCandidateQuery(v);
-                    setShowSuggestions(true);
-                    if (!v.trim()) {
-                      clearSuggestions();
-                      return;
-                    }
-                    search(v);
-                  }}
-                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                  onBlur={() =>
-                    setTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
-                  }
-                  placeholder="추가할 ETF 종목명 또는 코드 검색"
-                  className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                {isSearching && (
-                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                    검색 중...
-                  </span>
-                )}
-                {showSuggestions && suggestions.length > 0 && (
-                  <ul
-                    role="listbox"
-                    aria-label="ETF 검색 결과"
-                    className="absolute z-20 left-0 right-0 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg mt-0.5 max-h-40 overflow-y-auto"
-                  >
-                    {suggestions.map((s) => (
-                      <li
-                        key={`${s.ticker}-${s.market}`}
-                        role="option"
-                        aria-selected={false}
-                        tabIndex={0}
-                        className="px-2.5 py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950 cursor-pointer text-xs flex items-center gap-2 focus:bg-purple-50 dark:focus:bg-purple-950 focus:outline-none"
-                        onMouseDown={() => addCandidate(s)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            addCandidate(s);
-                          }
-                        }}
-                      >
-                        <span className="font-medium text-purple-700 dark:text-purple-400">
-                          {s.ticker}
-                        </span>
-                        <span className="text-gray-700 dark:text-gray-300">{s.name}</span>
-                        <span className="text-xs text-gray-400 ml-auto">{s.market}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {pendingCandidates !== null && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    disabled={saveMutation.isPending}
-                    onClick={() => saveMutation.mutate(candidates)}
-                    className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
-                  >
-                    {saveMutation.isPending && <Loader2 size={12} className="animate-spin" />}
-                    저장
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
+
+      {managerOpen && <GoalCandidateManagerModal onClose={() => setManagerOpen(false)} />}
 
       {confirmOpen && confirmTarget && (
         <ConfirmModal

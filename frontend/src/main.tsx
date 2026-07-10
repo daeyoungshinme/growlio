@@ -1,7 +1,10 @@
 import * as Sentry from "@sentry/react";
 import { QueryClient } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import {
+  PersistQueryClientProvider,
+  removeOldestQuery,
+} from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -38,6 +41,8 @@ const persister = createSyncStoragePersister({
   storage: typeof window !== "undefined" ? window.localStorage : undefined,
   key: PERSIST_CACHE_KEY,
   throttleTime: 2000,
+  // localStorage 용량 초과(QuotaExceededError) 시 가장 오래된 쿼리부터 제거하고 재시도
+  retry: removeOldestQuery,
 });
 
 const PERSIST_QUERY_KEYS = new Set(["dashboard", "portfolio-overview", "accounts", "dca-analysis"]);

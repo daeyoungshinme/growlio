@@ -82,6 +82,9 @@ export default function Modal({
         className={`bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl shadow-xl w-full ${SIZE_CLASSES[size]} max-h-[85dvh] flex flex-col overscroll-contain`}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="sm:hidden flex justify-center pt-2 pb-1 shrink-0" aria-hidden="true">
+          <div className="w-9 h-1 rounded-full bg-gray-300 dark:bg-gray-600" />
+        </div>
         {title != null && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 id={titleId} className="text-lg font-bold text-gray-900 dark:text-gray-50">

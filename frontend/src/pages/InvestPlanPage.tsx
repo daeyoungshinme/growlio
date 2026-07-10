@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { Settings2 } from "lucide-react";
+import { lazy, Suspense, useState } from "react";
+import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
@@ -27,6 +27,7 @@ type Tab = (typeof TABS)[number];
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
+  const [showAllStats, setShowAllStats] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
   const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
@@ -70,8 +71,10 @@ export default function InvestPlanPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-16 text-gray-400 dark:text-gray-500 text-sm">
-        불러오는 중…
+      <div className="space-y-6">
+        <SkeletonCard rows={2} height="h-6" />
+        <SkeletonCard rows={7} height="h-10" />
+        <SkeletonCard rows={5} height="h-5" />
       </div>
     );
   }
@@ -133,75 +136,80 @@ export default function InvestPlanPage() {
               적립 계획 설정
             </h2>
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">월 적립액</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {s?.monthly_deposit_amount ? (
-                    fmtKrw(s.monthly_deposit_amount)
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">목표 연수익률</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {s?.goal_annual_return_pct ? (
-                    `${s.goal_annual_return_pct}%`
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">목표 금액</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {s?.goal_amount ? (
-                    fmtKrw(s.goal_amount)
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">투자 시작일</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {s?.goal_start_date ?? (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">시작시점 자산</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {s?.goal_initial_amount ? (
-                    fmtKrw(s.goal_initial_amount)
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">스냅샷 자동</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">연간 입금 목표</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {settingsData?.annual_deposit_goal ? (
-                    fmtKrw(settingsData.annual_deposit_goal)
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500">은퇴 목표시점</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                  {settingsData?.retirement_target_year ? (
-                    `${settingsData.retirement_target_year}년`
-                  ) : (
-                    <span className="text-gray-300 dark:text-gray-600">미설정</span>
-                  )}
-                </p>
-              </div>
+              {(
+                [
+                  {
+                    label: "월 적립액",
+                    value: s?.monthly_deposit_amount ? fmtKrw(s.monthly_deposit_amount) : null,
+                    priority: true,
+                  },
+                  {
+                    label: "목표 연수익률",
+                    value: s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : null,
+                    priority: true,
+                  },
+                  {
+                    label: "목표 금액",
+                    value: s?.goal_amount ? fmtKrw(s.goal_amount) : null,
+                    priority: true,
+                  },
+                  {
+                    label: "연간 입금 목표",
+                    value: settingsData?.annual_deposit_goal
+                      ? fmtKrw(settingsData.annual_deposit_goal)
+                      : null,
+                    priority: true,
+                  },
+                  {
+                    label: "투자 시작일",
+                    value: s?.goal_start_date ?? null,
+                    priority: false,
+                  },
+                  {
+                    label: "시작시점 자산",
+                    value: s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : null,
+                    emptyLabel: "스냅샷 자동",
+                    priority: false,
+                  },
+                  {
+                    label: "은퇴 목표시점",
+                    value: settingsData?.retirement_target_year
+                      ? `${settingsData.retirement_target_year}년`
+                      : null,
+                    priority: false,
+                  },
+                ] as const
+              ).map((stat) => (
+                <div
+                  key={stat.label}
+                  className={stat.priority || showAllStats ? "" : "hidden sm:block"}
+                >
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
+                  <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+                    {stat.value ?? (
+                      <span className="text-gray-300 dark:text-gray-600">
+                        {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={() => setShowAllStats((v) => !v)}
+              className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
+            >
+              {showAllStats ? (
+                <>
+                  접기 <ChevronUp size={13} />
+                </>
+              ) : (
+                <>
+                  더보기 <ChevronDown size={13} />
+                </>
+              )}
+            </button>
             <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
               연간 입금 목표·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다. 자동 정기매수
               설정은 아래 설정 편집에서 변경할 수 있습니다.
