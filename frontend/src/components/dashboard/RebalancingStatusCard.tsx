@@ -148,8 +148,7 @@ interface Props {
   marketSignal?: MarketSignalResponse | null;
   onPortfolioSelect?: (id: string, openAlert?: boolean) => void;
   showAllInsights?: boolean;
-  hideSignalBanner?: boolean;
-  showSignalBadge?: boolean;
+  signalDisplay?: "none" | "badge" | "banner";
   showDriftRows?: boolean;
   maxDriftRows?: number;
 }
@@ -168,8 +167,7 @@ export default function RebalancingStatusCard({
   marketSignal,
   onPortfolioSelect,
   showAllInsights = false,
-  hideSignalBanner = false,
-  showSignalBadge = true,
+  signalDisplay = "banner",
   showDriftRows = false,
   maxDriftRows,
 }: Props) {
@@ -244,7 +242,7 @@ export default function RebalancingStatusCard({
           />
         </button>
         <div className="flex items-center gap-1.5 shrink-0">
-          {marketSignal && hideSignalBanner && showSignalBadge && (
+          {marketSignal && signalDisplay === "badge" && (
             <span
               className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
             >
@@ -266,7 +264,7 @@ export default function RebalancingStatusCard({
       {isOpen && (
         <>
           {/* 시장 신호 배너 */}
-          {marketSignal && !hideSignalBanner && (
+          {marketSignal && signalDisplay === "banner" && (
             <Link
               to="/rebalancing"
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}

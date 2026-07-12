@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 
@@ -42,6 +43,91 @@ class TestVerifySupabaseToken:
             mock_getter.return_value.get_signing_key_from_jwt.side_effect = RuntimeError("connection refused")
             with pytest.raises(ValueError, match="Token verification failed"):
                 verify_supabase_token("any.token.value")
+
+
+class TestVerifyPassword:
+    @pytest.mark.asyncio
+    async def test_returns_true_on_200(self, monkeypatch):
+        """Supabase password grant가 200을 반환하면 True."""
+        from app.services.auth_service import verify_password
+
+        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.config.settings.supabase_anon_key", "anon-key")
+
+        async def fake_post(self, url, params=None, headers=None, json=None, **kwargs):
+            assert params == {"grant_type": "password"}
+            assert headers["apikey"] == "anon-key"
+            return httpx.Response(200, request=httpx.Request("POST", url))
+
+        with patch("httpx.AsyncClient.post", new=fake_post):
+            assert await verify_password("user@example.com", "correct") is True
+
+    @pytest.mark.asyncio
+    async def test_returns_false_on_400(self, monkeypatch):
+        """잘못된 비밀번호면 Supabase가 400을 반환하고 False로 매핑된다."""
+        from app.services.auth_service import verify_password
+
+        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.config.settings.supabase_anon_key", "anon-key")
+
+        async def fake_post(self, url, **kwargs):
+            return httpx.Response(400, request=httpx.Request("POST", url))
+
+        with patch("httpx.AsyncClient.post", new=fake_post):
+            assert await verify_password("user@example.com", "wrong") is False
+
+    @pytest.mark.asyncio
+    async def test_raises_on_network_error(self, monkeypatch):
+        """네트워크 오류는 삼키지 않고 그대로 전파한다."""
+        from app.services.auth_service import verify_password
+
+        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+
+        with (
+            patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=httpx.ConnectError("refused"))),
+            pytest.raises(httpx.ConnectError),
+        ):
+            await verify_password("user@example.com", "pw")
+
+
+class TestDeleteSupabaseUser:
+    @pytest.mark.asyncio
+    async def test_calls_admin_api_with_service_role_key(self, monkeypatch):
+        """Supabase Admin API를 service role key로 호출한다."""
+        from app.services.auth_service import delete_supabase_user
+
+        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.config.settings.supabase_service_role_key", "service-role-key")
+
+        captured = {}
+
+        async def fake_delete(self, url, headers=None, **kwargs):
+            captured["url"] = url
+            captured["headers"] = headers
+            return httpx.Response(200, request=httpx.Request("DELETE", url))
+
+        with patch("httpx.AsyncClient.delete", new=fake_delete):
+            await delete_supabase_user("user-id-123")
+
+        assert captured["url"].endswith("/auth/v1/admin/users/user-id-123")
+        assert captured["headers"]["apikey"] == "service-role-key"
+        assert captured["headers"]["Authorization"] == "Bearer service-role-key"
+
+    @pytest.mark.asyncio
+    async def test_raises_on_error_status(self, monkeypatch):
+        """Admin API가 에러 상태를 반환하면 예외를 전파한다."""
+        from app.services.auth_service import delete_supabase_user
+
+        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+
+        async def fake_delete(self, url, **kwargs):
+            return httpx.Response(404, request=httpx.Request("DELETE", url))
+
+        with (
+            patch("httpx.AsyncClient.delete", new=fake_delete),
+            pytest.raises(httpx.HTTPStatusError),
+        ):
+            await delete_supabase_user("missing-user")
 
 
 class TestCredentialServiceGetKey:

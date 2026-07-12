@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Target } from "lucide-react";
+import { Loader2, Plus, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { fetchOverallGoalRecommendation, type GoalRecommendationItem } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
@@ -14,6 +14,7 @@ import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
+import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 
 function normalizeWeights(items: GoalRecommendationItem[]) {
   const normalized = items.map((i) => ({ ...i, weight: Math.round(i.weight * 10) / 10 }));
@@ -78,6 +79,7 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
     targetPortfolios.find((p) => p.id === selectedTargetId) ?? targetPortfolios[0];
 
   const [managerOpen, setManagerOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState(false);
 
   const { data: settingsData } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -116,7 +118,8 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
           <>
             <p className="text-xs text-gray-600 dark:text-gray-300">
               목표 달성에 필요한 연 수익률 {data.required_return_pct?.toFixed(1)}% — 아래 비중으로
-              조정하면 기대수익률 {data.expected_return_pct?.toFixed(1)}%
+              조정하면 기대수익률 {data.expected_return_pct?.toFixed(1)}% (최근{" "}
+              {data.cagr_lookback_years}년 CAGR 기준)
               {data.expected_dividend_yield_pct != null &&
                 ` (배당수익률 약 ${data.expected_dividend_yield_pct.toFixed(1)}%)`}
               를 기대할 수 있습니다.
@@ -137,6 +140,10 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
                 </li>
               ))}
             </ul>
+
+            {data.note && (
+              <p className="text-xs text-amber-600 dark:text-amber-500 pt-1">{data.note}</p>
+            )}
 
             <p className="text-xs text-purple-500 dark:text-purple-500 pt-1">
               등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
@@ -190,7 +197,7 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
           </p>
         )}
 
-        <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50">
+        <div className="pt-2 border-t border-purple-200 dark:border-purple-800/50 flex items-center gap-3">
           <button
             type="button"
             onClick={() => setManagerOpen(true)}
@@ -199,10 +206,19 @@ export default function GoalRecommendationCard({ noTopMargin = false, onApplied 
             <Plus size={12} />
             후보 ETF 관리{candidateCount > 0 && ` (${candidateCount})`}
           </button>
+          <button
+            type="button"
+            onClick={() => setOptionsOpen(true)}
+            className="flex items-center gap-1 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-700"
+          >
+            <Settings2 size={12} />
+            추천 설정
+          </button>
         </div>
       </div>
 
       {managerOpen && <GoalCandidateManagerModal onClose={() => setManagerOpen(false)} />}
+      {optionsOpen && <GoalRecommendationOptionsModal onClose={() => setOptionsOpen(false)} />}
 
       {confirmOpen && confirmTarget && (
         <ConfirmModal

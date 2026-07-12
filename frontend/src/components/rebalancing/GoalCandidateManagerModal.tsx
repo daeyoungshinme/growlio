@@ -10,13 +10,13 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "@/hooks/useStockSearch";
-import { invalidateGoalCandidateData } from "@/utils/queryInvalidation";
+import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
 
 // backend app/services/recommendation_universe.py의 MAX_GOAL_CANDIDATE_TICKERS와 동일하게 유지
-const MAX_CANDIDATE_TICKERS = 10;
+const MAX_CANDIDATE_TICKERS = 20;
 
 interface Props {
   onClose: () => void;
@@ -44,7 +44,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
     onSuccess: async () => {
       toast("후보 ETF 목록이 저장되었습니다", "success");
       setPendingCandidates(null);
-      await invalidateGoalCandidateData(queryClient);
+      await invalidateGoalRecommendationData(queryClient);
     },
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
@@ -67,7 +67,7 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
 
   return (
     <Modal onClose={onClose} title="후보 ETF 관리" size="sm">
-      <div className="p-4 space-y-3">
+      <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-3">
         <p className="text-xs text-gray-500 dark:text-gray-400">
           목표 달성 추천 비중 계산에 함께 고려할 ETF 후보를 등록합니다.
         </p>

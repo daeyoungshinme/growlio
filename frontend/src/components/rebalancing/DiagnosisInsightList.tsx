@@ -54,8 +54,13 @@ export default function DiagnosisInsightList({ context }: Props) {
                   key={`${item.ticker}-${item.market}`}
                   className="flex justify-between text-xs text-gray-400"
                 >
-                  <span>
+                  <span className="flex items-center gap-1">
                     {item.name} ({item.ticker})
+                    {item.is_tax_deferred && (
+                      <span className="px-1 py-px border border-purple-700 text-purple-400 rounded-full text-[10px] leading-tight">
+                        과세이연
+                      </span>
+                    )}
                   </span>
                   <span>
                     {item.excluded_reason ?? (

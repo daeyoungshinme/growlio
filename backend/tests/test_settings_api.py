@@ -101,6 +101,9 @@ class TestGetSettings:
             fcm_token=None,
             composite_signal_alerts_enabled=True,
             goal_candidate_tickers=None,
+            goal_risk_tolerance=None,
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -113,6 +116,10 @@ class TestGetSettings:
             assert data["has_dart"] is True
             assert data["goal_amount"] == 100_000_000
             assert data["goal_candidate_tickers"] == []
+            # 신규 추천 설정 컬럼이 NULL이면 기존 하드코딩 기본값과 동일하게 echo된다
+            assert data["goal_risk_tolerance"] == "CONSERVATIVE"
+            assert data["goal_max_weight_pct"] == 40.0
+            assert data["goal_cagr_lookback_years"] == 10
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
@@ -281,8 +288,8 @@ class TestUpdateGoalCandidateTickers:
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
-    def test_put_goal_candidate_tickers_rejects_over_ten(self, override_settings):
-        """후보 ETF가 10개를 초과하면 422를 반환한다."""
+    def test_put_goal_candidate_tickers_rejects_over_twenty(self, override_settings):
+        """후보 ETF가 20개를 초과하면 422를 반환한다."""
         user = _make_user()
         db = _make_mock_db()
 
@@ -291,7 +298,7 @@ class TestUpdateGoalCandidateTickers:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
                     "/api/v1/settings/goal-candidate-tickers",
-                    json={"tickers": [{"ticker": f"T{i}", "name": f"ETF {i}", "market": "NYSE"} for i in range(11)]},
+                    json={"tickers": [{"ticker": f"T{i}", "name": f"ETF {i}", "market": "NYSE"} for i in range(21)]},
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code == 422
@@ -309,6 +316,85 @@ class TestUpdateGoalCandidateTickers:
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/goal-candidate-tickers", json={"tickers": []})
+        assert resp.status_code == 401
+
+
+class TestUpdateGoalRecommendationOptions:
+    def test_put_goal_recommendation_options_returns_200_and_saves_fields(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(goal_risk_tolerance=None, goal_max_weight_pct=None, goal_cagr_lookback_years=None)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-recommendation-options",
+                    json={"risk_tolerance": "AGGRESSIVE", "max_weight_pct": 25.0, "cagr_lookback_years": 5},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.goal_risk_tolerance == "AGGRESSIVE"
+            assert settings.goal_max_weight_pct == 25.0
+            assert settings.goal_cagr_lookback_years == 5
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_recommendation_options_rejects_max_weight_out_of_range(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-recommendation-options",
+                    json={"risk_tolerance": "BALANCED", "max_weight_pct": 5.0, "cagr_lookback_years": 5},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_recommendation_options_rejects_invalid_lookback_years(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-recommendation-options",
+                    json={"risk_tolerance": "BALANCED", "max_weight_pct": 40.0, "cagr_lookback_years": 7},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_recommendation_options_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(
+                "/api/v1/settings/goal-recommendation-options",
+                json={"risk_tolerance": "CONSERVATIVE", "max_weight_pct": 40.0, "cagr_lookback_years": 10},
+            )
         assert resp.status_code == 401
 
 

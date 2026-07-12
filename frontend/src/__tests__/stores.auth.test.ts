@@ -10,6 +10,7 @@ vi.mock("@/lib/supabase", () => ({
       getSession: vi.fn(),
       resetPasswordForEmail: vi.fn(),
       updateUser: vi.fn(),
+      resend: vi.fn(),
     },
   },
 }));
@@ -364,5 +365,29 @@ describe("authStore — resetPassword", () => {
     } as never);
     const store = await getStore();
     await expect(store.resetPassword("badpass")).rejects.toThrow("update failed");
+  });
+});
+
+describe("authStore — resendConfirmationEmail", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("성공 시 에러를 던지지 않는다", async () => {
+    vi.mocked(supabase.auth.resend).mockResolvedValue({ data: {}, error: null } as never);
+    const store = await getStore();
+    await expect(store.resendConfirmationEmail("user@example.com")).resolves.not.toThrow();
+    expect(supabase.auth.resend).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "signup", email: "user@example.com" }),
+    );
+  });
+
+  it("supabase 오류 시 에러를 던진다", async () => {
+    vi.mocked(supabase.auth.resend).mockResolvedValue({
+      data: {},
+      error: new Error("rate limited"),
+    } as never);
+    const store = await getStore();
+    await expect(store.resendConfirmationEmail("user@example.com")).rejects.toThrow("rate limited");
   });
 });

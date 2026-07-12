@@ -605,6 +605,19 @@ def password_reset_template(reset_link: str) -> tuple[str, str]:
     return subject, html
 
 
+def account_deletion_template() -> tuple[str, str]:
+    subject = "[Growlio] 회원 탈퇴가 완료되었습니다"
+    body = (
+        "<p style='color:#374151;margin-top:16px;'>"
+        "요청하신 회원 탈퇴가 정상적으로 처리되었습니다.<br>"
+        "계좌·거래내역·포트폴리오·리밸런싱 이력 등 모든 데이터가 삭제되었습니다.</p>"
+        "<p style='color:#64748b;font-size:13px;margin-top:20px;'>"
+        "본인이 요청하지 않은 경우 즉시 고객센터로 문의해주세요.</p>"
+    )
+    html = _email_div("회원 탈퇴 완료", "#dc2626", body)
+    return subject, html
+
+
 def indicator_alert_template(indicators: list[dict]) -> tuple[str, str]:
     if len(indicators) > 1:
         subject = f"[Growlio] 경제지표 발표 알림 — {indicators[0]['name']} 외 {len(indicators) - 1}개"

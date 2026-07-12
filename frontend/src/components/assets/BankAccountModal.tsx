@@ -1,4 +1,5 @@
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
+import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
 import Modal from "@/components/common/Modal";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
@@ -16,12 +17,14 @@ interface Props {
 export default function BankAccountModal({ initialAccount, onClose, onSubmit, isLoading }: Props) {
   const isEdit = !!initialAccount;
 
-  const { form, set } = useForm({
+  const { form, set } = useForm<AssetAccountCreate>({
     name: initialAccount?.name ?? "",
     institution: initialAccount?.institution ?? "",
     asset_type: initialAccount?.asset_type ?? "BANK_ACCOUNT",
     notes: initialAccount?.notes ?? "",
     include_in_total: initialAccount?.include_in_total ?? true,
+    tax_type: initialAccount?.tax_type ?? "GENERAL",
+    investment_horizon: initialAccount?.investment_horizon ?? undefined,
   });
 
   const {
@@ -50,6 +53,8 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
       manual_amount: totalKrw > 0 ? totalKrw : undefined,
       notes: form.notes || undefined,
       include_in_total: form.include_in_total,
+      tax_type: form.tax_type,
+      investment_horizon: form.investment_horizon ?? null,
     });
   };
 
@@ -115,6 +120,54 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
               </select>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label
+                htmlFor="bank-tax-type"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                세제 유형
+              </label>
+              <select
+                id="bank-tax-type"
+                value={form.tax_type ?? "GENERAL"}
+                onChange={(e) => set("tax_type", e.target.value as AssetAccountCreate["tax_type"])}
+                className={`w-full ${INPUT_SM}`}
+              >
+                {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="bank-horizon"
+                className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                투자 기간
+              </label>
+              <select
+                id="bank-horizon"
+                value={form.investment_horizon ?? ""}
+                onChange={(e) =>
+                  set(
+                    "investment_horizon",
+                    (e.target.value || undefined) as AssetAccountCreate["investment_horizon"],
+                  )
+                }
+                className={`w-full ${INPUT_SM}`}
+              >
+                <option value="">미지정</option>
+                {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
               잔액

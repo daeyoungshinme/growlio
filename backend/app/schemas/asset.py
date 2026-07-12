@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.enums import AssetType, DataSource, TransactionType
+from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, TransactionType
 from app.models.asset import VALID_MARKETS
 
 
@@ -171,6 +171,8 @@ class AssetAccountCreate(BaseModel):
     sort_order: int = 0
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool = True
+    tax_type: AccountTaxType = AccountTaxType.GENERAL
+    investment_horizon: InvestmentHorizon | None = None
 
     @field_validator("deposit_krw", "deposit_usd")
     @classmethod
@@ -216,6 +218,8 @@ class AssetAccountUpdate(BaseModel):
     sort_order: int | None = None
     real_estate_details: RealEstateDetails | None = None
     include_in_total: bool | None = None
+    tax_type: AccountTaxType | None = None
+    investment_horizon: InvestmentHorizon | None = None
 
     @field_validator("manual_amount")
     @classmethod
@@ -252,6 +256,8 @@ class AssetAccountResponse(BaseModel):
     has_own_kis_credentials: bool = False  # KIS 계좌별 API 키 보유 여부
     has_own_kiwoom_credentials: bool = False  # 키움 계좌별 API 키 보유 여부
     target_portfolio_id: UUID | None = None
+    tax_type: AccountTaxType = AccountTaxType.GENERAL
+    investment_horizon: InvestmentHorizon | None = None
 
     model_config = {"from_attributes": True}
 

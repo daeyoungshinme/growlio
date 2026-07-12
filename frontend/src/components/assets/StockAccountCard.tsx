@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Settings, Trash2 } from "lucide-react";
-import { type AssetAccount } from "@/api/assets";
+import {
+  type AssetAccount,
+  ACCOUNT_TAX_TYPE_LABELS,
+  INVESTMENT_HORIZON_LABELS,
+} from "@/api/assets";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useHaptic } from "@/hooks/useHaptic";
 import { convertUsdToKrw, fmtKrw, fmtPct } from "@/utils/format";
@@ -88,6 +92,16 @@ export default function StockAccountCard({
             <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
               {typeLabel}
             </span>
+            {account.tax_type && account.tax_type !== "GENERAL" && (
+              <span className="px-1.5 py-px border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 text-xs rounded-full shrink-0">
+                {ACCOUNT_TAX_TYPE_LABELS[account.tax_type]}
+              </span>
+            )}
+            {account.investment_horizon && (
+              <span className="px-1.5 py-px border border-teal-300 dark:border-teal-700 text-teal-600 dark:text-teal-400 text-xs rounded-full shrink-0">
+                {INVESTMENT_HORIZON_LABELS[account.investment_horizon]}
+              </span>
+            )}
             {account.has_own_kis_credentials && (
               <span className="px-1.5 py-px border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 text-xs rounded-full shrink-0">
                 API 키

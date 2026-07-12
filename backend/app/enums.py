@@ -35,3 +35,23 @@ class PortfolioBaseType(StrEnum):
 class AlertDirection(StrEnum):
     ABOVE = "ABOVE"
     BELOW = "BELOW"
+
+
+class GoalRiskTolerance(StrEnum):
+    CONSERVATIVE = "CONSERVATIVE"
+    BALANCED = "BALANCED"
+    AGGRESSIVE = "AGGRESSIVE"
+
+
+class AccountTaxType(StrEnum):
+    GENERAL = "GENERAL"
+    ISA = "ISA"
+    PENSION_SAVINGS = "PENSION_SAVINGS"
+    IRP = "IRP"
+    OVERSEAS_DEDICATED = "OVERSEAS_DEDICATED"
+
+
+class InvestmentHorizon(StrEnum):
+    SHORT_TERM = "SHORT_TERM"
+    MID_TERM = "MID_TERM"
+    LONG_TERM = "LONG_TERM"

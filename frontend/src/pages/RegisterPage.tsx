@@ -12,12 +12,16 @@ export default function RegisterPage() {
   const [displayName, setDisplayName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
   const register = useAuthStore((s) => s.register);
+  const resendConfirmationEmail = useAuthStore((s) => s.resendConfirmationEmail);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setAwaitingConfirmation(false);
 
     if (password.length < 8) {
       setError("비밀번호는 8자 이상이어야 합니다");
@@ -40,7 +44,10 @@ export default function RegisterPage() {
       ) {
         setError("이미 사용 중인 이메일입니다");
       } else if (msg === "EMAIL_CONFIRMATION_REQUIRED") {
-        setError("가입 확인 이메일을 발송했습니다. 이메일의 인증 링크를 클릭한 후 로그인해주세요.");
+        setError(
+          "가입 확인 이메일을 발송했습니다. 이메일의 인증 링크를 클릭한 후 로그인해주세요. (메일함에 안 보이면 스팸함도 확인해주세요)",
+        );
+        setAwaitingConfirmation(true);
       } else if (
         msg.toLowerCase().includes("should not be too common") ||
         msg.toLowerCase().includes("data breach")
@@ -54,6 +61,18 @@ export default function RegisterPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setResendLoading(true);
+    try {
+      await resendConfirmationEmail(email);
+      toast("인증 메일을 다시 보냈습니다. 잠시 후 메일함(스팸함 포함)을 확인해주세요.", "success");
+    } catch {
+      toast("인증 메일 재발송에 실패했습니다. 잠시 후 다시 시도해주세요.", "error");
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -134,6 +153,16 @@ export default function RegisterPage() {
             />
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          {awaitingConfirmation && (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={resendLoading}
+              className="w-full text-sm text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+            >
+              {resendLoading ? "재발송 중..." : "인증 메일을 못 받으셨나요? 재발송"}
+            </button>
+          )}
           <button
             type="submit"
             disabled={loading}

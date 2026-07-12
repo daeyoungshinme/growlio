@@ -10,7 +10,7 @@ import {
   invalidateStockPriceAlertData,
   invalidateRebalancingAlertData,
   invalidateRebalancingHistoryData,
-  invalidateGoalCandidateData,
+  invalidateGoalRecommendationData,
 } from "../queryInvalidation";
 
 function makeQueryClient() {
@@ -124,10 +124,10 @@ describe("invalidateRebalancingHistoryData", () => {
   });
 });
 
-describe("invalidateGoalCandidateData", () => {
+describe("invalidateGoalRecommendationData", () => {
   it("goal-recommendation(접두사 매칭), settings 무효화", async () => {
     const qc = makeQueryClient();
-    await invalidateGoalCandidateData(qc as any);
+    await invalidateGoalRecommendationData(qc as any);
     const keys = qc.invalidateQueries.mock.calls.map((c) => c[0].queryKey[0]);
     expect(keys).toContain("goal-recommendation");
     expect(keys).toContain("settings");

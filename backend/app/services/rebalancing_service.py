@@ -275,6 +275,7 @@ def _build_ticker_account_map(overview: dict) -> dict[str, list[TickerAccountInf
         str(acc.get("id", acc.get("account_id", ""))): {
             "asset_type": acc.get("asset_type", "UNKNOWN"),
             "is_mock_mode": bool(acc.get("is_mock_mode", False)),
+            "tax_type": acc.get("tax_type", "GENERAL"),
         }
         for acc in overview.get("accounts", [])
     }
@@ -302,6 +303,7 @@ def _build_ticker_account_map(overview: dict) -> dict[str, list[TickerAccountInf
                 quantity=round(data["qty"], 4),
                 value_krw=round(data["val"], 0),
                 is_mock_mode=meta.get("is_mock_mode", False),
+                tax_type=meta.get("tax_type", "GENERAL"),
             )
         )
     return ticker_account_map

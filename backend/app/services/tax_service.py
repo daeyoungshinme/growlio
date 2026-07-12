@@ -15,6 +15,8 @@ from app.services._snapshot_queries import latest_snapshot_subquery
 _OVERSEAS_MARKETS = {"NYSE", "NASDAQ", "AMEX", "TSE", "HKEX", "SSE", "SGX", "LSE"}
 _DOMESTIC_MARKETS = {"KOSPI", "KOSDAQ", "KONEX"}
 _DOMESTIC_STOCK_TYPES = {"STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"}
+# ISA/연금저축/IRP는 계좌 내 매도 시 즉시 양도세가 발생하지 않는 과세이연 계좌
+_TAX_DEFERRED_TYPES = {"ISA", "PENSION_SAVINGS", "IRP"}
 
 _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
 _COMPREHENSIVE_TAX_THRESHOLD = 20_000_000
@@ -167,7 +169,9 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     )
     dividend_tax = dividend_income * rates["dividend"]
 
-    overseas_unrealized, domestic_stock_krw, domestic_unrealized = await _calc_stock_unrealized(user_id, db)
+    overseas_unrealized, domestic_stock_krw, domestic_unrealized, tax_deferred_value_krw = await _calc_stock_unrealized(
+        user_id, db
+    )
     overseas_gain_taxable = max(0.0, overseas_unrealized - rates["overseas_deduction"])
     overseas_tax_estimated = overseas_gain_taxable * rates["overseas_gain"]
 
@@ -193,9 +197,13 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
         "comprehensive_tax_warning": comprehensive_tax_warning,
         "total_estimated_tax_krw": round(dividend_tax + overseas_tax_estimated, 0),
         "total_fees_krw": round(total_fees, 0),
+        "tax_deferred_value_krw": round(tax_deferred_value_krw, 0),
         "harvesting_recommendations": harvesting,
         "financial_investment_tax_simulation": geumt_simulation,
-        "note": ("해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. 실제 납부액은 실현 손익 기준으로 계산됩니다."),
+        "note": (
+            "해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. 실제 납부액은 실현 손익 기준으로 계산됩니다. "
+            "ISA/연금저축/IRP 계좌 보유분은 과세이연되어 위 추정에서 제외되었습니다."
+        ),
         "rates": {
             "dividend_tax_rate_pct": rates["dividend"] * 100,
             "overseas_tax_rate_pct": rates["overseas_gain"] * 100,
@@ -226,6 +234,8 @@ async def get_overseas_positions_detail(user_id: uuid.UUID, db: AsyncSession) ->
 
     positions: list[dict] = []
     for snap, acc in rows:
+        if acc.tax_type in _TAX_DEFERRED_TYPES:
+            continue
         for pos in snap.position_items:
             if pos.market not in _OVERSEAS_MARKETS:
                 continue
@@ -316,10 +326,13 @@ async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession)
     return float(total) if total else 0.0
 
 
-async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[float, float, float]:
+async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[float, float, float, float]:
     """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
 
-    Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw)
+    ISA/연금저축/IRP(과세이연) 계좌 보유분은 국내/해외 미실현손익 합산에서 제외하고
+    tax_deferred_value_krw로 별도 집계한다.
+
+    Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
     """
     subq = latest_snapshot_subquery(user_id=user_id)
     result = await db.execute(
@@ -341,13 +354,19 @@ async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[
     overseas_invested = 0.0
     domestic_value = 0.0
     domestic_invested = 0.0
+    tax_deferred_value = 0.0
 
-    for snap, _acc in rows:
+    for snap, acc in rows:
+        is_tax_deferred = acc.tax_type in _TAX_DEFERRED_TYPES
         for pos in snap.position_items:
             market = pos.market
             qty = float(pos.qty or 0)
             avg = float(pos.avg_price or 0)
             cur = float(pos.current_price or avg)
+
+            if is_tax_deferred:
+                tax_deferred_value += cur * qty
+                continue
 
             if market in _OVERSEAS_MARKETS:
                 overseas_value += cur * qty
@@ -358,4 +377,4 @@ async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[
 
     overseas_unrealized = overseas_value - overseas_invested
     domestic_unrealized = domestic_value - domestic_invested
-    return overseas_unrealized, domestic_value, domestic_unrealized
+    return overseas_unrealized, domestic_value, domestic_unrealized, tax_deferred_value

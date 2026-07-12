@@ -947,7 +947,7 @@ def _make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, 
     return SimpleNamespace(**defaults)
 
 
-def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_name="계좌"):
+def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_name="계좌", tax_type="GENERAL"):
     from app.schemas.rebalancing import TickerAccountInfo
 
     return TickerAccountInfo(
@@ -956,6 +956,7 @@ def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_n
         asset_type=asset_type,
         quantity=quantity,
         value_krw=quantity * 70000.0,
+        tax_type=tax_type,
     )
 
 
@@ -1034,6 +1035,26 @@ class TestBuildSellOrders:
         assert len(orders) == 1
         assert orders[0].account_id == str(acc_kis)
 
+    def test_tax_deferred_account_sold_last_even_with_larger_quantity(self):
+        """ISA/연금 계좌는 보유수량이 더 많아도 일반계좌를 먼저 소진한 뒤에만 매도한다."""
+        from app.services.rebalancing_order_builder import _build_sell_orders
+
+        acc_general = uuid.uuid4()
+        acc_isa = uuid.uuid4()
+        item = _make_drift_item()
+        ticker_account_map = {
+            "005930": [
+                _make_ticker_account(acc_isa, quantity=100, tax_type="ISA"),
+                _make_ticker_account(acc_general, quantity=5, tax_type="GENERAL"),
+            ]
+        }
+
+        orders = _build_sell_orders(item, 5, ticker_account_map, "MARKET", None)
+
+        assert len(orders) == 1
+        assert orders[0].account_id == str(acc_general)
+        assert orders[0].quantity == 5
+
 
 class TestBuildRebalancingOrders:
     """공용 build_rebalancing_orders() — AUTO 실행과 quick-execute가 공유하는 주문 생성 로직."""
@@ -1104,6 +1125,39 @@ class TestBuildRebalancingOrders:
         assert orders[0].limit_price is None
         assert orders[0].reference_price == 50000.0
 
+    def test_overseas_buy_into_tax_deferred_account_skipped(self):
+        """ISA/연금저축/IRP 계좌로는 해외 개별 종목 매수 주문을 생성하지 않는다(실행 불가능한 주문 방지)."""
+        from app.services.rebalancing_alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(
+                ticker="AAPL", market="NASDAQ", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0
+            )
+        ]
+        # buy_account가 ISA 계좌라는 사실은 ticker_account_map에 등장하는 다른 보유 종목을 통해 알 수 있다.
+        ticker_account_map = {"005930": [_make_ticker_account(buy_account, quantity=1, tax_type="ISA")]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "FULL", "MARKET", str(buy_account))
+
+        assert orders == []
+
+    def test_domestic_buy_into_tax_deferred_account_allowed(self):
+        from app.services.rebalancing_alert_service import build_rebalancing_orders
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(
+                ticker="005930", market="KOSPI", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0
+            )
+        ]
+        ticker_account_map = {"005930": [_make_ticker_account(buy_account, quantity=1, tax_type="ISA")]}
+
+        orders = build_rebalancing_orders(drifting, ticker_account_map, "FULL", "MARKET", str(buy_account))
+
+        assert len(orders) == 1
+        assert orders[0].side == "BUY"
+
     def test_sell_orders_carry_reference_price(self):
         from app.services.rebalancing_alert_service import build_rebalancing_orders
 
@@ -1118,6 +1172,50 @@ class TestBuildRebalancingOrders:
         sell = next(o for o in orders if o.side == "SELL")
         assert sell.limit_price == 70000.0
         assert sell.reference_price == 70000.0
+
+
+class TestRecommendDriftThresholdPct:
+    """recommend_drift_threshold_pct() — PER_ACCOUNT 알림 생성 시 계좌 유형 기반 임계값 추천."""
+
+    def test_general_mid_term_returns_base_default(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("GENERAL", "MID_TERM") == 5.0
+
+    def test_tax_deferred_types_widen_threshold(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        for tax_type in ("ISA", "PENSION_SAVINGS", "IRP"):
+            assert recommend_drift_threshold_pct(tax_type, "MID_TERM") == 7.0
+
+    def test_overseas_dedicated_widens_less_than_tax_deferred(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("OVERSEAS_DEDICATED", "MID_TERM") == 6.5
+
+    def test_short_term_narrows_and_long_term_widens(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") == 3.5
+        assert recommend_drift_threshold_pct("GENERAL", "LONG_TERM") == 6.5
+
+    def test_combined_axis_stacks_adjustment(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("ISA", "LONG_TERM") == 8.5
+        assert recommend_drift_threshold_pct("ISA", "SHORT_TERM") == 5.5
+
+    def test_clamped_to_min_and_max_bounds(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") >= 1.0
+        assert recommend_drift_threshold_pct("ISA", "LONG_TERM") <= 20.0
+
+    def test_unknown_tax_type_or_horizon_falls_back_to_general_defaults(self):
+        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+
+        assert recommend_drift_threshold_pct("UNKNOWN", "MID_TERM") == 5.0
+        assert recommend_drift_threshold_pct("GENERAL", "UNKNOWN") == 5.0
 
 
 class TestRefreshLivePrices:

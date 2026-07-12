@@ -14,6 +14,8 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES
+
 logger = structlog.get_logger()
 
 _BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
@@ -38,7 +40,8 @@ def _build_sell_orders(
     holders = [
         a for a in ticker_account_map.get(item.ticker, []) if a.asset_type in _BROKER_ASSET_TYPES and a.quantity > 0
     ]
-    holders.sort(key=lambda a: a.quantity, reverse=True)
+    # 과세이연 계좌(ISA/연금저축/IRP)는 최후순위로 매도해 절세 혜택을 보호한다 — 일반/해외전용 계좌를 먼저 소진.
+    holders.sort(key=lambda a: (a.tax_type in _TAX_DEFERRED_TYPES, -a.quantity))
 
     orders: list[Any] = []
     remaining = qty
@@ -113,6 +116,60 @@ async def refresh_live_prices(
                 item.shares_to_trade = target_qty - (item.current_qty or 0)
 
 
+def is_market_signal_blocking_auto_mode(market_condition_mode: str, composite_level: str) -> bool:
+    """AUTO 모드에서 시장 신호 등급이 `market_condition_mode` 게이트를 위반하는지 판정한다.
+
+    드리프트 알림 체크(`rebalancing_alert_service.py`)와 AUTO 플랜 생성 job
+    (`jobs/rebalancing_auto_execution.py`)이 동일한 판정 로직을 각각 인라인 구현하던 것을
+    단일화한 순수 함수 — 로깅은 각 호출부 책임으로 남긴다.
+    """
+    return (market_condition_mode == "CAUTIOUS" and composite_level == "RED") or (
+        market_condition_mode == "STRICT" and composite_level in ("YELLOW", "RED")
+    )
+
+
+_HORIZON_THRESHOLD_ADJUSTMENT = {
+    "SHORT_TERM": -1.5,
+    "MID_TERM": 0.0,
+    "LONG_TERM": 1.5,
+}
+_TAX_TYPE_BASE_THRESHOLD_PCT = {
+    "GENERAL": 5.0,
+    "ISA": 7.0,
+    "PENSION_SAVINGS": 7.0,
+    "IRP": 7.0,
+    "OVERSEAS_DEDICATED": 6.5,
+}
+_MIN_RECOMMENDED_THRESHOLD_PCT = 1.0
+_MAX_RECOMMENDED_THRESHOLD_PCT = 20.0
+
+
+def recommend_drift_threshold_pct(tax_type: str, investment_horizon: str) -> float:
+    """계좌 tax_type·investment_horizon 기반 PER_ACCOUNT 알림 임계값 추천치를 계산한다.
+
+    과세이연 계좌(ISA/연금저축/IRP)와 해외전용 계좌는 잦은 매매가 절세 혜택 훼손·FX비용·
+    양도세 유발로 이어지므로 기본 임계값을 넓힌다. 장기 성향은 더 넓게, 단기 성향은 더 좁게
+    조정한다. 어디까지나 알림 생성 UI의 초기값 제안이며, 사용자가 언제든 override 가능하고
+    drift 판정(`rebalancing_service.py`)이나 AUTO 게이트에는 관여하지 않는다.
+    """
+    base = _TAX_TYPE_BASE_THRESHOLD_PCT.get(tax_type, _TAX_TYPE_BASE_THRESHOLD_PCT["GENERAL"])
+    adjustment = _HORIZON_THRESHOLD_ADJUSTMENT.get(investment_horizon, 0.0)
+    return round(min(max(base + adjustment, _MIN_RECOMMENDED_THRESHOLD_PCT), _MAX_RECOMMENDED_THRESHOLD_PCT), 1)
+
+
+def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str, str]:
+    """ticker_account_map에 등장하는 모든 계좌의 account_id → tax_type 맵을 구성한다.
+
+    buy_account_id의 tax_type 조회용 — 매수 대상 계좌가 현재 어떤 종목이라도 보유하고 있어야
+    맵에 등장하므로, 아무것도 보유하지 않은 신규 계좌는 GENERAL로 취급된다(보수적 기본값).
+    """
+    result: dict[str, str] = {}
+    for accounts in ticker_account_map.values():
+        for a in accounts:
+            result[a.account_id] = getattr(a, "tax_type", "GENERAL")
+    return result
+
+
 def build_rebalancing_orders(
     drifting: list,
     ticker_account_map: dict[str, list],
@@ -131,6 +188,7 @@ def build_rebalancing_orders(
     from app.schemas.rebalancing import ExecutionOrderItem
 
     ticker_account_map = ticker_account_map or {}
+    account_tax_type_map = _flatten_account_tax_types(ticker_account_map)
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
         if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
@@ -175,6 +233,17 @@ def build_rebalancing_orders(
         if side == "SELL":
             orders.extend(
                 _build_sell_orders(item, qty, ticker_account_map, effective_order_type, limit_price, reference_price)
+            )
+            continue
+
+        # ISA/연금저축/IRP 계좌는 해외 개별 종목을 직접 매수할 수 없다 — 실행 불가능한 주문 생성 방지.
+        buy_account_tax_type = account_tax_type_map.get(buy_account_id, "GENERAL")
+        if item.market in _OVERSEAS_MARKETS and buy_account_tax_type in _TAX_DEFERRED_TYPES:
+            logger.info(
+                "rebalancing_auto_item_skipped",
+                alert_id=alert_id,
+                ticker=item.ticker,
+                reason="overseas_not_allowed_in_tax_deferred_account",
             )
             continue
 

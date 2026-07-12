@@ -20,6 +20,7 @@ from tenacity import (
 
 from app.config import settings
 from app.services.email_templates import (
+    account_deletion_template,
     exchange_rate_alert_template,
     goal_achievement_template,
     indicator_alert_template,
@@ -324,6 +325,21 @@ async def send_password_reset_email(to_email: str, reset_link: str) -> bool:
         return True
     except Exception as e:
         logger.error("password_reset_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_account_deletion_email(to_email: str) -> bool:
+    """회원 탈퇴 완료 안내 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_account_deletion_email", to=to_email)
+        return False
+    subject, html = account_deletion_template()
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("account_deletion_email_sent", to=to_email)
+        return True
+    except Exception as e:
+        logger.error("account_deletion_email_failed", to=to_email, error=str(e))
         return False
 
 

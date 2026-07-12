@@ -378,4 +378,37 @@ describe("useRebalancingAlertFormState", () => {
 
     expect(result.current.isPending).toBe(false);
   });
+
+  it("신규 알림 + 계좌유형 정보가 있으면 추천 임계값으로 초기화된다", () => {
+    const { result } = renderHook(
+      () =>
+        useRebalancingAlertFormState({
+          alert: null,
+          portfolioId: "port-1",
+          targetAccountTaxType: "ISA",
+          targetAccountInvestmentHorizon: "LONG_TERM",
+          onClose,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.recommendedThreshold).toBe(8.5);
+    expect(result.current.threshold).toBe(8.5);
+    expect(result.current.isNewAlert).toBe(true);
+  });
+
+  it("기존 알림 수정 시에는 계좌유형 정보가 있어도 저장된 값을 유지한다", () => {
+    const { result } = renderHook(
+      () =>
+        useRebalancingAlertFormState({
+          alert: mockAlert,
+          portfolioId: "port-1",
+          targetAccountTaxType: "ISA",
+          targetAccountInvestmentHorizon: "LONG_TERM",
+          onClose,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.threshold).toBe(mockAlert.threshold_pct);
+    expect(result.current.isNewAlert).toBe(false);
+  });
 });

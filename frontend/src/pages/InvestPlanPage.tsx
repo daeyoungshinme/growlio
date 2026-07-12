@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { api } from "@/api/client";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
@@ -49,6 +50,9 @@ export default function InvestPlanPage() {
   });
 
   const invalidateSettings = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);
 
   const {
     data,
@@ -127,153 +131,155 @@ export default function InvestPlanPage() {
         ))}
       </div>
 
-      {/* 적립 계획 탭 */}
-      {activeTab === "적립 계획" && (
-        <>
-          {/* 현재 설정 요약 */}
-          <div className="card">
-            <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-              적립 계획 설정
-            </h2>
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-              {(
-                [
-                  {
-                    label: "월 적립액",
-                    value: s?.monthly_deposit_amount ? fmtKrw(s.monthly_deposit_amount) : null,
-                    priority: true,
-                  },
-                  {
-                    label: "목표 연수익률",
-                    value: s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : null,
-                    priority: true,
-                  },
-                  {
-                    label: "목표 금액",
-                    value: s?.goal_amount ? fmtKrw(s.goal_amount) : null,
-                    priority: true,
-                  },
-                  {
-                    label: "연간 입금 목표",
-                    value: settingsData?.annual_deposit_goal
-                      ? fmtKrw(settingsData.annual_deposit_goal)
-                      : null,
-                    priority: true,
-                  },
-                  {
-                    label: "투자 시작일",
-                    value: s?.goal_start_date ?? null,
-                    priority: false,
-                  },
-                  {
-                    label: "시작시점 자산",
-                    value: s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : null,
-                    emptyLabel: "스냅샷 자동",
-                    priority: false,
-                  },
-                  {
-                    label: "은퇴 목표시점",
-                    value: settingsData?.retirement_target_year
-                      ? `${settingsData.retirement_target_year}년`
-                      : null,
-                    priority: false,
-                  },
-                ] as const
-              ).map((stat) => (
-                <div
-                  key={stat.label}
-                  className={stat.priority || showAllStats ? "" : "hidden sm:block"}
-                >
-                  <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
-                  <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                    {stat.value ?? (
-                      <span className="text-gray-300 dark:text-gray-600">
-                        {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
-                      </span>
-                    )}
-                  </p>
+      <div ref={tabContentRef}>
+        {/* 적립 계획 탭 */}
+        {activeTab === "적립 계획" && (
+          <>
+            {/* 현재 설정 요약 */}
+            <div className="card">
+              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                적립 계획 설정
+              </h2>
+              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+                {(
+                  [
+                    {
+                      label: "월 적립액",
+                      value: s?.monthly_deposit_amount ? fmtKrw(s.monthly_deposit_amount) : null,
+                      priority: true,
+                    },
+                    {
+                      label: "목표 연수익률",
+                      value: s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : null,
+                      priority: true,
+                    },
+                    {
+                      label: "목표 금액",
+                      value: s?.goal_amount ? fmtKrw(s.goal_amount) : null,
+                      priority: true,
+                    },
+                    {
+                      label: "연간 입금 목표",
+                      value: settingsData?.annual_deposit_goal
+                        ? fmtKrw(settingsData.annual_deposit_goal)
+                        : null,
+                      priority: true,
+                    },
+                    {
+                      label: "투자 시작일",
+                      value: s?.goal_start_date ?? null,
+                      priority: false,
+                    },
+                    {
+                      label: "시작시점 자산",
+                      value: s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : null,
+                      emptyLabel: "스냅샷 자동",
+                      priority: false,
+                    },
+                    {
+                      label: "은퇴 목표시점",
+                      value: settingsData?.retirement_target_year
+                        ? `${settingsData.retirement_target_year}년`
+                        : null,
+                      priority: false,
+                    },
+                  ] as const
+                ).map((stat) => (
+                  <div
+                    key={stat.label}
+                    className={stat.priority || showAllStats ? "" : "hidden sm:block"}
+                  >
+                    <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
+                    <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+                      {stat.value ?? (
+                        <span className="text-gray-300 dark:text-gray-600">
+                          {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllStats((v) => !v)}
+                className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
+              >
+                {showAllStats ? (
+                  <>
+                    접기 <ChevronUp size={13} />
+                  </>
+                ) : (
+                  <>
+                    더보기 <ChevronDown size={13} />
+                  </>
+                )}
+              </button>
+              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
+                자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
+              </p>
+              <Link
+                to="/rebalancing?rtab=진단"
+                className="mt-2 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                목표 대비 포트폴리오 진단 보기 →
+              </Link>
+              {data && !isConfigured && (
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
+                  월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
+                  있습니다.{" "}
+                  <button onClick={openEdit} className="underline font-medium">
+                    지금 설정하기
+                  </button>
                 </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowAllStats((v) => !v)}
-              className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
-            >
-              {showAllStats ? (
-                <>
-                  접기 <ChevronUp size={13} />
-                </>
-              ) : (
-                <>
-                  더보기 <ChevronDown size={13} />
-                </>
               )}
-            </button>
-            <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-              연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
-              자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
-            </p>
-            <Link
-              to="/rebalancing?rtab=진단"
-              className="mt-2 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              목표 대비 포트폴리오 진단 보기 →
-            </Link>
-            {data && !isConfigured && (
-              <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
-                월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
-                있습니다.{" "}
-                <button onClick={openEdit} className="underline font-medium">
-                  지금 설정하기
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
 
-          {isConfigured && data && (
-            <ErrorBoundary variant="section">
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
-                <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                  <DCAProjectionChart data={data.projection_months} />
-                </Suspense>
-                <div className="card divide-y divide-gray-100 dark:divide-gray-700">
-                  <div className="pb-4">
-                    <GoalTimelineCard
-                      flat
-                      timeline={data.goal_timeline}
-                      goalAmount={s?.goal_amount ?? null}
-                    />
-                  </div>
-                  <div className="py-4">
-                    <YearlyAchievementTable flat data={data.yearly_achievements} />
-                  </div>
-                  <div className="pt-4">
-                    <MonthlyAchievementTable flat data={data.projection_months} />
+            {isConfigured && data && (
+              <ErrorBoundary variant="section">
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
+                  <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                    <DCAProjectionChart data={data.projection_months} />
+                  </Suspense>
+                  <div className="card divide-y divide-gray-100 dark:divide-gray-700">
+                    <div className="pb-4">
+                      <GoalTimelineCard
+                        flat
+                        timeline={data.goal_timeline}
+                        goalAmount={s?.goal_amount ?? null}
+                      />
+                    </div>
+                    <div className="py-4">
+                      <YearlyAchievementTable flat data={data.yearly_achievements} />
+                    </div>
+                    <div className="pt-4">
+                      <MonthlyAchievementTable flat data={data.projection_months} />
+                    </div>
                   </div>
                 </div>
-              </div>
-            </ErrorBoundary>
-          )}
-        </>
-      )}
+              </ErrorBoundary>
+            )}
+          </>
+        )}
 
-      {/* 배당 계획 탭 */}
-      {activeTab === "배당 계획" && (
-        <ErrorBoundary variant="section">
-          <div className="flex justify-end">
-            <Link
-              to="/rebalancing?rtab=진단"
-              className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              목표 대비 포트폴리오 진단 보기 →
-            </Link>
-          </div>
-          <Suspense fallback={<SkeletonCard rows={5} height="h-5" />}>
-            <DividendPlanSection onOpenSettings={openEdit} />
-          </Suspense>
-        </ErrorBoundary>
-      )}
+        {/* 배당 계획 탭 */}
+        {activeTab === "배당 계획" && (
+          <ErrorBoundary variant="section">
+            <div className="flex justify-end">
+              <Link
+                to="/rebalancing?rtab=진단"
+                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                목표 대비 포트폴리오 진단 보기 →
+              </Link>
+            </div>
+            <Suspense fallback={<SkeletonCard rows={5} height="h-5" />}>
+              <DividendPlanSection onOpenSettings={openEdit} />
+            </Suspense>
+          </ErrorBoundary>
+        )}
+      </div>
 
       {/* 설정 편집 모달 */}
       {editing && (

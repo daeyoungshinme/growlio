@@ -16,6 +16,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.alert_calculator import already_fired_today
+from app.services.rebalancing_order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing_plan_service import (
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
@@ -77,10 +78,7 @@ async def _run_auto_execution() -> None:
 
             # 시장 신호 게이트 — 계획 생성 시점에만 확인한다(실행/승인 시점 재확인 안 함).
             market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-            blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
-                market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
-            )
-            if blocked:
+            if is_market_signal_blocking_auto_mode(market_mode, composite_level):
                 logger.info(
                     "rebalancing_auto_skipped_market_signal",
                     alert_id=str(alert.id),

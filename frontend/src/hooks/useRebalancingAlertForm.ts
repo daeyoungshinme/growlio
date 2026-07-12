@@ -12,13 +12,14 @@ import {
   type ScheduleType,
   type TriggerCondition,
 } from "@/api/alerts";
-import { fetchAccounts } from "@/api/assets";
+import { fetchAccounts, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateRebalancingAlertData } from "@/utils/queryInvalidation";
 import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { toast } from "@/utils/toast";
+import { recommendDriftThresholdPct } from "@/utils/rebalancingThresholdRecommendation";
 
 const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
@@ -76,9 +77,10 @@ export function useRebalancingAlertQueries({
       (accountIds == null || accountIds.includes(a.id)),
   );
 
-  const targetAccountIsKis = targetAccountId
-    ? accounts.find((a) => a.id === targetAccountId)?.asset_type === "STOCK_KIS"
-    : true;
+  const targetAccount = targetAccountId
+    ? accounts.find((a) => a.id === targetAccountId)
+    : undefined;
+  const targetAccountIsKis = targetAccountId ? targetAccount?.asset_type === "STOCK_KIS" : true;
 
   return {
     alert: alert ?? null,
@@ -87,6 +89,8 @@ export function useRebalancingAlertQueries({
     kisAccounts,
     kisExecutionAccounts,
     targetAccountIsKis,
+    targetAccountTaxType: targetAccount?.tax_type,
+    targetAccountInvestmentHorizon: targetAccount?.investment_horizon,
     marketSignal,
   };
 }
@@ -96,6 +100,9 @@ interface UseRebalancingAlertFormStateOpts {
   portfolioId: string;
   /** 지정 시 계좌별 독립 설정(PER_ACCOUNT) API로 저장/삭제한다. */
   targetAccountId?: string;
+  /** 대상 계좌의 tax_type/investment_horizon — 신규 알림 생성 시 임계값 추천에 사용. */
+  targetAccountTaxType?: AccountTaxType;
+  targetAccountInvestmentHorizon?: InvestmentHorizon | null;
   onClose: () => void;
 }
 
@@ -103,9 +110,17 @@ export function useRebalancingAlertFormState({
   alert,
   portfolioId,
   targetAccountId,
+  targetAccountTaxType,
+  targetAccountInvestmentHorizon,
   onClose,
 }: UseRebalancingAlertFormStateOpts) {
   const qc = useQueryClient();
+
+  // 계좌 유형 기반 추천값 — 신규 알림 생성 시에만 초기값으로 사용, 기존 알림은 저장된 값을 유지한다.
+  const recommendedThreshold = recommendDriftThresholdPct(
+    targetAccountTaxType,
+    targetAccountInvestmentHorizon,
+  );
 
   const [scheduleType, setScheduleType] = useState<ScheduleType>(alert?.schedule_type ?? "DAILY");
   const [dayOfWeek, setDayOfWeek] = useState(alert?.schedule_day_of_week ?? 0);
@@ -113,7 +128,7 @@ export function useRebalancingAlertFormState({
   const [triggerCondition, setTriggerCondition] = useState<TriggerCondition>(
     alert?.trigger_condition ?? "DRIFT_ONLY",
   );
-  const [threshold, setThreshold] = useState(alert?.threshold_pct ?? 5);
+  const [threshold, setThreshold] = useState(alert?.threshold_pct ?? recommendedThreshold);
   const [mode, setMode] = useState<"NOTIFY" | "AUTO">(alert?.mode ?? "NOTIFY");
   const [strategy, setStrategy] = useState<"FULL" | "BUY_ONLY" | "TWO_PHASE">(
     alert?.strategy ?? "BUY_ONLY",
@@ -183,6 +198,8 @@ export function useRebalancingAlertFormState({
     setTriggerCondition,
     threshold,
     setThreshold,
+    recommendedThreshold,
+    isNewAlert: !alert,
     mode,
     setMode,
     strategy,

@@ -2,6 +2,7 @@ import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Modal from "@/components/common/Modal";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
+import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
@@ -48,6 +49,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     is_mock_mode: initialAccount?.is_mock_mode ?? true,
     notes: initialAccount?.notes ?? "",
     include_in_total: initialAccount?.include_in_total ?? true,
+    tax_type: initialAccount?.tax_type ?? "GENERAL",
+    investment_horizon: initialAccount?.investment_horizon ?? undefined,
   });
 
   const {
@@ -109,6 +112,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       include_in_total: form.include_in_total,
       deposit_krw: depositKrw ?? 0,
       deposit_usd: depositUsd ?? 0,
+      tax_type: form.tax_type,
+      investment_horizon: form.investment_horizon ?? null,
     };
     if (initialAccount!.data_source === "MANUAL") {
       const usdConverted = convertUsdToKrw(depositUsd, usdRate);
@@ -246,6 +251,57 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                 onChange={(e) => set("institution", e.target.value)}
                 placeholder="예: 한국투자증권, 키움증권"
               />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="stock-tax-type"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  세제 유형
+                </label>
+                <select
+                  id="stock-tax-type"
+                  className={`mt-1 w-full ${INPUT_SM}`}
+                  value={form.tax_type ?? "GENERAL"}
+                  onChange={(e) =>
+                    set("tax_type", e.target.value as AssetAccountCreate["tax_type"])
+                  }
+                >
+                  {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label
+                  htmlFor="stock-horizon"
+                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                >
+                  투자 기간
+                </label>
+                <select
+                  id="stock-horizon"
+                  className={`mt-1 w-full ${INPUT_SM}`}
+                  value={form.investment_horizon ?? ""}
+                  onChange={(e) =>
+                    set(
+                      "investment_horizon",
+                      (e.target.value || undefined) as AssetAccountCreate["investment_horizon"],
+                    )
+                  }
+                >
+                  <option value="">미지정</option>
+                  {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* MANUAL 예수금 */}

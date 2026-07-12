@@ -6,6 +6,14 @@ export interface GoalCandidateTicker {
   market: string;
 }
 
+export type GoalRiskTolerance = "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE";
+
+export interface GoalRecommendationOptions {
+  risk_tolerance: GoalRiskTolerance;
+  max_weight_pct: number;
+  cagr_lookback_years: number;
+}
+
 export interface SettingsData {
   has_kis: boolean;
   has_dart: boolean;
@@ -26,6 +34,9 @@ export interface SettingsData {
   fcm_token_stored: boolean;
   composite_signal_alerts_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
+  goal_risk_tolerance: GoalRiskTolerance;
+  goal_max_weight_pct: number;
+  goal_cagr_lookback_years: number;
 }
 
 export interface AutoDcaPayload {
@@ -48,3 +59,6 @@ export const updateCompositeSignalAlerts = (enabled: boolean) =>
 
 export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
   apiPut("/settings/goal-candidate-tickers", { tickers });
+
+export const updateGoalRecommendationOptions = (payload: GoalRecommendationOptions) =>
+  apiPut("/settings/goal-recommendation-options", payload);

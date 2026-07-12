@@ -10,6 +10,7 @@ import type {
   HighYieldSpreadLevel,
   DollarIndexLevel,
   RateCutExpectationLevel,
+  ExchangeRateLevel,
 } from "@/api/marketSignals";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
@@ -149,6 +150,27 @@ const RATE_HINT: Record<RateCutExpectationLevel, string> = {
   MILD_CUT_EXPECTED: "인하 기대 소폭 반영",
   CUT_EXPECTED: "금리 인하 기대 확대",
   DEEP_CUT_EXPECTED: "경기둔화 우려, 장기채·성장주 비중 점검",
+};
+
+const EXCHANGE_DOT: Record<ExchangeRateLevel, string> = {
+  NORMAL: "bg-green-500",
+  ELEVATED: "bg-yellow-500",
+  HIGH: "bg-orange-500",
+  BREAKOUT: "bg-red-500",
+};
+
+const EXCHANGE_LABEL: Record<ExchangeRateLevel, string> = {
+  NORMAL: "안정",
+  ELEVATED: "약세 전환",
+  HIGH: "약세 심화",
+  BREAKOUT: "급등 돌파",
+};
+
+const EXCHANGE_HINT: Record<ExchangeRateLevel, string> = {
+  NORMAL: "환율 안정 국면",
+  ELEVATED: "원화 약세 전환 모니터링",
+  HIGH: "해외자산 환차익 유리, 원화 약세 우려",
+  BREAKOUT: "20일선 상향 돌파, 환헤지 비중 점검",
 };
 
 function scoreColor(level: MarketRiskLevel): string {
@@ -330,6 +352,31 @@ export default function MarketSignalBanner({ signal }: Props) {
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {RATE_HINT[signals.rate_cut_expectation.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 원/달러 환율 (참고 지표 — 예측치 아님) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              원/달러 환율
+            </span>
+            {signals.exchange_rate ? (
+              <>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${EXCHANGE_DOT[signals.exchange_rate.level]}`}
+                />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  ₩{signals.exchange_rate.value.toFixed(0)} ·{" "}
+                  {signals.exchange_rate.deviation_pct >= 0 ? "+" : ""}
+                  {signals.exchange_rate.deviation_pct.toFixed(1)}% ·{" "}
+                  {EXCHANGE_LABEL[signals.exchange_rate.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {EXCHANGE_HINT[signals.exchange_rate.level]}
                 </span>
               </>
             ) : (

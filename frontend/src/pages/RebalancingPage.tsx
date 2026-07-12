@@ -9,6 +9,7 @@ import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
@@ -90,6 +91,9 @@ export default function RebalancingPage() {
     [setSearchParams],
   );
 
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
+
   const executionRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!portfolioId || localTab !== "포트폴리오") return;
@@ -130,7 +134,7 @@ export default function RebalancingPage() {
         />
       </div>
 
-      <div className="flex-1 flex flex-col gap-4">
+      <div ref={tabContentRef} className="flex-1 flex flex-col gap-4">
         {/* ── 진단 탭: 전체 포트폴리오 드리프트 현황 + 시장신호 ── */}
         {localTab === "진단" && (
           <>
@@ -147,8 +151,7 @@ export default function RebalancingPage() {
                 <RebalancingStatusCard
                   marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
-                  hideSignalBanner={true}
-                  showSignalBadge={false}
+                  signalDisplay="none"
                   showAllInsights={true}
                 />
               </Suspense>

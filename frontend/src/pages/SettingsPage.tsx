@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint, UserX } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -14,6 +14,7 @@ import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAler
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
+import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -104,6 +105,7 @@ export default function SettingsPage() {
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false);
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -251,8 +253,19 @@ export default function SettingsPage() {
             <LogOut size={18} />
             로그아웃
           </button>
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <button
+              onClick={() => setShowDeleteAccount(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors min-h-[44px]"
+            >
+              <UserX size={18} />
+              회원 탈퇴
+            </button>
+          </div>
         </SectionCard>
       </div>
+
+      {showDeleteAccount && <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />}
     </div>
   );
 }

@@ -57,12 +57,19 @@ export default function RebalancingAlertModal({
   onSwitchToPerAccount,
   onClose,
 }: Props) {
-  const { alert, isLoading, kisExecutionAccounts, targetAccountIsKis, marketSignal } =
-    useRebalancingAlertQueries({
-      portfolioId,
-      accountIds,
-      targetAccountId,
-    });
+  const {
+    alert,
+    isLoading,
+    kisExecutionAccounts,
+    targetAccountIsKis,
+    targetAccountTaxType,
+    targetAccountInvestmentHorizon,
+    marketSignal,
+  } = useRebalancingAlertQueries({
+    portfolioId,
+    accountIds,
+    targetAccountId,
+  });
 
   const title = targetAccountName
     ? `리밸런싱 자동화 — ${portfolioName} · ${targetAccountName}`
@@ -84,6 +91,8 @@ export default function RebalancingAlertModal({
             portfolioId={portfolioId}
             targetAccountId={targetAccountId}
             targetAccountName={targetAccountName}
+            targetAccountTaxType={targetAccountTaxType}
+            targetAccountInvestmentHorizon={targetAccountInvestmentHorizon}
             canSwitchToPerAccount={canSwitchToPerAccount}
             onSwitchToPerAccount={onSwitchToPerAccount}
             onClose={onClose}
@@ -96,7 +105,7 @@ export default function RebalancingAlertModal({
 }
 
 import type { RebalancingAlert } from "@/api/alerts";
-import type { AssetAccount } from "@/api/assets";
+import type { AccountTaxType, AssetAccount, InvestmentHorizon } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 
 function AlertFormBody({
@@ -106,6 +115,8 @@ function AlertFormBody({
   portfolioId,
   targetAccountId,
   targetAccountName,
+  targetAccountTaxType,
+  targetAccountInvestmentHorizon,
   canSwitchToPerAccount,
   onSwitchToPerAccount,
   onClose,
@@ -117,6 +128,8 @@ function AlertFormBody({
   portfolioId: string;
   targetAccountId?: string;
   targetAccountName?: string;
+  targetAccountTaxType?: AccountTaxType;
+  targetAccountInvestmentHorizon?: InvestmentHorizon | null;
   canSwitchToPerAccount?: boolean;
   onSwitchToPerAccount?: () => void;
   onClose: () => void;
@@ -126,6 +139,8 @@ function AlertFormBody({
     alert,
     portfolioId,
     targetAccountId,
+    targetAccountTaxType,
+    targetAccountInvestmentHorizon,
     onClose,
   });
 
@@ -324,6 +339,11 @@ function AlertFormBody({
                 ±{form.threshold.toFixed(1)}%
               </span>
             </div>
+            {form.isNewAlert && form.threshold === form.recommendedThreshold && (
+              <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+                계좌 유형 기반 추천값: {form.recommendedThreshold.toFixed(1)}% · 직접 조정 가능
+              </p>
+            )}
           </div>
         )}
 

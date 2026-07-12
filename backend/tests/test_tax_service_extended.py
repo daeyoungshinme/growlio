@@ -35,9 +35,9 @@ def _make_position(
     )
 
 
-def _make_snap_acc(positions):
+def _make_snap_acc(positions, tax_type="GENERAL"):
     snap = SimpleNamespace(id=uuid.uuid4(), position_items=positions)
-    acc = SimpleNamespace(id=uuid.uuid4(), name="테스트 계좌")
+    acc = SimpleNamespace(id=uuid.uuid4(), name="테스트 계좌", tax_type=tax_type)
     return snap, acc
 
 
@@ -102,6 +102,17 @@ class TestGetOverseasPositionsDetail:
 
         assert result[0]["avg_price_usd"] == 100.0
 
+    @pytest.mark.asyncio
+    async def test_tax_deferred_account_excluded(self, mock_db, override_settings):
+        from app.services.tax_service import get_overseas_positions_detail
+
+        pos = _make_position(avg_price=100_000.0, current_price=150_000.0, qty=10)
+        snap, acc = _make_snap_acc([pos], tax_type="IRP")
+
+        mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[(snap, acc)])))
+        result = await get_overseas_positions_detail(uuid.uuid4(), mock_db)
+        assert result == []
+
 
 class TestCalcStockUnrealized:
     @pytest.mark.asyncio
@@ -109,10 +120,11 @@ class TestCalcStockUnrealized:
         from app.services.tax_service import _calc_stock_unrealized
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[])))
-        overseas, domestic_val, domestic_unrealized = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
+        overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
         assert overseas == 0.0
         assert domestic_val == 0.0
         assert domestic_unrealized == 0.0
+        assert tax_deferred == 0.0
 
     @pytest.mark.asyncio
     async def test_overseas_position_unrealized_gain(self, mock_db, override_settings):
@@ -120,15 +132,16 @@ class TestCalcStockUnrealized:
 
         pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
-        acc = SimpleNamespace(id=uuid.uuid4())
+        acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[(snap, acc)])))
-        overseas, domestic_val, domestic_unrealized = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
+        overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
 
         # overseas = 150_000 * 10 - 100_000 * 10 = 500_000
         assert overseas == pytest.approx(500_000.0)
         assert domestic_val == 0.0
         assert domestic_unrealized == 0.0
+        assert tax_deferred == 0.0
 
     @pytest.mark.asyncio
     async def test_domestic_position_value_and_unrealized(self, mock_db, override_settings):
@@ -136,14 +149,15 @@ class TestCalcStockUnrealized:
 
         pos = _make_position(ticker="005930", market="KOSPI", avg_price=60_000.0, current_price=70_000.0, qty=100)
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos])
-        acc = SimpleNamespace(id=uuid.uuid4())
+        acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[(snap, acc)])))
-        overseas, domestic_val, domestic_unrealized = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
+        overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
 
         assert overseas == 0.0
         assert domestic_val == pytest.approx(7_000_000.0)  # 70_000 * 100
         assert domestic_unrealized == pytest.approx(1_000_000.0)  # (70k-60k)*100
+        assert tax_deferred == 0.0
 
     @pytest.mark.asyncio
     async def test_mixed_positions(self, mock_db, override_settings):
@@ -154,14 +168,30 @@ class TestCalcStockUnrealized:
             ticker="005930", market="KOSPI", avg_price=60_000.0, current_price=70_000.0, qty=10
         )
         snap = SimpleNamespace(id=uuid.uuid4(), position_items=[pos_overseas, pos_domestic])
-        acc = SimpleNamespace(id=uuid.uuid4())
+        acc = SimpleNamespace(id=uuid.uuid4(), tax_type="GENERAL")
 
         mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[(snap, acc)])))
-        overseas, domestic_val, domestic_unrealized = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
+        overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
 
         assert overseas == pytest.approx(100_000.0)  # (120k-100k)*5
         assert domestic_val == pytest.approx(700_000.0)  # 70k*10
         assert domestic_unrealized == pytest.approx(100_000.0)  # (70k-60k)*10
+        assert tax_deferred == 0.0
+
+    @pytest.mark.asyncio
+    async def test_tax_deferred_account_excluded_from_gain_and_counted_separately(self, mock_db, override_settings):
+        from app.services.tax_service import _calc_stock_unrealized
+
+        pos = _make_position(market="NASDAQ", avg_price=100_000.0, current_price=150_000.0, qty=10)
+        snap, acc = _make_snap_acc([pos], tax_type="ISA")
+
+        mock_db.execute = AsyncMock(return_value=MagicMock(all=MagicMock(return_value=[(snap, acc)])))
+        overseas, domestic_val, domestic_unrealized, tax_deferred = await _calc_stock_unrealized(uuid.uuid4(), mock_db)
+
+        assert overseas == 0.0
+        assert domestic_val == 0.0
+        assert domestic_unrealized == 0.0
+        assert tax_deferred == pytest.approx(1_500_000.0)  # 150_000 * 10
 
 
 class TestCalcGeumtTax:

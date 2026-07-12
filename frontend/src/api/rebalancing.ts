@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from "./client";
+import type { GoalRiskTolerance } from "./settings";
 
 export interface RebalancingItem {
   ticker: string;
@@ -48,6 +49,7 @@ export interface TaxImpactItem {
   sell_qty: number;
   estimated_realized_gain_krw: number;
   excluded_reason?: string | null;
+  is_tax_deferred: boolean;
 }
 
 export interface DiagnosisContext {
@@ -285,6 +287,9 @@ export interface GoalRecommendation {
   expected_return_pct: number | null;
   expected_dividend_yield_pct: number | null;
   note: string | null;
+  cagr_lookback_years: number;
+  risk_tolerance: GoalRiskTolerance;
+  max_weight_pct: number;
 }
 
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>

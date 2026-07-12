@@ -57,6 +57,8 @@ export interface AccountRow {
   unrealized_pnl: number;
   position_count: number;
   positions: PortfolioPosition[];
+  tax_type?: string;
+  investment_horizon?: string | null;
 }
 
 // 포트폴리오 전체 overview (API: /portfolio/overview)

@@ -39,6 +39,7 @@ export type RateCutExpectationLevel =
   | "MILD_CUT_EXPECTED"
   | "CUT_EXPECTED"
   | "DEEP_CUT_EXPECTED";
+export type ExchangeRateLevel = "NORMAL" | "ELEVATED" | "HIGH" | "BREAKOUT";
 
 export interface HighYieldSpreadSignal {
   value: number;
@@ -65,6 +66,15 @@ export interface RateCutExpectationSignal {
   sub_score: number;
 }
 
+export interface ExchangeRateSignal {
+  value: number; // 원/달러 환율(DEXKOUS)
+  ma20: number;
+  deviation_pct: number;
+  level: ExchangeRateLevel;
+  date: string;
+  sub_score: number;
+}
+
 export interface MarketSignalResponse {
   composite_level: MarketRiskLevel;
   composite_score: number;
@@ -78,6 +88,7 @@ export interface MarketSignalResponse {
     high_yield_spread: HighYieldSpreadSignal | null;
     dollar_index: DollarIndexSignal | null;
     rate_cut_expectation: RateCutExpectationSignal | null;
+    exchange_rate: ExchangeRateSignal | null;
   };
   computed_at: string;
   data_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";

@@ -10,6 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.enums import GoalRiskTolerance
 from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis
@@ -76,6 +77,26 @@ class GoalCandidateTickersUpdate(BaseModel):
         return v
 
 
+class GoalRecommendationOptionsUpdate(BaseModel):
+    risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
+    max_weight_pct: float = 40.0
+    cagr_lookback_years: int = 10
+
+    @field_validator("max_weight_pct")
+    @classmethod
+    def validate_max_weight(cls, v: float) -> float:
+        if not (10 <= v <= 100):
+            raise ValueError("종목당 최대 비중은 10~100% 범위여야 합니다")
+        return v
+
+    @field_validator("cagr_lookback_years")
+    @classmethod
+    def validate_lookback(cls, v: int) -> int:
+        if v not in (3, 5, 10):
+            raise ValueError("수익률 산출 기간은 3/5/10년 중 하나여야 합니다")
+        return v
+
+
 class NotificationEmailUpdate(BaseModel):
     notification_email: EmailStr | None = None
 
@@ -132,6 +153,9 @@ class SettingsResponse(BaseModel):
     fcm_token_stored: bool = False
     composite_signal_alerts_enabled: bool = True
     goal_candidate_tickers: list[GoalCandidateTicker] = []
+    goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
+    goal_max_weight_pct: float = 40.0
+    goal_cagr_lookback_years: int = 10
 
 
 @router.get("", response_model=SettingsResponse)
@@ -175,6 +199,11 @@ async def get_settings(
         fcm_token_stored=bool(row.fcm_token),
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
+        goal_risk_tolerance=(
+            GoalRiskTolerance(row.goal_risk_tolerance) if row.goal_risk_tolerance else GoalRiskTolerance.CONSERVATIVE
+        ),
+        goal_max_weight_pct=float(row.goal_max_weight_pct) if row.goal_max_weight_pct else 40.0,
+        goal_cagr_lookback_years=row.goal_cagr_lookback_years or 10,
     )
 
 
@@ -254,6 +283,23 @@ async def update_goal_candidate_tickers(
     row.goal_candidate_tickers = [t.model_dump() for t in req.tickers]
     await db.commit()
     return {"detail": "후보 ETF 목록이 저장되었습니다"}
+
+
+@router.put("/goal-recommendation-options")
+@limiter.limit("20/minute")
+async def update_goal_recommendation_options(
+    request: Request,
+    req: GoalRecommendationOptionsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """목표 역산 추천 엔진의 리스크 성향/종목당 최대비중/CAGR 산출기간 설정(전체 교체)."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.goal_risk_tolerance = req.risk_tolerance.value
+    row.goal_max_weight_pct = req.max_weight_pct
+    row.goal_cagr_lookback_years = req.cagr_lookback_years
+    await db.commit()
+    return {"detail": "목표 역산 추천 설정이 저장되었습니다"}
 
 
 @router.put("/notification-email")

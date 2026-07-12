@@ -31,13 +31,36 @@ export interface AssetAccount {
   has_own_kis_credentials: boolean;
   has_own_kiwoom_credentials: boolean;
   target_portfolio_id?: string | null;
+  tax_type?: AccountTaxType;
+  investment_horizon?: InvestmentHorizon | null;
 }
+
+// GENERAL: 일반 | ISA: ISA | PENSION_SAVINGS: 연금저축 | IRP: IRP | OVERSEAS_DEDICATED: 해외전용
+export type AccountTaxType = "GENERAL" | "ISA" | "PENSION_SAVINGS" | "IRP" | "OVERSEAS_DEDICATED";
+
+export type InvestmentHorizon = "SHORT_TERM" | "MID_TERM" | "LONG_TERM";
+
+export const ACCOUNT_TAX_TYPE_LABELS: Record<AccountTaxType, string> = {
+  GENERAL: "일반",
+  ISA: "ISA",
+  PENSION_SAVINGS: "연금저축",
+  IRP: "IRP",
+  OVERSEAS_DEDICATED: "해외전용",
+};
+
+export const INVESTMENT_HORIZON_LABELS: Record<InvestmentHorizon, string> = {
+  SHORT_TERM: "단기",
+  MID_TERM: "중기",
+  LONG_TERM: "장기",
+};
 
 export interface AssetAccountCreate {
   name: string;
   asset_type: string;
   data_source?: string;
   institution?: string;
+  tax_type?: AccountTaxType;
+  investment_horizon?: InvestmentHorizon | null;
   kis_account_no?: string;
   kis_app_key?: string;
   kis_app_secret?: string;

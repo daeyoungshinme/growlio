@@ -26,6 +26,7 @@ export interface AuthState {
   findAccount: (displayName: string) => Promise<string>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
+  resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
 interface OptimisticAuth {
@@ -218,6 +219,17 @@ export const useAuthStore = create<AuthState>((set) => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       set({ needsPasswordReset: false });
+    },
+
+    resendConfirmationEmail: async (email: string) => {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: {
+          emailRedirectTo: import.meta.env.VITE_REDIRECT_URL,
+        },
+      });
+      if (error) throw error;
     },
   };
 });

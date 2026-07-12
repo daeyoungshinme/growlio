@@ -7,6 +7,7 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
+import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -175,6 +176,11 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
+        {/* Row 3-1: 투자기간별 자산현황 (계좌에 태그된 경우에만 표시) */}
+        <ErrorBoundary variant="section">
+          <HorizonSummaryCard overview={overview} />
+        </ErrorBoundary>
+
         {/* Row 4: 리밸런싱 진단 요약 */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={2} />}>
@@ -182,7 +188,7 @@ export default function DashboardPage() {
               showAllInsights={false}
               showDriftRows={true}
               maxDriftRows={3}
-              hideSignalBanner={true}
+              signalDisplay="badge"
               marketSignal={marketSignal}
               onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
             />

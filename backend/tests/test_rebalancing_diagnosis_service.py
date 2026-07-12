@@ -53,8 +53,21 @@ def _make_analysis(items: list[RebalancingItem]) -> RebalancingAnalysis:
     )
 
 
-def _make_overview(positions: list[dict]) -> dict:
-    return {"all_positions": positions, "total_assets_krw": 10_000_000.0, "total_stock_krw": 9_000_000.0}
+def _make_overview(positions: list[dict], accounts: list[dict] | None = None) -> dict:
+    if accounts is None:
+        # 기존 테스트 호환: 포지션에 등장하는 계좌를 기본 GENERAL로 구성
+        seen: dict[str, dict] = {}
+        for p in positions:
+            acc_id = p.get("account_id")
+            if acc_id and acc_id not in seen:
+                seen[acc_id] = {"id": acc_id, "tax_type": "GENERAL"}
+        accounts = list(seen.values())
+    return {
+        "all_positions": positions,
+        "accounts": accounts,
+        "total_assets_krw": 10_000_000.0,
+        "total_stock_krw": 9_000_000.0,
+    }
 
 
 def _make_position(
@@ -81,11 +94,14 @@ class TestAggregatePositionCosts:
         overview = _make_overview([_make_position()])
         costs = _aggregate_position_costs(overview)
         key = ("AAPL", "NASDAQ")
-        assert costs[key]["qty"] == pytest.approx(10.0)
-        assert costs[key]["value_krw"] == pytest.approx(1_200_000.0)
-        assert costs[key]["invested_krw"] == pytest.approx(1_000_000.0)
+        assert len(costs[key]) == 1
+        lot = costs[key][0]
+        assert lot["qty"] == pytest.approx(10.0)
+        assert lot["value_krw"] == pytest.approx(1_200_000.0)
+        assert lot["invested_krw"] == pytest.approx(1_000_000.0)
+        assert lot["is_tax_deferred"] is False
 
-    def test_multiple_accounts_same_ticker_summed(self):
+    def test_multiple_accounts_same_ticker_listed_separately(self):
         overview = _make_overview(
             [
                 _make_position(qty=10.0, account_id="acc-1"),
@@ -94,8 +110,28 @@ class TestAggregatePositionCosts:
         )
         costs = _aggregate_position_costs(overview)
         key = ("AAPL", "NASDAQ")
-        assert costs[key]["qty"] == pytest.approx(15.0)
-        assert costs[key]["invested_krw"] == pytest.approx(1_500_000.0)
+        assert len(costs[key]) == 2
+        assert sum(lot["qty"] for lot in costs[key]) == pytest.approx(15.0)
+        assert sum(lot["invested_krw"] for lot in costs[key]) == pytest.approx(1_500_000.0)
+
+    def test_tax_deferred_lots_sorted_after_general_lots(self):
+        """매도 우선순위와 동일하게 과세이연 계좌 lot이 뒤로 정렬된다(보유수량은 오히려 더 커도)."""
+        overview = _make_overview(
+            [
+                _make_position(qty=5.0, account_id="general-acc"),
+                _make_position(qty=100.0, account_id="isa-acc"),
+            ],
+            accounts=[
+                {"id": "general-acc", "tax_type": "GENERAL"},
+                {"id": "isa-acc", "tax_type": "ISA"},
+            ],
+        )
+        costs = _aggregate_position_costs(overview)
+        key = ("AAPL", "NASDAQ")
+        assert costs[key][0]["account_id"] == "general-acc"
+        assert costs[key][0]["is_tax_deferred"] is False
+        assert costs[key][1]["account_id"] == "isa-acc"
+        assert costs[key][1]["is_tax_deferred"] is True
 
     def test_empty_overview_returns_empty_dict(self):
         assert _aggregate_position_costs({}) == {}
@@ -175,6 +211,67 @@ class TestBuildTaxPreview:
 
         assert total_gain == 0.0
         assert items == []
+
+    def test_isa_account_sell_excluded_from_realized_gain(self):
+        """ISA 계좌 보유분 매도는 과세이연되어 실현손익 추정에서 제외되고 is_tax_deferred=True로 표시된다."""
+        item = _make_item(ticker="AAPL", market="NASDAQ", diff_krw=-1_000_000.0, shares_to_trade=-10.0)
+        overview = _make_overview(
+            [
+                _make_position(
+                    ticker="AAPL",
+                    market="NASDAQ",
+                    qty=10.0,
+                    avg_price=100_000.0,
+                    current_price=150_000.0,
+                    account_id="isa-acc",
+                )
+            ],
+            accounts=[{"id": "isa-acc", "tax_type": "ISA"}],
+        )
+        analysis = _make_analysis([item])
+
+        total_gain, overseas_tax, fee, notes, items = _build_tax_preview(analysis, overview)
+
+        assert total_gain == 0.0
+        assert overseas_tax == 0.0
+        assert items[0].is_tax_deferred is True
+        assert items[0].estimated_realized_gain_krw == 0.0
+        assert any("과세이연" in n for n in notes)
+
+    def test_general_account_sold_before_isa_when_mixed(self):
+        """동일 종목을 일반+ISA 계좌에 나눠 보유 시, 일반계좌 보유분부터 소진해 실현손익을 계산한다."""
+        item = _make_item(ticker="AAPL", market="NASDAQ", diff_krw=-1_000_000.0, shares_to_trade=-5.0)
+        overview = _make_overview(
+            [
+                _make_position(
+                    ticker="AAPL",
+                    market="NASDAQ",
+                    qty=5.0,
+                    avg_price=100_000.0,
+                    current_price=150_000.0,
+                    account_id="general-acc",
+                ),
+                _make_position(
+                    ticker="AAPL",
+                    market="NASDAQ",
+                    qty=5.0,
+                    avg_price=100_000.0,
+                    current_price=150_000.0,
+                    account_id="isa-acc",
+                ),
+            ],
+            accounts=[
+                {"id": "general-acc", "tax_type": "GENERAL"},
+                {"id": "isa-acc", "tax_type": "ISA"},
+            ],
+        )
+        analysis = _make_analysis([item])
+
+        total_gain, overseas_tax, fee, notes, items = _build_tax_preview(analysis, overview)
+
+        # 매도 5주 전량 일반계좌(5주 보유)에서 소진 → (150k-100k)*5 = 250_000, ISA 계좌는 건드리지 않음
+        assert total_gain == pytest.approx(250_000.0)
+        assert items[0].is_tax_deferred is False
 
 
 class TestRiskNote:

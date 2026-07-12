@@ -36,6 +36,8 @@ def _make_account(acc_id=None, asset_type="STOCK_KIS", include_in_total=True):
         deposit_usd=None,
         sort_order=0,
         created_at=None,
+        tax_type="GENERAL",
+        investment_horizon=None,
     )
 
 
@@ -223,6 +225,8 @@ class TestBuildPortfolioOverviewWithAccounts:
             deposit_usd=None,
             sort_order=0,
             created_at=None,
+            tax_type="GENERAL",
+            investment_horizon=None,
         )
 
         # REAL_ESTATE: snap_ids=[], acc_ids=[] → only 2 DB calls

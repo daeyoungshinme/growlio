@@ -197,6 +197,8 @@ def _build_account_row(
         "asset_type_label": ASSET_TYPE_LABELS.get(acc.asset_type, acc.asset_type),
         "data_source": acc.data_source,
         "institution": acc.institution,
+        "tax_type": acc.tax_type,
+        "investment_horizon": acc.investment_horizon,
         "amount_krw": amount_krw,
         "invested_krw": invested,
         "unrealized_pnl": pnl,

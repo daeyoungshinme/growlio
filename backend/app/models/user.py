@@ -25,8 +25,8 @@ class User(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    settings: Mapped["UserSettings"] = relationship(back_populates="user", uselist=False)
-    asset_accounts: Mapped[list["AssetAccount"]] = relationship(back_populates="user")
+    settings: Mapped["UserSettings"] = relationship(back_populates="user", uselist=False, passive_deletes=True)
+    asset_accounts: Mapped[list["AssetAccount"]] = relationship(back_populates="user", passive_deletes=True)
 
 
 class UserSettings(Base):
@@ -46,6 +46,10 @@ class UserSettings(Base):
     annual_dividend_goal: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     # 목표 역산 추천 엔진에 병합할 사용자 등록 후보 ETF (RECOMMENDATION_UNIVERSE 외 추가분, 최대 10개)
     goal_candidate_tickers: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    # 목표 역산 추천 엔진 파라미터 (사용자 조정 가능, NULL이면 기존 하드코딩 기본값 사용 — 하위호환)
+    goal_risk_tolerance: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    goal_max_weight_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    goal_cagr_lookback_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 알림 설정

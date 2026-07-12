@@ -9,6 +9,7 @@ import type { AssetAccount } from "@/api/assets";
 const fetchOverallGoalRecommendation = vi.fn();
 const fetchSettings = vi.fn();
 const updateGoalCandidateTickers = vi.fn();
+const updateGoalRecommendationOptions = vi.fn();
 const fetchPortfolios = vi.fn();
 const updatePortfolio = vi.fn();
 const fetchAccounts = vi.fn();
@@ -22,6 +23,7 @@ vi.mock("@/api/rebalancing", () => ({
 vi.mock("@/api/settings", () => ({
   fetchSettings: (...args: unknown[]) => fetchSettings(...args),
   updateGoalCandidateTickers: (...args: unknown[]) => updateGoalCandidateTickers(...args),
+  updateGoalRecommendationOptions: (...args: unknown[]) => updateGoalRecommendationOptions(...args),
 }));
 
 vi.mock("@/api/portfolios", () => ({
@@ -105,6 +107,9 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     fcm_token_stored: false,
     composite_signal_alerts_enabled: true,
     goal_candidate_tickers: [],
+    goal_risk_tolerance: "CONSERVATIVE",
+    goal_max_weight_pct: 40.0,
+    goal_cagr_lookback_years: 10,
     ...overrides,
   };
 }
@@ -122,6 +127,9 @@ function makeRecommendation(overrides: Partial<GoalRecommendation> = {}): GoalRe
     expected_return_pct: 9.1,
     expected_dividend_yield_pct: 2.1,
     note: null,
+    cagr_lookback_years: 10,
+    risk_tolerance: "CONSERVATIVE",
+    max_weight_pct: 40.0,
     ...overrides,
   };
 }
@@ -133,6 +141,8 @@ describe("GoalRecommendationCard", () => {
     fetchSettings.mockResolvedValue(makeSettingsData());
     updateGoalCandidateTickers.mockReset();
     updateGoalCandidateTickers.mockResolvedValue({ detail: "저장되었습니다" });
+    updateGoalRecommendationOptions.mockReset();
+    updateGoalRecommendationOptions.mockResolvedValue({ detail: "저장되었습니다" });
     fetchPortfolios.mockReset();
     fetchPortfolios.mockResolvedValue([]);
     fetchAccounts.mockReset();
@@ -371,5 +381,59 @@ describe("GoalRecommendationCard", () => {
 
     await waitFor(() => expect(toastMock).toHaveBeenCalled());
     expect(onApplied).not.toHaveBeenCalled();
+  });
+
+  it("shows the CAGR lookback year used in the expected-return summary", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(
+      makeRecommendation({ cagr_lookback_years: 5 }),
+    );
+    renderWithProviders(<GoalRecommendationCard />);
+
+    expect(await screen.findByText(/최근 5년 CAGR 기준/)).toBeDefined();
+  });
+
+  it("renders a clamp note alongside a successful recommendation", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(
+      makeRecommendation({
+        note: "선택한 리스크 성향의 여유 수익률 목표는 종목당 최대 비중 제약 하에서 달성 가능한 최대 기대수익률까지만 반영되었습니다",
+      }),
+    );
+    renderWithProviders(<GoalRecommendationCard />);
+
+    expect(
+      await screen.findByText(
+        "선택한 리스크 성향의 여유 수익률 목표는 종목당 최대 비중 제약 하에서 달성 가능한 최대 기대수익률까지만 반영되었습니다",
+      ),
+    ).toBeDefined();
+  });
+
+  it("opens the recommendation-options modal and saves risk tolerance changes", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<GoalRecommendationCard />);
+
+    fireEvent.click(await screen.findByText("추천 설정"));
+    expect(await screen.findByText("리스크 성향")).toBeDefined();
+
+    fireEvent.change(screen.getByDisplayValue("보수적 (목표치 그대로)"), {
+      target: { value: "AGGRESSIVE" },
+    });
+    fireEvent.click(await screen.findByText("저장"));
+
+    await waitFor(() => expect(updateGoalRecommendationOptions).toHaveBeenCalled());
+    expect(updateGoalRecommendationOptions.mock.calls[0][0]).toEqual({
+      risk_tolerance: "AGGRESSIVE",
+      max_weight_pct: 40,
+      cagr_lookback_years: 10,
+    });
+  });
+
+  it("does not show a save button in the options modal until a value changes", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(makeRecommendation());
+    renderWithProviders(<GoalRecommendationCard />);
+
+    fireEvent.click(await screen.findByText("추천 설정"));
+    await screen.findByText("리스크 성향");
+
+    expect(screen.queryByText("저장")).toBeNull();
   });
 });

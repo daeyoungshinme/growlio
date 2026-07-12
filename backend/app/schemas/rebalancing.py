@@ -14,6 +14,7 @@ class TickerAccountInfo(BaseModel):
     quantity: float = 0  # 해당 계좌 보유 수량
     value_krw: float = 0  # 해당 계좌 보유 금액 (KRW)
     is_mock_mode: bool = False  # KIS 모의 여부
+    tax_type: str = "GENERAL"  # GENERAL | ISA | PENSION_SAVINGS | IRP | OVERSEAS_DEDICATED — 매도 계좌 우선순위에 사용
 
 
 # ── 리밸런싱 분석 결과 ────────────────────────────────────────
@@ -62,6 +63,7 @@ class TaxImpactItem(BaseModel):
     sell_qty: float
     estimated_realized_gain_krw: float  # 양수=이익, 음수=손실
     excluded_reason: str | None = None  # 가격/평단가 부족 등으로 추정 제외 시 사유
+    is_tax_deferred: bool = False  # 매도 수량 중 일부/전부가 ISA·연금저축·IRP(과세이연) 계좌 보유분인 경우 True
 
 
 class DiagnosisContext(BaseModel):
@@ -434,9 +436,12 @@ class GoalRecommendation(BaseModel):
     required_return_pct: float | None = None  # 목표 달성에 필요한 연평균 수익률(%)
     required_dividend_yield_pct: float | None = None  # 목표 배당 달성에 필요한 배당수익률(%, 현재 자산 기준)
     recommended_items: list[GoalRecommendationItem] = []
-    expected_return_pct: float | None = None  # 추천 비중의 가중평균 10년 CAGR(%)
+    expected_return_pct: float | None = None  # 추천 비중의 가중평균 CAGR(%) — cagr_lookback_years 기간 기준
     expected_dividend_yield_pct: float | None = None  # 추천 비중의 가중평균 배당수익률(%)
-    note: str | None = None  # 미설정/이미 달성/달성 불가 등 상태 설명
+    note: str | None = None  # 미설정/이미 달성/달성 불가/리스크 성향 클램프 등 상태 설명
+    cagr_lookback_years: int = 10  # 기대수익률(CAGR) 산출 기간(년) — 진단화면 10년 고정 지표와 다를 수 있음
+    risk_tolerance: str = "CONSERVATIVE"  # 적용된 리스크 성향 (CONSERVATIVE/BALANCED/AGGRESSIVE)
+    max_weight_pct: float = 40.0  # 적용된 종목당 최대 비중(%)
 
 
 class CompositeSignalStatus(BaseModel):

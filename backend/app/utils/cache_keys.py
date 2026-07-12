@@ -39,7 +39,9 @@ TTL_EXCHANGE_RATE_ALERTS = 300  # 환율 알림 목록 5분
 TTL_INDICATOR_LATEST = 3600  # 경제지표 최신값 1시간
 TTL_INDICATOR_HISTORY = 21600  # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400  # 경제지표 발표 일정 24시간
-TTL_MARKET_SIGNAL = 3600  # 복합 시장 신호 1시간
+TTL_MARKET_SIGNAL = 3600  # 복합 시장 신호 1시간 (전체 신호 정상 조회 시)
+TTL_MARKET_SIGNAL_DEGRADED = 60  # 일부/전체 신호 조회 실패(PARTIAL·STALE) 시 1분 — 일시적 장애가
+# 1시간짜리 캐시에 고착되어 사용자가 오래 빈 신호를 보는 것을 방지, 빠르게 재시도되도록 함
 TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
 TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
 TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
@@ -161,9 +163,10 @@ def economic_indicator_calendar_key() -> str:
 
 
 def market_signal_latest_key() -> str:
-    # v2: 하이일드 스프레드·달러인덱스·금리인하기대 3개 신호 추가로 스키마 변경 — 배포 직후
-    # 구버전 캐시(3개 신호 필드)가 신버전 응답에 섞이는 것을 방지하기 위해 키를 분리
-    return f"{_env_prefix()}market:signal:latest:v2"
+    # v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
+    # (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
+    # 잘못된 값을 계속 서빙하지 않도록 키를 분리)
+    return f"{_env_prefix()}market:signal:latest:v4"
 
 
 def market_signal_last_level_key() -> str:
@@ -247,6 +250,11 @@ async def _scan_unlink(redis: RedisType, pattern: str) -> None:
                 break
         if keys_to_delete:
             await redis.unlink(*keys_to_delete)
+
+
+async def invalidate_all_user_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+    """회원 탈퇴 시 해당 유저의 모든 캐시 키를 SCAN+UNLINK로 일괄 삭제한다."""
+    await _scan_unlink(redis, f"{_env_prefix()}*{user_id}*")
 
 
 async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:

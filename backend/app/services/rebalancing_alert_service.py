@@ -28,7 +28,11 @@ from app.services.alert_calculator import (
 )
 from app.services.alert_service import save_alert_history
 from app.services.rebalancing_diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
-from app.services.rebalancing_order_builder import build_rebalancing_orders, refresh_live_prices
+from app.services.rebalancing_order_builder import (
+    build_rebalancing_orders,
+    is_market_signal_blocking_auto_mode,
+    refresh_live_prices,
+)
 from app.utils.cache_keys import (
     TTL_COMPOSITE_ALERT_SENT,
     composite_alert_sent_key,
@@ -187,10 +191,7 @@ async def _process_rebalancing_alert(
     # 시장 신호 기반 자동 실행 게이트
     if mode == "AUTO":
         market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        _blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
-            market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
-        )
-        if _blocked:
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level):
             logger.info(
                 "rebalancing_auto_skipped_market_signal",
                 alert_id=str(alert.id),

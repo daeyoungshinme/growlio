@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import redis.asyncio as aioredis
 import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,12 +17,18 @@ from app.utils.metrics import alert_trigger_count
 logger = structlog.get_logger()
 
 
-async def check_and_trigger_alerts(db: AsyncSession) -> None:
-    """활성 환율 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
+async def check_and_trigger_alerts(db: AsyncSession, redis: aioredis.Redis | None = None) -> None:
+    """활성 환율 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화.
+
+    redis를 함께 전달해야 fetch_usd_krw(force_refresh=True)로 가져온 실시간 환율이
+    Redis usd_krw_rate 캐시에 반영된다 — 이 캐시는 market_signal_service의 환율 신호를
+    비롯해 앱 전역에서 "현재 환율"로 참조하는 유일한 소스이므로, redis=None으로 호출하면
+    이 job이 5분마다 실시간 값을 가져오고도 캐시에 저장하지 않아 fallback 값으로 굳어진다.
+    """
     from app.services.email_service import send_exchange_rate_alert
     from app.services.push_service import send_push_to_user
 
-    current_rate = await fetch_usd_krw(None, force_refresh=True)
+    current_rate = await fetch_usd_krw(redis, force_refresh=True)
     if current_rate <= 0:
         logger.warning("alert_check_skipped_no_rate")
         return

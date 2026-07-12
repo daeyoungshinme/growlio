@@ -71,6 +71,13 @@ vi.mock("@/components/settings/NotificationEmailSection", () => ({
 vi.mock("@/components/settings/DCASettingsSection", () => ({
   DCASettingsSection: () => <div data-testid="dca-settings-section">DCASettingsSection</div>,
 }));
+vi.mock("@/components/settings/DeleteAccountModal", () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="delete-account-modal">
+      <button onClick={onClose}>modal-close</button>
+    </div>
+  ),
+}));
 
 import SettingsPage from "@/pages/SettingsPage";
 import { api } from "@/api/client";
@@ -262,6 +269,20 @@ describe("SettingsPage", () => {
       expect(api.delete).toHaveBeenCalledWith("/settings/dart");
     });
     expect(toast).toHaveBeenCalledWith("DART API 키가 삭제되었습니다", "success");
+  });
+
+  it("회원 탈퇴 버튼을 클릭하면 모달이 열리고 닫기 버튼으로 닫힌다", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("delete-account-modal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "회원 탈퇴" }));
+    expect(screen.getByTestId("delete-account-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "modal-close" }));
+    expect(screen.queryByTestId("delete-account-modal")).not.toBeInTheDocument();
   });
 
   it("NotificationEmailSection에 user_email을 전달한다", async () => {

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,7 @@ from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
 from app.services.risk_service import get_portfolio_risk_metrics
-from app.services.tax_service import _OVERSEAS_MARKETS, estimate_overseas_transfer_tax
+from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES, estimate_overseas_transfer_tax
 from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
@@ -39,20 +40,58 @@ _MARKET_NOTES: dict[str, str | None] = {
 }
 
 
-def _aggregate_position_costs(overview: dict) -> dict[tuple[str, str], dict[str, float]]:
-    """overview.all_positions에서 (ticker, market)별 qty/value_krw/invested_krw 합계를 구한다.
+def _aggregate_position_costs(overview: dict) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """overview.all_positions에서 (ticker, market)별 계좌 단위 보유 목록(lot)을 구한다.
 
-    여러 계좌에 분산 보유된 동일 종목을 합산한다. 추가 DB 쿼리 없이 이미 조회된 overview만 사용.
+    각 lot은 계좌의 tax_type을 포함하며, 매도 우선순위(rebalancing_order_builder._build_sell_orders와
+    동일 기준 — 과세이연 계좌 후순위, 그 다음 보유수량 큰 순)로 정렬해 반환한다. 세금 미리보기가
+    실제 매도 실행 시 계좌 선택 순서와 동일한 가정으로 실현손익을 추정하도록 하기 위함이다.
     """
-    costs: dict[tuple[str, str], dict[str, float]] = {}
+    tax_type_map = {row["id"]: row.get("tax_type", "GENERAL") for row in overview.get("accounts", [])}
+
+    lots: dict[tuple[str, str], list[dict[str, Any]]] = {}
     for p in overview.get("all_positions", []):
         key = (p["ticker"], p["market"])
-        if key not in costs:
-            costs[key] = {"qty": 0.0, "value_krw": 0.0, "invested_krw": 0.0}
-        costs[key]["qty"] += float(p.get("qty", 0))
-        costs[key]["value_krw"] += float(p.get("value_krw", 0))
-        costs[key]["invested_krw"] += float(p.get("invested_krw", 0))
-    return costs
+        tax_type = tax_type_map.get(p.get("account_id"), "GENERAL")
+        lots.setdefault(key, []).append(
+            {
+                "account_id": p.get("account_id"),
+                "is_tax_deferred": tax_type in _TAX_DEFERRED_TYPES,
+                "qty": float(p.get("qty", 0)),
+                "value_krw": float(p.get("value_krw", 0)),
+                "invested_krw": float(p.get("invested_krw", 0)),
+            }
+        )
+
+    for lot_list in lots.values():
+        lot_list.sort(key=lambda lot: (lot["is_tax_deferred"], -lot["qty"]))
+    return lots
+
+
+def _consume_lots(lots: list[dict[str, Any]], sell_qty: float) -> tuple[float, float, float]:
+    """매도 우선순위(lots 정렬 순서)대로 sell_qty를 소진하며 실현손익/매도금액/과세이연 수량을 계산한다.
+
+    Returns: (realized_gain, sell_notional, deferred_qty) — realized_gain은 과세이연 lot을 제외한 합계.
+    """
+    remaining = sell_qty
+    realized_gain = 0.0
+    sell_notional = 0.0
+    deferred_qty = 0.0
+    for lot in lots:
+        if remaining <= 0:
+            break
+        if lot["qty"] <= 0:
+            continue
+        take = min(remaining, lot["qty"])
+        avg_cost_per_share = lot["invested_krw"] / lot["qty"]
+        current_price_per_share = lot["value_krw"] / lot["qty"]
+        sell_notional += take * current_price_per_share
+        if lot["is_tax_deferred"]:
+            deferred_qty += take
+        else:
+            realized_gain += take * (current_price_per_share - avg_cost_per_share)
+        remaining -= take
+    return realized_gain, sell_notional, deferred_qty
 
 
 def _build_tax_preview(
@@ -75,14 +114,15 @@ def _build_tax_preview(
         if item.ticker in _EXCLUDED_TICKERS or item.market in _EXCLUDED_MARKETS:
             continue
 
-        cost = cost_map.get((item.ticker, item.market))
+        lots = cost_map.get((item.ticker, item.market), [])
+        total_qty = sum(lot["qty"] for lot in lots)
         is_overseas = item.market in _OVERSEAS_MARKETS
 
         # shares_to_trade가 None(가격 데이터 누락)이면 보유수량 전체를 매도한다고 가정해 폴백한다.
         if item.shares_to_trade is not None:
             sell_qty = abs(item.shares_to_trade)
-        elif cost and cost["qty"] > 0:
-            sell_qty = cost["qty"]
+        elif total_qty > 0:
+            sell_qty = total_qty
         else:
             tax_items.append(
                 TaxImpactItem(
@@ -97,7 +137,7 @@ def _build_tax_preview(
             )
             continue
 
-        if not cost or cost["qty"] <= 0:
+        if not lots or total_qty <= 0:
             tax_items.append(
                 TaxImpactItem(
                     ticker=item.ticker,
@@ -111,10 +151,9 @@ def _build_tax_preview(
             )
             continue
 
-        avg_cost_per_share = cost["invested_krw"] / cost["qty"]
-        current_price_per_share = cost["value_krw"] / cost["qty"]
-        realized_gain = sell_qty * (current_price_per_share - avg_cost_per_share)
-        sell_notional = sell_qty * current_price_per_share
+        # lots는 _aggregate_position_costs에서 실제 매도 우선순위(과세이연 계좌 후순위)로 정렬되어 있다 —
+        # 여기서도 동일 순서로 소진해 실제 실행 결과와 세금 추정치가 어긋나지 않도록 한다.
+        realized_gain, sell_notional, deferred_qty = _consume_lots(lots, sell_qty)
 
         total_gain += realized_gain
         if is_overseas:
@@ -131,6 +170,7 @@ def _build_tax_preview(
                 is_overseas=is_overseas,
                 sell_qty=sell_qty,
                 estimated_realized_gain_krw=round(realized_gain, 0),
+                is_tax_deferred=deferred_qty > 0,
             )
         )
 
@@ -148,6 +188,13 @@ def _build_tax_preview(
     excluded_count = sum(1 for t in tax_items if t.excluded_reason)
     if excluded_count:
         tax_notes.append(f"{excluded_count}개 종목은 가격/평단가 정보 부족으로 세금 영향 추정에서 제외되었습니다.")
+
+    deferred_count = sum(1 for t in tax_items if t.is_tax_deferred)
+    if deferred_count:
+        tax_notes.append(
+            f"{deferred_count}개 종목은 매도 수량 중 일부/전부가 ISA·연금저축·IRP 계좌 보유분으로, "
+            "과세이연되어 위 세금 추정에서 제외되었습니다."
+        )
 
     tax_items.sort(key=lambda t: abs(t.estimated_realized_gain_krw), reverse=True)
     return total_gain, overseas_tax, total_fee, tax_notes, tax_items[:_TAX_DETAIL_LIMIT]

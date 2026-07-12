@@ -12,16 +12,21 @@ vi.mock("react-router-dom", async (importOriginal) => {
 });
 
 const mockRegister = vi.fn();
+const mockResendConfirmationEmail = vi.fn();
 
 vi.mock("@/stores/authStore", () => ({
   useAuthStore: vi.fn((selector) => {
-    const state = { register: mockRegister };
+    const state = {
+      register: mockRegister,
+      resendConfirmationEmail: mockResendConfirmationEmail,
+    };
     return typeof selector === "function" ? selector(state) : state;
   }),
 }));
 
+const mockToast = vi.fn();
 vi.mock("@/utils/toast", () => ({
-  toast: vi.fn(),
+  toast: (...args: unknown[]) => mockToast(...args),
 }));
 
 function fillForm(email: string, password: string, confirm: string) {
@@ -88,12 +93,42 @@ describe("RegisterPage", () => {
     );
   });
 
-  it("이메일 확인이 필요한 경우 안내 메시지를 표시한다", async () => {
+  it("이메일 확인이 필요한 경우 안내 메시지와 재발송 버튼을 표시한다", async () => {
     mockRegister.mockRejectedValue(new Error("EMAIL_CONFIRMATION_REQUIRED"));
     renderPage();
     fillForm("new@example.com", "password123", "password123");
     fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
     await waitFor(() => expect(screen.getByText(/인증 링크를 클릭/)).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /재발송/ })).toBeInTheDocument();
+  });
+
+  it("재발송 버튼 클릭 시 resendConfirmationEmail을 호출하고 성공 토스트를 표시한다", async () => {
+    mockRegister.mockRejectedValue(new Error("EMAIL_CONFIRMATION_REQUIRED"));
+    mockResendConfirmationEmail.mockResolvedValue(undefined);
+    renderPage();
+    fillForm("new@example.com", "password123", "password123");
+    fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
+    const resendButton = await screen.findByRole("button", { name: /재발송/ });
+    fireEvent.click(resendButton);
+    await waitFor(() =>
+      expect(mockResendConfirmationEmail).toHaveBeenCalledWith("new@example.com"),
+    );
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("다시 보냈습니다"), "success"),
+    );
+  });
+
+  it("재발송 실패 시 에러 토스트를 표시한다", async () => {
+    mockRegister.mockRejectedValue(new Error("EMAIL_CONFIRMATION_REQUIRED"));
+    mockResendConfirmationEmail.mockRejectedValue(new Error("rate limited"));
+    renderPage();
+    fillForm("new@example.com", "password123", "password123");
+    fireEvent.submit(screen.getByRole("button", { name: /회원가입/ }));
+    const resendButton = await screen.findByRole("button", { name: /재발송/ });
+    fireEvent.click(resendButton);
+    await waitFor(() =>
+      expect(mockToast).toHaveBeenCalledWith(expect.stringContaining("실패"), "error"),
+    );
   });
 
   it("일반 오류 발생 시 에러 메시지를 표시한다", async () => {

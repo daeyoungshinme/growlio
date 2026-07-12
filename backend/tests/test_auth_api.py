@@ -2,8 +2,9 @@
 
 import uuid
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
@@ -193,3 +194,123 @@ class TestFindAccount:
 
         assert result.message
         assert len(result.message) > 0
+
+
+# ── POST /auth/account/delete ───────────────────────────────────
+
+
+def test_user_settings_relationship_uses_passive_deletes():
+    """UserSettings.user_id는 PK+FK라 passive_deletes 없이 User를 삭제하면 SQLAlchemy가
+
+    FK를 NULL로 지우려다 AssertionError를 낸다 (PK는 NULL 불가). mock DB 테스트로는
+    이 매퍼 설정 버그를 잡지 못하므로 매퍼 configuration 자체를 검증한다.
+    """
+    from sqlalchemy import inspect
+
+    from app.models.user import User
+
+    mapper = inspect(User)
+    assert mapper.relationships["settings"].passive_deletes is True
+    assert mapper.relationships["asset_accounts"].passive_deletes is True
+
+
+def _setup_app(user, db):
+    from app.api.deps import get_current_user
+    from app.database import get_db
+    from app.main import app
+
+    async def override_auth():
+        return user
+
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_current_user] = override_auth
+    app.dependency_overrides[get_db] = override_db
+    return app
+
+
+def _configure_empty_execute(db) -> None:
+    """db.execute(select(AssetAccount.id)...).scalars().all() → [] 로 체이닝 설정."""
+    execute_result = MagicMock()
+    execute_result.scalars.return_value.all.return_value = []
+    db.execute = AsyncMock(return_value=execute_result)
+
+
+class TestDeleteAccount:
+    """POST /api/v1/auth/account/delete"""
+
+    def test_wrong_password_returns_401(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=False)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "wrong"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 401
+        db.delete.assert_not_called()
+        app.dependency_overrides.clear()
+
+    def test_supabase_delete_failure_returns_502_and_keeps_local_data(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        _configure_empty_execute(db)
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
+            patch(
+                "app.api.v1.auth.delete_supabase_user",
+                AsyncMock(side_effect=httpx.HTTPStatusError("boom", request=MagicMock(), response=MagicMock())),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "correct"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 502
+        db.delete.assert_not_called()
+        db.commit.assert_not_called()
+        app.dependency_overrides.clear()
+
+    def test_success_deletes_local_user_and_returns_204(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        _configure_empty_execute(db)
+        app = _setup_app(user, db)
+
+        redis_mock = AsyncMock()
+        redis_mock.scan = AsyncMock(return_value=(0, []))
+        redis_mock.delete = AsyncMock()
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
+            patch("app.api.v1.auth.delete_supabase_user", AsyncMock(return_value=None)),
+            patch("app.api.v1.auth.get_redis", AsyncMock(return_value=redis_mock)),
+            patch("app.services.email_service.send_account_deletion_email", AsyncMock(return_value=True)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "correct"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 204
+        db.delete.assert_called_once_with(user)
+        db.commit.assert_called_once()
+        app.dependency_overrides.clear()

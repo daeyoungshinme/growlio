@@ -43,6 +43,10 @@ class AssetAccount(Base):
     # MANUAL | KIS_API | KIWOOM_API
     data_source: Mapped[str] = mapped_column(String(20), nullable=False, default="MANUAL")
     institution: Mapped[str | None] = mapped_column(String(100))
+    # GENERAL | ISA | PENSION_SAVINGS | IRP | OVERSEAS_DEDICATED — 세제 성격 (리밸런싱 세금 계산·매도 우선순위에 사용)
+    tax_type: Mapped[str] = mapped_column(String(30), nullable=False, server_default="GENERAL")
+    # SHORT_TERM | MID_TERM | LONG_TERM | None — 투자기간 태그 (계좌 그룹핑용, 리밸런싱 계산에는 영향 없음)
+    investment_horizon: Mapped[str | None] = mapped_column(String(20))
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))

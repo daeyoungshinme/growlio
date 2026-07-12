@@ -147,6 +147,14 @@ const mockSignal: MarketSignalResponse = {
       date: "2024-01-15",
       sub_score: 1,
     },
+    exchange_rate: {
+      value: 1380.0,
+      ma20: 1370.0,
+      deviation_pct: 0.73,
+      level: "NORMAL",
+      date: "2024-01-15",
+      sub_score: 0,
+    },
   },
 };
 
@@ -203,6 +211,12 @@ describe("MarketSignalBanner", () => {
   it("labels the toggle row so it isn't a bare checkbox", async () => {
     renderBanner();
     expect(await screen.findByText("시장 위험 신호 알림 설정")).toBeDefined();
+  });
+
+  it("shows the exchange rate signal row", () => {
+    renderBanner();
+    expect(screen.getByText("원/달러 환율")).toBeDefined();
+    expect(screen.getByText(/₩1380/)).toBeDefined();
   });
 });
 

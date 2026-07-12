@@ -1,5 +1,6 @@
 import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount } from "@/api/assets";
+import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import EditableNameField from "@/components/common/EditableNameField";
@@ -45,6 +46,16 @@ export default function BankAccountCard({
           <span className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
             {typeLabel}
           </span>
+          {account.tax_type && account.tax_type !== "GENERAL" && (
+            <span className="px-2 py-0.5 border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 text-xs rounded-full shrink-0">
+              {ACCOUNT_TAX_TYPE_LABELS[account.tax_type]}
+            </span>
+          )}
+          {account.investment_horizon && (
+            <span className="px-2 py-0.5 border border-teal-300 dark:border-teal-700 text-teal-600 dark:text-teal-400 text-xs rounded-full shrink-0">
+              {INVESTMENT_HORIZON_LABELS[account.investment_horizon]}
+            </span>
+          )}
         </div>
         {account.institution && (
           <p className="text-sm text-gray-500 dark:text-gray-400">{account.institution}</p>

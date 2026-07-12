@@ -1,5 +1,5 @@
 """시장 위험 신호 서비스 — VIX, 장단기 금리차(T10Y2Y), Fear & Greed Index,
-하이일드 스프레드, 달러 인덱스, 금리인하기대(2Y-FEDFUNDS 대체지표) 통합."""
+하이일드 스프레드, 달러 인덱스, 금리인하기대(2Y-FEDFUNDS 대체지표), 환율 방향성(DEXKOUS) 통합."""
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ import structlog
 
 from app.utils.cache_keys import (
     TTL_MARKET_SIGNAL,
+    TTL_MARKET_SIGNAL_DEGRADED,
     TTL_MARKET_SIGNAL_LAST_LEVEL,
     get_cached_json,
     market_signal_last_level_key,
@@ -265,6 +266,66 @@ async def fetch_rate_cut_expectation_signal() -> dict[str, Any] | None:
     }
 
 
+async def fetch_exchange_rate_signal(redis: aioredis.Redis | None = None) -> dict[str, Any] | None:
+    """실시간 원/달러 환율의 FRED DEXKOUS 20일 이동평균 대비 이격도로 원화 약세 방향성을 판단한다.
+
+    실시간 "예측치"가 아닌 참고 지표 — 원/달러 급등(20일선 상향 이탈)은 원화 약세 심화·
+    자금 이탈 우려 방향으로 해석하며, 달러 인덱스 신호와 동일한 산출 로직을 재사용한다.
+
+    FRED DEXKOUS는 연준 H.10 발표 특성상 최신 관측치가 실제로 1주일 이상 지연되는 경우가
+    있어 그대로 "현재 환율"로 노출하면 실제 시세와 크게 어긋난다. 따라서 표시용 현재값
+    (value)과 이격도 계산의 기준값은 앱 전역에서 쓰는 실시간 캐시(get_usd_krw_rate)를 쓰고,
+    FRED 시계열은 원래 목적대로 ma20(20일 이동평균) 산출에만 사용한다 — 이동평균은 개별
+    관측치가 며칠 지연되어 섞여도 방향성 판단에 미치는 영향이 작다.
+    """
+    if not fred_circuit.is_available():
+        logger.warning("fred_circuit_open", signal="exchange_rate")
+        return None
+    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+
+    try:
+        obs = await fred_circuit.call(_fred_get_observations, "DEXKOUS", limit=30)
+    except (CircuitOpenError, Exception) as exc:
+        logger.warning("exchange_rate_fetch_failed", error=str(exc))
+        return None
+
+    points = _parse_fred_obs(obs)
+    if len(points) < 20:
+        return None
+
+    recent = points[-20:]
+    ma20 = sum(p["value"] for p in recent) / len(recent)
+    if ma20 == 0:
+        return None
+
+    from app.utils.currency import get_usd_krw_rate
+
+    live_rate = await get_usd_krw_rate(redis)
+    deviation_pct = (live_rate - ma20) / ma20 * 100
+
+    if deviation_pct <= 1:
+        level = "NORMAL"
+        sub_score = 0
+    elif deviation_pct <= 3:
+        level = "ELEVATED"
+        sub_score = 1
+    elif deviation_pct <= 5:
+        level = "HIGH"
+        sub_score = 2
+    else:
+        level = "BREAKOUT"
+        sub_score = 3
+
+    return {
+        "value": round(live_rate, 2),
+        "ma20": round(ma20, 2),
+        "deviation_pct": round(deviation_pct, 2),
+        "level": level,
+        "date": recent[-1]["date"],  # ma20 산출 기준 FRED 최신 관측일 (value의 기준일 아님)
+        "sub_score": sub_score,
+    }
+
+
 async def _call_fng_api() -> dict[str, Any]:
     """Alternative.me Fear & Greed Index API를 실제 호출한다."""
     async with httpx.AsyncClient(timeout=8) as client:
@@ -339,9 +400,10 @@ async def fetch_fear_greed_signal() -> dict[str, Any] | None:
 
 # 복합 점수 임계값 — 기존 3개 신호(상한 10) 배점 비율(GREEN 0-20%, YELLOW 30-50%, RED 60-100%)을
 # 6개 신호(상한 20)로 확장하면서 그대로 보존: new_threshold = old_threshold * (20/10)
-COMPOSITE_SCORE_MAX = 20
-_GREEN_MAX = 4  # old: 2
-_YELLOW_MAX = 10  # old: 5
+# 이후 환율 신호(상한 3) 추가로 상한 23 — 비율(20%/50%)을 유지해 재계산: 23*0.2≈5, 23*0.5≈12
+COMPOSITE_SCORE_MAX = 23
+_GREEN_MAX = 5  # old: 4
+_YELLOW_MAX = 12  # old: 10
 
 
 def compute_composite_signal(
@@ -351,12 +413,13 @@ def compute_composite_signal(
     high_yield_spread: dict[str, Any] | None = None,
     dollar_index: dict[str, Any] | None = None,
     rate_cut_expectation: dict[str, Any] | None = None,
+    exchange_rate: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """여섯 신호를 점수화해 GREEN/YELLOW/RED 복합 레벨을 반환한다.
+    """일곱 신호를 점수화해 GREEN/YELLOW/RED 복합 레벨을 반환한다.
 
     각 신호 조회 실패 시 해당 점수를 0으로 처리 (안전 방향 처리).
-    총점 0–4 → GREEN, 5–10 → YELLOW, 11–20 → RED (상한 20 = 기존 VIX/YC/FG 상한 10에
-    하이일드 스프레드·달러인덱스·금리인하기대 상한 10을 더한 값, 임계값은 옛 비율 그대로 2배 확장).
+    총점 0–5 → GREEN, 6–12 → YELLOW, 13–23 → RED (상한 23 = 기존 6개 신호 상한 20에
+    환율 방향성 신호 상한 3을 더한 값, 임계값은 기존 비율 그대로 재확장).
     """
     vix_score = vix["sub_score"] if vix else 0
     yc_score = yield_curve["sub_score"] if yield_curve else 0
@@ -364,7 +427,8 @@ def compute_composite_signal(
     hy_score = high_yield_spread["sub_score"] if high_yield_spread else 0
     usd_score = dollar_index["sub_score"] if dollar_index else 0
     rate_score = rate_cut_expectation["sub_score"] if rate_cut_expectation else 0
-    total = vix_score + yc_score + fg_score + hy_score + usd_score + rate_score
+    fx_score = exchange_rate["sub_score"] if exchange_rate else 0
+    total = vix_score + yc_score + fg_score + hy_score + usd_score + rate_score + fx_score
 
     if total <= _GREEN_MAX:
         level = "GREEN"
@@ -373,7 +437,15 @@ def compute_composite_signal(
     else:
         level = "RED"
 
-    all_signals = (vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation)
+    all_signals = (
+        vix,
+        yield_curve,
+        fear_greed,
+        high_yield_spread,
+        dollar_index,
+        rate_cut_expectation,
+        exchange_rate,
+    )
     none_count = sum(1 for s in all_signals if s is None)
     if none_count == len(all_signals):
         data_freshness = "STALE"
@@ -399,6 +471,7 @@ def compute_composite_signal(
             "high_yield_spread": high_yield_spread,
             "dollar_index": dollar_index,
             "rate_cut_expectation": rate_cut_expectation,
+            "exchange_rate": exchange_rate,
         },
         "computed_at": datetime.now(UTC).isoformat(),
         "data_freshness": data_freshness,
@@ -411,7 +484,7 @@ def compute_composite_signal(
 
 
 async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, Any]:
-    """복합 시장 위험 신호를 반환한다. Redis 1시간 캐시."""
+    """복합 시장 위험 신호를 반환한다. Redis 캐시(정상 시 1시간, 일부/전체 실패 시 1분)."""
     cache_key = market_signal_latest_key()
 
     if redis is not None and (data := await get_cached_json(redis, cache_key)) is not None:
@@ -419,12 +492,27 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             data["data_freshness"] = "CACHED"
         return data
 
-    vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation = await _fetch_all_signals()
+    (
+        vix,
+        yield_curve,
+        fear_greed,
+        high_yield_spread,
+        dollar_index,
+        rate_cut_expectation,
+        exchange_rate,
+    ) = await _fetch_all_signals(redis)
     result = compute_composite_signal(
-        vix, yield_curve, fear_greed, high_yield_spread, dollar_index, rate_cut_expectation
+        vix,
+        yield_curve,
+        fear_greed,
+        high_yield_spread,
+        dollar_index,
+        rate_cut_expectation,
+        exchange_rate,
     )
 
-    await set_cached_json(redis, cache_key, result, TTL_MARKET_SIGNAL)
+    ttl = TTL_MARKET_SIGNAL if result["data_freshness"] == "LIVE" else TTL_MARKET_SIGNAL_DEGRADED
+    await set_cached_json(redis, cache_key, result, ttl)
     return result
 
 
@@ -440,7 +528,10 @@ async def set_last_composite_level(redis: aioredis.Redis | None, level: str) -> 
     await set_cached_json(redis, market_signal_last_level_key(), level, TTL_MARKET_SIGNAL_LAST_LEVEL)
 
 
-async def _fetch_all_signals() -> tuple[
+async def _fetch_all_signals(
+    redis: aioredis.Redis | None = None,
+) -> tuple[
+    dict[str, Any] | None,
     dict[str, Any] | None,
     dict[str, Any] | None,
     dict[str, Any] | None,
@@ -448,7 +539,7 @@ async def _fetch_all_signals() -> tuple[
     dict[str, Any] | None,
     dict[str, Any] | None,
 ]:
-    """여섯 신호를 병렬로 조회한다. 개별 실패가 전체를 막지 않는다."""
+    """일곱 신호를 병렬로 조회한다. 개별 실패가 전체를 막지 않는다."""
     import asyncio
 
     results = await asyncio.gather(
@@ -458,6 +549,7 @@ async def _fetch_all_signals() -> tuple[
         fetch_high_yield_spread_signal(),
         fetch_dollar_index_signal(),
         fetch_rate_cut_expectation_signal(),
+        fetch_exchange_rate_signal(redis),
         return_exceptions=True,
     )
 

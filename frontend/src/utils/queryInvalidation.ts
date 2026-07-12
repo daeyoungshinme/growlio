@@ -99,8 +99,9 @@ export function invalidateCompositeSignalData(qc: QueryClient) {
   ]);
 }
 
-/** 목표 역산 추천 후보 ETF 목록 변경 후 — 포트폴리오별/전체 추천 전부(접두사 매칭) + settings 무효화 */
-export function invalidateGoalCandidateData(qc: QueryClient) {
+/** 목표 역산 추천 후보 ETF/추천 엔진 설정(리스크성향·최대비중·CAGR기간) 변경 후 —
+ * 포트폴리오별/전체 추천 전부(접두사 매칭) + settings 무효화 */
+export function invalidateGoalRecommendationData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: ["goal-recommendation"] }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.settings }),

@@ -15,6 +15,10 @@ class FindAccountResponse(BaseModel):
     message: str
 
 
+class AccountDeleteRequest(BaseModel):
+    password: str = Field(min_length=1)
+
+
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str

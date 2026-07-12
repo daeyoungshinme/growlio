@@ -105,7 +105,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 0.0, 0.0),
+                return_value=(0.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -124,6 +124,7 @@ class TestGetTaxSummary:
             "comprehensive_tax_warning",
             "total_estimated_tax_krw",
             "total_fees_krw",
+            "tax_deferred_value_krw",
             "harvesting_recommendations",
             "financial_investment_tax_simulation",
             "note",
@@ -148,7 +149,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 0.0, 0.0),
+                return_value=(0.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -169,7 +170,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(overseas_unrealized, 0.0, 0.0),
+                return_value=(overseas_unrealized, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -190,7 +191,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(1_000_000.0, 0.0, 0.0),
+                return_value=(1_000_000.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -209,7 +210,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 1_000_000_000.0, 0.0),
+                return_value=(0.0, 1_000_000_000.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -232,7 +233,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 0.0, 0.0),
+                return_value=(0.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -251,7 +252,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 0.0, 0.0),
+                return_value=(0.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
@@ -270,7 +271,7 @@ class TestGetTaxSummary:
             patch(
                 "app.services.tax_service._calc_stock_unrealized",
                 new_callable=AsyncMock,
-                return_value=(0.0, 0.0, 0.0),
+                return_value=(0.0, 0.0, 0.0, 0.0),
             ),
             patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
         ):
