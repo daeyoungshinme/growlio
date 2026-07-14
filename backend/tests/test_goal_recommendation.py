@@ -1729,3 +1729,64 @@ class TestGetHorizonRecommendations:
         saved_tickers = {c["ticker"] for c in settings_row.goal_candidate_tickers}
         assert {"133690", "360750", "458730"} <= saved_tickers
         mock_db.commit.assert_awaited()
+
+    async def test_multiple_combos_preserve_order_after_parallelized_io(self):
+        """`_build_horizon_result` 호출을 asyncio.gather로 동시 실행하도록 바꾼 뒤에도, DB 의존
+        단계(overview 조회)는 여전히 (InvestmentHorizon, AccountTaxType) enum 순서대로 순차 실행되고
+        최종 결과 순서도 그 순서를 유지해야 한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        mid_account_id = uuid.uuid4()
+        short_account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        # SHORT_TERM보다 나중인 MID_TERM 조합을 먼저 반환해도, 결과는 InvestmentHorizon enum
+        # 순서(SHORT_TERM → MID_TERM)를 따라야 한다.
+        mock_db.execute = AsyncMock(
+            return_value=_execute_result(
+                [
+                    ("MID_TERM", "GENERAL", mid_account_id),
+                    ("SHORT_TERM", "GENERAL", short_account_id),
+                ]
+            )
+        )
+
+        cagr_map = {
+            ("153130", "KOSPI"): {"cagr_pct": 2.0},
+            ("114260", "KOSPI"): {"cagr_pct": 3.0},
+        }
+        random.seed(11)
+        returns_map = {
+            "153130.KS": [random.gauss(0.0001, 0.0005) for _ in range(252)],
+            "114260.KS": [random.gauss(0.00015, 0.001) for _ in range(252)],
+        }
+        overview_mock = AsyncMock(return_value={"total_assets_krw": 5_000_000.0})
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch("app.services.goal_recommendation_service.build_portfolio_overview", overview_mock),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        assert [(r.investment_horizon, r.tax_type) for r in result.recommendations] == [
+            ("SHORT_TERM", "GENERAL"),
+            ("MID_TERM", "GENERAL"),
+        ]
+        overview_account_ids = [call.kwargs["account_ids"] for call in overview_mock.call_args_list]
+        assert overview_account_ids == [[short_account_id], [mid_account_id]]

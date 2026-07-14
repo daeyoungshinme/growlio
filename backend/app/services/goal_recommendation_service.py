@@ -839,7 +839,10 @@ async def get_horizon_recommendations(
         key = (horizon_value, tax_type_value or AccountTaxType.GENERAL.value)
         accounts_by_pair.setdefault(key, []).append(account_id)
 
-    results: list[HorizonGoalRecommendation] = []
+    # 1단계: DB(AsyncSession, 동시 접근 불가) 의존 부분 — 계좌당 자산총액·후보 필터링을 조합별로
+    # 순차 계산한다. `candidate_dicts`는 `_apply_index_region_preference`가 앞선 조합에서 추가한
+    # 큐레이션 후보를 뒤따르는 조합의 capacity_remaining/필터링에 반영해야 하므로 병렬화할 수 없다.
+    combos: list[tuple[str, str, list[uuid.UUID], float, list[dict[str, str]], str | None]] = []
     all_added: list[dict[str, str]] = []
     for horizon in InvestmentHorizon:
         for tax_type in AccountTaxType:
@@ -866,26 +869,42 @@ async def get_horizon_recommendations(
                 candidate_dicts.extend(added)
                 all_added.extend(added)
 
-            results.append(
-                await _build_horizon_result(
-                    redis,
-                    horizon.value,
-                    tax_type.value,
-                    account_ids,
-                    base_krw,
-                    eligible_candidates,
-                    _HORIZON_RISK_TOLERANCE[horizon.value],
-                    max_weight,
-                    cagr_lookback_years,
-                    short_term_equity_floor,
-                    preference_fallback_note,
-                )
+            combos.append(
+                (horizon.value, tax_type.value, account_ids, base_krw, eligible_candidates, preference_fallback_note)
             )
 
     if all_added:
         await _persist_added_candidates(db, user_id, all_added)
 
+    # 2단계: DB에 의존하지 않는 외부 I/O(Yahoo/pykrx 수익률 조회 + SLSQP 최적화)는 조합 수(최대 15개)만큼
+    # 동시 실행한다 — `_build_horizon_result`는 `db`를 사용하지 않으므로 AsyncSession 동시성 제약이 없다.
+    results = await asyncio.gather(
+        *(
+            _build_horizon_result(
+                redis,
+                horizon_value,
+                tax_type_value,
+                account_ids,
+                base_krw,
+                eligible_candidates,
+                _HORIZON_RISK_TOLERANCE[horizon_value],
+                max_weight,
+                cagr_lookback_years,
+                short_term_equity_floor,
+                preference_fallback_note,
+            )
+            for (
+                horizon_value,
+                tax_type_value,
+                account_ids,
+                base_krw,
+                eligible_candidates,
+                preference_fallback_note,
+            ) in combos
+        )
+    )
+
     return HorizonRecommendationResponse(
         generated_at=datetime.now(UTC).isoformat(),
-        recommendations=results,
+        recommendations=list(results),
     )

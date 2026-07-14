@@ -27,7 +27,8 @@ from app.models.asset import AssetAccount
 from app.services.credential_service import decrypt
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
-    _sync_calc_return,
+    _sync_calc_returns_batch,
+    _sync_pykrx_returns_batch,
     _sync_yahoo_batch,
     _sync_yahoo_price,
     _yfinance_sem,
@@ -191,41 +192,56 @@ async def get_historical_returns(
     redis: RedisType = None,
     years: int = 10,
 ) -> dict[tuple[str, str], dict]:
-    """각 종목의 최근 N년 누적/연환산 수익률을 반환한다."""
+    """각 종목의 최근 N년 누적/연환산 수익률을 반환한다.
+
+    Yahoo Finance는 종목별 개별 호출 대신 한 번의 batch download로 조회한다(`_sync_calc_returns_batch`).
+    Yahoo가 실패했거나(클라우드 호스팅 IP 차단 등) 회로가 열려 있어도, 국내(KOSPI/KOSDAQ) 종목은
+    pykrx로 보완한다(`_sync_pykrx_returns_batch`) — 해외 종목은 대체 소스가 없어 그대로 누락된다.
+    """
     if not tickers:
         return {}
 
     loop = asyncio.get_running_loop()
+    return_map: dict[tuple[str, str], dict] = {}
+    missing: list[tuple[str, str]] = []
 
-    async def _get_one(ticker: str, market: str) -> dict | None:
-        cache_key = price_return_key(years, ticker, market)
+    for ticker, market in tickers:
+        cached = None
         if redis:
             with contextlib.suppress(RedisError):
-                cached = await redis.get(cache_key)
-                if cached:
-                    return json.loads(cached)
+                cached = await redis.get(price_return_key(years, ticker, market))
+        if cached:
+            return_map[(ticker, market)] = json.loads(cached)
+        else:
+            missing.append((ticker, market))
 
-        if not yahoo_circuit.is_available():
-            return None
+    newly_fetched: dict[tuple[str, str], dict] = {}
 
+    if missing and yahoo_circuit.is_available():
         async with _yfinance_sem:
-            result = await loop.run_in_executor(None, partial(_sync_calc_return, ticker, market, years))
-        if result:
+            batch_result = await loop.run_in_executor(None, partial(_sync_calc_returns_batch, missing, years))
+        if batch_result:
             yahoo_circuit.record_success()
+        else:
+            yahoo_circuit.record_failure()
+        newly_fetched.update(batch_result)
+        missing = [tm for tm in missing if tm not in batch_result]
 
-        if result and redis:
-            with contextlib.suppress(RedisError):
-                await redis.setex(cache_key, TTL_PRICE_RETURN, json.dumps(result))
+    domestic_missing = [(t, m) for t, m in missing if m.upper() in DOMESTIC_MARKETS]
+    if domestic_missing:
+        pykrx_result = await loop.run_in_executor(None, partial(_sync_pykrx_returns_batch, domestic_missing, years))
+        newly_fetched.update(pykrx_result)
 
-        return result
+    return_map.update(newly_fetched)
 
-    tasks = [_get_one(ticker, market) for ticker, market in tickers]
-    raw = await asyncio.gather(*tasks, return_exceptions=True)
-
-    return_map: dict[tuple[str, str], dict] = {}
-    for (ticker, market), res in zip(tickers, raw, strict=False):
-        if isinstance(res, dict):
-            return_map[(ticker, market)] = res
+    if newly_fetched and redis:
+        with contextlib.suppress(RedisError):
+            await asyncio.gather(
+                *(
+                    redis.setex(price_return_key(years, t, m), TTL_PRICE_RETURN, json.dumps(result))
+                    for (t, m), result in newly_fetched.items()
+                )
+            )
 
     return return_map
 

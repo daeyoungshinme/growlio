@@ -185,7 +185,8 @@ class TestGetHistoricalReturns:
         assert result[("AAPL", "NASDAQ")]["cumulative_pct"] == 120.0
 
     @pytest.mark.asyncio
-    async def test_circuit_open_returns_empty(self, override_settings):
+    async def test_circuit_open_returns_empty_for_overseas(self, override_settings):
+        """회로 OPEN + 해외 종목(대체 소스 없음)이면 빈 결과."""
         from unittest.mock import patch
 
         with patch("app.services.price_service.yahoo_circuit") as mock_circuit:
@@ -198,11 +199,33 @@ class TestGetHistoricalReturns:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_yahoo_returns_result(self, override_settings):
-        """Yahoo Finance 결과 반환 시 return_map에 저장."""
+    async def test_circuit_open_falls_back_to_pykrx_for_domestic(self, override_settings):
+        """회로 OPEN이어도 국내 종목은 pykrx로 보완된다."""
         from unittest.mock import AsyncMock, patch
 
-        ret_data = {"cumulative_pct": 200.0, "annual_pct": 10.0}
+        pykrx_data = {("005930", "KOSPI"): {"cumulative_return_pct": 50.0, "cagr_pct": 5.0, "actual_years": 10.0}}
+
+        with (
+            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+        ):
+            mock_circuit.is_available.return_value = False
+
+            loop_mock = AsyncMock()
+            loop_mock.run_in_executor = AsyncMock(return_value=pykrx_data)
+
+            with patch("asyncio.get_running_loop", return_value=loop_mock):
+                from app.services.price_service import get_historical_returns
+
+                result = await get_historical_returns([("005930", "KOSPI")])
+
+        assert result == pykrx_data
+
+    @pytest.mark.asyncio
+    async def test_yahoo_returns_result(self, override_settings):
+        """Yahoo Finance batch 결과 반환 시 return_map에 저장."""
+        from unittest.mock import AsyncMock, patch
+
+        batch_data = {("AAPL", "NASDAQ"): {"cumulative_pct": 200.0, "annual_pct": 10.0}}
 
         with (
             patch("app.services.price_service.yahoo_circuit") as mock_circuit,
@@ -211,7 +234,7 @@ class TestGetHistoricalReturns:
             mock_circuit.is_available.return_value = True
 
             loop_mock = AsyncMock()
-            loop_mock.run_in_executor = AsyncMock(return_value=ret_data)
+            loop_mock.run_in_executor = AsyncMock(return_value=batch_data)
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
                 from app.services.price_service import get_historical_returns
@@ -219,6 +242,41 @@ class TestGetHistoricalReturns:
                 result = await get_historical_returns([("AAPL", "NASDAQ")])
 
         assert ("AAPL", "NASDAQ") in result
+
+    @pytest.mark.asyncio
+    async def test_yahoo_partial_miss_backfilled_by_pykrx(self, override_settings):
+        """Yahoo batch가 국내 종목을 못 채우면 pykrx로 보완한다."""
+        from unittest.mock import AsyncMock, patch
+
+        with (
+            patch("app.services.price_service.yahoo_circuit") as mock_circuit,
+            patch("app.services.price_service._yfinance_sem"),
+            patch(
+                "app.services.price_service._sync_calc_returns_batch",
+                return_value={},
+            ),
+            patch(
+                "app.services.price_service._sync_pykrx_returns_batch",
+                return_value={
+                    ("005930", "KOSPI"): {"cumulative_return_pct": 30.0, "cagr_pct": 3.0, "actual_years": 10.0}
+                },
+            ),
+        ):
+            mock_circuit.is_available.return_value = True
+
+            loop_mock = AsyncMock()
+
+            async def _run_in_executor(_executor, func):
+                return func()
+
+            loop_mock.run_in_executor = _run_in_executor
+
+            with patch("asyncio.get_running_loop", return_value=loop_mock):
+                from app.services.price_service import get_historical_returns
+
+                result = await get_historical_returns([("005930", "KOSPI")])
+
+        assert ("005930", "KOSPI") in result
 
 
 # ── fetch_current_price cache hit ─────────────────────────────
