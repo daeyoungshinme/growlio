@@ -12,12 +12,16 @@ import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
 
+from app.constants import DOMESTIC_MARKETS
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.redis_client import get_redis
+from app.services.recommendation_universe import guess_asset_class, resolve_index_region
 from app.utils.cache_keys import (
+    TTL_ETF_INDEX_REGION,
     TTL_PRICE_CURRENT,
     current_price_key,
+    etf_index_region_key,
     get_cached_json,
     set_cached_json,
 )
@@ -65,12 +69,16 @@ async def _search_naver(q: str, limit: int) -> list[dict]:
     for item in data.get("items", []):
         type_code = item.get("typeCode", "")
         market = type_code if type_code in ("KOSPI", "KOSDAQ") else type_code
+        ticker = item.get("code", "")
+        name = item.get("name", "")
         results.append(
             {
-                "ticker": item.get("code", ""),
-                "name": item.get("name", ""),
+                "ticker": ticker,
+                "name": name,
                 "market": market,
                 "exchange": type_code,
+                "asset_class": guess_asset_class(name),
+                "index_region": resolve_index_region(ticker, market, None),
             }
         )
         if len(results) >= limit:
@@ -101,7 +109,16 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
         symbol: str = item.get("symbol", "")
         ticker = symbol.removesuffix(".KS").removesuffix(".KQ")
         name = item.get("shortname") or item.get("longname") or symbol
-        results.append({"ticker": ticker, "name": name, "market": market, "exchange": exchange})
+        results.append(
+            {
+                "ticker": ticker,
+                "name": name,
+                "market": market,
+                "exchange": exchange,
+                "asset_class": guess_asset_class(name),
+                "index_region": resolve_index_region(ticker, market, None),
+            }
+        )
         if len(results) >= limit:
             break
     return results
@@ -120,6 +137,40 @@ async def search_stocks(
     if _has_korean(q):
         return await _search_naver(q, limit)
     return await _search_yahoo(q, limit)
+
+
+@router.get("/index-region")
+@limiter.limit("30/minute")
+async def get_index_region(
+    request: Request,
+    ticker: str = Query(..., min_length=1, max_length=20),
+    market: str = Query(...),
+    redis: aioredis.Redis = Depends(get_redis),
+):
+    """종목이 추종하는 지수의 지역(DOMESTIC/OVERSEAS)을 조회한다.
+
+    해외거래소 상장은 시장 구분만으로 자명하므로 네트워크 조회 없이 즉시 반환한다. KRX 상장
+    종목은 Naver ETF 분석 API(`sync_naver_etf_index_region`)로 실제 추종지수의 국가별 편입
+    비중을 조회해 판별 — ETF가 아니거나 조회 실패 시 `resolve_index_region`의 기존 폴백
+    (큐레이션 목록 → 기본값 DOMESTIC)으로 넘어간다. 결과는 7일 캐싱(추종지수는 사실상 불변).
+    """
+    if market.upper() not in DOMESTIC_MARKETS:
+        return {"index_region": "OVERSEAS"}
+
+    cache_key = etf_index_region_key(ticker)
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return cached
+
+    from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+    loop = asyncio.get_running_loop()
+    fetched = await loop.run_in_executor(None, sync_naver_etf_index_region, ticker)
+    index_region = fetched if fetched is not None else resolve_index_region(ticker, market, None)
+
+    result = {"index_region": index_region}
+    await set_cached_json(redis, cache_key, result, TTL_ETF_INDEX_REGION)
+    return result
 
 
 @router.get("/exchange-rate")

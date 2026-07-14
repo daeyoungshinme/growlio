@@ -104,6 +104,7 @@ class TestGetSettings:
             goal_risk_tolerance=None,
             goal_max_weight_pct=None,
             goal_cagr_lookback_years=None,
+            goal_short_term_equity_floor_pct=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -120,6 +121,7 @@ class TestGetSettings:
             assert data["goal_risk_tolerance"] == "CONSERVATIVE"
             assert data["goal_max_weight_pct"] == 40.0
             assert data["goal_cagr_lookback_years"] == 10
+            assert data["goal_short_term_equity_floor_pct"] == 80.0
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db
@@ -279,7 +281,13 @@ class TestUpdateGoalCandidateTickers:
                 )
             assert resp.status_code == 200
             assert settings.goal_candidate_tickers == [
-                {"ticker": "TLT", "name": "iShares 20+ Year Treasury Bond ETF", "market": "NYSE"}
+                {
+                    "ticker": "TLT",
+                    "name": "iShares 20+ Year Treasury Bond ETF",
+                    "market": "NYSE",
+                    "asset_class": "EQUITY",
+                    "index_region": None,
+                }
             ]
         finally:
             from app.api.deps import get_current_user
@@ -323,7 +331,12 @@ class TestUpdateGoalRecommendationOptions:
     def test_put_goal_recommendation_options_returns_200_and_saves_fields(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
-        settings = SimpleNamespace(goal_risk_tolerance=None, goal_max_weight_pct=None, goal_cagr_lookback_years=None)
+        settings = SimpleNamespace(
+            goal_risk_tolerance=None,
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+            goal_short_term_equity_floor_pct=None,
+        )
         db.scalar = AsyncMock(return_value=settings)
 
         app = _setup_app(user, db)
@@ -331,13 +344,44 @@ class TestUpdateGoalRecommendationOptions:
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
                     "/api/v1/settings/goal-recommendation-options",
-                    json={"risk_tolerance": "AGGRESSIVE", "max_weight_pct": 25.0, "cagr_lookback_years": 5},
+                    json={
+                        "risk_tolerance": "AGGRESSIVE",
+                        "max_weight_pct": 25.0,
+                        "cagr_lookback_years": 5,
+                        "short_term_equity_floor_pct": 60.0,
+                    },
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code == 200
             assert settings.goal_risk_tolerance == "AGGRESSIVE"
             assert settings.goal_max_weight_pct == 25.0
             assert settings.goal_cagr_lookback_years == 5
+            assert settings.goal_short_term_equity_floor_pct == 60.0
+        finally:
+            from app.api.deps import get_current_user
+            from app.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_recommendation_options_rejects_short_term_equity_floor_out_of_range(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-recommendation-options",
+                    json={
+                        "risk_tolerance": "BALANCED",
+                        "max_weight_pct": 40.0,
+                        "cagr_lookback_years": 10,
+                        "short_term_equity_floor_pct": 150.0,
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
             from app.database import get_db

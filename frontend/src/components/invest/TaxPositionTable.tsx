@@ -26,6 +26,7 @@ function QtyInput({
     <div className="flex items-center gap-1">
       <input
         type="number"
+        inputMode="numeric"
         min={0}
         max={Math.floor(pos.qty)}
         step={1}

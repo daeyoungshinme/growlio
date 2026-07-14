@@ -26,15 +26,24 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import uuid
 from datetime import UTC, date, datetime
 
 import structlog
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS
+from app.enums import AccountTaxType, InvestmentHorizon
+from app.models.asset import AssetAccount
 from app.models.user import UserSettings
-from app.schemas.rebalancing import GoalRecommendation, GoalRecommendationItem
+from app.schemas.rebalancing import (
+    GoalRecommendation,
+    GoalRecommendationItem,
+    HorizonGoalRecommendation,
+    HorizonRecommendationResponse,
+)
 from app.services.dividend_constants import is_korean_etf
 from app.services.dividend_sync_sources import (
     sync_naver_etf_dividend_info,
@@ -43,8 +52,14 @@ from app.services.dividend_sync_sources import (
 )
 from app.services.goal_return_solver import solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
+from app.services.portfolio_service import build_portfolio_overview
+from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS, RECOMMENDATION_UNIVERSE
+from app.services.recommendation_universe import (
+    MAX_GOAL_CANDIDATE_TICKERS,
+    RECOMMENDATION_UNIVERSE,
+    resolve_index_region,
+)
 from app.services.yahoo_price import to_yf_symbol
 from app.utils.cache_keys import RedisType
 
@@ -56,6 +71,130 @@ _MIN_CANDIDATES = 2
 _DIVIDEND_FETCH_CONCURRENCY = 8
 _DEFAULT_CAGR_LOOKBACK_YEARS = 10
 _RISK_TOLERANCE_FRONTIER_FRACTION = {"CONSERVATIVE": 0.0, "BALANCED": 0.4, "AGGRESSIVE": 0.8}
+
+_HORIZON_RISK_TOLERANCE: dict[str, str] = {
+    "SHORT_TERM": "CONSERVATIVE",
+    "MID_TERM": "BALANCED",
+    "LONG_TERM": "AGGRESSIVE",
+}
+_HORIZON_ELIGIBLE_ASSET_CLASSES: dict[str, set[str]] = {
+    "SHORT_TERM": {"BOND", "EQUITY", "CASH"},
+    "MID_TERM": {"BOND", "EQUITY", "CASH"},
+    "LONG_TERM": {"EQUITY"},
+}
+_TAX_TYPE_MARKET_GROUP: dict[str, str] = {
+    "GENERAL": "DOMESTIC",
+    "ISA": "DOMESTIC",
+    "PENSION_SAVINGS": "DOMESTIC",
+    "IRP": "DOMESTIC",
+    "OVERSEAS_DEDICATED": "OVERSEAS",
+}
+"""세제유형별 투자 가능 시장 — ISA/연금저축/IRP/일반 계좌는 국내(국내주식+국내ETF)만,
+해외전용 계좌는 해외(해외주식+해외ETF)만 추천 후보로 허용한다."""
+_TAX_TYPE_INDEX_REGION_PREFERENCE: dict[str, str] = {
+    "GENERAL": "DOMESTIC",
+    "ISA": "OVERSEAS",
+    "PENSION_SAVINGS": "OVERSEAS",
+    "IRP": "OVERSEAS",
+    "OVERSEAS_DEDICATED": "OVERSEAS",
+}
+"""세제유형별 선호 추종지수 지역(EQUITY 후보 한정) — ISA/연금저축/IRP는 국내상장이지만 해외지수를
+추종하는 ETF(나스닥100 등)를, 일반 계좌는 국내지수를 추종하는 종목/ETF를 우선 추천한다.
+`_TAX_TYPE_MARKET_GROUP`(상장거래소 기준)과 달리 이건 추종지수 기준이라 별개 축이다.
+OVERSEAS_DEDICATED도 이 맵에 포함하는 이유는 선호 지역 좁히기가 아니라 `_apply_index_region_preference`의
+큐레이션 보강(등록 후보 부족 시 `RECOMMENDATION_UNIVERSE`에서 자동 추가) 경로를 태우기 위함이다 —
+`preferred_equity` 계산에서 OVERSEAS_DEDICATED는 항상 상장거래소가 해외인 후보만 통과하도록 별도
+조건을 추가로 강제하므로(아래 `_apply_index_region_preference` 참고), KRX 상장·해외지수 추종 ETF가
+이 세제유형 후보로 섞여 들어가지는 않는다."""
+_NON_BINDING_RETURN_FLOOR = -50.0
+"""기간별 추천은 목표 역산이 아니므로 required_return_pct 하한 제약을 사실상 무효화한다."""
+
+_CASH_EQUIVALENT_TICKER = "CASH_EQUIVALENT"
+"""실제 시세 없는 합성 후보 식별자 — 프론트 CASH_EQUIVALENT_TICKER(api/rebalancing.ts)와 동일 문자열 유지 필요."""
+_CASH_EQUIVALENT_NAME = "현금성 자산 (CMA·파킹통장 등)"
+_CASH_EQUIVALENT_MARKET = "CASH"
+_CASH_EQUIVALENT_CAGR_PCT = 3.0
+"""CMA/파킹통장 평균 금리 가정치(%) — 실제 상품별로 상이하고 시세 데이터가 없어 고정값을 사용한다.
+CONSERVATIVE 리스크 성향은 required_return_pct 부등식 제약이 비구속적(_NON_BINDING_RETURN_FLOOR)이므로
+이 값은 비중 계산에 거의 영향을 주지 않고 주로 expected_return_pct 표시용으로 쓰인다."""
+_CASH_EQUIVALENT_RETURN_DAYS = 252
+
+_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT = 80.0
+"""단기(최대 3년) 목표는 안전자산 위주가 아니라 주식을 최소 이 비율까지 담아 다소 공격적으로
+구성한다 — 사용자가 UserSettings.goal_short_term_equity_floor_pct로 조정 가능, NULL이면 이 기본값
+사용. 등록된 주식 후보가 하나도 없으면 이 제약은 적용하지 않고 기존(안전자산만으로 최소분산)
+동작을 유지한다."""
+
+
+def _apply_index_region_preference(
+    candidates: list[dict[str, str]], tax_type_value: str, capacity_remaining: int
+) -> tuple[list[dict[str, str]], str | None, list[dict[str, str]]]:
+    """EQUITY 후보를 세제유형별 선호 추종지수 지역으로 좁힌다. BOND/CASH는 영향받지 않는다.
+
+    선호 지역에 맞는 EQUITY 후보가 사용자 등록 목록에 하나도 없으면(예: ISA인데 해외지수 추종
+    ETF 미등록), 큐레이션 유니버스(`RECOMMENDATION_UNIVERSE`)에서 선호 지역·해당 세제유형이
+    투자 가능한 시장에 맞는 ETF를 찾아 자동 보강한다 — 사용자가 직접 등록하지 않아도 항상
+    선호 지역 위주로 추천되도록 하기 위함. 보강된 후보는 세 번째 반환값(`added`)으로 함께
+    돌려주며, 호출측이 이를 `UserSettings.goal_candidate_tickers`에도 실제로 등록해 "후보 ETF
+    관리" 화면에 반영해야 한다 — 계산에만 쓰이고 등록 목록엔 안 보이면 사용자가 당황하기 때문.
+
+    `capacity_remaining`(등록 가능 잔여 슬롯, `MAX_GOAL_CANDIDATE_TICKERS - 전체 등록 후보 수`)보다
+    보강 후보가 많아 전부 등록할 수 없으면(등록 한도 초과) 보강 자체를 포기한다 — 계산에 쓰인
+    후보와 실제 등록되는 후보가 항상 일치하도록 하기 위한 전부 아니면 전무 규칙. 큐레이션 보강도
+    실패하거나 포기되면(안전장치) 원본 후보 목록을 그대로 반환하고 `added=[]`.
+    """
+    preferred_region = _TAX_TYPE_INDEX_REGION_PREFERENCE.get(tax_type_value)
+    if not preferred_region:
+        return candidates, None, []
+
+    non_equity = [c for c in candidates if c.get("asset_class", "EQUITY") != "EQUITY"]
+    equity_candidates = [c for c in candidates if c.get("asset_class", "EQUITY") == "EQUITY"]
+    preferred_equity = [
+        c
+        for c in equity_candidates
+        if resolve_index_region(c["ticker"], c["market"], c.get("index_region")) == preferred_region
+        # OVERSEAS_DEDICATED는 추종지수가 아니라 상장거래소가 실제 매수 가능 여부를 결정한다 — KRX
+        # 상장·해외지수 추종 ETF(예: TIGER 미국나스닥100)가 index_region=OVERSEAS로 태그돼 있어도
+        # 이 세제유형 계좌에서는 매수할 수 없으므로 항상 제외한다. get_horizon_recommendations는
+        # 호출 전에 이미 시장으로 후보를 걸러주지만, get_goal_recommendation(전체 탭)은 그런 사전
+        # 필터링이 없어 이 함수 자체가 강제하지 않으면 새어 들어갈 수 있다.
+        and (tax_type_value != "OVERSEAS_DEDICATED" or c["market"].upper() not in DOMESTIC_MARKETS)
+    ]
+
+    if preferred_equity:
+        return preferred_equity + non_equity, None, []
+    if not equity_candidates:
+        # 애초에 EQUITY 후보가 하나도 없던 경우(예: 시장그룹 필터에서 전부 걸러짐) — 이 함수의
+        # 관심사(등록은 했지만 지역이 안 맞음)가 아니므로 큐레이션 보강 없이 그대로 통과시킨다.
+        return candidates, None, []
+
+    region_label = "해외지수 추종 ETF" if preferred_region == "OVERSEAS" else "국내지수 추종 종목/ETF"
+    market_group = _TAX_TYPE_MARKET_GROUP.get(tax_type_value, "DOMESTIC")
+    seen = {(c["ticker"], c["market"]) for c in candidates}
+    curated_fallback = [
+        c
+        for c in RECOMMENDATION_UNIVERSE
+        if c.get("asset_class", "EQUITY") == "EQUITY"
+        and resolve_index_region(c["ticker"], c["market"], c.get("index_region")) == preferred_region
+        and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
+        and (c["ticker"], c["market"]) not in seen
+    ]
+    if curated_fallback and len(curated_fallback) <= capacity_remaining:
+        note = (
+            f"등록된 후보 중 {region_label}가 없어 큐레이션 ETF를 후보 목록에 자동 등록했습니다 — "
+            "후보 ETF 관리에서 확인·삭제할 수 있습니다"
+        )
+        return curated_fallback + non_equity, note, curated_fallback
+
+    note = (
+        f"등록된 후보 중 {region_label}가 없어 전체 후보로 대체 추천합니다 — 후보 ETF 관리에서 지역 태그를 확인해주세요"
+    )
+    return candidates, note, []
+
+
+def _cash_equivalent_daily_returns() -> list[float]:
+    """변동성 0으로 가정한 합성 일별수익률 시계열 — MVO 공분산 계산에 참여시키기 위함."""
+    return [_CASH_EQUIVALENT_CAGR_PCT / 100 / _CASH_EQUIVALENT_RETURN_DAYS] * _CASH_EQUIVALENT_RETURN_DAYS
 
 
 def _months_until_year_end(target_year: int) -> int:
@@ -125,6 +264,8 @@ def _optimize_goal_portfolio(
     required_return_pct: float,
     max_weight: float = _MAX_WEIGHT,
     risk_tolerance: str = "CONSERVATIVE",
+    is_equity: list[bool] | None = None,
+    equity_floor: float | None = None,
 ) -> tuple[list[dict], float | None, str | None]:
     """분산 최소화 + 목표수익률 제약(SLSQP). (recommended_items, expected_return_pct, note) 반환. 동기 함수.
 
@@ -136,19 +277,24 @@ def _optimize_goal_portfolio(
     CAGR 사이를 성향 비율(`_RISK_TOLERANCE_FRONTIER_FRACTION`)로 보간한 지점을 **등식 제약**으로
     고정한다 — 부등식과 달리 이미 자연 수익률이 목표를 넘는 경우에도 항상 실제로 비중이
     달라짐을 보장한다.
+
+    `is_equity`+`equity_floor`가 함께 주어지면(단기 추천 전용) "주식 비중 합 ≥ equity_floor"
+    부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산 비중 ≤ 1-equity_floor"도 자동
+    성립한다. 후보가 전부 주식이거나 전부 비주식이면(비교 대상이 없어 제약이 무의미) 무시한다.
     """
     import numpy as np
     from scipy.optimize import minimize
 
+    equity_flags_in = is_equity or [False] * len(symbols)
     valid = [
-        (s, tk, c)
-        for s, tk, c in zip(symbols, tickers, cagr_pct, strict=False)
+        (s, tk, c, eq)
+        for s, tk, c, eq in zip(symbols, tickers, cagr_pct, equity_flags_in, strict=False)
         if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
     ]
     if len(valid) < _MIN_CANDIDATES:
         return [], None, f"추천에 충분한 시세 데이터가 있는 종목이 {_MIN_CANDIDATES}개 미만입니다"
 
-    syms, tks, cagrs_list = zip(*valid, strict=False)
+    syms, tks, cagrs_list, equity_flags = zip(*valid, strict=False)
     cagrs = np.array(cagrs_list, dtype=float)
     n = len(syms)
 
@@ -160,7 +306,16 @@ def _optimize_goal_portfolio(
     cov_annual = np.cov(rets) * 252 if n > 1 else np.array([[float(np.var(rets[0])) * 252]])
 
     max_weight_used = max(max_weight, 1.0 / n)  # n이 작아 상한 합이 100%를 못 채우면 완화
-    bounds = [(0.0, max_weight_used)] * n
+
+    n_equity = sum(equity_flags)
+    apply_equity_floor = equity_floor is not None and equity_floor > 0 and 0 < n_equity < n
+    if apply_equity_floor:
+        assert equity_floor is not None
+        # 주식 후보가 적어도(예: 1개) 하한을 채울 수 있도록 주식 종목당 상한을 별도로 완화
+        equity_cap = max(max_weight_used, equity_floor / n_equity)
+        bounds = [(0.0, equity_cap if eq else max_weight_used) for eq in equity_flags]
+    else:
+        bounds = [(0.0, max_weight_used)] * n
     x0 = np.full(n, 1.0 / n)
 
     # 종목당 비중 상한(max_weight_used) 하에서 달성 가능한 최대 가중평균 CAGR
@@ -205,6 +360,13 @@ def _optimize_goal_portfolio(
         constraints = [
             {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
             {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
+        ]
+    if apply_equity_floor:
+        assert equity_floor is not None
+        equity_mask = np.array(equity_flags, dtype=bool)
+        constraints = [
+            *constraints,
+            {"type": "ineq", "fun": lambda w: float(w[equity_mask].sum()) - equity_floor},
         ]
     res = minimize(
         lambda w: float(w @ cov_annual @ w),
@@ -266,6 +428,91 @@ def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[
     return seed
 
 
+async def _persist_added_candidates(
+    db: AsyncSession, user_id: uuid.UUID, added: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    """`added`를 잠금 후 재조회한 최신 `goal_candidate_tickers`에 병합해 커밋한다.
+
+    `/goal-recommendation`과 `/goal-recommendation/by-horizon`은 완전히 독립된 요청·DB세션으로,
+    둘 다 세제유형 선호 지수 지역에 맞는 큐레이션 ETF를 동시에 추가하려 할 수 있다. 각자 요청 시작
+    시점에 읽은 스냅샷을 그대로 덮어쓰면 나중에 커밋하는 쪽이 먼저 커밋된 추가분을 지워버리는
+    lost-update가 발생한다 — `with_for_update()`로 행을 잠그고 그 시점의 최신 값을 다시 읽어
+    병합해야 두 요청의 추가분이 모두 살아남는다.
+
+    `populate_existing=True`가 반드시 필요하다 — `settings_row`는 이 함수 호출 전에 이미 같은
+    세션에서 한 번 로드돼 identity map에 올라가 있으므로, 이 옵션 없이 동일 PK를 다시 select하면
+    SQLAlchemy는 DB에서 잠금만 걸 뿐 Python 객체 속성은 갱신하지 않고 기존(스테일한) 객체를
+    그대로 반환한다 — 그러면 아래 `current`가 여전히 요청 시작 시점의 낡은 값이 되어 락을 걸어도
+    lost-update가 재발한다.
+    """
+    locked_row = await db.scalar(
+        select(UserSettings)
+        .where(UserSettings.user_id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    if locked_row is None:
+        return added
+    current = locked_row.goal_candidate_tickers or []
+    seen = {(c["ticker"], c["market"]) for c in current}
+    merged = current + [c for c in added if (c["ticker"], c["market"]) not in seen]
+    if len(merged) > MAX_GOAL_CANDIDATE_TICKERS:
+        merged = merged[:MAX_GOAL_CANDIDATE_TICKERS]
+    locked_row.goal_candidate_tickers = merged
+    await db.commit()
+    return merged
+
+
+async def _get_or_seed_candidates(
+    db: AsyncSession,
+    settings_row: UserSettings,
+    existing_items: list[tuple[str, str, str]],
+) -> list[dict[str, str]]:
+    """등록된 후보 목록을 반환하거나, 한 번도 등록한 적 없으면 시딩 후 커밋한다.
+
+    최초 시딩도 두 목표 역산 엔드포인트가 동시에 트리거할 수 있으므로 락을 걸고 재확인한다
+    (`_persist_added_candidates`와 동일한 lost-update 방지 목적 — `populate_existing=True`가
+    빠지면 이미 로드된 `settings_row`의 스테일한 속성이 그대로 반환되어 락이 무의미해진다).
+    """
+    candidate_dicts = getattr(settings_row, "goal_candidate_tickers", None)
+    if candidate_dicts is None:
+        user_id = getattr(settings_row, "user_id", None)
+        locked_row = (
+            await db.scalar(
+                select(UserSettings)
+                .where(UserSettings.user_id == user_id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+            if user_id is not None
+            else None
+        )
+        candidate_dicts = locked_row.goal_candidate_tickers if locked_row is not None else None
+        if candidate_dicts is None:
+            candidate_dicts = _seed_candidate_tickers(existing_items)
+            target_row = locked_row if locked_row is not None else settings_row
+            target_row.goal_candidate_tickers = candidate_dicts
+            await db.commit()
+    return candidate_dicts
+
+
+async def _active_account_tax_types(db: AsyncSession, user_id: uuid.UUID) -> list[str]:
+    """활성 계좌들의 tax_type 목록을 조회한다 (전체 탭의 단일세제유형 판별용)."""
+    rows = (
+        (
+            await db.execute(
+                select(AssetAccount.tax_type).where(
+                    AssetAccount.user_id == user_id,
+                    AssetAccount.is_active == True,  # noqa: E712
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return list(rows)
+
+
 async def get_goal_recommendation(
     redis: RedisType,
     base_krw: float,
@@ -306,11 +553,7 @@ async def get_goal_recommendation(
             required_dividend_yield_pct=required_dividend_yield_pct,
         )
 
-    candidate_dicts = getattr(settings_row, "goal_candidate_tickers", None)
-    if candidate_dicts is None:
-        candidate_dicts = _seed_candidate_tickers(existing_items)
-        settings_row.goal_candidate_tickers = candidate_dicts
-        await db.commit()
+    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
 
     if not candidate_dicts:
         return _no_recommendation(
@@ -319,12 +562,31 @@ async def get_goal_recommendation(
             required_dividend_yield_pct,
         )
 
+    preference_fallback_note: str | None = None
+    computed_candidates = candidate_dicts
+    user_id = getattr(settings_row, "user_id", None)
+    if user_id is not None:
+        tax_type_rows = await _active_account_tax_types(db, user_id)
+        distinct_tax_types = {t or AccountTaxType.GENERAL.value for t in tax_type_rows}
+        if len(distinct_tax_types) == 1:
+            capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+            computed_candidates, preference_fallback_note, added = _apply_index_region_preference(
+                candidate_dicts, next(iter(distinct_tax_types)), capacity_remaining
+            )
+            if added:
+                await _persist_added_candidates(db, user_id, added)
+
+    def _combine_note(msg: str | None) -> str | None:
+        if preference_fallback_note and msg:
+            return f"{preference_fallback_note} {msg}"
+        return preference_fallback_note or msg
+
     risk_tolerance = getattr(settings_row, "goal_risk_tolerance", None) or "CONSERVATIVE"
     max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
     max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
     cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
 
-    candidates = [(c["ticker"], c["name"], c["market"]) for c in candidate_dicts]
+    candidates = [(c["ticker"], c["name"], c["market"]) for c in computed_candidates]
     tickers_only = [(t, m) for t, _, m in candidates]
 
     cagr_map, dividend_map = await asyncio.gather(
@@ -338,11 +600,13 @@ async def get_goal_recommendation(
         if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
     ]
     if len(filtered) < _MIN_CANDIDATES:
-        return _no_recommendation(
+        result = _no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_return_pct,
             required_dividend_yield_pct,
         )
+        result.note = _combine_note(result.note)
+        return result
 
     f_symbols = [f[0] for f in filtered]
     f_tickers = [f[1] for f in filtered]
@@ -378,8 +642,250 @@ async def get_goal_recommendation(
         recommended_items=[GoalRecommendationItem(**i) for i in items],
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
-        note=opt_note,
+        note=_combine_note(opt_note),
         cagr_lookback_years=cagr_lookback_years,
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
+    )
+
+
+async def _build_horizon_result(
+    redis: RedisType,
+    horizon: str,
+    tax_type: str,
+    account_ids: list[uuid.UUID],
+    base_krw: float,
+    eligible_candidates: list[dict[str, str]],
+    risk_tolerance: str,
+    max_weight: float,
+    cagr_lookback_years: int,
+    short_term_equity_floor: float,
+    preference_fallback_note: str | None = None,
+) -> HorizonGoalRecommendation:
+    """필터링된(자산군·시장 적합) 후보 목록으로 (기간, 세제유형) 조합 하나에 대한 추천을 계산한다.
+
+    SHORT_TERM은 등록된 BOND/CASH 후보 개수와 무관하게 현금성 자산(CMA·파킹통장) 합성 후보를 항상
+    함께 분석 대상에 포함시켜, 실제 등록 후보가 없으면 100% 현금성 자산으로, 있으면 그 후보들과
+    나란히 MVO로 비중을 분배한다. 등록된 주식(EQUITY) 후보가 있으면 `short_term_equity_floor`
+    비율 이상을 주식에 배분하도록 강제해 지나치게 안전자산 위주로 수렴하지 않게 한다.
+
+    `preference_fallback_note`는 세제유형별 추종지수 선호 필터(`get_horizon_recommendations`)가
+    선호 지역 후보 부족으로 전체 후보로 되돌아갔을 때 그 사실을 안내하기 위해 전달된다 — 이후
+    계산되는 다른 note와 함께(있으면 앞에 붙여) 표시된다.
+    """
+    include_cash_equivalent = horizon == "SHORT_TERM"
+
+    def _combine_note(msg: str | None) -> str | None:
+        if preference_fallback_note and msg:
+            return f"{preference_fallback_note} {msg}"
+        return preference_fallback_note or msg
+
+    if not include_cash_equivalent and len(eligible_candidates) < _MIN_CANDIDATES:
+        needs_conservative = horizon == "MID_TERM"
+        note = (
+            "이 기간에 적합한 후보가 부족합니다 — 후보 ETF 관리에서 채권/현금성 ETF를 추가해주세요"
+            if needs_conservative
+            else "이 기간에 적합한 후보가 부족합니다 — 후보 ETF를 추가해주세요"
+        )
+        return HorizonGoalRecommendation(
+            investment_horizon=horizon,
+            tax_type=tax_type,
+            base_krw=base_krw,
+            account_count=len(account_ids),
+            risk_tolerance=risk_tolerance,
+            max_weight_pct=round(max_weight * 100, 2),
+            note=_combine_note(note),
+        )
+
+    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in eligible_candidates]
+    tickers_only = [(t, m) for t, _, m, _ in candidates]
+
+    cagr_map = (
+        await get_historical_returns(tickers_only, redis=redis, years=cagr_lookback_years) if tickers_only else {}
+    )
+    filtered = [
+        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], asset_class == "EQUITY")
+        for t, name, m, asset_class in candidates
+        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
+    ]
+    if include_cash_equivalent:
+        filtered.append(
+            (
+                _CASH_EQUIVALENT_TICKER,
+                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
+                _CASH_EQUIVALENT_CAGR_PCT,
+                False,
+            )
+        )
+
+    if not filtered:
+        return HorizonGoalRecommendation(
+            investment_horizon=horizon,
+            tax_type=tax_type,
+            base_krw=base_krw,
+            account_count=len(account_ids),
+            risk_tolerance=risk_tolerance,
+            max_weight_pct=round(max_weight * 100, 2),
+            note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다"),
+        )
+
+    if len(filtered) == 1:
+        # 등록된 실 후보가 하나도 유효하지 않아 현금성 자산 합성 후보만 남은 경우 — 옵티마이저 없이 전액 배분
+        _, (tk, name, mk), cagr, _ = filtered[0]
+        return HorizonGoalRecommendation(
+            investment_horizon=horizon,
+            tax_type=tax_type,
+            base_krw=base_krw,
+            account_count=len(account_ids),
+            recommended_items=[GoalRecommendationItem(ticker=tk, name=name, market=mk, weight=100.0)],
+            expected_return_pct=cagr,
+            risk_tolerance=risk_tolerance,
+            max_weight_pct=round(max_weight * 100, 2),
+            includes_cash_equivalent=True,
+            note=_combine_note(
+                "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 "
+                "배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다."
+            ),
+        )
+
+    f_symbols = [f[0] for f in filtered]
+    f_tickers = [f[1] for f in filtered]
+    f_cagrs = [f[2] for f in filtered]
+    f_is_equity = [f[3] for f in filtered]
+
+    loop = asyncio.get_running_loop()
+    real_symbols = [s for s in f_symbols if s != _CASH_EQUIVALENT_TICKER]
+    returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols) if real_symbols else {}
+    if include_cash_equivalent:
+        returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+
+    equity_floor = short_term_equity_floor if include_cash_equivalent and any(f_is_equity) else None
+
+    items, expected_return_pct, opt_note = await loop.run_in_executor(
+        None,
+        functools.partial(
+            _optimize_goal_portfolio,
+            f_symbols,
+            f_tickers,
+            f_cagrs,
+            returns_map,
+            _NON_BINDING_RETURN_FLOOR,
+            max_weight=max_weight,
+            risk_tolerance=risk_tolerance,
+            is_equity=f_is_equity,
+            equity_floor=equity_floor,
+        ),
+    )
+
+    includes_cash_equivalent = any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
+
+    if opt_note is None and equity_floor is not None:
+        opt_note = (
+            f"단기(최대 3년) 목표는 안정적인 주식 위주로 최소 {equity_floor * 100:.0f}%까지 배분하고, "
+            f"안전자산은 {100 - equity_floor * 100:.0f}% 이내로 제한합니다."
+        )
+
+    return HorizonGoalRecommendation(
+        investment_horizon=horizon,
+        tax_type=tax_type,
+        base_krw=base_krw,
+        account_count=len(account_ids),
+        recommended_items=[GoalRecommendationItem(**i) for i in items],
+        expected_return_pct=expected_return_pct,
+        risk_tolerance=risk_tolerance,
+        max_weight_pct=round(max_weight * 100, 2),
+        includes_cash_equivalent=includes_cash_equivalent,
+        note=_combine_note(opt_note),
+    )
+
+
+async def get_horizon_recommendations(
+    redis: RedisType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+) -> HorizonRecommendationResponse:
+    """투자기간(단기/중기/장기) × 세제유형(ISA/연금저축/IRP/일반/해외전용) 조합별로 계좌를 묶어
+    기간별 리스크 성향 + 세제유형별 투자 가능 시장에 맞는 추천을 계산한다.
+
+    목표금액/목표연도 역산은 하지 않는다 — `_NON_BINDING_RETURN_FLOOR`로 required_return_pct 제약을
+    사실상 무효화하고, 오직 기간별 리스크 성향(단기=보수/중기=중립/장기=공격)만으로 결과를 결정한다.
+    태그된 계좌가 하나도 없는 (기간, 세제유형) 조합은 결과에서 생략한다.
+    """
+    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
+    max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
+    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+    short_term_equity_floor_pct_raw = getattr(settings_row, "goal_short_term_equity_floor_pct", None)
+    short_term_equity_floor = (
+        float(short_term_equity_floor_pct_raw)
+        if short_term_equity_floor_pct_raw is not None
+        else _DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT
+    ) / 100
+
+    all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items_from_positions(all_pos_map))
+
+    rows = (
+        await db.execute(
+            select(AssetAccount.investment_horizon, AssetAccount.tax_type, AssetAccount.id).where(
+                AssetAccount.user_id == user_id,
+                AssetAccount.is_active == True,  # noqa: E712
+                AssetAccount.investment_horizon.isnot(None),
+            )
+        )
+    ).all()
+    accounts_by_pair: dict[tuple[str, str], list[uuid.UUID]] = {}
+    for horizon_value, tax_type_value, account_id in rows:
+        key = (horizon_value, tax_type_value or AccountTaxType.GENERAL.value)
+        accounts_by_pair.setdefault(key, []).append(account_id)
+
+    results: list[HorizonGoalRecommendation] = []
+    all_added: list[dict[str, str]] = []
+    for horizon in InvestmentHorizon:
+        for tax_type in AccountTaxType:
+            account_ids = accounts_by_pair.get((horizon.value, tax_type.value))
+            if not account_ids:
+                continue
+
+            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, redis=redis)
+            base_krw = float(overview.get("total_assets_krw", 0))
+
+            eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon.value]
+            market_group = _TAX_TYPE_MARKET_GROUP[tax_type.value]
+            eligible_candidates = [
+                c
+                for c in candidate_dicts
+                if c.get("asset_class", "EQUITY") in eligible_classes
+                and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
+            ]
+            capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+            eligible_candidates, preference_fallback_note, added = _apply_index_region_preference(
+                eligible_candidates, tax_type.value, capacity_remaining
+            )
+            if added:
+                candidate_dicts.extend(added)
+                all_added.extend(added)
+
+            results.append(
+                await _build_horizon_result(
+                    redis,
+                    horizon.value,
+                    tax_type.value,
+                    account_ids,
+                    base_krw,
+                    eligible_candidates,
+                    _HORIZON_RISK_TOLERANCE[horizon.value],
+                    max_weight,
+                    cagr_lookback_years,
+                    short_term_equity_floor,
+                    preference_fallback_note,
+                )
+            )
+
+    if all_added:
+        await _persist_added_candidates(db, user_id, all_added)
+
+    return HorizonRecommendationResponse(
+        generated_at=datetime.now(UTC).isoformat(),
+        recommendations=results,
     )

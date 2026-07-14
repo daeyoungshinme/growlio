@@ -9,10 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User, UserSettings
-from app.services.alert_calculator import should_trigger_exchange_rate
-from app.services.alert_service import apply_alert_trigger
+from app.services.alerts.alert_service import finalize_alert_batch, notify_and_record_trigger
+from app.services.alerts.calculator import should_trigger_exchange_rate
 from app.utils.currency import fetch_usd_krw
-from app.utils.metrics import alert_trigger_count
 
 logger = structlog.get_logger()
 
@@ -26,7 +25,6 @@ async def check_and_trigger_alerts(db: AsyncSession, redis: aioredis.Redis | Non
     이 job이 5분마다 실시간 값을 가져오고도 캐시에 저장하지 않아 fallback 값으로 굳어진다.
     """
     from app.services.email_service import send_exchange_rate_alert
-    from app.services.push_service import send_push_to_user
 
     current_rate = await fetch_usd_krw(redis, force_refresh=True)
     if current_rate <= 0:
@@ -63,22 +61,16 @@ async def check_and_trigger_alerts(db: AsyncSession, redis: aioredis.Redis | Non
             continue
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title="환율 알림",
-            body=f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
-            fcm_token=fcm_token,
-        )
-
-        await apply_alert_trigger(
+        await notify_and_record_trigger(
             db,
             alert,
             "EXCHANGE_RATE",
             f"환율 알림: USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+            alert.user_id,
+            "환율 알림",
+            f"USD/KRW {current_rate:.0f}원 (목표 {target:.0f}원 {direction_label})",
+            fcm_token,
         )
         triggered_count += 1
 
-    if triggered_count:
-        await db.commit()
-        alert_trigger_count.labels(alert_type="exchange_rate").inc(triggered_count)
-        logger.info("exchange_rate_alerts_triggered", count=triggered_count, current_rate=current_rate)
+    await finalize_alert_batch(db, "exchange_rate", triggered_count, current_rate=current_rate)

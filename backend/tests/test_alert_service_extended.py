@@ -27,32 +27,32 @@ def _make_alert(schedule_type="DAILY", schedule_day_of_week=None, schedule_day_o
 
 class TestShouldFireToday:
     def test_daily_always_true(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         alert = _make_alert(schedule_type="DAILY")
         assert _should_fire_today(alert) is True
 
     def test_none_schedule_defaults_to_daily(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         alert = _make_alert(schedule_type=None)
         assert _should_fire_today(alert) is True
 
     def test_unknown_schedule_returns_false(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         alert = _make_alert(schedule_type="UNKNOWN_SCHEDULE")
         assert _should_fire_today(alert) is False
 
     def test_weekly_matches_today_dow(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today_dow = datetime.now(tz=_KST).date().weekday()
         alert = _make_alert(schedule_type="WEEKLY", schedule_day_of_week=today_dow)
         assert _should_fire_today(alert) is True
 
     def test_weekly_mismatches_today_dow(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today_dow = datetime.now(tz=_KST).date().weekday()
         mismatch_dow = (today_dow + 3) % 7
@@ -60,14 +60,14 @@ class TestShouldFireToday:
         assert _should_fire_today(alert) is False
 
     def test_monthly_matches_today_day(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=today.day)
         assert _should_fire_today(alert) is True
 
     def test_monthly_mismatches_today_day(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         mismatch_day = (today.day % 28) + 1  # never today
@@ -79,7 +79,7 @@ class TestShouldFireToday:
         assert result is (mismatch_day == today.day)
 
     def test_monthly_defaults_to_day_1(self, override_settings):
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(schedule_type="MONTHLY", schedule_day_of_month=None)
@@ -88,7 +88,7 @@ class TestShouldFireToday:
 
     def test_quarterly_first_trigger(self, override_settings):
         """최초 발송(last_triggered_at=None)이면 True."""
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         alert = _make_alert(
@@ -102,7 +102,7 @@ class TestShouldFireToday:
 
     def test_quarterly_within_cooldown_returns_false(self, override_settings):
         """80일 쿨다운 이전에는 False."""
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         last_triggered = datetime.now(tz=_KST) - timedelta(days=30)
@@ -115,7 +115,7 @@ class TestShouldFireToday:
 
     def test_quarterly_after_cooldown_returns_true(self, override_settings):
         """80일 이상 경과 후 True."""
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         last_triggered = datetime.now(tz=_KST) - timedelta(days=90)
@@ -128,7 +128,7 @@ class TestShouldFireToday:
 
     def test_quarterly_day_mismatch_returns_false(self, override_settings):
         """발송일이 오늘과 다르면 False."""
-        from app.services.alert_calculator import should_fire_today as _should_fire_today
+        from app.services.alerts.calculator import should_fire_today as _should_fire_today
 
         today = datetime.now(tz=_KST).date()
         mismatch_day = (today.day % 28) + 1
@@ -147,19 +147,19 @@ class TestShouldFireToday:
 
 class TestAlreadyFiredToday:
     def test_no_last_triggered_returns_false(self, override_settings):
-        from app.services.alert_calculator import already_fired_today as _already_fired_today
+        from app.services.alerts.calculator import already_fired_today as _already_fired_today
 
         alert = SimpleNamespace(last_triggered_at=None)
         assert _already_fired_today(alert) is False
 
     def test_fired_today_returns_true(self, override_settings):
-        from app.services.alert_calculator import already_fired_today as _already_fired_today
+        from app.services.alerts.calculator import already_fired_today as _already_fired_today
 
         alert = SimpleNamespace(last_triggered_at=datetime.now(tz=_KST))
         assert _already_fired_today(alert) is True
 
     def test_fired_yesterday_returns_false(self, override_settings):
-        from app.services.alert_calculator import already_fired_today as _already_fired_today
+        from app.services.alerts.calculator import already_fired_today as _already_fired_today
 
         yesterday = datetime.now(tz=_KST) - timedelta(days=1)
         alert = SimpleNamespace(last_triggered_at=yesterday)
@@ -172,22 +172,22 @@ class TestAlreadyFiredToday:
 class TestCheckAndTriggerAlerts:
     @pytest.mark.asyncio
     async def test_skips_when_rate_is_zero(self, mock_db, override_settings):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
-        with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", new=AsyncMock(return_value=0.0)):
+        with patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", new=AsyncMock(return_value=0.0)):
             await check_and_trigger_alerts(mock_db)
 
         mock_db.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_alerts_nothing_happens(self, mock_db, override_settings):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", new=AsyncMock(return_value=1300.0)):
+        with patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", new=AsyncMock(return_value=1300.0)):
             await check_and_trigger_alerts(mock_db)
 
         mock_db.commit.assert_not_called()
@@ -199,7 +199,7 @@ class TestCheckAndTriggerAlerts:
 class TestCheckStockPriceAlerts:
     @pytest.mark.asyncio
     async def test_no_alerts_returns_early(self, mock_db, override_settings):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         exec_result = MagicMock()
         exec_result.all.return_value = []

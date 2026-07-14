@@ -15,9 +15,9 @@ from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.redis_client import get_redis
-from app.services.alert_calculator import already_fired_today
-from app.services.rebalancing_order_builder import is_market_signal_blocking_auto_mode
-from app.services.rebalancing_plan_service import (
+from app.services.alerts.calculator import already_fired_today
+from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
+from app.services.rebalancing.plan_service import (
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
     notify_plan_generated,

@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
+import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
 import { api } from "@/api/client";
@@ -70,6 +71,19 @@ export default function InvestPlanPage() {
     saveSettings,
   } = useGoalSettings();
 
+  const {
+    editing: dividendEditing,
+    saving: dividendSaving,
+    showCloseConfirm: dividendShowCloseConfirm,
+    form: dividendForm,
+    setForm: setDividendForm,
+    setShowCloseConfirm: setDividendShowCloseConfirm,
+    setEditing: setDividendEditing,
+    handleCloseModal: handleDividendCloseModal,
+    openEdit: openDividendEdit,
+    saveSettings: saveDividendSettings,
+  } = useDividendPlanSettings();
+
   const s = data?.settings;
   const isConfigured = data?.is_configured;
 
@@ -99,36 +113,29 @@ export default function InvestPlanPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-            적립식 DCA 복리계산 및 배당 목표 관리
-          </p>
-        </div>
-        <button
-          onClick={openEdit}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          <Settings2 size={15} />
-          설정 편집
-        </button>
-      </div>
-
       {/* 탭 전환 */}
-      <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-full sm:w-fit">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
-              activeTab === tab
-                ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-            }`}
-          >
-            {tab}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-full sm:w-fit">
+          {TABS.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
+                activeTab === tab
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+        <Link
+          to="/rebalancing?rtab=진단"
+          className="ml-auto text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          목표 대비 포트폴리오 진단 보기 →
+        </Link>
       </div>
 
       <div ref={tabContentRef}>
@@ -137,9 +144,23 @@ export default function InvestPlanPage() {
           <>
             {/* 현재 설정 요약 */}
             <div className="card">
-              <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-                적립 계획 설정
-              </h2>
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                    적립 계획 설정
+                  </h2>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                    적립식 DCA 복리계산 및 목표 달성 현황
+                  </p>
+                </div>
+                <button
+                  onClick={openEdit}
+                  className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Settings2 size={15} />
+                  설정 편집
+                </button>
+              </div>
               <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
                 {(
                   [
@@ -219,12 +240,6 @@ export default function InvestPlanPage() {
                 연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
                 자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
               </p>
-              <Link
-                to="/rebalancing?rtab=진단"
-                className="mt-2 inline-block text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                목표 대비 포트폴리오 진단 보기 →
-              </Link>
               {data && !isConfigured && (
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                   월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
@@ -266,28 +281,17 @@ export default function InvestPlanPage() {
         {/* 배당 계획 탭 */}
         {activeTab === "배당 계획" && (
           <ErrorBoundary variant="section">
-            <div className="flex justify-end">
-              <Link
-                to="/rebalancing?rtab=진단"
-                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-              >
-                목표 대비 포트폴리오 진단 보기 →
-              </Link>
-            </div>
             <Suspense fallback={<SkeletonCard rows={5} height="h-5" />}>
-              <DividendPlanSection onOpenSettings={openEdit} />
+              <DividendPlanSection onOpenSettings={openDividendEdit} />
             </Suspense>
           </ErrorBoundary>
         )}
       </div>
 
-      {/* 설정 편집 모달 */}
+      {/* 적립 계획 설정 편집 모달 */}
       {editing && (
-        <Modal title="투자 목표 설정" onClose={handleCloseModal} size="md">
+        <Modal title="적립 계획 설정 편집" onClose={handleCloseModal} size="md">
           <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-              적립 계획
-            </p>
             {[
               { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
               {
@@ -333,18 +337,6 @@ export default function InvestPlanPage() {
               />
             ))}
 
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-2">
-              배당 계획
-            </p>
-            <FormInput
-              label="목표 연간 배당금 (원)"
-              type="number"
-              value={form.annual_dividend_goal}
-              onChange={(e) => setForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))}
-              placeholder="10000000"
-              hint="예상 연배당이 이 금액을 넘으면 목표 달성"
-            />
-
             <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
               <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
                 자동 실행 설정
@@ -387,6 +379,54 @@ export default function InvestPlanPage() {
             setEditing(false);
           }}
           onCancel={() => setShowCloseConfirm(false)}
+        />
+      )}
+
+      {/* 배당 계획 설정 편집 모달 */}
+      {dividendEditing && (
+        <Modal title="배당 계획 설정" onClose={handleDividendCloseModal} size="md">
+          <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
+            <FormInput
+              label="목표 연간 배당금 (원)"
+              type="number"
+              value={dividendForm.annual_dividend_goal}
+              onChange={(e) =>
+                setDividendForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))
+              }
+              placeholder="10000000"
+              hint="예상 연배당이 이 금액을 넘으면 목표 달성"
+            />
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleDividendCloseModal}
+                className="flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={saveDividendSettings}
+                disabled={dividendSaving}
+                className="flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {dividendSaving ? "저장 중..." : "저장"}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {dividendShowCloseConfirm && (
+        <ConfirmModal
+          message="저장하지 않은 변경사항이 있습니다. 닫으시겠습니까?"
+          confirmLabel="닫기"
+          cancelLabel="계속 편집"
+          danger={false}
+          onConfirm={() => {
+            setDividendShowCloseConfirm(false);
+            setDividendEditing(false);
+          }}
+          onCancel={() => setDividendShowCloseConfirm(false)}
         />
       )}
     </div>

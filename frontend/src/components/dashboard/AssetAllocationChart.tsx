@@ -64,7 +64,7 @@ const AssetAllocationChart = memo(function AssetAllocationChart({
                 className="inline-block w-2 h-2 rounded-sm shrink-0"
                 style={{ backgroundColor: COLORS[i % COLORS.length] }}
               />
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-tight">
+              <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
                 {item.name} {item.pct.toFixed(0)}%
               </span>
             </div>

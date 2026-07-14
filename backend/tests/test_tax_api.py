@@ -132,3 +132,78 @@ class TestOverseasPositionsTax:
             resp = client.get("/api/v1/tax/overseas-positions")
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
+
+
+_MOCK_ISA_STATUS: dict = {"accounts": [], "note": "추정치입니다."}
+_MOCK_PENSION_CONTRIBUTION = {
+    "year": 2026,
+    "pension_savings_deposit_krw": 0.0,
+    "irp_deposit_krw": 0.0,
+    "total_deposit_krw": 0.0,
+    "pension_savings_limit_krw": 6_000_000,
+    "total_limit_krw": 9_000_000,
+    "pension_savings_achievement_pct": 0.0,
+    "total_achievement_pct": 0.0,
+    "pension_savings_remaining_krw": 6_000_000.0,
+    "total_remaining_krw": 9_000_000.0,
+    "note": "수기 입력 기준입니다.",
+}
+
+
+class TestIsaStatus:
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/isa-status")
+        assert resp.status_code == 401
+
+    def test_returns_200_with_mocked_service(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.tax.get_isa_status_summary",
+                AsyncMock(return_value=_MOCK_ISA_STATUS),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/tax/isa-status")
+        assert resp.status_code == 200
+        assert resp.json()["accounts"] == []
+
+
+class TestPensionContribution:
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/pension-contribution")
+        assert resp.status_code == 401
+
+    def test_returns_200_with_mocked_service(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.tax.calc_pension_contribution_status",
+                AsyncMock(return_value=_MOCK_PENSION_CONTRIBUTION),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/tax/pension-contribution")
+        assert resp.status_code == 200
+
+    def test_returns_400_for_invalid_year(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/tax/pension-contribution?year=1999")
+        assert resp.status_code == 400

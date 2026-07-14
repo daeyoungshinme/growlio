@@ -8,6 +8,7 @@ from app.kis.constants import (
     REDIS_TOKEN_KEY,
     REDIS_TOKEN_TTL_BUFFER,
 )
+from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
@@ -36,8 +37,30 @@ async def get_access_token(
     else:
         cache_key = REDIS_TOKEN_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
 
-    if force_refresh:
-        await redis.delete(cache_key)
+    async def _query_token_row():
+        from sqlalchemy import select
+
+        from app.models.token import KisToken
+
+        if account_id:
+            result = await db.execute(
+                select(KisToken).where(
+                    KisToken.account_id == account_id,
+                    KisToken.expires_at > datetime.now(UTC),
+                )
+            )
+        else:
+            result = await db.execute(
+                select(KisToken).where(
+                    KisToken.user_id == user_id,
+                    KisToken.is_mock_mode == is_mock,
+                    KisToken.account_id == None,  # noqa: E711
+                    KisToken.expires_at > datetime.now(UTC),
+                )
+            )
+        return result.scalar_one_or_none()
+
+    async def _fetch():
         return await _fetch_and_store_token(
             app_key,
             app_secret,
@@ -48,50 +71,7 @@ async def get_access_token(
             account_id=account_id,
         )
 
-    # 1. Redis 캐시 확인
-    cached = await redis.get(cache_key)
-    if cached:
-        return cached
-
-    # 2. DB fallback
-    from sqlalchemy import select
-
-    from app.models.token import KisToken
-
-    if account_id:
-        result = await db.execute(
-            select(KisToken).where(
-                KisToken.account_id == account_id,
-                KisToken.expires_at > datetime.now(UTC),
-            )
-        )
-    else:
-        result = await db.execute(
-            select(KisToken).where(
-                KisToken.user_id == user_id,
-                KisToken.is_mock_mode == is_mock,
-                KisToken.account_id == None,  # noqa: E711
-                KisToken.expires_at > datetime.now(UTC),
-            )
-        )
-    token_row = result.scalar_one_or_none()
-    if token_row:
-        elapsed = (token_row.expires_at - datetime.now(UTC)).total_seconds()
-        ttl = int(elapsed - REDIS_TOKEN_TTL_BUFFER)
-        if ttl > 0:
-            await redis.setex(cache_key, ttl, token_row.access_token)
-            return token_row.access_token
-
-    # 3. KIS API에서 신규 발급
-    return await _fetch_and_store_token(
-        app_key,
-        app_secret,
-        is_mock=is_mock,
-        redis=redis,
-        db=db,
-        user_id=user_id,
-        account_id=account_id,
-    )
+    return await get_or_fetch_token(cache_key, redis, force_refresh, REDIS_TOKEN_TTL_BUFFER, _query_token_row, _fetch)
 
 
 async def _fetch_and_store_token(

@@ -11,7 +11,7 @@ from app.models.user import User
 from app.redis_client import get_redis
 from app.services.portfolio_history_service import get_allocation_history
 from app.services.portfolio_service import build_portfolio_overview
-from app.services.rebalancing_strategy_service import get_rebalancing_strategy
+from app.services.rebalancing.strategy_service import get_rebalancing_strategy
 from app.services.risk_service import get_portfolio_risk_metrics
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])

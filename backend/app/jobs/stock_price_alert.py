@@ -1,7 +1,7 @@
 """주가 목표 알림 Job — 10분 간격 실행."""
 
 from app.jobs._job_helpers import run_alert_job
-from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
 
 async def run_stock_price_alert_check() -> None:

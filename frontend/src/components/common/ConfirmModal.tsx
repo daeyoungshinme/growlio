@@ -1,6 +1,7 @@
 import { AlertTriangle } from "lucide-react";
 import { useId } from "react";
 import { triggerHaptic } from "@/hooks/useHaptic";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
 interface Props {
   message: string;
@@ -41,10 +42,10 @@ export default function ConfirmModal({
             {message}
           </p>
         </div>
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-4 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            className={`${TOUCH_TARGET_MIN} px-4 text-sm border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
           >
             {cancelLabel}
           </button>
@@ -53,7 +54,7 @@ export default function ConfirmModal({
               void triggerHaptic(danger ? "heavy" : "medium");
               onConfirm();
             }}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+            className={`${TOUCH_TARGET_MIN} px-4 text-sm font-medium rounded-lg transition-colors ${
               danger
                 ? "bg-red-600 text-white hover:bg-red-700"
                 : "bg-blue-600 text-white hover:bg-blue-700"

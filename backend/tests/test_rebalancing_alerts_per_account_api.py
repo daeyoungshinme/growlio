@@ -331,7 +331,7 @@ class TestTriggerAccountRebalancingAlertTest:
         with (
             TestClient(app, raise_server_exceptions=False) as client,
             patch(
-                "app.services.rebalancing_alert_service.send_test_rebalancing_alert",
+                "app.services.rebalancing.alert_test.send_test_rebalancing_alert",
                 new=AsyncMock(return_value={"email_sent": True, "push_sent": False}),
             ) as mock_send,
         ):

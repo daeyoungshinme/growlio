@@ -8,7 +8,7 @@ import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
 import DividendTab from "@/components/portfolio/DividendTab";
-import { fmtKrwPrice } from "@/utils/format";
+import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
@@ -22,6 +22,7 @@ import { STALE_TIME, REFETCH_INTERVAL } from "@/constants/queryConfig";
 import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
 import { isPortfolioAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
@@ -166,7 +167,7 @@ export default function PortfolioPage() {
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
           onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview })}
-          className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
         >
           다시 시도
         </button>
@@ -188,7 +189,7 @@ export default function PortfolioPage() {
             <button
               onClick={handleSyncAll}
               disabled={isSyncingAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-1.5 px-3 py-1.5 text-sm border border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 disabled:opacity-50 transition-colors`}
             >
               <RefreshCw size={14} className={isSyncingAll ? "animate-spin" : ""} />
               {isSyncingAll ? `${syncDone}/${syncTotal} 갱신 중...` : "전체 갱신"}
@@ -196,7 +197,7 @@ export default function PortfolioPage() {
           </div>
         </div>
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">
-          {fmtKrwPrice(data.total_stock_krw)}
+          {fmtKrw(data.total_stock_krw)}
         </p>
         <div className="mt-2">
           <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>

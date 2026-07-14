@@ -479,4 +479,67 @@ class TestDeleteCredentials:
             resp = client.delete(f"/api/v1/assets/{account.id}/kiwoom-credentials")
         assert resp.status_code == 204
         assert account.kiwoom_app_key is None
+
+
+class TestUpdateIsaPnlOverride:
+    def test_not_found(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                f"/api/v1/assets/{uuid.uuid4()}/isa-pnl-override",
+                json={"cumulative_pnl_krw": 1_000_000},
+            )
+        assert resp.status_code == 404
+
+    def test_rejects_non_isa_account(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.tax_type = "GENERAL"
+        account.isa_manual_cumulative_pnl_krw = None
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                f"/api/v1/assets/{account.id}/isa-pnl-override",
+                json={"cumulative_pnl_krw": 1_000_000},
+            )
+        assert resp.status_code == 400
+
+    def test_sets_override_on_isa_account(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.tax_type = "ISA"
+        account.isa_manual_cumulative_pnl_krw = None
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                f"/api/v1/assets/{account.id}/isa-pnl-override",
+                json={"cumulative_pnl_krw": 2_500_000},
+            )
+        assert resp.status_code == 200
+        assert account.isa_manual_cumulative_pnl_krw == 2_500_000
+
+    def test_clears_override_with_null(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id)
+        account.tax_type = "ISA"
+        account.isa_manual_cumulative_pnl_krw = 2_500_000.0
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=account)
+        db.refresh = AsyncMock(side_effect=lambda obj: None)
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.patch(
+                f"/api/v1/assets/{account.id}/isa-pnl-override",
+                json={"cumulative_pnl_krw": None},
+            )
+        assert resp.status_code == 200
+        assert account.isa_manual_cumulative_pnl_krw is None
         assert account.kiwoom_app_secret is None

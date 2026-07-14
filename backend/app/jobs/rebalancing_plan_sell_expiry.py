@@ -5,7 +5,7 @@ from __future__ import annotations
 import structlog
 
 from app.database import AsyncSessionLocal
-from app.services.rebalancing_plan_service import expire_due_sell_legs
+from app.services.rebalancing.plan_service import expire_due_sell_legs
 
 logger = structlog.get_logger()
 

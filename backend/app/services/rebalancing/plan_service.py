@@ -1,6 +1,6 @@
 """AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 서비스.
 
-계획 생성은 rebalancing_order_builder.py의 build_rebalancing_orders/refresh_live_prices를
+계획 생성은 rebalancing/order_builder.py의 build_rebalancing_orders/refresh_live_prices를
 재사용한다. 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일
 장마감 미응답 시 자동 만료)라는 leg별 독립 생명주기를 관리한다.
 """
@@ -24,8 +24,8 @@ from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
-from app.services.alert_service import save_alert_history
-from app.services.rebalancing_order_builder import build_rebalancing_orders, refresh_live_prices
+from app.services.alerts.alert_service import save_alert_history
+from app.services.rebalancing.order_builder import build_rebalancing_orders, refresh_live_prices
 
 logger = structlog.get_logger()
 
@@ -178,8 +178,8 @@ async def build_pending_plan_for_alert(
     반환: (plan, buy_token, sell_token) | None — 드리프트가 없으면 None.
     """
     from app.services.portfolio_service import build_portfolio_overview
-    from app.services.rebalancing_alert_service import resolve_effective_account_ids
-    from app.services.rebalancing_service import analyze_rebalancing
+    from app.services.rebalancing.alert_scope import resolve_effective_account_ids
+    from app.services.rebalancing.service import analyze_rebalancing
 
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
@@ -446,7 +446,7 @@ async def _execute_leg(
     locked: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, redis, decided_by: str
 ) -> uuid.UUID | None:
     """잠긴(claim된) leg의 아이템으로 실제 주문을 실행하고 상태를 최종 반영한다."""
-    from app.services.rebalancing_execution_service import execute_rebalancing
+    from app.services.rebalancing.execution_service import execute_rebalancing
 
     await db.refresh(locked, attribute_names=["items"])
     orders = await _rebuild_orders_from_items(locked.items, locked.side, plan.user_id, db, redis)

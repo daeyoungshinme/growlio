@@ -45,7 +45,7 @@ class TestCheckAndTriggerStockPriceAlerts:
         """활성 알림이 없으면 가격 조회 없이 바로 반환한다."""
         mock_db.execute.return_value.all.return_value = []
 
-        from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -62,7 +62,7 @@ class TestCheckAndTriggerStockPriceAlerts:
             new_callable=AsyncMock,
             return_value={},
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -83,9 +83,9 @@ class TestCheckAndTriggerStockPriceAlerts:
             ),
             patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
-            patch("app.services.alert_service.save_alert_history", new_callable=AsyncMock),
+            patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -107,9 +107,9 @@ class TestCheckAndTriggerStockPriceAlerts:
             ),
             patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
-            patch("app.services.alert_service.save_alert_history", new_callable=AsyncMock),
+            patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -129,9 +129,9 @@ class TestCheckAndTriggerStockPriceAlerts:
             ),
             patch("app.services.email_service.send_stock_price_alert", new_callable=AsyncMock),
             patch("app.services.push_service.send_push_to_user", new_callable=AsyncMock),
-            patch("app.services.alert_service.save_alert_history", new_callable=AsyncMock),
+            patch("app.services.alerts.alert_service.save_alert_history", new_callable=AsyncMock),
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -149,7 +149,7 @@ class TestCheckAndTriggerStockPriceAlerts:
             new_callable=AsyncMock,
             return_value={"005930": 65000.0},
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -174,7 +174,7 @@ class TestCheckAndTriggerStockPriceAlerts:
                 return_value=False,
             ),
         ):
-            from app.services.stock_price_alert_service import check_and_trigger_stock_price_alerts
+            from app.services.alerts.stock_price_service import check_and_trigger_stock_price_alerts
 
             await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 

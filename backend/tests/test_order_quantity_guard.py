@@ -1,7 +1,7 @@
 """_order_quantity_guard.clamp_sell_orders 단위 테스트."""
 
 from app.schemas.rebalancing import ExecutionOrderItem
-from app.services._order_quantity_guard import clamp_sell_orders
+from app.services.rebalancing._order_quantity_guard import clamp_sell_orders
 
 
 def _make_order(ticker: str = "005930", market: str = "KOSPI", quantity: int = 10) -> ExecutionOrderItem:

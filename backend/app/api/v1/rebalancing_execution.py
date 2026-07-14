@@ -26,8 +26,8 @@ from app.schemas.rebalancing import (
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
 )
-from app.services.rebalancing_execution_service import execute_rebalancing
-from app.services.rebalancing_plan_service import (
+from app.services.rebalancing.execution_service import execute_rebalancing
+from app.services.rebalancing.plan_service import (
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
     notify_plan_generated,

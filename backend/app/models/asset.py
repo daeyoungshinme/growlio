@@ -47,6 +47,12 @@ class AssetAccount(Base):
     tax_type: Mapped[str] = mapped_column(String(30), nullable=False, server_default="GENERAL")
     # SHORT_TERM | MID_TERM | LONG_TERM | None — 투자기간 태그 (계좌 그룹핑용, 리밸런싱 계산에는 영향 없음)
     investment_horizon: Mapped[str | None] = mapped_column(String(20))
+    # ISA 의무가입 3년 기산일 — 계좌 앱 등록일(created_at)과 별개. tax_type=ISA일 때만 의미
+    isa_open_date: Mapped[date | None] = mapped_column(Date)
+    # GENERAL | PREFERENTIAL — ISA 비과세 한도 구분(일반형 200만원 / 서민형·농어민형 400만원)
+    isa_type: Mapped[str | None] = mapped_column(String(20))
+    # 사용자가 직접 입력한 ISA 계좌 누적 손익(원) — 값이 있으면 자동 추정치보다 우선 사용
+    isa_manual_cumulative_pnl_krw: Mapped[float | None] = mapped_column(Numeric(18, 2))
 
     # KIS 계좌 (STOCK_KIS)
     kis_account_no: Mapped[str | None] = mapped_column(String(20))

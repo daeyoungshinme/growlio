@@ -287,6 +287,7 @@ export function RebalancingOrderTable({
                         <div className="flex items-center justify-end gap-1">
                           <input
                             type="number"
+                            inputMode="numeric"
                             min={0}
                             max={currentQty}
                             value={qty || ""}
@@ -399,6 +400,7 @@ export function RebalancingOrderTable({
                         <div className="flex items-center justify-end gap-1">
                           <input
                             type="number"
+                            inputMode="numeric"
                             min={0}
                             value={qty || ""}
                             onFocus={(e) => e.target.select()}

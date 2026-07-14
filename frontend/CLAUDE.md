@@ -94,7 +94,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **컨텍스트 (`src/context/`):**
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
 
-`components/common/` 주요 파일: `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
+`components/common/` 주요 파일: `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
@@ -134,6 +134,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글 (MarketSignalBanner/MarketSignalAlertSection 공용)
+- `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)

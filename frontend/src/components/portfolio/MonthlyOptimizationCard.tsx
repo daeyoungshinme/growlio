@@ -84,7 +84,7 @@ export default function MonthlyOptimizationCard() {
                       <span className="text-gray-400 dark:text-gray-500 truncate max-w-[120px]">
                         {item.name}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-[10px]">
+                      <span className="px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 text-xs">
                         {item.market}
                       </span>
                     </div>

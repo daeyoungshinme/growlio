@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
+import type { AssetClass, IndexRegion } from "./settings";
 
 export interface RealEstateDetails {
   address?: string;
@@ -33,12 +34,18 @@ export interface AssetAccount {
   target_portfolio_id?: string | null;
   tax_type?: AccountTaxType;
   investment_horizon?: InvestmentHorizon | null;
+  isa_open_date?: string | null;
+  isa_type?: IsaType | null;
+  isa_manual_cumulative_pnl_krw?: number | null;
 }
 
 // GENERAL: 일반 | ISA: ISA | PENSION_SAVINGS: 연금저축 | IRP: IRP | OVERSEAS_DEDICATED: 해외전용
 export type AccountTaxType = "GENERAL" | "ISA" | "PENSION_SAVINGS" | "IRP" | "OVERSEAS_DEDICATED";
 
 export type InvestmentHorizon = "SHORT_TERM" | "MID_TERM" | "LONG_TERM";
+
+// GENERAL: 일반형(비과세 200만원) | PREFERENTIAL: 서민형·농어민형(비과세 400만원)
+export type IsaType = "GENERAL" | "PREFERENTIAL";
 
 export const ACCOUNT_TAX_TYPE_LABELS: Record<AccountTaxType, string> = {
   GENERAL: "일반",
@@ -54,6 +61,11 @@ export const INVESTMENT_HORIZON_LABELS: Record<InvestmentHorizon, string> = {
   LONG_TERM: "장기",
 };
 
+export const ISA_TYPE_LABELS: Record<IsaType, string> = {
+  GENERAL: "일반형 (비과세 200만원)",
+  PREFERENTIAL: "서민형·농어민형 (비과세 400만원)",
+};
+
 export interface AssetAccountCreate {
   name: string;
   asset_type: string;
@@ -61,6 +73,8 @@ export interface AssetAccountCreate {
   institution?: string;
   tax_type?: AccountTaxType;
   investment_horizon?: InvestmentHorizon | null;
+  isa_open_date?: string | null;
+  isa_type?: IsaType | null;
   kis_account_no?: string;
   kis_app_key?: string;
   kis_app_secret?: string;
@@ -113,6 +127,11 @@ export const setAccountTargetPortfolio = (accountId: string, portfolioId: string
     target_portfolio_id: portfolioId,
   });
 
+export const updateIsaPnlOverride = (accountId: string, cumulativePnlKrw: number | null) =>
+  apiPatch<AssetAccount>(`/assets/${accountId}/isa-pnl-override`, {
+    cumulative_pnl_krw: cumulativePnlKrw,
+  });
+
 export const batchSetTargetPortfolio = (
   portfolioId: string | null,
   accountIds: string[],
@@ -136,10 +155,20 @@ export interface StockSuggestion {
   name: string;
   market: string;
   exchange: string;
+  /** 종목명 패턴 기반 추정치 — 확정 근거 아님, 사용자가 후보 ETF 관리에서 직접 수정 가능해야 함 */
+  asset_class?: AssetClass;
+  /** 상장거래소·큐레이션 목록 기반 추정치 — 위와 동일하게 사용자 수정 가능해야 함 */
+  index_region?: IndexRegion;
 }
 
 export const searchStocks = (q: string, signal?: AbortSignal): Promise<StockSuggestion[]> =>
   apiGet<StockSuggestion[]>("/stocks/search", { params: { q }, signal });
+
+export const fetchIndexRegion = (
+  ticker: string,
+  market: string,
+): Promise<{ index_region: IndexRegion }> =>
+  apiGet<{ index_region: IndexRegion }>("/stocks/index-region", { params: { ticker, market } });
 
 export const fetchExchangeRate = (): Promise<{ usd_krw: number }> =>
   apiGet<{ usd_krw: number }>("/stocks/exchange-rate");

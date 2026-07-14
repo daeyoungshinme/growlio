@@ -147,7 +147,7 @@ def _patch_common(mock_db, composite_level="GREEN"):
             )
         )
         stack.enter_context(patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)))
-        stack.enter_context(patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()))
+        stack.enter_context(patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()))
         stack.enter_context(patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()))
         yield
 
@@ -191,7 +191,7 @@ class TestRunAutoExecution:
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(_make_plan(), "buy-token", None)),
             ) as mock_gen,
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
             patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
         ):
@@ -332,7 +332,7 @@ class TestRunAutoExecution:
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(_make_plan(), "buy-token", None)),
             ),
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()) as mock_save,
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save,
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()) as mock_email,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
@@ -371,7 +371,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
             patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", side_effect=_gen_side_effect),
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()) as mock_save,
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save,
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
@@ -400,10 +400,10 @@ class TestBuildPendingPlanForAlert:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
-            patch("app.services.rebalancing_plan_service.generate_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.generate_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
         ):
-            from app.services.rebalancing_plan_service import build_pending_plan_for_alert
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
 
             result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
 
@@ -420,13 +420,13 @@ class TestBuildPendingPlanForAlert:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch(
-                "app.services.rebalancing_plan_service.generate_pending_plan_for_alert",
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", None)),
             ) as mock_gen,
         ):
-            from app.services.rebalancing_plan_service import build_pending_plan_for_alert
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
 
             result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
 
@@ -436,7 +436,7 @@ class TestBuildPendingPlanForAlert:
 
     @pytest.mark.asyncio
     async def test_propagates_overview_failure(self):
-        from app.services.rebalancing_plan_service import build_pending_plan_for_alert
+        from app.services.rebalancing.plan_service import build_pending_plan_for_alert
 
         alert = _make_alert()
         portfolio = _make_portfolio()
@@ -453,7 +453,7 @@ class TestBuildPendingPlanForAlert:
 
     @pytest.mark.asyncio
     async def test_propagates_analysis_failure(self):
-        from app.services.rebalancing_plan_service import build_pending_plan_for_alert
+        from app.services.rebalancing.plan_service import build_pending_plan_for_alert
 
         alert = _make_alert()
         portfolio = _make_portfolio()
@@ -461,7 +461,7 @@ class TestBuildPendingPlanForAlert:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.rebalancing_service.analyze_rebalancing", side_effect=ValueError("bad data")),
+            patch("app.services.rebalancing.service.analyze_rebalancing", side_effect=ValueError("bad data")),
             pytest.raises(ValueError, match="bad data"),
         ):
             await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
@@ -476,13 +476,13 @@ class TestBuildPendingPlanForAlert:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch(
-                "app.services.rebalancing_plan_service.generate_pending_plan_for_alert",
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, None, "sell-token")),
             ) as mock_gen,
         ):
-            from app.services.rebalancing_plan_service import build_pending_plan_for_alert
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
 
             result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
 

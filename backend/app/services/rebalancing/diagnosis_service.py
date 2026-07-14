@@ -22,7 +22,7 @@ from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
 
-# 리스크 이상 판단 임계값 — rebalancing_alert_service._check_composite_alert_trigger와 동일 기준 공유(단일 소스)
+# 리스크 이상 판단 임계값 — rebalancing/alert_check._evaluate_composite_trigger와 동일 기준 공유(단일 소스)
 RISK_DIVERSIFICATION_MIN = 40
 RISK_TOP_HOLDING_MAX_PCT = 40.0
 RISK_VOLATILITY_MAX_PCT = 20.0
@@ -43,7 +43,7 @@ _MARKET_NOTES: dict[str, str | None] = {
 def _aggregate_position_costs(overview: dict) -> dict[tuple[str, str], list[dict[str, Any]]]:
     """overview.all_positions에서 (ticker, market)별 계좌 단위 보유 목록(lot)을 구한다.
 
-    각 lot은 계좌의 tax_type을 포함하며, 매도 우선순위(rebalancing_order_builder._build_sell_orders와
+    각 lot은 계좌의 tax_type을 포함하며, 매도 우선순위(rebalancing/order_builder._build_sell_orders와
     동일 기준 — 과세이연 계좌 후순위, 그 다음 보유수량 큰 순)로 정렬해 반환한다. 세금 미리보기가
     실제 매도 실행 시 계좌 선택 순서와 동일한 가정으로 실현손익을 추정하도록 하기 위함이다.
     """

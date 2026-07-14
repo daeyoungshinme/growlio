@@ -15,9 +15,7 @@ const RebalancingStatusCard = lazy(() => import("../components/dashboard/Rebalan
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
 const MarketSignalBanner = lazy(() => import("../components/rebalancing/MarketSignalBanner"));
 const InflationSummaryCard = lazy(() => import("../components/rebalancing/InflationSummaryCard"));
-const GoalRecommendationCard = lazy(
-  () => import("../components/rebalancing/GoalRecommendationCard"),
-);
+const RecommendationCard = lazy(() => import("../components/rebalancing/RecommendationCard"));
 const PortfolioManageTab = lazy(
   () => import("../components/portfolio-analysis/PortfolioManageTab"),
 );
@@ -140,8 +138,7 @@ export default function RebalancingPage() {
           <>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
-                <GoalRecommendationCard
-                  noTopMargin
+                <RecommendationCard
                   onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
                 />
               </Suspense>

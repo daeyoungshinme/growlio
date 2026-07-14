@@ -5,7 +5,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, TransactionType
+from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, IsaType, TransactionType
 from app.models.asset import VALID_MARKETS
 
 
@@ -77,14 +77,6 @@ class ManualPosition(BaseModel):
         if v not in VALID_MARKETS:
             raise ValueError(f"유효하지 않은 시장: {v}. 허용값: {sorted(VALID_MARKETS)}")
         return v
-
-
-class PositionItem(BaseModel):
-    ticker: str
-    market: str
-    qty: float
-    avg_price: float
-    name: str | None = None
 
 
 class PositionResponse(BaseModel):
@@ -173,6 +165,8 @@ class AssetAccountCreate(BaseModel):
     include_in_total: bool = True
     tax_type: AccountTaxType = AccountTaxType.GENERAL
     investment_horizon: InvestmentHorizon | None = None
+    isa_open_date: date | None = None
+    isa_type: IsaType | None = None
 
     @field_validator("deposit_krw", "deposit_usd")
     @classmethod
@@ -220,6 +214,8 @@ class AssetAccountUpdate(BaseModel):
     include_in_total: bool | None = None
     tax_type: AccountTaxType | None = None
     investment_horizon: InvestmentHorizon | None = None
+    isa_open_date: date | None = None
+    isa_type: IsaType | None = None
 
     @field_validator("manual_amount")
     @classmethod
@@ -258,8 +254,17 @@ class AssetAccountResponse(BaseModel):
     target_portfolio_id: UUID | None = None
     tax_type: AccountTaxType = AccountTaxType.GENERAL
     investment_horizon: InvestmentHorizon | None = None
+    isa_open_date: date | None = None
+    isa_type: IsaType | None = None
+    isa_manual_cumulative_pnl_krw: float | None = None
 
     model_config = {"from_attributes": True}
+
+
+class IsaPnlOverrideUpdate(BaseModel):
+    """ISA 계좌 누적 손익 수동 입력/해제. cumulative_pnl_krw=None 전송 시 자동 추정치로 되돌림."""
+
+    cumulative_pnl_krw: float | None = None
 
 
 class AssetSnapshotResponse(BaseModel):

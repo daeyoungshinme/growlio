@@ -31,12 +31,12 @@ class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_first_run_stores_without_notifying(self, mock_db, mock_redis):
         """이전 관측값이 없으면(최초 실행) 저장만 하고 알림을 보내지 않는다."""
-        from app.services.market_signal_alert_service import check_market_signal_level_change
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         mock_redis.get = AsyncMock(return_value=None)
         with (
             patch(
-                "app.services.market_signal_alert_service.get_market_signal",
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
@@ -50,12 +50,12 @@ class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_no_change_does_nothing(self, mock_db, mock_redis):
         """이전 관측값과 동일하면 아무 것도 하지 않는다."""
-        from app.services.market_signal_alert_service import check_market_signal_level_change
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         mock_redis.get = AsyncMock(return_value='"GREEN"')
         with (
             patch(
-                "app.services.market_signal_alert_service.get_market_signal",
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
@@ -69,7 +69,7 @@ class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_level_change_notifies_subscribers_and_saves_history(self, mock_db, mock_redis):
         """등급이 바뀌면 composite_signal_alerts_enabled=True인 구독자에게 이메일+푸시 발송, 이력 저장, 커밋."""
-        from app.services.market_signal_alert_service import check_market_signal_level_change
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)
         user_settings = SimpleNamespace(notification_email=None, fcm_token="token-abc")
@@ -82,7 +82,7 @@ class TestCheckMarketSignalLevelChange:
 
         with (
             patch(
-                "app.services.market_signal_alert_service.get_market_signal",
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED"}),
             ),
             patch(
@@ -113,7 +113,7 @@ class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_no_subscribers_still_updates_last_level(self, mock_db, mock_redis):
         """구독자가 없어도 마지막 관측값은 갱신된다."""
-        from app.services.market_signal_alert_service import check_market_signal_level_change
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         execute_result = MagicMock()
         execute_result.all.return_value = []
@@ -121,7 +121,7 @@ class TestCheckMarketSignalLevelChange:
         mock_redis.get = AsyncMock(return_value='"GREEN"')
 
         with patch(
-            "app.services.market_signal_alert_service.get_market_signal",
+            "app.services.alerts.market_signal_alert_service.get_market_signal",
             new=AsyncMock(return_value={"composite_level": "RED"}),
         ):
             await check_market_signal_level_change(mock_db, mock_redis)
@@ -132,10 +132,10 @@ class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_market_signal_fetch_failure_is_swallowed(self, mock_db, mock_redis):
         """시장 신호 조회 실패 시 예외를 삼키고 조용히 반환한다."""
-        from app.services.market_signal_alert_service import check_market_signal_level_change
+        from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         with patch(
-            "app.services.market_signal_alert_service.get_market_signal",
+            "app.services.alerts.market_signal_alert_service.get_market_signal",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             await check_market_signal_level_change(mock_db, mock_redis)

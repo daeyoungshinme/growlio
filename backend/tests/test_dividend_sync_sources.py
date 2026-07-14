@@ -195,6 +195,83 @@ class TestSyncNaverEtfDividendInfo:
         assert result["dps"] == 0.0
 
 
+# ── sync_naver_etf_index_region ──────────────────────────────
+
+
+class TestSyncNaverEtfIndexRegion:
+    def test_high_kr_weight_returns_domestic(self, override_settings):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "countryPortfolioList": [
+                {"detailTypeCode": "KR", "weight": 98.95},
+                {"detailTypeCode": "US", "weight": 1.05},
+            ]
+        }
+
+        with patch("requests.get", return_value=mock_resp):
+            from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+            result = sync_naver_etf_index_region("069500")
+
+        assert result == "DOMESTIC"
+
+    def test_low_kr_weight_returns_overseas(self, override_settings):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {
+            "countryPortfolioList": [
+                {"detailTypeCode": "KR", "weight": 0.34},
+                {"detailTypeCode": "US", "weight": 99.1},
+            ]
+        }
+
+        with patch("requests.get", return_value=mock_resp):
+            from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+            result = sync_naver_etf_index_region("133690")
+
+        assert result == "OVERSEAS"
+
+    def test_no_kr_entry_returns_overseas(self, override_settings):
+        """KR 항목 자체가 없으면 비중 0으로 간주해 해외지수로 판별한다."""
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {"countryPortfolioList": [{"detailTypeCode": "US", "weight": 100.0}]}
+
+        with patch("requests.get", return_value=mock_resp):
+            from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+            result = sync_naver_etf_index_region("360750")
+
+        assert result == "OVERSEAS"
+
+    def test_no_portfolio_data_returns_none(self, override_settings):
+        """개별 종목 등 ETF 데이터가 없으면 None 반환 — 호출측이 폴백을 적용해야 함."""
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.return_value = {}
+
+        with patch("requests.get", return_value=mock_resp):
+            from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+            result = sync_naver_etf_index_region("005930")
+
+        assert result is None
+
+    def test_parse_error_returns_none(self, override_settings):
+        mock_resp = MagicMock()
+        mock_resp.raise_for_status.return_value = None
+        mock_resp.json.side_effect = ValueError("bad json")
+
+        with patch("requests.get", return_value=mock_resp):
+            from app.services.dividend_sync_sources import sync_naver_etf_index_region
+
+            result = sync_naver_etf_index_region("069500")
+
+        assert result is None
+
+
 # ── sync_naver_stock_dividend_info ────────────────────────────
 
 

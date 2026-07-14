@@ -98,7 +98,7 @@ export function RebalancingAccountSyncSection({ accounts, onReanalyze }: Props) 
               className="rounded text-blue-600"
             />
             <span className="font-medium truncate max-w-[120px]">{account.name}</span>
-            <span className="shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded text-[10px]">
+            <span className="shrink-0 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded text-xs">
               {SOURCE_LABEL[account.data_source] ?? account.data_source}
             </span>
           </label>

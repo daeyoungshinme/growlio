@@ -13,7 +13,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1 import exchange_rate_alerts, rebalancing_alerts, stock_price_alerts
 from app.limiter import limiter
 from app.models.user import User
-from app.services.alert_service import list_alert_history as _list_alert_history
+from app.services.alerts.alert_service import list_alert_history as _list_alert_history
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
 

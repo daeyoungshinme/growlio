@@ -7,7 +7,7 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
-import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
+import TaxHorizonSummarySection from "@/components/dashboard/TaxHorizonSummarySection";
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -176,9 +176,9 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* Row 3-1: 투자기간별 자산현황 (계좌에 태그된 경우에만 표시) */}
+        {/* Row 3-1: 세제·기간 현황 (투자기간/ISA/연금저축·IRP 통합, 조건부 표시) */}
         <ErrorBoundary variant="section">
-          <HorizonSummaryCard overview={overview} />
+          <TaxHorizonSummarySection overview={overview} />
         </ErrorBoundary>
 
         {/* Row 4: 리밸런싱 진단 요약 */}

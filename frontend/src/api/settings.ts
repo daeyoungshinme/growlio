@@ -1,9 +1,15 @@
 import { apiGet, apiPut } from "./client";
 
+export type AssetClass = "EQUITY" | "BOND" | "CASH";
+
+export type IndexRegion = "DOMESTIC" | "OVERSEAS";
+
 export interface GoalCandidateTicker {
   ticker: string;
   name: string;
   market: string;
+  asset_class?: AssetClass;
+  index_region?: IndexRegion | null;
 }
 
 export type GoalRiskTolerance = "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE";
@@ -12,6 +18,7 @@ export interface GoalRecommendationOptions {
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
   cagr_lookback_years: number;
+  short_term_equity_floor_pct: number;
 }
 
 export interface SettingsData {
@@ -37,6 +44,7 @@ export interface SettingsData {
   goal_risk_tolerance: GoalRiskTolerance;
   goal_max_weight_pct: number;
   goal_cagr_lookback_years: number;
+  goal_short_term_equity_floor_pct: number;
 }
 
 export interface AutoDcaPayload {

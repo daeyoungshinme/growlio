@@ -57,7 +57,7 @@ export default function DiagnosisInsightList({ context }: Props) {
                   <span className="flex items-center gap-1">
                     {item.name} ({item.ticker})
                     {item.is_tax_deferred && (
-                      <span className="px-1 py-px border border-purple-700 text-purple-400 rounded-full text-[10px] leading-tight">
+                      <span className="px-1 py-px border border-purple-700 text-purple-400 rounded-full text-xs leading-tight">
                         과세이연
                       </span>
                     )}

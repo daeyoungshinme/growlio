@@ -54,6 +54,7 @@ TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
+TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -71,6 +72,10 @@ def current_price_key(ticker: str, market: str) -> str:
 
 def price_return_key(years: int, ticker: str, market: str) -> str:
     return f"{_env_prefix()}return:{years}y:{ticker}:{market}"
+
+
+def etf_index_region_key(ticker: str) -> str:
+    return f"{_env_prefix()}etf:index_region:{ticker}"
 
 
 def dashboard_summary_key(user_id: uuid.UUID) -> str:

@@ -154,11 +154,27 @@ services/
   ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, Redis로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
-  ├── alert_service.py        # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 exchange_rate_alert_service.py/stock_price_alert_service.py/rebalancing_alert_service.py) — 의도된 설계, 제거 대상 아님
-  ├── rebalancing_alert_service.py  # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH) (alert_service.py에서 분리). 시장신호 게이팅은 market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). 주문 생성 헬퍼(`build_rebalancing_orders`/`refresh_live_prices`)는 rebalancing_order_builder.py에서 import해 재노출(하위호환) — 실제 구현은 그쪽에 있음
-  ├── rebalancing_order_builder.py  # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices) — rebalancing_alert_service.py에서 분리(알림 발송과 주문 생성 책임 분리)
-  ├── rebalancing_plan_service.py  # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지
-  ├── rebalancing_diagnosis_service.py  # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직 (alert 아님)
+  ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
+  │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 alerts/exchange_rate_service.py·alerts/stock_price_service.py·rebalancing/alert_check.py·rebalancing/alert_test.py·rebalancing/order_builder.py) — 의도된 설계, 제거 대상 아님
+  │   ├── exchange_rate_service.py # 환율 알림 조건 체크 서비스 (구 exchange_rate_alert_service.py)
+  │   ├── stock_price_service.py   # 주가 알림 조건 체크 서비스 (구 stock_price_alert_service.py)
+  │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing/alert_check.py·rebalancing/diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing/alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
+  │   └── calculator.py       # 알림 조건 판단 로직 (구 alert_calculator.py, alert_service.py에서 분리)
+  ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
+  │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
+  │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
+  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices) — 구 rebalancing_order_builder.py
+  │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`)
+  │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
+  │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
+  │   ├── plan_service.py     # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지 (구 rebalancing_plan_service.py)
+  │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리 (구 rebalancing_execution_service.py)
+  │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (execution_service.py에서 분리)
+  │   ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (execution_service.py에서 분리)
+  │   ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼 (양쪽 executor 공용)
+  │   ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
+  │   ├── diagnosis_service.py # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직, alert 아님 (구 rebalancing_diagnosis_service.py)
+  │   └── _alert_queries.py   # RebalancingAlert portfolio_id+user_id 조회 헬퍼 (rebalancing_alerts.py 라우터에서 분리, 구 _rebalancing_alert_queries.py)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend_fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
@@ -181,12 +197,6 @@ services/
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
-  ├── rebalancing_execution_service.py  # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리
-  ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (rebalancing_execution_service.py에서 분리)
-  ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (rebalancing_execution_service.py에서 분리)
-  ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼 (양쪽 executor 공용)
-  ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
-  ├── rebalancing_service.py  # 리밸런싱 추천
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
@@ -194,12 +204,8 @@ services/
   ├── _account_queries.py     # 활성 계좌 조회 쿼리 헬퍼 (is_active == True 필터, 브로커 계좌 필터, 비활성 포함 단건 조회)
   ├── _position_queries.py    # 포지션 DB 쿼리 헬퍼
   ├── _settings_queries.py    # UserSettings 조회/get-or-create + has_active_kis_credentials 쿼리 헬퍼 (settings.py 라우터에서 분리)
-  ├── _rebalancing_alert_queries.py  # RebalancingAlert portfolio_id+user_id 조회 헬퍼 (rebalancing_alerts.py 라우터에서 분리)
   ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
   ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
-  ├── alert_calculator.py           # 알림 조건 판단 로직 (alert_service.py에서 분리)
-  ├── exchange_rate_alert_service.py # 환율 알림 조건 체크 서비스
-  ├── stock_price_alert_service.py  # 주가 알림 조건 체크 서비스
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
   ├── composition_calculator.py     # 자산 구성 비중 계산
   ├── trend_calculator.py           # 월별 자산 추이 계산
@@ -211,18 +217,23 @@ services/
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
-  ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing_alert_service.py/rebalancing_diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing_alert_service.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
-  ├── rebalancing_strategy_service.py # 리밸런싱 전략 로직 (rebalancing_service.py에서 분리)
   └── risk_service.py               # 포트폴리오 리스크 지표 계산 (VaR, 변동성 등)
 
 > 새 서비스 파일 추가/삭제 시 이 목록도 함께 갱신.
 
 schemas/                      # Pydantic 요청/응답 스키마
   ├── _validators.py          # 공용 field_validator 헬퍼
-  ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py / rebalancing.py
+  ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py
+  ├── rebalancing/             # 리밸런싱 스키마 패키지 (구 rebalancing.py 단일 파일, 453줄 → 책임별 분리) — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X` 호출부는 변경 없음
+  │   ├── analysis.py          # 분석 결과: TickerAccountInfo/RebalancingItem/CurrentHolding/TaxImpactItem/DiagnosisContext/RebalancingAnalysis
+  │   ├── execution.py         # 실행/실행이력: ExecutionOrderItem/ExecutionRequest/KisBalance*/OrderResult/ExecutionResult/RebalancingExecution*
+  │   ├── drift.py             # 드리프트 요약(대시보드 경량 조회): DriftedItem/PortfolioDriftSummary
+  │   ├── alert.py             # 알림 설정: RebalancingAlertCreate/AlertScopeUpdate/TestAlertResponse/RebalancingAlertResponse
+  │   ├── plan.py               # 대기 플랜: RebalancingPlanItemOut/RebalancingPlanLegSummary/PlanTokenPreview 등
+  │   └── goal.py               # 목표 역산 추천/복합신호 배너: GoalRecommendation*/CompositeSignalStatus
   └── service_dtypes.py       # 서비스 계층 내부 TypedDict (DB/외부 API 응답 형태 고정)
 
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)

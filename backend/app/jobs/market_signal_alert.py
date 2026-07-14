@@ -1,7 +1,7 @@
 """시장 위험 신호등 등급 변화 감지 job — 1시간 간격 실행, 등급 전환 시 즉시 알림."""
 
 from app.jobs._job_helpers import run_alert_job
-from app.services.market_signal_alert_service import check_market_signal_level_change
+from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
 
 async def run_market_signal_alert_check() -> None:

@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime, timedelta, timezone
 from types import SimpleNamespace
 
-from app.services.alert_calculator import (
+from app.services.alerts.calculator import (
     already_fired_today,
     should_fire_today,
     should_trigger_exchange_rate,

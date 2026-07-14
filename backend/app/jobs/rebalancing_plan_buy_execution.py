@@ -6,7 +6,7 @@ import structlog
 
 from app.database import AsyncSessionLocal
 from app.redis_client import get_redis
-from app.services.rebalancing_plan_service import execute_due_buy_legs
+from app.services.rebalancing.plan_service import execute_due_buy_legs
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_PLAN_BUY
 from app.utils.market_hours import is_korean_market_open
 from app.utils.redis_lock import redis_lock

@@ -50,6 +50,8 @@ class UserSettings(Base):
     goal_risk_tolerance: Mapped[str | None] = mapped_column(String(20), nullable=True)
     goal_max_weight_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     goal_cagr_lookback_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # 단기(SHORT_TERM) 추천의 주식 최소 비중(%) — NULL이면 기본값 80% 사용
+    goal_short_term_equity_floor_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 알림 설정

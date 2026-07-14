@@ -51,7 +51,31 @@ class AccountTaxType(StrEnum):
     OVERSEAS_DEDICATED = "OVERSEAS_DEDICATED"
 
 
+class IsaType(StrEnum):
+    GENERAL = "GENERAL"  # 일반형 — 비과세 한도 200만원
+    PREFERENTIAL = "PREFERENTIAL"  # 서민형·농어민형 통합 — 비과세 한도 400만원
+
+
 class InvestmentHorizon(StrEnum):
     SHORT_TERM = "SHORT_TERM"
     MID_TERM = "MID_TERM"
     LONG_TERM = "LONG_TERM"
+
+
+class AssetClass(StrEnum):
+    """목표 역산 추천 후보 종목의 자산군 — 기간별(단기/중기/장기) 추천 시 후보 필터링에 사용."""
+
+    EQUITY = "EQUITY"
+    BOND = "BOND"
+    CASH = "CASH"
+
+
+class IndexRegion(StrEnum):
+    """목표 역산 추천 후보 ETF/주식이 추종하는 지수의 지역 — 상장거래소와는 별개 개념.
+
+    예: `133690 TIGER 미국나스닥100`은 KRX(국내) 상장이지만 나스닥100(해외) 지수를 추종한다.
+    세제유형별(ISA/연금저축/IRP는 해외지수, 일반은 국내지수) 후보 선호도 필터링에 사용된다.
+    """
+
+    DOMESTIC = "DOMESTIC"
+    OVERSEAS = "OVERSEAS"

@@ -470,7 +470,7 @@ class TestRebalancingAlertExtended:
 
         with (
             patch(
-                "app.services.rebalancing_alert_service.send_test_rebalancing_alert",
+                "app.services.rebalancing.alert_test.send_test_rebalancing_alert",
                 new=AM(return_value={"email_sent": True, "push_sent": True}),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -497,7 +497,7 @@ class TestRebalancingAlertExtended:
 
         with (
             patch(
-                "app.services.rebalancing_alert_service.send_test_rebalancing_alert",
+                "app.services.rebalancing.alert_test.send_test_rebalancing_alert",
                 new=AM(return_value={"email_sent": True, "push_sent": False}),
             ),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -524,7 +524,7 @@ class TestRebalancingAlertExtended:
 
         with (
             patch(
-                "app.services.rebalancing_alert_service.send_test_rebalancing_alert",
+                "app.services.rebalancing.alert_test.send_test_rebalancing_alert",
                 new=AM(return_value={"email_sent": False, "push_sent": False}),
             ),
             TestClient(app, raise_server_exceptions=False) as client,

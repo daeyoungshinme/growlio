@@ -36,7 +36,7 @@ export default function FormInput({
         {...inputProps}
       />
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-      {hint && !error && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{hint}</p>}
+      {hint && !error && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{hint}</p>}
     </div>
   );
 }

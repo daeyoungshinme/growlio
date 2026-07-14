@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from app.services.alert_service import save_alert_history
+from app.services.alerts.alert_service import save_alert_history
 
 
 class TestSaveAlertHistory:

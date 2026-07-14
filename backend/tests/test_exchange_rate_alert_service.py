@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-_FETCH_RATE = "app.services.exchange_rate_alert_service.fetch_usd_krw"
+_FETCH_RATE = "app.services.alerts.exchange_rate_service.fetch_usd_krw"
 _SEND_EMAIL = "app.services.email_service.send_exchange_rate_alert"
 _SEND_PUSH = "app.services.push_service.send_push_to_user"
-_SAVE_HIST = "app.services.alert_service.save_alert_history"
+_SAVE_HIST = "app.services.alerts.alert_service.save_alert_history"
 
 
 def _make_alert(
@@ -45,7 +45,7 @@ class TestCheckAndTriggerAlerts:
         mock_db.execute.return_value.all.return_value = []
 
         with patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1320.0):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -55,7 +55,7 @@ class TestCheckAndTriggerAlerts:
     async def test_rate_zero_returns_early(self, mock_db):
         """환율 조회 실패(0 반환) 시 조기 종료한다."""
         with patch(_FETCH_RATE, new_callable=AsyncMock, return_value=0):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -68,7 +68,7 @@ class TestCheckAndTriggerAlerts:
         mock_db.execute.return_value.all.return_value = [_make_db_row(alert)]
 
         with patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1350.0):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -87,7 +87,7 @@ class TestCheckAndTriggerAlerts:
             patch(_SEND_PUSH, new_callable=AsyncMock),
             patch(_SAVE_HIST, new_callable=AsyncMock),
         ):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -107,7 +107,7 @@ class TestCheckAndTriggerAlerts:
             patch(_SEND_PUSH, new_callable=AsyncMock),
             patch(_SAVE_HIST, new_callable=AsyncMock),
         ):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -126,7 +126,7 @@ class TestCheckAndTriggerAlerts:
             patch(_SEND_PUSH, new_callable=AsyncMock),
             patch(_SAVE_HIST, new_callable=AsyncMock),
         ):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 
@@ -144,7 +144,7 @@ class TestCheckAndTriggerAlerts:
         mock_redis = object()
 
         with patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1320.0) as mock_fetch:
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db, mock_redis)
 
@@ -160,7 +160,7 @@ class TestCheckAndTriggerAlerts:
             patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1280.0),
             patch(_SEND_EMAIL, new_callable=AsyncMock, return_value=False),
         ):
-            from app.services.exchange_rate_alert_service import check_and_trigger_alerts
+            from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
             await check_and_trigger_alerts(mock_db)
 

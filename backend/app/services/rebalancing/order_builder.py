@@ -1,8 +1,8 @@
 """리밸런싱 실행 주문 생성 로직.
 
 AUTO 자동실행(`rebalancing_auto_execution` job)·원클릭 실행(`quick_execute_rebalancing`)·
-대기 플랜 생성(`rebalancing_plan_service.generate_pending_plan_for_alert`)이 공유하는
-주문 생성 헬퍼. 알림 발송 책임(`rebalancing_alert_service.py`)과 분리하기 위해 별도 모듈로 둔다.
+대기 플랜 생성(`rebalancing/plan_service.generate_pending_plan_for_alert`)이 공유하는
+주문 생성 헬퍼. 알림 발송 책임(`rebalancing/alert_check.py`)과 분리하기 위해 별도 모듈로 둔다.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ async def refresh_live_prices(
 def is_market_signal_blocking_auto_mode(market_condition_mode: str, composite_level: str) -> bool:
     """AUTO 모드에서 시장 신호 등급이 `market_condition_mode` 게이트를 위반하는지 판정한다.
 
-    드리프트 알림 체크(`rebalancing_alert_service.py`)와 AUTO 플랜 생성 job
+    드리프트 알림 체크(`rebalancing/alert_check.py`)와 AUTO 플랜 생성 job
     (`jobs/rebalancing_auto_execution.py`)이 동일한 판정 로직을 각각 인라인 구현하던 것을
     단일화한 순수 함수 — 로깅은 각 호출부 책임으로 남긴다.
     """
@@ -150,7 +150,7 @@ def recommend_drift_threshold_pct(tax_type: str, investment_horizon: str) -> flo
     과세이연 계좌(ISA/연금저축/IRP)와 해외전용 계좌는 잦은 매매가 절세 혜택 훼손·FX비용·
     양도세 유발로 이어지므로 기본 임계값을 넓힌다. 장기 성향은 더 넓게, 단기 성향은 더 좁게
     조정한다. 어디까지나 알림 생성 UI의 초기값 제안이며, 사용자가 언제든 override 가능하고
-    drift 판정(`rebalancing_service.py`)이나 AUTO 게이트에는 관여하지 않는다.
+    drift 판정(`rebalancing/service.py`)이나 AUTO 게이트에는 관여하지 않는다.
     """
     base = _TAX_TYPE_BASE_THRESHOLD_PCT.get(tax_type, _TAX_TYPE_BASE_THRESHOLD_PCT["GENERAL"])
     adjustment = _HORIZON_THRESHOLD_ADJUSTMENT.get(investment_horizon, 0.0)

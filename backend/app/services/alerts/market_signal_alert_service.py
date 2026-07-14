@@ -1,6 +1,6 @@
 """시장 위험 신호등 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림.
 
-포트폴리오별 드리프트 알림(rebalancing_alert_service.py)과 달리, 시장 신호 자체의
+포트폴리오별 드리프트 알림(rebalancing/alert_check.py)과 달리, 시장 신호 자체의
 등급 전환만을 감지해 특정 포트폴리오 알림 설정 여부와 무관하게 발송한다. 대상 유저는
 UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)이고 활성 RebalancingAlert를
 하나라도 가진 유저로 한정한다 — 신규 구독 모델을 만들지 않고 기존
@@ -15,13 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import RebalancingAlert
 from app.models.user import User, UserSettings
-from app.services.alert_service import save_alert_history
+from app.services.alerts.alert_service import save_alert_history
 from app.services.market_signal_service import (
     get_last_composite_level,
     get_market_signal,
     set_last_composite_level,
 )
-from app.services.rebalancing_diagnosis_service import _MARKET_NOTES
+from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 from app.utils.cache_keys import RedisType
 
 logger = structlog.get_logger()
@@ -50,7 +50,7 @@ async def check_market_signal_level_change(db: AsyncSession, redis: RedisType) -
     """
     from app.services.email_service import send_market_signal_change_alert
     from app.services.push_service import send_push_to_user
-    from app.services.rebalancing_alert_service import _mark_composite_alert_sent_today
+    from app.services.rebalancing.alert_check import _mark_composite_alert_sent_today
 
     try:
         signal = await get_market_signal(redis)
@@ -96,7 +96,7 @@ async def check_market_signal_level_change(db: AsyncSession, redis: RedisType) -
 
         if email_sent or push_sent:
             await save_alert_history(db, user.id, "MARKET_SIGNAL", f"시장 위험 신호: {old_level} → {new_level}")
-            # 같은 날 rebalancing_alert_service의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
+            # 같은 날 rebalancing/alert_check의 복합신호 알림과 중복 발송되지 않도록 dedup을 공유한다.
             await _mark_composite_alert_sent_today(redis, user.id)
             sent_count += 1
 

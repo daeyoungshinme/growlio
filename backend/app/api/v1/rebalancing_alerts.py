@@ -22,7 +22,7 @@ from app.schemas.rebalancing import (
     RebalancingAlertResponse,
     TestAlertResponse,
 )
-from app.services._rebalancing_alert_queries import (
+from app.services.rebalancing._alert_queries import (
     get_alert_by_portfolio,
     get_alert_by_portfolio_and_account,
     list_alerts_by_portfolio_accounts,
@@ -195,7 +195,7 @@ async def trigger_rebalancing_alert_test(
 
     스케줄/드리프트 조건 없이 즉시 현재 포트폴리오 데이터로 이메일+FCM 발송.
     """
-    from app.services.rebalancing_alert_service import send_test_rebalancing_alert
+    from app.services.rebalancing.alert_test import send_test_rebalancing_alert
 
     portfolio = await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
     _reject_if_per_account_scope(portfolio)
@@ -257,7 +257,7 @@ async def update_alert_scope(
     db: AsyncSession = Depends(get_db),
 ):
     """포트폴리오의 알림 스코프를 AGGREGATE ↔ PER_ACCOUNT로 전환한다."""
-    from app.services.rebalancing_alert_service import switch_alert_scope
+    from app.services.rebalancing.alert_scope import switch_alert_scope
 
     portfolio = await _get_portfolio_with_accounts(db, portfolio_id, current_user.id)
     await switch_alert_scope(db, portfolio, body.alert_scope)
@@ -387,7 +387,7 @@ async def trigger_account_rebalancing_alert_test(
     db: AsyncSession = Depends(get_db),
 ):
     """특정 계좌 전용 리밸런싱 자동화 알림 테스트 발송."""
-    from app.services.rebalancing_alert_service import send_test_rebalancing_alert
+    from app.services.rebalancing.alert_test import send_test_rebalancing_alert
 
     alert = await get_alert_by_portfolio_and_account(db, portfolio_id, account_id, current_user.id)
     if not alert:

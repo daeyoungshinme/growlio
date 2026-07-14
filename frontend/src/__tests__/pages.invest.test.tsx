@@ -38,6 +38,7 @@ vi.mock("@/api/invest", () => ({
 
 vi.mock("@/utils/queryInvalidation", () => ({
   invalidateDcaData: vi.fn().mockResolvedValue(undefined),
+  invalidateDividendPlanData: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("@/utils/toast", () => ({
@@ -245,7 +246,7 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
   });
 
@@ -258,7 +259,7 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
     // Click save
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
@@ -276,7 +277,7 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => {
@@ -292,12 +293,12 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
     // Close without changes
     fireEvent.click(screen.getByRole("button", { name: "취소" }));
     await waitFor(() => {
-      expect(screen.queryByText("투자 목표 설정")).not.toBeInTheDocument();
+      expect(screen.queryByText("적립 계획 설정 편집")).not.toBeInTheDocument();
     });
   });
 
@@ -309,7 +310,7 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
     // Modify a field to make form dirty
     const inputs = screen.getAllByRole("textbox");
@@ -331,7 +332,7 @@ describe("InvestPlanPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
     await waitFor(() => {
-      expect(screen.getByText("투자 목표 설정")).toBeInTheDocument();
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
     const inputs = screen.getAllByRole("textbox");
     if (inputs.length > 0) {
@@ -345,7 +346,7 @@ describe("InvestPlanPage", () => {
     const confirmModal = screen.getByTestId("confirm-modal");
     fireEvent.click(within(confirmModal).getByRole("button", { name: "닫기" }));
     await waitFor(() => {
-      expect(screen.queryByText("투자 목표 설정")).not.toBeInTheDocument();
+      expect(screen.queryByText("적립 계획 설정 편집")).not.toBeInTheDocument();
     });
   });
 });

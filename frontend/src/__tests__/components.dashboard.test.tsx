@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { screen, render } from "@testing-library/react";
+import { screen, render, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -182,6 +182,18 @@ describe("InvestmentGoalCard", () => {
     renderGoalCard(<InvestmentGoalCard data={data} />);
     expect(screen.queryByText(/투자 목표가 설정되지 않았습니다/)).not.toBeInTheDocument();
     expect(screen.getAllByText("목표 13%")[0]).toBeInTheDocument();
+  });
+
+  it("모바일 DCA 상세는 기본 접힘 상태이며, 토글 클릭 시 펼쳐진다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} dcaData={makeDcaData("2045-03")} />);
+    // 헤드라인(진행율)은 접힘 상태에도 모바일+데스크탑 양쪽에 항상 보인다
+    expect(screen.getAllByText("15.0%").length).toBeGreaterThanOrEqual(2);
+    // 접힘 상태: "실제 달성 예상"은 데스크탑 블록에만 존재(1개) — 모바일 상세는 아직 숨김
+    expect(screen.getAllByText("실제 달성 예상")).toHaveLength(1);
+
+    fireEvent.click(screen.getByText("달성 예상일 · 진행 상세"));
+    // 펼침 후에는 모바일 상세 블록도 렌더되어 2곳에 존재
+    expect(screen.getAllByText("실제 달성 예상")).toHaveLength(2);
   });
 });
 

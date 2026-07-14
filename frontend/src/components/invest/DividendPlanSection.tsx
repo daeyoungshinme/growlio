@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
-import { TrendingUp } from "lucide-react";
+import { Settings2, TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -83,10 +83,19 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     <div className="space-y-5">
       {/* 배당 목표 달성 카드 */}
       <div className="card">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between mb-1">
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
             배당 목표 달성 현황
           </h3>
+          <button
+            onClick={onOpenSettings}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <Settings2 size={15} />
+            설정 편집
+          </button>
+        </div>
+        <div className="text-right mb-4">
           <Link
             to="/assets?tab=투자현황&portfolioTab=배당"
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.rebalancing_service import analyze_rebalancing
+from app.services.rebalancing.service import analyze_rebalancing
 
 
 def _make_portfolio(items: list[dict], base_type: str = "STOCK_ONLY") -> SimpleNamespace:
@@ -440,18 +440,18 @@ class TestWeightValidation:
 
 class TestDivInfo:
     def test_none_map_returns_none_zero(self):
-        from app.services.rebalancing_service import _div_info
+        from app.services.rebalancing.service import _div_info
 
         assert _div_info("AAPL", "NASDAQ", None) == (None, 0.0)
 
     def test_ticker_not_in_map_returns_none_zero(self):
-        from app.services.rebalancing_service import _div_info
+        from app.services.rebalancing.service import _div_info
 
         div_map = {("TSLA", "NASDAQ"): {"dividend_yield": 1.5, "estimated_annual_krw": 1000}}
         assert _div_info("AAPL", "NASDAQ", div_map) == (None, 0.0)
 
     def test_with_positive_yield(self):
-        from app.services.rebalancing_service import _div_info
+        from app.services.rebalancing.service import _div_info
 
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 2.5, "estimated_annual_krw": 50_000}}
         yp, annual = _div_info("AAPL", "NASDAQ", div_map)
@@ -459,13 +459,13 @@ class TestDivInfo:
         assert annual == pytest.approx(50_000.0)
 
     def test_zero_yield_and_annual_returns_none_zero(self):
-        from app.services.rebalancing_service import _div_info
+        from app.services.rebalancing.service import _div_info
 
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 0, "estimated_annual_krw": 0}}
         assert _div_info("AAPL", "NASDAQ", div_map) == (None, 0.0)
 
     def test_only_annual_positive_returns_none_and_annual(self):
-        from app.services.rebalancing_service import _div_info
+        from app.services.rebalancing.service import _div_info
 
         div_map = {("AAPL", "NASDAQ"): {"dividend_yield": 0, "estimated_annual_krw": 30_000}}
         yp, annual = _div_info("AAPL", "NASDAQ", div_map)

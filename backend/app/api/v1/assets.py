@@ -19,6 +19,7 @@ from app.schemas.asset import (
     AssetAccountUpdate,
     AssetSnapshotResponse,
     BatchSetTargetPortfolioRequest,
+    IsaPnlOverrideUpdate,
     KisCredentialVerifyRequest,
     SetTargetPortfolioRequest,
 )
@@ -489,4 +490,25 @@ async def set_target_portfolio(
     account.target_portfolio_id = body.target_portfolio_id
     await db.commit()
     await db.refresh(account)
+    return _account_response(account)
+
+
+@router.patch("/{account_id}/isa-pnl-override", response_model=AssetAccountResponse)
+@limiter.limit("30/minute")
+async def update_isa_pnl_override(
+    request: Request,
+    account_id: UUID,
+    body: IsaPnlOverrideUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """ISA 계좌의 누적 손익 수동 입력을 설정하거나(값 전송) 해제한다(null 전송, 자동 추정치로 복귀)."""
+    account = await _get_owned_account(account_id, current_user.id, db)
+    if account.tax_type != "ISA":
+        raise HTTPException(status_code=400, detail="ISA 계좌에만 손익 수동 입력을 설정할 수 있습니다.")
+    account.isa_manual_cumulative_pnl_krw = body.cumulative_pnl_krw
+    await db.commit()
+    await db.refresh(account)
+    redis = await get_redis()
+    await invalidate_asset_account_caches(redis, current_user.id, account.id)
     return _account_response(account)

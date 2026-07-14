@@ -18,7 +18,6 @@ export interface GoalForm {
   goal_initial_amount: string;
   annual_deposit_goal: string;
   retirement_target_year: string;
-  annual_dividend_goal: string;
 }
 
 const EMPTY_FORM: GoalForm = {
@@ -29,7 +28,6 @@ const EMPTY_FORM: GoalForm = {
   goal_initial_amount: "",
   annual_deposit_goal: "",
   retirement_target_year: "",
-  annual_dividend_goal: "",
 };
 
 export function useGoalSettings() {
@@ -64,7 +62,6 @@ export function useGoalSettings() {
     const s = data?.settings;
     let annual_deposit_goal = "";
     let retirement_target_year = "";
-    let annual_dividend_goal = "";
     if (data) {
       const settingsData = await fetchSettings();
       annual_deposit_goal = settingsData.annual_deposit_goal
@@ -72,9 +69,6 @@ export function useGoalSettings() {
         : "";
       retirement_target_year = settingsData.retirement_target_year
         ? String(settingsData.retirement_target_year)
-        : "";
-      annual_dividend_goal = settingsData.annual_dividend_goal
-        ? String(settingsData.annual_dividend_goal)
         : "";
     }
     const newForm: GoalForm = {
@@ -85,7 +79,6 @@ export function useGoalSettings() {
       goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
       annual_deposit_goal,
       retirement_target_year,
-      annual_dividend_goal,
     };
     setForm(newForm);
     setInitialForm(newForm);
@@ -123,7 +116,6 @@ export function useGoalSettings() {
         retirement_target_year: form.retirement_target_year
           ? Number(form.retirement_target_year)
           : null,
-        annual_dividend_goal: form.annual_dividend_goal ? Number(form.annual_dividend_goal) : null,
       });
       toast("설정이 저장되었습니다", "success");
       setEditing(false);

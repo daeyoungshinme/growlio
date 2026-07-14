@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from app.services import rebalancing_plan_service as svc
+from app.services.rebalancing import plan_service as svc
 
 
 def _make_alert(**kwargs) -> SimpleNamespace:
@@ -204,7 +204,7 @@ class TestNotifyPlanGenerated:
         with (
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
             patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
                 plan, alert, portfolio, None, "sell-token", "user@test.com", None, "GREEN", mock_db
@@ -226,7 +226,7 @@ class TestNotifyPlanGenerated:
         with (
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
             patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
                 plan, alert, portfolio, None, None, "user@test.com", None, "GREEN", mock_db
@@ -246,7 +246,7 @@ class TestNotifyPlanGenerated:
         with (
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=mock_email),
             patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
-            patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
                 plan, alert, portfolio, "buy-token", None, None, None, "GREEN", mock_db
@@ -308,7 +308,7 @@ class TestCancelBuyLeg:
         mock_db.scalar = AsyncMock(return_value=locked_leg)
         mock_db.get = AsyncMock(return_value=plan)
 
-        with patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()) as mock_save:
+        with patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save:
             await svc.cancel_buy_leg(locked_leg, mock_db, decided_by="USER_APP")
 
         assert locked_leg.status == "CANCELED"
@@ -361,7 +361,7 @@ class TestRejectSellLeg:
         mock_db.scalar = AsyncMock(return_value=locked_leg)
         mock_db.get = AsyncMock(return_value=plan)
 
-        with patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()) as mock_save:
+        with patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save:
             await svc.reject_sell_leg(locked_leg, mock_db, decided_by="USER_EMAIL")
 
         assert locked_leg.status == "REJECTED"
@@ -418,10 +418,10 @@ class TestApproveSellLeg:
         with (
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
+                "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
             ),
-            patch("app.services.rebalancing_plan_service._send_leg_execution_email", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service._send_leg_execution_email", new=AsyncMock()),
         ):
             result = await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
 
@@ -449,7 +449,7 @@ class TestApproveSellLeg:
         with (
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
+                "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(side_effect=RuntimeError("broker error")),
             ),
         ):
@@ -522,10 +522,10 @@ class TestApproveBuyLeg:
         with (
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
+                "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
             ),
-            patch("app.services.rebalancing_plan_service._send_leg_execution_email", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service._send_leg_execution_email", new=AsyncMock()),
         ):
             result = await svc.approve_buy_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_APP")
 
@@ -628,10 +628,10 @@ class TestExecuteDueBuyLegs:
             patch("app.utils.market_hours.is_korean_market_open", return_value=True),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
-                "app.services.rebalancing_execution_service.execute_rebalancing",
+                "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(return_value=([], execution_id)),
             ),
-            patch("app.services.rebalancing_plan_service._send_leg_execution_email", new=AsyncMock()),
+            patch("app.services.rebalancing.plan_service._send_leg_execution_email", new=AsyncMock()),
         ):
             count = await svc.execute_due_buy_legs(mock_db, MagicMock())
 
@@ -669,7 +669,7 @@ class TestExpireDueSellLegs:
         mock_db.scalar = AsyncMock(return_value=locked_leg)
         mock_db.get = AsyncMock(return_value=plan)
 
-        with patch("app.services.rebalancing_plan_service.save_alert_history", new=AsyncMock()) as mock_save:
+        with patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save:
             count = await svc.expire_due_sell_legs(mock_db)
 
         assert count == 1

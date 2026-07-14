@@ -40,6 +40,7 @@ vi.mock("@/utils/queryInvalidation", () => ({
   invalidateSyncData: vi.fn(),
   invalidateAlertData: vi.fn(),
   invalidateDcaData: vi.fn(),
+  invalidateDividendPlanData: vi.fn(),
 }));
 
 vi.mock("@/utils/toast", () => ({ toast: vi.fn() }));
@@ -326,7 +327,7 @@ describe("InvestPlanPage", () => {
 
   it("적립 계획 설명 텍스트가 표시된다", () => {
     renderPage(<InvestPlanPage />);
-    expect(screen.getByText("적립식 DCA 복리계산 및 배당 목표 관리")).toBeInTheDocument();
+    expect(screen.getByText("적립식 DCA 복리계산 및 목표 달성 현황")).toBeInTheDocument();
   });
 
   it("월 적립액, 목표 연수익률 등 설정 항목이 표시된다", () => {
@@ -358,7 +359,6 @@ describe("InvestPlanPage", () => {
         goal_initial_amount: "",
         annual_deposit_goal: "",
         retirement_target_year: "",
-        annual_dividend_goal: "",
       },
       isDirty: false,
       setForm: vi.fn(),
@@ -369,7 +369,7 @@ describe("InvestPlanPage", () => {
       saveSettings: vi.fn(),
     });
     const { container } = renderPage(<InvestPlanPage />);
-    expect(screen.queryByText("적립식 DCA 복리계산 및 배당 목표 관리")).not.toBeInTheDocument();
+    expect(screen.queryByText("적립 계획")).not.toBeInTheDocument();
     expect(container.querySelectorAll(".animate-pulse").length).toBeGreaterThan(0);
   });
 });

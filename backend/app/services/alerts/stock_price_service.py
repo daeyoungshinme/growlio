@@ -8,9 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.alert import StockPriceAlert
 from app.models.user import User, UserSettings
-from app.services.alert_calculator import should_trigger_stock_price
-from app.services.alert_service import apply_alert_trigger
-from app.utils.metrics import alert_trigger_count
+from app.services.alerts.alert_service import finalize_alert_batch, notify_and_record_trigger
+from app.services.alerts.calculator import should_trigger_stock_price
 
 logger = structlog.get_logger()
 
@@ -19,7 +18,6 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
     """활성 주가 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
     from app.services.email_service import send_stock_price_alert
     from app.services.price_service import fetch_prices_batch
-    from app.services.push_service import send_push_to_user
 
     result = await db.execute(
         select(
@@ -62,22 +60,16 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
             continue
 
         direction_label = "이하" if alert.direction == "BELOW" else "이상"
-        await send_push_to_user(
-            user_id=alert.user_id,
-            title=f"주가 알림: {alert.name}",
-            body=f"{price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
-            fcm_token=fcm_token,
-        )
-
-        await apply_alert_trigger(
+        await notify_and_record_trigger(
             db,
             alert,
             "STOCK_PRICE",
             f"주가 알림: {alert.name}({alert.ticker}) {price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
+            alert.user_id,
+            f"주가 알림: {alert.name}",
+            f"{price:,.0f}원 (목표 {target:,.0f}원 {direction_label})",
+            fcm_token,
         )
         triggered_count += 1
 
-    if triggered_count:
-        await db.commit()
-        alert_trigger_count.labels(alert_type="stock_price").inc(triggered_count)
-        logger.info("stock_price_alerts_triggered", count=triggered_count)
+    await finalize_alert_batch(db, "stock_price", triggered_count)

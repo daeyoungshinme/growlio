@@ -3,10 +3,13 @@ import { screen, fireEvent } from "@testing-library/react";
 import { render } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
+import { Wallet } from "lucide-react";
 import StatCard from "@/components/common/StatCard";
 import PriceCell from "@/components/common/PriceCell";
 import BankAccountCard from "@/components/assets/BankAccountCard";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),
@@ -203,5 +206,94 @@ describe("AmountUnitButtons", () => {
   it("className prop이 컨테이너에 적용된다", () => {
     const { container } = render(<AmountUnitButtons onAdd={vi.fn()} className="custom-class" />);
     expect(container.firstChild).toHaveClass("custom-class");
+  });
+});
+
+// ------- CollapsibleCard -------
+describe("CollapsibleCard", () => {
+  it("펼침 상태(isOpen=true)면 children을 렌더한다", () => {
+    render(
+      <CollapsibleCard icon={Wallet} title="제목" isOpen onToggle={vi.fn()}>
+        <p>상세 내용</p>
+      </CollapsibleCard>,
+    );
+    expect(screen.getByText("상세 내용")).toBeInTheDocument();
+  });
+
+  it("접힘 상태(isOpen=false)면 children 대신 collapsedHint를 렌더한다", () => {
+    render(
+      <CollapsibleCard
+        icon={Wallet}
+        title="제목"
+        isOpen={false}
+        onToggle={vi.fn()}
+        collapsedHint="탭하여 펼치기"
+      >
+        <p>상세 내용</p>
+      </CollapsibleCard>,
+    );
+    expect(screen.queryByText("상세 내용")).toBeNull();
+    expect(screen.getByText("탭하여 펼치기")).toBeInTheDocument();
+  });
+
+  it("헤더 버튼 클릭 시 onToggle을 호출한다", () => {
+    const onToggle = vi.fn();
+    render(
+      <CollapsibleCard icon={Wallet} title="제목" isOpen onToggle={onToggle}>
+        <p>상세 내용</p>
+      </CollapsibleCard>,
+    );
+    fireEvent.click(screen.getByText("제목"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("titleBadge/headerRight를 함께 렌더한다", () => {
+    render(
+      <CollapsibleCard
+        icon={Wallet}
+        title="제목"
+        titleBadge={<span>배지</span>}
+        headerRight={<span>우측액션</span>}
+        isOpen
+        onToggle={vi.fn()}
+      >
+        <p>상세 내용</p>
+      </CollapsibleCard>,
+    );
+    expect(screen.getByText("배지")).toBeInTheDocument();
+    expect(screen.getByText("우측액션")).toBeInTheDocument();
+  });
+});
+
+// ------- CollapsibleSection -------
+describe("CollapsibleSection", () => {
+  it("펼침 상태면 children을 렌더한다", () => {
+    render(
+      <CollapsibleSection isOpen onToggle={vi.fn()} label="상세">
+        <p>내부 내용</p>
+      </CollapsibleSection>,
+    );
+    expect(screen.getByText("내부 내용")).toBeInTheDocument();
+  });
+
+  it("접힘 상태면 children 대신 collapsedHint를 렌더한다", () => {
+    render(
+      <CollapsibleSection isOpen={false} onToggle={vi.fn()} label="상세" collapsedHint="힌트">
+        <p>내부 내용</p>
+      </CollapsibleSection>,
+    );
+    expect(screen.queryByText("내부 내용")).toBeNull();
+    expect(screen.getByText("힌트")).toBeInTheDocument();
+  });
+
+  it("토글 버튼 클릭 시 onToggle을 호출한다", () => {
+    const onToggle = vi.fn();
+    render(
+      <CollapsibleSection isOpen={false} onToggle={onToggle} label="상세">
+        <p>내부 내용</p>
+      </CollapsibleSection>,
+    );
+    fireEvent.click(screen.getByText("상세"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

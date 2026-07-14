@@ -61,7 +61,7 @@ class TestLoadAccount:
 
     @pytest.mark.asyncio
     async def test_raises_404_when_account_not_found(self, mock_db, override_settings):
-        from app.services.rebalancing_execution_service import _load_account
+        from app.services.rebalancing.execution_service import _load_account
 
         mock_db.scalar = AsyncMock(return_value=None)
         account_id = uuid.uuid4()
@@ -73,7 +73,7 @@ class TestLoadAccount:
 
     @pytest.mark.asyncio
     async def test_raises_400_for_non_broker_account(self, mock_db, override_settings):
-        from app.services.rebalancing_execution_service import _load_account
+        from app.services.rebalancing.execution_service import _load_account
 
         account = _make_kis_account()
         account.asset_type = "BANK_ACCOUNT"
@@ -85,7 +85,7 @@ class TestLoadAccount:
 
     @pytest.mark.asyncio
     async def test_raises_400_when_kis_account_no_missing(self, mock_db, override_settings):
-        from app.services.rebalancing_execution_service import _load_account
+        from app.services.rebalancing.execution_service import _load_account
 
         account = _make_kis_account()
         account.kis_account_no = None
@@ -97,7 +97,7 @@ class TestLoadAccount:
 
     @pytest.mark.asyncio
     async def test_returns_account_when_valid(self, mock_db, override_settings):
-        from app.services.rebalancing_execution_service import _load_account
+        from app.services.rebalancing.execution_service import _load_account
 
         account = _make_kis_account()
         mock_db.scalar = AsyncMock(return_value=account)
@@ -114,7 +114,7 @@ class TestExecuteKiwoomSingleOrder:
 
     @pytest.mark.asyncio
     async def test_skips_zero_quantity(self, override_settings):
-        from app.services.rebalancing_execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=0)
         result = await _execute_kiwoom_single_order(order, "token", "12345", False, AsyncMock())
@@ -123,7 +123,7 @@ class TestExecuteKiwoomSingleOrder:
 
     @pytest.mark.asyncio
     async def test_skips_overseas_market(self, override_settings):
-        from app.services.rebalancing_execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(ticker="AAPL", market="NASDAQ", quantity=5)
         result = await _execute_kiwoom_single_order(order, "token", "12345", False, AsyncMock())
@@ -133,7 +133,7 @@ class TestExecuteKiwoomSingleOrder:
 
     @pytest.mark.asyncio
     async def test_returns_success_on_successful_order(self, override_settings):
-        from app.services.rebalancing_execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
         mock_place = AsyncMock(return_value={"order_no": "ORD001"})
@@ -144,7 +144,7 @@ class TestExecuteKiwoomSingleOrder:
 
     @pytest.mark.asyncio
     async def test_returns_failed_on_exception(self, override_settings):
-        from app.services.rebalancing_execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
         mock_place = AsyncMock(side_effect=Exception("API 오류"))
@@ -162,14 +162,14 @@ class TestExecuteSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_empty_sells_returns_empty(self, override_settings):
-        from app.services._kis_order_executor import _execute_sells_with_clamp
+        from app.services.rebalancing._kis_order_executor import _execute_sells_with_clamp
 
         result = await _execute_sells_with_clamp([], "key", "secret", "token", "12345678-01", True)
         assert result == []
 
     @pytest.mark.asyncio
     async def test_clamps_domestic_sell_to_actual_holdings(self, override_settings):
-        from app.services import _kis_order_executor
+        from app.services.rebalancing import _kis_order_executor
 
         order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": [{"ticker": "005930", "qty": 3}]})
@@ -200,7 +200,7 @@ class TestExecuteSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_skips_sell_with_zero_holdings(self, override_settings):
-        from app.services import _kis_order_executor
+        from app.services.rebalancing import _kis_order_executor
 
         order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": []})
@@ -215,7 +215,7 @@ class TestExecuteSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_balance_fetch_failure_falls_back_to_unclamped_execution(self, override_settings):
-        from app.services import _kis_order_executor
+        from app.services.rebalancing import _kis_order_executor
 
         order = _make_order(ticker="005930", market="KOSPI", side="SELL", quantity=10)
         mock_balance = AsyncMock(side_effect=Exception("API 오류"))
@@ -243,7 +243,7 @@ class TestExecuteSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_clamps_overseas_sell_using_ticker_and_market(self, override_settings):
-        from app.services import _kis_order_executor
+        from app.services.rebalancing import _kis_order_executor
 
         order = _make_order(ticker="AAPL", market="NASDAQ", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": [{"ticker": "AAPL", "market": "NASDAQ", "qty": 2}]})
@@ -281,14 +281,14 @@ class TestExecuteKiwoomSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_empty_sells_returns_empty(self, override_settings):
-        from app.services._kiwoom_order_executor import _execute_kiwoom_sells_with_clamp
+        from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_sells_with_clamp
 
         result = await _execute_kiwoom_sells_with_clamp([], "token", "12345", True, AsyncMock())
         assert result == []
 
     @pytest.mark.asyncio
     async def test_clamps_sell_to_actual_holdings(self, override_settings):
-        from app.services import _kiwoom_order_executor
+        from app.services.rebalancing import _kiwoom_order_executor
 
         order = _make_order(ticker="005930", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": [{"ticker": "005930", "qty": 4}]})
@@ -305,7 +305,7 @@ class TestExecuteKiwoomSellsWithClamp:
 
     @pytest.mark.asyncio
     async def test_skips_sell_with_zero_holdings(self, override_settings):
-        from app.services import _kiwoom_order_executor
+        from app.services.rebalancing import _kiwoom_order_executor
 
         order = _make_order(ticker="005930", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": []})
@@ -327,7 +327,7 @@ class TestExecuteRebalancing:
 
     @pytest.mark.asyncio
     async def test_raises_400_when_no_orders(self, mock_db, mock_redis, override_settings):
-        from app.services.rebalancing_execution_service import execute_rebalancing
+        from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
         with pytest.raises(HTTPException) as exc:
@@ -337,7 +337,7 @@ class TestExecuteRebalancing:
     @pytest.mark.asyncio
     async def test_sell_before_buy_execution_order(self, mock_db, mock_redis, override_settings):
         """SELL 주문이 BUY 주문보다 먼저 실행되어야 한다."""
-        from app.services.rebalancing_execution_service import execute_rebalancing
+        from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
         account = _make_kis_account(user_id=user_id)
@@ -371,15 +371,15 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
+            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
             patch(
-                "app.services.rebalancing_execution_service.get_access_token",
+                "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
             patch(
-                "app.services.rebalancing_execution_service._execute_sells_with_clamp",
+                "app.services.rebalancing.execution_service._execute_sells_with_clamp",
                 side_effect=mock_execute_sells_with_clamp,
             ),
         ):
@@ -391,7 +391,7 @@ class TestExecuteRebalancing:
     @pytest.mark.asyncio
     async def test_continues_after_individual_order_failure(self, mock_db, mock_redis, override_settings):
         """첫 주문 실패 시 나머지 주문은 계속 진행되어야 한다."""
-        from app.services.rebalancing_execution_service import execute_rebalancing
+        from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
         account = _make_kis_account(user_id=user_id)
@@ -425,13 +425,13 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
+            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
             patch(
-                "app.services.rebalancing_execution_service.get_access_token",
+                "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
             results, _execution_id = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_redis)
 
@@ -445,7 +445,7 @@ class TestExecuteRebalancing:
         self, mock_db, mock_redis, override_settings
     ):
         """한 계좌 그룹 처리 중 예외가 발생해도 다른 계좌 그룹의 정상 결과는 보존돼야 한다."""
-        from app.services.rebalancing_execution_service import execute_rebalancing
+        from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
         valid_account = _make_kis_account(user_id=user_id)
@@ -470,13 +470,13 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing_execution_service.decrypt", return_value="decrypted"),
+            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
             patch(
-                "app.services.rebalancing_execution_service.get_access_token",
+                "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing_execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
             results, _execution_id = await execute_rebalancing(
                 user_id, None, [valid_order, broken_order], mock_db, mock_redis

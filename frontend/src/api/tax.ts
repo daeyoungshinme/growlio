@@ -72,3 +72,45 @@ export interface TaxSummary {
 
 export const fetchTaxSummary = (year?: number) =>
   apiGet<TaxSummary>("/tax/summary", { params: year ? { year } : undefined });
+
+export interface IsaAccountStatus {
+  account_id: string;
+  account_name: string;
+  isa_type: string;
+  isa_open_date: string | null;
+  maturity_date: string | null;
+  is_mature: boolean;
+  days_remaining: number | null;
+  needs_open_date: boolean;
+  estimated_cumulative_pnl_krw: number;
+  is_manual_override: boolean;
+  tax_free_limit_krw: number;
+  taxable_excess_krw: number;
+  estimated_tax_krw: number;
+}
+
+export interface IsaStatusSummary {
+  accounts: IsaAccountStatus[];
+  note: string;
+}
+
+export const fetchIsaStatus = () => apiGet<IsaStatusSummary>("/tax/isa-status");
+
+export interface PensionContributionStatus {
+  year: number;
+  pension_savings_deposit_krw: number;
+  irp_deposit_krw: number;
+  total_deposit_krw: number;
+  pension_savings_limit_krw: number;
+  total_limit_krw: number;
+  pension_savings_achievement_pct: number;
+  total_achievement_pct: number;
+  pension_savings_remaining_krw: number;
+  total_remaining_krw: number;
+  note: string;
+}
+
+export const fetchPensionContribution = (year?: number) =>
+  apiGet<PensionContributionStatus>("/tax/pension-contribution", {
+    params: year ? { year } : undefined,
+  });

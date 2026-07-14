@@ -15,7 +15,7 @@ import pytest
 @pytest.mark.asyncio
 async def test_check_rebalancing_alerts_no_alerts_nothing_happens(mock_db, override_settings):
     """활성 리밸런싱 알림이 없으면 조기 반환한다."""
-    from app.services.rebalancing_alert_service import check_rebalancing_alerts
+    from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
     exec_result = MagicMock()
     exec_result.all.return_value = []
@@ -66,10 +66,10 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -114,10 +114,10 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -155,7 +155,7 @@ async def test_check_rebalancing_alerts_overview_failure_continues(mock_db):
         ),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -202,10 +202,10 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -218,37 +218,37 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
 
 class TestSelectItemsToShowExtraTrigger:
     def test_drift_only_no_drift_no_extra_trigger_returns_none(self):
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         assert _select_items_to_show("DRIFT_ONLY", False, [], ["a", "b"]) is None
 
     def test_drift_only_no_drift_with_extra_trigger_sends_all_items(self):
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         result = _select_items_to_show("DRIFT_ONLY", False, [], ["a", "b"], extra_trigger=True)
         assert result == (["a", "b"], False, True)
 
     def test_drift_only_with_drift_ignores_extra_trigger_flag(self):
         """drift가 있으면 extra_trigger 값과 무관하게 기존처럼 drift 항목만 표시(is_composite_triggered=False)."""
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         result = _select_items_to_show("DRIFT_ONLY", False, ["drift_item"], ["a", "b"], extra_trigger=True)
         assert result == (["drift_item"], False, False)
 
     def test_both_non_schedule_no_drift_with_extra_trigger_sends(self):
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         result = _select_items_to_show("BOTH", False, [], ["a", "b"], extra_trigger=True)
         assert result == (["a", "b"], False, True)
 
     def test_both_non_schedule_no_drift_no_extra_trigger_returns_none(self):
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         assert _select_items_to_show("BOTH", False, [], ["a", "b"], extra_trigger=False) is None
 
     def test_schedule_only_ignores_extra_trigger(self):
         """SCHEDULE_ONLY는 스케줄일 여부만으로 결정 — extra_trigger는 관여하지 않는다."""
-        from app.services.rebalancing_alert_service import _select_items_to_show
+        from app.services.rebalancing.alert_check import _select_items_to_show
 
         assert _select_items_to_show("SCHEDULE_ONLY", False, [], ["a"], extra_trigger=True) is None
         result = _select_items_to_show("SCHEDULE_ONLY", True, [], ["a"], extra_trigger=False)
@@ -307,14 +307,14 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
             ),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -341,14 +341,14 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": False})),
             ),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -375,11 +375,11 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)),
-            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
+            patch("app.services.rebalancing.alert_check.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -403,14 +403,14 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
             patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(side_effect=RuntimeError("boom")),
             ),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)  # 예외를 던지지 않아야 함
 
@@ -454,16 +454,16 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
             ),
-            patch("app.services.rebalancing_alert_service.get_cached_json", side_effect=fake_get_cached_json),
-            patch("app.services.rebalancing_alert_service.set_cached_json", side_effect=fake_set_cached_json),
+            patch("app.services.rebalancing.alert_check.get_cached_json", side_effect=fake_get_cached_json),
+            patch("app.services.rebalancing.alert_check.set_cached_json", side_effect=fake_set_cached_json),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -509,11 +509,11 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         # 이미 오늘 이 유저에게 복합신호 알림이 발송된 것처럼 플래그를 세팅해도 drift 알림엔 영향 없어야 함.
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
-            patch("app.services.rebalancing_alert_service.get_cached_json", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.alert_check.get_cached_json", new=AsyncMock(return_value=True)),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -541,11 +541,11 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
-            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
+            patch("app.services.rebalancing.alert_check.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -570,14 +570,14 @@ class TestCheckRebalancingAlertsCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
             patch(
-                "app.services.rebalancing_alert_service.fetch_market_and_risk_signal",
+                "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
             ),
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -626,11 +626,11 @@ class TestAutoModeUnaffectedByCompositeTrigger:
 
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-            patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
-            patch("app.services.rebalancing_alert_service.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
+            patch("app.services.rebalancing.alert_check.fetch_market_and_risk_signal", new=AsyncMock()) as mock_fetch,
         ):
-            from app.services.rebalancing_alert_service import check_rebalancing_alerts
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
             await check_rebalancing_alerts(mock_db)
 
@@ -695,10 +695,10 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -738,10 +738,10 @@ async def test_check_rebalancing_alerts_both_non_schedule_with_drift(mock_db):
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -781,10 +781,10 @@ async def test_check_rebalancing_alerts_both_non_schedule_no_drift_skips(mock_db
 
     with (
         patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
-        patch("app.services.rebalancing_service.analyze_rebalancing", return_value=analysis),
+        patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
         patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.rebalancing_alert_service import check_rebalancing_alerts
+        from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
         await check_rebalancing_alerts(mock_db)
 
@@ -819,7 +819,7 @@ async def test_process_rebalancing_alert_smtp_not_configured_fcm_succeeds(mock_d
     portfolio_id = uuid.uuid4()
     alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
 
-    from app.services.rebalancing_alert_service import _process_rebalancing_alert
+    from app.services.rebalancing.alert_check import _process_rebalancing_alert
 
     with (
         patch(
@@ -854,7 +854,7 @@ async def test_process_rebalancing_alert_email_fails_fcm_still_runs(mock_db):
     portfolio_id = uuid.uuid4()
     alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
 
-    from app.services.rebalancing_alert_service import _process_rebalancing_alert
+    from app.services.rebalancing.alert_check import _process_rebalancing_alert
 
     with (
         patch(
@@ -891,7 +891,7 @@ async def test_process_rebalancing_alert_both_channels_fail_returns_false(mock_d
     portfolio_id = uuid.uuid4()
     alert, portfolio, drifting, items = _make_process_alert_args(user_id, portfolio_id)
 
-    from app.services.rebalancing_alert_service import _process_rebalancing_alert
+    from app.services.rebalancing.alert_check import _process_rebalancing_alert
 
     with (
         patch(
@@ -962,7 +962,7 @@ def _make_ticker_account(account_id, quantity, asset_type="STOCK_KIS", account_n
 
 class TestBuildSellOrders:
     def test_distributes_across_holding_accounts_largest_first(self):
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         acc_small = uuid.uuid4()
         acc_large = uuid.uuid4()
@@ -981,7 +981,7 @@ class TestBuildSellOrders:
         assert orders[0].quantity == 5
 
     def test_splits_across_multiple_accounts_when_needed(self):
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         acc_a = uuid.uuid4()
         acc_b = uuid.uuid4()
@@ -998,7 +998,7 @@ class TestBuildSellOrders:
         assert {o.account_id: o.quantity for o in orders} == {str(acc_b): 4, str(acc_a): 2}
 
     def test_unallocated_remainder_is_skipped_not_forced(self):
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         acc = uuid.uuid4()
         item = _make_drift_item()
@@ -1010,7 +1010,7 @@ class TestBuildSellOrders:
         assert orders[0].quantity == 2
 
     def test_no_holding_accounts_returns_empty(self):
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         item = _make_drift_item()
         orders = _build_sell_orders(item, 5, {}, "MARKET", None)
@@ -1018,7 +1018,7 @@ class TestBuildSellOrders:
         assert orders == []
 
     def test_manual_asset_type_account_excluded(self):
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         acc_manual = uuid.uuid4()
         acc_kis = uuid.uuid4()
@@ -1037,7 +1037,7 @@ class TestBuildSellOrders:
 
     def test_tax_deferred_account_sold_last_even_with_larger_quantity(self):
         """ISA/연금 계좌는 보유수량이 더 많아도 일반계좌를 먼저 소진한 뒤에만 매도한다."""
-        from app.services.rebalancing_order_builder import _build_sell_orders
+        from app.services.rebalancing.order_builder import _build_sell_orders
 
         acc_general = uuid.uuid4()
         acc_isa = uuid.uuid4()
@@ -1060,7 +1060,7 @@ class TestBuildRebalancingOrders:
     """공용 build_rebalancing_orders() — AUTO 실행과 quick-execute가 공유하는 주문 생성 로직."""
 
     def test_sell_distributed_and_buy_uses_given_account(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         holder_account = uuid.uuid4()
@@ -1080,7 +1080,7 @@ class TestBuildRebalancingOrders:
         assert buy.quantity == 3
 
     def test_buy_only_strategy_skips_sell(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
@@ -1091,14 +1091,14 @@ class TestBuildRebalancingOrders:
         assert orders == []
 
     def test_missing_shares_to_trade_skipped(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         drifting = [_make_drift_item(shares_to_trade=None)]
         orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(uuid.uuid4()))
         assert orders == []
 
     def test_limit_order_uses_current_price_as_limit_price(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         drifting = [
@@ -1112,7 +1112,7 @@ class TestBuildRebalancingOrders:
         assert orders[0].reference_price == 50000.0
 
     def test_market_order_still_carries_reference_price(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         drifting = [
@@ -1127,7 +1127,7 @@ class TestBuildRebalancingOrders:
 
     def test_overseas_buy_into_tax_deferred_account_skipped(self):
         """ISA/연금저축/IRP 계좌로는 해외 개별 종목 매수 주문을 생성하지 않는다(실행 불가능한 주문 방지)."""
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         drifting = [
@@ -1143,7 +1143,7 @@ class TestBuildRebalancingOrders:
         assert orders == []
 
     def test_domestic_buy_into_tax_deferred_account_allowed(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         buy_account = uuid.uuid4()
         drifting = [
@@ -1159,7 +1159,7 @@ class TestBuildRebalancingOrders:
         assert orders[0].side == "BUY"
 
     def test_sell_orders_carry_reference_price(self):
-        from app.services.rebalancing_alert_service import build_rebalancing_orders
+        from app.services.rebalancing.order_builder import build_rebalancing_orders
 
         holder_account = uuid.uuid4()
         drifting = [
@@ -1178,41 +1178,41 @@ class TestRecommendDriftThresholdPct:
     """recommend_drift_threshold_pct() — PER_ACCOUNT 알림 생성 시 계좌 유형 기반 임계값 추천."""
 
     def test_general_mid_term_returns_base_default(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("GENERAL", "MID_TERM") == 5.0
 
     def test_tax_deferred_types_widen_threshold(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         for tax_type in ("ISA", "PENSION_SAVINGS", "IRP"):
             assert recommend_drift_threshold_pct(tax_type, "MID_TERM") == 7.0
 
     def test_overseas_dedicated_widens_less_than_tax_deferred(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("OVERSEAS_DEDICATED", "MID_TERM") == 6.5
 
     def test_short_term_narrows_and_long_term_widens(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") == 3.5
         assert recommend_drift_threshold_pct("GENERAL", "LONG_TERM") == 6.5
 
     def test_combined_axis_stacks_adjustment(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("ISA", "LONG_TERM") == 8.5
         assert recommend_drift_threshold_pct("ISA", "SHORT_TERM") == 5.5
 
     def test_clamped_to_min_and_max_bounds(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") >= 1.0
         assert recommend_drift_threshold_pct("ISA", "LONG_TERM") <= 20.0
 
     def test_unknown_tax_type_or_horizon_falls_back_to_general_defaults(self):
-        from app.services.rebalancing_order_builder import recommend_drift_threshold_pct
+        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
 
         assert recommend_drift_threshold_pct("UNKNOWN", "MID_TERM") == 5.0
         assert recommend_drift_threshold_pct("GENERAL", "UNKNOWN") == 5.0
@@ -1223,7 +1223,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_updates_current_price_krw_from_live_quote(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
@@ -1237,7 +1237,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_existing_price_when_quote_missing(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
@@ -1251,7 +1251,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_existing_price_when_fetch_raises(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
 
@@ -1265,7 +1265,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_skips_cash_and_real_estate_tickers(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         cash_item = _make_drift_item(ticker="CASH", current_price_krw=None)
         stock_item = _make_drift_item(ticker="005930", current_price_krw=70000.0)
@@ -1283,7 +1283,7 @@ class TestRefreshLivePrices:
         """분석 시점엔 가격이 없어 shares_to_trade=None이었던 종목도, 실시간 가격을 새로
         확보하면 수량을 재계산해야 한다 — 그러지 않으면 build_rebalancing_orders()가
         이 항목을 영구히 스킵해 실제 드리프트가 조용히 누락된다."""
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(
             ticker="367380",
@@ -1304,7 +1304,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_recomputed_shares_to_trade_subtracts_current_qty(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(
             ticker="367380",
@@ -1324,7 +1324,7 @@ class TestRefreshLivePrices:
 
     @pytest.mark.asyncio
     async def test_shares_to_trade_stays_none_when_price_still_unavailable(self, mock_db):
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(
             ticker="367380",
@@ -1346,7 +1346,7 @@ class TestRefreshLivePrices:
     async def test_does_not_touch_already_computed_shares_to_trade(self, mock_db):
         """이미 shares_to_trade가 계산돼 있던 항목은 실시간 가격 갱신 후에도 재계산하지 않는다
         (기존 동작 회귀 방지 — 재계산 범위는 '분석 시점에 None이었던 경우'로 한정)."""
-        from app.services.rebalancing_alert_service import refresh_live_prices
+        from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(
             ticker="005930",
@@ -1370,7 +1370,7 @@ class TestRefreshLivePrices:
 
 class TestResolveEffectiveAccountIds:
     def test_aggregate_scope_uses_portfolio_account_ids(self):
-        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+        from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 
         acc1, acc2 = uuid.uuid4(), uuid.uuid4()
         portfolio = SimpleNamespace(alert_scope="AGGREGATE", account_ids=[str(acc1), str(acc2)])
@@ -1382,7 +1382,7 @@ class TestResolveEffectiveAccountIds:
 
     def test_aggregate_scope_with_no_linked_accounts_returns_none(self):
         """AGGREGATE + account_ids=None(전체 계좌)은 alert.account_id(AUTO 실행계좌)가 있어도 전체로 취급."""
-        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+        from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 
         portfolio = SimpleNamespace(alert_scope="AGGREGATE", account_ids=None)
         alert = SimpleNamespace(account_id=uuid.uuid4())
@@ -1392,7 +1392,7 @@ class TestResolveEffectiveAccountIds:
         assert result is None
 
     def test_per_account_scope_returns_single_target_account(self):
-        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+        from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 
         target_acc = uuid.uuid4()
         other_acc = uuid.uuid4()
@@ -1405,7 +1405,7 @@ class TestResolveEffectiveAccountIds:
 
     def test_missing_alert_scope_attribute_defaults_to_aggregate(self):
         """alert_scope 컬럼이 없는 낡은 테스트 더블/객체도 AGGREGATE로 안전하게 폴백해야 한다."""
-        from app.services.rebalancing_alert_service import resolve_effective_account_ids
+        from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 
         portfolio = SimpleNamespace(account_ids=None)  # alert_scope 속성 자체가 없음
         alert = SimpleNamespace(account_id=uuid.uuid4())
@@ -1432,7 +1432,7 @@ class TestSwitchAlertScope:
     async def test_rejects_unknown_scope(self, mock_db):
         from fastapi import HTTPException
 
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
 
@@ -1442,7 +1442,7 @@ class TestSwitchAlertScope:
 
     @pytest.mark.asyncio
     async def test_noop_when_target_equals_current_scope(self, mock_db):
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
 
@@ -1454,7 +1454,7 @@ class TestSwitchAlertScope:
     async def test_to_per_account_rejects_fewer_than_two_linked_accounts(self, mock_db):
         from fastapi import HTTPException
 
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4()])
 
@@ -1464,7 +1464,7 @@ class TestSwitchAlertScope:
 
     @pytest.mark.asyncio
     async def test_to_per_account_with_no_existing_alert_just_flips_scope(self, mock_db):
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
         mock_db.scalar = AsyncMock(return_value=None)
@@ -1478,7 +1478,7 @@ class TestSwitchAlertScope:
     @pytest.mark.asyncio
     async def test_to_per_account_converts_existing_auto_alert_in_place(self, mock_db):
         """기존 AGGREGATE AUTO 행의 account_id가 연결 계좌 소속이면 삭제하지 않고 그대로 승계한다."""
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         acc1, acc2 = uuid.uuid4(), uuid.uuid4()
         portfolio = _make_linked_portfolio("AGGREGATE", [acc1, acc2])
@@ -1496,7 +1496,7 @@ class TestSwitchAlertScope:
     @pytest.mark.asyncio
     async def test_to_per_account_deletes_existing_notify_alert(self, mock_db):
         """기존 AGGREGATE 행이 NOTIFY라 account_id가 없으면(연결 계좌 밖 포함) 삭제한다."""
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("AGGREGATE", [uuid.uuid4(), uuid.uuid4()])
         existing_alert = SimpleNamespace(account_id=None)
@@ -1509,7 +1509,7 @@ class TestSwitchAlertScope:
 
     @pytest.mark.asyncio
     async def test_to_aggregate_deletes_all_per_account_rows(self, mock_db):
-        from app.services.rebalancing_alert_service import switch_alert_scope
+        from app.services.rebalancing.alert_scope import switch_alert_scope
 
         portfolio = _make_linked_portfolio("PER_ACCOUNT", [uuid.uuid4(), uuid.uuid4()])
         row1, row2 = SimpleNamespace(id=uuid.uuid4()), SimpleNamespace(id=uuid.uuid4())

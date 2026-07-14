@@ -24,7 +24,7 @@ from app.schemas.rebalancing import (
     RebalancingPlanLegSummary,
     SellDecisionRequest,
 )
-from app.services.rebalancing_plan_service import (
+from app.services.rebalancing.plan_service import (
     approve_sell_leg,
     cancel_buy_leg,
     get_plan_leg_by_token,

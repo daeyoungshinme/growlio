@@ -22,7 +22,7 @@ class TestShouldFireToday:
         )
 
     def test_daily_always_fires(self):
-        from app.services.alert_calculator import should_fire_today
+        from app.services.alerts.calculator import should_fire_today
 
         alert = self._make_alert("DAILY")
         assert should_fire_today(alert) is True
@@ -30,7 +30,7 @@ class TestShouldFireToday:
     def test_weekly_fires_on_correct_day(self):
         from datetime import timezone
 
-        from app.services.alert_calculator import should_fire_today
+        from app.services.alerts.calculator import should_fire_today
 
         # today의 요일을 구해 schedule_day_of_week로 설정
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
@@ -40,7 +40,7 @@ class TestShouldFireToday:
     def test_weekly_does_not_fire_on_wrong_day(self):
         from datetime import timezone
 
-        from app.services.alert_calculator import should_fire_today
+        from app.services.alerts.calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         wrong_day = (today.weekday() + 1) % 7
@@ -54,7 +54,7 @@ class TestShouldFireToday:
         import calendar
         from datetime import timezone
 
-        from app.services.alert_calculator import should_fire_today
+        from app.services.alerts.calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         last_day = calendar.monthrange(today.year, today.month)[1]
@@ -71,7 +71,7 @@ class TestShouldFireToday:
         import calendar
         from datetime import timezone
 
-        from app.services.alert_calculator import should_fire_today
+        from app.services.alerts.calculator import should_fire_today
 
         today = datetime.now(tz=timezone(timedelta(hours=9))).date()
         last_day = calendar.monthrange(today.year, today.month)[1]
@@ -95,20 +95,20 @@ class TestShouldFireToday:
 
 class TestAlreadyFiredToday:
     def test_returns_false_when_never_triggered(self):
-        from app.services.alert_calculator import already_fired_today
+        from app.services.alerts.calculator import already_fired_today
 
         alert = SimpleNamespace(last_triggered_at=None)
         assert already_fired_today(alert) is False
 
     def test_returns_true_when_fired_today(self):
-        from app.services.alert_calculator import already_fired_today
+        from app.services.alerts.calculator import already_fired_today
 
         now = datetime.now(tz=UTC)
         alert = SimpleNamespace(last_triggered_at=now)
         assert already_fired_today(alert) is True
 
     def test_returns_false_when_fired_yesterday(self):
-        from app.services.alert_calculator import already_fired_today
+        from app.services.alerts.calculator import already_fired_today
 
         yesterday = datetime.now(tz=UTC) - timedelta(days=1)
         alert = SimpleNamespace(last_triggered_at=yesterday)
@@ -121,8 +121,8 @@ class TestAlreadyFiredToday:
 @pytest.mark.asyncio
 async def test_check_and_trigger_alerts_no_rate(mock_db):
     """환율 조회 실패(0 반환) 시 알림을 발송하지 않는다."""
-    with patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=0)):
-        from app.services.alert_service import check_and_trigger_alerts
+    with patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=0)):
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
         mock_db.commit.assert_not_called()
@@ -151,10 +151,10 @@ async def test_check_and_trigger_alerts_below_condition(mock_db):
 
     # send_exchange_rate_alert는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
     with (
-        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
 
@@ -186,10 +186,10 @@ async def test_check_and_trigger_alerts_above_not_met(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
 
@@ -219,10 +219,10 @@ async def test_check_and_trigger_alerts_multi_trigger_cooldown(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch("app.services.email_service.send_exchange_rate_alert", AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
 
@@ -251,13 +251,13 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
     mock_db.execute = AsyncMock(return_value=execute_result)
 
     with (
-        patch("app.services.exchange_rate_alert_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
+        patch("app.services.alerts.exchange_rate_service.fetch_usd_krw", AsyncMock(return_value=current_rate)),
         patch(
             "app.services.email_service.send_exchange_rate_alert",
             AsyncMock(return_value=False),
         ),
     ):
-        from app.services.alert_service import check_and_trigger_alerts
+        from app.services.alerts.alert_service import check_and_trigger_alerts
 
         await check_and_trigger_alerts(mock_db)
 
@@ -277,7 +277,7 @@ async def test_check_stock_price_alerts_no_alerts(mock_db, mock_redis):
 
     # fetch_prices_batch는 함수 내부에서 로컬 임포트됨 → 소스 모듈 경로로 패치
     with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -315,7 +315,7 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_redis):
         ),
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -355,7 +355,7 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_redis):
         ),
         patch("app.services.email_service.send_stock_price_alert", AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -371,7 +371,7 @@ async def test_save_alert_history_adds_to_session(mock_db):
     """_save_alert_history가 AlertHistory 객체를 session에 추가한다."""
     user_id = uuid.uuid4()
 
-    from app.services.alert_service import save_alert_history
+    from app.services.alerts.alert_service import save_alert_history
 
     await save_alert_history(mock_db, user_id, "EXCHANGE_RATE", "환율 알림: 1290원")
 
@@ -413,7 +413,7 @@ async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_redis):
         patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
         patch("app.services.email_service.send_stock_price_alert", new=AsyncMock()) as mock_email,
     ):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 
@@ -448,7 +448,7 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
         patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={"005930": current_price})),
         patch("app.services.email_service.send_stock_price_alert", new=AsyncMock(return_value=False)),
     ):
-        from app.services.alert_service import check_and_trigger_stock_price_alerts
+        from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
         await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
 

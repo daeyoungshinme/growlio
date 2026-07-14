@@ -166,26 +166,33 @@ def sync_fdr_etf_dividend_info(ticker: str) -> dict:
         return _zero_div()
 
 
-def sync_naver_etf_dividend_info(ticker: str) -> dict:
-    """Naver Finance 모바일 API(etfAnalysis)로 국내 ETF TTM 분배율·DPS·배당월 조회."""
-    import requests as _req
-    import requests.exceptions as _req_exc
+_NAVER_MOBILE_UA = (
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
+    "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
+)
 
-    _MOBILE_UA = (
-        "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
-        "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
-    )
+
+def _fetch_naver_etf_analysis(ticker: str) -> dict:
+    """Naver Finance 모바일 API(etfAnalysis) 원본 JSON 조회 — 배당·추종지수 판별이 공유하는 소스."""
+    import requests as _req
 
     @retry(**_NAVER_RETRY)  # type: ignore[call-overload]
     def _fetch() -> _req.Response:
         url = f"https://m.stock.naver.com/api/stock/{ticker}/etfAnalysis"
-        r = _req.get(url, headers={"User-Agent": _MOBILE_UA}, timeout=10)
+        r = _req.get(url, headers={"User-Agent": _NAVER_MOBILE_UA}, timeout=10)
         r.raise_for_status()
         return r
 
+    return _fetch().json()
+
+
+def sync_naver_etf_dividend_info(ticker: str) -> dict:
+    """Naver Finance 모바일 API(etfAnalysis)로 국내 ETF TTM 분배율·DPS·배당월 조회."""
+    import requests.exceptions as _req_exc
+
     try:
-        resp = _fetch()
-        div = resp.json().get("dividend") or {}
+        data = _fetch_naver_etf_analysis(ticker)
+        div = data.get("dividend") or {}
         if not div:
             return _zero_div_with_months()
 
@@ -219,6 +226,43 @@ def sync_naver_etf_dividend_info(ticker: str) -> dict:
     except (ValueError, KeyError, TypeError) as exc:
         logger.warning("naver_etf_dividend_parse_error", ticker=ticker, error=str(exc))
         return _zero_div_with_months()
+
+
+def sync_naver_etf_index_region(ticker: str) -> str | None:
+    """Naver Finance 모바일 API(etfAnalysis)의 국가별 편입비중(`countryPortfolioList`)으로
+    ETF가 추종하는 지수의 지역(DOMESTIC/OVERSEAS)을 판별한다.
+
+    국내(KR) 비중이 50% 미만이면 해외지수 추종으로 본다. 이 API는 ETF 전용이라 개별 종목이거나
+    조회에 실패하면 `None`을 반환한다 — 호출측은 `resolve_index_region`의 기존 폴백(시장구분 →
+    큐레이션 목록 → 기본값 DOMESTIC)으로 넘어가면 된다.
+    """
+    import requests.exceptions as _req_exc
+
+    try:
+        data = _fetch_naver_etf_analysis(ticker)
+        countries = data.get("countryPortfolioList") or []
+        if not countries:
+            return None
+        kr_weight = next(
+            (float(c.get("weight") or 0) for c in countries if c.get("detailTypeCode") == "KR"),
+            0.0,
+        )
+        result = "DOMESTIC" if kr_weight >= 50.0 else "OVERSEAS"
+        logger.info("naver_etf_index_region_fetched", ticker=ticker, kr_weight=kr_weight, result=result)
+        return result
+    except _req_exc.HTTPError as exc:
+        logger.warning(
+            "naver_etf_index_region_http_error",
+            ticker=ticker,
+            status=exc.response.status_code if exc.response else None,
+        )
+        return None
+    except _req_exc.RequestException as exc:
+        logger.warning("naver_etf_index_region_network_error", ticker=ticker, error=str(exc))
+        return None
+    except (ValueError, KeyError, TypeError) as exc:
+        logger.warning("naver_etf_index_region_parse_error", ticker=ticker, error=str(exc))
+        return None
 
 
 def sync_naver_stock_dividend_info(ticker: str) -> dict:

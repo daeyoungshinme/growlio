@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.schemas.rebalancing import RebalancingAnalysis, RebalancingItem
-from app.services.rebalancing_diagnosis_service import (
+from app.services.rebalancing.diagnosis_service import (
     _aggregate_position_costs,
     _build_tax_preview,
     _risk_note,
@@ -332,11 +332,11 @@ class TestFetchMarketAndRiskSignal:
     async def test_success_returns_level_and_risk_dict(self, mock_db, mock_redis):
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(return_value={"data_available": True, "diversification_score": 50}),
             ),
         ):
@@ -349,11 +349,11 @@ class TestFetchMarketAndRiskSignal:
     async def test_both_failures_return_safe_defaults(self, mock_db, mock_redis):
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(side_effect=RuntimeError("down")),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(side_effect=RuntimeError("down")),
             ),
         ):
@@ -372,11 +372,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "YELLOW"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(
                     return_value={
                         "data_available": True,
@@ -407,11 +407,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "YELLOW"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(
                     return_value={
                         "data_available": True,
@@ -440,11 +440,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "RED"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(
                     return_value={
                         "data_available": True,
@@ -472,11 +472,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(side_effect=RuntimeError("fred down")),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(return_value={"data_available": False}),
             ),
         ):
@@ -495,11 +495,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(side_effect=RuntimeError("yfinance down")),
             ),
         ):
@@ -520,11 +520,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(side_effect=RuntimeError("fred down")),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(side_effect=RuntimeError("yfinance down")),
             ),
         ):
@@ -542,11 +542,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(return_value={"data_available": False}),
             ),
         ):
@@ -564,11 +564,11 @@ class TestBuildDiagnosisContext:
 
         with (
             patch(
-                "app.services.rebalancing_diagnosis_service.get_market_signal",
+                "app.services.rebalancing.diagnosis_service.get_market_signal",
                 new=AsyncMock(return_value={"composite_level": "GREEN"}),
             ),
             patch(
-                "app.services.rebalancing_diagnosis_service.get_portfolio_risk_metrics",
+                "app.services.rebalancing.diagnosis_service.get_portfolio_risk_metrics",
                 new=AsyncMock(return_value={"data_available": False}),
             ),
         ):

@@ -1,5 +1,6 @@
 import { apiGet, apiPost } from "./client";
 import type { GoalRiskTolerance } from "./settings";
+import type { AccountTaxType } from "./assets";
 
 export interface RebalancingItem {
   ticker: string;
@@ -294,3 +295,30 @@ export interface GoalRecommendation {
 
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
   apiGet<GoalRecommendation>(`/rebalancing/goal-recommendation`);
+
+// ── 투자기간별(단기/중기/장기) 추천 — 목표 역산이 아닌 리스크 성향 재배분 ──────
+
+/** 백엔드 goal_recommendation_service.py의 _CASH_EQUIVALENT_TICKER와 동일 문자열 유지 필요 —
+ * 실제 시세 없는 현금성 자산(CMA·파킹통장) 합성 후보 식별자. */
+export const CASH_EQUIVALENT_TICKER = "CASH_EQUIVALENT";
+
+export interface HorizonGoalRecommendation {
+  investment_horizon: "SHORT_TERM" | "MID_TERM" | "LONG_TERM";
+  tax_type: AccountTaxType;
+  base_krw: number;
+  account_count: number;
+  recommended_items: GoalRecommendationItem[];
+  expected_return_pct: number | null;
+  risk_tolerance: GoalRiskTolerance;
+  max_weight_pct: number;
+  includes_cash_equivalent: boolean;
+  note: string | null;
+}
+
+export interface HorizonRecommendationResponse {
+  generated_at: string;
+  recommendations: HorizonGoalRecommendation[];
+}
+
+export const fetchHorizonGoalRecommendations = (): Promise<HorizonRecommendationResponse> =>
+  apiGet<HorizonRecommendationResponse>(`/rebalancing/goal-recommendation/by-horizon`);

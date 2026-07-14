@@ -10,7 +10,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.enums import GoalRiskTolerance
+from app.enums import AssetClass, GoalRiskTolerance, IndexRegion
 from app.limiter import limiter
 from app.models.user import User
 from app.redis_client import get_redis
@@ -64,6 +64,8 @@ class GoalCandidateTicker(BaseModel):
     ticker: str
     name: str
     market: str
+    asset_class: AssetClass = AssetClass.EQUITY
+    index_region: IndexRegion | None = None
 
 
 class GoalCandidateTickersUpdate(BaseModel):
@@ -81,6 +83,7 @@ class GoalRecommendationOptionsUpdate(BaseModel):
     risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     max_weight_pct: float = 40.0
     cagr_lookback_years: int = 10
+    short_term_equity_floor_pct: float = 80.0
 
     @field_validator("max_weight_pct")
     @classmethod
@@ -94,6 +97,13 @@ class GoalRecommendationOptionsUpdate(BaseModel):
     def validate_lookback(cls, v: int) -> int:
         if v not in (3, 5, 10):
             raise ValueError("수익률 산출 기간은 3/5/10년 중 하나여야 합니다")
+        return v
+
+    @field_validator("short_term_equity_floor_pct")
+    @classmethod
+    def validate_short_term_equity_floor(cls, v: float) -> float:
+        if not (0 <= v <= 100):
+            raise ValueError("단기 목표 최소 주식 비중은 0~100% 범위여야 합니다")
         return v
 
 
@@ -156,6 +166,7 @@ class SettingsResponse(BaseModel):
     goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     goal_max_weight_pct: float = 40.0
     goal_cagr_lookback_years: int = 10
+    goal_short_term_equity_floor_pct: float = 80.0
 
 
 @router.get("", response_model=SettingsResponse)
@@ -204,6 +215,9 @@ async def get_settings(
         ),
         goal_max_weight_pct=float(row.goal_max_weight_pct) if row.goal_max_weight_pct else 40.0,
         goal_cagr_lookback_years=row.goal_cagr_lookback_years or 10,
+        goal_short_term_equity_floor_pct=(
+            float(row.goal_short_term_equity_floor_pct) if row.goal_short_term_equity_floor_pct else 80.0
+        ),
     )
 
 
@@ -298,6 +312,7 @@ async def update_goal_recommendation_options(
     row.goal_risk_tolerance = req.risk_tolerance.value
     row.goal_max_weight_pct = req.max_weight_pct
     row.goal_cagr_lookback_years = req.cagr_lookback_years
+    row.goal_short_term_equity_floor_pct = req.short_term_equity_floor_pct
     await db.commit()
     return {"detail": "목표 역산 추천 설정이 저장되었습니다"}
 

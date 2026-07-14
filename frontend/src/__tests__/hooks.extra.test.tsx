@@ -404,6 +404,49 @@ describe("useGoalSettings", () => {
 });
 
 // ============================================
+// useDividendPlanSettings
+// ============================================
+describe("useDividendPlanSettings", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns initial state", async () => {
+    const { useDividendPlanSettings } = await import("@/hooks/useDividendPlanSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useDividendPlanSettings(), { wrapper });
+    expect(result.current.editing).toBe(false);
+    expect(result.current.saving).toBe(false);
+    expect(result.current.form).toEqual({ annual_dividend_goal: "" });
+  });
+
+  it("openEdit fetches current annual_dividend_goal and opens the modal", async () => {
+    const { fetchSettings } = await import("@/api/settings");
+    vi.mocked(fetchSettings).mockResolvedValueOnce({
+      annual_dividend_goal: 12000000,
+    } as never);
+    const { useDividendPlanSettings } = await import("@/hooks/useDividendPlanSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useDividendPlanSettings(), { wrapper });
+    await act(async () => {
+      await result.current.openEdit();
+    });
+    expect(result.current.editing).toBe(true);
+    expect(result.current.form.annual_dividend_goal).toBe("12000000");
+  });
+
+  it("handleCloseModal sets editing to false when not dirty", async () => {
+    const { useDividendPlanSettings } = await import("@/hooks/useDividendPlanSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useDividendPlanSettings(), { wrapper });
+    act(() => {
+      result.current.handleCloseModal();
+    });
+    expect(result.current.editing).toBe(false);
+  });
+});
+
+// ============================================
 // useSwipeNavigation
 // ============================================
 describe("useSwipeNavigation", () => {

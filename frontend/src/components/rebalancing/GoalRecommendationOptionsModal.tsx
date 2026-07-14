@@ -39,19 +39,23 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const [riskTolerance, setRiskTolerance] = useState<GoalRiskTolerance | null>(null);
   const [maxWeightPct, setMaxWeightPct] = useState<number | null>(null);
   const [cagrLookbackYears, setCagrLookbackYears] = useState<number | null>(null);
+  const [shortTermEquityFloorPct, setShortTermEquityFloorPct] = useState<number | null>(null);
 
   const savedRiskTolerance = settingsData?.goal_risk_tolerance ?? "CONSERVATIVE";
   const savedMaxWeightPct = settingsData?.goal_max_weight_pct ?? 40.0;
   const savedCagrLookbackYears = settingsData?.goal_cagr_lookback_years ?? 10;
+  const savedShortTermEquityFloorPct = settingsData?.goal_short_term_equity_floor_pct ?? 80.0;
 
   const currentRiskTolerance = riskTolerance ?? savedRiskTolerance;
   const currentMaxWeightPct = maxWeightPct ?? savedMaxWeightPct;
   const currentCagrLookbackYears = cagrLookbackYears ?? savedCagrLookbackYears;
+  const currentShortTermEquityFloorPct = shortTermEquityFloorPct ?? savedShortTermEquityFloorPct;
 
   const isDirty =
     currentRiskTolerance !== savedRiskTolerance ||
     currentMaxWeightPct !== savedMaxWeightPct ||
-    currentCagrLookbackYears !== savedCagrLookbackYears;
+    currentCagrLookbackYears !== savedCagrLookbackYears ||
+    currentShortTermEquityFloorPct !== savedShortTermEquityFloorPct;
 
   const saveMutation = useMutation({
     mutationFn: updateGoalRecommendationOptions,
@@ -132,6 +136,28 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           </p>
         </div>
 
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            단기(최대 3년) 목표 최소 주식 비중
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              step={5}
+              value={currentShortTermEquityFloorPct}
+              onChange={(e) => setShortTermEquityFloorPct(Number(e.target.value))}
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">% (0~100)</span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            나머지 비중은 채권/현금성 ETF 및 현금성 자산(CMA·파킹통장)으로 채워집니다. 0으로
+            설정하면 이 하한 없이 계산됩니다.
+          </p>
+        </div>
+
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
@@ -149,6 +175,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
                   risk_tolerance: currentRiskTolerance,
                   max_weight_pct: currentMaxWeightPct,
                   cagr_lookback_years: currentCagrLookbackYears,
+                  short_term_equity_floor_pct: currentShortTermEquityFloorPct,
                 })
               }
               className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"

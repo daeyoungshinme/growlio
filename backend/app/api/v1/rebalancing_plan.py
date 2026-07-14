@@ -14,7 +14,7 @@ from app.limiter import limiter
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanLeg
 from app.models.user import User
 from app.schemas.rebalancing import PlanActionResponse, RebalancingPlanItemOut, RebalancingPlanLegSummary
-from app.services.rebalancing_plan_service import (
+from app.services.rebalancing.plan_service import (
     approve_buy_leg,
     approve_sell_leg,
     cancel_buy_leg,

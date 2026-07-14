@@ -27,6 +27,8 @@ export const QUERY_KEYS = {
   rebalancingPlans: ["rebalancing-plans"] as const,
   taxSummary: (year: number) => ["tax-summary", year] as const,
   overseasPositionsTax: ["overseas-positions-tax"] as const,
+  isaStatus: ["isa-status"] as const,
+  pensionContribution: (year: number) => ["pension-contribution", year] as const,
   allocationHistory: (months: number) => ["allocation-history", months] as const,
   alertHistory: ["alert-history"] as const,
   insights: ["insights"] as const,
@@ -37,5 +39,6 @@ export const QUERY_KEYS = {
   driftSummary: ["drift-summary"] as const,
   compositeSignalStatus: ["composite-signal-status"] as const,
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
+  goalRecommendationByHorizon: ["goal-recommendation", "by-horizon"] as const,
   inflationSummary: ["inflation-summary"] as const,
 } as const;

@@ -1,7 +1,7 @@
 import type { PortfolioPosition, AggregatedPosition } from "@/types";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
-import type { AssetAccount } from "@/api/assets";
+import type { AccountTaxType, AssetAccount, InvestmentHorizon } from "@/api/assets";
 
 export interface AggregatedPositionWithSubs extends AggregatedPosition {
   sub_positions: PortfolioPosition[];
@@ -65,6 +65,41 @@ export function getPortfolioTargetState(
   const assigned = relevant.filter((a) => a.target_portfolio_id === portfolio.id).length;
   if (assigned === 0) return "none";
   return assigned === relevant.length ? "full" : "partial";
+}
+
+/**
+ * 포트폴리오의 "목표 지정"된 계좌들이 전부 동일한 investment_horizon 태그를 가지면 그 값을
+ * 반환한다 — 기간별 추천(RecommendationCard) 적용 시 어느 포트폴리오가 어느 기간(단기/
+ * 중기/장기) 담당인지 자동으로 추론하는 데 쓰인다. 계좌 태그가 섞여 있거나 없으면 null.
+ */
+export function getPortfolioHorizon(
+  portfolio: Portfolio,
+  stockAccounts: AssetAccount[],
+): InvestmentHorizon | null {
+  const assigned = stockAccounts.filter((a) => a.target_portfolio_id === portfolio.id);
+  if (assigned.length === 0) return null;
+  const horizon = assigned[0].investment_horizon;
+  if (!horizon) return null;
+  return assigned.every((a) => a.investment_horizon === horizon) ? horizon : null;
+}
+
+/**
+ * 포트폴리오의 "목표 지정"된 계좌들이 전부 동일한 investment_horizon **및** tax_type 태그를 가지면
+ * 그 조합을 반환한다 — 계좌 세제유형까지 반영된 기간별 추천(RecommendationCard)을 적용할 때
+ * 어느 포트폴리오가 어느 (기간, 세제유형) 카드를 담당하는지 추론하는 데 쓰인다. 둘 중 하나라도 계좌
+ * 간에 섞여 있거나 없으면 null.
+ */
+export function getPortfolioHorizonTaxType(
+  portfolio: Portfolio,
+  stockAccounts: AssetAccount[],
+): { horizon: InvestmentHorizon; taxType: AccountTaxType } | null {
+  const assigned = stockAccounts.filter((a) => a.target_portfolio_id === portfolio.id);
+  if (assigned.length === 0) return null;
+  const horizon = assigned[0].investment_horizon;
+  const taxType = assigned[0].tax_type;
+  if (!horizon || !taxType) return null;
+  const matches = assigned.every((a) => a.investment_horizon === horizon && a.tax_type === taxType);
+  return matches ? { horizon, taxType } : null;
 }
 
 export function mergeAlertsByPortfolio(

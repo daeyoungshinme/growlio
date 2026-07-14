@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from app.schemas.rebalancing import ExecutionOrderItem
-from app.services import _kiwoom_order_executor
+from app.services.rebalancing import _kiwoom_order_executor
 
 
 def _make_order(

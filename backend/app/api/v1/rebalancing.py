@@ -26,6 +26,7 @@ from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     CompositeSignalStatus,
     GoalRecommendation,
+    HorizonRecommendationResponse,
     KisBalancePosition,
     KisBalanceResponse,
     PortfolioDriftSummary,
@@ -34,7 +35,7 @@ from app.schemas.rebalancing import (
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
-from app.services._settings_queries import get_settings_row
+from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.credential_service import decrypt
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.dividend_constants import is_korean_etf
@@ -46,16 +47,17 @@ from app.services.dividend_sync_sources import (
 from app.services.goal_recommendation_service import (
     existing_items_from_positions,
     get_goal_recommendation,
+    get_horizon_recommendations,
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import fetch_prices_batch, get_historical_returns
-from app.services.rebalancing_diagnosis_service import (
+from app.services.rebalancing.diagnosis_service import (
     build_diagnosis_context,
     check_composite_signal,
     fetch_market_and_risk_signal,
 )
-from app.services.rebalancing_service import (
+from app.services.rebalancing.service import (
     _item_attr,
     analyze_rebalancing,
     compute_portfolio_drift_summary,
@@ -261,6 +263,23 @@ async def get_overall_goal_recommendation_endpoint(
     pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
     existing_items = existing_items_from_positions(pos_map)
     return await get_goal_recommendation(redis, base_krw, existing_items, settings_row, db)
+
+
+@router.get("/goal-recommendation/by-horizon", response_model=HorizonRecommendationResponse)
+@limiter.limit("5/minute")
+async def get_horizon_goal_recommendation_endpoint(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis=Depends(get_redis),
+):
+    """계좌에 태그된 투자기간(단기/중기/장기)별로 리스크 성향이 다른 추천을 반환한다 (자동 적용 아님).
+
+    목표금액/목표연도 설정과 무관하게 동작한다 — `/goal-recommendation`(전체 자산 기준 목표 역산)과는
+    별개의 기능이며, 두 엔드포인트 모두 그대로 유지된다.
+    """
+    settings_row = await get_or_create_settings(db, current_user.id)
+    return await get_horizon_recommendations(redis, db, current_user.id, settings_row)
 
 
 async def _fetch_broker_balance(

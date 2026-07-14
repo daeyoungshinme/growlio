@@ -14,14 +14,6 @@ class PositionMapEntry(TypedDict):
     qty: float
 
 
-class TickerPositionEntry(TypedDict):
-    """ticker 문자열로 인덱싱된 포지션 집계 항목 (factor/risk 서비스용)."""
-
-    ticker: str
-    market: str
-    value_krw: float
-
-
 class DividendMapEntry(TypedDict, total=False):
     """(ticker, market) 키로 인덱싱된 배당 정보 항목."""
 

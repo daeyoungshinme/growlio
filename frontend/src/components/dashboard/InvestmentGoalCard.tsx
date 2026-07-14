@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
 
@@ -39,7 +41,7 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
         {gap.toFixed(decimals)}
         {unit}
       </span>
-      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
         {isEven ? "목표 일치" : isAhead ? aheadLabel : behindLabel}
       </p>
     </>
@@ -47,6 +49,7 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
 }
 
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
+  const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false);
   const timeline = dcaData?.goal_timeline;
   const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
@@ -91,7 +94,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           >
             {Math.min(data?.deposit_achievement_pct ?? 0, 100).toFixed(1)}%
           </span>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {fmtKrwShort(data?.annual_deposit_current ?? 0)} /{" "}
             {fmtKrwShort(data?.annual_deposit_goal ?? 0)}원
           </p>
@@ -111,7 +114,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           >
             {Math.min(data?.dividend_goal_achievement_pct ?? 0, 100).toFixed(1)}%
           </span>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             {fmtKrwShort(data?.estimated_annual_dividends ?? 0)} /{" "}
             {fmtKrwShort(data?.annual_dividend_goal ?? 0)}원
           </p>
@@ -131,7 +134,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             aheadLabel: "초과달성",
             behindLabel: "미달",
           })}
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             목표 {data!.goal_annual_return_pct}% · 현재 {actualReturnPct!.toFixed(1)}%
           </p>
         </>
@@ -140,7 +143,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
             목표 {data!.goal_annual_return_pct}%
           </span>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">실제 수익률 계산 중</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">실제 수익률 계산 중</p>
         </>
       ) : null,
     },
@@ -155,7 +158,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
               <span className="text-sm font-bold text-gray-500 dark:text-gray-400">
                 목표 시점 일치
               </span>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 목표 {data!.retirement_target_year}년 · 예상 {expectedGoalYear}년
               </p>
             </>
@@ -165,7 +168,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 <TrendingUp size={12} />
                 {retirementGapYears}년 앞서 달성
               </span>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 목표 {data!.retirement_target_year}년 · 예상 {expectedGoalYear}년
               </p>
             </>
@@ -175,7 +178,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 <TrendingDown size={12} />
                 {Math.abs(retirementGapYears)}년 지연 예상
               </span>
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                 목표 {data!.retirement_target_year}년 · 예상 {expectedGoalYear}년
               </p>
             </>
@@ -185,7 +188,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             <span className="text-sm font-bold text-gray-600 dark:text-gray-300">
               {yearsUntilRetirement}년 후
             </span>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">DCA 설정 시 예측</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">DCA 설정 시 예측</p>
           </>
         ) : null,
     },
@@ -261,24 +264,29 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         ))}
       </div>
 
-      {/* 모바일 DCA 달성 전망 — 2행 부각 */}
+      {/* 모바일 DCA 달성 전망 — 헤드라인(진행율+금액)은 항상 노출, 예상일/배지/진행바는 접기 뒤로 */}
       <div className="sm:hidden border-t border-gray-100 dark:border-gray-700 pt-1.5 mt-1.5">
         {currentProgressPct != null || timeline ? (
           <>
-            <div className="flex items-end justify-between">
-              <div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">전체 진행율</p>
-                <p className="text-base font-bold text-gray-900 dark:text-gray-50">
-                  {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">전체 진행율</p>
+              <p className="text-base font-bold text-gray-900 dark:text-gray-50">
+                {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
+              </p>
+              {goalAmountDisplay != null && data != null && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  현재 {fmtKrw(data.total_assets_krw)} · 목표 {fmtKrw(goalAmountDisplay)}
                 </p>
-                {goalAmountDisplay != null && data != null && (
-                  <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                    현재 {fmtKrw(data.total_assets_krw)} · 목표 {fmtKrw(goalAmountDisplay)}
-                  </p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">실제 달성 예상</p>
+              )}
+            </div>
+            <CollapsibleSection
+              isOpen={dcaDetailOpen}
+              onToggle={toggleDcaDetail}
+              label="달성 예상일 · 진행 상세"
+              buttonClassName="mt-2 w-full flex items-center justify-between py-1.5 text-xs text-gray-400 dark:text-gray-500 font-medium"
+            >
+              <div className="flex items-end justify-between">
+                <p className="text-xs text-gray-400 dark:text-gray-500">실제 달성 예상</p>
                 <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
                   {timeline?.actual_expected_goal_date
                     ? fmtMonth(timeline.actual_expected_goal_date)
@@ -287,45 +295,45 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                       : "—"}
                 </p>
               </div>
-            </div>
-            <div className="flex items-center justify-between mt-1">
-              {timeline?.lead_lag_months != null && timeline.lead_lag_months !== 0 ? (
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    timeline.lead_lag_months > 0
-                      ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
-                      : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                  }`}
-                >
-                  {timeline.lead_lag_months > 0 ? (
-                    <>
-                      <TrendingUp size={10} />
-                      {timeline.lead_lag_months}개월 앞서
-                    </>
-                  ) : (
-                    <>
-                      <TrendingDown size={10} />
-                      {Math.abs(timeline.lead_lag_months)}개월 지연
-                    </>
-                  )}
-                </span>
-              ) : (
-                <span />
-              )}
-              {timeline?.expected_goal_date &&
-                timeline?.lead_lag_months != null &&
-                timeline.lead_lag_months !== 0 && (
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    계획: {fmtMonth(timeline.expected_goal_date)}
+              <div className="flex items-center justify-between mt-1">
+                {timeline?.lead_lag_months != null && timeline.lead_lag_months !== 0 ? (
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                      timeline.lead_lag_months > 0
+                        ? "bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400"
+                        : "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                    }`}
+                  >
+                    {timeline.lead_lag_months > 0 ? (
+                      <>
+                        <TrendingUp size={10} />
+                        {timeline.lead_lag_months}개월 앞서
+                      </>
+                    ) : (
+                      <>
+                        <TrendingDown size={10} />
+                        {Math.abs(timeline.lead_lag_months)}개월 지연
+                      </>
+                    )}
                   </span>
+                ) : (
+                  <span />
                 )}
-            </div>
-            <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
-              <div
-                className="h-full bg-blue-500 rounded-full transition-all"
-                style={{ width: `${Math.min(currentProgressPct ?? 0, 100)}%` }}
-              />
-            </div>
+                {timeline?.expected_goal_date &&
+                  timeline?.lead_lag_months != null &&
+                  timeline.lead_lag_months !== 0 && (
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      계획: {fmtMonth(timeline.expected_goal_date)}
+                    </span>
+                  )}
+              </div>
+              <div className="h-2.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden mt-1">
+                <div
+                  className="h-full bg-blue-500 rounded-full transition-all"
+                  style={{ width: `${Math.min(currentProgressPct ?? 0, 100)}%` }}
+                />
+              </div>
+            </CollapsibleSection>
           </>
         ) : (
           <Link

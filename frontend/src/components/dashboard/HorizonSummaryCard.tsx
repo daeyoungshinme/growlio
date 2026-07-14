@@ -5,12 +5,14 @@ import { fmtKrw } from "@/utils/format";
 
 interface Props {
   overview: PortfolioOverview | undefined;
+  /** true면 카드 헤더/보더 없이 그리드만 렌더 (통합 섹션 내부 임베드용) */
+  embedded?: boolean;
 }
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 
 /** 계좌에 태그된 투자기간(단기/중기/장기)별 평가액 합계를 보여준다. 태그된 계좌가 하나도 없으면 표시하지 않는다. */
-export default function HorizonSummaryCard({ overview }: Props) {
+export default function HorizonSummaryCard({ overview, embedded = false }: Props) {
   const accounts = overview?.accounts ?? [];
   const tagged = accounts.filter((a) => a.investment_horizon);
   if (tagged.length === 0) return null;
@@ -25,6 +27,37 @@ export default function HorizonSummaryCard({ overview }: Props) {
     };
   }).filter((g) => g.count > 0);
 
+  const grid = (
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      {groups.map((g) => (
+        <div key={g.horizon}>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+            {INVESTMENT_HORIZON_LABELS[g.horizon]} ({g.count}개 계좌)
+          </p>
+          <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
+            {fmtKrw(g.amount)}
+          </p>
+          {totalTagged > 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              {((g.amount / totalTagged) * 100).toFixed(0)}%
+            </p>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <div>
+        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1.5">
+          투자기간별 자산현황
+        </p>
+        {grid}
+      </div>
+    );
+  }
+
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
@@ -33,23 +66,7 @@ export default function HorizonSummaryCard({ overview }: Props) {
           투자기간별 자산현황
         </h2>
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        {groups.map((g) => (
-          <div key={g.horizon}>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
-              {INVESTMENT_HORIZON_LABELS[g.horizon]} ({g.count}개 계좌)
-            </p>
-            <p className="text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-50 tabular-nums">
-              {fmtKrw(g.amount)}
-            </p>
-            {totalTagged > 0 && (
-              <p className="text-xs text-gray-400 dark:text-gray-500">
-                {((g.amount / totalTagged) * 100).toFixed(0)}%
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
+      {grid}
     </div>
   );
 }

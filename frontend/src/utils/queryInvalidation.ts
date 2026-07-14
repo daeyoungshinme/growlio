@@ -24,6 +24,7 @@ export function invalidateAccountData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
   ]);
 }
 

@@ -2,7 +2,7 @@ import { Lock } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Modal from "@/components/common/Modal";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
-import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS } from "@/api/assets";
+import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS, ISA_TYPE_LABELS } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
@@ -51,6 +51,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     include_in_total: initialAccount?.include_in_total ?? true,
     tax_type: initialAccount?.tax_type ?? "GENERAL",
     investment_horizon: initialAccount?.investment_horizon ?? undefined,
+    isa_open_date: initialAccount?.isa_open_date ?? undefined,
+    isa_type: initialAccount?.isa_type ?? "GENERAL",
   });
 
   const {
@@ -114,6 +116,8 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       deposit_usd: depositUsd ?? 0,
       tax_type: form.tax_type,
       investment_horizon: form.investment_horizon ?? null,
+      isa_open_date: form.tax_type === "ISA" ? (form.isa_open_date ?? null) : undefined,
+      isa_type: form.tax_type === "ISA" ? form.isa_type : undefined,
     };
     if (initialAccount!.data_source === "MANUAL") {
       const usdConverted = convertUsdToKrw(depositUsd, usdRate);
@@ -303,6 +307,48 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                 </select>
               </div>
             </div>
+
+            {form.tax_type === "ISA" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label
+                    htmlFor="stock-isa-open-date"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    ISA 가입일
+                  </label>
+                  <input
+                    id="stock-isa-open-date"
+                    type="date"
+                    className={`mt-1 w-full ${INPUT_SM}`}
+                    value={form.isa_open_date ?? ""}
+                    onChange={(e) => set("isa_open_date", e.target.value || undefined)}
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="stock-isa-type"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                  >
+                    ISA 유형
+                  </label>
+                  <select
+                    id="stock-isa-type"
+                    className={`mt-1 w-full ${INPUT_SM}`}
+                    value={form.isa_type ?? "GENERAL"}
+                    onChange={(e) =>
+                      set("isa_type", e.target.value as AssetAccountCreate["isa_type"])
+                    }
+                  >
+                    {Object.entries(ISA_TYPE_LABELS).map(([v, l]) => (
+                      <option key={v} value={v}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* MANUAL 예수금 */}
             {form.data_source === "MANUAL" && (

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.services.rebalancing_strategy_service import (
+from app.services.rebalancing.strategy_service import (
     _build_summary,
     _build_trade_recommendations,
     _factor_reason,
