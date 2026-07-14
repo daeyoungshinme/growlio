@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
+import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -121,6 +122,15 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
+  // MarketSignalBanner(useCompositeSignalToggle)는 signal 로딩 후에야 마운트되므로, 같은
+  // queryKey로 여기서 signal과 병렬로 미리 조회해두면 배너 마운트 시 캐시로 즉시 표시된다.
+  useQuery({
+    queryKey: QUERY_KEYS.compositeSignalStatus,
+    queryFn: fetchCompositeSignalStatus,
+    staleTime: STALE_TIME.LONG,
+    enabled: localTab === "진단",
+  });
+
   return (
     <div className="flex flex-col min-h-full gap-4">
       <div className="px-1">
@@ -136,13 +146,6 @@ export default function RebalancingPage() {
         {/* ── 진단 탭: 전체 포트폴리오 드리프트 현황 + 시장신호 ── */}
         {localTab === "진단" && (
           <>
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard />}>
-                <RecommendationCard
-                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
-                />
-              </Suspense>
-            </ErrorBoundary>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
@@ -174,6 +177,14 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
+            {/* 목표 역산 추천 — 진단탭 내 가장 무거운 계산(최대 15개 조합 최적화)이라 아래로 배치 */}
+            <ErrorBoundary variant="section">
+              <Suspense fallback={<SkeletonCard />}>
+                <RecommendationCard
+                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
+                />
+              </Suspense>
+            </ErrorBoundary>
           </>
         )}
 

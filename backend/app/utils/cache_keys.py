@@ -55,6 +55,7 @@ TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감�
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
+TTL_GOAL_RECOMMENDATION = 600  # 목표 역산 추천(전체/기간별) 10분 — 설정 변경 시 명시적으로 무효화됨
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -118,12 +119,19 @@ def dividend_summary_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}dividend_summary:{user_id}"
 
 
-def portfolio_overview_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}portfolio_overview:{user_id}"
+def portfolio_overview_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}portfolio_overview:{user_id}:{acct_suffix}"
 
 
-def portfolio_overview_lite_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}portfolio_overview_lite:{user_id}"
+def portfolio_overview_lite_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}portfolio_overview_lite:{user_id}:{acct_suffix}"
+
+
+def portfolio_overview_acct_suffix(account_ids: list[uuid.UUID] | None) -> str:
+    """계좌 조합을 캐시 키 suffix로 정규화한다 (정렬해 조합 순서와 무관하게 동일 키를 사용)."""
+    if not account_ids:
+        return "all"
+    return "-".join(sorted(str(a) for a in account_ids))
 
 
 def portfolio_list_key(user_id: uuid.UUID) -> str:
@@ -153,6 +161,14 @@ def rebalancing_strategy_key(user_id: uuid.UUID, portfolio_id: uuid.UUID | str, 
 
 def tax_overseas_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}tax:overseas:{user_id}"
+
+
+def goal_recommendation_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}goal_recommendation:{user_id}"
+
+
+def goal_recommendation_horizon_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}goal_recommendation_horizon:{user_id}"
 
 
 def economic_indicator_latest_key(code: str) -> str:
@@ -267,6 +283,25 @@ async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> Non
     await _scan_unlink(redis, f"{_env_prefix()}alloc_history_v2:{user_id}:*")
 
 
+async def invalidate_goal_recommendation_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+    """목표 역산 추천(전체/기간별) 캐시를 삭제한다 — 목표 설정, 후보 ETF, 계좌 포지션 변경 시 호출."""
+    await invalidate_user_caches(
+        redis,
+        goal_recommendation_key(user_id),
+        goal_recommendation_horizon_key(user_id),
+    )
+
+
+async def invalidate_portfolio_overview_cache(redis: RedisType, user_id: uuid.UUID) -> None:
+    """`portfolio_overview`/`portfolio_overview_lite` 캐시를 계좌 조합(acct_suffix) 전체에 대해 삭제한다.
+
+    account_ids 조합별로 키가 분기되어(무효화 시점엔 어떤 조합이 캐시됐는지 알 수 없음) SCAN+UNLINK
+    와일드카드 패턴을 사용한다 — `invalidate_rebalancing_strategy_cache`와 동일한 패턴.
+    """
+    await _scan_unlink(redis, f"{_env_prefix()}portfolio_overview:{user_id}:*")
+    await _scan_unlink(redis, f"{_env_prefix()}portfolio_overview_lite:{user_id}:*")
+
+
 async def invalidate_rebalancing_strategy_cache(
     redis: RedisType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
 ) -> None:
@@ -284,20 +319,25 @@ async def invalidate_asset_account_caches(
     account_id: uuid.UUID | None = None,
     year: int | None = None,
 ) -> None:
-    """계좌 생성/수정/삭제/동기화 후 관련 캐시 일괄 무효화."""
+    """계좌 생성/수정/삭제/동기화 후 관련 캐시 일괄 무효화.
+
+    계좌 수정에는 investment_horizon/tax_type 태그 변경(목표 역산 추천의 조합 구성에 직접
+    영향)도 포함되므로 goal_recommendation 캐시도 함께 무효화한다.
+    """
     from datetime import date as _date
 
     _year = year if year is not None else _date.today().year
     keys = [
         dashboard_summary_key(user_id),
-        portfolio_overview_key(user_id),
-        portfolio_overview_lite_key(user_id),
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
+        goal_recommendation_key(user_id),
+        goal_recommendation_horizon_key(user_id),
     ]
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(redis, *keys)
+    await invalidate_portfolio_overview_cache(redis, user_id)
 
 
 async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: int | None = None) -> None:
@@ -310,10 +350,11 @@ async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: 
         redis,
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
-        portfolio_overview_key(user_id),
-        portfolio_overview_lite_key(user_id),
         dividend_summary_key(user_id),
         dividend_ticker_summary_key(user_id, _year),
         dividends_positions_key(user_id),
         tax_overseas_key(user_id),
+        goal_recommendation_key(user_id),
+        goal_recommendation_horizon_key(user_id),
     )
+    await invalidate_portfolio_overview_cache(redis, user_id)

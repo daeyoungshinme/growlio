@@ -17,7 +17,11 @@ from app.redis_client import get_redis
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
-from app.utils.cache_keys import dashboard_summary_key, invalidate_user_caches
+from app.utils.cache_keys import (
+    dashboard_summary_key,
+    invalidate_goal_recommendation_caches,
+    invalidate_user_caches,
+)
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -281,6 +285,7 @@ async def update_goal(
     await db.commit()
     redis = await get_redis()
     await invalidate_user_caches(redis, dashboard_summary_key(current_user.id))
+    await invalidate_goal_recommendation_caches(redis, current_user.id)
     return {"detail": "목표가 저장되었습니다"}
 
 
@@ -296,6 +301,8 @@ async def update_goal_candidate_tickers(
     row = await get_or_create_settings(db, current_user.id)
     row.goal_candidate_tickers = [t.model_dump() for t in req.tickers]
     await db.commit()
+    redis = await get_redis()
+    await invalidate_goal_recommendation_caches(redis, current_user.id)
     return {"detail": "후보 ETF 목록이 저장되었습니다"}
 
 
@@ -314,6 +321,8 @@ async def update_goal_recommendation_options(
     row.goal_cagr_lookback_years = req.cagr_lookback_years
     row.goal_short_term_equity_floor_pct = req.short_term_equity_floor_pct
     await db.commit()
+    redis = await get_redis()
+    await invalidate_goal_recommendation_caches(redis, current_user.id)
     return {"detail": "목표 역산 추천 설정이 저장되었습니다"}
 
 

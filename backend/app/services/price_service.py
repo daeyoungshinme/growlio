@@ -229,7 +229,11 @@ async def get_historical_returns(
 
     domestic_missing = [(t, m) for t, m in missing if m.upper() in DOMESTIC_MARKETS]
     if domestic_missing:
-        pykrx_result = await loop.run_in_executor(None, partial(_sync_pykrx_returns_batch, domestic_missing, years))
+        # pykrx는 스레드 안전성이 보장되지 않아(동시 호출 시 프로세스 크래시 관측됨) Yahoo와
+        # 동일한 세마포어로 동시 실행 개수를 제한한다 — 목표 역산 기간별 추천처럼 여러 조합이
+        # asyncio.gather로 병렬 호출하는 경로에서 특히 중요하다.
+        async with _yfinance_sem:
+            pykrx_result = await loop.run_in_executor(None, partial(_sync_pykrx_returns_batch, domestic_missing, years))
         newly_fetched.update(pykrx_result)
 
     return_map.update(newly_fetched)

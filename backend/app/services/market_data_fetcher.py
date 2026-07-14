@@ -56,6 +56,11 @@ def fetch_yf_daily_returns(
     portfolio_optimizer, risk_service에서 공통으로 사용.
     extra_symbols(예: ^GSPC)를 포함해 다운로드하되 결과에는 symbols + extra_symbols 모두 포함.
     Yahoo가 실패/차단된 국내(.KS/.KQ) 심볼은 pykrx로 보완한다.
+
+    이 함수는 `run_in_executor`로 여러 개가 동시에 호출될 수 있다(예: 목표 역산 기간별 추천이
+    조합마다 asyncio.gather로 병렬 호출). `yf.download(threads=True)`를 쓰면 호출마다 yfinance
+    내부 스레드풀이 추가로 생성돼 동시 호출 수만큼 스레드가 곱해지며 프로세스 크래시를 일으킨
+    적이 있다 — 반드시 `threads=False` 유지.
     """
     import pandas as pd
 
@@ -77,7 +82,7 @@ def fetch_yf_daily_returns(
                 end=end.isoformat(),
                 auto_adjust=True,
                 progress=False,
-                threads=True,
+                threads=False,
             )
         except Exception as e:
             logger.warning("yf_download_failed", symbols=all_syms[:5], error=str(e))
@@ -118,6 +123,8 @@ def fetch_yf_close_series(
 
     factor_service 모멘텀 계산(12-1M)에서 사용.
     Yahoo가 실패/차단된 국내(.KS/.KQ) 심볼은 pykrx로 보완한다.
+
+    `fetch_yf_daily_returns`와 동일한 이유로 `threads=False` 유지 — 동시 호출 시 크래시 방지.
     """
     import pandas as pd
 
@@ -136,7 +143,7 @@ def fetch_yf_close_series(
                 end=end.isoformat(),
                 auto_adjust=True,
                 progress=False,
-                threads=True,
+                threads=False,
             )
         except Exception as e:
             logger.warning("yf_close_series_failed", symbols=symbols[:5], error=str(e))

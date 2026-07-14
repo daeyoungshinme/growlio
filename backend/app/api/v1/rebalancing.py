@@ -192,7 +192,7 @@ async def analyze_portfolio(
 
     portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
+    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis)
 
     base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
@@ -446,7 +446,7 @@ async def get_drift_summary(
         try:
             portfolio_account_ids = getattr(portfolio, "account_ids", None)
             effective_ids = [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
-            overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids)
+            overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis)
             threshold = alert_by_portfolio.get(str(portfolio.id), 5.0)
             summary = compute_portfolio_drift_summary(portfolio, overview, threshold)
             summary.has_composite_signal = has_composite_signal

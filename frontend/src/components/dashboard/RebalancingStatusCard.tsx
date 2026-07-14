@@ -179,11 +179,12 @@ export default function RebalancingStatusCard({
   });
   const portfolioCount = Array.isArray(portfoliosRaw) ? portfoliosRaw.length : 0;
 
+  // /drift-summary는 백엔드에서 자체적으로 포트폴리오 목록을 조회하므로(빈 목록이면 [] 반환),
+  // 프론트의 portfolios 쿼리 완료를 기다릴 필요 없이 독립적으로 즉시 발화한다.
   const { data: driftSummaries } = useQuery({
     queryKey: QUERY_KEYS.driftSummary,
     queryFn: fetchDriftSummary,
     staleTime: STALE_TIME.MEDIUM,
-    enabled: portfolioCount > 0,
   });
 
   const { data: allInsights } = useInsights();

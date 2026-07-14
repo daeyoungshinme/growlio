@@ -256,6 +256,8 @@ def _mock_redis_singleton():
     redis_mock.delete = AsyncMock()
     redis_mock.exists = AsyncMock(return_value=0)
     redis_mock.expire = AsyncMock()
+    redis_mock.scan = AsyncMock(return_value=(0, []))
+    redis_mock.unlink = AsyncMock()
 
     old = _rc.redis_client
     _rc.redis_client = redis_mock

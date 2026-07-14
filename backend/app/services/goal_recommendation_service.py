@@ -60,8 +60,15 @@ from app.services.recommendation_universe import (
     RECOMMENDATION_UNIVERSE,
     resolve_index_region,
 )
-from app.services.yahoo_price import to_yf_symbol
-from app.utils.cache_keys import RedisType
+from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
+from app.utils.cache_keys import (
+    TTL_GOAL_RECOMMENDATION,
+    RedisType,
+    get_cached_json,
+    goal_recommendation_horizon_key,
+    goal_recommendation_key,
+    set_cached_json,
+)
 
 logger = structlog.get_logger()
 
@@ -520,6 +527,39 @@ async def get_goal_recommendation(
     settings_row: UserSettings | None,
     db: AsyncSession,
 ) -> GoalRecommendation:
+    """`_compute_goal_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+
+    계산 자체가 CAGR/배당수익률 외부 조회 + SLSQP 최적화를 포함해 무겁고, 진단탭 마운트 시
+    무조건 호출되므로 짧은 TTL로도 체감 속도 개선 효과가 크다. 목표 설정·후보 ETF 변경,
+    계좌 sync(포지션 변경) 시 `invalidate_goal_recommendation_caches()`/`invalidate_account_caches()`가
+    캐시를 무효화한다 — 그 외의 사소한 자산평가액 변동은 TTL 만료까지 반영되지 않는다(허용된 트레이드오프).
+
+    `recommended_items`가 비어 있는 결과(목표 미설정·달성불가·후보부족·Yahoo 서킷브레이커 등으로
+    시세 데이터 조회 실패 등)는 캐싱하지 않는다 — 이런 실패는 대부분 일시적 외부 API 장애이며,
+    캐싱하면 다음 요청부터 서킷브레이커가 복구된 뒤에도 TTL 동안 계속 같은 실패를 반환하게 된다.
+    """
+    user_id = getattr(settings_row, "user_id", None)
+    if user_id is not None:
+        cached = await get_cached_json(redis, goal_recommendation_key(user_id))
+        if cached is not None:
+            return GoalRecommendation(**cached)
+
+    result = await _compute_goal_recommendation(redis, base_krw, existing_items, settings_row, db)
+
+    if user_id is not None and result.recommended_items:
+        await set_cached_json(
+            redis, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+        )
+    return result
+
+
+async def _compute_goal_recommendation(
+    redis: RedisType,
+    base_krw: float,
+    existing_items: list[tuple[str, str, str]],
+    settings_row: UserSettings | None,
+    db: AsyncSession,
+) -> GoalRecommendation:
     """기준 자산총액과 유저 목표를 받아 목표 역산 추천을 계산한다."""
     if not settings_row or not settings_row.goal_amount or not settings_row.retirement_target_year:
         return _not_configured("목표금액·목표연도를 설정하면 추천을 받을 수 있습니다")
@@ -613,7 +653,8 @@ async def get_goal_recommendation(
     f_cagrs = [f[2] for f in filtered]
 
     loop = asyncio.get_running_loop()
-    returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, f_symbols)
+    async with _yfinance_sem:
+        returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, f_symbols)
     items, expected_return_pct, opt_note = await loop.run_in_executor(
         None,
         functools.partial(
@@ -755,7 +796,11 @@ async def _build_horizon_result(
 
     loop = asyncio.get_running_loop()
     real_symbols = [s for s in f_symbols if s != _CASH_EQUIVALENT_TICKER]
-    returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols) if real_symbols else {}
+    if real_symbols:
+        async with _yfinance_sem:
+            returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
+    else:
+        returns_map = {}
     if include_cash_equivalent:
         returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
 
@@ -800,6 +845,35 @@ async def _build_horizon_result(
 
 
 async def get_horizon_recommendations(
+    redis: RedisType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+) -> HorizonRecommendationResponse:
+    """`_compute_horizon_recommendations()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+
+    최대 15개(투자기간×세제유형) 조합에 대해 순차 DB 조회 후 조합별 SLSQP 최적화를 수행하는
+    무거운 계산이라 캐싱 효과가 크다. 무효화 조건은 `get_goal_recommendation`과 동일.
+
+    조합 중 하나라도 `recommended_items`가 비어 있으면(예: 해외전용 조합만 Yahoo 서킷브레이커에
+    걸려 시세 데이터를 못 가져온 경우) 응답 전체를 캐싱하지 않는다 — 15개 조합이 하나의 캐시
+    키로 묶여 있어, 그대로 캐싱하면 일시적으로 실패한 조합 하나 때문에 나머지 정상 조합까지
+    TTL 동안 통째로 그 실패 상태를 계속 반환하게 된다.
+    """
+    cached = await get_cached_json(redis, goal_recommendation_horizon_key(user_id))
+    if cached is not None:
+        return HorizonRecommendationResponse(**cached)
+
+    result = await _compute_horizon_recommendations(redis, db, user_id, settings_row)
+
+    if all(rec.recommended_items for rec in result.recommendations):
+        await set_cached_json(
+            redis, goal_recommendation_horizon_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+        )
+    return result
+
+
+async def _compute_horizon_recommendations(
     redis: RedisType,
     db: AsyncSession,
     user_id: uuid.UUID,

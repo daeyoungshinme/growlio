@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -256,18 +257,23 @@ async def fetch_market_and_risk_signal(
 
     drift-summary 배지, 알림 복합 트리거 등 tax 미리보기가 필요 없는 가벼운 호출부가 공용으로 쓴다.
     """
+    market_signal_result, risk_result = await asyncio.gather(
+        get_market_signal(redis),
+        get_portfolio_risk_metrics(user_id, db, redis, portfolio_id=None),
+        return_exceptions=True,
+    )
+
     market_level: str | None = None
-    try:
-        market_signal = await get_market_signal(redis)
-        market_level = market_signal.get("composite_level")
-    except Exception as exc:
-        logger.warning("diagnosis_market_signal_failed", error=str(exc))
+    if isinstance(market_signal_result, BaseException):
+        logger.warning("diagnosis_market_signal_failed", error=str(market_signal_result))
+    else:
+        market_level = market_signal_result.get("composite_level")
 
     risk: dict = {}
-    try:
-        risk = await get_portfolio_risk_metrics(user_id, db, redis, portfolio_id=None)
-    except Exception as exc:
-        logger.warning("diagnosis_risk_metrics_failed", error=str(exc))
+    if isinstance(risk_result, BaseException):
+        logger.warning("diagnosis_risk_metrics_failed", error=str(risk_result))
+    else:
+        risk = risk_result
 
     return market_level, risk
 

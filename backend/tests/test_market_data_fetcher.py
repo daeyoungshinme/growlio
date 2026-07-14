@@ -116,6 +116,21 @@ class TestFetchYfDailyReturns:
 
         assert result == {}
 
+    def test_yf_download_called_with_threads_false(self):
+        """yf.download은 반드시 threads=False로 호출돼야 한다 — threads=True는 이 함수가
+        run_in_executor로 동시 호출될 때(예: 목표 역산 기간별 추천의 조합별 병렬 계산) yfinance
+        내부 스레드풀이 추가로 생겨 프로세스 크래시를 일으키는 것이 확인됐다."""
+        import pandas as pd
+
+        mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 101.0]})
+
+        with patch("yfinance.download", return_value=mock_df) as mock_download:
+            from app.services.market_data_fetcher import fetch_yf_daily_returns
+
+            fetch_yf_daily_returns(["AAPL"])
+
+        assert mock_download.call_args.kwargs["threads"] is False
+
     def test_circuit_open_still_tries_pykrx_for_domestic(self):
         """yahoo_circuit이 OPEN이어도 국내 심볼은 pykrx 경로로 조회된다."""
         import pandas as pd
@@ -180,6 +195,19 @@ class TestFetchYfCloseSeries:
 
         assert "005930.KS" in result
         assert len(result["005930.KS"]) == 3
+
+    def test_yf_download_called_with_threads_false(self):
+        """`fetch_yf_daily_returns`와 동일한 이유로 threads=False가 유지돼야 한다."""
+        import pandas as pd
+
+        mock_df = pd.DataFrame({"AAPL": [100.0, 102.0, 104.0]})
+
+        with patch("yfinance.download", return_value=mock_df) as mock_download:
+            from app.services.market_data_fetcher import fetch_yf_close_series
+
+            fetch_yf_close_series(["AAPL"], date(2024, 1, 1), date(2024, 1, 31))
+
+        assert mock_download.call_args.kwargs["threads"] is False
 
 
 class TestFetchYfInfo:

@@ -150,3 +150,40 @@ class TestSyncPykrxCloseSeries:
             result = sync_pykrx_close_series("005930", date(2024, 1, 1), date(2024, 1, 31))
 
         assert result is None
+
+    def test_concurrent_calls_are_serialized(self, override_settings):
+        """pykrx는 멀티스레드 동시 호출 시 프로세스 크래시가 관측돼(스레드 안전하지 않음)
+        `_pykrx_lock`으로 완전히 직렬화한다 — 여러 스레드에서 동시에 호출해도 실제 pykrx 호출은
+        한 번에 하나만 진행돼야 한다."""
+        import threading
+        import time
+
+        import pandas as pd
+
+        active = 0
+        max_active = 0
+        lock_for_counter = threading.Lock()
+
+        def fake_get_market_ohlcv_by_date(*args, **kwargs):
+            nonlocal active, max_active
+            with lock_for_counter:
+                active += 1
+                max_active = max(max_active, active)
+            time.sleep(0.05)
+            with lock_for_counter:
+                active -= 1
+            return pd.DataFrame({"종가": [100.0, 101.0]})
+
+        with patch("pykrx.stock.get_market_ohlcv_by_date", side_effect=fake_get_market_ohlcv_by_date):
+            from app.services.price_sync_sources import sync_pykrx_close_series
+
+            threads = [
+                threading.Thread(target=sync_pykrx_close_series, args=(str(i), date(2024, 1, 1), date(2024, 1, 31)))
+                for i in range(5)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert max_active == 1

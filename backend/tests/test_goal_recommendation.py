@@ -1032,6 +1032,89 @@ class TestGetGoalRecommendation:
         assert set(queried_tickers) == {("005930", "KOSPI"), ("000660", "KOSPI")}
         assert result.recommended_items
 
+    async def test_does_not_cache_result_with_no_recommended_items(self):
+        """서킷브레이커 등으로 시세 데이터를 못 가져와 recommended_items가 비어 있으면 캐시에
+        쓰지 않는다 — 그렇지 않으면 일시적 실패가 TTL(10분) 동안 그대로 얼어붙는다."""
+        settings_row = SimpleNamespace(
+            user_id=uuid.uuid4(),
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ"},
+            ],
+        )
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service._active_account_tax_types",
+                AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value={},  # Yahoo 서킷브레이커 오픈 상황 시뮬레이션 — 일별수익률 조회 실패
+            ),
+        ):
+            result = await get_goal_recommendation(mock_redis, 10_000_000.0, [], settings_row, AsyncMock())
+
+        assert result.recommended_items == []
+        mock_redis.setex.assert_not_called()
+
+    async def test_caches_result_with_recommended_items(self):
+        """정상적으로 추천이 생성되면 결과를 캐싱한다."""
+        settings_row = SimpleNamespace(
+            user_id=uuid.uuid4(),
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ"},
+            ],
+        )
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}
+        returns_map = {"SPY": [0.0005] * 252, "QQQ": [0.0006] * 252}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service._active_account_tax_types",
+                AsyncMock(return_value=[]),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_goal_recommendation(mock_redis, 10_000_000.0, [], settings_row, AsyncMock())
+
+        assert result.recommended_items
+        mock_redis.setex.assert_awaited_once()
+
 
 def _execute_result(rows: list[tuple]) -> MagicMock:
     result = MagicMock()
@@ -1790,3 +1873,87 @@ class TestGetHorizonRecommendations:
         ]
         overview_account_ids = [call.kwargs["account_ids"] for call in overview_mock.call_args_list]
         assert overview_account_ids == [[short_account_id], [mid_account_id]]
+
+    async def test_does_not_cache_when_any_combo_has_no_recommended_items(self):
+        """조합 중 하나라도 recommended_items가 비어 있으면(예: Yahoo 서킷브레이커로 해외전용
+        조합만 시세 조회 실패) 전체 응답을 캐싱하지 않는다 — 그렇지 않으면 나머지 정상 조합까지
+        TTL 동안 이 실패 상태로 함께 얼어붙는다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value={},  # Yahoo 서킷브레이커 오픈 상황 시뮬레이션 — 일별수익률 조회 실패
+            ),
+        ):
+            result = await get_horizon_recommendations(mock_redis, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 1
+        assert result.recommendations[0].recommended_items == []
+        mock_redis.setex.assert_not_called()
+
+    async def test_caches_when_all_combos_have_recommended_items(self):
+        """모든 조합이 정상적으로 추천을 생성하면 응답 전체를 캐싱한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        random.seed(13)
+        returns_map = {sym: [random.gauss(0.0005, 0.01) for _ in range(252)] for sym in ["SPY", "QQQ"]}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(mock_redis, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 1
+        assert result.recommendations[0].recommended_items
+        mock_redis.setex.assert_awaited_once()
