@@ -310,7 +310,7 @@ def _optimize_goal_portfolio(
     n_equity = sum(equity_flags)
     apply_equity_floor = equity_floor is not None and equity_floor > 0 and 0 < n_equity < n
     if apply_equity_floor:
-        assert equity_floor is not None
+        assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
         # 주식 후보가 적어도(예: 1개) 하한을 채울 수 있도록 주식 종목당 상한을 별도로 완화
         equity_cap = max(max_weight_used, equity_floor / n_equity)
         bounds = [(0.0, equity_cap if eq else max_weight_used) for eq in equity_flags]
@@ -362,7 +362,7 @@ def _optimize_goal_portfolio(
             {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
         ]
     if apply_equity_floor:
-        assert equity_floor is not None
+        assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
         equity_mask = np.array(equity_flags, dtype=bool)
         constraints = [
             *constraints,

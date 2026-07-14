@@ -100,14 +100,18 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 - **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동).
 - **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
+- **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드 (DashboardPage).
+- **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드 (DashboardPage).
+- **`components/dashboard/TaxHorizonSummarySection.tsx`** — 위 두 카드를 묶는 세금 현황 요약 섹션 (DashboardPage).
+- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load).
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
 
 **데이터 흐름:**
 ```
 api/client.ts (axios + JWT interceptor + 401 자동 refresh)
-  └── api/{alerts,assets,backtest,dashboard,dividends,economicIndicators,
-           insights,invest,marketSignals,portfolios,rebalancing,risk,settings,tax,transactions}.ts
+  └── api/{alerts,assets,auth,backtest,dashboard,dividends,economicIndicators,
+           insights,invest,marketSignals,portfolios,rebalancing,rebalancingPlan,risk,settings,tax,transactions}.ts
         └── React Query useQuery/useMutation   # 자동 refetch (REFETCH_INTERVAL 상수 기준)
               └── Page 컴포넌트
 ```
@@ -124,6 +128,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAssetModals.ts` — 자산관리 페이지 모달 열기/닫기 상태 통합 관리
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
 - `useDividendData.ts` — 배당 요약 데이터 조회
+- `useDividendPlanSettings.ts` — 배당 계획(연/월배당) 설정 폼 상태 관리
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
 - `useKisCredentialVerify.ts` — KIS 자격증명 검증 상태 머신 (`verifyKisCredentials` 래핑)
@@ -280,6 +285,9 @@ cd frontend && npx playwright test
 
 **리밸런싱 알림 설명 유틸리티 (`src/utils/rebalancingAlertDescription.ts`)**
 - `buildAlertDescription(...)` — 알림 스케줄/트리거 조건/모드 설정을 사람이 읽는 한글 설명 문장으로 조합.
+
+**리밸런싱 임계값 추천 유틸리티 (`src/utils/rebalancingThresholdRecommendation.ts`)**
+- 목표 역산 추천 옵션(계좌 투자기간 태그 등) 기반으로 드리프트 임계값을 추천. `useRebalancingAlertForm.ts`에서 사용.
 
 **진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
 - `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.

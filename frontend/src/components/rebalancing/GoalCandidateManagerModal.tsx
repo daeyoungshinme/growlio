@@ -208,11 +208,11 @@ export default function GoalCandidateManagerModal({ onClose }: Props) {
                   aria-selected={false}
                   tabIndex={0}
                   className="px-2.5 py-1.5 hover:bg-purple-50 dark:hover:bg-purple-950 cursor-pointer text-xs flex items-center gap-2 focus:bg-purple-50 dark:focus:bg-purple-950 focus:outline-none"
-                  onMouseDown={() => addCandidate(s)}
+                  onMouseDown={() => void addCandidate(s)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      addCandidate(s);
+                      void addCandidate(s);
                     }
                   }}
                 >

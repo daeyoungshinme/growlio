@@ -108,18 +108,18 @@ cd backend && uv run mypy app/
 
 ### 데이터 모델
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정. ISA 계좌는 `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`로 의무가입 만기·수동입력 누적손익 관리
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표
+- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
 
 ```
 API Request
   └── api/v1/router.py        # 모든 라우터 등록
-        ├── assets.py         # 계좌 CRUD + 동기화 트리거
+        ├── assets.py         # 계좌 CRUD + 동기화 트리거, ISA 누적손익 수동입력(PATCH /{account_id}/isa-pnl-override)
         ├── auth.py           # 로그인/회원가입/토큰 refresh
         ├── alerts.py         # 알림 목록 + 읽음 처리
         ├── backtest.py       # 백테스트 실행
@@ -128,13 +128,13 @@ API Request
         ├── invest.py         # DCA 분석
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk(?portfolio_id=), /rebalancing-strategy
-        ├── rebalancing.py    # 리밸런싱 추천
+        ├── rebalancing.py    # 리밸런싱 추천 + 투자기간별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-horizon)
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── rebalancing_plan.py       # 리밸런싱 대기 플랜 조회/취소/승인 (인증 필요, 앱 내 사용)
         ├── rebalancing_plan_public.py  # 리밸런싱 대기 플랜 토큰 기반 액션 (인증 없음, 이메일 링크 전용 — `Depends(get_current_user)` 사용 금지)
         ├── settings.py       # KIS/LS 자격증명 + 목표 설정
-        ├── stocks.py         # 종목 검색
-        ├── tax.py            # 세금 추정 요약 (GET /tax/summary?year=YYYY)
+        ├── stocks.py         # 종목 검색 + ETF 추종지수 지역 판별(GET /stocks/index-region)
+        ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution)
         ├── transactions.py   # 입출금/배당 내역 CRUD
         ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
         ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — CPI/Core CPI 요약(`/inflation-summary`)은 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 그 외 전체 지표 목록/구독/알림 job은 프론트 미연동
@@ -181,7 +181,7 @@ services/
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
   ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 (목표금액/월적립액/목표연도 → 필요 수익률 역산 → 기존 종목+큐레이션 ETF 중 MVO로 최소분산 포트폴리오 추천). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률을 구하는 순수 계산 함수 (goal_recommendation_service.py 서브모듈)
-  ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 상수
+  ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
   ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
   ├── dividend_sync_sources.py # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — dividend_fetcher.py 체인이 호출
   ├── dividend_plan_service.py # 연배당/월배당 계획 및 목표 달성 현황 서비스
@@ -196,7 +196,8 @@ services/
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
-  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계
+  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·ISA 만기 현황·연금(연금저축/IRP) 납입 현황
+  ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
@@ -244,6 +245,7 @@ providers/                    # 금융 데이터 provider
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── manual_provider.py      # 수동 입력 provider
+  ├── _token_cache.py         # 토큰 캐싱 헬퍼
   └── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
@@ -333,7 +335,7 @@ db.add(obj); await db.commit(); await db.refresh(obj)
 **새 라우터/모델 추가**
 - 새 라우터는 `api/v1/router.py`에 `include_router()`로 등록 필수.
 - 새 모델은 `alembic/env.py`에 import 필요 — 누락 시 autogenerate가 해당 테이블 변경 감지 못함.
-- 새 기능 E2E 순서: 모델(`models/`) → 스키마(`schemas/`) → 서비스(`services/`) → 라우터(`api/v1/`) → `router.py` 등록 → `alembic/env.py` import → 마이그레이션 생성 → 테스트
+- 새 기능 E2E 순서: 모델(`models/`) → 스키마(`schemas/`) → 서비스(`services/`) → 라우터(`api/v1/`) → `router.py` 등록 → `alembic/env.py` import → 마이그레이션 생성 → 테스트 → 관련 CLAUDE.md 목록/설명 갱신
 
 **Rate Limiting**
 - `@limiter.limit("X/minute")` 데코레이터 적용 시 함수 시그니처에 `request: Request` 파라미터 필수.
