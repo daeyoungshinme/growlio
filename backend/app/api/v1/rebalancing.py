@@ -2,7 +2,6 @@
 
 import asyncio
 import uuid
-from functools import partial
 from typing import cast
 
 import structlog
@@ -12,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.constants import DOMESTIC_MARKETS
 from app.kis.auth import get_access_token
 from app.kis.balance import get_orderable_cash
 from app.limiter import limiter
@@ -36,14 +34,10 @@ from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_or_create_settings, get_settings_row
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt, get_kis_user_credentials
+from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.services.dividend_constants import is_korean_etf
-from app.services.dividend_sync_sources import (
-    sync_naver_etf_dividend_info,
-    sync_naver_stock_dividend_info,
-    sync_yahoo_dividend_info,
-)
+from app.services.dividend_fetcher import fetch_ticker_dividend_info
 from app.services.goal_recommendation_service import (
     existing_items_from_positions,
     get_goal_recommendation,
@@ -62,7 +56,6 @@ from app.services.rebalancing.service import (
     analyze_rebalancing,
     compute_portfolio_drift_summary,
 )
-from app.services.yahoo_price import to_yf_symbol as _to_yahoo_symbol
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
@@ -71,13 +64,22 @@ _DIVIDEND_FETCH_CONCURRENCY = 8  # yfinance 가격 조회와 별개 I/O이므로
 
 
 async def _collect_dividend_map(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    redis,
     portfolio: Portfolio,
     base_dividend_map: dict,
 ) -> dict:
-    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Naver/Yahoo에서 보완한다."""
+    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Redis 캐시(TTL_DIVIDEND_INFO=24h) 경유로 보완한다.
+
+    보유 종목 배당 집계(get_ticker_dividend_summary)가 쓰는 것과 동일한 (ticker, market) 단위
+    캐시·멀티소스 폴백 체인(fetch_ticker_dividend_info)을 재사용한다.
+    """
     dividend_map = dict(base_dividend_map)
-    loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
+    kis_creds = await get_kis_user_credentials(user_id, db)
+    dart_key = await fetch_dart_api_key(user_id, db)
+    overrides = await load_user_dividend_overrides(user_id, db)
 
     async def _fetch_one(raw_item) -> None:
         ticker = str(_item_attr(raw_item, "ticker"))
@@ -87,30 +89,17 @@ async def _collect_dividend_map(
         key = (ticker, market)
         if key in dividend_map:
             return
-        is_korean = market.upper() in DOMESTIC_MARKETS
         try:
-            async with sem:
-                if is_korean:
-                    is_etf = is_korean_etf(ticker, market)
-                    fn = sync_naver_etf_dividend_info if is_etf else sync_naver_stock_dividend_info
-                    info = await loop.run_in_executor(None, partial(fn, ticker))
-                    if info["dividend_yield"] > 0:
-                        dividend_map[key] = {
-                            "ticker": ticker,
-                            "market": market,
-                            "dividend_yield": info["dividend_yield"] * 100,
-                            "estimated_annual_krw": 0.0,
-                        }
-                else:
-                    yahoo_sym = _to_yahoo_symbol(ticker, market)
-                    info = await loop.run_in_executor(None, partial(sync_yahoo_dividend_info, yahoo_sym))
-                    if info["dividend_yield"] > 0:
-                        dividend_map[key] = {
-                            "ticker": ticker,
-                            "market": market,
-                            "dividend_yield": info["dividend_yield"] * 100,
-                            "estimated_annual_krw": 0.0,
-                        }
+            yield_decimal, _dps, _months, _ex_dividend_date = await fetch_ticker_dividend_info(
+                ticker, market, redis, sem, kis_creds, dart_key, overrides
+            )
+            if yield_decimal > 0:
+                dividend_map[key] = {
+                    "ticker": ticker,
+                    "market": market,
+                    "dividend_yield": yield_decimal * 100,
+                    "estimated_annual_krw": 0.0,
+                }
         except Exception as e:
             logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
 
@@ -196,7 +185,7 @@ async def analyze_portfolio(
 
     base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
-    dividend_map = await _collect_dividend_map(portfolio, base_dividend_map)
+    dividend_map = await _collect_dividend_map(current_user.id, db, redis, portfolio, base_dividend_map)
 
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))

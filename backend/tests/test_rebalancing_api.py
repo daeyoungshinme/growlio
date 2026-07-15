@@ -462,3 +462,74 @@ class TestBrokerBalance:
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
+
+
+class TestCollectDividendMap:
+    """_collect_dividend_map이 fetch_ticker_dividend_info(캐시된 멀티소스 폴백)에
+    올바르게 위임하는지 검증 — Naver/Yahoo 직접 호출 시절의 회귀 방지용."""
+
+    @staticmethod
+    def _make_portfolio(items):
+        return SimpleNamespace(items=items)
+
+    async def test_skips_cash_and_property_and_existing_tickers(self):
+        from app.api.v1.rebalancing import _collect_dividend_map
+
+        portfolio = self._make_portfolio(
+            [
+                {"ticker": "CASH", "market": "KRW"},
+                {"ticker": "101", "market": "KR_PROPERTY"},
+                {"ticker": "AAPL", "market": "NASDAQ"},  # 이미 base_dividend_map에 존재
+            ]
+        )
+        base_map = {("AAPL", "NASDAQ"): {"ticker": "AAPL", "market": "NASDAQ", "dividend_yield": 0.5}}
+
+        with (
+            patch("app.api.v1.rebalancing.get_kis_user_credentials", new_callable=AsyncMock, return_value=None),
+            patch("app.api.v1.rebalancing.fetch_dart_api_key", new_callable=AsyncMock, return_value=""),
+            patch("app.api.v1.rebalancing.load_user_dividend_overrides", new_callable=AsyncMock, return_value={}),
+            patch("app.api.v1.rebalancing.fetch_ticker_dividend_info", new_callable=AsyncMock) as mock_fetch,
+        ):
+            result = await _collect_dividend_map(uuid.uuid4(), MagicMock(), AsyncMock(), portfolio, base_map)
+
+        mock_fetch.assert_not_called()
+        assert result == base_map
+
+    async def test_fetches_new_ticker_once_and_scales_yield_to_percent(self):
+        from app.api.v1.rebalancing import _collect_dividend_map
+
+        portfolio = self._make_portfolio([{"ticker": "SPY", "market": "NYSE"}])
+        kis_creds = {"app_key": "x"}
+        dart_key = "dart-key"
+        overrides = {("SPY", "NYSE"): [3, 6, 9, 12]}
+
+        with (
+            patch(
+                "app.api.v1.rebalancing.get_kis_user_credentials",
+                new_callable=AsyncMock,
+                return_value=kis_creds,
+            ),
+            patch("app.api.v1.rebalancing.fetch_dart_api_key", new_callable=AsyncMock, return_value=dart_key),
+            patch(
+                "app.api.v1.rebalancing.load_user_dividend_overrides",
+                new_callable=AsyncMock,
+                return_value=overrides,
+            ),
+            patch(
+                "app.api.v1.rebalancing.fetch_ticker_dividend_info",
+                new_callable=AsyncMock,
+                return_value=(0.015, 3.5, [3, 6, 9, 12], "2026-03-15"),
+            ) as mock_fetch,
+        ):
+            redis = AsyncMock()
+            result = await _collect_dividend_map(uuid.uuid4(), MagicMock(), redis, portfolio, {})
+
+        mock_fetch.assert_called_once()
+        call_args = mock_fetch.call_args.args
+        assert call_args[0] == "SPY"
+        assert call_args[1] == "NYSE"
+        assert call_args[2] is redis
+        assert call_args[4] == kis_creds
+        assert call_args[5] == dart_key
+        assert call_args[6] == overrides
+        assert result[("SPY", "NYSE")]["dividend_yield"] == 1.5

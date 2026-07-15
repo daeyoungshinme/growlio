@@ -177,7 +177,12 @@ export default function RebalancingPage() {
                 </Suspense>
               </ErrorBoundary>
             )}
-            {/* 목표 역산 추천 — 진단탭 내 가장 무거운 계산(최대 15개 조합 최적화)이라 아래로 배치 */}
+          </>
+        )}
+
+        {/* ── 포트폴리오 탭: 목표 역산 추천 + 목록 관리 + 분석/실행 ── */}
+        {localTab === "포트폴리오" && (
+          <>
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RecommendationCard
@@ -185,12 +190,6 @@ export default function RebalancingPage() {
                 />
               </Suspense>
             </ErrorBoundary>
-          </>
-        )}
-
-        {/* ── 포트폴리오 탭: 목록 관리 + 분석/실행 ── */}
-        {localTab === "포트폴리오" && (
-          <>
             <Suspense fallback={<SkeletonCard />}>
               <PortfolioManageTab
                 selectedPortfolioId={portfolioId}

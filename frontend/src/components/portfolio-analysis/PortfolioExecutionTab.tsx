@@ -18,7 +18,7 @@ interface Props {
 export default function PortfolioExecutionTab({ portfolioId }: Props) {
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(null);
 
-  // 진단 탭의 "목표 포트폴리오에 적용" CTA에서 넘어온 경우 실행 모달을 자동으로 연다.
+  // 추천 비중 카드의 "목표 포트폴리오에 적용" CTA 또는 푸시 알림 딥링크에서 넘어온 경우 실행 모달을 자동으로 연다.
   const [searchParams, setSearchParams] = useSearchParams();
   const [autoOpenExecution] = useState(() => searchParams.get("openExecution") === "1");
 
