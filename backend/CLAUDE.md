@@ -137,7 +137,7 @@ API Request
         ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution)
         ├── transactions.py   # 입출금/배당 내역 CRUD
         ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
-        ├── economic_indicators.py  # 미국 경제지표 + FRED 캘린더 (/economic-indicators) — CPI/Core CPI 요약(`/inflation-summary`)은 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 그 외 전체 지표 목록/구독/알림 job은 프론트 미연동
+        ├── economic_indicators.py  # 미국 CPI/Core CPI 인플레이션 요약(GET /economic-indicators/inflation-summary) — 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 이 엔드포인트만 존재 (지표 목록/구독/캘린더/알림 job은 프론트 미연동이라 제거됨)
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
@@ -259,7 +259,6 @@ limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/m
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
   ├── dca_auto_buy.py         # 매일 09:00 KST DCA 자동매수
-  ├── economic_indicator_sync.py  # 08:00 KST 경제지표 갱신 + 08:05 KST 알림 체크
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송

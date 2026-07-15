@@ -116,7 +116,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
               └── Page 컴포넌트
 ```
 
-> `api/economicIndicators.ts`는 백엔드 `/economic-indicators` 라우터 중 `/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage`의 `InflationSummaryCard`가 소비. 그 외 전체 지표 목록·구독·캘린더 엔드포인트는 여전히 프론트 미연동.
+> `api/economicIndicators.ts`는 백엔드 `/economic-indicators/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage`의 `InflationSummaryCard`가 소비. 백엔드에는 이 엔드포인트만 존재함(과거 프론트 미연동이던 지표 목록·구독·캘린더 엔드포인트는 제거됨).
 
 **hooks/**
 - `useExchangeRate.ts` — 환율 조회

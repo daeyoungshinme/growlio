@@ -8,17 +8,12 @@ from typing import Any
 
 import httpx
 import structlog
-from sqlalchemy import select
 
 from app.config import settings
-from app.models.indicator_subscription import IndicatorSubscription
 from app.utils.cache_keys import (
     TTL_INDICATOR_HISTORY,
-    TTL_INDICATOR_LATEST,
     economic_indicator_history_key,
-    economic_indicator_latest_key,
     get_cached_json,
-    invalidate_user_caches,
     set_cached_json,
 )
 
@@ -228,59 +223,6 @@ def _parse_fred_obs(obs: list[dict]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-async def fetch_indicator_latest(code: str, redis=None) -> dict[str, Any] | None:
-    """지표의 최신값 + 전월값 반환, Redis 1시간 캐시."""
-    meta = INDICATORS.get(code)
-    if not meta:
-        return None
-
-    cache_key = economic_indicator_latest_key(code)
-    if (hit := await get_cached_json(redis, cache_key)) is not None:
-        return hit
-
-    raw = await _fred_get_observations(meta["series"], limit=3)
-    points = _parse_fred_obs(raw)
-
-    if not points:
-        return None
-
-    latest = points[-1]
-    previous = points[-2] if len(points) >= 2 else None
-
-    change = None
-    change_pct = None
-    if previous and previous["value"]:
-        change = latest["value"] - previous["value"]
-        change_pct = change / previous["value"] * 100
-
-    result: dict[str, Any] = {
-        "code": code,
-        "name": meta["name"],
-        "name_en": meta["name_en"],
-        "unit": meta["unit"],
-        "frequency": meta["frequency"],
-        "description": meta["description"],
-        "latest_value": latest["value"],
-        "latest_date": latest["date"],
-        "previous_value": previous["value"] if previous else None,
-        "previous_date": previous["date"] if previous else None,
-        "change": change,
-        "change_pct": change_pct,
-    }
-
-    await set_cached_json(redis, cache_key, result, TTL_INDICATOR_LATEST)
-    return result
-
-
-async def fetch_all_indicators(redis=None) -> list[dict[str, Any]]:
-    """모든 지표의 최신값 목록 반환."""
-    import asyncio
-
-    tasks = [fetch_indicator_latest(code, redis) for code in INDICATORS]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-    return [r for r in results if isinstance(r, dict)]
-
-
 _INFLATION_CODES = ("CPI_US", "CORE_CPI_US")
 
 
@@ -348,62 +290,3 @@ async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> li
 
     await set_cached_json(redis, cache_key, result, TTL_INDICATOR_HISTORY)
     return result
-
-
-# ---------------------------------------------------------------------------
-# 구독 관리
-# ---------------------------------------------------------------------------
-
-
-async def get_user_subscriptions(user_id, db) -> list[str]:
-    """사용자가 구독 중인 indicator_code 목록."""
-    result = await db.execute(
-        select(IndicatorSubscription.indicator_code).where(IndicatorSubscription.user_id == user_id)
-    )
-    return [row[0] for row in result.all()]
-
-
-async def subscribe_indicator(user_id, code: str, db) -> None:
-    """경제지표 알림 구독 추가. 이미 구독 중이면 무시."""
-    if code not in INDICATORS:
-        raise ValueError(f"지원하지 않는 지표 코드: {code}")
-
-    existing = await db.scalar(
-        select(IndicatorSubscription).where(
-            IndicatorSubscription.user_id == user_id,
-            IndicatorSubscription.indicator_code == code,
-        )
-    )
-    if existing:
-        return
-
-    db.add(IndicatorSubscription(user_id=user_id, indicator_code=code))
-    await db.commit()
-
-
-async def unsubscribe_indicator(user_id, code: str, db) -> None:
-    """경제지표 알림 구독 해제."""
-    existing = await db.scalar(
-        select(IndicatorSubscription).where(
-            IndicatorSubscription.user_id == user_id,
-            IndicatorSubscription.indicator_code == code,
-        )
-    )
-    if existing:
-        await db.delete(existing)
-        await db.commit()
-
-
-async def sync_all_to_cache(redis) -> dict[str, dict[str, Any]]:
-    """모든 지표 최신값을 FRED/ECOS에서 강제 갱신 후 반환."""
-    import asyncio
-
-    await invalidate_user_caches(redis, *[economic_indicator_latest_key(c) for c in INDICATORS])
-
-    results = {}
-    tasks = [(code, fetch_indicator_latest(code, redis)) for code in INDICATORS]
-    gathered = await asyncio.gather(*[t for _, t in tasks], return_exceptions=True)
-    for (code, _), result in zip(tasks, gathered, strict=False):
-        if isinstance(result, dict):
-            results[code] = result
-    return results

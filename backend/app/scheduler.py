@@ -117,22 +117,5 @@ def init_scheduler() -> None:
         id="goal_achievement_check_daily",
         replace_existing=True,
     )
-    from app.jobs.economic_indicator_sync import (
-        run_economic_indicator_alert_check,
-        run_economic_indicator_sync,
-    )
-
-    scheduler.add_job(
-        run_economic_indicator_sync,
-        CronTrigger(hour=8, minute=0, timezone="Asia/Seoul"),
-        id="economic_indicator_sync_daily",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_economic_indicator_alert_check,
-        CronTrigger(hour=8, minute=5, timezone="Asia/Seoul"),
-        id="economic_indicator_alert_check_daily",
-        replace_existing=True,
-    )
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

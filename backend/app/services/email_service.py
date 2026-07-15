@@ -23,7 +23,6 @@ from app.services.email_templates import (
     account_deletion_template,
     exchange_rate_alert_template,
     goal_achievement_template,
-    indicator_alert_template,
     market_signal_change_template,
     monthly_report_template,
     password_reset_template,
@@ -340,24 +339,6 @@ async def send_account_deletion_email(to_email: str) -> bool:
         return True
     except Exception as e:
         logger.error("account_deletion_email_failed", to=to_email, error=str(e))
-        return False
-
-
-async def send_indicator_alert_email(
-    to_email: str,
-    indicators: list[dict],
-) -> bool:
-    """경제지표 발표 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_email", to=to_email)
-        return False
-    subject, html = indicator_alert_template(indicators)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("indicator_alert_email_sent", to=to_email, count=len(indicators))
-        return True
-    except Exception as e:
-        logger.error("indicator_alert_email_failed", to=to_email, error=str(e))
         return False
 
 

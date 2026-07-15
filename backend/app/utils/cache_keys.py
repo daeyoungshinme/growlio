@@ -36,7 +36,6 @@ TTL_PORTFOLIO_OVERVIEW = 1800  # 포트폴리오 overview 30분
 TTL_PORTFOLIO_LIST = 300  # 포트폴리오 목록 5분
 TTL_ACCOUNT_DETAIL = 300  # 계좌 상세 5분
 TTL_EXCHANGE_RATE_ALERTS = 300  # 환율 알림 목록 5분
-TTL_INDICATOR_LATEST = 3600  # 경제지표 최신값 1시간
 TTL_INDICATOR_HISTORY = 21600  # 경제지표 시계열 6시간
 TTL_INDICATOR_CALENDAR = 86400  # 경제지표 발표 일정 24시간
 TTL_MARKET_SIGNAL = 3600  # 복합 시장 신호 1시간 (전체 신호 정상 조회 시)
@@ -177,10 +176,6 @@ def goal_recommendation_key(user_id: uuid.UUID) -> str:
 
 def goal_recommendation_horizon_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}goal_recommendation_horizon:{user_id}"
-
-
-def economic_indicator_latest_key(code: str) -> str:
-    return f"{_env_prefix()}economic:latest:{code}"
 
 
 def economic_indicator_history_key(code: str, months: int) -> str:

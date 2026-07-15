@@ -20,7 +20,6 @@ from app.utils.cache_keys import (
     dividend_summary_key,
     dividend_ticker_summary_key,
     economic_indicator_calendar_key,
-    economic_indicator_latest_key,
     has_overseas_key,
     invalidate_rebalancing_strategy_cache,
     invalidate_user_caches,
@@ -108,10 +107,6 @@ class TestCacheKeyBuilders:
         uid = uuid.uuid4()
         key = portfolio_list_key(uid)
         assert str(uid) in key
-
-    def test_economic_indicator_latest_key(self, override_settings):
-        key = economic_indicator_latest_key("GDP")
-        assert "GDP" in key
 
     def test_economic_indicator_calendar_key(self, override_settings):
         key = economic_indicator_calendar_key()

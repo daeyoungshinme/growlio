@@ -618,48 +618,6 @@ def account_deletion_template() -> tuple[str, str]:
     return subject, html
 
 
-def indicator_alert_template(indicators: list[dict]) -> tuple[str, str]:
-    if len(indicators) > 1:
-        subject = f"[Growlio] 경제지표 발표 알림 — {indicators[0]['name']} 외 {len(indicators) - 1}개"
-    else:
-        subject = f"[Growlio] 경제지표 발표 알림 — {indicators[0]['name']}"
-
-    rows_html = ""
-    for ind in indicators:
-        latest = ind.get("latest_value")
-        previous = ind.get("previous_value")
-        change_pct = ind.get("change_pct")
-        unit = ind.get("unit", "")
-        date_str = ind.get("latest_date", "")
-        change_str = ""
-        if change_pct is not None:
-            arrow = "▲" if change_pct >= 0 else "▼"
-            color = "#dc2626" if change_pct >= 0 else "#2563eb"
-            change_str = f" <span style='color:{color};'>{arrow}{abs(change_pct):.2f}%</span>"
-        rows_html += (
-            f"<tr>"
-            f"<td style='padding:10px 8px;background:#f8fafc;font-weight:600;"
-            f"border-bottom:1px solid #e2e8f0;'>{ind.get('name', '')}</td>"
-            f"<td style='padding:10px 8px;border-bottom:1px solid #e2e8f0;'>"
-            f"<strong>{latest} {unit}</strong>{change_str}<br>"
-            f"<span style='font-size:12px;color:#94a3b8;'>전월 {previous} {unit} | {date_str}</span>"
-            f"</td></tr>"
-        )
-
-    body = (
-        "<p style='color:#64748b;font-size:14px;margin-top:0;'>구독하신 경제지표의 최신 발표값을 안내드립니다.</p>"
-        f"<table style='width:100%;border-collapse:collapse;margin-top:16px;'>{rows_html}</table>"
-    )
-    html = _email_div(
-        "📊 경제지표 발표 알림",
-        "#1d4ed8",
-        body,
-        "Growlio 앱에서 상세 추이 차트를 확인하실 수 있습니다.<br>"
-        "알림 설정은 앱 &gt; 시장 &gt; 구독 관리에서 변경하세요.",
-    )
-    return subject, html
-
-
 _SIGNAL_LEVEL_LABEL: dict[str, str] = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
 _SIGNAL_LEVEL_COLOR: dict[str, str] = {"GREEN": "#16a34a", "YELLOW": "#d97706", "RED": "#dc2626"}
 
