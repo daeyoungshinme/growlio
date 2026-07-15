@@ -12,13 +12,13 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   AlertCircle,
   AlertTriangle,
+  Anchor,
   Bell,
   CheckCircle,
   Edit2,
   GripVertical,
   Loader2,
   Plus,
-  Target,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -205,8 +205,8 @@ const PortfolioCard = memo(function PortfolioCard({
         <button
           onClick={(e) => onToggleTarget(e, p)}
           disabled={isTargetPending}
-          aria-label="목표 포트폴리오 지정"
-          title={tState === "full" ? "목표 지정 해제" : "이 포트폴리오를 목표로 지정"}
+          aria-label="기준 포트폴리오 지정"
+          title={tState !== "none" ? "기준 포트폴리오 해제" : "이 포트폴리오를 기준으로 지정"}
           className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
             tState === "full"
               ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"
@@ -215,8 +215,8 @@ const PortfolioCard = memo(function PortfolioCard({
                 : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
           }`}
         >
-          <Target size={11} />
-          <span>{tState === "full" ? "목표" : tState === "partial" ? "일부" : "목표 지정"}</span>
+          <Anchor size={11} />
+          <span>{tState === "full" ? "기준" : tState === "partial" ? "일부" : "기준 지정"}</span>
         </button>
         <button
           onClick={(e) => {
@@ -299,10 +299,11 @@ export default function PortfolioListSection({
     const relevant = stockAccounts.filter((a) => linkedIds.includes(a.id));
     if (relevant.length === 0) return;
     const currentState = getPortfolioTargetState(p, stockAccounts);
-    if (currentState === "full") {
+    if (currentState === "full" || currentState === "partial") {
+      const currentlyTargeted = stockAccounts.filter((a) => a.target_portfolio_id === p.id);
       onBatchSetTarget(
         null,
-        relevant.map((a) => a.id),
+        currentlyTargeted.map((a) => a.id),
       );
       return;
     }
@@ -318,7 +319,7 @@ export default function PortfolioListSection({
         })
         .join(", ");
       toast(
-        `다음 계좌가 이미 다른 포트폴리오를 목표로 지정하고 있습니다: ${conflictNames}`,
+        `다음 계좌가 이미 다른 포트폴리오를 기준으로 지정하고 있습니다: ${conflictNames}`,
         "error",
       );
       return;
@@ -346,7 +347,7 @@ export default function PortfolioListSection({
           <div className="flex items-center gap-1.5 mb-2">
             <AlertCircle size={13} className="text-amber-500 flex-shrink-0" />
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              목표 미지정 계좌
+              기준 포트폴리오 미지정 계좌
             </p>
           </div>
           <div className="flex flex-wrap gap-1">
@@ -360,7 +361,7 @@ export default function PortfolioListSection({
             ))}
           </div>
           <p className="text-xs text-amber-600/70 dark:text-amber-500/70 mt-1.5">
-            포트폴리오 카드에서 목표 지정 버튼을 클릭해 지정하세요.
+            포트폴리오 카드에서 기준 포트폴리오 지정 버튼을 클릭해 지정하세요.
           </p>
         </div>
       )}
@@ -400,7 +401,7 @@ export default function PortfolioListSection({
           <div className="text-2xl">🎯</div>
           <div>
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              목표 포트폴리오를 만들어 보세요
+              첫 포트폴리오를 만들어 보세요
             </p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
               종목과 목표 비중을 설정하면 현재 보유 현황과 비교해 리밸런싱 가이드를 제공합니다.

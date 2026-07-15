@@ -192,25 +192,20 @@ describe("MarketSignalBanner", () => {
     expect(screen.getByText(/일부 데이터 없음/)).toBeDefined();
   });
 
-  it("shows composite signal alert toggle once loaded", async () => {
-    renderBanner();
-    expect(await screen.findByLabelText("시장 위험 신호 알림 설정 켜기/끄기")).toBeDefined();
-  });
-
-  it("shows the on/off state text next to the toggle", async () => {
+  it("shows the on/off state text for the composite signal alert", async () => {
     renderBanner();
     expect(await screen.findByText("받는 중")).toBeDefined();
   });
 
-  it("shows a labeled link back to the settings page for full explanation", async () => {
+  it("shows a labeled link to the settings page to change the alert (read-only here)", async () => {
     renderBanner();
-    const link = await screen.findByText("설정 자세히 보기");
+    const link = await screen.findByText("설정에서 켜기/끄기 →");
     expect(link.getAttribute("href")).toBe("/settings?atab=시장 신호 알림");
   });
 
-  it("labels the toggle row so it isn't a bare checkbox", async () => {
+  it("labels the alert status row", async () => {
     renderBanner();
-    expect(await screen.findByText("시장 위험 신호 알림 설정")).toBeDefined();
+    expect(await screen.findByText("시장 위험 신호 알림")).toBeDefined();
   });
 
   it("shows the exchange rate signal row", () => {
@@ -459,7 +454,11 @@ describe("RebalancingHistoryTab", () => {
 
   it("renders without crash", () => {
     mockFetchRecentPlanLegs.mockResolvedValue([]);
-    renderWithProviders(<RebalancingHistoryTab />);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
     // Shows loading or empty state
     expect(document.body).toBeDefined();
   });
@@ -494,7 +493,11 @@ describe("RebalancingHistoryTab", () => {
 
   it("expands a pending plan row to show item detail", async () => {
     mockFetchRecentPlanLegs.mockResolvedValue([buyLeg]);
-    renderWithProviders(<RebalancingHistoryTab />);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
 
     const toggle = await screen.findByText("매수 대기");
     expect(screen.queryByText("70,000")).toBeNull();
@@ -511,7 +514,11 @@ describe("RebalancingHistoryTab", () => {
       status: "EXECUTED",
       message: "매수 주문이 실행되었습니다",
     });
-    renderWithProviders(<RebalancingHistoryTab />);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
 
     const executeButton = await screen.findByText("지금 매수 실행");
     fireEvent.click(executeButton);
@@ -531,7 +538,11 @@ describe("RebalancingHistoryTab", () => {
       status: "CANCELED",
       message: "매수 대기가 취소되었습니다",
     });
-    renderWithProviders(<RebalancingHistoryTab />);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingHistoryTab />
+      </MemoryRouter>,
+    );
 
     const cancelButton = await screen.findByText("매수 취소");
     fireEvent.click(cancelButton);

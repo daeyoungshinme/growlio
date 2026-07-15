@@ -31,6 +31,11 @@ export function resolvePushDeepLink(
       return "/rebalancing?rtab=이력";
     case "MARKET_SIGNAL":
       return "/rebalancing?rtab=진단";
+    case "GOAL_ASSET":
+    case "GOAL_DEPOSIT":
+      return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
+    case "GOAL_DIVIDEND":
+      return `/invest-plan?tab=${encodeURIComponent("배당 계획")}`;
     default:
       return null;
   }

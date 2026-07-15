@@ -1,7 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import PageLoader from "@/components/common/PageLoader";
 import Tabs from "@/components/common/Tabs";
+import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSETS_TOP_TABS, type AssetsTopTab } from "@/constants/tabs";
 
 const AssetManagementContent = lazy(() => import("./AssetManagementPage"));
@@ -25,6 +26,9 @@ export default function AssetsPage() {
     );
   };
 
+  const tabContentRef = useRef<HTMLDivElement>(null);
+  useSwipeTabs(tabContentRef, ASSETS_TOP_TABS, activeTab, handleTabChange);
+
   return (
     <div>
       <Tabs
@@ -34,9 +38,11 @@ export default function AssetsPage() {
         variant="pill"
         className="mb-6"
       />
-      <Suspense fallback={<PageLoader />}>
-        {activeTab === "투자현황" ? <PortfolioContent /> : <AssetManagementContent />}
-      </Suspense>
+      <div ref={tabContentRef}>
+        <Suspense fallback={<PageLoader />}>
+          {activeTab === "투자현황" ? <PortfolioContent /> : <AssetManagementContent />}
+        </Suspense>
+      </div>
     </div>
   );
 }

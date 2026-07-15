@@ -5,6 +5,7 @@ import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
 import { fetchCompositeSignalStatus } from "@/api/rebalancing";
+import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -89,6 +90,10 @@ export default function RebalancingPage() {
     },
     [setSearchParams],
   );
+
+  const [prefillItems, setPrefillItems] = useState<PortfolioItem[] | null>(null);
+  const [prefillName, setPrefillName] = useState("");
+  const [prefillAccountIds, setPrefillAccountIds] = useState<string[] | null>(null);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
@@ -187,6 +192,11 @@ export default function RebalancingPage() {
               <Suspense fallback={<SkeletonCard />}>
                 <RecommendationCard
                   onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
+                  onCreatePortfolio={(items, name, accountIds) => {
+                    setPrefillItems(items);
+                    setPrefillName(name);
+                    setPrefillAccountIds(accountIds ?? null);
+                  }}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -194,6 +204,13 @@ export default function RebalancingPage() {
               <PortfolioManageTab
                 selectedPortfolioId={portfolioId}
                 onAnalyze={handlePortfolioChange}
+                prefillItems={prefillItems}
+                prefillName={prefillName}
+                prefillAccountIds={prefillAccountIds}
+                onPrefillConsumed={() => {
+                  setPrefillItems(null);
+                  setPrefillAccountIds(null);
+                }}
               />
             </Suspense>
             {portfolioId && (

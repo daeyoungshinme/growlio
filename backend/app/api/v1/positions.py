@@ -20,6 +20,7 @@ from app.schemas.asset import ManualPosition, PositionListResponse
 from app.services._position_queries import fetch_manual_positions
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
+from app.utils.cache_keys import invalidate_asset_account_caches
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_position_pnl
 from app.utils.redis_lock import redis_lock
@@ -147,6 +148,7 @@ async def save_positions(
             db.add(_build(p, snap.id))
 
         await db.commit()
+        await invalidate_asset_account_caches(redis, account.user_id, account.id)
         raw = [p.model_dump() for p in positions]
         return _enrich_positions(raw)
 
@@ -218,5 +220,6 @@ async def sync_position_prices(
         )
         await sync_snapshot_positions(db, snapshot_id=snap.id, account_id=account.id, positions=list(pos_objs))
         await db.commit()
+        await invalidate_asset_account_caches(redis, account.user_id, account.id)
 
         return _enrich_positions(updated_dicts)

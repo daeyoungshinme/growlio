@@ -246,10 +246,43 @@ describe("RecommendationCard", () => {
 
       expect(
         await screen.findByText(
-          "포트폴리오 탭에서 목표 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
+          "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
         ),
       ).toBeDefined();
       expect(screen.queryByText(/에 적용/)).toBeNull();
+    });
+
+    it("offers a create-new-portfolio button that reports normalized weights even without a target portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({
+          recommended_items: [
+            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 33.33 },
+            {
+              ticker: "SCHD",
+              name: "Schwab US Dividend Equity ETF",
+              market: "NYSE",
+              weight: 66.67,
+            },
+          ],
+        }),
+      );
+      const onCreatePortfolio = vi.fn();
+      renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
+
+      fireEvent.click(await screen.findByText("이 비중으로 새 포트폴리오 만들기"));
+
+      expect(onCreatePortfolio).toHaveBeenCalledWith(
+        [
+          { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 33.3 },
+          {
+            ticker: "SCHD",
+            name: "Schwab US Dividend Equity ETF",
+            market: "NYSE",
+            weight: 66.7,
+          },
+        ],
+        "추천 포트폴리오",
+      );
     });
 
     it("applies normalized recommended weights to the single target portfolio and reports success", async () => {
@@ -314,7 +347,7 @@ describe("RecommendationCard", () => {
 
       renderWithProviders(<RecommendationCard onApplied={onApplied} />);
 
-      const applyButton = await screen.findByText("목표 포트폴리오에 적용");
+      const applyButton = await screen.findByText("기준 포트폴리오에 적용");
       expect(applyButton.closest("button")).toBeDisabled();
 
       fireEvent.change(screen.getByDisplayValue("포트폴리오 선택"), {
@@ -575,6 +608,247 @@ describe("RecommendationCard", () => {
         await screen.findByText(/포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고/),
       ).toBeDefined();
       expect(screen.queryByText(/에 적용/)).toBeNull();
+    });
+
+    it("offers a create-new-portfolio button for the active horizon even without a matching portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      const onCreatePortfolio = vi.fn();
+      renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      fireEvent.click(await screen.findByText("이 비중으로 새 포트폴리오 만들기"));
+
+      expect(onCreatePortfolio).toHaveBeenCalledWith(
+        [
+          { ticker: "153130", name: "KODEX 단기채권", market: "KOSPI", weight: 60 },
+          { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 40 },
+        ],
+        "단기 추천 포트폴리오",
+        [],
+      );
+    });
+
+    it("passes only the accounts tagged with the active horizon/tax type when creating a new portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ id: "a-match", investment_horizon: "SHORT_TERM", tax_type: "GENERAL" }),
+        makeAccount({
+          id: "a-other-horizon",
+          investment_horizon: "LONG_TERM",
+          tax_type: "GENERAL",
+        }),
+        makeAccount({ id: "a-other-tax", investment_horizon: "SHORT_TERM", tax_type: "ISA" }),
+        makeAccount({ id: "a-untagged" }),
+      ]);
+      const onCreatePortfolio = vi.fn();
+      renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      fireEvent.click(await screen.findByText("이 비중으로 새 포트폴리오 만들기"));
+
+      expect(onCreatePortfolio).toHaveBeenCalledWith(expect.anything(), expect.anything(), [
+        "a-match",
+      ]);
+    });
+
+    it("does not offer a create-new-portfolio button for cash-equivalent recommendations with no matching CMA account", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({
+            recommended_items: [
+              {
+                ticker: "CASH_EQUIVALENT",
+                name: "현금성 자산 (CMA·파킹통장 등)",
+                market: "CASH",
+                weight: 100,
+              },
+            ],
+            includes_cash_equivalent: true,
+          }),
+        ]),
+      );
+      const onCreatePortfolio = vi.fn();
+      renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      await screen.findByText(/현금성 자산 \(CMA·파킹통장 등\)/);
+
+      expect(screen.queryByText("이 비중으로 새 포트폴리오 만들기")).toBeNull();
+      expect(
+        await screen.findByText(/CMA\/파킹통장 계좌에.*기간 태그를 지정하면 자동 적용할 수 있어요/),
+      ).toBeDefined();
+    });
+
+    it("offers apply/create controls and links the matching CMA account when one is tagged for the horizon", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({
+            recommended_items: [
+              {
+                ticker: "CASH_EQUIVALENT",
+                name: "현금성 자산 (CMA·파킹통장 등)",
+                market: "CASH",
+                weight: 100,
+              },
+            ],
+            includes_cash_equivalent: true,
+          }),
+        ]),
+      );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({
+          id: "bank-1",
+          name: "토스뱅크 파킹통장",
+          asset_type: "BANK_ACCOUNT",
+          investment_horizon: "SHORT_TERM",
+          tax_type: "GENERAL",
+        }),
+      ]);
+      const onCreatePortfolio = vi.fn();
+      renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      await screen.findByText(/현금성 자산 \(CMA·파킹통장 등\)/);
+
+      expect(
+        await screen.findByText(/현금성 자산 반영을 위해.*토스뱅크 파킹통장.*계좌가 포트폴리오에/),
+      ).toBeDefined();
+
+      fireEvent.click(await screen.findByText("이 비중으로 새 포트폴리오 만들기"));
+
+      expect(onCreatePortfolio).toHaveBeenCalledWith(
+        [
+          {
+            ticker: "CASH_EQUIVALENT",
+            name: "현금성 자산 (CMA·파킹통장 등)",
+            market: "CASH",
+            weight: 100,
+          },
+        ],
+        "단기 추천 포트폴리오",
+        ["bank-1"],
+      );
+    });
+
+    it("merges the matching CMA account into account_ids when applying a cash-equivalent recommendation to an account-scoped portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({
+            recommended_items: [
+              {
+                ticker: "CASH_EQUIVALENT",
+                name: "현금성 자산 (CMA·파킹통장 등)",
+                market: "CASH",
+                weight: 100,
+              },
+            ],
+            includes_cash_equivalent: true,
+          }),
+        ]),
+      );
+      const portfolio = makePortfolio({
+        id: "target-1",
+        name: "단기 포트폴리오",
+        account_ids: ["stock-1"],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([
+        makeAccount({
+          id: "stock-1",
+          target_portfolio_id: "target-1",
+          investment_horizon: "SHORT_TERM",
+        }),
+        makeAccount({
+          id: "bank-1",
+          asset_type: "BANK_ACCOUNT",
+          investment_horizon: "SHORT_TERM",
+          tax_type: "GENERAL",
+        }),
+      ]);
+      updatePortfolio.mockResolvedValue({ ...portfolio, items: [] });
+      const onApplied = vi.fn();
+
+      renderWithProviders(<RecommendationCard onApplied={onApplied} />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      fireEvent.click(await screen.findByText("단기 포트폴리오에 적용"));
+      fireEvent.click(await screen.findByText("적용"));
+
+      await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
+      expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        items: [
+          {
+            ticker: "CASH_EQUIVALENT",
+            name: "현금성 자산 (CMA·파킹통장 등)",
+            market: "CASH",
+            weight: 100,
+          },
+        ],
+        account_ids: ["stock-1", "bank-1"],
+      });
+      await waitFor(() => expect(onApplied).toHaveBeenCalledWith("target-1"));
+    });
+
+    it("does not send account_ids when applying a cash-equivalent recommendation to an all-accounts portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({
+            recommended_items: [
+              {
+                ticker: "CASH_EQUIVALENT",
+                name: "현금성 자산 (CMA·파킹통장 등)",
+                market: "CASH",
+                weight: 100,
+              },
+            ],
+            includes_cash_equivalent: true,
+          }),
+        ]),
+      );
+      const portfolio = makePortfolio({
+        id: "target-1",
+        name: "단기 포트폴리오",
+        account_ids: null,
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([
+        makeAccount({
+          id: "stock-1",
+          target_portfolio_id: "target-1",
+          investment_horizon: "SHORT_TERM",
+        }),
+        makeAccount({
+          id: "bank-1",
+          asset_type: "BANK_ACCOUNT",
+          investment_horizon: "SHORT_TERM",
+          tax_type: "GENERAL",
+        }),
+      ]);
+      updatePortfolio.mockResolvedValue({ ...portfolio, items: [] });
+
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      fireEvent.click(await screen.findByText("단기 포트폴리오에 적용"));
+      fireEvent.click(await screen.findByText("적용"));
+
+      await waitFor(() => expect(updatePortfolio).toHaveBeenCalled());
+      expect(updatePortfolio).toHaveBeenCalledWith("target-1", {
+        items: [
+          {
+            ticker: "CASH_EQUIVALENT",
+            name: "현금성 자산 (CMA·파킹통장 등)",
+            market: "CASH",
+            weight: 100,
+          },
+        ],
+      });
     });
 
     it("applies the recommendation to the portfolio inferred from matching account horizon tags", async () => {

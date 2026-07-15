@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import UTC, date, datetime
 
 import structlog
@@ -14,6 +15,7 @@ from app.models.user import User, UserSettings
 from app.redis_client import get_redis
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
+from app.services.push_service import send_push_to_user
 
 logger = structlog.get_logger()
 
@@ -94,6 +96,14 @@ async def _check_user_goals(user: User, settings_row: UserSettings, redis, sem: 
                         )
                         await db.commit()
                         logger.info("goal_asset_alert_sent", user_id=str(user.id), pct=goal_pct)
+                        with contextlib.suppress(Exception):
+                            await send_push_to_user(
+                                user_id=user.id,
+                                title="자산 목표 달성",
+                                body=msg,
+                                fcm_token=settings_row.fcm_token,
+                                data={"type": "GOAL_ASSET"},
+                            )
 
                 if (
                     settings_row.annual_deposit_goal
@@ -123,6 +133,14 @@ async def _check_user_goals(user: User, settings_row: UserSettings, redis, sem: 
                         )
                         await db.commit()
                         logger.info("goal_deposit_alert_sent", user_id=str(user.id), pct=deposit_pct)
+                        with contextlib.suppress(Exception):
+                            await send_push_to_user(
+                                user_id=user.id,
+                                title="입금 목표 달성",
+                                body=msg,
+                                fcm_token=settings_row.fcm_token,
+                                data={"type": "GOAL_DEPOSIT"},
+                            )
 
                 if (
                     settings_row.annual_dividend_goal
@@ -153,6 +171,14 @@ async def _check_user_goals(user: User, settings_row: UserSettings, redis, sem: 
                         )
                         await db.commit()
                         logger.info("goal_dividend_alert_sent", user_id=str(user.id), pct=dividend_pct)
+                        with contextlib.suppress(Exception):
+                            await send_push_to_user(
+                                user_id=user.id,
+                                title="배당 목표 달성",
+                                body=msg,
+                                fcm_token=settings_row.fcm_token,
+                                data={"type": "GOAL_DIVIDEND"},
+                            )
 
         except Exception as e:
             logger.error("goal_achievement_check_failed", user_id=str(user.id), error=str(e))

@@ -102,6 +102,8 @@ async def create_portfolio(
         user_id=current_user.id,
         name=body.name,
         base_type=body.base_type,
+        investment_horizon=body.investment_horizon,
+        tax_type=body.tax_type,
     )
     db.add(portfolio)
     await db.flush()  # id 생성
@@ -167,6 +169,12 @@ async def update_portfolio(
         portfolio.name = body.name
     if body.base_type is not None:
         portfolio.base_type = body.base_type
+    # 명시적으로 null을 보낸 경우(태그 해제)와 필드 미전송(변경 없음)을 구분
+    fields_set = body.model_fields_set
+    if "investment_horizon" in fields_set:
+        portfolio.investment_horizon = body.investment_horizon
+    if "tax_type" in fields_set:
+        portfolio.tax_type = body.tax_type
 
     if body.items is not None:
         await db.execute(delete(PortfolioItem).where(PortfolioItem.portfolio_id == portfolio_id))

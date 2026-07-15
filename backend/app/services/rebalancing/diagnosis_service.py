@@ -14,6 +14,7 @@ from typing import Any
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import CASH_EQUIVALENT_TICKER
 from app.models.user import UserSettings
 from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxImpactItem
 from app.services.market_signal_service import get_market_signal
@@ -31,7 +32,7 @@ RISK_VOLATILITY_MAX_PCT = 20.0
 _ASSUMED_FEE_RATE_DOMESTIC = 0.00015  # 국내 온라인 매매 수수료 대략치 (참고용, 증권사별 상이)
 _ASSUMED_FEE_RATE_OVERSEAS = 0.0025  # 해외 온라인 매매 수수료 대략치 (참고용)
 _TAX_DETAIL_LIMIT = 5
-_EXCLUDED_TICKERS = {"CASH"}
+_EXCLUDED_TICKERS = {"CASH", CASH_EQUIVALENT_TICKER}
 _EXCLUDED_MARKETS = {"KR_PROPERTY"}
 
 _MARKET_NOTES: dict[str, str | None] = {

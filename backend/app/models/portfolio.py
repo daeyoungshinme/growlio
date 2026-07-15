@@ -68,6 +68,11 @@ class Portfolio(Base):
     base_type: Mapped[str] = mapped_column(String(20), nullable=False, default="STOCK_ONLY")
     # AGGREGATE(연결 계좌 전체 합산 1개 알림) | PER_ACCOUNT(연결 계좌마다 독립 알림/AUTO 설정)
     alert_scope: Mapped[str] = mapped_column(String(20), nullable=False, server_default="AGGREGATE")
+    # 명시적으로 지정된 기간/세제유형 태그 — 미지정(null)이면 기준 포트폴리오로 지정된 계좌들의
+    # 태그로부터 추론(전부 동일할 때만). 목표 역산 추천(기간·세제유형별)이 어느 포트폴리오에
+    # 적용될지 판별하는 데 사용
+    investment_horizon: Mapped[str | None] = mapped_column(String(20))
+    tax_type: Mapped[str | None] = mapped_column(String(30))
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

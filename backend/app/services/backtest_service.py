@@ -20,6 +20,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.constants import CASH_EQUIVALENT_TICKER
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.models.portfolio import Portfolio
 from app.schemas.backtest import (
@@ -37,7 +38,7 @@ from app.utils.circuit_breaker import yahoo_circuit
 
 logger = structlog.get_logger()
 
-_BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE"}
+_BACKTEST_SKIP_TICKERS = {"CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER}
 _BACKTEST_SKIP_MARKETS = {"KR_PROPERTY"}
 
 # 테스트 backward-compatibility 별칭

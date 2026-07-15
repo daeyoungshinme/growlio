@@ -30,7 +30,10 @@ export default function TaxHorizonSummarySection({ overview }: Props) {
   });
   const hasIsa = (isaData?.accounts.length ?? 0) > 0;
 
-  const [isOpen, toggleOpen] = useCollapsible(() => window.innerWidth >= 1024);
+  const [isOpen, toggleOpen] = useCollapsible(
+    () => window.innerWidth >= 1024,
+    "growlio:taxHorizonSection:open",
+  );
 
   if (!hasHorizon && !hasIsa && !hasPension) return null;
 

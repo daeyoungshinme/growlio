@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Target, X } from "lucide-react";
+import { Anchor, X } from "lucide-react";
 import { fetchPortfolios } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 
@@ -19,14 +19,14 @@ export default function SetupTargetPortfolioBanner() {
       role="status"
       className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4"
     >
-      <Target
+      <Anchor
         size={20}
         className="mt-0.5 shrink-0 text-blue-500 dark:text-blue-400"
         aria-hidden="true"
       />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-          전체 투자 자산에 대한 목표 포트폴리오를 만들어보세요
+          전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요
         </p>
         <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
           계좌를 선택하지 않으면 전체 투자 자산을 기준으로 목표 비중과 리밸런싱을 관리할 수

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import {
@@ -388,6 +389,15 @@ export default function RebalancingHistoryTab() {
     onError: (e) => toast(extractErrorMessage(e, "처리 중 오류가 발생했습니다"), "error"),
   });
 
+  const alertHistoryLink = (
+    <Link
+      to="/settings?atab=발송 이력"
+      className="block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+    >
+      이 화면은 주문 실행 이력이에요 — 알림 발송 이력은 설정에서 확인 →
+    </Link>
+  );
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -398,16 +408,20 @@ export default function RebalancingHistoryTab() {
 
   if (history.length === 0 && planLegs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-        <div className="text-4xl mb-3">📋</div>
-        <p className="text-sm">아직 실행 이력이 없습니다.</p>
-        <p className="text-xs mt-1">리밸런싱을 실행하면 여기에 기록됩니다.</p>
+      <div className="space-y-4">
+        {alertHistoryLink}
+        <div className="flex flex-col items-center justify-center py-20 text-gray-500">
+          <div className="text-4xl mb-3">📋</div>
+          <p className="text-sm">아직 실행 이력이 없습니다.</p>
+          <p className="text-xs mt-1">리밸런싱을 실행하면 여기에 기록됩니다.</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      {alertHistoryLink}
       {planLegs.length > 0 && (
         <div className="space-y-2">
           <p className="text-xs font-medium text-gray-500">대기중 / 최근 종료된 플랜</p>

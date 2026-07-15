@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle, ChevronDown, Info } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
-import { CASH_TICKER } from "@/constants/assets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
 
 const DEFAULT_THRESHOLD = 5.0;
@@ -50,7 +50,10 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
 
   const { tradeable, maxDrift, driftedCount } = useMemo(() => {
     const tradeable = analysis.items.filter(
-      (i) => i.ticker !== CASH_TICKER && i.market !== "KR_PROPERTY",
+      (i) =>
+        i.ticker !== CASH_TICKER &&
+        i.ticker !== CASH_EQUIVALENT_TICKER &&
+        i.market !== "KR_PROPERTY",
     );
     const maxDrift =
       tradeable.length > 0 ? Math.max(...tradeable.map((i) => Math.abs(i.weight_diff_pct))) : 0;
@@ -61,7 +64,7 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
   const status = getDriftStatus(maxDrift, threshold);
   const cfg = STATUS_CONFIG[status];
 
-  // 이탈 크기 상위 3개 종목 (CASH·KR_PROPERTY 제외)
+  // 이탈 크기 상위 3개 종목 (CASH·KR_PROPERTY·CASH_EQUIVALENT 제외)
   const topDrifted = [...tradeable]
     .sort((a, b) => Math.abs(b.weight_diff_pct) - Math.abs(a.weight_diff_pct))
     .slice(0, 3);

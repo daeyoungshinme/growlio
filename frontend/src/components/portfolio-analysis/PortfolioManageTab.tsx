@@ -13,7 +13,12 @@ import {
   updatePortfolio,
 } from "@/api/portfolios";
 import { fetchDriftSummary, PortfolioDriftSummary } from "@/api/rebalancing";
-import { fetchAccounts, batchSetTargetPortfolio } from "@/api/assets";
+import {
+  fetchAccounts,
+  batchSetTargetPortfolio,
+  type AccountTaxType,
+  type InvestmentHorizon,
+} from "@/api/assets";
 import { fetchRebalancingAlerts } from "@/api/alerts";
 import UnifiedPortfolioEditor from "./UnifiedPortfolioEditor";
 import PortfolioListSection from "./PortfolioListSection";
@@ -32,9 +37,22 @@ import { STALE_TIME } from "@/constants/queryConfig";
 interface Props {
   selectedPortfolioId?: string;
   onAnalyze: (portfolioId: string) => void;
+  /** 추천 비중 카드 등에서 "이 비중으로 새 포트폴리오 만들기"를 눌렀을 때 채울 초기 종목/이름/분석 대상 계좌. */
+  prefillItems?: PortfolioItem[] | null;
+  prefillName?: string;
+  prefillAccountIds?: string[] | null;
+  /** prefillItems를 소비(편집 모달 오픈)한 뒤 부모 state를 비우도록 알린다 — 재오픈 방지. */
+  onPrefillConsumed?: () => void;
 }
 
-export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: Props) {
+export default function PortfolioManageTab({
+  selectedPortfolioId,
+  onAnalyze,
+  prefillItems,
+  prefillName,
+  prefillAccountIds,
+  onPrefillConsumed,
+}: Props) {
   const qc = useQueryClient();
 
   const { data: portfoliosRaw, isLoading } = useQuery({
@@ -105,6 +123,17 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
   const [editingPortfolio, setEditingPortfolio] = useState<Portfolio | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
+  // prefillItems가 있으면(추천 비중 카드에서 "새 포트폴리오 만들기" 클릭) 항상 신규 생성 모드로
+  // 편집 모달을 연다 — editingPortfolio를 별도로 초기화할 필요 없이 렌더 시점에 파생시킨다.
+  const isEditorOpen = editorOpen || !!prefillItems;
+  const editingTarget = prefillItems ? null : editingPortfolio;
+
+  function closeEditor() {
+    setEditorOpen(false);
+    setEditingPortfolio(null);
+    onPrefillConsumed?.();
+  }
+
   // 진단 탭의 "자동화 설정" CTA에서 넘어온 경우 자동화 설정 모달을 마운트 시점에 자동으로 연다.
   const [searchParams, setSearchParams] = useSearchParams();
   const [alertModalPortfolioId, setAlertModalPortfolioId] = useState<string | null>(() =>
@@ -155,10 +184,12 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
       items: PortfolioItem[];
       base_type: string;
       account_ids: string[] | null;
+      investment_horizon: InvestmentHorizon | null;
+      tax_type: AccountTaxType | null;
     }) => createPortfolio(args),
     onSuccess: () => {
       void invalidatePortfolioData(qc);
-      setEditorOpen(false);
+      closeEditor();
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 저장에 실패했습니다"), "error"),
   });
@@ -170,17 +201,20 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
       items: PortfolioItem[];
       base_type: string;
       account_ids: string[] | null;
+      investment_horizon: InvestmentHorizon | null;
+      tax_type: AccountTaxType | null;
     }) =>
       updatePortfolio(args.id, {
         name: args.name,
         items: args.items,
         base_type: args.base_type,
         account_ids: args.account_ids,
+        investment_horizon: args.investment_horizon,
+        tax_type: args.tax_type,
       }),
     onSuccess: () => {
       void invalidatePortfolioData(qc);
-      setEditingPortfolio(null);
-      setEditorOpen(false);
+      closeEditor();
     },
     onError: (e) => toast(extractErrorMessage(e, "포트폴리오 수정에 실패했습니다"), "error"),
   });
@@ -204,13 +238,13 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     onSuccess: (_, { portfolioId: pid, accountIds }) => {
       void invalidateAccountData(qc);
       if (pid === null) {
-        toast("목표 포트폴리오 지정이 해제되었습니다", "success");
+        toast("기준 포트폴리오 지정이 해제되었습니다", "success");
       } else {
         const pName = sortedPortfolios.find((p) => p.id === pid)?.name ?? "";
-        toast(`${pName}가 ${accountIds.length}개 계좌의 목표로 지정되었습니다`, "success");
+        toast(`${pName}가 ${accountIds.length}개 계좌의 기준으로 지정되었습니다`, "success");
       }
     },
-    onError: (e) => toast(extractErrorMessage(e, "목표 포트폴리오 설정에 실패했습니다"), "error"),
+    onError: (e) => toast(extractErrorMessage(e, "기준 포트폴리오 설정에 실패했습니다"), "error"),
   });
 
   function handleSave(
@@ -218,17 +252,28 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
     items: PortfolioItem[],
     baseType: string,
     accountIds: string[] | null,
+    investmentHorizon: InvestmentHorizon | null,
+    taxType: AccountTaxType | null,
   ) {
-    if (editingPortfolio) {
+    if (editingTarget) {
       updateMut.mutate({
-        id: editingPortfolio.id,
+        id: editingTarget.id,
         name,
         items,
         base_type: baseType,
         account_ids: accountIds,
+        investment_horizon: investmentHorizon,
+        tax_type: taxType,
       });
     } else {
-      createMut.mutate({ name, items, base_type: baseType, account_ids: accountIds });
+      createMut.mutate({
+        name,
+        items,
+        base_type: baseType,
+        account_ids: accountIds,
+        investment_horizon: investmentHorizon,
+        tax_type: taxType,
+      });
     }
   }
 
@@ -257,15 +302,15 @@ export default function PortfolioManageTab({ selectedPortfolioId, onAnalyze }: P
         }
       />
 
-      {editorOpen && (
+      {isEditorOpen && (
         <UnifiedPortfolioEditor
-          initial={editingPortfolio}
+          initial={editingTarget}
+          initialItems={prefillItems ?? undefined}
+          initialName={prefillName}
+          initialAccountIds={prefillAccountIds ?? undefined}
           accounts={stockAccounts}
           onSave={handleSave}
-          onClose={() => {
-            setEditorOpen(false);
-            setEditingPortfolio(null);
-          }}
+          onClose={closeEditor}
           saving={createMut.isPending || updateMut.isPending}
         />
       )}

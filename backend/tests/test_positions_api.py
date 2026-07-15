@@ -103,6 +103,8 @@ class TestSavePositions:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_get_redis.return_value = mock_redis
             with patch("app.utils.redis_lock.redis_lock") as mock_lock:
                 mock_cm = MagicMock()
@@ -203,6 +205,8 @@ class TestSavePositionsExtended:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
                 patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
@@ -242,6 +246,8 @@ class TestSavePositionsExtended:
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.get = AsyncMock(return_value=None)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
                 patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
@@ -275,6 +281,8 @@ class TestSavePositionsExtended:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=None)  # Lock NOT acquired
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
@@ -305,6 +313,8 @@ class TestSyncPositionPrices:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
@@ -322,6 +332,8 @@ class TestSyncPositionPrices:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=None)  # Lock NOT acquired
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
@@ -363,6 +375,8 @@ class TestSyncPositionPrices:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"005930": 76000.0})),
@@ -412,6 +426,8 @@ class TestSyncPositionPrices:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
@@ -460,6 +476,8 @@ class TestSyncPositionPrices:
             mock_redis = AsyncMock()
             mock_redis.set = AsyncMock(return_value=True)
             mock_redis.delete = AsyncMock()
+            mock_redis.scan = AsyncMock(return_value=(0, []))
+            mock_redis.unlink = AsyncMock()
             mock_gr.return_value = mock_redis
             with (
                 patch(

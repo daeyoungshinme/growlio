@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Loader2, RefreshCw, X } from "lucide-react";
 import { api } from "@/api/client";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
@@ -6,6 +7,7 @@ import { usePositionsEditor } from "@/hooks/usePositionsEditor";
 import { extractErrorMessage } from "@/utils/error";
 import { fmtKrwShort } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
+import { invalidateAccountData } from "@/utils/queryInvalidation";
 import Modal from "@/components/common/Modal";
 import { PositionsTable } from "./PositionsTable";
 import type { Position } from "@/hooks/usePositionsEditor";
@@ -51,6 +53,7 @@ export default function StockPositionsModal({
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const usdRate = useExchangeRate();
+  const queryClient = useQueryClient();
 
   const editor = usePositionsEditor([], usdRate);
 
@@ -93,6 +96,7 @@ export default function StockPositionsModal({
       const r = await api.put<PositionsResponse>(`/assets/${accountId}/positions`, valid);
       editor.setRows(editor.enrichRows(r.data.positions));
       setSummary(r.data.summary);
+      void invalidateAccountData(queryClient);
     } catch (e) {
       setError(extractErrorMessage(e, "저장에 실패했습니다"));
     } finally {
@@ -107,6 +111,7 @@ export default function StockPositionsModal({
       const r = await api.post<PositionsResponse>(`/assets/${accountId}/positions/sync-prices`);
       editor.setRows(editor.enrichRows(r.data.positions));
       setSummary(r.data.summary);
+      void invalidateAccountData(queryClient);
     } catch (e: unknown) {
       setError(extractErrorMessage(e, "현재가 조회에 실패했습니다"));
     } finally {

@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from "./client";
 import type { PortfolioOverview } from "@/types";
+import type { AccountTaxType, InvestmentHorizon } from "@/api/assets";
 
 export const fetchPortfolioOverview = () => apiGet<PortfolioOverview>("/portfolio/overview");
 
@@ -36,6 +37,9 @@ export interface Portfolio {
   base_type: string; // "STOCK_ONLY" | "TOTAL_ASSETS"
   account_ids?: string[] | null; // null이면 모든 활성 주식 계좌 사용
   alert_scope?: "AGGREGATE" | "PER_ACCOUNT"; // 리밸런싱 알림/AUTO 설정 스코프 (기본 AGGREGATE)
+  // 명시적으로 지정된 기간/세제유형 태그 — null이면 기준 포트폴리오 지정 계좌들의 태그로부터 추론
+  investment_horizon?: InvestmentHorizon | null;
+  tax_type?: AccountTaxType | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -48,6 +52,8 @@ export const createPortfolio = (body: {
   items: PortfolioItem[];
   base_type?: string;
   account_ids?: string[] | null;
+  investment_horizon?: InvestmentHorizon | null;
+  tax_type?: AccountTaxType | null;
 }) => apiPost<Portfolio>("/portfolios", body);
 
 export const updatePortfolio = (
@@ -57,6 +63,8 @@ export const updatePortfolio = (
     items?: PortfolioItem[];
     base_type?: string;
     account_ids?: string[] | null;
+    investment_horizon?: InvestmentHorizon | null;
+    tax_type?: AccountTaxType | null;
   },
 ) => apiPut<Portfolio>(`/portfolios/${id}`, body);
 

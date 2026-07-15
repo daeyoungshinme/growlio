@@ -36,6 +36,18 @@ vi.mock("@/api/alerts", () => ({
 vi.mock("@/api/assets", () => ({
   fetchAccounts: vi.fn().mockResolvedValue([]),
   updateAccount: vi.fn().mockResolvedValue({}),
+  ACCOUNT_TAX_TYPE_LABELS: {
+    GENERAL: "일반",
+    ISA: "ISA",
+    PENSION_SAVINGS: "연금저축",
+    IRP: "IRP",
+    OVERSEAS_DEDICATED: "해외전용",
+  },
+  INVESTMENT_HORIZON_LABELS: {
+    SHORT_TERM: "단기",
+    MID_TERM: "중기",
+    LONG_TERM: "장기",
+  },
 }));
 
 vi.mock("@/api/marketSignals", () => ({
@@ -529,5 +541,19 @@ describe("UnifiedPortfolioEditor", () => {
     const appleTexts = screen.queryAllByText(/Apple|AAPL/i);
     if (appleTexts.length > 0) expect(appleTexts[0]).toBeDefined();
     else expect(document.body).toBeDefined();
+  });
+
+  it("adds a cash-equivalent item and disables the button once added", () => {
+    renderWithProviders(
+      <MemoryRouter>
+        <UnifiedPortfolioEditor onSave={vi.fn()} onClose={vi.fn()} saving={false} />
+      </MemoryRouter>,
+    );
+    const addBtn = screen.getByText("현금성 자산 추가").closest("button")!;
+    fireEvent.click(addBtn);
+
+    expect(screen.getByText("현금성자산")).toBeDefined();
+    expect(screen.getByText("CMA·파킹통장 등 (계좌 잔액 합산)")).toBeDefined();
+    expect(addBtn).toBeDisabled();
   });
 });

@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import type { StockSuggestion } from "@/api/assets";
 import type { PortfolioItem } from "@/api/portfolios";
-import { CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
@@ -50,6 +50,15 @@ export default function PortfolioItemRow({
           </span>
           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
             REAL_ESTATE (순자산 합산)
+          </span>
+        </div>
+      ) : item.ticker === CASH_EQUIVALENT_TICKER ? (
+        <div className="flex-1 flex items-center gap-2 border border-teal-200 dark:border-teal-700/50 bg-teal-50 dark:bg-teal-900/20 rounded-lg px-3 py-2">
+          <span className="text-xs font-medium text-teal-700 bg-teal-200 px-2 py-0.5 rounded">
+            현금성자산
+          </span>
+          <span className="text-sm text-gray-700 dark:text-gray-300 flex-1">
+            CMA·파킹통장 등 (계좌 잔액 합산)
           </span>
         </div>
       ) : item.ticker && item.name && !isEditing ? (

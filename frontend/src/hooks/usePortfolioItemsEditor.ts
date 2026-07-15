@@ -2,7 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import type { StockSuggestion } from "@/api/assets";
 import type { PortfolioItem } from "@/api/portfolios";
 import type { PortfolioOverview } from "@/types";
-import { CASH_TICKER, KR_PROPERTY_MARKET, REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
+import {
+  CASH_EQUIVALENT_MARKET,
+  CASH_EQUIVALENT_NAME,
+  CASH_EQUIVALENT_TICKER,
+  CASH_TICKER,
+  KR_PROPERTY_MARKET,
+  REAL_ESTATE_ASSET_TYPE,
+} from "@/constants/assets";
 import { PORTFOLIO_WEIGHT_TOLERANCE } from "@/constants/validation";
 import { FOCUS_SETTLE_DELAY } from "@/constants/timers";
 import { useStockSearch } from "./useStockSearch";
@@ -44,6 +51,19 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
     setItems((prev) => [
       ...prev,
       { ticker: REAL_ESTATE_ASSET_TYPE, name: "부동산", market: KR_PROPERTY_MARKET, weight: 0 },
+    ]);
+  }
+
+  function addCashEquivalent() {
+    if (items.some((i) => i.ticker === CASH_EQUIVALENT_TICKER)) return;
+    setItems((prev) => [
+      ...prev,
+      {
+        ticker: CASH_EQUIVALENT_TICKER,
+        name: CASH_EQUIVALENT_NAME,
+        market: CASH_EQUIVALENT_MARKET,
+        weight: 0,
+      },
     ]);
   }
 
@@ -150,6 +170,7 @@ export function usePortfolioItemsEditor(initialItems: PortfolioItem[]) {
     removeItem,
     addCash,
     addRealEstate,
+    addCashEquivalent,
     fillFromHoldings,
     handleTickerInput,
     selectSuggestion,

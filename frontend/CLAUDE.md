@@ -129,6 +129,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
 - `useDividendData.ts` — 배당 요약 데이터 조회
 - `useDividendPlanSettings.ts` — 배당 계획(연/월배당) 설정 폼 상태 관리
+- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
 - `useKisCredentialVerify.ts` — KIS 자격증명 검증 상태 머신 (`verifyKisCredentials` 래핑)
@@ -138,7 +139,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
-- `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글 (MarketSignalBanner/MarketSignalAlertSection 공용)
+- `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
 - `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리

@@ -203,6 +203,15 @@ class TestBuildTaxPreview:
         assert total_gain == 0.0
         assert items == []
 
+    def test_cash_equivalent_skipped(self):
+        cash_equiv_item = _make_item(ticker="CASH_EQUIVALENT", market="CASH", diff_krw=-100_000.0, shares_to_trade=None)
+        analysis = _make_analysis([cash_equiv_item])
+
+        total_gain, overseas_tax, fee, notes, items = _build_tax_preview(analysis, _make_overview([]))
+
+        assert total_gain == 0.0
+        assert items == []
+
     def test_buy_items_not_included(self):
         item = _make_item(diff_krw=500_000.0, weight_diff_pct=3.0)  # 매수(diff_krw > 0)
         analysis = _make_analysis([item])

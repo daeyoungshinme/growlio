@@ -515,6 +515,177 @@ class TestKrPropertyItem:
         assert item.current_value_krw == 0
 
 
+# ── CASH_EQUIVALENT(현금성 자산) 항목 ───────────────────────
+
+
+class TestCashEquivalentItem:
+    def test_uses_bank_type_account_balances(self):
+        """CASH_EQUIVALENT 항목은 BANK_ACCOUNT/DEPOSIT/CASH_OTHER 계좌 잔액 합산."""
+        portfolio = _make_portfolio(
+            [
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 100,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 3_000_000, "include_in_total": True},
+                {"asset_type": "CASH_OTHER", "amount_krw": 2_000_000, "include_in_total": True},
+                {"asset_type": "DEPOSIT", "amount_krw": 1_000_000, "include_in_total": True},
+                # 브로커 예수금 계좌는 집계 대상 아님
+                {"asset_type": "STOCK_KIS", "amount_krw": 4_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        item = result.items[0]
+        assert item.shares_to_trade is None
+        assert item.current_price_krw is None
+        assert item.current_value_krw == pytest.approx(6_000_000)
+
+    def test_no_bank_type_accounts_gives_zero(self):
+        portfolio = _make_portfolio(
+            [
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 100,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 1_000_000,
+            "total_stock_krw": 1_000_000,
+            "all_positions": [],
+            "accounts": [],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.items[0].current_value_krw == 0
+
+    def test_excluded_account_not_counted(self):
+        """include_in_total=False 계좌는 합산에서 제외."""
+        portfolio = _make_portfolio(
+            [
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 100,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 1_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "CASH_OTHER", "amount_krw": 1_000_000, "include_in_total": False},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.items[0].current_value_krw == 0
+
+    def test_no_double_count_with_cash_item(self):
+        """CASH(브로커 예수금)와 CASH_EQUIVALENT가 함께 있으면 CASH_EQUIVALENT가 차지한 금액이
+        CASH의 '전체 비주식자산' 계산에서 빠져야 한다."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 50},
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 50,
+                },
+            ]
+        )
+        overview = {
+            # 비주식자산 총합 = 10M (총자산 10M - 주식 0)
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "CASH_OTHER", "amount_krw": 4_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        cash_item = next(i for i in result.items if i.ticker == "CASH")
+        cash_equiv_item = next(i for i in result.items if i.ticker == "CASH_EQUIVALENT")
+        assert cash_equiv_item.current_value_krw == pytest.approx(4_000_000)
+        # CASH는 전체 비주식자산(10M)에서 CASH_EQUIVALENT가 이미 집계한 4M을 뺀 나머지만 가진다
+        assert cash_item.current_value_krw == pytest.approx(6_000_000)
+        assert cash_item.current_value_krw + cash_equiv_item.current_value_krw == pytest.approx(
+            float(overview["total_assets_krw"])
+        )
+
+    def test_no_double_count_with_real_estate_and_cash(self):
+        """CASH + REAL_ESTATE + CASH_EQUIVALENT 세 항목이 함께 있어도 각자 몫만 계산되고
+        합계가 전체 비주식자산을 넘지 않는다."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 34},
+                {"ticker": "HOUSE", "name": "아파트", "market": "KR_PROPERTY", "weight": 33},
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 33,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 20_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "REAL_ESTATE", "amount_krw": 8_000_000, "include_in_total": True},
+                {"asset_type": "CASH_OTHER", "amount_krw": 5_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        by_ticker = {i.ticker: i for i in result.items}
+        assert by_ticker["HOUSE"].current_value_krw == pytest.approx(8_000_000)
+        assert by_ticker["CASH_EQUIVALENT"].current_value_krw == pytest.approx(5_000_000)
+        # CASH = 전체 20M - REAL_ESTATE 8M - CASH_EQUIVALENT 5M = 7M
+        assert by_ticker["CASH"].current_value_krw == pytest.approx(7_000_000)
+
+    def test_excluded_from_drift_and_tax_return_lookups(self):
+        """배당/CAGR/수익률 조회 대상에서 제외되어 None/0으로 채워진다."""
+        portfolio = _make_portfolio(
+            [
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 100,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 1_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "CASH_OTHER", "amount_krw": 1_000_000, "include_in_total": True},
+            ],
+        }
+        dividend_map = {("CASH_EQUIVALENT", "CASH"): {"dividend_yield": 5.0, "estimated_annual_krw": 50_000}}
+        returns_map = {("CASH_EQUIVALENT", "CASH"): {"cumulative_return_pct": 10.0, "cagr_pct": 3.0, "actual_years": 5}}
+        result = analyze_rebalancing(portfolio, overview, dividend_map=dividend_map, returns_map=returns_map)
+        item = result.items[0]
+        assert item.dividend_yield is None
+        assert item.annual_dividend_current_krw == 0
+        assert item.cagr_10y_pct is None
+        assert item.return_10y_pct is None
+
+
 # ── 배당 정보가 있는 포트폴리오 ─────────────────────────────
 
 

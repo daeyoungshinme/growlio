@@ -191,7 +191,7 @@ export default function MarketSignalBanner({ signal }: Props) {
   } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
-  const { status: compositeStatus, toggle, isPending } = useCompositeSignalToggle();
+  const { status: compositeStatus } = useCompositeSignalToggle();
 
   return (
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
@@ -404,30 +404,20 @@ export default function MarketSignalBanner({ signal }: Props) {
         </div>
       )}
 
-      {/* 시장 위험 신호 알림 설정 — isOpen 상태와 무관하게 항상 표시. 배너 상태색과 분리된 중립 배경으로 "설정 영역"임을 구분 */}
+      {/* 시장 위험 신호 알림 현황 — isOpen 상태와 무관하게 항상 표시. 읽기 전용(켜기/끄기는 설정 페이지가 단일 소스),
+          배너 상태색과 분리된 중립 배경으로 "알림 영역"임을 구분 */}
       {compositeStatus && (
         <div className="flex flex-col gap-1 px-4 py-2.5 border-t border-inherit bg-gray-50/80 dark:bg-gray-900/40 rounded-b-xl">
           <div className="flex items-center gap-2">
             <Bell size={13} className="text-gray-400 shrink-0" />
             <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
-              시장 위험 신호 알림 설정
+              시장 위험 신호 알림
             </span>
             <span
-              className={`text-xs font-semibold shrink-0 ${compositeStatus.enabled ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
+              className={`text-xs font-semibold shrink-0 ml-auto ${compositeStatus.enabled ? "text-blue-600 dark:text-blue-400" : "text-gray-400 dark:text-gray-500"}`}
             >
               {compositeStatus.enabled ? "받는 중" : "꺼짐"}
             </span>
-            <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-auto">
-              <input
-                type="checkbox"
-                checked={compositeStatus.enabled}
-                disabled={isPending}
-                onChange={(e) => toggle(e.target.checked)}
-                className="sr-only peer"
-                aria-label="시장 위험 신호 알림 설정 켜기/끄기"
-              />
-              <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
-            </label>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 ml-5">
             {compositeStatus.triggered && compositeStatus.reason
@@ -440,7 +430,7 @@ export default function MarketSignalBanner({ signal }: Props) {
             to="/settings?atab=시장 신호 알림"
             className="text-xs text-blue-600 dark:text-blue-400 underline self-start ml-5"
           >
-            설정 자세히 보기
+            설정에서 켜기/끄기 →
           </Link>
         </div>
       )}

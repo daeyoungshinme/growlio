@@ -49,7 +49,7 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
 }
 
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
-  const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false);
+  const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false, "growlio:goalCard:dcaDetailOpen");
   const timeline = dcaData?.goal_timeline;
   const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;
@@ -206,8 +206,10 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       <div className="card">
         <div className="flex items-center justify-between mb-2 sm:mb-4">
           <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-            <Target size={16} className="text-blue-500" />
-            투자 목표
+            <div className="p-1.5 bg-violet-50 dark:bg-violet-950 rounded-lg shrink-0">
+              <Target size={16} className="text-violet-600 dark:text-violet-400" />
+            </div>
+            투자 목표 달성 현황
           </h2>
           <Link
             to="/invest-plan"
@@ -227,8 +229,10 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     <div className="card">
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-          <Target size={16} className="text-blue-500" />
-          투자 목표
+          <div className="p-1.5 bg-violet-50 dark:bg-violet-950 rounded-lg shrink-0">
+            <Target size={16} className="text-violet-600 dark:text-violet-400" />
+          </div>
+          투자 목표 달성 현황
         </h2>
         <Link
           to="/invest-plan"

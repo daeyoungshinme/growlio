@@ -298,9 +298,8 @@ export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
 
 // ── 투자기간별(단기/중기/장기) 추천 — 목표 역산이 아닌 리스크 성향 재배분 ──────
 
-/** 백엔드 goal_recommendation_service.py의 _CASH_EQUIVALENT_TICKER와 동일 문자열 유지 필요 —
- * 실제 시세 없는 현금성 자산(CMA·파킹통장) 합성 후보 식별자. */
-export const CASH_EQUIVALENT_TICKER = "CASH_EQUIVALENT";
+/** 단일 소스는 @/constants/assets — 포트폴리오 편집기의 CASH_EQUIVALENT 항목과 동일 식별자를 공유한다. */
+export { CASH_EQUIVALENT_TICKER } from "@/constants/assets";
 
 export interface HorizonGoalRecommendation {
   investment_horizon: "SHORT_TERM" | "MID_TERM" | "LONG_TERM";

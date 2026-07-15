@@ -5,7 +5,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { triggerHaptic } from "../useHaptic";
 import { OVERSEAS_MARKET_SET, isOverseasMarket } from "@/constants/markets";
-import { CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 import {
   type ExecutionOrderItem,
   type ExecutionResult,
@@ -43,6 +43,7 @@ export function getActionableItems(analysis: RebalancingAnalysis): RebalancingIt
   return analysis.items.filter(
     (i) =>
       i.ticker !== CASH_TICKER &&
+      i.ticker !== CASH_EQUIVALENT_TICKER &&
       i.market !== KR_PROPERTY_MARKET &&
       i.shares_to_trade !== null &&
       Math.abs(i.shares_to_trade) >= 1,

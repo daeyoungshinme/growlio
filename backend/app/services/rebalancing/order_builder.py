@@ -14,11 +14,14 @@ from typing import Any, Literal
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.constants import CASH_EQUIVALENT_TICKER
 from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES
 
 logger = structlog.get_logger()
 
 _BROKER_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+_NON_TRADABLE_TICKERS = ("CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER)
+"""실제 주문을 낼 수 없는 합성 포트폴리오 항목 티커 — 가격 조회·주문 생성 양쪽에서 제외."""
 
 
 def _build_sell_orders(
@@ -97,7 +100,7 @@ async def refresh_live_prices(
     """
     from app.services.price_service import fetch_prices_batch
 
-    tickers = [(item.ticker, item.market) for item in items if item.ticker not in ("CASH", "REAL_ESTATE")]
+    tickers = [(item.ticker, item.market) for item in items if item.ticker not in _NON_TRADABLE_TICKERS]
     if not tickers:
         return
 
@@ -111,7 +114,7 @@ async def refresh_live_prices(
         price = price_map.get(item.ticker)
         if price and price > 0:
             item.current_price_krw = float(price)
-            if item.shares_to_trade is None and item.ticker not in ("CASH", "REAL_ESTATE"):
+            if item.shares_to_trade is None and item.ticker not in _NON_TRADABLE_TICKERS:
                 target_qty = math.floor(item.target_value_krw / price)
                 item.shares_to_trade = target_qty - (item.current_qty or 0)
 
@@ -191,7 +194,7 @@ def build_rebalancing_orders(
     account_tax_type_map = _flatten_account_tax_types(ticker_account_map)
     orders: list[ExecutionOrderItem] = []
     for item in drifting:
-        if item.ticker in ("CASH", "REAL_ESTATE") or item.shares_to_trade is None:
+        if item.ticker in _NON_TRADABLE_TICKERS or item.shares_to_trade is None:
             logger.info(
                 "rebalancing_auto_item_skipped",
                 alert_id=alert_id,

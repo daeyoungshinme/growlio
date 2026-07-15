@@ -2,9 +2,20 @@ import { lazy, Suspense, useMemo, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { Plus, Wand2, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AssetAccount } from "@/api/assets";
+import {
+  ACCOUNT_TAX_TYPE_LABELS,
+  AccountTaxType,
+  AssetAccount,
+  INVESTMENT_HORIZON_LABELS,
+  InvestmentHorizon,
+} from "@/api/assets";
 import { Portfolio, PortfolioItem } from "@/api/portfolios";
-import { BASE_TYPE_STOCK_ONLY, BASE_TYPE_TOTAL_ASSETS } from "@/constants/assets";
+import {
+  BASE_TYPE_STOCK_ONLY,
+  BASE_TYPE_TOTAL_ASSETS,
+  CASH_EQUIVALENT_TICKER,
+} from "@/constants/assets";
+import { INPUT_SM } from "@/constants/inputStyles";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import type { PortfolioOverview } from "@/types";
 import { usePortfolioItemsEditor } from "@/hooks/usePortfolioItemsEditor";
@@ -14,12 +25,18 @@ import PortfolioItemRow from "./PortfolioItemRow";
 
 interface Props {
   initial?: Portfolio | null;
+  /** 신규 생성 모드(`initial`이 없을 때)에서 종목/이름/분석 대상 계좌를 미리 채울 때 사용 (예: 추천 비중 카드에서 생성). */
+  initialItems?: PortfolioItem[];
+  initialName?: string;
+  initialAccountIds?: string[];
   accounts?: AssetAccount[]; // 주식 계좌 목록 (STOCK_KIS, STOCK_OTHER)
   onSave: (
     name: string,
     items: PortfolioItem[],
     baseType: string,
     accountIds: string[] | null,
+    investmentHorizon: InvestmentHorizon | null,
+    taxType: AccountTaxType | null,
   ) => void;
   onClose: () => void;
   saving?: boolean;
@@ -27,14 +44,21 @@ interface Props {
 
 export default function UnifiedPortfolioEditor({
   initial,
+  initialItems,
+  initialName,
+  initialAccountIds,
   accounts = [],
   onSave,
   onClose,
   saving,
 }: Props) {
   const qc = useQueryClient();
-  const [name, setName] = useState(initial?.name ?? "");
+  const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [baseType, setBaseType] = useState(initial?.base_type ?? BASE_TYPE_STOCK_ONLY);
+  const [investmentHorizon, setInvestmentHorizon] = useState<InvestmentHorizon | "">(
+    initial?.investment_horizon ?? "",
+  );
+  const [taxType, setTaxType] = useState<AccountTaxType | "">(initial?.tax_type ?? "");
   const {
     items,
     totalWeight,
@@ -48,17 +72,20 @@ export default function UnifiedPortfolioEditor({
     removeItem,
     addCash,
     addRealEstate,
+    addCashEquivalent,
     fillFromHoldings,
     handleTickerInput,
     selectSuggestion,
     startEditing,
     registerInputRef,
-  } = usePortfolioItemsEditor(initial?.items ?? []);
+  } = usePortfolioItemsEditor(initial?.items ?? initialItems ?? []);
 
   // null = 모든 계좌 (동적), Set = 사용자가 명시적으로 선택한 계좌
-  const [userOverrideIds, setUserOverrideIds] = useState<Set<string> | null>(() =>
-    initial?.account_ids?.length ? new Set(initial.account_ids) : null,
-  );
+  const [userOverrideIds, setUserOverrideIds] = useState<Set<string> | null>(() => {
+    if (initial?.account_ids?.length) return new Set(initial.account_ids);
+    if (initialAccountIds?.length) return new Set(initialAccountIds);
+    return null;
+  });
 
   // accounts가 바뀌어도 userOverrideIds가 null이면 항상 전체 계좌를 반영
   const selectedAccountIds = useMemo(() => {
@@ -82,7 +109,7 @@ export default function UnifiedPortfolioEditor({
   function handleSubmit() {
     if (!name.trim() || !weightOk) return;
     const accountIds = isAllSelected ? null : Array.from(selectedAccountIds);
-    onSave(name.trim(), items, baseType, accountIds);
+    onSave(name.trim(), items, baseType, accountIds, investmentHorizon || null, taxType || null);
   }
 
   return (
@@ -141,7 +168,44 @@ export default function UnifiedPortfolioEditor({
                 ))}
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                백테스팅에는 영향 없음. 현금·부동산 항목은 백테스팅에서 자동 제외됩니다.
+                백테스팅에는 영향 없음. 현금·부동산·현금성 자산 항목은 백테스팅에서 자동 제외됩니다.
+              </p>
+            </div>
+
+            {/* 목표 역산 추천 매칭용 기간/세제유형 태그 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                투자 기간 · 세제 유형 (목표 역산 추천 매칭용)
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className={INPUT_SM}
+                  value={investmentHorizon}
+                  onChange={(e) => setInvestmentHorizon(e.target.value as InvestmentHorizon | "")}
+                >
+                  <option value="">투자 기간 미지정</option>
+                  {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  className={INPUT_SM}
+                  value={taxType}
+                  onChange={(e) => setTaxType(e.target.value as AccountTaxType | "")}
+                >
+                  <option value="">세제 유형 미지정</option>
+                  {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
+                    <option key={v} value={v}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                지정하면 리밸런싱 탭의 기간별 목표 역산 추천이 이 포트폴리오에 자동 매칭됩니다.
+                미지정 시 기준으로 지정된 계좌들의 태그가 전부 동일할 때만 자동 추론합니다.
               </p>
             </div>
 
@@ -217,6 +281,13 @@ export default function UnifiedPortfolioEditor({
                   className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 px-2 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
                 >
                   <Plus size={14} /> 부동산 추가
+                </button>
+                <button
+                  onClick={addCashEquivalent}
+                  disabled={items.some((i) => i.ticker === CASH_EQUIVALENT_TICKER)}
+                  className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 px-2 py-1.5 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40"
+                >
+                  <Plus size={14} /> 현금성 자산 추가
                 </button>
               </div>
             </div>

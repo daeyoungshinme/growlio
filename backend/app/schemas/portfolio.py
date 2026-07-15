@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, field_validator, model_validator
 
-from app.enums import PortfolioBaseType
+from app.enums import AccountTaxType, InvestmentHorizon, PortfolioBaseType
 from app.schemas._validators import validate_portfolio_weights, validate_portfolio_weights_optional
 
 
@@ -23,6 +23,9 @@ class PortfolioCreate(BaseModel):
     items: list[PortfolioItem]
     base_type: PortfolioBaseType = PortfolioBaseType.STOCK_ONLY
     account_ids: list[uuid.UUID] | None = None  # null이면 모든 활성 주식 계좌 사용
+    # 명시적 기간/세제유형 태그 — 미지정이면 기준 포트폴리오 지정 계좌들의 태그로부터 추론
+    investment_horizon: InvestmentHorizon | None = None
+    tax_type: AccountTaxType | None = None
 
     @field_validator("items")
     @classmethod
@@ -35,6 +38,9 @@ class PortfolioUpdate(BaseModel):
     items: list[PortfolioItem] | None = None
     base_type: PortfolioBaseType | None = None
     account_ids: list[uuid.UUID] | None = None  # [] 전송 시 null로 초기화 (전체 계좌 사용)
+    # None/미전송 구분은 model_fields_set으로 판별 — 명시적으로 null을 보내면 태그 해제(추론으로 복귀)
+    investment_horizon: InvestmentHorizon | None = None
+    tax_type: AccountTaxType | None = None
 
     @field_validator("items")
     @classmethod
@@ -66,6 +72,8 @@ class PortfolioResponse(BaseModel):
     base_type: str
     account_ids: list[str] | None = None  # Portfolio.account_ids property에서 자동 변환
     alert_scope: str = "AGGREGATE"  # AGGREGATE | PER_ACCOUNT
+    investment_horizon: InvestmentHorizon | None = None
+    tax_type: AccountTaxType | None = None
     sort_order: int = 0
     created_at: datetime
     updated_at: datetime

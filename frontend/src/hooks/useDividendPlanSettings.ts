@@ -1,9 +1,9 @@
-import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
 import { fetchSettings } from "@/api/settings";
 import { toast } from "@/utils/toast";
 import { invalidateDividendPlanData } from "@/utils/queryInvalidation";
+import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 
 export interface DividendPlanForm {
   annual_dividend_goal: string;
@@ -15,34 +15,27 @@ const EMPTY_FORM: DividendPlanForm = {
 
 export function useDividendPlanSettings() {
   const queryClient = useQueryClient();
-
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [initialForm, setInitialForm] = useState<DividendPlanForm | null>(null);
-  const [form, setForm] = useState<DividendPlanForm>(EMPTY_FORM);
-
-  const isDirty =
-    editing && initialForm !== null ? JSON.stringify(form) !== JSON.stringify(initialForm) : false;
-
-  const handleCloseModal = () => {
-    if (isDirty) {
-      setShowCloseConfirm(true);
-    } else {
-      setEditing(false);
-    }
-  };
+  const {
+    editing,
+    saving,
+    setSaving,
+    showCloseConfirm,
+    form,
+    setForm,
+    isDirty,
+    setShowCloseConfirm,
+    setEditing,
+    handleCloseModal,
+    startEditing,
+  } = useEditableSettingsForm<DividendPlanForm>(EMPTY_FORM);
 
   const openEdit = async () => {
     const settingsData = await fetchSettings();
-    const newForm: DividendPlanForm = {
+    startEditing({
       annual_dividend_goal: settingsData.annual_dividend_goal
         ? String(settingsData.annual_dividend_goal)
         : "",
-    };
-    setForm(newForm);
-    setInitialForm(newForm);
-    setEditing(true);
+    });
   };
 
   const saveSettings = async () => {

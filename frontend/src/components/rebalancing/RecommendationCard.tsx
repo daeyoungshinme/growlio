@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Settings2, Target } from "lucide-react";
+import { Anchor, FolderPlus, Loader2, Plus, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CASH_EQUIVALENT_TICKER,
@@ -8,7 +8,7 @@ import {
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
-import { fetchPortfolios, updatePortfolio } from "@/api/portfolios";
+import { fetchPortfolios, updatePortfolio, type PortfolioItem } from "@/api/portfolios";
 import {
   ACCOUNT_TAX_TYPE_LABELS,
   fetchAccounts,
@@ -20,7 +20,7 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import { getPortfolioHorizonTaxType, getPortfolioTargetState } from "@/utils/portfolio";
-import { isStockAccount } from "@/utils/accounts";
+import { isBankAccount, isStockAccount } from "@/utils/accounts";
 import { fmtKrw } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -53,8 +53,15 @@ function normalizeWeights(items: GoalRecommendationItem[]) {
 }
 
 interface Props {
-  /** 추천 비중을 목표 포트폴리오에 저장한 뒤 호출된다 — 부모가 화면 전환(포트폴리오 탭 이동 등)을 담당한다. */
+  /** 추천 비중을 기준 포트폴리오에 저장한 뒤 호출된다 — 부모가 화면 전환(포트폴리오 탭 이동 등)을 담당한다. */
   onApplied?: (portfolioId: string) => void;
+  /** "이 비중으로 새 포트폴리오 만들기" 클릭 시 호출 — 부모가 포트폴리오 편집 모달을 해당 비중(+ 기간별 탭이면 태그
+   * 매칭 계좌)으로 미리 채워 연다. */
+  onCreatePortfolio?: (
+    items: PortfolioItem[],
+    suggestedName: string,
+    accountIds?: string[],
+  ) => void;
 }
 
 /** 목표 역산 추천("전체")과 투자기간별 추천("단기"/"중기"/"장기")을 하나의 탭 카드로 합쳐 보여준다.
@@ -62,7 +69,7 @@ interface Props {
  * 목표연도를 역산한 필요수익률 제약을, 기간별 탭은 계좌 태그 기반 고정 리스크 성향을 사용한다는
  * 점에서 서로 다른 API 응답(`GoalRecommendation`/`HorizonGoalRecommendation`)을 소비한다.
  * "전체" 탭은 목표 미설정 상태에서도 항상 노출해 설정 유도 문구를 보여준다. */
-export default function RecommendationCard({ onApplied }: Props) {
+export default function RecommendationCard({ onApplied, onCreatePortfolio }: Props) {
   const queryClient = useQueryClient();
 
   const { data: overallData } = useQuery({
@@ -89,6 +96,9 @@ export default function RecommendationCard({ onApplied }: Props) {
   });
   const stockAccounts = (accountsRaw ?? []).filter(
     (a) => a.is_active && isStockAccount(a.asset_type),
+  );
+  const bankAccounts = (accountsRaw ?? []).filter(
+    (a) => a.is_active && isBankAccount(a.asset_type),
   );
 
   const { data: settingsData } = useQuery({
@@ -122,6 +132,16 @@ export default function RecommendationCard({ onApplied }: Props) {
           (r) => r.investment_horizon === effectiveTab && r.tax_type === activeTaxType,
         )
       : undefined;
+
+  // 현금성 자산(CASH_EQUIVALENT) 추천 항목의 실제 근거가 되는, 같은 기간·세제유형 태그를 가진
+  // CMA/파킹통장 계좌 — 적용/생성 시 account_ids에 자동으로 함께 연결해 목표비중이 실제로
+  // 계산되도록 한다(연결 안 하면 목표비중은 잡히는데 현재값이 영구히 0으로 남음).
+  const cashEquivalentMatches =
+    effectiveTab !== "전체" && activeTaxType
+      ? bankAccounts.filter(
+          (a) => a.investment_horizon === effectiveTab && a.tax_type === activeTaxType,
+        )
+      : [];
 
   const horizonTargetPortfolio =
     effectiveTab !== "전체" && activeTaxType
@@ -159,9 +179,18 @@ export default function RecommendationCard({ onApplied }: Props) {
   const applyHorizonMutation = useMutation({
     mutationFn: async () => {
       if (!activeHorizonRec || !horizonTargetPortfolio) throw new Error("추천 비중이 없습니다");
-      await updatePortfolio(horizonTargetPortfolio.id, {
+      const body: { items: PortfolioItem[]; account_ids?: string[] } = {
         items: normalizeWeights(activeHorizonRec.recommended_items),
-      });
+      };
+      if (activeHorizonRec.includes_cash_equivalent && horizonTargetPortfolio.account_ids?.length) {
+        body.account_ids = Array.from(
+          new Set([
+            ...horizonTargetPortfolio.account_ids,
+            ...cashEquivalentMatches.map((a) => a.id),
+          ]),
+        );
+      }
+      await updatePortfolio(horizonTargetPortfolio.id, body);
       return horizonTargetPortfolio.id;
     },
     onSuccess: async (portfolioId) => {
@@ -290,10 +319,10 @@ export default function RecommendationCard({ onApplied }: Props) {
                     등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
                   </p>
 
-                  <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50">
+                  <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
                     {targetPortfolios.length === 0 ? (
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        포트폴리오 탭에서 목표 포트폴리오를 지정하면 추천 비중을 바로 적용할 수
+                        포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수
                         있어요.
                       </p>
                     ) : (
@@ -324,13 +353,27 @@ export default function RecommendationCard({ onApplied }: Props) {
                           {applyOverallMutation.isPending ? (
                             <Loader2 size={12} className="animate-spin" />
                           ) : (
-                            <Target size={12} />
+                            <Anchor size={12} />
                           )}
                           {targetPortfolios.length === 1
                             ? `${targetPortfolios[0].name}에 적용`
-                            : "목표 포트폴리오에 적용"}
+                            : "기준 포트폴리오에 적용"}
                         </button>
                       </div>
+                    )}
+                    {onCreatePortfolio && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onCreatePortfolio(
+                            normalizeWeights(overallData.recommended_items),
+                            "추천 포트폴리오",
+                          )
+                        }
+                        className="flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
+                      </button>
                     )}
                   </div>
                 </>
@@ -387,16 +430,24 @@ export default function RecommendationCard({ onApplied }: Props) {
             )}
 
             {activeHorizonRec.recommended_items.length > 0 &&
-              activeHorizonRec.includes_cash_equivalent && (
+              activeHorizonRec.includes_cash_equivalent &&
+              cashEquivalentMatches.length === 0 && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-teal-200 dark:border-teal-800/50">
-                  현금성 자산(CMA·파킹통장 등)이 포함된 추천은 자동 적용할 수 없어요 — 실제 계좌에서
-                  해당 비중만큼 현금성 자산으로 배분해주세요.
+                  현금성 자산(CMA·파킹통장 등)이 포함된 추천이에요 — 계좌 관리에서 CMA/파킹통장
+                  계좌에 "{INVESTMENT_HORIZON_LABELS[effectiveTab]}" 기간 태그를 지정하면 자동
+                  적용할 수 있어요.
                 </p>
               )}
 
             {activeHorizonRec.recommended_items.length > 0 &&
-              !activeHorizonRec.includes_cash_equivalent && (
-                <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50">
+              (!activeHorizonRec.includes_cash_equivalent || cashEquivalentMatches.length > 0) && (
+                <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
+                  {activeHorizonRec.includes_cash_equivalent && (
+                    <p className="text-[11px] text-teal-600 dark:text-teal-500">
+                      현금성 자산 반영을 위해 {cashEquivalentMatches.map((a) => a.name).join(", ")}{" "}
+                      계좌가 포트폴리오에 자동으로 연결됩니다.
+                    </p>
+                  )}
                   {horizonTargetPortfolio ? (
                     <button
                       type="button"
@@ -407,15 +458,39 @@ export default function RecommendationCard({ onApplied }: Props) {
                       {applyHorizonMutation.isPending ? (
                         <Loader2 size={12} className="animate-spin" />
                       ) : (
-                        <Target size={12} />
+                        <Anchor size={12} />
                       )}
                       {horizonTargetPortfolio.name}에 적용
                     </button>
                   ) : (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 목표
+                      포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준
                       포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.
                     </p>
+                  )}
+                  {onCreatePortfolio && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onCreatePortfolio(
+                          normalizeWeights(activeHorizonRec.recommended_items),
+                          `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
+                          [
+                            ...stockAccounts
+                              .filter(
+                                (a) =>
+                                  a.investment_horizon === effectiveTab &&
+                                  a.tax_type === activeTaxType,
+                              )
+                              .map((a) => a.id),
+                            ...cashEquivalentMatches.map((a) => a.id),
+                          ],
+                        )
+                      }
+                      className="flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
+                    </button>
                   )}
                 </div>
               )}
@@ -457,7 +532,11 @@ export default function RecommendationCard({ onApplied }: Props) {
 
       {confirmOpen && effectiveTab !== "전체" && horizonTargetPortfolio && (
         <ConfirmModal
-          message={`${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`}
+          message={
+            activeHorizonRec?.includes_cash_equivalent && cashEquivalentMatches.length > 0
+              ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`
+              : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`
+          }
           confirmLabel="적용"
           danger={false}
           onConfirm={() => applyHorizonMutation.mutate()}

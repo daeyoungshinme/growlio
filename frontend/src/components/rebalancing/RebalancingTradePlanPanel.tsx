@@ -2,7 +2,7 @@ import { useState } from "react";
 import { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
-import { CASH_TICKER } from "@/constants/assets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import { TRADING_FEE_RATE, calcTradeKrw } from "./rebalancingTradeMath";
 
 interface Props {
@@ -30,7 +30,8 @@ export default function RebalancingTradePlanPanel({
     (i) =>
       i.diff_krw !== 0 &&
       (i.shares_to_trade === null || !i.current_price_krw) &&
-      i.ticker !== CASH_TICKER,
+      i.ticker !== CASH_TICKER &&
+      i.ticker !== CASH_EQUIVALENT_TICKER,
   );
 
   const estFee = (totalBuySummary + totalSellSummary) * TRADING_FEE_RATE;

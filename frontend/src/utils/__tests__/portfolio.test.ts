@@ -209,13 +209,13 @@ function makeAccount(overrides: Partial<AssetAccount> = {}): AssetAccount {
 }
 
 describe("getPortfolioHorizon", () => {
-  it("목표 지정된 계좌가 없으면 null", () => {
+  it("기준 지정된 계좌가 없으면 null", () => {
     const portfolio = makePortfolio();
     const accounts = [makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM" })];
     expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
   });
 
-  it("목표 지정된 계좌가 전부 같은 기간이면 그 기간을 반환", () => {
+  it("기준 지정된 계좌가 전부 같은 기간이면 그 기간을 반환", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: "SHORT_TERM" }),
@@ -224,7 +224,7 @@ describe("getPortfolioHorizon", () => {
     expect(getPortfolioHorizon(portfolio, accounts)).toBe("SHORT_TERM");
   });
 
-  it("목표 지정된 계좌의 기간이 섞여 있으면 null", () => {
+  it("기준 지정된 계좌의 기간이 섞여 있으면 null", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: "SHORT_TERM" }),
@@ -233,7 +233,7 @@ describe("getPortfolioHorizon", () => {
     expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
   });
 
-  it("목표 지정된 계좌에 기간 태그가 없으면 null", () => {
+  it("기준 지정된 계좌에 기간 태그가 없으면 null", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({ id: "acc-1", target_portfolio_id: "p1", investment_horizon: null }),
@@ -241,7 +241,7 @@ describe("getPortfolioHorizon", () => {
     expect(getPortfolioHorizon(portfolio, accounts)).toBeNull();
   });
 
-  it("다른 포트폴리오를 목표로 지정한 계좌는 무시", () => {
+  it("다른 포트폴리오를 기준으로 지정한 계좌는 무시", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({ id: "acc-1", target_portfolio_id: "p2", investment_horizon: "SHORT_TERM" }),
@@ -251,7 +251,7 @@ describe("getPortfolioHorizon", () => {
 });
 
 describe("getPortfolioHorizonTaxType", () => {
-  it("목표 지정된 계좌가 없으면 null", () => {
+  it("기준 지정된 계좌가 없으면 null", () => {
     const portfolio = makePortfolio();
     const accounts = [
       makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "ISA" }),
@@ -259,7 +259,7 @@ describe("getPortfolioHorizonTaxType", () => {
     expect(getPortfolioHorizonTaxType(portfolio, accounts)).toBeNull();
   });
 
-  it("목표 지정된 계좌가 전부 같은 기간·세제유형이면 그 조합을 반환", () => {
+  it("기준 지정된 계좌가 전부 같은 기간·세제유형이면 그 조합을 반환", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({
@@ -319,7 +319,7 @@ describe("getPortfolioHorizonTaxType", () => {
     expect(getPortfolioHorizonTaxType(portfolio, accounts)).toBeNull();
   });
 
-  it("목표 지정된 계좌에 세제유형 태그가 없으면 null", () => {
+  it("기준 지정된 계좌에 세제유형 태그가 없으면 null", () => {
     const portfolio = makePortfolio({ id: "p1" });
     const accounts = [
       makeAccount({

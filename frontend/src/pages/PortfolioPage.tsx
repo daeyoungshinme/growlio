@@ -209,7 +209,12 @@ export default function PortfolioPage() {
       </div>
 
       {/* 탭 */}
-      <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="pill" />
+      <div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">
+          자산 <span className="mx-1">›</span> 투자현황
+        </p>
+        <Tabs tabs={TABS} activeTab={tab} onChange={handleTabChange} variant="pill" />
+      </div>
 
       <div ref={tabContentRef}>
         {tab === "종목 현황" && (

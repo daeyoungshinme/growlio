@@ -1,7 +1,7 @@
 import { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
-import { CASH_TICKER } from "@/constants/assets";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 
 export function DiffCell({ diff }: { diff: number }) {
   if (diff === 0) return <span className="text-gray-400">-</span>;
@@ -93,7 +93,8 @@ export function DividendDiffCell({ diff }: { diff: number }) {
 }
 
 export function Return10yCell({ item }: { item: RebalancingItem }) {
-  if (item.ticker === CASH_TICKER) return <span className="text-gray-500">-</span>;
+  if (item.ticker === CASH_TICKER || item.ticker === CASH_EQUIVALENT_TICKER)
+    return <span className="text-gray-500">-</span>;
   const cagr = item.cagr_10y_pct;
   const total = item.return_10y_pct;
   if (cagr == null || total == null) return <span className="text-gray-500">—</span>;

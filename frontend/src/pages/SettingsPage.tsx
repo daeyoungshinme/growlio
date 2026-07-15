@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint, UserX } from "lucide-react";
+import { Sun, Moon, LogOut, Bell, Fingerprint, LayoutGrid, UserX } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,7 @@ import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
+import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
@@ -25,6 +26,9 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   REBALANCING: "리밸런싱 알림",
   STOCK_PRICE: "주가 알림",
   MARKET_SIGNAL: "시장 신호 알림",
+  GOAL_ASSET: "자산 목표 달성 알림",
+  GOAL_DEPOSIT: "입금 목표 달성 알림",
+  GOAL_DIVIDEND: "배당 목표 달성 알림",
 };
 
 function AlertHistorySection() {
@@ -99,6 +103,9 @@ export default function SettingsPage() {
     }, 100);
     return () => clearTimeout(timer);
   }, [initialAlertTab]);
+
+  const alertTabContentRef = useRef<HTMLDivElement>(null);
+  useSwipeTabs(alertTabContentRef, ALERT_TABS, alertTab, setAlertTab);
 
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
@@ -215,15 +222,26 @@ export default function SettingsPage() {
           ))}
         </div>
 
-        {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
-        {alertTab === "주가 알림" && <StockPriceAlertSection />}
-        {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
-        {alertTab === "발송 이력" && <AlertHistorySection />}
+        <div ref={alertTabContentRef}>
+          {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
+          {alertTab === "주가 알림" && <StockPriceAlertSection />}
+          {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
+          {alertTab === "발송 이력" && <AlertHistorySection />}
+        </div>
       </div>
 
       {/* 앱 설정 */}
       <div>
         <SectionCard title="앱 설정">
+          {isNativePlatform() && (
+            <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 mb-1">
+              <LayoutGrid size={18} className="shrink-0 mt-0.5" />
+              <p className="text-xs leading-relaxed">
+                홈 화면을 길게 눌러 "위젯 추가"에서 Growlio를 선택하면 자산 현황을 홈 화면에서 바로
+                확인할 수 있어요.
+              </p>
+            </div>
+          )}
           <button
             onClick={toggle}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px]"

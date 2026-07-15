@@ -10,6 +10,7 @@ import { api } from "@/api/client";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
@@ -120,7 +121,7 @@ export default function InvestPlanPage() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
                 activeTab === tab
                   ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
                   : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
@@ -134,7 +135,7 @@ export default function InvestPlanPage() {
           to="/rebalancing?rtab=진단"
           className="ml-auto text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
         >
-          목표 대비 포트폴리오 진단 보기 →
+          포트폴리오 비중 진단 보기 →
         </Link>
       </div>
 

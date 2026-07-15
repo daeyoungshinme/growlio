@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { api } from "@/api/client";
@@ -9,6 +9,7 @@ import { invalidateDcaData } from "@/utils/queryInvalidation";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { useQuery } from "@tanstack/react-query";
+import { useEditableSettingsForm } from "@/hooks/useEditableSettingsForm";
 
 export interface GoalForm {
   monthly_deposit_amount: string;
@@ -41,22 +42,19 @@ export function useGoalSettings() {
     staleTime: STALE_TIME.EXCHANGE_RATE,
   });
 
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [initialForm, setInitialForm] = useState<GoalForm | null>(null);
-  const [form, setForm] = useState<GoalForm>(EMPTY_FORM);
-
-  const isDirty =
-    editing && initialForm !== null ? JSON.stringify(form) !== JSON.stringify(initialForm) : false;
-
-  const handleCloseModal = () => {
-    if (isDirty) {
-      setShowCloseConfirm(true);
-    } else {
-      setEditing(false);
-    }
-  };
+  const {
+    editing,
+    saving,
+    setSaving,
+    showCloseConfirm,
+    form,
+    setForm,
+    isDirty,
+    setShowCloseConfirm,
+    setEditing,
+    handleCloseModal,
+    startEditing,
+  } = useEditableSettingsForm<GoalForm>(EMPTY_FORM);
 
   const openEdit = useCallback(async () => {
     const s = data?.settings;
@@ -71,7 +69,7 @@ export function useGoalSettings() {
         ? String(settingsData.retirement_target_year)
         : "";
     }
-    const newForm: GoalForm = {
+    startEditing({
       monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
       goal_annual_return_pct: s?.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
       goal_amount: s?.goal_amount ? String(s.goal_amount) : "",
@@ -79,11 +77,8 @@ export function useGoalSettings() {
       goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
       annual_deposit_goal,
       retirement_target_year,
-    };
-    setForm(newForm);
-    setInitialForm(newForm);
-    setEditing(true);
-  }, [data]);
+    });
+  }, [data, startEditing]);
 
   useEffect(() => {
     if (location.state?.openEdit && !autoOpenTriggeredRef.current && !isLoading && data) {

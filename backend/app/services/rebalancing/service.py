@@ -9,6 +9,7 @@ from typing import Any
 
 import structlog
 
+from app.constants import CASH_EQUIVALENT_ACCOUNT_TYPES, CASH_EQUIVALENT_TICKER
 from app.models.portfolio import Portfolio
 from app.schemas.rebalancing import (
     DriftedItem,
@@ -90,6 +91,24 @@ def _div_info(
     return None, 0.0
 
 
+def _real_estate_value_krw(overview: dict) -> float:
+    """overview.accounts 중 REAL_ESTATE 계좌 잔액 합산 (부동산 항목 현재가치)."""
+    return sum(
+        float(acc.get("amount_krw", 0))
+        for acc in overview.get("accounts", [])
+        if acc.get("asset_type") == "REAL_ESTATE" and acc.get("include_in_total", True)
+    )
+
+
+def _cash_equivalent_value_krw(overview: dict) -> float:
+    """overview.accounts 중 CMA·파킹통장 등 은행성 계좌(CASH_EQUIVALENT_ACCOUNT_TYPES) 잔액 합산."""
+    return sum(
+        float(acc.get("amount_krw", 0))
+        for acc in overview.get("accounts", [])
+        if acc.get("asset_type") in CASH_EQUIVALENT_ACCOUNT_TYPES and acc.get("include_in_total", True)
+    )
+
+
 def _build_target_items(
     portfolio: Portfolio,
     base_krw: float,
@@ -101,6 +120,14 @@ def _build_target_items(
     """목표 포트폴리오 항목별 RebalancingItem 리스트와 대상 키 집합을 반환한다."""
     result_items: list[RebalancingItem] = []
     target_keys: set[tuple[str, str]] = set()
+
+    # CASH(브로커 예수금) 항목의 "total_assets - total_stock" 잔여값에는 REAL_ESTATE·
+    # CASH_EQUIVALENT 계좌 잔액도 섞여 있다. 두 항목이 포트폴리오에 별도로 존재하면 그만큼
+    # 미리 차감해 CASH 값과 이중 계산되지 않도록 한다.
+    has_real_estate_item = any(str(_item_attr(i, "market")) == "KR_PROPERTY" for i in portfolio.items)
+    has_cash_equivalent_item = any(str(_item_attr(i, "ticker")) == CASH_EQUIVALENT_TICKER for i in portfolio.items)
+    real_estate_claimed_krw = _real_estate_value_krw(overview) if has_real_estate_item else 0.0
+    cash_equivalent_claimed_krw = _cash_equivalent_value_krw(overview) if has_cash_equivalent_item else 0.0
 
     for item in portfolio.items:
         ticker = str(_item_attr(item, "ticker"))
@@ -116,15 +143,20 @@ def _build_target_items(
         target_qty: float | None = None
 
         if ticker == "CASH":
-            current_value = float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0))
+            current_value = (
+                float(overview.get("total_assets_krw", 0))
+                - float(overview.get("total_stock_krw", 0))
+                - real_estate_claimed_krw
+                - cash_equivalent_claimed_krw
+            )
             current_price = None
             shares = None
         elif market == "KR_PROPERTY":
-            current_value = sum(
-                float(acc.get("amount_krw", 0))
-                for acc in overview.get("accounts", [])
-                if acc.get("asset_type") == "REAL_ESTATE" and acc.get("include_in_total", True)
-            )
+            current_value = _real_estate_value_krw(overview)
+            current_price = None
+            shares = None
+        elif ticker == CASH_EQUIVALENT_TICKER:
+            current_value = _cash_equivalent_value_krw(overview)
             current_price = None
             shares = None
         else:
@@ -142,17 +174,19 @@ def _build_target_items(
         current_weight_pct = (current_value / base_krw * 100) if base_krw > 0 else 0.0
         diff_krw = target_value - current_value
 
+        is_non_tradable = ticker in ("CASH", CASH_EQUIVALENT_TICKER) or market == "KR_PROPERTY"
+
         div_yield: float | None = None
         annual_div_current = 0.0
         annual_div_target = 0.0
-        if ticker != "CASH" and market != "KR_PROPERTY":
+        if not is_non_tradable:
             div_yield, annual_div_current = _div_info(ticker, market, dividend_map)
             if annual_div_current > 0 and current_value > 0:
                 annual_div_target = annual_div_current * (target_value / current_value)
             elif div_yield and div_yield > 0:
                 annual_div_target = target_value * (div_yield / 100)
 
-        ret = returns_map.get(key) if (returns_map and ticker != "CASH" and market != "KR_PROPERTY") else None
+        ret = returns_map.get(key) if (returns_map and not is_non_tradable) else None
 
         result_items.append(
             RebalancingItem(
@@ -240,7 +274,9 @@ def _calc_portfolio_cagrs(
 ) -> tuple[float | None, float | None]:
     """목표 포트폴리오와 현재 보유 포트폴리오의 가중 CAGR을 계산한다."""
     items_with_return = [
-        i for i in result_items if i.cagr_10y_pct is not None and i.ticker != "CASH" and i.market != "KR_PROPERTY"
+        i
+        for i in result_items
+        if i.cagr_10y_pct is not None and i.ticker not in ("CASH", CASH_EQUIVALENT_TICKER) and i.market != "KR_PROPERTY"
     ]
 
     target_weighted_cagr: float | None = None
@@ -327,9 +363,15 @@ def _build_implicit_cash_item(
     total_target_pct = sum(i.target_weight_pct for i in result_items)
     implicit_cash_target_pct = max(0.0, 100.0 - total_target_pct)
 
+    # 이미 REAL_ESTATE·CASH_EQUIVALENT 항목으로 별도 집계된 금액은 암묵적 예수금에서 제외
+    # (_build_target_items의 CASH 분기와 동일한 이중계산 방지 규칙).
+    already_claimed_krw = sum(
+        i.current_value_krw for i in result_items if i.market == "KR_PROPERTY" or i.ticker == CASH_EQUIVALENT_TICKER
+    )
+
     total_assets_krw = float(overview.get("total_assets_krw", 0))
     total_stock_krw = float(overview.get("total_stock_krw", 0))
-    cash_value = max(0.0, total_assets_krw - total_stock_krw)
+    cash_value = max(0.0, total_assets_krw - total_stock_krw - already_claimed_krw)
 
     if cash_value <= 0:
         return None
@@ -459,8 +501,10 @@ def compute_portfolio_drift_summary(
     # dividend/returns는 None으로 생략 — 빠른 계산용
     result_items, _ = _build_target_items(portfolio, base_krw, overview, current_map, None, None)
 
-    # CASH·KR_PROPERTY 제외한 주식 종목만 드리프트 계산
-    tradeable = [i for i in result_items if i.ticker != "CASH" and i.market != "KR_PROPERTY"]
+    # CASH·KR_PROPERTY·CASH_EQUIVALENT 제외한 주식 종목만 드리프트 계산
+    tradeable = [
+        i for i in result_items if i.ticker not in ("CASH", CASH_EQUIVALENT_TICKER) and i.market != "KR_PROPERTY"
+    ]
     if not tradeable:
         return PortfolioDriftSummary(
             portfolio_id=uuid.UUID(str(portfolio.id)),
