@@ -1,4 +1,5 @@
 import React from "react";
+import { RefreshCw } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
@@ -41,6 +42,9 @@ export interface RebalancingOrderTableProps {
   priceState: PriceLoadState;
   livePricesKrw: Record<string, number>;
   livePricesUsd: Record<string, number>;
+  priceRetrying: Set<string>;
+  onRetryPrice: (ticker: string, market: string) => void;
+  onRetryAllPrices: () => void;
   globalUsdRate: number | null;
   selected: Set<string>;
   qtyOverrides: Record<string, number>;
@@ -59,6 +63,9 @@ export function RebalancingOrderTable({
   priceState,
   livePricesKrw,
   livePricesUsd,
+  priceRetrying,
+  onRetryPrice,
+  onRetryAllPrices,
   globalUsdRate,
   selected,
   qtyOverrides,
@@ -73,9 +80,16 @@ export function RebalancingOrderTable({
       {priceState === "error" && (
         <div
           role="alert"
-          className="mx-3 mb-2 px-3 py-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg"
+          className="mx-3 mb-2 px-3 py-2 flex items-center justify-between gap-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg"
         >
-          현재가 조회 실패 — 지정가를 직접 입력하거나 잠시 후 다시 시도하세요.
+          <span>현재가 조회 실패 — 지정가를 직접 입력하거나 다시 시도하세요.</span>
+          <button
+            onClick={onRetryAllPrices}
+            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded bg-amber-800/40 hover:bg-amber-800/60 text-amber-200 transition-colors"
+          >
+            <RefreshCw size={12} />
+            재조회
+          </button>
         </div>
       )}
       {/* 모바일 카드 뷰 */}
@@ -113,6 +127,8 @@ export function RebalancingOrderTable({
                   priceState={priceState}
                   livePricesKrw={livePricesKrw}
                   livePricesUsd={livePricesUsd}
+                  priceRetrying={priceRetrying}
+                  onRetryPrice={onRetryPrice}
                   globalUsdRate={globalUsdRate}
                   nativeLimitPrice={nativeLimitPrice}
                   currentNativePrice={currentNativePrice}
@@ -179,6 +195,8 @@ export function RebalancingOrderTable({
                   priceState={priceState}
                   livePricesKrw={livePricesKrw}
                   livePricesUsd={livePricesUsd}
+                  priceRetrying={priceRetrying}
+                  onRetryPrice={onRetryPrice}
                   globalUsdRate={globalUsdRate}
                   nativeLimitPrice={nativeLimitPrice}
                   currentNativePrice={currentNativePrice}
@@ -281,6 +299,8 @@ export function RebalancingOrderTable({
                           priceState={priceState}
                           livePricesKrw={livePricesKrw}
                           livePricesUsd={livePricesUsd}
+                          priceRetrying={priceRetrying}
+                          onRetryPrice={onRetryPrice}
                         />
                       </td>
                       <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>
@@ -394,6 +414,8 @@ export function RebalancingOrderTable({
                           priceState={priceState}
                           livePricesKrw={livePricesKrw}
                           livePricesUsd={livePricesUsd}
+                          priceRetrying={priceRetrying}
+                          onRetryPrice={onRetryPrice}
                         />
                       </td>
                       <td className="px-3 py-2 text-right" onClick={(e) => e.stopPropagation()}>

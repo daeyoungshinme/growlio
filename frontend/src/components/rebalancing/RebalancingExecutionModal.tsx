@@ -1,3 +1,4 @@
+import { RefreshCw } from "lucide-react";
 import { AssetAccount } from "@/api/assets";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { RebalancingResultSection } from "./RebalancingResultSection";
@@ -28,7 +29,7 @@ export function RebalancingExecutionModal({
     accounts,
     onExecuted,
   });
-  const { state, orders, dispatch } = exec;
+  const { state, orders, dispatch, loadAllPrices } = exec;
   const { phase, results, confirmed, orderType, priceState, priceLoadProgress } = state;
 
   return (
@@ -85,9 +86,18 @@ export function RebalancingExecutionModal({
                 </div>
               )}
               {priceState === "error" && (
-                <span className="text-xs text-amber-400 w-full sm:w-auto">
-                  현재가 조회 실패 — 지정가 직접 입력 가능
-                </span>
+                <div className="w-full sm:w-auto flex items-center gap-2">
+                  <span className="text-xs text-amber-400">
+                    현재가 조회 실패 — 지정가 직접 입력 가능
+                  </span>
+                  <button
+                    onClick={() => void loadAllPrices()}
+                    className="shrink-0 flex items-center gap-1 text-xs text-amber-300 hover:text-amber-200 px-2 py-1 rounded bg-amber-900/30 hover:bg-amber-900/50 border border-amber-700/40 transition-colors"
+                  >
+                    <RefreshCw size={12} />
+                    재조회
+                  </button>
+                </div>
               )}
             </div>
           )}

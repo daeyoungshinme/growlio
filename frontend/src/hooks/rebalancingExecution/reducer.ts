@@ -64,6 +64,32 @@ export function executionReducer(state: ExecutionState, action: ExecutionAction)
             ? "loaded"
             : "error",
       };
+    case "PRICE_RETRY_START": {
+      const nextRetrying = new Set(state.priceRetrying);
+      nextRetrying.add(action.ticker);
+      return { ...state, priceRetrying: nextRetrying };
+    }
+    case "PRICE_RETRY_DONE": {
+      const nextRetrying = new Set(state.priceRetrying);
+      nextRetrying.delete(action.ticker);
+      const nextKrw = { ...state.livePricesKrw };
+      const nextUsd = { ...state.livePricesUsd };
+      if (action.krw != null) nextKrw[action.ticker] = action.krw;
+      if (action.usd != null) nextUsd[action.ticker] = action.usd;
+      return {
+        ...state,
+        priceRetrying: nextRetrying,
+        livePricesKrw: nextKrw,
+        livePricesUsd: nextUsd,
+        globalUsdRate: action.usdRate ?? state.globalUsdRate,
+        priceState: "loaded",
+      };
+    }
+    case "PRICE_RETRY_ERROR": {
+      const nextRetrying = new Set(state.priceRetrying);
+      nextRetrying.delete(action.ticker);
+      return { ...state, priceRetrying: nextRetrying };
+    }
     case "SET_ORDER_TYPE":
       return { ...state, orderType: action.orderType };
     case "SET_STRATEGY":

@@ -23,6 +23,8 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     getLimitPriceNative,
     getEstimateKrw,
     loadLiveBalance,
+    retryPrice,
+    loadAllPrices,
     hasRealAccount,
     globalCashSummary,
     autoAdjustForCash,
@@ -31,6 +33,7 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
     balanceState,
     depositKrw,
     priceState,
+    priceRetrying,
     livePricesKrw,
     livePricesUsd,
     globalUsdRate,
@@ -251,6 +254,9 @@ export function RebalancingConfirmStep({ ordersCount }: Props) {
                         priceState={priceState}
                         livePricesKrw={livePricesKrw}
                         livePricesUsd={livePricesUsd}
+                        priceRetrying={priceRetrying}
+                        onRetryPrice={retryPrice}
+                        onRetryAllPrices={() => void loadAllPrices()}
                         globalUsdRate={globalUsdRate}
                         selected={selected}
                         qtyOverrides={qtyOverrides}

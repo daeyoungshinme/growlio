@@ -567,6 +567,7 @@ const baseReducerState: ExecutionState = {
   priceLoadProgress: { loaded: 0, total: 0 },
   livePricesKrw: {},
   livePricesUsd: {},
+  priceRetrying: new Set(),
   globalUsdRate: null,
   orderType: "MARKET",
   strategy: "FULL",

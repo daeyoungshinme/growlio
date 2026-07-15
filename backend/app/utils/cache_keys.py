@@ -68,7 +68,15 @@ USD_KRW_RATE = "usd_krw_rate"
 
 
 def current_price_key(ticker: str, market: str) -> str:
+    """price_service.py 내부 배치 조회(fetch_current_price/fetch_prices_batch) 전용 — plain float 문자열 캐시.
+    JSON dict를 캐싱하는 `current_price_display_key`와 포맷이 다르므로 절대 공유하지 않는다."""
     return f"{_env_prefix()}price:current:{ticker}:{market}"
+
+
+def current_price_display_key(ticker: str, market: str) -> str:
+    """stocks.py의 /stocks/price, /stocks/prices-batch 응답 전용 — {price_krw, price_usd, usd_rate}
+    JSON dict 캐시. plain float를 저장하는 `current_price_key`와 포맷이 다르므로 절대 공유하지 않는다."""
+    return f"{_env_prefix()}price:display:{ticker}:{market}"
 
 
 def price_return_key(years: int, ticker: str, market: str) -> str:

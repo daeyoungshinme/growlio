@@ -179,10 +179,14 @@ export interface StockPrice {
   usd_rate: number | null;
 }
 
-export const fetchStockPrice = (ticker: string, market: string): Promise<StockPrice> =>
-  apiGet<StockPrice>("/stocks/price", { params: { ticker, market } });
+export const fetchStockPrice = (
+  ticker: string,
+  market: string,
+  accountId?: string,
+): Promise<StockPrice> =>
+  apiGet<StockPrice>("/stocks/price", { params: { ticker, market, account_id: accountId } });
 
 export const fetchStockPricesBatch = (
-  items: { ticker: string; market: string }[],
+  items: { ticker: string; market: string; account_id?: string }[],
 ): Promise<Record<string, StockPrice>> =>
   apiPost<Record<string, StockPrice>>("/stocks/prices-batch", { items });

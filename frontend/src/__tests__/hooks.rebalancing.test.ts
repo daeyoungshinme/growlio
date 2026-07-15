@@ -31,6 +31,7 @@ vi.mock("@/api/rebalancing", () => ({
 
 vi.mock("@/api/assets", () => ({
   fetchStockPrice: vi.fn(),
+  fetchStockPricesBatch: vi.fn().mockResolvedValue({}),
   fetchAccounts: vi.fn().mockResolvedValue([]),
   fetchExchangeRate: vi.fn().mockResolvedValue({ usd_krw: 1350 }),
 }));
@@ -150,6 +151,7 @@ const baseState: ExecutionState = {
   priceLoadProgress: { loaded: 0, total: 0 },
   livePricesKrw: {},
   livePricesUsd: {},
+  priceRetrying: new Set(),
   globalUsdRate: null,
   orderType: "MARKET",
   strategy: "FULL",
@@ -269,6 +271,45 @@ describe("executionReducer", () => {
   it("PRICES_DONE — krw가 비어있으면 priceState를 error로 설정한다", () => {
     const action: ExecutionAction = { type: "PRICES_DONE", krw: {}, usd: {}, usdRate: null };
     const result = executionReducer(baseState, action);
+    expect(result.priceState).toBe("error");
+  });
+
+  it("PRICE_RETRY_START — priceRetrying에 ticker를 추가한다", () => {
+    const action: ExecutionAction = { type: "PRICE_RETRY_START", ticker: "005930" };
+    const result = executionReducer(baseState, action);
+    expect(result.priceRetrying.has("005930")).toBe(true);
+  });
+
+  it("PRICE_RETRY_DONE — 해당 ticker만 병합하고 다른 값은 보존하며 priceState를 loaded로 전환한다", () => {
+    const state: ExecutionState = {
+      ...baseState,
+      priceState: "error",
+      livePricesKrw: { AAPL: 100 },
+      priceRetrying: new Set(["005930"]),
+    };
+    const action: ExecutionAction = {
+      type: "PRICE_RETRY_DONE",
+      ticker: "005930",
+      krw: 70000,
+      usdRate: 1350,
+    };
+    const result = executionReducer(state, action);
+    expect(result.livePricesKrw["005930"]).toBe(70000);
+    expect(result.livePricesKrw["AAPL"]).toBe(100);
+    expect(result.priceRetrying.has("005930")).toBe(false);
+    expect(result.globalUsdRate).toBe(1350);
+    expect(result.priceState).toBe("loaded");
+  });
+
+  it("PRICE_RETRY_ERROR — priceRetrying에서 제거하고 priceState는 변경하지 않는다", () => {
+    const state: ExecutionState = {
+      ...baseState,
+      priceState: "error",
+      priceRetrying: new Set(["005930"]),
+    };
+    const action: ExecutionAction = { type: "PRICE_RETRY_ERROR", ticker: "005930" };
+    const result = executionReducer(state, action);
+    expect(result.priceRetrying.has("005930")).toBe(false);
     expect(result.priceState).toBe("error");
   });
 
@@ -553,11 +594,9 @@ describe("useRebalancingPrices", () => {
   });
 
   it("loadAllPrices — 성공 시 PRICES_DONE을 dispatch한다", async () => {
-    const { fetchStockPrice } = await import("@/api/assets");
-    vi.mocked(fetchStockPrice).mockResolvedValue({
-      price_krw: 70000,
-      price_usd: null,
-      usd_rate: null,
+    const { fetchStockPricesBatch } = await import("@/api/assets");
+    vi.mocked(fetchStockPricesBatch).mockResolvedValue({
+      "005930": { price_krw: 70000, price_usd: null, usd_rate: null },
     });
 
     const dispatch = vi.fn();
@@ -567,15 +606,18 @@ describe("useRebalancingPrices", () => {
       await result.current.loadAllPrices();
     });
 
-    expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "PRICES_DONE" }));
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "PRICES_DONE",
+        krw: expect.objectContaining({ "005930": 70000 }),
+      }),
+    );
   });
 
   it("loadAllPrices — PRICES_DONE 또는 PRICES_START를 dispatch한다", async () => {
-    const { fetchStockPrice } = await import("@/api/assets");
-    vi.mocked(fetchStockPrice).mockResolvedValue({
-      price_krw: 80000,
-      price_usd: null,
-      usd_rate: null,
+    const { fetchStockPricesBatch } = await import("@/api/assets");
+    vi.mocked(fetchStockPricesBatch).mockResolvedValue({
+      FRESH1: { price_krw: 80000, price_usd: null, usd_rate: null },
     });
 
     const dispatch = vi.fn();
@@ -595,6 +637,150 @@ describe("useRebalancingPrices", () => {
     const types = dispatch.mock.calls.map((c) => c[0].type);
     // At least PRICES_DONE should have been called
     expect(types).toContain("PRICES_DONE");
+  });
+
+  it("loadAllPrices — 실패 결과는 세션 캐시에 저장하지 않아 재호출 시 다시 요청한다", async () => {
+    const { fetchStockPricesBatch } = await import("@/api/assets");
+    const freshAnalysis: RebalancingAnalysis = {
+      ...mockAnalysis,
+      items: [{ ...mockAnalysis.items[0], ticker: "RETRY_CACHE_TEST" }],
+      untracked_holdings: [],
+      ticker_account_map: {},
+    };
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, freshAnalysis));
+
+    vi.mocked(fetchStockPricesBatch).mockResolvedValueOnce({
+      RETRY_CACHE_TEST: { price_krw: null, price_usd: null, usd_rate: null },
+    });
+    await act(async () => {
+      await result.current.loadAllPrices();
+    });
+
+    vi.mocked(fetchStockPricesBatch).mockResolvedValueOnce({
+      RETRY_CACHE_TEST: { price_krw: 90000, price_usd: null, usd_rate: null },
+    });
+    await act(async () => {
+      await result.current.loadAllPrices();
+    });
+
+    expect(fetchStockPricesBatch).toHaveBeenCalledTimes(2);
+    const pricesDoneCalls = dispatch.mock.calls
+      .map((c) => c[0])
+      .filter((a) => a.type === "PRICES_DONE");
+    const lastPricesDone = pricesDoneCalls[pricesDoneCalls.length - 1];
+    expect(lastPricesDone.krw["RETRY_CACHE_TEST"]).toBe(90000);
+  });
+
+  it("loadAllPrices — STOCK_KIS 계좌 보유 티커는 account_id를 함께 전달한다", async () => {
+    const { fetchStockPricesBatch } = await import("@/api/assets");
+    vi.mocked(fetchStockPricesBatch).mockResolvedValue({
+      KIS_TICKER: { price_krw: 12345, price_usd: null, usd_rate: null },
+    });
+
+    const freshAnalysis: RebalancingAnalysis = {
+      ...mockAnalysis,
+      items: [{ ...mockAnalysis.items[0], ticker: "KIS_TICKER" }],
+      untracked_holdings: [],
+      ticker_account_map: {
+        KIS_TICKER: [
+          {
+            account_id: "acc-kis-1",
+            account_name: "KIS 계좌",
+            asset_type: "STOCK_KIS",
+            quantity: 1,
+            value_krw: 12345,
+            is_mock_mode: false,
+          },
+        ],
+      },
+    };
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, freshAnalysis));
+
+    await act(async () => {
+      await result.current.loadAllPrices();
+    });
+
+    expect(fetchStockPricesBatch).toHaveBeenCalledWith([
+      expect.objectContaining({ ticker: "KIS_TICKER", account_id: "acc-kis-1" }),
+    ]);
+  });
+
+  it("retryPrice — 성공 시 PRICE_RETRY_START 후 PRICE_RETRY_DONE을 dispatch한다", async () => {
+    const { fetchStockPrice } = await import("@/api/assets");
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: 71000,
+      price_usd: null,
+      usd_rate: null,
+    });
+
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, mockAnalysis));
+
+    await act(async () => {
+      await result.current.retryPrice("005930", "KRX");
+    });
+
+    const types = dispatch.mock.calls.map((c) => c[0].type);
+    expect(types).toEqual(["PRICE_RETRY_START", "PRICE_RETRY_DONE"]);
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "PRICE_RETRY_DONE", ticker: "005930", krw: 71000 }),
+    );
+  });
+
+  it("retryPrice — STOCK_KIS 계좌 보유 티커는 account_id를 함께 전달한다", async () => {
+    const { fetchStockPrice } = await import("@/api/assets");
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: 71000,
+      price_usd: null,
+      usd_rate: null,
+    });
+
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, mockAnalysis));
+
+    await act(async () => {
+      await result.current.retryPrice("005930", "KRX");
+    });
+
+    expect(fetchStockPrice).toHaveBeenCalledWith("005930", "KRX", "acc1");
+  });
+
+  it("retryPrice — 가격이 둘 다 null이면 PRICE_RETRY_ERROR를 dispatch하고 toast를 띄운다", async () => {
+    const { fetchStockPrice } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchStockPrice).mockResolvedValue({
+      price_krw: null,
+      price_usd: null,
+      usd_rate: null,
+    });
+
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, mockAnalysis));
+
+    await act(async () => {
+      await result.current.retryPrice("005930", "KRX");
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({ type: "PRICE_RETRY_ERROR", ticker: "005930" });
+    expect(toast).toHaveBeenCalled();
+  });
+
+  it("retryPrice — 예외 발생 시 PRICE_RETRY_ERROR를 dispatch하고 toast를 띄운다", async () => {
+    const { fetchStockPrice } = await import("@/api/assets");
+    const { toast } = await import("@/utils/toast");
+    vi.mocked(fetchStockPrice).mockRejectedValue(new Error("network error"));
+
+    const dispatch = vi.fn();
+    const { result } = renderHook(() => useRebalancingPrices(dispatch, mockAnalysis));
+
+    await act(async () => {
+      await result.current.retryPrice("005930", "KRX");
+    });
+
+    expect(dispatch).toHaveBeenCalledWith({ type: "PRICE_RETRY_ERROR", ticker: "005930" });
+    expect(toast).toHaveBeenCalled();
   });
 });
 

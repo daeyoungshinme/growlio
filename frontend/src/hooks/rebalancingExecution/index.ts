@@ -121,6 +121,7 @@ export function useRebalancingExecution({
         priceLoadProgress: { loaded: 0, total: 0 },
         livePricesKrw: {},
         livePricesUsd: {},
+        priceRetrying: new Set<string>(),
         globalUsdRate: null,
         orderType: "MARKET" as OrderType,
         strategy: "FULL" as Strategy,
@@ -150,7 +151,7 @@ export function useRebalancingExecution({
 
   const actionableItems = getActionableItems(analysis);
   const { loadLiveBalance, loadAllLiveBalances } = useRebalancingBalances(dispatch, kisAccounts);
-  const { loadAllPrices } = useRebalancingPrices(dispatch, analysis);
+  const { loadAllPrices, retryPrice } = useRebalancingPrices(dispatch, analysis);
 
   function getAccountQuantity(ticker: string, accountId: string): number {
     const livePos = liveBalances[accountId]?.find((p) => p.ticker === ticker);
@@ -502,6 +503,8 @@ export function useRebalancingExecution({
     getLimitPriceNative,
     getEstimateKrw,
     loadLiveBalance,
+    loadAllPrices,
+    retryPrice,
     handleExecute,
   };
 }

@@ -42,7 +42,7 @@ class TestFetchCurrentPrice:
         user_id = uuid.uuid4()
 
         with (
-            patch("app.services.price_service._domestic_price_fallback", new=AsyncMock(return_value=None)),
+            patch("app.services.price_service.domestic_price_fallback", new=AsyncMock(return_value=None)),
             patch("app.services.price_service._sync_yahoo_price", return_value=75000.0),
             patch("asyncio.get_event_loop") as mock_loop,
         ):
@@ -155,6 +155,30 @@ class TestFetchPricesBatch:
 
         assert result.get("005930") == 286000.0
         mock_yahoo_batch.assert_not_called()
+
+
+class TestReadCachedPricesMalformedEntry:
+    """_read_cached_prices: 캐시에 float으로 파싱 불가능한 값(예: 다른 엔드포인트가 저장한
+    JSON dict)이 섞여 있어도 전체 요청이 크래시하지 않고 해당 티커만 건너뛰어야 한다 — 과거
+    stocks.py와 current_price_key를 공유해 float(cached)가 JSON 문자열을 파싱하려다 크래시하던
+    회귀 방지."""
+
+    @pytest.mark.asyncio
+    async def test_skips_malformed_entry_and_returns_valid_ones(self, mock_redis, override_settings):
+        from unittest.mock import AsyncMock
+
+        from app.services.price_service import _read_cached_prices
+
+        mock_redis.mget = AsyncMock(
+            return_value=[
+                '{"price_krw": 15525.0, "price_usd": null, "usd_rate": null}',
+                "75000.0",
+            ]
+        )
+
+        result = await _read_cached_prices(mock_redis, [("402970", "KOSPI"), ("005930", "KOSPI")])
+
+        assert result == {"005930": 75000.0}
 
 
 # ── get_historical_returns ────────────────────────────────────
@@ -299,7 +323,7 @@ class TestFetchCurrentPriceCacheHit:
         assert price == 75000.0
 
 
-# ── _domestic_price_fallback: 국내 종목 Naver→pykrx 폴백 ────────
+# ── domestic_price_fallback: 국내 종목 Naver→pykrx 폴백 ────────
 
 
 class TestDomesticPriceFallback:
@@ -312,10 +336,10 @@ class TestDomesticPriceFallback:
             patch("app.services.price_service.sync_naver_price", return_value=286000.0),
             patch("app.services.price_service.sync_pykrx_price") as mock_pykrx,
         ):
-            from app.services.price_service import _domestic_price_fallback
+            from app.services.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
-            price = await _domestic_price_fallback("005930", loop)
+            price = await domestic_price_fallback("005930", loop)
 
         assert price == 286000.0
         mock_pykrx.assert_not_called()
@@ -329,10 +353,10 @@ class TestDomesticPriceFallback:
             patch("app.services.price_service.sync_naver_price", return_value=None),
             patch("app.services.price_service.sync_pykrx_price", return_value=284000.0),
         ):
-            from app.services.price_service import _domestic_price_fallback
+            from app.services.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
-            price = await _domestic_price_fallback("005930", loop)
+            price = await domestic_price_fallback("005930", loop)
 
         assert price == 284000.0
 
@@ -345,10 +369,10 @@ class TestDomesticPriceFallback:
             patch("app.services.price_service.sync_naver_price", return_value=None),
             patch("app.services.price_service.sync_pykrx_price", return_value=None),
         ):
-            from app.services.price_service import _domestic_price_fallback
+            from app.services.price_service import domestic_price_fallback
 
             loop = asyncio.get_running_loop()
-            price = await _domestic_price_fallback("005930", loop)
+            price = await domestic_price_fallback("005930", loop)
 
         assert price is None
 
@@ -385,7 +409,7 @@ class TestFetchCurrentPriceDomesticPriority:
         mock_db.scalar.return_value = None
 
         with (
-            patch("app.services.price_service._domestic_price_fallback") as mock_domestic,
+            patch("app.services.price_service.domestic_price_fallback") as mock_domestic,
             patch("app.services.price_service._sync_yahoo_price", return_value=180.0),
         ):
             from app.services.price_service import fetch_current_price

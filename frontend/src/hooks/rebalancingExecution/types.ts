@@ -34,6 +34,7 @@ export interface ExecutionState {
   priceLoadProgress: { loaded: number; total: number };
   livePricesKrw: Record<string, number>;
   livePricesUsd: Record<string, number>;
+  priceRetrying: Set<string>;
   globalUsdRate: number | null;
   orderType: OrderType;
   strategy: Strategy;
@@ -74,6 +75,15 @@ export type ExecutionAction =
       usd: Record<string, number>;
       usdRate: number | null;
     }
+  | { type: "PRICE_RETRY_START"; ticker: string }
+  | {
+      type: "PRICE_RETRY_DONE";
+      ticker: string;
+      krw?: number;
+      usd?: number;
+      usdRate?: number | null;
+    }
+  | { type: "PRICE_RETRY_ERROR"; ticker: string }
   | { type: "SET_ORDER_TYPE"; orderType: OrderType }
   | { type: "SET_STRATEGY"; strategy: Strategy }
   | { type: "SET_LIMIT_PRICE"; key: string; price: number }

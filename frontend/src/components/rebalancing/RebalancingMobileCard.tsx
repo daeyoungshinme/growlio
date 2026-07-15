@@ -19,6 +19,8 @@ export interface RebalancingMobileCardProps {
   priceState: PriceLoadState;
   livePricesKrw: Record<string, number>;
   livePricesUsd: Record<string, number>;
+  priceRetrying?: Set<string>;
+  onRetryPrice?: (ticker: string, market: string) => void;
   globalUsdRate: number | null;
   nativeLimitPrice: number;
   currentNativePrice: number | undefined;
@@ -39,6 +41,8 @@ export function RebalancingMobileCard({
   priceState,
   livePricesKrw,
   livePricesUsd,
+  priceRetrying,
+  onRetryPrice,
   globalUsdRate,
   nativeLimitPrice,
   currentNativePrice,
@@ -103,6 +107,8 @@ export function RebalancingMobileCard({
           priceState={priceState}
           livePricesKrw={livePricesKrw}
           livePricesUsd={livePricesUsd}
+          priceRetrying={priceRetrying}
+          onRetryPrice={onRetryPrice}
         />
       </div>
 

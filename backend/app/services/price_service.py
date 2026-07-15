@@ -40,12 +40,12 @@ from app.utils.cache_keys import (
     current_price_key,
     price_return_key,
 )
-from app.utils.circuit_breaker import CircuitOpenError, naver_circuit, yahoo_circuit
+from app.utils.circuit_breaker import CircuitOpenError, kis_circuit, naver_circuit, yahoo_circuit
 
 logger = structlog.get_logger()
 
 
-async def _domestic_price_fallback(ticker: str, loop: asyncio.AbstractEventLoop) -> float | None:
+async def domestic_price_fallback(ticker: str, loop: asyncio.AbstractEventLoop) -> float | None:
     """국내 종목 전용 폴백: Naver Finance → pykrx 순으로 시도."""
     try:
         price = await naver_circuit.call(loop.run_in_executor, None, partial(sync_naver_price, ticker))
@@ -81,7 +81,7 @@ async def fetch_current_price(
 
     price: float | None = None
     if market.upper() in DOMESTIC_MARKETS:
-        price = await _domestic_price_fallback(ticker, loop)
+        price = await domestic_price_fallback(ticker, loop)
 
     if not price and yahoo_circuit.is_available():
         async with _yfinance_sem:
@@ -115,7 +115,10 @@ async def _read_cached_prices(redis: RedisType, tickers: list[tuple[str, str]]) 
         cached_values = await redis.mget([current_price_key(t, m) for t, m in tickers])
         for (ticker, _), cached in zip(tickers, cached_values, strict=False):
             if cached:
-                price_map[ticker] = float(cached)
+                try:
+                    price_map[ticker] = float(cached)
+                except (ValueError, TypeError):
+                    logger.warning("price_cache_malformed", ticker=ticker, cached=cached)
     return price_map
 
 
@@ -156,7 +159,7 @@ async def fetch_prices_batch(
     domestic = [(t, m) for t, m in remaining if m.upper() in DOMESTIC_MARKETS]
     if domestic:
         domestic_results = await asyncio.gather(
-            *(_domestic_price_fallback(t, loop) for t, _ in domestic), return_exceptions=True
+            *(domestic_price_fallback(t, loop) for t, _ in domestic), return_exceptions=True
         )
         for (ticker, _), result in zip(domestic, domestic_results, strict=False):
             if isinstance(result, (int, float)) and result > 0:
@@ -277,26 +280,39 @@ async def _fetch_fallback(
 async def _price_via_kis(
     account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType
 ) -> float | None:
+    """KIS API로 현재가 조회 — 다른 소스가 실패했을 때만 쓰는 최후 폴백.
+    반복 실패 시 빠른 실패를 위해 `kis_circuit`으로 보호한다."""
+    if not kis_circuit.is_available():
+        return None
+
     from app.kis.auth import get_access_token
 
-    app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
-    app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
-    is_mock = account.is_mock_mode
-    token = await get_access_token(
-        app_key,
-        app_secret,
-        is_mock=is_mock,
-        redis=redis,
-        db=db,
-        user_id=str(account.user_id),
-        account_id=str(account.id),
-    )
-    if market in DOMESTIC_MARKETS:
-        from app.kis.domestic_quote import get_domestic_price
+    try:
+        app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
+        app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
+        is_mock = account.is_mock_mode
+        token = await get_access_token(
+            app_key,
+            app_secret,
+            is_mock=is_mock,
+            redis=redis,
+            db=db,
+            user_id=str(account.user_id),
+            account_id=str(account.id),
+        )
+        price: float | None
+        if market in DOMESTIC_MARKETS:
+            from app.kis.domestic_quote import get_domestic_price
 
-        return await get_domestic_price(app_key, app_secret, token, ticker, is_mock=is_mock)
-    else:
-        from app.kis.overseas_quote import get_overseas_price
+            price = await get_domestic_price(app_key, app_secret, token, ticker, is_mock=is_mock)
+        else:
+            from app.kis.overseas_quote import get_overseas_price
 
-        result = await get_overseas_price(app_key, app_secret, token, ticker, market, is_mock=is_mock)
-        return float(result.get("price", 0)) or None
+            result = await get_overseas_price(app_key, app_secret, token, ticker, market, is_mock=is_mock)
+            price = float(result.get("price", 0)) or None
+    except Exception:
+        kis_circuit.record_failure()
+        raise
+
+    kis_circuit.record_success()
+    return price
