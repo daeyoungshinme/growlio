@@ -41,6 +41,7 @@ export default function KisCredentialFields({
             value={form.kis_account_no ?? ""}
             onChange={(e) => set("kis_account_no", e.target.value)}
             placeholder="12345678-01"
+            autoComplete="off"
           />
           {form.kis_account_no && !kisAccountNoValid && (
             <p className="mt-1 text-xs text-red-500">형식 오류: 12345678-01 형식으로 입력하세요</p>
@@ -69,6 +70,7 @@ export default function KisCredentialFields({
             onCredentialChange();
           }}
           placeholder={isEdit ? "기존 키 유지" : "KIS 앱 키"}
+          autoComplete="off"
         />
       </div>
       <div>
@@ -88,6 +90,7 @@ export default function KisCredentialFields({
             onCredentialChange();
           }}
           placeholder={isEdit ? "기존 시크릿 유지" : "KIS 앱 시크릿"}
+          autoComplete="off"
         />
       </div>
       {(!isEdit || form.kis_app_key || form.kis_app_secret) && (

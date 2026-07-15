@@ -173,15 +173,6 @@ class AssetAccountCreate(BaseModel):
     def deposit_non_negative(cls, v: float | None) -> float | None:
         return _validate_non_negative(v)
 
-    @field_validator("kis_account_no")
-    @classmethod
-    def kis_account_no_format(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        if not re.fullmatch(r"\d{8}-\d{2}|\d{10}", v):
-            raise ValueError("KIS 계좌번호 형식이 올바르지 않습니다. 예: 12345678-01")
-        return v
-
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
@@ -189,11 +180,16 @@ class AssetAccountCreate(BaseModel):
 
     @model_validator(mode="after")
     def kis_credentials_required(self) -> "AssetAccountCreate":
-        if self.data_source == "KIS_API":
-            if not self.kis_account_no:
-                raise ValueError("KIS 계좌번호를 입력하세요.")
-            if not self.kis_app_key or not self.kis_app_secret:
-                raise ValueError("KIS App Key와 App Secret을 입력하세요.")
+        # data_source가 KIS_API가 아니면 kis_account_no는 무관한 값(브라우저 자동완성 등으로
+        # 남아있을 수 있음) — 검증하지 않고 무시한다.
+        if self.data_source != "KIS_API":
+            return self
+        if not self.kis_account_no:
+            raise ValueError("KIS 계좌번호를 입력하세요.")
+        if not re.fullmatch(r"\d{8}-\d{2}|\d{10}", self.kis_account_no):
+            raise ValueError("KIS 계좌번호 형식이 올바르지 않습니다. 예: 12345678-01")
+        if not self.kis_app_key or not self.kis_app_secret:
+            raise ValueError("KIS App Key와 App Secret을 입력하세요.")
         return self
 
 

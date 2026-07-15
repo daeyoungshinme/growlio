@@ -26,6 +26,7 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
             value={form.kiwoom_account_no ?? ""}
             onChange={(e) => set("kiwoom_account_no", e.target.value)}
             placeholder="12345678-01"
+            autoComplete="off"
           />
         </div>
       )}
@@ -48,6 +49,7 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
           value={form.kiwoom_app_key ?? ""}
           onChange={(e) => set("kiwoom_app_key", e.target.value || undefined)}
           placeholder={isEdit ? "기존 키 유지" : "키움 앱 키"}
+          autoComplete="off"
         />
       </div>
       <div>
@@ -64,6 +66,7 @@ export default function KiwoomCredentialFields({ form, set, isEdit }: Props) {
           value={form.kiwoom_app_secret ?? ""}
           onChange={(e) => set("kiwoom_app_secret", e.target.value || undefined)}
           placeholder={isEdit ? "기존 시크릿 유지" : "키움 앱 시크릿"}
+          autoComplete="off"
         />
       </div>
     </>

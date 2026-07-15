@@ -93,6 +93,17 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
       setDepositKrw(undefined);
       setDepositUsd(undefined);
     }
+    if (source !== "KIS_API") {
+      set("kis_account_no", undefined);
+      set("kis_app_key", undefined);
+      set("kis_app_secret", undefined);
+      resetVerify();
+    }
+    if (source !== "KIWOOM_API") {
+      set("kiwoom_account_no", undefined);
+      set("kiwoom_app_key", undefined);
+      set("kiwoom_app_secret", undefined);
+    }
   };
 
   const handleCreateSubmit = () => {
