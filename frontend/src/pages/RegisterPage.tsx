@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -57,6 +58,8 @@ export default function RegisterPage() {
           "error",
         );
       } else {
+        console.error("[Register] Unhandled Supabase signUp error:", msg);
+        Sentry.captureException(err, { extra: { context: "register", email } });
         setError("회원가입 중 오류가 발생했습니다");
       }
     } finally {
