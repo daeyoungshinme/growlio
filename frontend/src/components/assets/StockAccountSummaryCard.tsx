@@ -1,36 +1,23 @@
 import { useMemo } from "react";
 import { fmtKrw, fmtPct } from "@/utils/format";
+import { pnlColor } from "@/utils/colors";
 import type { AssetAccount } from "@/api/assets";
 import type { PortfolioOverview } from "@/types";
-
-interface Transaction {
-  transaction_type: string;
-  amount: number;
-  account_id: string | null;
-}
+import type { AccountStats } from "./StockAccountCard";
 
 interface Props {
-  stockAccounts: AssetAccount[];
+  perAccountStats: { account: AssetAccount; stats: AccountStats }[];
   overview: PortfolioOverview | undefined;
-  allTx: Transaction[];
   usdRate: number | null;
 }
 
-export default function StockAccountSummaryCard({
-  stockAccounts,
-  overview,
-  allTx,
-  usdRate,
-}: Props) {
+export default function StockAccountSummaryCard({ perAccountStats, overview, usdRate }: Props) {
   const { totalDeposit, totalDividend, totalDepositKrw, pnl, ret } = useMemo(() => {
-    const deposit = allTx
-      .filter((t) => t.transaction_type === "DEPOSIT")
-      .reduce((s, t) => s + t.amount, 0);
-    const dividend = allTx
-      .filter((t) => t.transaction_type === "DIVIDEND")
-      .reduce((s, t) => s + t.amount, 0);
-    const depositKrw = stockAccounts.reduce(
-      (s, a) => s + (a.deposit_krw ?? 0) + (a.deposit_usd ?? 0) * (usdRate ?? 1),
+    const deposit = perAccountStats.reduce((s, { stats }) => s + stats.deposit_total, 0);
+    const dividend = perAccountStats.reduce((s, { stats }) => s + stats.dividend_total, 0);
+    const depositKrw = perAccountStats.reduce(
+      (s, { account }) =>
+        s + (account.deposit_krw ?? 0) + (account.deposit_usd ?? 0) * (usdRate ?? 1),
       0,
     );
     return {
@@ -40,16 +27,14 @@ export default function StockAccountSummaryCard({
       pnl: overview?.unrealized_pnl_krw ?? 0,
       ret: overview?.stock_return_pct ?? 0,
     };
-  }, [stockAccounts, overview, allTx, usdRate]);
-
-  const pnlColor = pnl >= 0 ? "text-red-500" : "text-blue-500";
+  }, [perAccountStats, overview, usdRate]);
 
   return (
     <div className="card">
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">
         증권계좌 전체 요약
       </p>
-      <div className="grid grid-cols-3 gap-x-6 gap-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
@@ -58,7 +43,7 @@ export default function StockAccountSummaryCard({
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
-          <p className={`text-sm font-semibold mt-0.5 ${pnlColor}`}>
+          <p className={`text-sm font-semibold mt-0.5 ${pnlColor(pnl)}`}>
             {pnl >= 0 ? "+" : ""}
             {fmtKrw(pnl)}({fmtPct(ret)})
           </p>

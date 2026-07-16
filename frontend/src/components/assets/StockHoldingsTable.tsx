@@ -420,9 +420,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                             <td className="py-2 px-4 text-right text-xs text-gray-600 dark:text-gray-400">
                               {fmtKrwShort(sub.value_krw)}원
                             </td>
-                            <td
-                              className={`py-2 px-4 text-right text-xs ${sub.pnl >= 0 ? "text-red-400" : "text-blue-400"}`}
-                            >
+                            <td className={`py-2 px-4 text-right text-xs ${pnlColor(sub.pnl)}`}>
                               <div>
                                 {sub.pnl >= 0 ? "+" : ""}
                                 {fmtKrwShort(sub.pnl)}원

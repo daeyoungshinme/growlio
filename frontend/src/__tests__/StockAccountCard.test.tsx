@@ -39,7 +39,6 @@ const defaultProps = {
   onManagePositions: vi.fn(),
   onTransactions: vi.fn(),
   onEdit: vi.fn(),
-  onEditDeposit: vi.fn(),
   onEditName: vi.fn(),
   onSync: vi.fn(),
   isSyncing: false,
@@ -113,5 +112,18 @@ describe("StockAccountCard", () => {
     };
     renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
     expect(screen.getByText("평가금액")).toBeInTheDocument();
+  });
+
+  it("예수금 수정 버튼 클릭 시 onEdit을 계좌 정보와 함께 호출한다 (계좌 수정 모달로 위임)", () => {
+    const stats = {
+      amount_krw: 5000000,
+      invested_krw: 4000000,
+      unrealized_pnl: 1000000,
+      deposit_total: 4000000,
+      dividend_total: 100000,
+    };
+    renderWithProviders(<StockAccountCard {...defaultProps} stats={stats} />);
+    fireEvent.click(screen.getByRole("button", { name: "예수금 수정" }));
+    expect(defaultProps.onEdit).toHaveBeenCalledWith(mockAccount);
   });
 });

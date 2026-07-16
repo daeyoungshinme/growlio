@@ -12,7 +12,7 @@ const StockPositionsModal = lazy(() => import("@/components/assets/StockPosition
 const TransactionModal = lazy(() => import("@/components/assets/TransactionModal"));
 const BankAccountModal = lazy(() => import("@/components/assets/BankAccountModal"));
 const StockAccountModal = lazy(() => import("@/components/assets/StockAccountModal"));
-import StockAccountCard, { type AccountStats } from "@/components/assets/StockAccountCard";
+import StockAccountCard from "@/components/assets/StockAccountCard";
 import StockAccountSummaryCard from "@/components/assets/StockAccountSummaryCard";
 import TransactionHistoryTab from "@/components/assets/TransactionHistoryTab";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -24,9 +24,11 @@ import { BANK_TYPES, STOCK_TYPES, REAL_ESTATE_TYPES } from "@/constants";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 import { useAssetModals } from "@/hooks/useAssetModals";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
+import { useStockAccountStats } from "@/hooks/useStockAccountStats";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
 import Tabs from "@/components/common/Tabs";
+import { fmtKrw, fmtPct } from "@/utils/format";
 
 const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = (typeof TABS)[number];
@@ -104,30 +106,26 @@ export default function AssetManagementPage() {
   const realEstateAccounts = accounts.filter((a) => REAL_ESTATE_TYPES.includes(a.asset_type));
   const currentBankOrStock = tab === "은행계좌" ? bankAccounts : stockAccounts;
 
-  const stockAccountStats = useMemo(() => {
-    const portfolioAccMap = Object.fromEntries((overview?.accounts ?? []).map((a) => [a.id, a]));
-    const txByAcc: Record<string, { deposit: number; dividend: number }> = {};
-    for (const t of allTx) {
-      if (!t.account_id) continue;
-      if (!txByAcc[t.account_id]) txByAcc[t.account_id] = { deposit: 0, dividend: 0 };
-      if (t.transaction_type === "DEPOSIT") txByAcc[t.account_id].deposit += t.amount;
-      if (t.transaction_type === "DIVIDEND") txByAcc[t.account_id].dividend += t.amount;
-    }
-    return stockAccounts.map((account) => {
-      const pa = portfolioAccMap[account.id];
-      const tx = txByAcc[account.id] ?? { deposit: 0, dividend: 0 };
-      return {
-        account,
-        stats: {
-          amount_krw: pa?.amount_krw ?? 0,
-          invested_krw: pa?.invested_krw ?? 0,
-          unrealized_pnl: pa?.unrealized_pnl ?? 0,
-          deposit_total: tx.deposit,
-          dividend_total: tx.dividend,
-        } as AccountStats,
-      };
-    });
-  }, [stockAccounts, overview, allTx]);
+  const stockAccountStats = useStockAccountStats(stockAccounts, overview, allTx);
+
+  const assetComposition = useMemo(() => {
+    const allocation = overview?.asset_type_allocation ?? [];
+    const totalKrw = overview?.total_assets_krw ?? 0;
+    const sumFor = (types: string[]) =>
+      allocation
+        .filter((a) => types.includes(a.type ?? ""))
+        .reduce((s, a) => s + (a.amount_krw ?? 0), 0);
+    const stockKrw = sumFor(STOCK_TYPES);
+    const cashKrw = sumFor(BANK_TYPES);
+    const realEstateKrw = sumFor(REAL_ESTATE_TYPES);
+    const pct = (v: number) => (totalKrw > 0 ? (v / totalKrw) * 100 : 0);
+    return {
+      totalKrw,
+      stock: { amount: stockKrw, pct: pct(stockKrw) },
+      cash: { amount: cashKrw, pct: pct(cashKrw) },
+      realEstate: { amount: realEstateKrw, pct: pct(realEstateKrw) },
+    };
+  }, [overview]);
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -136,6 +134,50 @@ export default function AssetManagementPage() {
           계좌를 등록하고 입출금·배당 내역을 관리합니다.
         </p>
       </div>
+
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">
+        자산 <span className="mx-1">›</span> 계좌관리
+      </p>
+
+      {assetComposition.totalKrw > 0 && (
+        <div className="card mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산 구성</p>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+              {fmtKrw(assetComposition.totalKrw)}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-x-4 gap-y-2">
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">주식</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+                {fmtPct(assetComposition.stock.pct)}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {fmtKrw(assetComposition.stock.amount)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">현금</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+                {fmtPct(assetComposition.cash.pct)}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {fmtKrw(assetComposition.cash.amount)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">부동산</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+                {fmtPct(assetComposition.realEstate.pct)}
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {fmtKrw(assetComposition.realEstate.amount)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <Tabs
         tabs={TABS}
@@ -246,9 +288,8 @@ export default function AssetManagementPage() {
               <div className="space-y-3">
                 {/* 증권계좌 전체 요약 */}
                 <StockAccountSummaryCard
-                  stockAccounts={stockAccounts}
+                  perAccountStats={stockAccountStats}
                   overview={overview}
-                  allTx={allTx}
                   usdRate={usdRate}
                 />
                 {/* 계좌별 카드 */}
@@ -263,9 +304,6 @@ export default function AssetManagementPage() {
                       setTxAccount({ ...a, depositKrw: account.deposit_krw ?? 0 })
                     }
                     onEdit={setEditingStockAccount}
-                    onEditDeposit={(id, krw, usd) =>
-                      updateDepositMutation.mutate({ id, deposit_krw: krw, deposit_usd: usd })
-                    }
                     onEditName={(id, name) => updateNameMutation.mutate({ id, name })}
                     onSync={(id) => handleSyncKisAccount(id, accounts)}
                     isSyncing={syncingStockIds.has(account.id)}

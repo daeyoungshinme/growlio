@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchAccounts, type AssetAccount } from "@/api/assets";
-import { fetchPortfolioOverview } from "@/api/portfolios";
+import { fetchPortfolioOverviewLite } from "@/api/portfolios";
 import { fetchTransactions } from "@/api/transactions";
 import { useExchangeRate } from "./useExchangeRate";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -17,9 +17,8 @@ export function useAssetManagementData(tab: Tab) {
   });
 
   const { data: overview } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchPortfolioOverview,
-    enabled: isStockTab,
+    queryKey: QUERY_KEYS.portfolioOverviewLite,
+    queryFn: fetchPortfolioOverviewLite,
   });
 
   const { data: allTx = [] } = useQuery({

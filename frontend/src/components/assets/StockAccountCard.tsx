@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { BarChart2, Loader2, Pencil, Receipt, RefreshCw, Settings, Trash2 } from "lucide-react";
 import {
   type AssetAccount,
@@ -28,7 +27,6 @@ interface Props {
   onManagePositions: (account: { id: string; name: string; dataSource: string }) => void;
   onTransactions: (account: { id: string; name: string }) => void;
   onEdit: (account: AssetAccount) => void;
-  onEditDeposit: (id: string, depositKrw: number, depositUsd: number) => void;
   onEditName: (id: string, name: string) => void;
   onSync: (id: string) => void;
   isSyncing: boolean;
@@ -42,7 +40,6 @@ export default function StockAccountCard({
   onManagePositions,
   onTransactions,
   onEdit,
-  onEditDeposit,
   onEditName,
   onSync,
   isSyncing,
@@ -54,22 +51,8 @@ export default function StockAccountCard({
     stats && (stats.amount_krw > 0 || stats.deposit_total > 0 || stats.dividend_total > 0);
   const pnl = stats?.unrealized_pnl ?? 0;
   const ret = stats?.invested_krw ? (pnl / stats.invested_krw) * 100 : 0;
-  const [editDepositMode, setEditDepositMode] = useState(false);
-  const [editKrwValue, setEditKrwValue] = useState("");
-  const [editUsdValue, setEditUsdValue] = useState("");
   const usdRate = useExchangeRate();
   const { impact } = useHaptic();
-
-  const handleSave = () => {
-    onEditDeposit(account.id, Number(editKrwValue) || 0, Number(editUsdValue) || 0);
-    setEditDepositMode(false);
-  };
-
-  const handleCancel = () => {
-    setEditDepositMode(false);
-    setEditKrwValue("");
-    setEditUsdValue("");
-  };
 
   return (
     <div className="card">
@@ -82,8 +65,8 @@ export default function StockAccountCard({
             className="min-w-0"
             textClassName="text-base font-semibold text-gray-900 dark:text-gray-50 truncate"
           />
-          {/* 줄2: 텍스트 정보(truncate) + 배지(항상 표시) */}
-          <div className="flex items-center gap-1.5 mt-1 min-w-0">
+          {/* 줄2: 텍스트 정보(truncate) + 배지(넘치면 다음 줄로) */}
+          <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 min-w-0">
             {(account.institution || accountNo) && (
               <span className="text-xs text-gray-400 dark:text-gray-500 truncate min-w-0">
                 {[account.institution, accountNo].filter(Boolean).join(" · ")}
@@ -114,7 +97,7 @@ export default function StockAccountCard({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex flex-wrap justify-end gap-1 shrink-0">
           <button
             onClick={() => onEdit(account)}
             title="계좌 수정"
@@ -175,7 +158,7 @@ export default function StockAccountCard({
         </div>
       </div>
       {hasStats && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
             <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
@@ -191,98 +174,38 @@ export default function StockAccountCard({
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
-            {editDepositMode ? (
-              <div className="mt-0.5 space-y-1">
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    autoFocus
-                    min={0}
-                    value={editKrwValue}
-                    onChange={(e) => setEditKrwValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSave();
-                      if (e.key === "Escape") handleCancel();
-                    }}
-                    placeholder="원화"
-                    className="w-20 border rounded px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-50"
-                  />
-                  <span className="text-xs text-gray-400 shrink-0">원</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-xs text-gray-400 shrink-0">$</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    step="0.01"
-                    value={editUsdValue}
-                    onChange={(e) => setEditUsdValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSave();
-                      if (e.key === "Escape") handleCancel();
-                    }}
-                    placeholder="외화"
-                    className="w-20 border rounded px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800 dark:text-gray-50"
-                  />
-                  <span className="text-xs text-gray-400 shrink-0">USD</span>
-                </div>
-                {convertUsdToKrw(Number(editUsdValue), usdRate) > 0 && (
-                  <p className="text-xs text-gray-400">
-                    ≈ {fmtKrw(convertUsdToKrw(Number(editUsdValue), usdRate))}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleSave}
-                    className="text-xs text-blue-500 hover:text-blue-700"
-                  >
-                    저장
-                  </button>
-                  <button onClick={handleCancel} className="text-xs text-gray-400">
-                    취소
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-1 mt-0.5">
-                <div className="flex-1">
-                  {(() => {
-                    const krw = account.deposit_krw ?? 0;
-                    const usd = account.deposit_usd ?? 0;
-                    const hasUsd = usd > 0;
-                    const usdAsKrw = convertUsdToKrw(hasUsd ? usd : null, usdRate);
-                    const total = krw + usdAsKrw;
-                    return (
-                      <>
-                        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                          {fmtKrw(hasUsd && usdRate ? total : krw)}
+            <div className="flex items-start gap-1 mt-0.5">
+              <div className="flex-1">
+                {(() => {
+                  const krw = account.deposit_krw ?? 0;
+                  const usd = account.deposit_usd ?? 0;
+                  const hasUsd = usd > 0;
+                  const usdAsKrw = convertUsdToKrw(hasUsd ? usd : null, usdRate);
+                  const total = krw + usdAsKrw;
+                  return (
+                    <>
+                      <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                        {fmtKrw(hasUsd && usdRate ? total : krw)}
+                      </p>
+                      {hasUsd && (
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {usdRate
+                            ? `${fmtKrw(krw)} + $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                            : `$${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })} (환율 조회 중)`}
                         </p>
-                        {hasUsd && (
-                          <p className="text-xs text-gray-400 dark:text-gray-500">
-                            {usdRate
-                              ? `${fmtKrw(krw)} + $${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                              : `$${usd.toLocaleString(undefined, { maximumFractionDigits: 2 })} (환율 조회 중)`}
-                          </p>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-                <button
-                  onClick={() => {
-                    setEditKrwValue(String(account.deposit_krw ?? 0));
-                    setEditUsdValue(account.deposit_usd ? String(account.deposit_usd) : "");
-                    setEditDepositMode(true);
-                  }}
-                  aria-label="예수금 수정"
-                  className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0"
-                >
-                  <Pencil size={12} />
-                </button>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
-            )}
+              <button
+                onClick={() => onEdit(account)}
+                aria-label="예수금 수정"
+                className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0"
+              >
+                <Pencil size={12} />
+              </button>
+            </div>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>

@@ -108,12 +108,19 @@ describe("StockAccountSummaryCard", () => {
 
     renderWithProviders(
       <StockAccountSummaryCard
-        stockAccounts={[mockStockAccount]}
-        overview={overview}
-        allTx={[
-          { transaction_type: "DEPOSIT", amount: 5000000, account_id: "acc1" },
-          { transaction_type: "DIVIDEND", amount: 200000, account_id: "acc1" },
+        perAccountStats={[
+          {
+            account: mockStockAccount,
+            stats: {
+              amount_krw: 10000000,
+              invested_krw: 9500000,
+              unrealized_pnl: 500000,
+              deposit_total: 5000000,
+              dividend_total: 200000,
+            },
+          },
         ]}
+        overview={overview}
         usdRate={1350}
       />,
     );
@@ -124,12 +131,7 @@ describe("StockAccountSummaryCard", () => {
 
   it("renders with undefined overview", () => {
     renderWithProviders(
-      <StockAccountSummaryCard
-        stockAccounts={[mockStockAccount]}
-        overview={undefined}
-        allTx={[]}
-        usdRate={1350}
-      />,
+      <StockAccountSummaryCard perAccountStats={[]} overview={undefined} usdRate={1350} />,
     );
     expect(screen.getByText("증권계좌 전체 요약")).toBeDefined();
   });
@@ -142,12 +144,7 @@ describe("StockAccountSummaryCard", () => {
     } as unknown as PortfolioOverview;
 
     renderWithProviders(
-      <StockAccountSummaryCard
-        stockAccounts={[mockStockAccount]}
-        overview={overview}
-        allTx={[]}
-        usdRate={null}
-      />,
+      <StockAccountSummaryCard perAccountStats={[]} overview={overview} usdRate={null} />,
     );
     expect(document.body).toBeDefined();
   });

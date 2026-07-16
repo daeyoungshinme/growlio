@@ -274,7 +274,6 @@ describe("StockAccountCard", () => {
     onManagePositions: vi.fn(),
     onTransactions: vi.fn(),
     onEdit: vi.fn(),
-    onEditDeposit: vi.fn(),
     onEditName: vi.fn(),
     onSync: vi.fn(),
     isSyncing: false,
