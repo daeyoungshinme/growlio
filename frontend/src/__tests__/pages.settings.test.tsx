@@ -68,9 +68,6 @@ vi.mock("@/components/settings/NotificationEmailSection", () => ({
     <div data-testid="notification-email-section">{userEmail ?? "no-email"}</div>
   ),
 }));
-vi.mock("@/components/settings/DCASettingsSection", () => ({
-  DCASettingsSection: () => <div data-testid="dca-settings-section">DCASettingsSection</div>,
-}));
 vi.mock("@/components/settings/DeleteAccountModal", () => ({
   default: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="delete-account-modal">
@@ -85,8 +82,23 @@ import { toast } from "@/utils/toast";
 import { fetchAlertHistory } from "@/api/alerts";
 
 const mockSettings = {
+  has_kis: false,
   has_dart: false,
+  goal_amount: null,
+  goal_annual_return_pct: null,
+  annual_deposit_goal: null,
+  monthly_deposit_amount: null,
+  retirement_target_year: null,
   user_email: "user@example.com",
+  notification_email: null,
+  annual_dividend_goal: null,
+  fcm_token_stored: false,
+  composite_signal_alerts_enabled: false,
+  goal_candidate_tickers: [],
+  goal_risk_tolerance: "BALANCED",
+  goal_max_weight_pct: 30,
+  goal_cagr_lookback_years: 5,
+  goal_short_term_equity_floor_pct: 20,
 };
 
 function renderSettings() {
@@ -123,6 +135,52 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("stock-price-alert-section")).toBeInTheDocument();
     });
+  });
+
+  it("다른 설정 카드에 계좌 연동/목표/추천 옵션 요약과 딥링크를 표시한다", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("미연결")).toBeInTheDocument();
+    });
+    expect(screen.getByText("설정된 목표 없음")).toBeInTheDocument();
+    expect(screen.getByText("중립 · 후보 0개")).toBeInTheDocument();
+
+    const kisLink = screen.getByText("계좌 연동 (KIS/키움)").closest("a");
+    expect(kisLink).toHaveAttribute("href", "/assets?tab=계좌관리");
+
+    const goalLink = screen.getByText("투자·입금·배당 목표").closest("a");
+    expect(goalLink).toHaveAttribute("href", "/invest-plan?tab=적립 계획");
+
+    const recommendationLink = screen.getByText("목표 역산 추천 옵션").closest("a");
+    expect(recommendationLink).toHaveAttribute("href", "/rebalancing?rtab=포트폴리오");
+  });
+
+  it("계좌 연동이 있고 목표가 설정된 경우 다른 설정 카드에 반영한다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/settings") {
+        return Promise.resolve({
+          data: {
+            ...mockSettings,
+            has_kis: true,
+            goal_amount: 500000000,
+            annual_deposit_goal: 12000000,
+            goal_risk_tolerance: "AGGRESSIVE",
+            goal_candidate_tickers: [
+              { ticker: "005930", name: "삼성전자", market: "KOSPI" },
+              { ticker: "069500", name: "KODEX 200", market: "KOSPI" },
+            ],
+          },
+        });
+      }
+      if (url === "/assets") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("연결됨")).toBeInTheDocument();
+    });
+    expect(screen.getByText("목표 2개 설정됨")).toBeInTheDocument();
+    expect(screen.getByText("공격적 · 후보 2개")).toBeInTheDocument();
   });
 
   it("시장 신호 알림 탭을 클릭하면 MarketSignalAlertSection을 표시한다", async () => {

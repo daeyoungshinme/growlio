@@ -5,7 +5,6 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
-import type { SettingsData } from "@/api/settings";
 
 // ---- API mocks ----
 vi.mock("@/api/client", () => ({
@@ -42,7 +41,6 @@ vi.mock("@/api/portfolios", () => ({
 }));
 
 vi.mock("@/api/settings", () => ({
-  updateAutoDca: vi.fn().mockResolvedValue({}),
   fetchSettings: vi.fn().mockResolvedValue({ has_dart: false }),
   updateCompositeSignalAlerts: vi.fn().mockResolvedValue(undefined),
   updateGoalCandidateTickers: vi.fn().mockResolvedValue({}),
@@ -103,7 +101,6 @@ vi.mock("@/lib/supabase", () => ({
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
-import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
 import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
@@ -271,43 +268,6 @@ describe("MarketSignalAlertSection", () => {
     expect(warning).toBeDefined();
     const link = screen.getByText("리밸런싱 탭에서 설정하기");
     expect(link.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
-  });
-});
-
-// =========================================
-// DCASettingsSection
-// =========================================
-describe("DCASettingsSection", () => {
-  it("renders without crash", async () => {
-    renderWithProviders(<DCASettingsSection current={null} onSettingsChange={vi.fn()} />);
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-
-  it("renders with existing settings", async () => {
-    const current = {
-      auto_dca_enabled: true,
-      auto_dca_day: 5,
-      auto_dca_amount: 500000,
-      auto_dca_portfolio_id: "p1",
-      auto_dca_account_id: "acc1",
-      has_dart: false,
-    } as unknown as SettingsData;
-
-    renderWithProviders(<DCASettingsSection current={current} onSettingsChange={vi.fn()} />);
-    await waitFor(() => {
-      expect(document.body).toBeDefined();
-    });
-  });
-
-  it("shows save button", async () => {
-    renderWithProviders(<DCASettingsSection current={null} onSettingsChange={vi.fn()} />);
-    await waitFor(() => {
-      const saveBtn = screen.queryByText("저장");
-      if (saveBtn) expect(saveBtn).toBeDefined();
-      else expect(document.body).toBeDefined();
-    });
   });
 });
 

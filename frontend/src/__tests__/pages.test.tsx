@@ -183,10 +183,6 @@ vi.mock("@/components/settings/StockPriceAlertSection", () => ({
 vi.mock("@/components/settings/MarketSignalAlertSection", () => ({
   MarketSignalAlertSection: () => <div>시장 신호 알림 설정</div>,
 }));
-vi.mock("@/components/settings/DCASettingsSection", () => ({
-  DCASettingsSection: () => <div>DCA 설정</div>,
-}));
-
 // ---- Page imports (after mocks) ----
 import DashboardPage from "@/pages/DashboardPage";
 import SettingsPage from "@/pages/SettingsPage";

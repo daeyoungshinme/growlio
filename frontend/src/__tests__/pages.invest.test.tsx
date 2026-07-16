@@ -58,9 +58,6 @@ vi.mock("@/components/invest/MonthlyAchievementTable", () => ({
 vi.mock("@/components/invest/YearlyAchievementTable", () => ({
   default: () => <div data-testid="yearly-table">YearlyAchievementTable</div>,
 }));
-vi.mock("@/components/settings/DCASettingsSection", () => ({
-  DCASettingsSection: () => <div data-testid="dca-settings-section">DCASettingsSection</div>,
-}));
 vi.mock("@/components/ErrorBoundary", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));

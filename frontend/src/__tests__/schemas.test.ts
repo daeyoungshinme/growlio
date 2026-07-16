@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { loginSchema, registerSchema, resetPasswordSchema } from "@/schemas/auth";
 import { transactionSchema } from "@/schemas/transaction";
-import { investGoalSchema } from "@/schemas/settings";
 import { portfolioItemSchema, portfolioCreateSchema } from "@/schemas/portfolios";
 import {
   realEstateDetailsSchema,
@@ -189,77 +188,6 @@ describe("transactionSchema", () => {
   it("ticker는 선택 사항이다", () => {
     expect(transactionSchema.safeParse({ ...valid, ticker: "005930" }).success).toBe(true);
     expect(transactionSchema.safeParse({ ...valid }).success).toBe(true);
-  });
-});
-
-// ────────────────────────────────────────────
-// settings / investGoal schema
-// ────────────────────────────────────────────
-describe("investGoalSchema", () => {
-  it("모든 필드가 선택 사항이므로 빈 객체도 유효하다", () => {
-    expect(investGoalSchema.safeParse({}).success).toBe(true);
-  });
-
-  it("유효한 전체 데이터를 수락한다", () => {
-    expect(
-      investGoalSchema.safeParse({
-        annual_investment_goal: 12000000,
-        target_asset_amount: 500000000,
-        target_year: 2035,
-      }).success,
-    ).toBe(true);
-  });
-
-  it("annual_investment_goal이 음수이면 실패한다", () => {
-    const result = investGoalSchema.safeParse({ annual_investment_goal: -1 });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe("목표 금액은 0 이상이어야 합니다");
-    }
-  });
-
-  it("annual_investment_goal이 0이면 허용된다", () => {
-    expect(investGoalSchema.safeParse({ annual_investment_goal: 0 }).success).toBe(true);
-  });
-
-  it("target_year가 2020 미만이면 실패한다", () => {
-    const result = investGoalSchema.safeParse({ target_year: 2019 });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe("2020년 이후 연도를 입력해주세요");
-    }
-  });
-
-  it("target_year가 2101 이상이면 실패한다", () => {
-    const result = investGoalSchema.safeParse({ target_year: 2101 });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe("2100년 이전 연도를 입력해주세요");
-    }
-  });
-
-  it("target_year가 2020이면 허용된다", () => {
-    expect(investGoalSchema.safeParse({ target_year: 2020 }).success).toBe(true);
-  });
-
-  it("target_year가 2100이면 허용된다", () => {
-    expect(investGoalSchema.safeParse({ target_year: 2100 }).success).toBe(true);
-  });
-
-  it("소수점 target_year는 실패한다", () => {
-    const result = investGoalSchema.safeParse({ target_year: 2030.5 });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe("정수 연도를 입력해주세요");
-    }
-  });
-
-  it("target_asset_amount가 음수이면 실패한다", () => {
-    const result = investGoalSchema.safeParse({ target_asset_amount: -1000 });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error.issues[0].message).toBe("목표 자산은 0 이상이어야 합니다");
-    }
   });
 });
 

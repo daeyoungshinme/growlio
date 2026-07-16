@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
 import SkeletonCard from "@/components/common/SkeletonCard";
-import { DCASettingsSection } from "@/components/settings/DCASettingsSection";
 import { api } from "@/api/client";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -24,6 +23,7 @@ import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import Modal from "@/components/common/Modal";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
 
 const TABS = ["적립 계획", "배당 계획"] as const;
 type Tab = (typeof TABS)[number];
@@ -31,6 +31,7 @@ type Tab = (typeof TABS)[number];
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
   const [showAllStats, setShowAllStats] = useState(false);
+  const [monthlyOpen, setMonthlyOpen] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("tab");
   const activeTab: Tab = (TABS as readonly string[]).includes(rawTab ?? "")
@@ -50,8 +51,6 @@ export default function InvestPlanPage() {
     queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
     staleTime: STALE_TIME.LONG,
   });
-
-  const invalidateSettings = () => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, activeTab, setActiveTab);
@@ -87,6 +86,10 @@ export default function InvestPlanPage() {
 
   const s = data?.settings;
   const isConfigured = data?.is_configured;
+  const today = new Date().toISOString().slice(0, 7);
+  const latestMonth = data?.projection_months
+    .filter((d) => d.month <= today && d.has_data)
+    .slice(-1)[0];
 
   if (isLoading) {
     return (
@@ -162,7 +165,9 @@ export default function InvestPlanPage() {
                   설정 편집
                 </button>
               </div>
-              <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+              <div
+                className={`grid gap-4 ${showAllStats ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}
+              >
                 {(
                   [
                     {
@@ -181,7 +186,7 @@ export default function InvestPlanPage() {
                       priority: true,
                     },
                     {
-                      label: "연간 입금 목표",
+                      label: "연간 입금 목표 (대시보드 연동)",
                       value: settingsData?.annual_deposit_goal
                         ? fmtKrw(settingsData.annual_deposit_goal)
                         : null,
@@ -199,7 +204,7 @@ export default function InvestPlanPage() {
                       priority: false,
                     },
                     {
-                      label: "은퇴 목표시점",
+                      label: "은퇴 목표시점 (대시보드 연동)",
                       value: settingsData?.retirement_target_year
                         ? `${settingsData.retirement_target_year}년`
                         : null,
@@ -239,7 +244,6 @@ export default function InvestPlanPage() {
               </button>
               <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
                 연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
-                자동 정기매수 설정은 아래 설정 편집에서 변경할 수 있습니다.
               </p>
               {data && !isConfigured && (
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
@@ -270,7 +274,18 @@ export default function InvestPlanPage() {
                       <YearlyAchievementTable flat data={data.yearly_achievements} />
                     </div>
                     <div className="pt-4">
-                      <MonthlyAchievementTable flat data={data.projection_months} />
+                      <CollapsibleSection
+                        isOpen={monthlyOpen}
+                        onToggle={() => setMonthlyOpen((v) => !v)}
+                        label="월별 상세 보기"
+                        collapsedHint={
+                          latestMonth
+                            ? `최근 달(${latestMonth.month}) 달성율 ${latestMonth.achievement_pct !== null ? `${latestMonth.achievement_pct.toFixed(1)}%` : "—"}`
+                            : undefined
+                        }
+                      >
+                        <MonthlyAchievementTable flat data={data.projection_months} />
+                      </CollapsibleSection>
                     </div>
                   </div>
                 </div>
@@ -337,18 +352,6 @@ export default function InvestPlanPage() {
                 hint={hint}
               />
             ))}
-
-            <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-              <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-4">
-                자동 실행 설정
-              </p>
-              <DCASettingsSection
-                key={settingsData ? "dca-loaded" : "dca-loading"}
-                current={settingsData ?? null}
-                onSettingsChange={invalidateSettings}
-                flat
-              />
-            </div>
 
             <div className="flex gap-3 pt-4">
               <button

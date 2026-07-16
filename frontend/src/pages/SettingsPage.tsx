@@ -1,5 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Sun, Moon, LogOut, Bell, Fingerprint, LayoutGrid, UserX } from "lucide-react";
+import {
+  Sun,
+  Moon,
+  LogOut,
+  Bell,
+  Fingerprint,
+  LayoutGrid,
+  UserX,
+  Landmark,
+  Target,
+  Sparkles,
+  ChevronRight,
+} from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +32,41 @@ import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
+
+const RISK_TOLERANCE_LABELS: Record<string, string> = {
+  CONSERVATIVE: "보수적",
+  BALANCED: "중립",
+  AGGRESSIVE: "공격적",
+};
+
+function SettingsLinkRow({
+  to,
+  icon,
+  label,
+  status,
+  statusClassName,
+}: {
+  to: string;
+  icon: React.ReactNode;
+  label: string;
+  status: string;
+  statusClassName?: string;
+}) {
+  return (
+    <Link
+      to={to}
+      className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
+    >
+      {icon}
+      <span className="flex-1 min-w-0 truncate">{label}</span>
+      <span className={`text-xs shrink-0 ${statusClassName ?? "text-gray-400 dark:text-gray-500"}`}>
+        {status}
+      </span>
+      <ChevronRight size={16} className="text-gray-300 dark:text-gray-600 shrink-0" />
+    </Link>
+  );
+}
 
 const ALERT_TYPE_LABELS: Record<string, string> = {
   EXCHANGE_RATE: "환율 알림",
@@ -141,6 +188,25 @@ export default function SettingsPage() {
     void invalidateSettings();
   };
 
+  const goalFieldsSetCount = current
+    ? [
+        current.goal_amount,
+        current.annual_deposit_goal,
+        current.monthly_deposit_amount,
+        current.retirement_target_year,
+        current.annual_dividend_goal,
+      ].filter((v) => v !== null && v !== undefined).length
+    : 0;
+  const goalSummary = !current
+    ? "불러오는 중..."
+    : goalFieldsSetCount > 0
+      ? `목표 ${goalFieldsSetCount}개 설정됨`
+      : "설정된 목표 없음";
+
+  const recommendationSummary = current
+    ? `${RISK_TOLERANCE_LABELS[current.goal_risk_tolerance] ?? current.goal_risk_tolerance} · 후보 ${current.goal_candidate_tickers.length}개`
+    : "불러오는 중...";
+
   return (
     <div className="space-y-6 max-w-xl">
       {/* DART OpenAPI */}
@@ -181,53 +247,77 @@ export default function SettingsPage() {
         </div>
       </SectionCard>
 
+      {/* 다른 설정 — 계좌 연동/목표/추천 옵션은 각 기능 페이지에서 편집, 여기서는 상태 요약 + 딥링크만 제공 */}
+      <SectionCard title="다른 설정">
+        <SettingsLinkRow
+          to="/assets?tab=계좌관리"
+          icon={<Landmark size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="계좌 연동 (KIS/키움)"
+          status={!current ? "불러오는 중..." : current.has_kis ? "연결됨" : "미연결"}
+          statusClassName={
+            current?.has_kis
+              ? "text-green-600 dark:text-green-400"
+              : "text-gray-400 dark:text-gray-500"
+          }
+        />
+        <SettingsLinkRow
+          to="/invest-plan?tab=적립 계획"
+          icon={<Target size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="투자·입금·배당 목표"
+          status={goalSummary}
+        />
+        <SettingsLinkRow
+          to="/rebalancing?rtab=포트폴리오"
+          icon={<Sparkles size={18} className="text-gray-400 dark:text-gray-500" />}
+          label="목표 역산 추천 옵션"
+          status={recommendationSummary}
+        />
+      </SectionCard>
+
       {/* 알림 설정 그룹 */}
       <div ref={alertSectionRef}>
-        <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
-          알림 설정
-        </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 px-1">
-          리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
-          <Link
-            to="/rebalancing?rtab=포트폴리오"
-            className="text-blue-600 dark:text-blue-400 underline"
-          >
-            리밸런싱 탭
-          </Link>
-          에서 포트폴리오별로 설정합니다.
-        </p>
+        <SectionCard title="알림 설정">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
+            <Link
+              to="/rebalancing?rtab=포트폴리오"
+              className="text-blue-600 dark:text-blue-400 underline"
+            >
+              리밸런싱 탭
+            </Link>
+            에서 포트폴리오별로 설정합니다.
+          </p>
 
-        {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
-        <div className="mb-4">
+          {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
           <NotificationEmailSection
             userEmail={current?.user_email}
             onSettingsChange={invalidateSettings}
           />
-        </div>
 
-        {/* 알림 탭 */}
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl mb-4">
-          {ALERT_TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setAlertTab(tab)}
-              className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors min-h-[44px] ${
-                alertTab === tab
-                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+          {/* 알림 탭 */}
+          <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+            {ALERT_TABS.map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setAlertTab(tab)}
+                className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
+                  alertTab === tab
+                    ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
 
-        <div ref={alertTabContentRef}>
-          {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
-          {alertTab === "주가 알림" && <StockPriceAlertSection />}
-          {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
-          {alertTab === "발송 이력" && <AlertHistorySection />}
-        </div>
+          <div ref={alertTabContentRef}>
+            {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
+            {alertTab === "주가 알림" && <StockPriceAlertSection />}
+            {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
+            {alertTab === "발송 이력" && <AlertHistorySection />}
+          </div>
+        </SectionCard>
       </div>
 
       {/* 앱 설정 */}
@@ -244,7 +334,7 @@ export default function SettingsPage() {
           )}
           <button
             onClick={toggle}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px]"
+            className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
           >
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
             {isDark ? "라이트 모드로 전환" : "다크 모드로 전환"}
@@ -252,7 +342,7 @@ export default function SettingsPage() {
           {isNativePlatform() && isAvailable && (
             <button
               onClick={() => setEnabled(!isEnabled)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px]"
+              className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
               aria-pressed={isEnabled}
             >
               <Fingerprint size={18} className={isEnabled ? "text-blue-500" : undefined} />
@@ -266,7 +356,7 @@ export default function SettingsPage() {
           )}
           <button
             onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors min-h-[44px]"
+            className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors ${TOUCH_TARGET_ROW}`}
           >
             <LogOut size={18} />
             로그아웃
@@ -274,7 +364,7 @@ export default function SettingsPage() {
           <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
             <button
               onClick={() => setShowDeleteAccount(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors min-h-[44px]"
+              className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950 transition-colors ${TOUCH_TARGET_ROW}`}
             >
               <UserX size={18} />
               회원 탈퇴

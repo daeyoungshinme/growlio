@@ -13,7 +13,7 @@ export function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
       <div className="flex items-center gap-3">
         <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{title}</h2>
         {badge}

@@ -218,10 +218,6 @@ vi.mock("@/components/settings/shared", () => ({
   ConnectedBadge: () => <span data-testid="connected-badge">연결됨</span>,
 }));
 
-vi.mock("@/components/settings/DCASettingsSection", () => ({
-  DCASettingsSection: () => <div data-testid="dca-settings-section" />,
-}));
-
 vi.mock("@/api/alerts", () => ({
   fetchAlertHistory: vi.fn().mockResolvedValue([]),
   fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),

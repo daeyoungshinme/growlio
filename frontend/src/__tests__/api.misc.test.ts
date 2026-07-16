@@ -24,12 +24,7 @@ vi.mock("@/api/client", () => {
 });
 
 import { api } from "@/api/client";
-import {
-  fetchSettings,
-  updateAutoDca,
-  registerPushToken,
-  updateGoalCandidateTickers,
-} from "@/api/settings";
+import { fetchSettings, registerPushToken, updateGoalCandidateTickers } from "@/api/settings";
 import { fetchDCAAnalysis, fetchDividendPlan } from "@/api/invest";
 import { fetchOverseasPositionsTax, fetchTaxSummary } from "@/api/tax";
 import {
@@ -52,19 +47,6 @@ describe("api/settings", () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchSettings();
     expect(api.get).toHaveBeenCalledWith("/settings");
-  });
-
-  it("updateAutoDca calls PUT /settings/auto-dca", async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
-    const payload = {
-      enabled: true,
-      day: 15,
-      amount: 100000,
-      portfolio_id: null,
-      account_id: null,
-    };
-    await updateAutoDca(payload);
-    expect(api.put).toHaveBeenCalledWith("/settings/auto-dca", payload);
   });
 
   it("registerPushToken calls PUT /settings/push-token", async () => {

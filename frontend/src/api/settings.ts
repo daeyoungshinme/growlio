@@ -31,12 +31,6 @@ export interface SettingsData {
   retirement_target_year: number | null;
   user_email: string;
   notification_email: string | null;
-  auto_dca_enabled: boolean;
-  auto_dca_day: number | null;
-  auto_dca_amount: number | null;
-  auto_dca_portfolio_id: string | null;
-  auto_dca_account_id: string | null;
-  auto_dca_last_executed_at: string | null;
   annual_dividend_goal: number | null;
   fcm_token_stored: boolean;
   composite_signal_alerts_enabled: boolean;
@@ -47,17 +41,7 @@ export interface SettingsData {
   goal_short_term_equity_floor_pct: number;
 }
 
-export interface AutoDcaPayload {
-  enabled: boolean;
-  day: number | null;
-  amount: number | null;
-  portfolio_id: string | null;
-  account_id: string | null;
-}
-
 export const fetchSettings = (): Promise<SettingsData> => apiGet<SettingsData>("/settings");
-
-export const updateAutoDca = (payload: AutoDcaPayload) => apiPut("/settings/auto-dca", payload);
 
 export const registerPushToken = (fcm_token: string | null) =>
   apiPut("/settings/push-token", { fcm_token });

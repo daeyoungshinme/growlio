@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
+import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import { SectionCard } from "./shared";
 
 export function MarketSignalAlertSection() {
@@ -27,17 +28,12 @@ export function MarketSignalAlertSection() {
       {status && (
         <>
           <div className="flex items-center gap-3 pt-1">
-            <label className="relative inline-flex items-center cursor-pointer shrink-0">
-              <input
-                type="checkbox"
-                checked={status.enabled}
-                disabled={isPending}
-                onChange={(e) => toggle(e.target.checked)}
-                className="sr-only peer"
-                aria-label="시장/리스크 신호 알림 받기"
-              />
-              <div className="w-9 h-5 bg-gray-200 dark:bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full" />
-            </label>
+            <ToggleSwitch
+              checked={status.enabled}
+              disabled={isPending}
+              onChange={toggle}
+              ariaLabel="시장/리스크 신호 알림 받기"
+            />
             <span className="text-sm text-gray-700 dark:text-gray-300">
               {status.enabled ? "알림 받는 중" : "알림 꺼짐"}
             </span>
