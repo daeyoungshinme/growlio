@@ -91,6 +91,10 @@ vi.mock("@/api/portfolios", () => ({
     total_stock_krw: 8000000,
     accounts: [],
   }),
+  fetchPortfolioOverviewLite: vi.fn().mockResolvedValue({
+    total_stock_krw: 8000000,
+    accounts: [],
+  }),
 }));
 
 vi.mock("@/api/transactions", () => ({
