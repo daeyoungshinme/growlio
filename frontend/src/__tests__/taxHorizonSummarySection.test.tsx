@@ -37,6 +37,7 @@ const emptyIsa: IsaStatusSummary = { accounts: [], note: "" };
 describe("TaxHorizonSummarySection", () => {
   afterEach(() => {
     setViewportWidth(1024);
+    localStorage.clear();
   });
 
   it("투자기간/ISA/연금 태그가 하나도 없으면 렌더링하지 않는다", async () => {
@@ -48,17 +49,20 @@ describe("TaxHorizonSummarySection", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("투자기간 태그가 있으면 카드를 렌더링한다 (데스크탑 기본 펼침)", async () => {
+  it("투자기간 태그가 있으면 카드를 렌더링하고, 토글 클릭 시 펼쳐진다 (니치 정보라 기본 접힘)", async () => {
     setViewportWidth(1280);
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     renderWithProviders(
       <TaxHorizonSummarySection overview={makeOverview([{ investment_horizon: "LONG_TERM" }])} />,
     );
     expect(await screen.findByText("세제·기간 현황")).toBeInTheDocument();
+    expect(screen.queryByText(/투자기간별 자산현황/)).toBeNull();
+
+    fireEvent.click(screen.getByText("세제·기간 현황"));
     expect(await screen.findByText(/투자기간별 자산현황/)).toBeInTheDocument();
   });
 
-  it("모바일 뷰포트에서는 기본 접힘 상태로 시작하고, 토글 클릭 시 펼쳐진다", async () => {
+  it("모바일 뷰포트에서도 기본 접힘 상태로 시작하고, 토글 클릭 시 펼쳐진다", async () => {
     setViewportWidth(375);
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     renderWithProviders(
@@ -71,7 +75,7 @@ describe("TaxHorizonSummarySection", () => {
     expect(await screen.findByText(/투자기간별 자산현황/)).toBeInTheDocument();
   });
 
-  it("ISA 계좌가 있으면 IsaMaturityCard를 임베드 렌더한다", async () => {
+  it("ISA 계좌가 있으면 토글 펼침 후 IsaMaturityCard를 임베드 렌더한다", async () => {
     setViewportWidth(1280);
     fetchIsaStatus.mockResolvedValue({
       accounts: [
@@ -94,10 +98,12 @@ describe("TaxHorizonSummarySection", () => {
       note: "추정치입니다.",
     } as IsaStatusSummary);
     renderWithProviders(<TaxHorizonSummarySection overview={makeOverview([])} />);
+    await screen.findByText("세제·기간 현황");
+    fireEvent.click(screen.getByText("세제·기간 현황"));
     expect(await screen.findByText("ISA 만기·세제 현황")).toBeInTheDocument();
   });
 
-  it("연금저축 태그가 있으면 PensionContributionCard를 임베드 렌더한다", async () => {
+  it("연금저축 태그가 있으면 토글 펼침 후 PensionContributionCard를 임베드 렌더한다", async () => {
     setViewportWidth(1280);
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     fetchPensionContribution.mockResolvedValue({
@@ -116,6 +122,8 @@ describe("TaxHorizonSummarySection", () => {
     renderWithProviders(
       <TaxHorizonSummarySection overview={makeOverview([{ tax_type: "PENSION_SAVINGS" }])} />,
     );
+    await screen.findByText("세제·기간 현황");
+    fireEvent.click(screen.getByText("세제·기간 현황"));
     expect(await screen.findByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument();
   });
 });

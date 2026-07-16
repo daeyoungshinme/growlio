@@ -101,6 +101,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           <div className="flex items-center gap-2">
             <input
               type="number"
+              inputMode="numeric"
               min={10}
               max={100}
               step={5}
@@ -143,6 +144,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           <div className="flex items-center gap-2">
             <input
               type="number"
+              inputMode="numeric"
               min={0}
               max={100}
               step={5}

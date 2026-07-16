@@ -16,8 +16,10 @@ import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
+import FormInput from "@/components/common/FormInput";
 import { TickerSearchField } from "./TickerSearchField";
 import { extractErrorMessage } from "@/utils/error";
+import { transactionSchema, type TransactionFormData } from "@/schemas/transaction";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -57,6 +59,9 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
   const { form, set: setField } = useForm<TransactionCreate>(initial);
   const [currency, setCurrency] = useState<"KRW" | "USD">("KRW");
   const [amountUsd, setAmountUsd] = useState(0);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof TransactionFormData, string>>
+  >({});
   const accountPositions = useAccountPositions(
     form.account_id ?? "",
     form.transaction_type === "DIVIDEND",
@@ -89,7 +94,23 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.amount || form.amount <= 0) return;
+    const result = transactionSchema.safeParse({
+      transaction_type: form.transaction_type,
+      amount: form.amount,
+      transaction_date: form.transaction_date,
+      ticker: form.ticker || undefined,
+      notes: form.notes || undefined,
+    });
+    if (!result.success) {
+      const errors: Partial<Record<keyof TransactionFormData, string>> = {};
+      for (const issue of result.error.issues) {
+        const key = issue.path[0] as keyof TransactionFormData;
+        if (!errors[key]) errors[key] = issue.message;
+      }
+      setFieldErrors(errors);
+      return;
+    }
+    setFieldErrors({});
     const payload = {
       ...form,
       account_id: form.account_id || undefined,
@@ -156,19 +177,16 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               ))}
             </select>
           </div>
-          <div>
-            <label htmlFor="txform-date" className={labelCls}>
-              날짜 *
-            </label>
-            <input
-              id="txform-date"
-              type="date"
-              required
-              value={form.transaction_date}
-              onChange={(e) => setField("transaction_date", e.target.value)}
-              className={inputCls}
-            />
-          </div>
+          <FormInput
+            id="txform-date"
+            label="날짜"
+            required
+            type="date"
+            inputSize="md"
+            value={form.transaction_date}
+            onChange={(e) => setField("transaction_date", e.target.value)}
+            error={fieldErrors.transaction_date}
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -237,6 +255,9 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                 />
               </>
             )}
+            {fieldErrors.amount && (
+              <p className="text-xs text-red-500 mt-1">{fieldErrors.amount}</p>
+            )}
           </div>
           {form.transaction_type === "DIVIDEND" ? (
             <TickerSearchField
@@ -247,47 +268,40 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
               onTickerChange={(t) => setField("ticker", t)}
             />
           ) : (
-            <div>
-              <label className={labelCls}>메모 (선택)</label>
-              <input
-                value={form.notes || ""}
-                onChange={(e) => setField("notes", e.target.value)}
-                placeholder="메모 입력"
-                className={`${inputCls} mt-1`}
-              />
-            </div>
-          )}
-        </div>
-        {form.transaction_type === "DIVIDEND" && (
-          <div>
-            <label htmlFor="txform-notes" className={labelCls}>
-              메모 (선택)
-            </label>
-            <input
+            <FormInput
               id="txform-notes"
+              label="메모 (선택)"
+              inputSize="md"
               value={form.notes || ""}
               onChange={(e) => setField("notes", e.target.value)}
               placeholder="메모 입력"
-              className={`${inputCls} mt-1`}
+              error={fieldErrors.notes}
             />
-          </div>
-        )}
-        <div>
-          <label htmlFor="txform-fee" className={labelCls}>
-            거래 수수료 (선택)
-          </label>
-          <input
-            id="txform-fee"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            value={form.fee ?? ""}
-            onChange={(e) => setField("fee", e.target.value ? Number(e.target.value) : undefined)}
-            placeholder="예: 350"
-            className={`${inputCls} mt-1`}
-          />
+          )}
         </div>
+        {form.transaction_type === "DIVIDEND" && (
+          <FormInput
+            id="txform-notes"
+            label="메모 (선택)"
+            inputSize="md"
+            value={form.notes || ""}
+            onChange={(e) => setField("notes", e.target.value)}
+            placeholder="메모 입력"
+            error={fieldErrors.notes}
+          />
+        )}
+        <FormInput
+          id="txform-fee"
+          label="거래 수수료 (선택)"
+          type="number"
+          inputMode="numeric"
+          inputSize="md"
+          min={0}
+          step={1}
+          value={form.fee ?? ""}
+          onChange={(e) => setField("fee", e.target.value ? Number(e.target.value) : undefined)}
+          placeholder="예: 350"
+        />
         <div className="flex justify-end gap-2">
           <button
             type="button"

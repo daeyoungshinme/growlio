@@ -127,7 +127,7 @@ export function TransactionList({
                 <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">
                   {fmtKrw(tx.amount)}
                 </td>
-                <td className="px-3 py-3 text-gray-400 dark:text-gray-500 text-xs">
+                <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs">
                   <div className="max-w-[100px] truncate">{tx.notes || "—"}</div>
                 </td>
                 <td className="px-3 py-3 text-right">
@@ -135,7 +135,7 @@ export function TransactionList({
                     <button
                       onClick={() => onEdit(tx)}
                       aria-label="수정"
-                      className="p-1 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors"
+                      className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
                     >
                       <Pencil size={13} />
                     </button>
@@ -143,7 +143,7 @@ export function TransactionList({
                       onClick={() => onDelete(tx.id)}
                       disabled={isDeleting}
                       aria-label="삭제"
-                      className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors"
+                      className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
                     >
                       <Trash2 size={13} />
                     </button>

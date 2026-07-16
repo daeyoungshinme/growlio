@@ -64,15 +64,16 @@ export function RebalancingMobileCard({
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-medium text-white text-sm">{item.name}</span>
+            <span className="font-medium text-gray-900 dark:text-white text-sm">{item.name}</span>
             <SideBadge isBuy={isBuy} />
           </div>
-          <p className="text-gray-400 text-xs">{item.ticker}</p>
+          <p className="text-gray-500 dark:text-gray-400 text-xs">{item.ticker}</p>
         </div>
         <div className="shrink-0 text-right">
           <div className="flex items-center gap-1">
             <input
               type="number"
+              inputMode="numeric"
               min={0}
               max={maxQty}
               value={qty || ""}
@@ -84,14 +85,16 @@ export function RebalancingMobileCard({
                   qty: parseInt(e.target.value) || 0,
                 })
               }
-              className={`w-24 bg-gray-800 border border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
-                isBuy ? "text-red-400" : "text-blue-400"
+              className={`w-24 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-2.5 text-right font-medium text-sm focus:outline-none focus:border-indigo-500 ${
+                isBuy ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"
               }`}
             />
-            <span className="text-gray-400 text-sm shrink-0">주</span>
+            <span className="text-gray-500 dark:text-gray-400 text-sm shrink-0">주</span>
           </div>
           {marketOrderEst != null && orderType === "MARKET" && (
-            <p className="text-xs text-gray-500 mt-0.5">≈ {fmtKrw(marketOrderEst)}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+              ≈ {fmtKrw(marketOrderEst)}
+            </p>
           )}
           {extra}
         </div>
@@ -99,7 +102,7 @@ export function RebalancingMobileCard({
 
       {/* Row 2: 현재가 인라인 */}
       <div className="mt-0.5 pl-7 flex items-center gap-1.5">
-        <span className="text-xs text-gray-500">현재가</span>
+        <span className="text-xs text-gray-500 dark:text-gray-500">현재가</span>
         <PriceCell
           ticker={item.ticker}
           market={item.market}
@@ -115,13 +118,13 @@ export function RebalancingMobileCard({
       {orderType === "LIMIT" && (
         <div className="mt-1 pl-7">
           <div className="flex items-center justify-between mb-0.5">
-            <p className="text-xs text-gray-500">지정가</p>
+            <p className="text-xs text-gray-500 dark:text-gray-500">지정가</p>
             {priceState === "loaded" && currentNativePrice != null && (
               <button
                 onClick={() =>
                   dispatch({ type: "SET_LIMIT_PRICE", key: orderKey, price: currentNativePrice })
                 }
-                className={`text-xs text-indigo-400 hover:text-indigo-300 px-2 rounded hover:bg-indigo-950/30 transition-colors ${TOUCH_TARGET_MIN}`}
+                className={`text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 px-2 rounded hover:bg-indigo-50 dark:hover:bg-indigo-950/30 transition-colors ${TOUCH_TARGET_MIN}`}
               >
                 현재가로
               </button>
@@ -130,6 +133,7 @@ export function RebalancingMobileCard({
           <div className="flex items-center gap-2">
             <input
               type="number"
+              inputMode="decimal"
               min={0}
               step={overseas ? 0.01 : 1}
               value={nativeLimitPrice || ""}
@@ -141,12 +145,14 @@ export function RebalancingMobileCard({
                   price: parseFloat(e.target.value) || 0,
                 })
               }
-              className="flex-1 bg-gray-800 border border-indigo-600/50 rounded px-2 py-2.5 text-right text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
+              className="flex-1 bg-white dark:bg-gray-800 border border-indigo-300 dark:border-indigo-600/50 rounded px-2 py-2.5 text-right text-indigo-700 dark:text-indigo-300 font-medium text-sm focus:outline-none focus:border-indigo-500"
             />
-            <span className="text-gray-400 text-sm shrink-0">{overseas ? "USD" : "원"}</span>
+            <span className="text-gray-500 dark:text-gray-400 text-sm shrink-0">
+              {overseas ? "USD" : "원"}
+            </span>
           </div>
           {nativeLimitPrice > 0 && (
-            <p className="text-xs text-gray-600 mt-0.5 text-right">
+            <p className="text-xs text-gray-500 dark:text-gray-600 mt-0.5 text-right">
               ≈{" "}
               {fmtKrw(
                 overseas && globalUsdRate != null

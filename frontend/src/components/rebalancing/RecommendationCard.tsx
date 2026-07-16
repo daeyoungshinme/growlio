@@ -206,23 +206,14 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
   // 최초 방문 시 백엔드가 후보를 시드하거나(seed) 세제유형 선호 지수에 맞는 큐레이션 ETF를 자동
   // 추가해 DB에 커밋할 수 있으므로, 이미 캐시된 settings 쿼리가 그 이전 값을 들고 있을 수 있다.
-  // overall/horizon 두 조회는 응답 시간이 크게 달라(horizon은 최대 15개 조합을 순회해 훨씬 느림)
-  // 한쪽만 트리거하면 늦게 끝나는 쪽의 커밋을 놓칠 수 있으므로, 각각 도착할 때 독립적으로 1회씩
-  // settings를 재조회해 동기화한다.
-  const overallSettingsSyncedRef = useRef(false);
+  // overall/horizon 중 먼저 도착하는 응답을 기준으로 1회만 재조회해 동기화한다.
+  const settingsSyncedRef = useRef(false);
   useEffect(() => {
-    if (overallData && !overallSettingsSyncedRef.current) {
-      overallSettingsSyncedRef.current = true;
+    if ((overallData || horizonData) && !settingsSyncedRef.current) {
+      settingsSyncedRef.current = true;
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
     }
-  }, [overallData, queryClient]);
-  const horizonSettingsSyncedRef = useRef(false);
-  useEffect(() => {
-    if (horizonData && !horizonSettingsSyncedRef.current) {
-      horizonSettingsSyncedRef.current = true;
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
-    }
-  }, [horizonData, queryClient]);
+  }, [overallData, horizonData, queryClient]);
 
   if (!overallData) return null;
 
@@ -263,7 +254,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                 key={t}
                 type="button"
                 onClick={() => setSelectedTaxType(t)}
-                className={`px-2 py-0.5 text-[11px] rounded-full border transition-colors ${
+                className={`px-2 py-1 text-xs rounded-full border transition-colors ${
                   t === activeTaxType
                     ? "bg-teal-100 dark:bg-teal-800/40 border-teal-400 dark:border-teal-600 text-teal-700 dark:text-teal-300"
                     : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
@@ -443,7 +434,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               (!activeHorizonRec.includes_cash_equivalent || cashEquivalentMatches.length > 0) && (
                 <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
                   {activeHorizonRec.includes_cash_equivalent && (
-                    <p className="text-[11px] text-teal-600 dark:text-teal-500">
+                    <p className="text-xs text-teal-600 dark:text-teal-500">
                       현금성 자산 반영을 위해 {cashEquivalentMatches.map((a) => a.name).join(", ")}{" "}
                       계좌가 포트폴리오에 자동으로 연결됩니다.
                     </p>

@@ -73,13 +73,15 @@ export default function RebalancingTable({
       {/* 실행 버튼 행 (데스크탑) */}
       <div className="hidden sm:flex items-center gap-2">
         {isStale && (
-          <span className="text-xs text-amber-400 bg-amber-900/30 border border-amber-700/40 rounded-lg px-2.5 py-1">
+          <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/40 rounded-lg px-2.5 py-1">
             분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
           </span>
         )}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
-            <span className="text-xs text-gray-500">KIS 증권계좌 연동 시 자동 주문 가능</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              KIS 증권계좌 연동 시 자동 주문 가능
+            </span>
           )}
           <button
             onClick={() => setExecutionOpen(true)}
@@ -119,20 +121,26 @@ export default function RebalancingTable({
 
       {/* 미추적 보유 종목 */}
       {(analysis.untracked_holdings ?? []).length > 0 && (
-        <div className="bg-amber-900/20 border border-amber-700/30 rounded-xl p-4">
-          <div className="text-xs font-medium text-amber-400 mb-2">
+        <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/30 rounded-xl p-4">
+          <div className="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">
             포트폴리오 미포함 보유 종목 ({(analysis.untracked_holdings ?? []).length}개)
           </div>
           <div className="space-y-1.5">
             {(analysis.untracked_holdings ?? []).map((h, idx) => (
               <div key={idx} className="flex items-center justify-between text-xs">
                 <div className="min-w-0">
-                  <span className="font-medium text-gray-200 truncate">{h.name}</span>
-                  <span className="text-gray-500 ml-1.5">{h.ticker}</span>
+                  <span className="font-medium text-gray-800 dark:text-gray-200 truncate">
+                    {h.name}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400 ml-1.5">{h.ticker}</span>
                 </div>
                 <div className="text-right shrink-0 ml-3">
-                  <span className="text-gray-300">{fmtKrw(h.current_value_krw)}</span>
-                  <span className="text-gray-500 ml-1">({h.current_weight_pct.toFixed(1)}%)</span>
+                  <span className="text-gray-700 dark:text-gray-300">
+                    {fmtKrw(h.current_value_krw)}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400 ml-1">
+                    ({h.current_weight_pct.toFixed(1)}%)
+                  </span>
                 </div>
               </div>
             ))}
@@ -140,7 +148,7 @@ export default function RebalancingTable({
         </div>
       )}
 
-      <div className="text-xs text-gray-500 text-right">
+      <div className="text-xs text-gray-500 dark:text-gray-400 text-right">
         분석 시점:{" "}
         {new Date(analysis.analyzed_at).toLocaleTimeString("ko-KR", {
           hour: "2-digit",

@@ -83,6 +83,21 @@ describe("LoginPage", () => {
     );
   });
 
+  it("Caps Lock이 켜진 상태로 비밀번호 필드에 입력하면 경고 문구를 표시한다", () => {
+    renderWithRouter(<LoginPage />);
+    const passwordInput = screen.getByLabelText("비밀번호");
+
+    const keyDownEvent = new KeyboardEvent("keydown", { bubbles: true, cancelable: true });
+    Object.defineProperty(keyDownEvent, "getModifierState", { value: () => true });
+    fireEvent(passwordInput, keyDownEvent);
+    expect(screen.getByText("Caps Lock이 켜져 있습니다")).toBeInTheDocument();
+
+    const keyUpEvent = new KeyboardEvent("keyup", { bubbles: true, cancelable: true });
+    Object.defineProperty(keyUpEvent, "getModifierState", { value: () => false });
+    fireEvent(passwordInput, keyUpEvent);
+    expect(screen.queryByText("Caps Lock이 켜져 있습니다")).not.toBeInTheDocument();
+  });
+
   it("로그인 중에는 버튼이 비활성화된다", async () => {
     let resolve: () => void;
     mockLogin.mockReturnValue(

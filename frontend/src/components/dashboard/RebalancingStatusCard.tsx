@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, AlertTriangle, ArrowRight, BellOff, ChevronDown, Shuffle } from "lucide-react";
@@ -9,9 +9,13 @@ import { fetchPortfolios } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useInsights } from "@/hooks/useInsights";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import type { Insight, InsightType, InsightSeverity } from "@/api/insights";
 import type { MarketSignalResponse } from "@/api/marketSignals";
 import { buildCombinedStatusNote } from "@/utils/diagnosisInsights";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+
+const OTHER_INSIGHTS_VISIBLE_LIMIT = 3;
 
 const SIGNAL_BG = {
   GREEN:
@@ -151,6 +155,9 @@ interface Props {
   signalDisplay?: "none" | "badge" | "banner";
   showDriftRows?: boolean;
   maxDriftRows?: number;
+  /** false면 헤더의 "N개 필요" 배지를 숨긴다 — 상위에 DiagnosisSummaryHeader 등 동일 정보를
+   * 이미 보여주는 통합 헤더가 있을 때 중복 표시를 피하기 위함 (기본값 true, 대시보드 카드는 유지). */
+  showHeaderBadge?: boolean;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -170,8 +177,10 @@ export default function RebalancingStatusCard({
   signalDisplay = "banner",
   showDriftRows = false,
   maxDriftRows,
+  showHeaderBadge = true,
 }: Props) {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, toggleOpen] = useCollapsible(true);
+  const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
@@ -221,28 +230,20 @@ export default function RebalancingStatusCard({
       : "card";
 
   return (
-    <div className={cardClass}>
-      <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-2 min-w-0"
-          aria-expanded={isOpen}
-        >
-          <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
-            <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
-          </div>
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">투자 현황 진단</h2>
-          {needsCount > 0 && (
-            <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
-              {needsCount}개 필요
-            </span>
-          )}
-          <ChevronDown
-            size={14}
-            className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-          />
-        </button>
-        <div className="flex items-center gap-1.5 shrink-0">
+    <CollapsibleCard
+      icon={Shuffle}
+      iconWrapClassName="bg-blue-50 dark:bg-blue-950"
+      iconColorClassName="text-blue-600 dark:text-blue-400"
+      title="투자 현황 진단"
+      titleBadge={
+        showHeaderBadge && needsCount > 0 ? (
+          <span className="text-xs font-semibold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 rounded-full px-2 py-0.5 shrink-0">
+            {needsCount}개 필요
+          </span>
+        ) : undefined
+      }
+      headerRight={
+        <>
           {marketSignal && signalDisplay === "badge" && (
             <span
               className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-0.5 ${SIGNAL_BADGE_CLASS[marketSignal.composite_level]}`}
@@ -259,70 +260,87 @@ export default function RebalancingStatusCard({
               분석하기 <ArrowRight size={12} />
             </Link>
           )}
-        </div>
-      </div>
-
-      {isOpen && (
-        <>
-          {/* 시장 신호 배너 */}
-          {marketSignal && signalDisplay === "banner" && (
-            <Link
-              to="/rebalancing"
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
-            >
-              {marketSignal.composite_level === "GREEN" ? (
-                <Activity size={13} className="flex-shrink-0" />
-              ) : (
-                <AlertTriangle size={13} className="flex-shrink-0" />
-              )}
-              <span>
-                시장 신호:{" "}
-                <span className="font-bold">{SIGNAL_LABEL[marketSignal.composite_level]}</span>
-                {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
-              </span>
-              <ArrowRight size={12} className="ml-auto flex-shrink-0" />
-            </Link>
-          )}
-
-          {/* 이탈 종목 + 시장상황 결합 안내 */}
-          {combinedStatusNote && (
-            <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
-              {combinedStatusNote}
-            </p>
-          )}
-
-          {/* 포트폴리오별 드리프트 현황 */}
-          {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
-            <div className="space-y-0.5 mt-1 mb-2">
-              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">
-                포트폴리오 이탈 현황
-              </p>
-              {(maxDriftRows != null
-                ? sortedDriftSummaries.slice(0, maxDriftRows)
-                : sortedDriftSummaries
-              ).map((s) => (
-                <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
-              ))}
-            </div>
-          )}
-
-          {/* 진단 결과 섹션 */}
-          {hasDiagnosis && (
-            <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
-              <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
-              {concentrationInsight?.metric_value != null && (
-                <DiagnosticGauge value={concentrationInsight.metric_value} />
-              )}
-              {concentrationInsight && concentrationInsight.metric_value == null && (
-                <InsightRow insight={concentrationInsight} />
-              )}
-              {otherInsights.map((insight, idx) => (
-                <InsightRow key={`insight-${idx}`} insight={insight} />
-              ))}
-            </div>
-          )}
         </>
+      }
+      isOpen={isOpen}
+      onToggle={toggleOpen}
+      cardClassName={cardClass}
+    >
+      {/* 시장 신호 배너 */}
+      {marketSignal && signalDisplay === "banner" && (
+        <Link
+          to="/rebalancing"
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium mb-3 transition-colors ${SIGNAL_BG[marketSignal.composite_level]}`}
+        >
+          {marketSignal.composite_level === "GREEN" ? (
+            <Activity size={13} className="flex-shrink-0" />
+          ) : (
+            <AlertTriangle size={13} className="flex-shrink-0" />
+          )}
+          <span>
+            시장 신호:{" "}
+            <span className="font-bold">{SIGNAL_LABEL[marketSignal.composite_level]}</span>
+            {marketSignal.composite_level !== "GREEN" && " — 리밸런싱 전략을 확인하세요"}
+          </span>
+          <ArrowRight size={12} className="ml-auto flex-shrink-0" />
+        </Link>
       )}
-    </div>
+
+      {/* 이탈 종목 + 시장상황 결합 안내 */}
+      {combinedStatusNote && (
+        <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
+          {combinedStatusNote}
+        </p>
+      )}
+
+      {/* 포트폴리오별 드리프트 현황 */}
+      {(showAllInsights || showDriftRows) && driftSummaries && driftSummaries.length > 0 && (
+        <div className="space-y-0.5 mt-1 mb-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 px-2.5 mb-1">
+            포트폴리오 이탈 현황
+          </p>
+          {(maxDriftRows != null
+            ? sortedDriftSummaries.slice(0, maxDriftRows)
+            : sortedDriftSummaries
+          ).map((s) => (
+            <PortfolioDriftRow key={s.portfolio_id} summary={s} onClick={onPortfolioSelect} />
+          ))}
+        </div>
+      )}
+
+      {/* 진단 결과 섹션 */}
+      {hasDiagnosis && (
+        <div className="space-y-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500">진단 결과</p>
+          {concentrationInsight?.metric_value != null && (
+            <DiagnosticGauge value={concentrationInsight.metric_value} />
+          )}
+          {concentrationInsight && concentrationInsight.metric_value == null && (
+            <InsightRow insight={concentrationInsight} />
+          )}
+          {(showAllOtherInsights
+            ? otherInsights
+            : otherInsights.slice(0, OTHER_INSIGHTS_VISIBLE_LIMIT)
+          ).map((insight, idx) => (
+            <InsightRow key={`insight-${idx}`} insight={insight} />
+          ))}
+          {otherInsights.length > OTHER_INSIGHTS_VISIBLE_LIMIT && (
+            <button
+              onClick={toggleShowAllOtherInsights}
+              className="flex items-center gap-1 py-1 text-xs font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+              aria-expanded={showAllOtherInsights}
+            >
+              {showAllOtherInsights
+                ? "접기"
+                : `${otherInsights.length - OTHER_INSIGHTS_VISIBLE_LIMIT}개 더 보기`}
+              <ChevronDown
+                size={12}
+                className={`transition-transform duration-200 ${showAllOtherInsights ? "rotate-180" : ""}`}
+              />
+            </button>
+          )}
+        </div>
+      )}
+    </CollapsibleCard>
   );
 }

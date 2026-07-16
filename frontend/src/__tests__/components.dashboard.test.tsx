@@ -91,11 +91,10 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("100.0%")[0]).toBeInTheDocument();
   });
 
-  it("전체 진행율 섹션에 자산 목표 달성률과 현재/목표 금액을 표시한다 (자산 목표 칩은 제거됨)", () => {
+  it("전체 진행율 섹션에 자산 목표 달성률과 목표까지 남은 금액을 표시한다 (자산 목표 칩은 제거됨)", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
     expect(screen.getAllByText("15.0%")[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/현재 1\.50억원/)[0]).toBeInTheDocument();
-    expect(screen.getAllByText(/목표 10\.00억원/)[0]).toBeInTheDocument();
+    expect(screen.getAllByText(/목표까지 8\.50억원 남음/)[0]).toBeInTheDocument();
   });
 
   it("연간 입금 항목에 현재/목표 금액 텍스트를 표시한다", () => {
@@ -148,9 +147,10 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("미달")[0]).toBeInTheDocument();
   });
 
-  it("목표 연수익률이 미설정이면 연수익률 패널에 미설정을 표시한다", () => {
+  it("목표 연수익률이 미설정이면 그리드 대신 목표 설정 CTA에 안내된다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    expect(screen.getAllByText("연수익률 목표")[0]).toBeInTheDocument();
+    expect(screen.queryByText("연수익률 목표")).not.toBeInTheDocument();
+    expect(screen.getByText(/연수익률.*목표도 설정해보세요/)).toBeInTheDocument();
   });
 
   it("목표 연수익률은 설정됐지만 실제 수익률 데이터가 없으면 미설정 대신 목표값을 표시한다", () => {

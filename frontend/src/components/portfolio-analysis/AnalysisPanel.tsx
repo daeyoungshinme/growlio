@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Bell, Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
@@ -8,6 +8,7 @@ import { fetchBrokerBalance } from "@/api/rebalancing";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
+import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 
 function StrategyAnalysisSection({
@@ -26,30 +27,10 @@ function StrategyAnalysisSection({
   return (
     <div className="space-y-4">
       <RebalancingStrategyCard portfolioId={id} portfolioName={portfolio.name} />
-
-      {/* 알림 설정 바 */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
-        {existingAlert ? (
-          <span
-            className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}
-          >
-            <Bell size={12} />
-            {existingAlert.mode === "AUTO"
-              ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
-              : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
-          </span>
-        ) : (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            이 포트폴리오에 자동화를 설정하시겠어요?
-          </span>
-        )}
-        <button
-          onClick={() => onOpenAlertModal(id)}
-          className="self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3"
-        >
-          {existingAlert ? "설정 변경" : "자동화 설정"}
-        </button>
-      </div>
+      <AutomationStatusBar
+        existingAlert={existingAlert}
+        onOpenAlertModal={() => onOpenAlertModal(id)}
+      />
     </div>
   );
 }
@@ -206,27 +187,11 @@ export function AnalysisPanel({
             const portfolioIdStr = analysis.portfolio_id.toString();
             const existingAlert = alertByPortfolioId[portfolioIdStr];
             return (
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-4 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-sm">
-                {existingAlert ? (
-                  <span
-                    className={`flex items-center gap-1.5 text-xs ${existingAlert.mode === "AUTO" ? "text-orange-600 dark:text-orange-400" : "text-blue-600 dark:text-blue-400"}`}
-                  >
-                    <Bell size={12} />
-                    {existingAlert.mode === "AUTO"
-                      ? `자동 실행 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`
-                      : `알림 설정됨 (±${existingAlert.threshold_pct}% 이탈 시)`}
-                  </span>
-                ) : (
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    이 포트폴리오에 자동화를 설정하시겠어요?
-                  </span>
-                )}
-                <button
-                  onClick={() => onOpenAlertModal(portfolioIdStr)}
-                  className="self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3"
-                >
-                  {existingAlert ? "설정 변경" : "자동화 설정"}
-                </button>
+              <div className="mt-4">
+                <AutomationStatusBar
+                  existingAlert={existingAlert}
+                  onOpenAlertModal={() => onOpenAlertModal(portfolioIdStr)}
+                />
               </div>
             );
           })()}

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/stores/authStore";
+import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { fetchDashboard } from "@/api/dashboard";
 import { fetchAccounts, fetchExchangeRate } from "@/api/assets";
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { isCapsLockOn, handleKeyEvent } = useCapsLockWarning();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,10 +89,17 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handleKeyEvent}
+              onKeyUp={handleKeyEvent}
               required
               className={`w-full ${INPUT_SM}`}
               placeholder="••••••••"
             />
+            {isCapsLockOn && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Caps Lock이 켜져 있습니다
+              </p>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button

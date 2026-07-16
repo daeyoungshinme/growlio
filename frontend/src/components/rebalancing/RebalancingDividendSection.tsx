@@ -22,13 +22,13 @@ export default function RebalancingDividendSection({ analysis }: Props) {
   );
 
   return (
-    <div className="bg-gray-700/50 rounded-xl p-4 space-y-3">
+    <div className="bg-gray-100 dark:bg-gray-700/50 rounded-xl p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-gray-200">배당 분석</div>
+        <div className="text-sm font-medium text-gray-800 dark:text-gray-200">배당 분석</div>
         {dividendItems.length > 0 && (
           <button
             onClick={() => setShowDividendDetail((v) => !v)}
-            className="text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
           >
             {showDividendDetail ? "▲ 접기" : "▼ 종목별 상세"}
           </button>
@@ -37,35 +37,43 @@ export default function RebalancingDividendSection({ analysis }: Props) {
 
       {/* 요약 카드 */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-700 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">
+        <div className="bg-white dark:bg-gray-700 rounded-xl p-3 text-center">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
             <span className="sm:hidden">현재 배당</span>
             <span className="hidden sm:inline">현재 연간 배당</span>
           </div>
-          <div className="text-sm font-semibold text-gray-100">{fmtKrw(totalCurrentDiv)}</div>
-          <div className="text-xs text-gray-500 mt-0.5 hidden sm:block">전체 보유 기준</div>
+          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {fmtKrw(totalCurrentDiv)}
+          </div>
+          <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 hidden sm:block">
+            전체 보유 기준
+          </div>
         </div>
-        <div className="bg-gray-700 rounded-xl p-3 text-center">
-          <div className="text-xs text-gray-400 mb-1">
+        <div className="bg-white dark:bg-gray-700 rounded-xl p-3 text-center">
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">
             <span className="sm:hidden">리밸 후 배당</span>
             <span className="hidden sm:inline">리밸런싱 후 연간 배당</span>
           </div>
-          <div className="text-sm font-semibold text-gray-100">{fmtKrw(targetDiv)}</div>
+          <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {fmtKrw(targetDiv)}
+          </div>
         </div>
         <div
           className={`col-span-1 rounded-xl p-3 text-center ${
-            divDiff >= 0 ? "bg-green-900/30" : "bg-red-900/30"
+            divDiff >= 0 ? "bg-green-100 dark:bg-green-900/30" : "bg-red-100 dark:bg-red-900/30"
           }`}
         >
-          <div className="text-xs text-gray-400 mb-1">배당 증감</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">배당 증감</div>
           <div
-            className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-400" : "text-red-400"}`}
+            className={`text-sm font-semibold ${divDiff >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}
           >
             {divDiff >= 0 ? "+" : ""}
             {fmtKrw(divDiff)}
           </div>
           {totalCurrentDiv > 0 && (
-            <div className={`text-xs ${divDiff >= 0 ? "text-green-500" : "text-red-500"}`}>
+            <div
+              className={`text-xs ${divDiff >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"}`}
+            >
               ({divDiff >= 0 ? "+" : ""}
               {divDiffPct.toFixed(1)}%)
             </div>
@@ -77,13 +85,15 @@ export default function RebalancingDividendSection({ analysis }: Props) {
       {showDividendDetail && dividendItems.length > 0 && (
         <>
           {/* 모바일 카드 */}
-          <div className="sm:hidden divide-y divide-gray-700 mt-2">
+          <div className="sm:hidden divide-y divide-gray-200 dark:divide-gray-700 mt-2">
             {dividendItems.map((item, idx) => (
               <div key={idx} className="py-2.5">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium text-gray-100 text-xs truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="font-medium text-gray-900 dark:text-gray-100 text-xs truncate">
+                      {item.name}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
                       {item.ticker}
                       {item.dividend_yield != null &&
                         ` · 배당율 ${item.dividend_yield.toFixed(2)}%`}
@@ -93,7 +103,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
                     <DividendDiffCell diff={item.annual_dividend_diff_krw ?? 0} />
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 overflow-hidden">
+                <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-gray-400 overflow-hidden">
                   <span className="truncate">
                     현재 {fmtKrw(item.annual_dividend_current_krw ?? 0)}
                   </span>
@@ -110,7 +120,7 @@ export default function RebalancingDividendSection({ analysis }: Props) {
           <div className="hidden sm:block overflow-x-auto mt-2">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-600 text-xs text-gray-400">
+                <tr className="border-b border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400">
                   <th className="text-left py-2 px-3 font-medium">종목</th>
                   <th className="text-right py-2 px-3 font-medium">배당수익률</th>
                   <th className="text-right py-2 px-3 font-medium">현재 연배당</th>
@@ -120,20 +130,23 @@ export default function RebalancingDividendSection({ analysis }: Props) {
               </thead>
               <tbody>
                 {dividendItems.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-700 hover:bg-gray-700">
+                  <tr
+                    key={idx}
+                    className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                  >
                     <td className="py-2 px-3">
-                      <div className="font-medium text-gray-100 text-xs truncate max-w-[120px]">
+                      <div className="font-medium text-gray-900 dark:text-gray-100 text-xs truncate max-w-[120px]">
                         {item.name}
                       </div>
-                      <div className="text-xs text-gray-400">{item.ticker}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{item.ticker}</div>
                     </td>
-                    <td className="py-2 px-3 text-right text-xs text-gray-300">
+                    <td className="py-2 px-3 text-right text-xs text-gray-700 dark:text-gray-300">
                       {item.dividend_yield != null ? `${item.dividend_yield.toFixed(2)}%` : "-"}
                     </td>
-                    <td className="py-2 px-3 text-right text-xs text-gray-300">
+                    <td className="py-2 px-3 text-right text-xs text-gray-700 dark:text-gray-300">
                       {fmtKrw(item.annual_dividend_current_krw ?? 0)}
                     </td>
-                    <td className="py-2 px-3 text-right text-xs text-gray-300">
+                    <td className="py-2 px-3 text-right text-xs text-gray-700 dark:text-gray-300">
                       {fmtKrw(item.annual_dividend_target_krw ?? 0)}
                     </td>
                     <td className="py-2 px-3 text-right">

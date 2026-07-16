@@ -199,12 +199,19 @@ export default function PortfolioPage() {
         <p className="text-2xl sm:text-3xl font-bold mt-1 leading-tight text-blue-600 dark:text-blue-400">
           {fmtKrw(data.total_stock_krw)}
         </p>
-        <div className="mt-2">
+        <div className="mt-2 flex items-center flex-wrap gap-x-2 gap-y-1">
           <span className={`text-sm font-semibold ${pnlColor(data.unrealized_pnl_krw)}`}>
             평가손익 {data.unrealized_pnl_krw >= 0 ? "+" : ""}
             {fmtKrwPrice(data.unrealized_pnl_krw)}({data.stock_return_pct >= 0 ? "+" : ""}
             {data.stock_return_pct.toFixed(2)}%)
           </span>
+          {data.total_assets_krw > 0 && (
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              · 전체 자산 중 {((data.total_stock_krw / data.total_assets_krw) * 100).toFixed(1)}%
+              {data.total_non_stock_krw > 0 &&
+                ` · 현금/부동산 등 ${fmtKrw(data.total_non_stock_krw)} 별도`}
+            </span>
+          )}
         </div>
       </div>
 

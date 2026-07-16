@@ -3,6 +3,7 @@ import { LineChart } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
+import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { toast } from "@/utils/toast";
 import { INPUT_SM } from "@/constants/inputStyles";
 
@@ -18,6 +19,10 @@ export default function RegisterPage() {
   const register = useAuthStore((s) => s.register);
   const resendConfirmationEmail = useAuthStore((s) => s.resendConfirmationEmail);
   const navigate = useNavigate();
+  const { isCapsLockOn: isPasswordCapsLockOn, handleKeyEvent: handlePasswordKeyEvent } =
+    useCapsLockWarning();
+  const { isCapsLockOn: isConfirmCapsLockOn, handleKeyEvent: handleConfirmKeyEvent } =
+    useCapsLockWarning();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,10 +138,17 @@ export default function RegisterPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={handlePasswordKeyEvent}
+              onKeyUp={handlePasswordKeyEvent}
               required
               className={`w-full ${INPUT_SM}`}
               placeholder="8자 이상"
             />
+            {isPasswordCapsLockOn && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Caps Lock이 켜져 있습니다
+              </p>
+            )}
           </div>
           <div>
             <label
@@ -150,10 +162,17 @@ export default function RegisterPage() {
               type="password"
               value={passwordConfirm}
               onChange={(e) => setPasswordConfirm(e.target.value)}
+              onKeyDown={handleConfirmKeyEvent}
+              onKeyUp={handleConfirmKeyEvent}
               required
               className={`w-full ${INPUT_SM}`}
               placeholder="••••••••"
             />
+            {isConfirmCapsLockOn && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                Caps Lock이 켜져 있습니다
+              </p>
+            )}
           </div>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           {awaitingConfirmation && (

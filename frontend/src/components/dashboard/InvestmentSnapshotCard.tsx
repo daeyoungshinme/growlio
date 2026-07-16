@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { TrendingUp } from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 import { fmtKrwShort } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import type { PortfolioOverview } from "@/types";
@@ -56,7 +56,9 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
         </div>
 
         <div>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">평가손익</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">
+            평가손익 <span className="text-gray-400 dark:text-gray-500">(매입원가)</span>
+          </p>
           <p
             className={`text-sm sm:text-base font-semibold tabular-nums ${
               pnl === 0 ? "text-gray-400 dark:text-gray-500" : pnlColor(pnl)
@@ -96,9 +98,9 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
           </div>
           <Link
             to="/assets?tab=투자현황&portfolioTab=배당"
-            className="ml-auto text-xs text-blue-500 dark:text-blue-400 hover:underline"
+            className="ml-auto flex items-center gap-1 text-xs text-blue-500 dark:text-blue-400 hover:underline"
           >
-            배당 상세 →
+            배당 상세 <ArrowRight size={11} />
           </Link>
         </div>
       )}

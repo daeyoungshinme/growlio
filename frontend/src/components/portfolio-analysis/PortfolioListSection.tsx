@@ -20,7 +20,6 @@ import {
   Loader2,
   Plus,
   Trash2,
-  Zap,
 } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
@@ -28,6 +27,7 @@ import { AssetAccount } from "@/api/assets";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
 import { getPortfolioTargetState } from "@/utils/portfolio";
+import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
 
 function SortablePortfolioItem({
   id,
@@ -218,24 +218,11 @@ const PortfolioCard = memo(function PortfolioCard({
           <Anchor size={11} />
           <span>{tState === "full" ? "기준" : tState === "partial" ? "일부" : "기준 지정"}</span>
         </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenAlertModal(p.id);
-          }}
-          title="리밸런싱 자동화 설정"
-          aria-label="리밸런싱 자동화 설정"
-          className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
-            alertMode === "AUTO"
-              ? "bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900"
-              : hasAlert
-                ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"
-                : "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-          }`}
-        >
-          {alertMode === "AUTO" ? <Zap size={11} /> : <Bell size={11} />}
-          <span>{alertMode === "AUTO" ? "자동" : hasAlert ? "알림" : "자동화 설정"}</span>
-        </button>
+        <AutomationStatusBar
+          existingAlert={hasAlert ? { mode: alertMode } : undefined}
+          onOpenAlertModal={() => onOpenAlertModal(p.id)}
+          compact
+        />
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuthStore } from "@/stores/authStore";
+import { useCapsLockWarning } from "@/hooks/useCapsLockWarning";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { REDIRECT_DELAY_MS } from "@/constants/timers";
 import { toast } from "@/utils/toast";
@@ -17,6 +18,10 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [sessionReady, setSessionReady] = useState(false);
   const resetPassword = useAuthStore((s) => s.resetPassword);
+  const { isCapsLockOn: isPasswordCapsLockOn, handleKeyEvent: handlePasswordKeyEvent } =
+    useCapsLockWarning();
+  const { isCapsLockOn: isConfirmCapsLockOn, handleKeyEvent: handleConfirmKeyEvent } =
+    useCapsLockWarning();
 
   useEffect(() => {
     // Supabase가 이메일 링크의 #access_token= 프래그먼트를 감지해 세션 설정
@@ -132,10 +137,17 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
+                onKeyDown={handlePasswordKeyEvent}
+                onKeyUp={handlePasswordKeyEvent}
                 required
                 placeholder="8자 이상"
                 className={`w-full ${INPUT_SM}`}
               />
+              {isPasswordCapsLockOn && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Caps Lock이 켜져 있습니다
+                </p>
+              )}
             </div>
             <div>
               <label
@@ -149,10 +161,17 @@ export default function ResetPasswordPage() {
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
+                onKeyDown={handleConfirmKeyEvent}
+                onKeyUp={handleConfirmKeyEvent}
                 required
                 placeholder="비밀번호 재입력"
                 className={`w-full ${INPUT_SM}`}
               />
+              {isConfirmCapsLockOn && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Caps Lock이 켜져 있습니다
+                </p>
+              )}
             </div>
 
             {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

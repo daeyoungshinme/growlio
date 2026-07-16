@@ -88,6 +88,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
           <div className="flex items-center gap-2">
             <input
               type="number"
+              inputMode="decimal"
               className={`${INPUT_SM} w-32`}
               value={value}
               onChange={(e) => setValue(e.target.value)}

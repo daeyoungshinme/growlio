@@ -80,12 +80,12 @@ export function RebalancingOrderTable({
       {priceState === "error" && (
         <div
           role="alert"
-          className="mx-3 mb-2 px-3 py-2 flex items-center justify-between gap-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-700/40 rounded-lg"
+          className="mx-3 mb-2 px-3 py-2 flex items-center justify-between gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-950/30 dark:border-amber-700/40 rounded-lg"
         >
           <span>현재가 조회 실패 — 지정가를 직접 입력하거나 다시 시도하세요.</span>
           <button
             onClick={onRetryAllPrices}
-            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded bg-amber-800/40 hover:bg-amber-800/60 text-amber-200 transition-colors"
+            className="shrink-0 flex items-center gap-1 px-2 py-1 rounded bg-amber-200 dark:bg-amber-800/40 hover:bg-amber-300 dark:hover:bg-amber-800/60 text-amber-800 dark:text-amber-200 transition-colors"
           >
             <RefreshCw size={12} />
             재조회
@@ -93,10 +93,12 @@ export function RebalancingOrderTable({
         </div>
       )}
       {/* 모바일 카드 뷰 */}
-      <div className="md:hidden divide-y divide-gray-700/30">
+      <div className="md:hidden divide-y divide-gray-200 dark:divide-gray-700/30">
         {sellRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-500 bg-gray-800/30">매도</div>
+            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30">
+              매도
+            </div>
             {sellRows.map(({ item, currentQty, suggestedQty }) => {
               const key = `sell_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
@@ -118,7 +120,7 @@ export function RebalancingOrderTable({
                   isBuy={false}
                   maxQty={currentQty}
                   extra={
-                    <p className="text-xs text-gray-500 mt-0.5 text-right">
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
                       현재 {currentQty.toLocaleString()}주 보유
                     </p>
                   }
@@ -142,7 +144,9 @@ export function RebalancingOrderTable({
         )}
         {buyRows.length > 0 && (
           <>
-            <div className="px-3 py-1.5 text-xs text-gray-500 bg-gray-800/30">매수</div>
+            <div className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30">
+              매수
+            </div>
             {buyRows.map(({ item, suggestedQty, currentQty }) => {
               const key = `buy_${item.ticker}_${accId}`;
               const qty = qtyOverrides[key] ?? suggestedQty;
@@ -170,13 +174,15 @@ export function RebalancingOrderTable({
                     isMultiAccount ? (
                       <div
                         className={`text-xs mt-0.5 text-right ${
-                          allocated === needed ? "text-gray-500" : "text-amber-400"
+                          allocated === needed
+                            ? "text-gray-500 dark:text-gray-500"
+                            : "text-amber-600 dark:text-amber-400"
                         }`}
                       >
                         배분 {allocated} / {needed}주
                       </div>
                     ) : (
-                      <p className="text-xs text-gray-500 mt-0.5 text-right">
+                      <p className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
                         {item.target_qty != null ? (
                           <>
                             {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} → 목표{" "}
@@ -223,7 +229,7 @@ export function RebalancingOrderTable({
             <col style={{ width: "32px" }} />
           </colgroup>
           <thead>
-            <tr className="text-xs text-gray-500 border-b border-gray-700/50">
+            <tr className="text-xs text-gray-500 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700/50">
               <th scope="col" />
               <th scope="col" className="px-3 py-2 text-left font-normal">
                 종목
@@ -245,13 +251,13 @@ export function RebalancingOrderTable({
               <th scope="col" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-700/30">
+          <tbody className="divide-y divide-gray-200 dark:divide-gray-700/30">
             {sellRows.length > 0 && (
               <>
                 <tr>
                   <td
                     colSpan={orderType === "LIMIT" ? 7 : 6}
-                    className="px-4 py-1.5 text-xs text-gray-500 bg-gray-800/30"
+                    className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30"
                   >
                     매도
                   </td>
@@ -270,7 +276,7 @@ export function RebalancingOrderTable({
                   return (
                     <tr
                       key={key}
-                      className="hover:bg-gray-800/40 cursor-pointer"
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
                       onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
                     >
                       <td className="px-3 py-2">
@@ -283,9 +289,13 @@ export function RebalancingOrderTable({
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <div className="text-white font-medium truncate">{item.name}</div>
-                        <div className="text-gray-400 text-xs">{item.ticker}</div>
-                        <div className="text-gray-500 text-xs">
+                        <div className="text-gray-900 dark:text-white font-medium truncate">
+                          {item.name}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400 text-xs">
+                          {item.ticker}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-500 text-xs">
                           현재 {currentQty.toLocaleString()}주 보유
                         </div>
                       </td>
@@ -319,12 +329,12 @@ export function RebalancingOrderTable({
                                 qty: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-blue-400 font-medium focus:outline-none focus:border-indigo-500"
+                            className="w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right text-blue-600 dark:text-blue-400 font-medium focus:outline-none focus:border-indigo-500"
                           />
-                          <span className="text-gray-400">주</span>
+                          <span className="text-gray-500 dark:text-gray-400">주</span>
                         </div>
                         {est != null && orderType === "MARKET" && (
-                          <div className="text-xs text-gray-500 mt-0.5 text-right">
+                          <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
                             ≈ {fmtKrw(est)}
                           </div>
                         )}
@@ -352,7 +362,7 @@ export function RebalancingOrderTable({
                 <tr>
                   <td
                     colSpan={orderType === "LIMIT" ? 7 : 6}
-                    className="px-4 py-1.5 text-xs text-gray-500 bg-gray-800/30"
+                    className="px-4 py-1.5 text-xs text-gray-500 dark:text-gray-500 bg-gray-100 dark:bg-gray-800/30"
                   >
                     매수
                   </td>
@@ -376,7 +386,7 @@ export function RebalancingOrderTable({
                   return (
                     <tr
                       key={key}
-                      className="hover:bg-gray-800/40 cursor-pointer"
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer"
                       onClick={() => dispatch({ type: "TOGGLE_SELECTED", key })}
                     >
                       <td className="px-3 py-2">
@@ -389,9 +399,13 @@ export function RebalancingOrderTable({
                         />
                       </td>
                       <td className="px-3 py-2">
-                        <div className="text-white font-medium truncate">{item.name}</div>
-                        <div className="text-gray-400 text-xs">{item.ticker}</div>
-                        <div className="text-gray-500 text-xs">
+                        <div className="text-gray-900 dark:text-white font-medium truncate">
+                          {item.name}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-400 text-xs">
+                          {item.ticker}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-500 text-xs">
                           {item.target_qty != null ? (
                             <>
                               {currentQty > 0 ? `${currentQty.toLocaleString()}주` : "미보유"} →
@@ -433,14 +447,16 @@ export function RebalancingOrderTable({
                                 qty: parseInt(e.target.value) || 0,
                               })
                             }
-                            className="w-16 bg-gray-800 border border-gray-600 rounded px-2 py-0.5 text-right text-red-400 font-medium focus:outline-none focus:border-indigo-500"
+                            className="w-16 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded px-2 py-0.5 text-right text-red-600 dark:text-red-400 font-medium focus:outline-none focus:border-indigo-500"
                           />
-                          <span className="text-gray-400">주</span>
+                          <span className="text-gray-500 dark:text-gray-400">주</span>
                         </div>
                         {isMultiAccount ? (
                           <div
                             className={`text-xs mt-0.5 text-right ${
-                              allocated === needed ? "text-gray-500" : "text-amber-400"
+                              allocated === needed
+                                ? "text-gray-500 dark:text-gray-500"
+                                : "text-amber-600 dark:text-amber-400"
                             }`}
                           >
                             배분 {allocated} / {needed}주
@@ -448,7 +464,7 @@ export function RebalancingOrderTable({
                         ) : (
                           est != null &&
                           orderType === "MARKET" && (
-                            <div className="text-xs text-gray-500 mt-0.5 text-right">
+                            <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5 text-right">
                               ≈ {fmtKrw(est)}
                             </div>
                           )
@@ -477,7 +493,7 @@ export function RebalancingOrderTable({
                           disabled={isOnlyAccount}
                           title="이 계좌에서 제거"
                           aria-label="이 계좌에서 제거"
-                          className="text-gray-600 hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
+                          className="text-gray-400 dark:text-gray-600 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-20 disabled:cursor-not-allowed transition-colors text-sm leading-none px-1"
                         >
                           ×
                         </button>

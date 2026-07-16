@@ -152,7 +152,7 @@ export default function DashboardPage() {
           <SetupTargetPortfolioBanner />
         </ErrorBoundary>
 
-        {/* Row 1: Hero Card — 자산 현황 */}
+        {/* Hero: 자산 현황 */}
         <ErrorBoundary variant="section">
           <HeroSummaryCard
             data={data}
@@ -164,24 +164,7 @@ export default function DashboardPage() {
           />
         </ErrorBoundary>
 
-        {/* Row 2: 투자 목표 달성 현황 */}
-        <ErrorBoundary variant="section">
-          <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
-        </ErrorBoundary>
-
-        {/* Row 3: 주식 투자 현황 */}
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard />}>
-            <InvestmentSnapshotCard overview={overview} data={data} />
-          </Suspense>
-        </ErrorBoundary>
-
-        {/* Row 3-1: 세제·기간 현황 (투자기간/ISA/연금저축·IRP 통합, 조건부 표시) */}
-        <ErrorBoundary variant="section">
-          <TaxHorizonSummarySection overview={overview} />
-        </ErrorBoundary>
-
-        {/* Row 4: 리밸런싱 진단 요약 */}
+        {/* 오늘의 진단: 리밸런싱 필요 여부 + 시장 신호 — 가장 액션 지향적인 정보라 Hero 다음으로 승격 */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={2} />}>
             <RebalancingStatusCard
@@ -195,7 +178,24 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* Row 5: 자산 추이 */}
+        {/* 투자 목표 달성 현황 */}
+        <ErrorBoundary variant="section">
+          <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
+        </ErrorBoundary>
+
+        {/* 주식 투자 현황 */}
+        <ErrorBoundary variant="section">
+          <Suspense fallback={<SkeletonCard />}>
+            <InvestmentSnapshotCard overview={overview} data={data} />
+          </Suspense>
+        </ErrorBoundary>
+
+        {/* 세제·기간 현황 (투자기간/ISA/연금저축·IRP 통합, 니치 정보라 하단 배치) */}
+        <ErrorBoundary variant="section">
+          <TaxHorizonSummarySection overview={overview} />
+        </ErrorBoundary>
+
+        {/* 자산 추이 — 과거지향 정보라 최하단 유지 */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
             <AllocationHistoryChart />

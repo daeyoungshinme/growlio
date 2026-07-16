@@ -210,6 +210,7 @@ export default function TransactionModal({
                   <span className="text-sm text-gray-400 shrink-0">$</span>
                   <input
                     type="number"
+                    inputMode="decimal"
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     value={amountUsd || ""}
                     onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
@@ -227,6 +228,7 @@ export default function TransactionModal({
             ) : (
               <input
                 type="number"
+                inputMode="decimal"
                 className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 value={form.amount || ""}
                 onChange={(e) => set("amount", Number(e.target.value))}

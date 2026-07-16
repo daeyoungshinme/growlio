@@ -7,13 +7,15 @@ const COLORS: Record<string, string> = {
   info: "bg-blue-600",
 };
 
+const MAX_TOASTS = 3;
+
 export default function Toaster() {
   const [toasts, setToasts] = useState<ToastEvent[]>([]);
 
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<ToastEvent>).detail;
-      setToasts((prev) => [...prev, detail]);
+      setToasts((prev) => [...prev, detail].slice(-MAX_TOASTS));
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== detail.id));
       }, 3500);

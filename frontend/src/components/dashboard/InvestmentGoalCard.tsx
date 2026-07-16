@@ -62,6 +62,9 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const canShowReturnGap =
     hasReturnGoal && actualReturnPct != null && data?.return_goal_gap_pct != null;
 
+  const goalGapAmount =
+    goalAmountDisplay != null && data != null ? goalAmountDisplay - data.total_assets_krw : null;
+
   const expectedGoalDateStr =
     timeline?.actual_expected_goal_date ?? timeline?.expected_goal_date ?? null;
   const expectedGoalYear = expectedGoalDateStr ? Number(expectedGoalDateStr.slice(0, 4)) : null;
@@ -78,6 +81,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const goalChips: {
     key: string;
     label: string;
+    shortLabel: string;
     isSet: boolean;
     content: ReactNode;
     barPct?: number;
@@ -86,6 +90,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     {
       key: "deposit",
       label: "연간 입금",
+      shortLabel: "입금",
       isSet: hasDepositGoal,
       content: (
         <>
@@ -106,6 +111,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     {
       key: "dividend",
       label: "배당 목표",
+      shortLabel: "배당",
       isSet: hasDividendGoal,
       content: (
         <>
@@ -126,6 +132,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     {
       key: "return",
       label: "연수익률 목표",
+      shortLabel: "연수익률",
       isSet: hasReturnGoal,
       content: canShowReturnGap ? (
         <>
@@ -135,7 +142,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             behindLabel: "미달",
           })}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            목표 {data!.goal_annual_return_pct}% · 현재 {actualReturnPct!.toFixed(1)}%
+            목표 {data!.goal_annual_return_pct}% · 실제 {actualReturnPct!.toFixed(1)}% (XIRR)
           </p>
         </>
       ) : hasReturnGoal ? (
@@ -150,6 +157,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     {
       key: "retirement",
       label: "은퇴 목표",
+      shortLabel: "은퇴",
       isSet: hasRetirementGoal,
       content:
         retirementGapYears != null ? (
@@ -193,6 +201,10 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         ) : null,
     },
   ];
+
+  const setGoalChips = goalChips.filter((c) => c.isSet);
+  const unsetGoalChips = goalChips.filter((c) => !c.isSet);
+  const goalGridColsClass = setGoalChips.length <= 1 ? "grid-cols-1" : "grid-cols-2";
 
   if (
     !isLoading &&
@@ -242,31 +254,36 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         </Link>
       </div>
 
-      {/* 목표 항목 — 2열 그리드, 파티션(hairline)으로만 구분 (4개 항목, 각 목표/현재 값 텍스트 포함) */}
-      <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
-        {goalChips.map((chip) => (
-          <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
-              {chip.label}
-            </p>
-            {chip.isSet ? (
-              <>
-                {chip.content}
-                {chip.barPct != null && (
-                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
-                    <div
-                      className={`h-full rounded-full ${chip.barColorClass}`}
-                      style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
-                    />
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-gray-300 dark:text-gray-600">미설정</p>
-            )}
-          </div>
-        ))}
-      </div>
+      {/* 목표 항목 — 설정된 목표만 그리드에 표시, 파티션(hairline)으로만 구분 */}
+      {setGoalChips.length > 0 && (
+        <div className={`grid ${goalGridColsClass} gap-px bg-gray-100 dark:bg-gray-700`}>
+          {setGoalChips.map((chip) => (
+            <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
+                {chip.label}
+              </p>
+              {chip.content}
+              {chip.barPct != null && (
+                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
+                  <div
+                    className={`h-full rounded-full ${chip.barColorClass}`}
+                    style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {unsetGoalChips.length > 0 && (
+        <Link
+          to="/invest-plan"
+          className="flex items-center gap-1 mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          {unsetGoalChips.map((c) => c.shortLabel).join("·")} 목표도 설정해보세요{" "}
+          <ArrowRight size={11} />
+        </Link>
+      )}
 
       {/* 모바일 DCA 달성 전망 — 헤드라인(진행율+금액)은 항상 노출, 예상일/배지/진행바는 접기 뒤로 */}
       <div className="sm:hidden border-t border-gray-100 dark:border-gray-700 pt-1.5 mt-1.5">
@@ -279,7 +296,9 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
               </p>
               {goalAmountDisplay != null && data != null && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  현재 {fmtKrw(data.total_assets_krw)} · 목표 {fmtKrw(goalAmountDisplay)}
+                  {goalGapAmount != null && goalGapAmount > 0
+                    ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
+                    : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
                 </p>
               )}
             </div>
@@ -361,14 +380,11 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
                 {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
               </p>
               {goalAmountDisplay != null && data != null && (
-                <>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    현재 {fmtKrw(data.total_assets_krw)}
-                  </p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    목표 {fmtKrw(goalAmountDisplay)}
-                  </p>
-                </>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                  {goalGapAmount != null && goalGapAmount > 0
+                    ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
+                    : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
+                </p>
               )}
             </div>
             <div>

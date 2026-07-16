@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Anchor, X } from "lucide-react";
 import { fetchPortfolios } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 export default function SetupTargetPortfolioBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -42,7 +43,7 @@ export default function SetupTargetPortfolioBanner() {
       <button
         onClick={() => setDismissed(true)}
         aria-label="배너 닫기"
-        className="shrink-0 p-1 -m-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300"
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} shrink-0 -m-1 text-blue-400 hover:text-blue-600 dark:hover:text-blue-300`}
       >
         <X size={16} />
       </button>

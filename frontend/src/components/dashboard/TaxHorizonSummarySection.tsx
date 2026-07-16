@@ -16,7 +16,7 @@ interface Props {
 
 /** 투자기간별 자산현황·ISA 만기·연금저축/IRP 납입 현황을 하나의 접이식 카드로 묶어 보여준다.
  * 셋 다 세제·기간 관련 참고용 정보라는 공통점이 있어 통합 — 각 카드는 embedded 모드로 렌더된다.
- * 모바일에서는 기본 접힘(AllocationHistoryChart와 동일 관례), 데스크탑은 기본 펼침. */
+ * 니치 정보이므로 데스크탑/모바일 모두 기본 접힘. */
 export default function TaxHorizonSummarySection({ overview }: Props) {
   const accounts = overview?.accounts ?? [];
   const hasHorizon = accounts.some((a) => a.investment_horizon);
@@ -30,10 +30,7 @@ export default function TaxHorizonSummarySection({ overview }: Props) {
   });
   const hasIsa = (isaData?.accounts.length ?? 0) > 0;
 
-  const [isOpen, toggleOpen] = useCollapsible(
-    () => window.innerWidth >= 1024,
-    "growlio:taxHorizonSection:open",
-  );
+  const [isOpen, toggleOpen] = useCollapsible(false, "growlio:taxHorizonSection:open");
 
   if (!hasHorizon && !hasIsa && !hasPension) return null;
 

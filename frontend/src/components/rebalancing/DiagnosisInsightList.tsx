@@ -5,9 +5,9 @@ import { buildDiagnosisNotes, type DiagnosisNoteIcon } from "@/utils/diagnosisIn
 import { fmtKrw } from "@/utils/format";
 
 const NOTE_ICONS: Record<DiagnosisNoteIcon, React.ReactNode> = {
-  market: <TrendingUp size={13} className="text-blue-400 shrink-0" />,
-  risk: <ShieldAlert size={13} className="text-amber-400 shrink-0" />,
-  tax: <Receipt size={13} className="text-gray-400 shrink-0" />,
+  market: <TrendingUp size={13} className="text-blue-600 dark:text-blue-400 shrink-0" />,
+  risk: <ShieldAlert size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />,
+  tax: <Receipt size={13} className="text-gray-500 dark:text-gray-400 shrink-0" />,
 };
 
 interface Props {
@@ -25,9 +25,12 @@ export default function DiagnosisInsightList({ context }: Props) {
   const detailItems = context.tax_detail_items;
 
   return (
-    <div className="mt-3 space-y-1.5 border-t border-gray-700/50 pt-3">
+    <div className="mt-3 space-y-1.5 border-t border-gray-200 dark:border-gray-700/50 pt-3">
       {notes.map((note, i) => (
-        <div key={`${note.icon}-${i}`} className="flex items-start gap-1.5 text-xs text-gray-300">
+        <div
+          key={`${note.icon}-${i}`}
+          className="flex items-start gap-1.5 text-xs text-gray-700 dark:text-gray-300"
+        >
           {NOTE_ICONS[note.icon]}
           <span className="flex-1">{note.text}</span>
         </div>
@@ -37,7 +40,7 @@ export default function DiagnosisInsightList({ context }: Props) {
         <div>
           <button
             onClick={() => setShowDetail((v) => !v)}
-            className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
             aria-expanded={showDetail}
             aria-label="세금 영향 상세 보기"
           >
@@ -52,12 +55,12 @@ export default function DiagnosisInsightList({ context }: Props) {
               {detailItems.map((item) => (
                 <li
                   key={`${item.ticker}-${item.market}`}
-                  className="flex justify-between text-xs text-gray-400"
+                  className="flex justify-between text-xs text-gray-500 dark:text-gray-400"
                 >
                   <span className="flex items-center gap-1">
                     {item.name} ({item.ticker})
                     {item.is_tax_deferred && (
-                      <span className="px-1 py-px border border-purple-700 text-purple-400 rounded-full text-xs leading-tight">
+                      <span className="px-1 py-px border border-purple-300 dark:border-purple-700 text-purple-600 dark:text-purple-400 rounded-full text-xs leading-tight">
                         과세이연
                       </span>
                     )}

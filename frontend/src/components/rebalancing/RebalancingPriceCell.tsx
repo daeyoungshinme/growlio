@@ -28,21 +28,24 @@ export function PriceCell({
   const usd = livePricesUsd[ticker];
   const priceCls = large ? "text-sm" : "text-xs";
   const retrying = priceRetrying?.has(ticker) ?? false;
-  if (priceState === "loading") return <span className="text-gray-600 text-xs">조회 중</span>;
+  if (priceState === "loading")
+    return <span className="text-gray-500 dark:text-gray-600 text-xs">조회 중</span>;
   if (krw != null) {
     if (isOverseasMarket(market) && usd != null) {
       return (
         <div>
-          <div className={`text-gray-300 ${priceCls}`}>${usd.toFixed(2)}</div>
+          <div className={`text-gray-700 dark:text-gray-300 ${priceCls}`}>${usd.toFixed(2)}</div>
           <div className="text-gray-500 text-xs">≈ {fmtKrwPrice(krw)}</div>
         </div>
       );
     }
-    return <span className={`text-gray-300 ${priceCls}`}>{fmtKrwPrice(krw)}</span>;
+    return (
+      <span className={`text-gray-700 dark:text-gray-300 ${priceCls}`}>{fmtKrwPrice(krw)}</span>
+    );
   }
   return (
     <div className="flex items-center justify-end gap-1">
-      <span className={`text-gray-600 ${priceCls}`}>—</span>
+      <span className={`text-gray-500 dark:text-gray-600 ${priceCls}`}>—</span>
       {onRetryPrice && (
         <button
           onClick={() => onRetryPrice(ticker, market)}

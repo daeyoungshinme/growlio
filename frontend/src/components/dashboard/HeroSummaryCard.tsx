@@ -79,7 +79,7 @@ export default memo(function HeroSummaryCard({
 
   return (
     <div className="card !p-3 sm:!p-5 flex flex-col gap-3 lg:gap-4">
-      <div className="flex flex-row items-start sm:gap-4">
+      <div className="flex flex-row items-center sm:gap-4">
         {/* 좌: 제목/금액 + 지표 */}
         <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -105,7 +105,9 @@ export default memo(function HeroSummaryCard({
           </p>
           <div className="grid grid-cols-2 gap-2 sm:gap-4 pt-0">
             <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">누적 수익률</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">
+                누적 수익률 <span className="text-gray-300 dark:text-gray-600">(전체자산)</span>
+              </p>
               <p
                 className={`text-sm sm:text-lg font-bold ${
                   data.cumulative_return_pct == null
@@ -129,11 +131,11 @@ export default memo(function HeroSummaryCard({
         </div>
 
         {/* 우: 도넛 + 범례 */}
-        <div className="shrink-0 w-[160px] sm:w-48 lg:w-56 xl:w-60 flex flex-col gap-0 -mt-4 sm:-mt-8 -mr-3 sm:mr-0">
+        <div className="shrink-0 w-[160px] sm:w-48 lg:w-56 xl:w-60 flex flex-col items-center gap-1 sm:gap-2 -mr-3 sm:mr-0">
           {allocationChartData.length > 0 ? (
-            <Suspense fallback={<div className="w-full aspect-square" />}>
+            <Suspense fallback={<div className="w-full h-24 sm:h-28 lg:h-32" />}>
               <>
-                <div className="w-full aspect-square">
+                <div className="w-full h-24 sm:h-28 lg:h-32">
                   <AssetAllocationChart
                     data={allocationChartData}
                     size="compact"
@@ -141,7 +143,7 @@ export default memo(function HeroSummaryCard({
                     showLegend={false}
                   />
                 </div>
-                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-0.5 sm:gap-x-1.5 justify-start sm:justify-center -mt-6 sm:-mt-16">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-y-0.5 sm:gap-x-1.5 justify-center">
                   {allocationChartData.map((item, i) => (
                     <div key={i} className="flex items-center gap-1">
                       <span
@@ -160,7 +162,7 @@ export default memo(function HeroSummaryCard({
               </>
             </Suspense>
           ) : (
-            <div className="flex items-center justify-center w-full aspect-square text-gray-300 dark:text-gray-600 text-xs text-center">
+            <div className="flex items-center justify-center w-full h-24 sm:h-28 lg:h-32 text-gray-300 dark:text-gray-600 text-xs text-center">
               자산 데이터 없음
             </div>
           )}

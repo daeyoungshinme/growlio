@@ -107,6 +107,26 @@ describe("TransactionForm", () => {
     expect(withdrawalBtn).toHaveClass("bg-blue-600");
   });
 
+  it("음수 금액으로 제출하면 검증 오류가 표시된다", () => {
+    const { container } = renderWithProviders(<TransactionForm {...defaultProps} />);
+    const amountInput = screen.getByPlaceholderText("예: 500000");
+    fireEvent.change(amountInput, { target: { value: "-100" } });
+    // HTML5 min 속성으로 인한 브라우저 기본 검증(click 시 폼 제출 차단)을 우회해
+    // 애플리케이션 레벨(Zod) 검증 로직 자체를 테스트한다.
+    fireEvent.submit(container.querySelector("form")!);
+    expect(screen.getByText("금액은 0보다 커야 합니다")).toBeInTheDocument();
+  });
+
+  it("메모가 500자를 초과하면 검증 오류가 표시된다", () => {
+    const { container } = renderWithProviders(<TransactionForm {...defaultProps} />);
+    const amountInput = screen.getByPlaceholderText("예: 500000");
+    fireEvent.change(amountInput, { target: { value: "500000" } });
+    const notesInput = screen.getByPlaceholderText("메모 입력");
+    fireEvent.change(notesInput, { target: { value: "a".repeat(501) } });
+    fireEvent.submit(container.querySelector("form")!);
+    expect(screen.getByText("메모는 500자 이하여야 합니다")).toBeInTheDocument();
+  });
+
   it("editingTx가 있으면 수정 모드로 렌더링된다", () => {
     const editingTx = {
       id: "tx-existing",

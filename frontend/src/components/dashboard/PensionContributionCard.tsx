@@ -60,9 +60,7 @@ export default function PensionContributionCard({ overview, embedded = false }: 
       <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
         {chips.map((chip) => (
           <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
-              {chip.label}
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 truncate">{chip.label}</p>
             <span className={`text-sm font-bold ${achievementColor(chip.pct)}`}>
               {Math.min(chip.pct, 999).toFixed(1)}%
             </span>
