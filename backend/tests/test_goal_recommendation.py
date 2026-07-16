@@ -245,6 +245,109 @@ class TestOptimizeGoalPortfolio:
         assert note is None
         assert sum(i["weight"] for i in items) == pytest.approx(100.0, abs=0.1)
 
+    def test_equity_ceiling_forces_maximum_equity_weight(self):
+        """is_equity+equity_ceiling을 주면(IRP 안전자산 하한 전용) 저변동 주식 쏠림이 상한으로
+        억제되고 안전자산이 그만큼 채워진다 — equity_floor와 대칭.
+
+        후보를 3개(주식 2개 + 안전자산 1개)로 구성한 것은 n=2일 때 기본 40% 상한이 1/n=50%로
+        완화되어 주식 종목당 상한이 equity_ceiling(70%)보다 낮아지는 코너케이스를 피하기 위함 —
+        `test_equity_floor_zero_disables_constraint`와 동일한 이유.
+        """
+        random.seed(29)
+        returns_map = {
+            "STOCK1": [random.gauss(0.0001, 0.0005) for _ in range(252)],  # 매우 저변동 — 무제한이면 쏠림
+            "STOCK2": [random.gauss(0.00012, 0.0006) for _ in range(252)],
+            "SAFE": [random.gauss(0.0004, 0.01) for _ in range(252)],
+        }
+        tickers = [("STOCK1", "주식1", "KOSPI"), ("STOCK2", "주식2", "KOSPI"), ("SAFE", "안전자산", "KOSPI")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["STOCK1", "STOCK2", "SAFE"],
+            tickers=tickers,
+            cagr_pct=[8.0, 8.0, 3.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            is_equity=[True, True, False],
+            equity_ceiling=0.7,
+        )
+
+        assert note is None
+        equity_weight = sum(i["weight"] for i in items if i["ticker"] in {"STOCK1", "STOCK2"})
+        assert equity_weight == pytest.approx(70.0, abs=1.0)
+
+    def test_equity_ceiling_ignored_when_all_candidates_are_equity(self):
+        """후보가 전부 주식이면 비교 대상이 없어 제약이 무의미하므로 무시되고 일반 최소분산으로 계산된다."""
+        random.seed(31)
+        returns_map = {
+            "A": [random.gauss(0.0002, 0.002) for _ in range(252)],
+            "B": [random.gauss(0.0004, 0.01) for _ in range(252)],
+        }
+        tickers = [("A", "A", "KOSPI"), ("B", "B", "KOSPI")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["A", "B"],
+            tickers=tickers,
+            cagr_pct=[3.0, 8.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            is_equity=[True, True],
+            equity_ceiling=0.7,
+        )
+
+        assert note is None
+        assert sum(i["weight"] for i in items) == pytest.approx(100.0, abs=0.1)
+
+    def test_equity_ceiling_one_disables_constraint(self):
+        """equity_ceiling=1.0이면 상한이 사실상 없는 것과 같아(안전자산 하한 0%) 일반 최소분산
+        결과와 동일해야 한다 — equity_floor=0의 대칭 케이스."""
+        random.seed(6)
+        returns_map = {
+            "SAFE1": [random.gauss(0.0001, 0.0005) for _ in range(252)],
+            "SAFE2": [random.gauss(0.00012, 0.0006) for _ in range(252)],
+            "STOCK": [random.gauss(0.0004, 0.01) for _ in range(252)],
+        }
+        tickers = [("SAFE1", "안전자산1", "KOSPI"), ("SAFE2", "안전자산2", "KOSPI"), ("STOCK", "주식", "KOSPI")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["SAFE1", "SAFE2", "STOCK"],
+            tickers=tickers,
+            cagr_pct=[3.0, 3.0, 8.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            is_equity=[False, False, True],
+            equity_ceiling=1.0,
+        )
+
+        assert note is None
+        stock_weight = next(i["weight"] for i in items if i["ticker"] == "STOCK")
+        assert stock_weight < 40.0  # 고변동 STOCK 쪽 비중이 억제되어야 함 (상한 제약 없음)
+
+    def test_equity_ceiling_with_single_non_equity_candidate_raises_per_ticker_cap(self):
+        """안전자산 하한(1-equity_ceiling)이 기본 종목당 최대 비중(40%)보다 크면, 안전자산 후보가
+        1개뿐이어도 그 하한을 채울 수 있도록 종목당 상한이 동적으로 완화된다 — equity_floor의
+        equity_cap 완화 로직과 대칭."""
+        random.seed(37)
+        returns_map = {
+            "STOCK1": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "STOCK2": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "SAFE": [random.gauss(0.0001, 0.0005) for _ in range(252)],
+        }
+        tickers = [("STOCK1", "주식1", "KOSPI"), ("STOCK2", "주식2", "KOSPI"), ("SAFE", "안전자산", "KOSPI")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["STOCK1", "STOCK2", "SAFE"],
+            tickers=tickers,
+            cagr_pct=[8.0, 8.0, 3.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            is_equity=[True, True, False],
+            equity_ceiling=0.5,  # 안전자산 하한 50% > 기본 종목당 상한 40%
+        )
+
+        assert note is None
+        safe_weight = next(i["weight"] for i in items if i["ticker"] == "SAFE")
+        assert safe_weight == pytest.approx(50.0, abs=1.0)
+
     def test_equity_floor_zero_disables_constraint(self):
         """equity_floor=0이면 하한 제약이 적용되지 않고 일반 최소분산 결과와 동일해야 한다.
 
@@ -1523,7 +1626,7 @@ class TestGetHorizonRecommendations:
         각 카드는 시장 적합 후보(국내 vs 해외)로만 필터링된다."""
         settings_row = SimpleNamespace(
             goal_candidate_tickers=[
-                {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
                 {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
             ],
             goal_max_weight_pct=None,
@@ -1584,10 +1687,17 @@ class TestGetHorizonRecommendations:
         assert all(item.market not in {"KOSPI", "KOSDAQ", "KRX"} for item in overseas_rec.recommended_items)
 
     async def test_pension_savings_and_irp_are_restricted_to_domestic_market(self):
-        """연금저축펀드/IRP 계좌는 국내 후보만 사용해야 하므로 해외 후보는 옵티마이저에 전달되지 않는다."""
+        """연금저축펀드/IRP 계좌는 국내 후보만 사용해야 하므로 해외 후보는 옵티마이저에 전달되지 않는다.
+
+        IRP는 추가로 퇴직연금 규정상 안전자산(현금성) 최소 30% 하한이 투자기간과 무관하게
+        적용되므로, LONG_TERM(원래 EQUITY만 허용)이어도 합성 현금성 자산 후보가 항상 함께
+        분석에 포함된다 — PENSION_SAVINGS는 이 규칙 대상이 아니므로 등록된 주식 후보만으로
+        기존처럼(안전자산 제약 없이) 계산된다.
+        """
         settings_row = SimpleNamespace(
             goal_candidate_tickers=[
-                {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
                 {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
             ],
             goal_max_weight_pct=None,
@@ -1605,8 +1715,16 @@ class TestGetHorizonRecommendations:
             )
         )
 
-        cagr_map = {("069500", "KOSPI"): {"cagr_pct": 8.0}}
+        cagr_map = {
+            ("133690", "KOSPI"): {"cagr_pct": 8.0},
+            ("360750", "KOSPI"): {"cagr_pct": 7.0},
+        }
         get_historical_returns_mock = AsyncMock(return_value=cagr_map)
+        random.seed(19)
+        returns_map = {
+            "133690.KS": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "360750.KS": [random.gauss(0.0004, 0.01) for _ in range(252)],
+        }
 
         with (
             patch(
@@ -1621,6 +1739,10 @@ class TestGetHorizonRecommendations:
                 "app.services.goal_recommendation_service.get_historical_returns",
                 get_historical_returns_mock,
             ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
         ):
             result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
 
@@ -1630,6 +1752,120 @@ class TestGetHorizonRecommendations:
         for call in get_historical_returns_mock.call_args_list:
             queried_tickers = call.args[0]
             assert ("SPY", "NYSE") not in queried_tickers
+
+        pension_rec = next(r for r in result.recommendations if r.tax_type == "PENSION_SAVINGS")
+        irp_rec = next(r for r in result.recommendations if r.tax_type == "IRP")
+
+        # PENSION_SAVINGS는 IRP 안전자산 규칙 대상이 아니므로 현금성 자산 없이 등록된 주식만으로 계산된다.
+        assert pension_rec.includes_cash_equivalent is False
+        assert sum(i.weight for i in pension_rec.recommended_items) == pytest.approx(100.0, abs=0.5)
+
+        # IRP는 안전자산 30% 하한(equity_ceiling=70%)이 적용되어 주식(133690+360750) 합산 비중이 제한된다.
+        irp_equity_weight = sum(i.weight for i in irp_rec.recommended_items if i.ticker != "CASH_EQUIVALENT")
+        assert irp_equity_weight <= 70.0 + 0.5
+        assert irp_rec.includes_cash_equivalent is True
+
+    async def test_irp_short_term_uses_safe_asset_floor_instead_of_equity_floor(self):
+        """IRP는 단기 태그여도 기존 주식 최소 80% 규칙이 아니라 퇴직연금 규정상 안전자산
+        최소 30% 하한(equity_ceiling=70%)이 우선 적용된다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+            goal_short_term_equity_floor_pct=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("SHORT_TERM", "IRP", account_id)]))
+
+        cagr_map = {
+            ("133690", "KOSPI"): {"cagr_pct": 8.0},
+            ("153130", "KOSPI"): {"cagr_pct": 2.0},
+        }
+        random.seed(11)
+        returns_map = {
+            "133690.KS": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "153130.KS": [random.gauss(0.0001, 0.0005) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        rec = result.recommendations[0]
+        stock_weight = next(i.weight for i in rec.recommended_items if i.ticker == "133690")
+        assert stock_weight <= 70.0 + 0.5  # 단기 주식 최소 80% 하한이 적용됐다면 이 검증은 실패한다
+        assert sum(i.weight for i in rec.recommended_items) == pytest.approx(100.0, abs=0.5)
+        assert "IRP" in (rec.note or "")
+
+    async def test_irp_mid_term_enforces_safe_asset_floor(self):
+        """IRP+MID_TERM 조합도 안전자산 최소 30% 하한이 투자기간과 무관하게 적용된다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("MID_TERM", "IRP", account_id)]))
+
+        cagr_map = {
+            ("133690", "KOSPI"): {"cagr_pct": 8.0},
+            ("114260", "KOSPI"): {"cagr_pct": 3.0},
+        }
+        random.seed(23)
+        returns_map = {
+            "133690.KS": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "114260.KS": [random.gauss(0.00015, 0.001) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        rec = result.recommendations[0]
+        stock_weight = next(i.weight for i in rec.recommended_items if i.ticker == "133690")
+        assert stock_weight <= 70.0 + 0.5
+        safe_weight = sum(i.weight for i in rec.recommended_items if i.ticker != "133690")
+        assert safe_weight >= 30.0 - 0.5
 
     async def test_isa_prefers_overseas_index_tracking_krx_etfs(self):
         """ISA는 국내상장이지만 해외지수를 추종하는 ETF(나스닥100/S&P500/다우존스)를 우선하고,
