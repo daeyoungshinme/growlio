@@ -12,7 +12,7 @@ import hashlib
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import structlog
 from fastapi import HTTPException, status
@@ -25,7 +25,7 @@ from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
-from app.services.rebalancing.order_builder import build_rebalancing_orders, refresh_live_prices
+from app.services.rebalancing.order_builder import build_rebalancing_orders, filter_drifting_items, refresh_live_prices
 
 logger = structlog.get_logger()
 
@@ -80,7 +80,7 @@ async def generate_pending_plan_for_alert(
     반환: (plan, buy_cancel_raw_token, sell_action_raw_token). 실행할 주문이 전혀 없으면
     (None, None, None) — 기존 "실행할 게 없음" 케이스와 동일하게 취급한다.
     """
-    from app.redis_client import get_redis
+    from app.core.redis_client import get_redis
     from app.utils.market_hours import korean_market_close_datetime
 
     strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
@@ -170,6 +170,7 @@ async def build_pending_plan_for_alert(
     strategy_override: str | None = None,
     order_type_override: Literal["MARKET", "LIMIT"] | None = None,
     account_id_override: uuid.UUID | None = None,
+    redis: Any = None,
 ) -> tuple[RebalancingPlan, str | None, str | None] | None:
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
@@ -183,11 +184,11 @@ async def build_pending_plan_for_alert(
 
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
-    overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
+    overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, redis=redis)
     analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
 
     threshold = float(alert.threshold_pct)
-    drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
+    drifting = filter_drifting_items(analysis.items, threshold)
 
     if not drifting:
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))

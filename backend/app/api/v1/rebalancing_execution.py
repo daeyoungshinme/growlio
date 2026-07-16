@@ -11,12 +11,12 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     ExecutionRequest,
     ExecutionResult,
@@ -161,6 +161,7 @@ async def quick_execute_rebalancing(
         strategy_override=body.strategy if body else None,
         order_type_override=body.order_type if body else None,
         account_id_override=body.account_id if body else None,
+        redis=redis,
     )
     if generated is None:
         return QuickExecuteResult(

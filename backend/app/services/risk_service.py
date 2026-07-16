@@ -17,6 +17,7 @@ from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, set_cached_json
+from app.utils.redis_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
@@ -108,7 +109,10 @@ async def get_portfolio_risk_metrics(
 ) -> dict:
     cache_key = f"risk:{user_id}:{portfolio_id or 'all'}"
 
-    cached = await get_cached_json(redis, cache_key)
+    async def _read_cache() -> dict | None:
+        return await get_cached_json(redis, cache_key)
+
+    cached = await _read_cache()
     if cached is not None:
         return cached
 
@@ -122,65 +126,71 @@ async def get_portfolio_risk_metrics(
     if total_value <= 0:
         return _empty_risk_result()
 
-    # 비중 계산 + yfinance 심볼 변환
-    positions = list(pos_map.values())
-    yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
-    weights = [p["value_krw"] / total_value for p in positions]
+    async def _fetch_and_cache() -> dict:
+        # 비중 계산 + yfinance 심볼 변환
+        positions = list(pos_map.values())
+        yf_symbols = [_to_yf_symbol(p["ticker"], p["market"]) for p in positions]
+        weights = [p["value_krw"] / total_value for p in positions]
 
-    loop = asyncio.get_running_loop()
-    returns_map = await loop.run_in_executor(None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL])
+        loop = asyncio.get_running_loop()
+        returns_map = await loop.run_in_executor(None, _sync_fetch_risk_data, yf_symbols, [_SP500_SYMBOL])
 
-    # 포트폴리오 가중 수익률 시계열 구성
-    min_len = min(
-        (len(returns_map[s]) for s in yf_symbols if s in returns_map),
-        default=0,
-    )
-    portfolio_rets: list[float] = []
-    if min_len >= 10:
-        for i in range(min_len):
-            r = 0.0
-            for sym, w in zip(yf_symbols, weights, strict=False):
-                if sym in returns_map and i < len(returns_map[sym]):
-                    r += returns_map[sym][i] * w
-            portfolio_rets.append(r)
+        # 포트폴리오 가중 수익률 시계열 구성
+        min_len = min(
+            (len(returns_map[s]) for s in yf_symbols if s in returns_map),
+            default=0,
+        )
+        portfolio_rets: list[float] = []
+        if min_len >= 10:
+            for i in range(min_len):
+                r = 0.0
+                for sym, w in zip(yf_symbols, weights, strict=False):
+                    if sym in returns_map and i < len(returns_map[sym]):
+                        r += returns_map[sym][i] * w
+                portfolio_rets.append(r)
 
-    # 지표 계산
-    var_95 = _calc_var(portfolio_rets, 0.95) if portfolio_rets else 0.0
-    var_99 = _calc_var(portfolio_rets, 0.99) if portfolio_rets else 0.0
+        # 지표 계산
+        var_95 = _calc_var(portfolio_rets, 0.95) if portfolio_rets else 0.0
+        var_99 = _calc_var(portfolio_rets, 0.99) if portfolio_rets else 0.0
 
-    n = len(portfolio_rets)
-    if n >= 2:
-        mean = sum(portfolio_rets) / n
-        std = math.sqrt(sum((r - mean) ** 2 for r in portfolio_rets) / (n - 1))
-        volatility_pct = std * math.sqrt(252) * 100
-    else:
-        volatility_pct = 0.0
+        n = len(portfolio_rets)
+        if n >= 2:
+            mean = sum(portfolio_rets) / n
+            std = math.sqrt(sum((r - mean) ** 2 for r in portfolio_rets) / (n - 1))
+            volatility_pct = std * math.sqrt(252) * 100
+        else:
+            volatility_pct = 0.0
 
-    beta_sp500 = _calc_beta(portfolio_rets, returns_map.get(_SP500_SYMBOL, []))
+        beta_sp500 = _calc_beta(portfolio_rets, returns_map.get(_SP500_SYMBOL, []))
 
-    diversification_score = _calc_diversification_score(
-        [s for s in yf_symbols if s in returns_map],
-        [w for s, w in zip(yf_symbols, weights, strict=False) if s in returns_map],
-        returns_map,
-    )
+        diversification_score = _calc_diversification_score(
+            [s for s in yf_symbols if s in returns_map],
+            [w for s, w in zip(yf_symbols, weights, strict=False) if s in returns_map],
+            returns_map,
+        )
 
-    # 집중도 계산 (top 1 비중)
-    top_weight_pct = max(weights) * 100 if weights else 0.0
+        # 집중도 계산 (top 1 비중)
+        top_weight_pct = max(weights) * 100 if weights else 0.0
 
-    result_data = {
-        "var_95_pct": round(var_95, 2),
-        "var_99_pct": round(var_99, 2),
-        "annualized_volatility_pct": round(volatility_pct, 2),
-        "beta_sp500": round(beta_sp500, 3),
-        "diversification_score": diversification_score,
-        "top_holding_weight_pct": round(top_weight_pct, 2),
-        "position_count": len(positions),
-        "data_available": len(portfolio_rets) >= 10,
-        "note": "1년 일별 수익률 기반 추정값 (yfinance)" if len(portfolio_rets) >= 10 else "데이터 불충분",
-    }
+        result_data = {
+            "var_95_pct": round(var_95, 2),
+            "var_99_pct": round(var_99, 2),
+            "annualized_volatility_pct": round(volatility_pct, 2),
+            "beta_sp500": round(beta_sp500, 3),
+            "diversification_score": diversification_score,
+            "top_holding_weight_pct": round(top_weight_pct, 2),
+            "position_count": len(positions),
+            "data_available": len(portfolio_rets) >= 10,
+            "note": "1년 일별 수익률 기반 추정값 (yfinance)" if len(portfolio_rets) >= 10 else "데이터 불충분",
+        }
 
-    await set_cached_json(redis, cache_key, result_data, TTL_RISK_ANALYSIS)
-    return result_data
+        await set_cached_json(redis, cache_key, result_data, TTL_RISK_ANALYSIS)
+        return result_data
+
+    if redis is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(redis, cache_key, _read_cache, _fetch_and_cache)
 
 
 def _empty_risk_result() -> dict:

@@ -31,6 +31,7 @@ from app.services.rebalancing.alert_scope import resolve_effective_account_ids
 from app.services.rebalancing.diagnosis_service import check_composite_signal, fetch_market_and_risk_signal
 from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
+    filter_drifting_items,
     is_market_signal_blocking_auto_mode,
     refresh_live_prices,
 )
@@ -237,7 +238,7 @@ def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is
     return False
 
 
-async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession):
+async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, redis: Any = None):
     """알림 대상 포트폴리오의 현재 배분을 조회·분석한다. 실패 시 None(호출부에서 skip)."""
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
@@ -245,7 +246,7 @@ async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
     try:
-        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids)
+        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, redis=redis)
     except Exception as exc:
         logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
         return None
@@ -301,7 +302,7 @@ async def _evaluate_composite_trigger(
 
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
-    from app.redis_client import get_redis
+    from app.core.redis_client import get_redis
 
     _redis = await get_redis()
     # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
@@ -332,12 +333,12 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         if _should_skip_by_schedule(alert, trigger_condition, is_schedule_day):
             continue
 
-        analysis = await _analyze_alert_drift(alert, portfolio, db)
+        analysis = await _analyze_alert_drift(alert, portfolio, db, _redis)
         if analysis is None:
             continue
 
         threshold = float(alert.threshold_pct)
-        drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
+        drifting = filter_drifting_items(analysis.items, threshold)
 
         # UserSettings 행이 없으면(outerjoin NULL) 기본값 True로 폴백 — 신규 유저 기본 동작 유지
         effective_composite_enabled = (

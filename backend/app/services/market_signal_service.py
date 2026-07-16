@@ -21,6 +21,7 @@ from app.utils.cache_keys import (
     set_cached_json,
 )
 from app.utils.circuit_breaker import CircuitBreaker, CircuitOpenError
+from app.utils.redis_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 
@@ -487,33 +488,43 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
     """복합 시장 위험 신호를 반환한다. Redis 캐시(정상 시 1시간, 일부/전체 실패 시 1분)."""
     cache_key = market_signal_latest_key()
 
-    if redis is not None and (data := await get_cached_json(redis, cache_key)) is not None:
+    async def _read_cache() -> dict[str, Any] | None:
+        data = await get_cached_json(redis, cache_key)
         if isinstance(data, dict) and data.get("data_freshness") != "STALE":
             data["data_freshness"] = "CACHED"
         return data
 
-    (
-        vix,
-        yield_curve,
-        fear_greed,
-        high_yield_spread,
-        dollar_index,
-        rate_cut_expectation,
-        exchange_rate,
-    ) = await _fetch_all_signals(redis)
-    result = compute_composite_signal(
-        vix,
-        yield_curve,
-        fear_greed,
-        high_yield_spread,
-        dollar_index,
-        rate_cut_expectation,
-        exchange_rate,
-    )
+    cached = await _read_cache()
+    if redis is not None and cached is not None:
+        return cached
 
-    ttl = TTL_MARKET_SIGNAL if result["data_freshness"] == "LIVE" else TTL_MARKET_SIGNAL_DEGRADED
-    await set_cached_json(redis, cache_key, result, ttl)
-    return result
+    async def _fetch_and_cache() -> dict[str, Any]:
+        (
+            vix,
+            yield_curve,
+            fear_greed,
+            high_yield_spread,
+            dollar_index,
+            rate_cut_expectation,
+            exchange_rate,
+        ) = await _fetch_all_signals(redis)
+        result = compute_composite_signal(
+            vix,
+            yield_curve,
+            fear_greed,
+            high_yield_spread,
+            dollar_index,
+            rate_cut_expectation,
+            exchange_rate,
+        )
+        ttl = TTL_MARKET_SIGNAL if result["data_freshness"] == "LIVE" else TTL_MARKET_SIGNAL_DEGRADED
+        await set_cached_json(redis, cache_key, result, ttl)
+        return result
+
+    if redis is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(redis, cache_key, _read_cache, _fetch_and_cache)
 
 
 async def get_last_composite_level(redis: aioredis.Redis | None) -> str | None:

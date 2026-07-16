@@ -11,21 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.kis.auth import get_access_token
-from app.kis.balance import get_orderable_cash
+from app.core.redis_client import get_redis
 from app.limiter import limiter
-from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User
-from app.providers.base import BrokerProvider
-from app.providers.kis_provider import KISProvider
-from app.providers.kiwoom_provider import KiwoomProvider
-from app.redis_client import get_redis
 from app.schemas.rebalancing import (
     CompositeSignalStatus,
     GoalRecommendation,
     HorizonRecommendationResponse,
-    KisBalancePosition,
     KisBalanceResponse,
     PortfolioDriftSummary,
     RebalancingAnalysis,
@@ -34,10 +27,7 @@ from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
 from app.services._account_queries import active_broker_accounts_stmt, get_account_including_inactive
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_or_create_settings, get_settings_row
-from app.services.credential_service import decrypt, get_kis_user_credentials
-from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.services.dividend_fetcher import fetch_ticker_dividend_info
 from app.services.goal_recommendation_service import (
     existing_items_from_positions,
     get_goal_recommendation,
@@ -45,12 +35,14 @@ from app.services.goal_recommendation_service import (
 )
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
-from app.services.price_service import fetch_prices_batch, get_historical_returns
+from app.services.price_service import get_historical_returns
+from app.services.rebalancing.broker_balance_service import fetch_broker_balance
 from app.services.rebalancing.diagnosis_service import (
     build_diagnosis_context,
     check_composite_signal,
     fetch_market_and_risk_signal,
 )
+from app.services.rebalancing.overview_enrichment import collect_dividend_map, enrich_overview_with_prices
 from app.services.rebalancing.service import (
     _item_attr,
     analyze_rebalancing,
@@ -59,98 +51,6 @@ from app.services.rebalancing.service import (
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
-
-_DIVIDEND_FETCH_CONCURRENCY = 8  # yfinance 가격 조회와 별개 I/O이므로 더 높은 동시성 허용
-
-
-async def _collect_dividend_map(
-    user_id: uuid.UUID,
-    db: AsyncSession,
-    redis,
-    portfolio: Portfolio,
-    base_dividend_map: dict,
-) -> dict:
-    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Redis 캐시(TTL_DIVIDEND_INFO=24h) 경유로 보완한다.
-
-    보유 종목 배당 집계(get_ticker_dividend_summary)가 쓰는 것과 동일한 (ticker, market) 단위
-    캐시·멀티소스 폴백 체인(fetch_ticker_dividend_info)을 재사용한다.
-    """
-    dividend_map = dict(base_dividend_map)
-    sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
-    kis_creds = await get_kis_user_credentials(user_id, db)
-    dart_key = await fetch_dart_api_key(user_id, db)
-    overrides = await load_user_dividend_overrides(user_id, db)
-
-    async def _fetch_one(raw_item) -> None:
-        ticker = str(_item_attr(raw_item, "ticker"))
-        market = str(_item_attr(raw_item, "market"))
-        if ticker == "CASH" or market == "KR_PROPERTY":
-            return
-        key = (ticker, market)
-        if key in dividend_map:
-            return
-        try:
-            yield_decimal, _dps, _months, _ex_dividend_date = await fetch_ticker_dividend_info(
-                ticker, market, redis, sem, kis_creds, dart_key, overrides
-            )
-            if yield_decimal > 0:
-                dividend_map[key] = {
-                    "ticker": ticker,
-                    "market": market,
-                    "dividend_yield": yield_decimal * 100,
-                    "estimated_annual_krw": 0.0,
-                }
-        except Exception as e:
-            logger.warning("dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
-
-    await asyncio.gather(*[_fetch_one(item) for item in portfolio.items])
-    return dividend_map
-
-
-async def _enrich_overview_with_prices(
-    portfolio: Portfolio,
-    overview: dict,
-    user_id: uuid.UUID,
-    db,
-    redis,
-) -> dict:
-    """목표 포트폴리오 중 미보유 종목의 현재가를 조회해 overview에 보완한다."""
-    existing_price_keys: set[tuple[str, str]] = {
-        (pos["ticker"], pos["market"]) for pos in overview.get("all_positions", []) if pos.get("current_price")
-    }
-    unpriced: list[tuple[str, str]] = [
-        (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
-        for raw_item in portfolio.items
-        if str(_item_attr(raw_item, "ticker")) != "CASH"
-        and str(_item_attr(raw_item, "market")) != "KR_PROPERTY"
-        and (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market"))) not in existing_price_keys
-    ]
-    if not unpriced:
-        return overview
-
-    fetched_prices = await fetch_prices_batch(user_id, unpriced, db, redis)
-    extra_positions = [
-        {
-            "ticker": ticker,
-            "market": market,
-            "name": next(
-                (
-                    str(_item_attr(raw_item, "name"))
-                    for raw_item in portfolio.items
-                    if str(_item_attr(raw_item, "ticker")) == ticker
-                ),
-                ticker,
-            ),
-            "value_krw": 0.0,
-            "current_price": fetched_prices[ticker],
-            "qty": 0.0,
-        }
-        for ticker, market in unpriced
-        if ticker in fetched_prices and fetched_prices[ticker] > 0
-    ]
-    if not extra_positions:
-        return overview
-    return {**overview, "all_positions": list(overview.get("all_positions", [])) + extra_positions}
 
 
 @router.get("/portfolios/{portfolio_id}/analyze", response_model=RebalancingAnalysis)
@@ -181,11 +81,11 @@ async def analyze_portfolio(
 
     portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
-    overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis)
-
-    base_dividend_items = await get_ticker_dividend_summary(current_user.id, db)
+    overview, base_dividend_items = await asyncio.gather(
+        build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis),
+        get_ticker_dividend_summary(current_user.id, db),
+    )
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
-    dividend_map = await _collect_dividend_map(current_user.id, db, redis, portfolio, base_dividend_map)
 
     target_tickers = [
         (str(_item_attr(raw_item, "ticker")), str(_item_attr(raw_item, "market")))
@@ -197,9 +97,12 @@ async def analyze_portfolio(
         for p in overview.get("all_positions", [])
         if p.get("ticker") and p.get("ticker") != "CASH"
     ]
-    returns_map = await get_historical_returns(list(set(target_tickers) | set(current_tickers)), redis=redis)
 
-    overview = await _enrich_overview_with_prices(portfolio, overview, current_user.id, db, redis)
+    dividend_map, returns_map, overview = await asyncio.gather(
+        collect_dividend_map(current_user.id, db, redis, portfolio, base_dividend_map),
+        get_historical_returns(list(set(target_tickers) | set(current_tickers)), redis=redis),
+        enrich_overview_with_prices(portfolio, overview, current_user.id, db, redis),
+    )
 
     if deposit_krw_override is not None:
         old_deposit = float(overview.get("total_deposit_krw") or 0)
@@ -271,69 +174,6 @@ async def get_horizon_goal_recommendation_endpoint(
     return await get_horizon_recommendations(redis, db, current_user.id, settings_row)
 
 
-async def _fetch_broker_balance(
-    account: AssetAccount,
-    db: AsyncSession,
-    redis,
-) -> KisBalanceResponse:
-    """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
-
-    실제 조회는 BrokerProvider(KISProvider/KiwoomProvider)에 위임한다 — 자격증명 검증,
-    토큰 갱신-재시도, 원화 포지션 변환은 sync_account()가 쓰는 것과 동일한 provider
-    경로를 공유한다. 실패 시 SyncError 계층 예외(ProviderCredentialError 등)가 그대로
-    전파되며 main.py 전역 핸들러가 HTTP 응답으로 변환한다.
-    """
-    if account.asset_type == "STOCK_KIS":
-        provider: BrokerProvider = KISProvider()
-    elif account.asset_type == "STOCK_KIWOOM":
-        provider = KiwoomProvider()
-    else:
-        raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
-
-    result = await provider.sync(account, db, redis)
-
-    orderable_krw: float | None = None
-    if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
-        try:
-            app_key = decrypt(account.kis_app_key)
-            app_secret = decrypt(account.kis_app_secret)
-            access_token = await get_access_token(
-                app_key,
-                app_secret,
-                is_mock=account.is_mock_mode,
-                redis=redis,
-                db=db,
-                user_id=str(account.user_id),
-                account_id=str(account.id),
-            )
-            orderable_krw = await get_orderable_cash(
-                app_key, app_secret, access_token, account.kis_account_no, is_mock=account.is_mock_mode
-            )
-        except Exception as e:
-            logger.warning("orderable_cash_fetch_failed", account_id=str(account.id), error=str(e))
-
-    positions = [
-        KisBalancePosition(
-            ticker=p.ticker,
-            name=p.name,
-            market=p.market,
-            quantity=p.qty,
-            avg_price=p.avg_price,
-            current_price=p.current_price,
-            value_krw=p.value_krw,
-        )
-        for p in result.positions
-    ]
-    return KisBalanceResponse(
-        account_id=str(account.id),
-        account_name=account.name,
-        is_mock=account.is_mock_mode,
-        positions=positions,
-        deposit_krw=result.deposit_krw,
-        orderable_krw=orderable_krw,
-    )
-
-
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)
 @limiter.limit("10/minute")
 async def get_broker_account_balance(
@@ -359,7 +199,7 @@ async def get_broker_account_balance(
         )
 
     try:
-        return await _fetch_broker_balance(account, db, redis)
+        return await fetch_broker_balance(account, db, redis)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -379,7 +219,7 @@ async def get_all_broker_balances(
     if not accounts:
         return []
 
-    tasks = [_fetch_broker_balance(acc, db, redis) for acc in accounts]
+    tasks = [fetch_broker_balance(acc, db, redis) for acc in accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [
@@ -430,6 +270,12 @@ async def get_drift_summary(
     except Exception as e:
         logger.warning("drift_summary_composite_signal_failed", error=str(e))
 
+    # NOTE: build_portfolio_overview는 요청-스코프 AsyncSession(db)으로 DB를 조회하므로
+    # 포트폴리오 루프를 asyncio.gather로 동시 실행할 수 없다 (SQLAlchemy AsyncSession은
+    # 동일 세션에 대한 동시 작업을 지원하지 않음). 별도 세션(AsyncSessionLocal)을 열어
+    # 우회하는 방법은 FastAPI의 get_db dependency-override 기반 테스트 목킹과 충돌하므로
+    # (실제 DB 연결 시도) 채택하지 않았다 — 순차 실행 유지, 콜드 캐시 시나리오는
+    # 1.2(캐시 스레딩)/1.5(single-flight 락)로 완화한다.
     summaries: list[PortfolioDriftSummary] = []
     for portfolio in portfolios:
         try:

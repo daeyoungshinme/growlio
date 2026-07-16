@@ -80,7 +80,7 @@ async def generate_insights(
 
     results = await asyncio.gather(
         _check_concentration(dashboard),
-        _check_rebalancing_opportunity(user_id, db),
+        _check_rebalancing_opportunity(user_id, db, redis),
         _check_tax_loss_harvest(user_id, db),
         return_exceptions=True,
     )
@@ -153,6 +153,7 @@ async def _check_concentration(dashboard: dict) -> list[Insight]:
 async def _check_rebalancing_opportunity(
     user_id: uuid.UUID,
     db: AsyncSession,
+    redis: RedisType = None,
 ) -> list[Insight]:
     """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림."""
     from app.models.portfolio import Portfolio
@@ -181,7 +182,7 @@ async def _check_rebalancing_opportunity(
         account_ids = [uuid.UUID(aid) for aid in raw_ids] if raw_ids else None
 
         try:
-            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids)
+            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, redis=redis)
         except Exception as e:  # 포트폴리오 단위 실패 무시, 나머지 계속
             logger.warning("portfolio_overview_failed", portfolio_id=str(pf.id), error=str(e))
             continue

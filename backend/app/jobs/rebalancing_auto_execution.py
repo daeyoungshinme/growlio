@@ -10,11 +10,11 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from app.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
-from app.redis_client import get_redis
 from app.services.alerts.calculator import already_fired_today
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
@@ -91,7 +91,7 @@ async def _run_auto_execution() -> None:
                 continue
 
             try:
-                generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level)
+                generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level, redis=redis)
             except Exception as exc:
                 logger.error("rebalancing_auto_plan_generation_failed", alert_id=str(alert.id), error=str(exc))
                 continue

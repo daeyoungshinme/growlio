@@ -12,7 +12,7 @@ RedisType: TypeAlias = AioRedis | None
 
 def _env_prefix() -> str:
     """app_env를 키 네임스페이스 prefix로 반환한다 (dev/staging/prod Redis 공유 시 충돌 방지)."""
-    from app.config import settings  # lazy — 순환 임포트 방지
+    from app.core.config import settings  # lazy — 순환 임포트 방지
 
     return f"{settings.app_env}:"
 
@@ -45,7 +45,6 @@ TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
 TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
 TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
-TTL_JOB_LOCK_DCA = 3600  # DCA 자동매수 분산 락
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
 TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
@@ -55,6 +54,19 @@ TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 TTL_GOAL_RECOMMENDATION = 600  # 목표 역산 추천(전체/기간별) 10분 — 설정 변경 시 명시적으로 무효화됨
+
+# ---------------------------------------------------------------------------
+# 캐시 스키마 버전 상수
+# ---------------------------------------------------------------------------
+# 캐시 값의 필드 구성이나 산출 로직이 바뀌어 기존 캐시가 새 코드와 호환되지 않을 때,
+# 아래처럼 `_XXX_VERSION` 상수를 올려 키를 분리한다(구버전 캐시가 TTL 만료 전까지
+# 잘못된 값을 계속 서빙하는 것을 방지). **값 자체(문자열)는 여기서만 바꾸고,
+# 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
+_ALLOC_HISTORY_VERSION = "v2"
+_MARKET_SIGNAL_VERSION = "v4"
+"""v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
+(필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
+잘못된 값을 계속 서빙하지 않도록 키를 분리)"""
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -115,7 +127,7 @@ def correlation_key(user_id: uuid.UUID, param_hash: str) -> str:
 
 
 def alloc_history_key(user_id: uuid.UUID, months: int) -> str:
-    return f"{_env_prefix()}alloc_history_v2:{user_id}:{months}"
+    return f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:{months}"
 
 
 def has_overseas_key(account_id: uuid.UUID) -> str:
@@ -187,10 +199,7 @@ def economic_indicator_calendar_key() -> str:
 
 
 def market_signal_latest_key() -> str:
-    # v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
-    # (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
-    # 잘못된 값을 계속 서빙하지 않도록 키를 분리)
-    return f"{_env_prefix()}market:signal:latest:v4"
+    return f"{_env_prefix()}market:signal:latest:{_MARKET_SIGNAL_VERSION}"
 
 
 def market_signal_last_level_key() -> str:
@@ -283,7 +292,7 @@ async def invalidate_all_user_caches(redis: RedisType, user_id: uuid.UUID) -> No
 
 async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:
     """alloc_history 캐시를 SCAN+UNLINK 패턴으로 일괄 삭제한다."""
-    await _scan_unlink(redis, f"{_env_prefix()}alloc_history_v2:{user_id}:*")
+    await _scan_unlink(redis, f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:*")
 
 
 async def invalidate_goal_recommendation_caches(redis: RedisType, user_id: uuid.UUID) -> None:

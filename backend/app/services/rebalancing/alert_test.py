@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import uuid
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import structlog
 from sqlalchemy import select
@@ -16,7 +16,7 @@ from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import save_alert_history
 from app.services.rebalancing.alert_scope import resolve_effective_account_ids
-from app.services.rebalancing.order_builder import build_rebalancing_orders
+from app.services.rebalancing.order_builder import build_rebalancing_orders, filter_drifting_items
 
 __all__ = ["send_test_rebalancing_alert"]
 
@@ -28,6 +28,7 @@ async def send_test_rebalancing_alert(
     user_id: uuid.UUID,
     db: AsyncSession,
     account_id: uuid.UUID | None = None,
+    redis: Any = None,
 ) -> dict[str, bool]:
     """리밸런싱 자동화 알림을 즉시 테스트 발송한다.
 
@@ -72,9 +73,9 @@ async def send_test_rebalancing_alert(
     drifting: list = []
     ticker_account_map: dict[str, list] = {}
     try:
-        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids)
+        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids, redis=redis)
         analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
-        drifting = [item for item in analysis.items if abs(item.weight_diff_pct) > threshold]
+        drifting = filter_drifting_items(analysis.items, threshold)
         items_to_show = analysis.items
         ticker_account_map = analysis.ticker_account_map
     except Exception as exc:

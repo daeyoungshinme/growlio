@@ -24,6 +24,11 @@ _NON_TRADABLE_TICKERS = ("CASH", "REAL_ESTATE", CASH_EQUIVALENT_TICKER)
 """실제 주문을 낼 수 없는 합성 포트폴리오 항목 티커 — 가격 조회·주문 생성 양쪽에서 제외."""
 
 
+def filter_drifting_items(items: list[Any], threshold_pct: float) -> list[Any]:
+    """threshold_pct(%)를 초과하는 드리프트 항목만 반환한다."""
+    return [item for item in items if abs(item.weight_diff_pct) > threshold_pct]
+
+
 def _build_sell_orders(
     item: Any,
     qty: int,

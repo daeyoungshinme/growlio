@@ -36,7 +36,7 @@ def _make_mock_db():
 
 def _setup_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -93,7 +93,7 @@ class TestRebalancingAnalyze:
             assert resp.status_code in (404, 422)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -125,7 +125,7 @@ class TestRebalancingHistory:
             assert resp.json() == []
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -178,7 +178,7 @@ class TestDriftSummary:
             mock_fetch.assert_not_called()
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -226,7 +226,7 @@ class TestCompositeSignalStatus:
             mock_fetch.assert_not_called()
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -263,7 +263,7 @@ class TestCompositeSignalStatus:
             assert data["reason"] is not None
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -296,7 +296,7 @@ class TestCompositeSignalStatus:
             assert resp.json()["has_active_alert"] is False
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -333,7 +333,7 @@ class TestCompositeSignalStatus:
             assert resp.json()["has_active_alert"] is True
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -371,7 +371,7 @@ class TestBrokerBalance:
             assert resp.status_code in (404, 422, 400)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -405,7 +405,7 @@ class TestBrokerBalance:
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
                 patch(
-                    "app.api.v1.rebalancing._fetch_broker_balance",
+                    "app.api.v1.rebalancing.fetch_broker_balance",
                     new_callable=AsyncMock,
                     side_effect=ProviderApiError("KIS 계좌 조회 실패: 호출 후처리(MCI전송) 오류 입니다. (rt_cd=1)."),
                 ),
@@ -419,7 +419,7 @@ class TestBrokerBalance:
             assert "KIS 계좌 조회 실패" in resp.json()["detail"]
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -458,14 +458,14 @@ class TestBrokerBalance:
             assert "키움 계좌번호" in resp.json()["detail"]
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
 
 
 class TestCollectDividendMap:
-    """_collect_dividend_map이 fetch_ticker_dividend_info(캐시된 멀티소스 폴백)에
+    """collect_dividend_map이 fetch_ticker_dividend_info(캐시된 멀티소스 폴백)에
     올바르게 위임하는지 검증 — Naver/Yahoo 직접 호출 시절의 회귀 방지용."""
 
     @staticmethod
@@ -473,7 +473,7 @@ class TestCollectDividendMap:
         return SimpleNamespace(items=items)
 
     async def test_skips_cash_and_property_and_existing_tickers(self):
-        from app.api.v1.rebalancing import _collect_dividend_map
+        from app.services.rebalancing.overview_enrichment import collect_dividend_map
 
         portfolio = self._make_portfolio(
             [
@@ -485,18 +485,32 @@ class TestCollectDividendMap:
         base_map = {("AAPL", "NASDAQ"): {"ticker": "AAPL", "market": "NASDAQ", "dividend_yield": 0.5}}
 
         with (
-            patch("app.api.v1.rebalancing.get_kis_user_credentials", new_callable=AsyncMock, return_value=None),
-            patch("app.api.v1.rebalancing.fetch_dart_api_key", new_callable=AsyncMock, return_value=""),
-            patch("app.api.v1.rebalancing.load_user_dividend_overrides", new_callable=AsyncMock, return_value={}),
-            patch("app.api.v1.rebalancing.fetch_ticker_dividend_info", new_callable=AsyncMock) as mock_fetch,
+            patch(
+                "app.services.rebalancing.overview_enrichment.get_kis_user_credentials",
+                new_callable=AsyncMock,
+                return_value=None,
+            ),
+            patch(
+                "app.services.rebalancing.overview_enrichment.fetch_dart_api_key",
+                new_callable=AsyncMock,
+                return_value="",
+            ),
+            patch(
+                "app.services.rebalancing.overview_enrichment.load_user_dividend_overrides",
+                new_callable=AsyncMock,
+                return_value={},
+            ),
+            patch(
+                "app.services.rebalancing.overview_enrichment.fetch_ticker_dividend_info", new_callable=AsyncMock
+            ) as mock_fetch,
         ):
-            result = await _collect_dividend_map(uuid.uuid4(), MagicMock(), AsyncMock(), portfolio, base_map)
+            result = await collect_dividend_map(uuid.uuid4(), MagicMock(), AsyncMock(), portfolio, base_map)
 
         mock_fetch.assert_not_called()
         assert result == base_map
 
     async def test_fetches_new_ticker_once_and_scales_yield_to_percent(self):
-        from app.api.v1.rebalancing import _collect_dividend_map
+        from app.services.rebalancing.overview_enrichment import collect_dividend_map
 
         portfolio = self._make_portfolio([{"ticker": "SPY", "market": "NYSE"}])
         kis_creds = {"app_key": "x"}
@@ -505,24 +519,28 @@ class TestCollectDividendMap:
 
         with (
             patch(
-                "app.api.v1.rebalancing.get_kis_user_credentials",
+                "app.services.rebalancing.overview_enrichment.get_kis_user_credentials",
                 new_callable=AsyncMock,
                 return_value=kis_creds,
             ),
-            patch("app.api.v1.rebalancing.fetch_dart_api_key", new_callable=AsyncMock, return_value=dart_key),
             patch(
-                "app.api.v1.rebalancing.load_user_dividend_overrides",
+                "app.services.rebalancing.overview_enrichment.fetch_dart_api_key",
+                new_callable=AsyncMock,
+                return_value=dart_key,
+            ),
+            patch(
+                "app.services.rebalancing.overview_enrichment.load_user_dividend_overrides",
                 new_callable=AsyncMock,
                 return_value=overrides,
             ),
             patch(
-                "app.api.v1.rebalancing.fetch_ticker_dividend_info",
+                "app.services.rebalancing.overview_enrichment.fetch_ticker_dividend_info",
                 new_callable=AsyncMock,
                 return_value=(0.015, 3.5, [3, 6, 9, 12], "2026-03-15"),
             ) as mock_fetch,
         ):
             redis = AsyncMock()
-            result = await _collect_dividend_map(uuid.uuid4(), MagicMock(), redis, portfolio, {})
+            result = await collect_dividend_map(uuid.uuid4(), MagicMock(), redis, portfolio, {})
 
         mock_fetch.assert_called_once()
         call_args = mock_fetch.call_args.args
