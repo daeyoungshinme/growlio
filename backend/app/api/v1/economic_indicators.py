@@ -5,9 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import get_current_user
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.services.economic_indicator_service import fetch_inflation_summary
 
 router = APIRouter(prefix="/economic-indicators", tags=["economic_indicators"])

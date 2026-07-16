@@ -18,8 +18,8 @@ def _ok_response(url: str) -> httpx.Response:
 @pytest.mark.asyncio
 async def test_send_html_email_calls_resend_api(monkeypatch):
     """_send_html_email이 Resend API를 정상 호출한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -48,7 +48,7 @@ async def test_send_html_email_calls_resend_api(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_email_not_configured(monkeypatch):
     """이메일 미설정 시 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_exchange_rate_alert
@@ -65,8 +65,8 @@ async def test_send_exchange_rate_alert_email_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_success(monkeypatch):
     """이메일 설정 시 이메일 제목에 목표 환율이 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -91,8 +91,8 @@ async def test_send_exchange_rate_alert_success(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_above_direction(monkeypatch):
     """direction=ABOVE이면 제목에 '이상'이 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -119,7 +119,7 @@ async def test_send_exchange_rate_alert_above_direction(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_email_not_configured(monkeypatch):
     """이메일 미설정 시 주가 알림 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_stock_price_alert
@@ -138,8 +138,8 @@ async def test_send_stock_price_alert_email_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_includes_ticker(monkeypatch):
     """주가 알림 이메일 제목에 종목명과 티커가 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -169,7 +169,7 @@ async def test_send_stock_price_alert_includes_ticker(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_not_configured(monkeypatch):
     """이메일 미설정 시 월간 리포트 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_monthly_report_email
@@ -195,8 +195,8 @@ async def test_send_monthly_report_email_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_includes_month(monkeypatch):
     """월간 리포트 이메일 제목에 월이 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -230,8 +230,8 @@ async def test_send_monthly_report_email_includes_month(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
     """자산 배분이 금액 내림차순으로 정렬되어 상위 5개만 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     # 6개 항목 — 상위 5개만 이메일에 포함되어야 함
     asset_allocation = [
@@ -282,8 +282,8 @@ async def test_send_monthly_report_email_asset_allocation_sorted(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_asset_type(monkeypatch):
     """총 자산 목표 달성 이메일 제목에 달성률이 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -308,8 +308,8 @@ async def test_send_goal_achievement_email_asset_type(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_deposit_type(monkeypatch):
     """연간 입금 목표 달성 이메일 제목에 '연간 입금 목표'가 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -334,8 +334,8 @@ async def test_send_goal_achievement_email_deposit_type(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_email_dividend_type(monkeypatch):
     """연간 배당 목표 달성 이메일 제목에 '연간 배당 목표'가 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -363,7 +363,7 @@ async def test_send_goal_achievement_email_dividend_type(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_test_email_raises_when_not_configured(monkeypatch):
     """이메일 미설정 시 send_test_email은 RuntimeError를 발생시킨다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     from app.services.email_service import send_test_email
 
@@ -374,8 +374,8 @@ async def test_send_test_email_raises_when_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_test_email_success(monkeypatch):
     """이메일 설정 시 테스트 이메일이 발송된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     mock_post = AsyncMock(return_value=_ok_response("https://api.resend.com/emails"))
     with patch("httpx.AsyncClient.post", new=mock_post):
@@ -391,7 +391,7 @@ async def test_send_test_email_success(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_password_reset_email_not_configured(monkeypatch):
     """이메일 미설정 시 비밀번호 재설정 이메일을 발송하지 않는다 (경고 로그만)."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_password_reset_email
@@ -403,8 +403,8 @@ async def test_send_password_reset_email_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_password_reset_email_includes_link(monkeypatch):
     """비밀번호 재설정 이메일 본문에 reset 링크가 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -426,7 +426,7 @@ async def test_send_password_reset_email_includes_link(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_email_not_configured(monkeypatch):
     """이메일 미설정 시 리밸런싱 알림 이메일을 발송하지 않는다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
 
     with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
         from app.services.email_service import send_rebalancing_alert
@@ -444,8 +444,8 @@ async def test_send_rebalancing_alert_email_not_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
     """is_scheduled_report=True이면 제목에 '리포트'가 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     from types import SimpleNamespace
 
@@ -486,9 +486,9 @@ async def test_send_rebalancing_alert_scheduled_report(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_includes_app_cta_link(monkeypatch):
     """알림 이메일에는 앱으로 돌아가는 CTA 링크가 항상 포함되어야 한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
-    monkeypatch.setattr("app.config.settings.frontend_url", "https://app.growlio.example")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.frontend_url", "https://app.growlio.example")
 
     captured = {}
 
@@ -514,8 +514,8 @@ async def test_send_rebalancing_alert_includes_app_cta_link(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_drift_branch(monkeypatch):
     """is_scheduled_report=False이면 제목에 '알림'이 포함된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     from types import SimpleNamespace
 
@@ -553,8 +553,8 @@ async def test_send_rebalancing_alert_drift_branch(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_with_all_values(monkeypatch):
     """월간 리포트에 MoM/수익률/목표 값이 모두 채워지면 해당 행이 생성된다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
 
     captured = {}
 
@@ -592,7 +592,7 @@ async def test_send_monthly_report_with_all_values(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -610,7 +610,7 @@ async def test_send_exchange_rate_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
     """_send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -629,7 +629,7 @@ async def test_send_rebalancing_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_monthly_report_exception_returns_false(monkeypatch):
     """월간 리포트 이메일 발송 실패 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -656,7 +656,7 @@ async def test_send_monthly_report_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
     """send_stock_price_alert _send_html_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -676,7 +676,7 @@ async def test_send_stock_price_alert_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_goal_achievement_exception_returns_false(monkeypatch):
     """send_goal_achievement_email 예외 시 예외를 삼키고 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -695,7 +695,7 @@ async def test_send_goal_achievement_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_test_email_exception_returns_false(monkeypatch):
     """send_test_email은 이메일 설정이 되어 있는데 발송 자체가 실패하면 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -708,7 +708,7 @@ async def test_send_test_email_exception_returns_false(monkeypatch):
 @pytest.mark.asyncio
 async def test_send_password_reset_exception_returns_false(monkeypatch):
     """send_password_reset_email은 예외 발생 시 re-raise 없이 False를 반환한다."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
 
     import app.services.email_service as em
 
@@ -726,9 +726,9 @@ async def test_send_password_reset_exception_returns_false(monkeypatch):
 async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkeypatch):
     """매도 전용 플랜(buy_cancel_token=None)도 예외 없이 발송되고, 매수 취소 링크는 만들어지지
     않아야 한다 — 매수 leg가 없다는 이유로 이메일 자체가 스킵되던 회귀 버그 방지."""
-    monkeypatch.setattr("app.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.config.settings.email_from", "noreply@test.com")
-    monkeypatch.setattr("app.config.settings.frontend_url", "https://growlio.app")
+    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
+    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
+    monkeypatch.setattr("app.core.config.settings.frontend_url", "https://growlio.app")
 
     from datetime import UTC, datetime
     from types import SimpleNamespace

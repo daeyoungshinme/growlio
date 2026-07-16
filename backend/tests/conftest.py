@@ -31,7 +31,7 @@ def override_settings(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test")
     monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")
-    from app.config import settings as _settings
+    from app.core.config import settings as _settings
 
     monkeypatch.setattr(_settings, "app_env", "test")
 
@@ -246,7 +246,7 @@ def mock_request():
 @pytest.fixture(autouse=True)
 def _mock_redis_singleton():
     """Redis singleton을 AsyncMock으로 교체 — Docker 없이 모든 테스트 실행 가능."""
-    import app.redis_client as _rc
+    import app.core.redis_client as _rc
 
     redis_mock = AsyncMock()
     redis_mock.ping = AsyncMock(return_value=True)
@@ -282,4 +282,4 @@ def mock_redis_for_app():
 
     redis_mock = AsyncMock()
     redis_mock.ping = AsyncMock(return_value=True)
-    return patch("app.redis_client.get_redis", return_value=redis_mock)
+    return patch("app.core.redis_client.get_redis", return_value=redis_mock)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import structlog
 
-from app.database import AsyncSessionLocal
-from app.redis_client import get_redis
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 from app.services.rebalancing.plan_service import execute_due_buy_legs
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_PLAN_BUY
 from app.utils.market_hours import is_korean_market_open

@@ -9,10 +9,10 @@ from datetime import UTC, date, datetime
 import structlog
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
-from app.redis_client import get_redis
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
 from app.services.push_service import send_push_to_user

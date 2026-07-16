@@ -56,7 +56,7 @@ def _make_portfolio(user_id=None, portfolio_id=None):
 
 def _setup_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -102,7 +102,7 @@ class TestUpdatePortfolio:
             assert resp.status_code == 404
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -137,7 +137,7 @@ class TestUpdatePortfolio:
             assert resp.status_code == 200
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -171,7 +171,7 @@ class TestListPortfolios:
             assert resp.json() == []
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -207,7 +207,7 @@ class TestCreatePortfolio:
             assert resp.status_code in (200, 201, 422, 500)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -226,7 +226,7 @@ class TestCreatePortfolio:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -255,7 +255,7 @@ class TestDeletePortfolio:
             assert resp.status_code == 404
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -284,7 +284,7 @@ class TestDeletePortfolio:
             assert resp.status_code in (204, 200)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -320,7 +320,7 @@ class TestReorderPortfolios:
             assert resp.status_code in (204, 200)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -340,7 +340,7 @@ class TestReorderPortfolios:
             assert resp.status_code in (204, 200, 422)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -348,7 +348,7 @@ class TestReorderPortfolios:
 
 def _cleanup(app):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
 
     app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides.pop(get_db, None)

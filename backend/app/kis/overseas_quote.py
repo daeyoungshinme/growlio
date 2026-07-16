@@ -1,4 +1,4 @@
-from app.config import settings
+from app.core.config import settings
 from app.kis.client import kis_request
 from app.kis.constants import OVERSEAS_MARKET_CODES, TR_OVERSEAS_PRICE
 

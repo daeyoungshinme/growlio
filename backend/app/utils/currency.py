@@ -8,7 +8,7 @@ import contextlib
 import redis.asyncio as aioredis
 from redis.exceptions import RedisError
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.cache_keys import USD_KRW_RATE as _REDIS_USD_KRW_KEY
 
 

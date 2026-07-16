@@ -39,7 +39,7 @@ def _make_mock_db():
 
 def _setup_authenticated_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -54,7 +54,7 @@ def _setup_authenticated_app(user, db):
 
 
 def _setup_public_app(db):
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_db():

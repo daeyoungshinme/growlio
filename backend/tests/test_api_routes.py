@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 @pytest.fixture(autouse=True)
 def mock_redis_and_scheduler(monkeypatch):
     """lifespan 시 Redis·Scheduler 없이도 앱이 시작되도록 모킹한다."""
-    import app.redis_client as redis_mod
+    import app.core.redis_client as redis_mod
     import app.scheduler as scheduler_mod
 
     mock_redis = AsyncMock()
@@ -63,7 +63,7 @@ def _make_mock_db():
 def _get_app_with_auth(user=None):
     """인증 + DB 의존성이 오버라이드된 app을 반환한다."""
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     _user = user or _make_user()

@@ -7,11 +7,11 @@ import pytest
 def patch_encryption_key(monkeypatch):
     """KIS_CRED_ENCRYPTION_KEY를 테스트용 값으로 직접 패치한다.
 
-    importlib.reload(app.config) 대신 속성 직접 패치를 사용한다.
+    importlib.reload(app.core.config) 대신 속성 직접 패치를 사용한다.
     reload는 새 Settings() 인스턴스를 생성해 다른 모듈의 settings 참조를 끊어
     monkeypatch 격리가 깨지는 부작용이 있다.
     """
-    import app.config as config_mod
+    import app.core.config as config_mod
     import app.services.credential_service as cs_mod
 
     test_key = "a" * 64
@@ -104,7 +104,7 @@ class TestGetKisUserCredentials:
 
         with (
             patch("app.kis.auth.get_access_token", AsyncMock(return_value="fake-token")),
-            patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.core.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
         ):
             result = await get_kis_user_credentials(uuid.uuid4(), db)
 
@@ -133,7 +133,7 @@ class TestGetKisUserCredentials:
 
         with (
             patch("app.kis.auth.get_access_token", AsyncMock(side_effect=Exception("token error"))),
-            patch("app.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.core.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
         ):
             result = await get_kis_user_credentials(uuid.uuid4(), db)
 

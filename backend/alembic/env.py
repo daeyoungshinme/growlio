@@ -6,8 +6,8 @@ from sqlalchemy.pool import NullPool
 
 import app.models  # noqa: F401 — ensure all models are imported for metadata
 from alembic import context
-from app.config import settings
-from app.database import Base
+from app.core.config import settings
+from app.core.database import Base
 
 config = context.config
 _migration_url = (settings.migration_database_url or settings.database_url).replace("%", "%%")

@@ -17,8 +17,8 @@ from typing import TYPE_CHECKING
 
 import structlog
 
-from app.config import settings
 from app.constants import DOMESTIC_MARKETS
+from app.core.config import settings
 from app.services.price_sync_sources import sync_pykrx_close_series
 
 if TYPE_CHECKING:

@@ -7,7 +7,7 @@ import jwt
 import structlog
 from jwt import PyJWKClient
 
-from app.config import settings
+from app.core.config import settings
 
 logger = structlog.get_logger()
 

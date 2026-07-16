@@ -16,9 +16,9 @@ from typing import Any
 
 import structlog
 
+from app.core.redis_client import get_redis
 from app.jobs.asset_sync import _sync_accounts
 from app.models.asset import AssetAccount
-from app.redis_client import get_redis
 from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
 from app.utils.redis_lock import redis_lock
 

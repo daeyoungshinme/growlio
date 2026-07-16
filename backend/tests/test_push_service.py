@@ -101,7 +101,7 @@ class TestSendPushToUser:
 
 class TestGetFirebaseApp:
     def test_firebase_init_failure_returns_none(self, override_settings):
-        import app.config as cfg
+        import app.core.config as cfg
         import app.services.push_service as ps
 
         original_initialized = ps._firebase_initialized

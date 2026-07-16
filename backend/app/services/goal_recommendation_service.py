@@ -49,8 +49,8 @@ from app.schemas.rebalancing import (
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
 )
-from app.services.dividend_constants import is_korean_etf
-from app.services.dividend_sync_sources import (
+from app.services.dividend.constants import is_korean_etf
+from app.services.dividend.sync_sources import (
     sync_naver_etf_dividend_info,
     sync_naver_stock_dividend_info,
     sync_yahoo_dividend_info,
@@ -136,6 +136,13 @@ _DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT = 80.0
 구성한다 — 사용자가 UserSettings.goal_short_term_equity_floor_pct로 조정 가능, NULL이면 이 기본값
 사용. 등록된 주식 후보가 하나도 없으면 이 제약은 적용하지 않고 기존(안전자산만으로 최소분산)
 동작을 유지한다."""
+
+_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT = 30.0
+"""IRP(개인형퇴직연금) 계좌는 실제 퇴직연금 규제(위험자산 투자한도 70%)에 근거해 안전자산
+(채권+현금성) 비중을 투자기간과 무관하게 항상 이 비율 이상 유지하도록 강제한다. 법규에 근거한
+고정 규칙이라 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`와 달리 UserSettings 오버라이드 필드를
+두지 않는다. 단기(SHORT_TERM) 조합에서는 이 규칙이 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`(주식
+최소 80%)와 정면 충돌하므로 IRP가 우선하고 단기 주식 하한 규칙은 적용하지 않는다."""
 
 
 def _apply_index_region_preference(
@@ -278,6 +285,7 @@ def _optimize_goal_portfolio(
     risk_tolerance: str = "CONSERVATIVE",
     is_equity: list[bool] | None = None,
     equity_floor: float | None = None,
+    equity_ceiling: float | None = None,
 ) -> tuple[list[dict], float | None, str | None]:
     """분산 최소화 + 목표수익률 제약(SLSQP). (recommended_items, expected_return_pct, note) 반환. 동기 함수.
 
@@ -293,6 +301,11 @@ def _optimize_goal_portfolio(
     `is_equity`+`equity_floor`가 함께 주어지면(단기 추천 전용) "주식 비중 합 ≥ equity_floor"
     부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산 비중 ≤ 1-equity_floor"도 자동
     성립한다. 후보가 전부 주식이거나 전부 비주식이면(비교 대상이 없어 제약이 무의미) 무시한다.
+
+    `is_equity`+`equity_ceiling`이 함께 주어지면(IRP 추천 전용) `equity_floor`와 대칭으로
+    "주식 비중 합 ≤ equity_ceiling" 부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산
+    비중 ≥ 1-equity_ceiling"도 자동 성립한다. 호출측은 `equity_floor`와 `equity_ceiling`을
+    동시에 넘기지 않는다(IRP는 단기 주식 하한 규칙보다 우선하므로 상호 배타적으로 세팅됨).
     """
     import numpy as np
     from scipy.optimize import minimize
@@ -321,23 +334,40 @@ def _optimize_goal_portfolio(
 
     n_equity = sum(equity_flags)
     apply_equity_floor = equity_floor is not None and equity_floor > 0 and 0 < n_equity < n
+    apply_equity_ceiling = equity_ceiling is not None and equity_ceiling < 1.0 and 0 < n_equity < n
     if apply_equity_floor:
         assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
         # 주식 후보가 적어도(예: 1개) 하한을 채울 수 있도록 주식 종목당 상한을 별도로 완화
         equity_cap = max(max_weight_used, equity_floor / n_equity)
         bounds = [(0.0, equity_cap if eq else max_weight_used) for eq in equity_flags]
+    elif apply_equity_ceiling:
+        assert equity_ceiling is not None  # nosec B101 — apply_equity_ceiling 가드로 이미 None 아님 보장, mypy 타입 내로잉용
+        # 비주식(안전자산) 후보가 적어도(예: 1개) 하한(1-equity_ceiling)을 채울 수 있도록 비주식
+        # 종목당 상한을 별도로 완화 — apply_equity_floor의 equity_cap과 대칭.
+        n_non_equity = n - n_equity
+        non_equity_cap = max(max_weight_used, (1.0 - equity_ceiling) / n_non_equity)
+        bounds = [(0.0, max_weight_used if eq else non_equity_cap) for eq in equity_flags]
     else:
         bounds = [(0.0, max_weight_used)] * n
     x0 = np.full(n, 1.0 / n)
 
-    # 종목당 비중 상한(max_weight_used) 하에서 달성 가능한 최대 가중평균 CAGR
-    # (상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR 종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음)
+    # 종목당 비중 상한(bounds) 하에서 달성 가능한 최대 가중평균 CAGR — equity_floor/equity_ceiling이
+    # 걸려 있으면 해당 그룹(주식/비주식)의 합산 상한도 함께 지켜야 한다. 그렇지 않으면 BALANCED/
+    # AGGRESSIVE 성향의 프론티어 목표(target)가 그 그룹 제약과 동시에 만족 불가능한 지점으로
+    # 계산돼 옵티마이저가 실패할 수 있다(예: IRP 안전자산 30% 하한 + LONG_TERM AGGRESSIVE 조합).
+    # 상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR 종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음.
+    equity_budget: float = equity_ceiling if apply_equity_ceiling and equity_ceiling is not None else 1.0
+    non_equity_budget: float = 1.0 - equity_floor if apply_equity_floor and equity_floor is not None else 1.0
+    group_budget = {True: equity_budget, False: non_equity_budget}
+    group_used = {True: 0.0, False: 0.0}
     max_achievable_return = 0.0
     remaining = 1.0
     for idx in np.argsort(-cagrs):
-        take = min(max_weight_used, remaining)
+        is_eq = bool(equity_flags[idx])
+        take = max(min(bounds[idx][1], remaining, group_budget[is_eq] - group_used[is_eq]), 0.0)
         max_achievable_return += take * float(cagrs[idx])
         remaining -= take
+        group_used[is_eq] += take
         if remaining <= 1e-9:
             break
 
@@ -373,13 +403,20 @@ def _optimize_goal_portfolio(
             {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
             {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
         ]
-    if apply_equity_floor:
-        assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
+    if apply_equity_floor or apply_equity_ceiling:
         equity_mask = np.array(equity_flags, dtype=bool)
-        constraints = [
-            *constraints,
-            {"type": "ineq", "fun": lambda w: float(w[equity_mask].sum()) - equity_floor},
-        ]
+        if apply_equity_floor:
+            assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
+            constraints = [
+                *constraints,
+                {"type": "ineq", "fun": lambda w: float(w[equity_mask].sum()) - equity_floor},
+            ]
+        if apply_equity_ceiling:
+            assert equity_ceiling is not None  # nosec B101 — apply_equity_ceiling 가드로 이미 None 아님 보장, mypy 타입 내로잉용
+            constraints = [
+                *constraints,
+                {"type": "ineq", "fun": lambda w: equity_ceiling - float(w[equity_mask].sum())},
+            ]
     res = minimize(
         lambda w: float(w @ cov_annual @ w),
         x0=x0,
@@ -715,11 +752,17 @@ async def _build_horizon_result(
     나란히 MVO로 비중을 분배한다. 등록된 주식(EQUITY) 후보가 있으면 `short_term_equity_floor`
     비율 이상을 주식에 배분하도록 강제해 지나치게 안전자산 위주로 수렴하지 않게 한다.
 
+    IRP(개인형퇴직연금)는 투자기간과 무관하게 이 현금성 자산 안전판을 항상 포함시키고, 대신
+    `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`(안전자산 최소 30%) 제약을 적용한다 — 퇴직연금 규제(위험자산
+    투자한도 70%)에 근거한 고정 규칙이라 SHORT_TERM의 주식 최소 80% 규칙보다 우선한다(동시에
+    적용 시 상호 모순이라 IRP 조합에서는 단기 주식 하한 규칙 자체를 적용하지 않는다).
+
     `preference_fallback_note`는 세제유형별 추종지수 선호 필터(`get_horizon_recommendations`)가
     선호 지역 후보 부족으로 전체 후보로 되돌아갔을 때 그 사실을 안내하기 위해 전달된다 — 이후
     계산되는 다른 note와 함께(있으면 앞에 붙여) 표시된다.
     """
-    include_cash_equivalent = horizon == "SHORT_TERM"
+    is_irp = tax_type == AccountTaxType.IRP.value
+    include_cash_equivalent = horizon == "SHORT_TERM" or is_irp
 
     def _combine_note(msg: str | None) -> str | None:
         if preference_fallback_note and msg:
@@ -809,7 +852,12 @@ async def _build_horizon_result(
     if include_cash_equivalent:
         returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
 
-    equity_floor = short_term_equity_floor if include_cash_equivalent and any(f_is_equity) else None
+    equity_floor: float | None = None
+    equity_ceiling: float | None = None
+    if is_irp:
+        equity_ceiling = 1.0 - _DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT / 100
+    elif include_cash_equivalent and any(f_is_equity):
+        equity_floor = short_term_equity_floor
 
     items, expected_return_pct, opt_note = await loop.run_in_executor(
         None,
@@ -824,6 +872,7 @@ async def _build_horizon_result(
             risk_tolerance=risk_tolerance,
             is_equity=f_is_equity,
             equity_floor=equity_floor,
+            equity_ceiling=equity_ceiling,
         ),
     )
 
@@ -833,6 +882,12 @@ async def _build_horizon_result(
         opt_note = (
             f"단기(최대 3년) 목표는 안정적인 주식 위주로 최소 {equity_floor * 100:.0f}%까지 배분하고, "
             f"안전자산은 {100 - equity_floor * 100:.0f}% 이내로 제한합니다."
+        )
+    elif opt_note is None and equity_ceiling is not None:
+        opt_note = (
+            f"IRP(개인형퇴직연금) 계좌는 퇴직연금 규정에 따라 위험자산(주식)을 최대 "
+            f"{equity_ceiling * 100:.0f}%로 제한하고, 안전자산(채권·현금성)을 최소 "
+            f"{100 - equity_ceiling * 100:.0f}% 이상 배분합니다."
         )
 
     return HorizonGoalRecommendation(
@@ -933,6 +988,10 @@ async def _compute_horizon_recommendations(
             base_krw = float(overview.get("total_assets_krw", 0))
 
             eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon.value]
+            if tax_type.value == AccountTaxType.IRP.value:
+                # IRP는 퇴직연금 규제상 안전자산 최소 30% 하한이 투자기간과 무관하게 적용되므로,
+                # LONG_TERM(원래 EQUITY만 허용)에서도 예외적으로 BOND/CASH 후보를 후보군에 포함시킨다.
+                eligible_classes = eligible_classes | {"BOND", "CASH"}
             market_group = _TAX_TYPE_MARKET_GROUP[tax_type.value]
             eligible_candidates = [
                 c

@@ -1,8 +1,8 @@
-"""app.config.Settings 검증 로직 테스트."""
+"""app.core.config.Settings 검증 로직 테스트."""
 
 import pytest
 
-from app.config import Settings
+from app.core.config import Settings
 
 
 def test_production_with_localhost_frontend_url_raises():

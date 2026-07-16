@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.services.portfolio_history_service import get_allocation_history
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.rebalancing.strategy_service import get_rebalancing_strategy

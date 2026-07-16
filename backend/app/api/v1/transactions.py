@@ -9,10 +9,10 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.redis_client import get_redis
 from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
 from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches, monthly_trend_key
 

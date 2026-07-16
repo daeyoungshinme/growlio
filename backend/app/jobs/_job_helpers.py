@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 import structlog
 
-from app.database import AsyncSessionLocal
-from app.redis_client import get_redis
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 
 logger = structlog.get_logger()
 

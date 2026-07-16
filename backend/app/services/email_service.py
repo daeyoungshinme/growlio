@@ -18,7 +18,7 @@ from tenacity import (
     wait_exponential,
 )
 
-from app.config import settings
+from app.core.config import settings
 from app.services.email_templates import (
     account_deletion_template,
     exchange_rate_alert_template,

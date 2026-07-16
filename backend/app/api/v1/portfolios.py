@@ -8,11 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
 from app.models.user import User
-from app.redis_client import get_redis
 from app.schemas.portfolio import (
     PortfolioCreate,
     PortfolioReorderRequest,

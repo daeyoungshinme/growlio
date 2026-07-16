@@ -1,7 +1,7 @@
 """목표 역산 추천 엔진의 큐레이션 ETF 후보 유니버스.
 
 기대수익률/배당수익률은 여기 하드코딩하지 않고 항상 실시간 조회한다
-(`price_service.get_historical_returns`, `dividend_sync_sources.*`) — 데이터 신선도 유지 목적.
+(`price_service.get_historical_returns`, `dividend.sync_sources.*`) — 데이터 신선도 유지 목적.
 
 `asset_class`(EQUITY/BOND/CASH)는 기간별(단기/중기/장기) 추천(`get_horizon_recommendations`)에서
 후보를 필터링하는 데 쓰인다 — 단기 추천은 BOND/CASH만, 장기 추천은 EQUITY만 후보로 사용한다.

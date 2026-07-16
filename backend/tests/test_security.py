@@ -35,7 +35,7 @@ class TestCrossUserAccess:
     def test_get_other_users_account_returns_404(self):
         """User A가 User B 소유 account_id로 GET 요청 → 404."""
         from app.api.deps import get_current_user
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user_a = _make_user()
@@ -66,7 +66,7 @@ class TestCrossUserAccess:
     def test_get_own_account_returns_200_or_404_based_on_db(self):
         """User A가 본인 계좌를 DB에서 찾으면 200, 없으면 404 — 소유 여부 분기 확인."""
         from app.api.deps import get_current_user
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user_a = _make_user()

@@ -5,7 +5,7 @@ from typing import Any
 
 import structlog
 
-from app.config import settings
+from app.core.config import settings
 from app.kiwoom.constants import KIWOOM_MOCK_BASE_URL, KIWOOM_REAL_BASE_URL
 from app.providers.http_client import broker_request
 

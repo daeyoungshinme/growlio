@@ -24,7 +24,7 @@ def _get_firebase_app() -> object | None:
         return _firebase_app
 
     _firebase_initialized = True
-    from app.config import settings
+    from app.core.config import settings
 
     if not settings.firebase_credentials_json:
         logger.info("firebase_push_disabled", reason="FIREBASE_CREDENTIALS_JSON not set")

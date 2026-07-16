@@ -67,7 +67,7 @@ class TestDashboardApi:
 
     def test_returns_200_with_mocked_service(self, override_settings):
         from app.api.deps import get_current_user
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user = _make_user()
@@ -104,7 +104,7 @@ class TestDashboardApi:
         import json
 
         from app.api.deps import get_current_user
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user = _make_user()

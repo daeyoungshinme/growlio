@@ -11,7 +11,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import settings
+from app.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -56,9 +56,9 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     계좌별 자격증명이 없거나 토큰 발급 실패 시 None 반환.
     반환값: {"app_key", "app_secret", "access_token", "is_mock"}
     """
+    from app.core.redis_client import get_redis
     from app.kis.auth import get_access_token
     from app.models.asset import AssetAccount
-    from app.redis_client import get_redis
 
     account = await db.scalar(
         select(AssetAccount).where(

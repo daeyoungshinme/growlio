@@ -18,7 +18,7 @@ from app.services.composition_calculator import (
     get_latest_snapshot_rows,
     get_no_snap_accounts,
 )
-from app.services.dividend_aggregator import get_dividend_summary
+from app.services.dividend.aggregator import get_dividend_summary
 from app.services.returns_calculator import calc_returns
 from app.services.returns_calculator import calc_xirr as _calc_xirr
 from app.services.trend_calculator import get_monthly_trend

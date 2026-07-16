@@ -11,11 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_account
+from app.core.redis_client import get_redis
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.asset import Position
 from app.models.user import User
-from app.redis_client import get_redis
 from app.schemas.asset import ManualPosition, PositionListResponse
 from app.services._position_queries import fetch_manual_positions
 from app.services.price_service import fetch_prices_batch

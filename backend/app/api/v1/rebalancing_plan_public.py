@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.core.database import get_db
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
@@ -114,7 +114,7 @@ async def decide_sell_by_token(
     db: AsyncSession = Depends(get_db),
 ):
     """이메일 링크로 매도 계획을 승인/거부한다. 승인 시 즉시 주문이 실행된다."""
-    from app.redis_client import get_redis
+    from app.core.redis_client import get_redis
 
     leg = await get_plan_leg_by_token(token, "SELL", db)
     if leg is None:

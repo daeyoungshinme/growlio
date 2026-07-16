@@ -18,8 +18,9 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import Response
 
 from app.api.v1.router import router
-from app.config import settings
-from app.database import get_db
+from app.core.config import settings
+from app.core.database import get_db
+from app.core.redis_client import close_redis, get_redis
 from app.exceptions import (
     AppError,
     ProviderApiError,
@@ -30,7 +31,6 @@ from app.exceptions import (
 from app.kis.client import KisApiError
 from app.limiter import limiter
 from app.providers.http_client import close_http_client
-from app.redis_client import close_redis, get_redis
 from app.scheduler import init_scheduler, scheduler
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.metrics import http_request_duration

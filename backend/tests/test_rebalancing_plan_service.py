@@ -71,7 +71,7 @@ class TestGeneratePendingPlanForAlert:
         ]
 
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
@@ -94,7 +94,7 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
 
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
@@ -118,7 +118,7 @@ class TestGeneratePendingPlanForAlert:
 
         before = datetime.now(tz=UTC)
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
@@ -145,7 +145,7 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(shares_to_trade=None)]
 
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             result = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
@@ -160,7 +160,7 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
 
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
@@ -179,7 +179,7 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
 
         with (
-            patch("app.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")

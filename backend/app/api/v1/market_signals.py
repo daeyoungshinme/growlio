@@ -6,9 +6,9 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import get_current_user
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.services.market_signal_service import get_market_signal
 
 router = APIRouter(prefix="/market-signals", tags=["market_signals"])

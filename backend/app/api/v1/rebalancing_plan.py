@@ -104,7 +104,7 @@ async def approve_plan_leg(
     db: AsyncSession = Depends(get_db),
 ):
     """대기중인 매수/매도 계획을 앱에서 즉시 실행한다. 매수는 대기시간을 건너뛰고 바로 체결한다."""
-    from app.redis_client import get_redis
+    from app.core.redis_client import get_redis
 
     leg = await _get_owned_leg(plan_id, leg_id, current_user.id, db)
     redis = await get_redis()

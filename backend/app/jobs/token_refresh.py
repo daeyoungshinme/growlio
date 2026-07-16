@@ -3,10 +3,10 @@ import asyncio
 import structlog
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 from app.kis.auth import _fetch_and_store_token
 from app.models.asset import AssetAccount
-from app.redis_client import get_redis
 from app.services.credential_service import decrypt
 
 logger = structlog.get_logger()

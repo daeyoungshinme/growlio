@@ -6,7 +6,7 @@ from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.metrics import slow_query_count
 
 logger = structlog.get_logger()

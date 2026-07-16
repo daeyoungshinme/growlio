@@ -51,8 +51,8 @@ class TestVerifyPassword:
         """Supabase password grant가 200을 반환하면 True."""
         from app.services.auth_service import verify_password
 
-        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
-        monkeypatch.setattr("app.config.settings.supabase_anon_key", "anon-key")
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.core.config.settings.supabase_anon_key", "anon-key")
 
         async def fake_post(self, url, params=None, headers=None, json=None, **kwargs):
             assert params == {"grant_type": "password"}
@@ -67,8 +67,8 @@ class TestVerifyPassword:
         """잘못된 비밀번호면 Supabase가 400을 반환하고 False로 매핑된다."""
         from app.services.auth_service import verify_password
 
-        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
-        monkeypatch.setattr("app.config.settings.supabase_anon_key", "anon-key")
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.core.config.settings.supabase_anon_key", "anon-key")
 
         async def fake_post(self, url, **kwargs):
             return httpx.Response(400, request=httpx.Request("POST", url))
@@ -81,7 +81,7 @@ class TestVerifyPassword:
         """네트워크 오류는 삼키지 않고 그대로 전파한다."""
         from app.services.auth_service import verify_password
 
-        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
 
         with (
             patch("httpx.AsyncClient.post", new=AsyncMock(side_effect=httpx.ConnectError("refused"))),
@@ -96,8 +96,8 @@ class TestDeleteSupabaseUser:
         """Supabase Admin API를 service role key로 호출한다."""
         from app.services.auth_service import delete_supabase_user
 
-        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
-        monkeypatch.setattr("app.config.settings.supabase_service_role_key", "service-role-key")
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.core.config.settings.supabase_service_role_key", "service-role-key")
 
         captured = {}
 
@@ -118,7 +118,7 @@ class TestDeleteSupabaseUser:
         """Admin API가 에러 상태를 반환하면 예외를 전파한다."""
         from app.services.auth_service import delete_supabase_user
 
-        monkeypatch.setattr("app.config.settings.supabase_project_url", "https://proj.supabase.co")
+        monkeypatch.setattr("app.core.config.settings.supabase_project_url", "https://proj.supabase.co")
 
         async def fake_delete(self, url, **kwargs):
             return httpx.Response(404, request=httpx.Request("DELETE", url))
@@ -133,7 +133,7 @@ class TestDeleteSupabaseUser:
 class TestCredentialServiceGetKey:
     def test_raises_if_key_not_32_bytes(self, monkeypatch):
         """decryption 키가 32바이트가 아니면 ValueError 발생."""
-        import app.config as config_mod
+        import app.core.config as config_mod
         import app.services.credential_service as cs_mod
 
         # 10바이트 (20자 hex) — unhexlify 후 10바이트여서 != 32 에러

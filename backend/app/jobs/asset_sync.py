@@ -4,9 +4,9 @@ from collections.abc import Awaitable, Callable
 import structlog
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal
+from app.core.redis_client import get_redis
 from app.models.asset import AssetAccount
-from app.redis_client import get_redis
 from app.services.asset_service import sync_account
 
 logger = structlog.get_logger()

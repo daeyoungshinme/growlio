@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1._alert_crud import register_alert_reactivate_delete
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.alert import ExchangeRateAlert
 from app.models.user import User
-from app.redis_client import get_redis
 from app.utils.cache_keys import (
     TTL_EXCHANGE_RATE_ALERTS,
     exchange_rate_alerts_key,

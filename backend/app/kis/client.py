@@ -3,7 +3,7 @@ from typing import Any
 
 import structlog
 
-from app.config import settings
+from app.core.config import settings
 from app.kis.constants import KIS_MOCK_BASE_URL, KIS_REAL_BASE_URL
 from app.providers.http_client import AsyncRateLimiter, broker_request
 

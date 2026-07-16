@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from app.config import settings
+from app.core.config import settings
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis

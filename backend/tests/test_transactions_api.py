@@ -54,7 +54,7 @@ def _make_tx(user_id=None, tx_id=None):
 
 def _setup_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -70,7 +70,7 @@ def _setup_app(user, db):
 
 def _cleanup_app():
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     app.dependency_overrides.pop(get_current_user, None)
