@@ -87,7 +87,7 @@ class TestSyncProfile:
     def test_sync_profile_creates_new_user(self):
         """신규 유저 JWT로 요청하면 users + user_settings 행을 생성한다."""
         from app.api.deps import get_token_payload
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user_id = str(uuid.uuid4())
@@ -136,7 +136,7 @@ class TestSyncProfile:
     def test_sync_profile_idempotent(self):
         """이미 존재하는 유저 JWT로 요청하면 기존 유저를 반환한다 (200)."""
         from app.api.deps import get_token_payload
-        from app.database import get_db
+        from app.core.database import get_db
         from app.main import app
 
         user_id = str(uuid.uuid4())
@@ -159,6 +159,45 @@ class TestSyncProfile:
                     headers={"Authorization": "Bearer faketoken"},
                 )
             assert resp.status_code == 200
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+            app.dependency_overrides.pop(get_token_payload, None)
+
+    def test_sync_profile_cleans_up_orphan_with_same_email(self):
+        """탈퇴 처리 중 로컬 DB 삭제만 실패해 남은 동일 이메일 고아 row는
+
+        재가입(새 sub) 시 자동 삭제되고 새 유저가 정상 생성된다.
+        """
+        from app.api.deps import get_token_payload
+        from app.core.database import get_db
+        from app.main import app
+
+        new_user_id = str(uuid.uuid4())
+        email = "sdy8603@hanmail.net"
+        orphan = _make_user(email=email)
+
+        db = _make_mock_db()
+        # id 조회 → None(신규), email 조회 → orphan 발견, 순서대로 반환
+        db.scalar = AsyncMock(side_effect=[None, orphan])
+        db.delete = AsyncMock()
+
+        async def override_db():
+            yield db
+
+        async def override_payload():
+            return _valid_jwt_payload(new_user_id, email=email)
+
+        app.dependency_overrides[get_db] = override_db
+        app.dependency_overrides[get_token_payload] = override_payload
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.post(
+                    "/api/v1/auth/sync-profile",
+                    json={"display_name": "재가입유저"},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+            assert resp.status_code == 200
+            db.delete.assert_called_once_with(orphan)
         finally:
             app.dependency_overrides.pop(get_db, None)
             app.dependency_overrides.pop(get_token_payload, None)
@@ -216,7 +255,7 @@ def test_user_settings_relationship_uses_passive_deletes():
 
 def _setup_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -313,4 +352,31 @@ class TestDeleteAccount:
         assert resp.status_code == 204
         db.delete.assert_called_once_with(user)
         db.commit.assert_called_once()
+        app.dependency_overrides.clear()
+
+    def test_local_delete_failure_returns_502(self, override_settings):
+        """Supabase 삭제는 성공했지만 로컬 DB 삭제/커밋이 실패하면 502를 반환하고
+
+        고아 발생을 로그로 남긴다 (수동 정리는 sync_profile의 자가 치유가 처리).
+        """
+        user = _make_user()
+        db = _make_mock_db()
+        db.delete = AsyncMock()
+        db.commit = AsyncMock(side_effect=RuntimeError("connection lost"))
+        _configure_empty_execute(db)
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
+            patch("app.api.v1.auth.delete_supabase_user", AsyncMock(return_value=None)),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/auth/account/delete",
+                json={"password": "correct"},
+                headers={"Authorization": "Bearer faketoken"},
+            )
+
+        assert resp.status_code == 502
+        db.delete.assert_called_once_with(user)
         app.dependency_overrides.clear()

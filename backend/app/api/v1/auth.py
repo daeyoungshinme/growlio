@@ -5,10 +5,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
-from app.redis_client import get_redis
 from app.schemas.auth import (
     AccountDeleteRequest,
     FindAccountRequest,
@@ -47,6 +47,19 @@ async def sync_profile(
     existing = await db.scalar(select(User).where(User.id == user_id))
     if existing:
         return existing
+
+    # 탈퇴 처리 중 Supabase Auth 삭제는 성공했으나 로컬 DB 삭제가 실패해 남은 고아 row 정리.
+    # (같은 이메일로 재가입 시 Supabase가 새 sub를 발급하므로 위 id 조회로는 찾을 수 없음)
+    orphan = await db.scalar(select(User).where(User.email == email))
+    if orphan:
+        logger.warning(
+            "sync_profile_orphan_email_cleanup",
+            old_user_id=str(orphan.id),
+            new_user_id=user_id,
+            email=email,
+        )
+        await db.delete(orphan)
+        await db.flush()
 
     user = User(
         id=user_id,
@@ -105,8 +118,14 @@ async def delete_account(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
         ) from e
 
-    await db.delete(current_user)
-    await db.commit()
+    try:
+        await db.delete(current_user)
+        await db.commit()
+    except Exception as e:
+        logger.critical("account_delete_local_cleanup_failed", user_id=str(user_id), email=user_email, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
+        ) from e
 
     redis = await get_redis()
     for account_id in account_ids:
