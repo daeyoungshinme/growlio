@@ -19,6 +19,7 @@ import { INPUT_SM } from "@/constants/inputStyles";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import type { PortfolioOverview } from "@/types";
 import { usePortfolioItemsEditor } from "@/hooks/usePortfolioItemsEditor";
+import { inferHorizonTaxTypeFromAccounts } from "@/utils/portfolio";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
 import PortfolioAccountSelector from "./PortfolioAccountSelector";
 import PortfolioItemRow from "./PortfolioItemRow";
@@ -55,10 +56,19 @@ export default function UnifiedPortfolioEditor({
   const qc = useQueryClient();
   const [name, setName] = useState(initial?.name ?? initialName ?? "");
   const [baseType, setBaseType] = useState(initial?.base_type ?? BASE_TYPE_STOCK_ONLY);
+  // 신규 생성 모드에서 추천 비중 카드가 넘긴 initialAccountIds의 태그가 전부 동일하면 계좌
+  // 특성으로부터 투자 기간·세제 유형 초기값을 자동으로 채운다.
+  const inferredTags = useMemo(() => {
+    if (initial || !initialAccountIds?.length) return null;
+    const matched = accounts.filter((a) => initialAccountIds.includes(a.id));
+    return inferHorizonTaxTypeFromAccounts(matched);
+  }, [initial, initialAccountIds, accounts]);
   const [investmentHorizon, setInvestmentHorizon] = useState<InvestmentHorizon | "">(
-    initial?.investment_horizon ?? "",
+    initial?.investment_horizon ?? inferredTags?.horizon ?? "",
   );
-  const [taxType, setTaxType] = useState<AccountTaxType | "">(initial?.tax_type ?? "");
+  const [taxType, setTaxType] = useState<AccountTaxType | "">(
+    initial?.tax_type ?? inferredTags?.taxType ?? "",
+  );
   const {
     items,
     totalWeight,

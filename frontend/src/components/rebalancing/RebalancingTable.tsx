@@ -18,7 +18,7 @@ interface Props {
   accounts: AssetAccount[];
   alertThreshold?: number;
   onExecuted?: (results: ExecutionResult[]) => void;
-  /** 진단 탭에서 기준 포트폴리오에 추천 비중을 적용한 직후 마운트된 경우, 분석 결과가 준비되면 실행 모달을 자동으로 연다. */
+  /** 푸시 알림 딥링크(openExecution=1)로 진입한 경우, 분석 결과가 준비되면 실행 모달을 자동으로 연다. */
   autoOpenExecution?: boolean;
 }
 

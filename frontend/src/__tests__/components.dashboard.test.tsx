@@ -147,10 +147,11 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getAllByText("미달")[0]).toBeInTheDocument();
   });
 
-  it("목표 연수익률이 미설정이면 그리드 대신 목표 설정 CTA에 안내된다", () => {
+  it("목표 연수익률이 미설정이면 해당 칸에 미설정 안내와 설정하기 링크가 표시된다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    expect(screen.queryByText("연수익률 목표")).not.toBeInTheDocument();
-    expect(screen.getByText(/연수익률.*목표도 설정해보세요/)).toBeInTheDocument();
+    expect(screen.getByText("연수익률 목표")).toBeInTheDocument();
+    expect(screen.getAllByText("미설정").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("설정하기").length).toBeGreaterThan(0);
   });
 
   it("목표 연수익률은 설정됐지만 실제 수익률 데이터가 없으면 미설정 대신 목표값을 표시한다", () => {

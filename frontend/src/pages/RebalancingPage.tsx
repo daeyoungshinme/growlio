@@ -71,7 +71,7 @@ export default function RebalancingPage() {
   );
 
   const handlePortfolioSelectFromDiagnosis = useCallback(
-    (id: string, openAlert?: boolean, openExecution?: boolean) => {
+    (id: string, openAlert?: boolean) => {
       setLocalTab("포트폴리오");
       setSearchParams(
         (prev) => {
@@ -80,9 +80,6 @@ export default function RebalancingPage() {
           next.set("rtab", "포트폴리오");
           if (openAlert) {
             next.set("openAlert", "1");
-          }
-          if (openExecution) {
-            next.set("openExecution", "1");
           }
           return next;
         },
@@ -211,7 +208,7 @@ export default function RebalancingPage() {
             <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RecommendationCard
-                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id, false, true)}
+                  onApplied={(id) => handlePortfolioSelectFromDiagnosis(id)}
                   onCreatePortfolio={(items, name, accountIds) => {
                     setPrefillItems(items);
                     setPrefillName(name);

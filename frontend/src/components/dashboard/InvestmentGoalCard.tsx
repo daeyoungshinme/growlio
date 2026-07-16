@@ -83,6 +83,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
     label: string;
     shortLabel: string;
     isSet: boolean;
+    setupHref: string;
     content: ReactNode;
     barPct?: number;
     barColorClass?: string;
@@ -92,6 +93,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       label: "연간 입금",
       shortLabel: "입금",
       isSet: hasDepositGoal,
+      setupHref: "/invest-plan",
       content: (
         <>
           <span
@@ -113,6 +115,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       label: "배당 목표",
       shortLabel: "배당",
       isSet: hasDividendGoal,
+      setupHref: "/invest-plan?tab=배당 계획",
       content: (
         <>
           <span
@@ -134,6 +137,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       label: "연수익률 목표",
       shortLabel: "연수익률",
       isSet: hasReturnGoal,
+      setupHref: "/invest-plan",
       content: canShowReturnGap ? (
         <>
           {gapBadge(data!.return_goal_gap_pct!, {
@@ -159,6 +163,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       label: "은퇴 목표",
       shortLabel: "은퇴",
       isSet: hasRetirementGoal,
+      setupHref: "/invest-plan",
       content:
         retirementGapYears != null ? (
           retirementGapYears === 0 ? (
@@ -201,10 +206,6 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         ) : null,
     },
   ];
-
-  const setGoalChips = goalChips.filter((c) => c.isSet);
-  const unsetGoalChips = goalChips.filter((c) => !c.isSet);
-  const goalGridColsClass = setGoalChips.length <= 1 ? "grid-cols-1" : "grid-cols-2";
 
   if (
     !isLoading &&
@@ -254,36 +255,39 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
         </Link>
       </div>
 
-      {/* 목표 항목 — 설정된 목표만 그리드에 표시, 파티션(hairline)으로만 구분 */}
-      {setGoalChips.length > 0 && (
-        <div className={`grid ${goalGridColsClass} gap-px bg-gray-100 dark:bg-gray-700`}>
-          {setGoalChips.map((chip) => (
-            <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
-                {chip.label}
-              </p>
-              {chip.content}
-              {chip.barPct != null && (
-                <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
-                  <div
-                    className={`h-full rounded-full ${chip.barColorClass}`}
-                    style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-      {unsetGoalChips.length > 0 && (
-        <Link
-          to="/invest-plan"
-          className="flex items-center gap-1 mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          {unsetGoalChips.map((c) => c.shortLabel).join("·")} 목표도 설정해보세요{" "}
-          <ArrowRight size={11} />
-        </Link>
-      )}
+      {/* 목표 항목 — 4개 항목 항상 표시, 미설정은 안내 CTA로 대체. 파티션(hairline)으로만 구분 */}
+      <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
+        {goalChips.map((chip) => (
+          <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
+            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
+              {chip.label}
+            </p>
+            {chip.isSet ? (
+              <>
+                {chip.content}
+                {chip.barPct != null && (
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1 mt-1">
+                    <div
+                      className={`h-full rounded-full ${chip.barColorClass}`}
+                      style={{ width: `${Math.min(Math.max(chip.barPct, 0), 100)}%` }}
+                    />
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-300 dark:text-gray-600">미설정</p>
+                <Link
+                  to={chip.setupHref}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  설정하기
+                </Link>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
 
       {/* 모바일 DCA 달성 전망 — 헤드라인(진행율+금액)은 항상 노출, 예상일/배지/진행바는 접기 뒤로 */}
       <div className="sm:hidden border-t border-gray-100 dark:border-gray-700 pt-1.5 mt-1.5">

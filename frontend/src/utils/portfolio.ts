@@ -108,6 +108,22 @@ export function getPortfolioHorizonTaxType(
   return matches ? { horizon, taxType } : null;
 }
 
+/**
+ * 계좌 목록의 investment_horizon·tax_type 태그가 전부 동일하면 그 값을 반환한다 — 새 포트폴리오
+ * 생성 시(추천 비중 카드 등에서 특정 계좌들을 미리 선택한 상태) 두 태그의 초기값을 계좌 특성에서
+ * 자동으로 채우는 데 사용한다. 계좌가 없거나 태그가 섞여 있으면(계좌 하나라도 미지정 포함) null.
+ */
+export function inferHorizonTaxTypeFromAccounts(
+  accounts: AssetAccount[],
+): { horizon: InvestmentHorizon; taxType: AccountTaxType } | null {
+  if (accounts.length === 0) return null;
+  const horizon = accounts[0].investment_horizon;
+  const taxType = accounts[0].tax_type;
+  if (!horizon || !taxType) return null;
+  const matches = accounts.every((a) => a.investment_horizon === horizon && a.tax_type === taxType);
+  return matches ? { horizon, taxType } : null;
+}
+
 export function mergeAlertsByPortfolio(
   alerts: RebalancingAlert[],
 ): Record<string, RebalancingAlert> {

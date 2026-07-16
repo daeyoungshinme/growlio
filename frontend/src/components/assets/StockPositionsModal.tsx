@@ -8,6 +8,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { fmtKrwShort } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
+import { toast } from "@/utils/toast";
 import Modal from "@/components/common/Modal";
 import { PositionsTable } from "./PositionsTable";
 import type { Position } from "@/hooks/usePositionsEditor";
@@ -93,10 +94,10 @@ export default function StockPositionsModal({
     setSaving(true);
     setError(null);
     try {
-      const r = await api.put<PositionsResponse>(`/assets/${accountId}/positions`, valid);
-      editor.setRows(editor.enrichRows(r.data.positions));
-      setSummary(r.data.summary);
+      await api.put(`/assets/${accountId}/positions`, valid);
       void invalidateAccountData(queryClient);
+      toast("저장되었습니다", "success");
+      onClose();
     } catch (e) {
       setError(extractErrorMessage(e, "저장에 실패했습니다"));
     } finally {

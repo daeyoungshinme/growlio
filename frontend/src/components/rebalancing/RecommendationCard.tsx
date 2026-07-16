@@ -513,7 +513,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
       {confirmOpen && effectiveTab === "전체" && overallConfirmTarget && (
         <ConfirmModal
-          message={`${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`}
+          message={`${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`}
           confirmLabel="적용"
           danger={false}
           onConfirm={() => applyOverallMutation.mutate(overallConfirmTarget.id)}
@@ -525,8 +525,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
         <ConfirmModal
           message={
             activeHorizonRec?.includes_cash_equivalent && cashEquivalentMatches.length > 0
-              ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`
-              : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 실행 화면이 열립니다. 계속하시겠습니까?`
+              ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
+              : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
           }
           confirmLabel="적용"
           danger={false}

@@ -3,9 +3,10 @@
  * These tests primarily verify components render without crashing.
  */
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, waitFor } from "@testing-library/react";
+import { screen, fireEvent, waitFor, render } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import type { PortfolioPosition } from "@/types";
 
@@ -210,6 +211,7 @@ import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import { fetchPortfolios } from "@/api/portfolios";
+import { analyzePortfolio } from "@/api/rebalancing";
 import AssetsPage from "@/pages/AssetsPage";
 import TopLoadingBar from "@/components/common/TopLoadingBar";
 
@@ -520,6 +522,54 @@ describe("AnalysisPanel", () => {
     await waitFor(() => {
       expect(document.body).toBeDefined();
     });
+  });
+
+  it("다른 포트폴리오로 전환해 분석이 완료되면 결과로 다시 스크롤한다", async () => {
+    const mockPortfolio2 = { ...mockPortfolio, id: "p2", name: "두번째 포트폴리오" };
+    const scrollIntoViewMock = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoViewMock;
+
+    vi.mocked(analyzePortfolio).mockImplementation(
+      async (id: string) =>
+        ({
+          portfolio_id: id,
+          portfolio_name: id === "p1" ? "테스트 포트폴리오" : "두번째 포트폴리오",
+          total_value_krw: 1000000,
+          total_cash_krw: 0,
+          items: [],
+          untracked_holdings: [],
+          target_weighted_cagr_10y_pct: null,
+          target_portfolio_annual_dividend: null,
+          base_value_krw: 1000000,
+        }) as never,
+    );
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    const renderPanel = (autoAnalyzeId: string) => (
+      <QueryClientProvider client={qc}>
+        <MemoryRouter>
+          <AnalysisPanel
+            selectedIds={new Set([autoAnalyzeId])}
+            selectedNames={autoAnalyzeId === "p1" ? "테스트 포트폴리오" : "두번째 포트폴리오"}
+            portfolios={[mockPortfolio, mockPortfolio2]}
+            activeAccounts={[mockStockAccount]}
+            onOpenAlertModal={vi.fn()}
+            alertByPortfolioId={{}}
+            autoAnalyzeId={autoAnalyzeId}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const { rerender } = render(renderPanel("p1"));
+
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledWith("p1", undefined, undefined));
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(1));
+
+    rerender(renderPanel("p2"));
+
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledWith("p2", undefined, undefined));
+    await waitFor(() => expect(scrollIntoViewMock).toHaveBeenCalledTimes(2));
   });
 });
 

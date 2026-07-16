@@ -3,6 +3,7 @@ import {
   getPortfolioHorizon,
   getPortfolioHorizonTaxType,
   groupPositionsByTicker,
+  inferHorizonTaxTypeFromAccounts,
   mergeAlertsByPortfolio,
 } from "../portfolio";
 import type { PortfolioPosition } from "@/types";
@@ -330,5 +331,46 @@ describe("getPortfolioHorizonTaxType", () => {
       }),
     ];
     expect(getPortfolioHorizonTaxType(portfolio, accounts)).toBeNull();
+  });
+});
+
+describe("inferHorizonTaxTypeFromAccounts", () => {
+  it("빈 배열이면 null", () => {
+    expect(inferHorizonTaxTypeFromAccounts([])).toBeNull();
+  });
+
+  it("모든 계좌의 기간·세제유형이 동일하면 그 조합을 반환", () => {
+    const accounts = [
+      makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeAccount({ id: "acc-2", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+    ];
+    expect(inferHorizonTaxTypeFromAccounts(accounts)).toEqual({
+      horizon: "SHORT_TERM",
+      taxType: "IRP",
+    });
+  });
+
+  it("세제유형이 하나라도 다르면 null", () => {
+    const accounts = [
+      makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeAccount({ id: "acc-2", investment_horizon: "SHORT_TERM", tax_type: "GENERAL" }),
+    ];
+    expect(inferHorizonTaxTypeFromAccounts(accounts)).toBeNull();
+  });
+
+  it("투자기간이 하나라도 다르면 null", () => {
+    const accounts = [
+      makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeAccount({ id: "acc-2", investment_horizon: "LONG_TERM", tax_type: "IRP" }),
+    ];
+    expect(inferHorizonTaxTypeFromAccounts(accounts)).toBeNull();
+  });
+
+  it("계좌 중 하나라도 태그가 미지정이면 null", () => {
+    const accounts = [
+      makeAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeAccount({ id: "acc-2", investment_horizon: undefined, tax_type: "IRP" }),
+    ];
+    expect(inferHorizonTaxTypeFromAccounts(accounts)).toBeNull();
   });
 });

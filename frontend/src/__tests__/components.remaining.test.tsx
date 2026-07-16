@@ -150,6 +150,7 @@ import BacktestResultChart from "@/components/backtest/BacktestResultChart";
 import RebalancingAlertModal from "@/components/rebalancing/RebalancingAlertModal";
 import TransactionModal from "@/components/assets/TransactionModal";
 import UnifiedPortfolioEditor from "@/components/portfolio-analysis/UnifiedPortfolioEditor";
+import type { AssetAccount } from "@/api/assets";
 
 // ---- Test Fixtures ----
 const mockMetrics: PortfolioMetrics[] = [
@@ -458,6 +459,33 @@ describe("UnifiedPortfolioEditor", () => {
     ],
   };
 
+  function makeTestAccount(overrides: Partial<AssetAccount> = {}): AssetAccount {
+    return {
+      id: "acc-1",
+      name: "테스트 계좌",
+      asset_type: "STOCK_KIS",
+      data_source: "KIS_API",
+      institution: null,
+      kis_account_no: null,
+      kiwoom_account_no: null,
+      is_mock_mode: false,
+      manual_amount: null,
+      manual_currency: "KRW",
+      manual_updated_at: null,
+      deposit_krw: null,
+      deposit_usd: null,
+      real_estate_details: null,
+      include_in_total: true,
+      is_active: true,
+      sort_order: 0,
+      notes: null,
+      created_at: "2026-01-01T00:00:00Z",
+      has_own_kis_credentials: false,
+      has_own_kiwoom_credentials: false,
+      ...overrides,
+    };
+  }
+
   it("renders create mode", () => {
     renderWithProviders(
       <MemoryRouter>
@@ -541,6 +569,69 @@ describe("UnifiedPortfolioEditor", () => {
     const appleTexts = screen.queryAllByText(/Apple|AAPL/i);
     if (appleTexts.length > 0) expect(appleTexts[0]).toBeDefined();
     else expect(document.body).toBeDefined();
+  });
+
+  it("prefill 계좌들의 투자기간·세제유형 태그가 동일하면 자동으로 채워짐", () => {
+    const accounts = [
+      makeTestAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeTestAccount({ id: "acc-2", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+    ];
+    renderWithProviders(
+      <MemoryRouter>
+        <UnifiedPortfolioEditor
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+          saving={false}
+          initialAccountIds={["acc-1", "acc-2"]}
+          accounts={accounts}
+        />
+      </MemoryRouter>,
+    );
+    const selects = document.querySelectorAll("select");
+    expect((selects[0] as HTMLSelectElement).value).toBe("SHORT_TERM");
+    expect((selects[1] as HTMLSelectElement).value).toBe("IRP");
+  });
+
+  it("prefill 계좌들의 태그가 섞여 있으면 미지정으로 남음", () => {
+    const accounts = [
+      makeTestAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+      makeTestAccount({ id: "acc-2", investment_horizon: "LONG_TERM", tax_type: "GENERAL" }),
+    ];
+    renderWithProviders(
+      <MemoryRouter>
+        <UnifiedPortfolioEditor
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+          saving={false}
+          initialAccountIds={["acc-1", "acc-2"]}
+          accounts={accounts}
+        />
+      </MemoryRouter>,
+    );
+    const selects = document.querySelectorAll("select");
+    expect((selects[0] as HTMLSelectElement).value).toBe("");
+    expect((selects[1] as HTMLSelectElement).value).toBe("");
+  });
+
+  it("edit 모드에서는 initial의 태그가 우선되고 계좌 추론값은 무시됨", () => {
+    const accounts = [
+      makeTestAccount({ id: "acc-1", investment_horizon: "SHORT_TERM", tax_type: "IRP" }),
+    ];
+    renderWithProviders(
+      <MemoryRouter>
+        <UnifiedPortfolioEditor
+          initial={{ ...mockPortfolio, investment_horizon: "LONG_TERM", tax_type: "ISA" }}
+          onSave={vi.fn()}
+          onClose={vi.fn()}
+          saving={false}
+          initialAccountIds={["acc-1"]}
+          accounts={accounts}
+        />
+      </MemoryRouter>,
+    );
+    const selects = document.querySelectorAll("select");
+    expect((selects[0] as HTMLSelectElement).value).toBe("LONG_TERM");
+    expect((selects[1] as HTMLSelectElement).value).toBe("ISA");
   });
 
   it("adds a cash-equivalent item and disables the button once added", () => {

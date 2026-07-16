@@ -222,15 +222,13 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           </>
         ) : (
           <div className="py-2">
-            <div className="flex items-center justify-between gap-3 p-3 bg-blue-50 dark:bg-blue-950 rounded-xl mb-4">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                배당 목표를 설정하면 달성률을 확인할 수 있습니다
-              </p>
+            <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-xl mb-4 text-sm text-gray-600 dark:text-gray-400">
+              배당 목표를 설정하면 달성률을 확인할 수 있습니다.{" "}
               <button
                 onClick={onOpenSettings}
-                className="shrink-0 px-3 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="underline font-medium text-gray-700 dark:text-gray-300"
               >
-                목표 설정
+                지금 설정하기
               </button>
             </div>
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-3">

@@ -68,7 +68,14 @@ export function AnalysisPanel({
   }, [autoAnalyzeId]);
 
   useEffect(() => {
-    if (!autoAnalyzeId || !analysis || autoScrolledForRef.current === autoAnalyzeId) return;
+    if (
+      !autoAnalyzeId ||
+      !analysis ||
+      analysis.portfolio_id.toString() !== autoAnalyzeId ||
+      autoScrolledForRef.current === autoAnalyzeId
+    ) {
+      return;
+    }
     autoScrolledForRef.current = autoAnalyzeId;
     const timer = setTimeout(() => {
       analysisResultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
