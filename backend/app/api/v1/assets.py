@@ -3,16 +3,15 @@ from uuid import UUID
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from sqlalchemy import delete as sql_delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Transaction
 from app.models.user import User
-from app.redis_client import get_redis
 from app.schemas.asset import (
     AssetAccountCreate,
     AssetAccountResponse,
@@ -24,6 +23,13 @@ from app.schemas.asset import (
     SetTargetPortfolioRequest,
 )
 from app.services._account_queries import portfolio_accounts_stmt
+from app.services.asset_credential_service import (
+    delete_kis_credentials,
+    delete_kiwoom_credentials,
+)
+from app.services.asset_credential_service import (
+    verify_kis_credentials as _verify_kis_credentials_service,
+)
 from app.services.asset_service import (
     list_accounts as _list_accounts,
 )
@@ -34,7 +40,7 @@ from app.services.asset_service import (
     list_snapshots_in_range as _list_snapshots_in_range,
 )
 from app.services.asset_service import (
-    sync_account as _sync_account_service,
+    sync_account_now as _sync_account_now,
 )
 from app.services.credential_service import encrypt, encrypt_if_present
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions, sync_snapshot_positions
@@ -44,7 +50,6 @@ from app.utils.cache_keys import (
     account_detail_key,
     get_cached_json,
     invalidate_asset_account_caches,
-    invalidate_user_caches,
     set_cached_json,
 )
 from app.utils.currency import fetch_usd_krw
@@ -93,18 +98,15 @@ async def verify_kis_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """KIS 자격증명 유효성 확인 (계좌 생성 없이)."""
-    from app.kis.auth import _fetch_and_store_token
-
     redis = await get_redis()
     try:
-        await _fetch_and_store_token(
+        await _verify_kis_credentials_service(
             req.kis_app_key,
             req.kis_app_secret,
-            is_mock=req.is_mock,
-            redis=redis,
-            db=db,
-            user_id=str(current_user.id),
-            account_id=None,
+            req.is_mock,
+            current_user.id,
+            db,
+            redis,
         )
     except httpx.HTTPStatusError as e:
         if e.response.status_code in (400, 401, 403):
@@ -312,17 +314,9 @@ async def delete_account_kis_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
-    from app.models.token import KisToken
-
-    await _delete_account_credentials(
-        account_id,
-        current_user.id,
-        db,
-        app_key_attr="kis_app_key",
-        app_secret_attr="kis_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
-        token_model=KisToken,
-        redis_key=f"kis_token:account:{account_id}",
-    )
+    account = await _get_owned_account(account_id, current_user.id, db)
+    redis = await get_redis()
+    await delete_kis_credentials(account, db, redis)
 
 
 @router.delete("/{account_id}/kiwoom-credentials", status_code=status.HTTP_204_NO_CONTENT)
@@ -332,38 +326,9 @@ async def delete_account_kiwoom_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """계좌별 키움 API 자격증명을 삭제한다."""
-    from app.models.token import KiwoomToken
-
-    await _delete_account_credentials(
-        account_id,
-        current_user.id,
-        db,
-        app_key_attr="kiwoom_app_key",
-        app_secret_attr="kiwoom_app_secret",  # nosec B106 — 속성명 문자열, 비밀번호 아님
-        token_model=KiwoomToken,
-        redis_key=f"kiwoom_token:account:{account_id}",
-    )
-
-
-async def _delete_account_credentials(
-    account_id: UUID,
-    user_id,
-    db: AsyncSession,
-    *,
-    app_key_attr: str,
-    app_secret_attr: str,
-    token_model,
-    redis_key: str,
-) -> None:
-    account = await _get_owned_account(account_id, user_id, db)
-    setattr(account, app_key_attr, None)
-    setattr(account, app_secret_attr, None)
-    await db.execute(sql_delete(token_model).where(token_model.account_id == account_id))
-    await db.commit()
-
+    account = await _get_owned_account(account_id, current_user.id, db)
     redis = await get_redis()
-    await redis.delete(redis_key)
-    await invalidate_user_caches(redis, account_detail_key(user_id, account_id))
+    await delete_kiwoom_credentials(account, db, redis)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -396,22 +361,7 @@ async def sync_account(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
-        return await _do_sync(account, current_user, db, redis)
-
-
-async def _do_sync(account: AssetAccount, current_user, db: AsyncSession, redis):
-    """sync_account의 실제 동기화 로직 — redis_lock 내부에서 호출.
-
-    SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
-    """
-    snapshot = await _sync_account_service(account, db, redis)
-
-    await invalidate_asset_account_caches(redis, current_user.id, account.id)
-    return {
-        "detail": "동기화 완료",
-        "snapshot_date": str(snapshot.snapshot_date),
-        "amount_krw": float(snapshot.amount_krw),
-    }
+        return await _sync_account_now(account, current_user.id, db, redis)
 
 
 @router.post("/sync-all")

@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from app.config import settings
+from app.core.config import settings
 from app.exceptions import ProviderNetworkError
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.providers.base import BalanceResult, BrokerProvider
@@ -27,6 +27,7 @@ from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positi
 from app.utils.cache_keys import (
     RedisType,
     invalidate_account_caches,
+    invalidate_asset_account_caches,
 )
 from app.utils.circuit_breaker import CircuitBreaker, kis_circuit, kiwoom_circuit
 from app.utils.metrics import broker_sync_duration
@@ -151,6 +152,23 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
         total_krw=balance.total_value_krw,
     )
     return snapshot
+
+
+async def sync_account_now(
+    account: AssetAccount, user_id: uuid.UUID, db: AsyncSession, redis: RedisType
+) -> dict[str, str | float]:
+    """계좌 동기화 실행 + 관련 캐시 무효화 + API 응답 dict 반환 (assets.py `/sync` 엔드포인트 전용).
+
+    SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
+    """
+    snapshot = await sync_account(account, db, redis)
+
+    await invalidate_asset_account_caches(redis, user_id, account.id)
+    return {
+        "detail": "동기화 완료",
+        "snapshot_date": str(snapshot.snapshot_date),
+        "amount_krw": float(snapshot.amount_krw),
+    }
 
 
 # ---------------------------------------------------------------------------
