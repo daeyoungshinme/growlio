@@ -16,21 +16,21 @@ function getDriftStatus(maxDrift: number, threshold: number): DriftStatus {
 
 const STATUS_CONFIG = {
   critical: {
-    bg: "bg-red-900/20 border-red-700/40",
-    icon: <AlertTriangle size={16} className="text-red-400 shrink-0" />,
-    badge: "bg-red-900/40 text-red-300",
+    bg: "bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-700/40",
+    icon: <AlertTriangle size={16} className="text-red-600 dark:text-red-400 shrink-0" />,
+    badge: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
     label: "리밸런싱 필요",
   },
   caution: {
-    bg: "bg-amber-900/20 border-amber-700/40",
-    icon: <Info size={16} className="text-amber-400 shrink-0" />,
-    badge: "bg-amber-900/40 text-amber-300",
+    bg: "bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-700/40",
+    icon: <Info size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />,
+    badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
     label: "점검 권고",
   },
   stable: {
-    bg: "bg-green-900/20 border-green-700/40",
-    icon: <CheckCircle size={16} className="text-green-400 shrink-0" />,
-    badge: "bg-green-900/40 text-green-300",
+    bg: "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-700/40",
+    icon: <CheckCircle size={16} className="text-green-600 dark:text-green-400 shrink-0" />,
+    badge: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
     label: "포트폴리오 안정",
   },
 } satisfies Record<
@@ -88,7 +88,7 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${cfg.badge}`}>
           {cfg.label}
         </span>
-        <span className="text-xs text-gray-400 truncate flex-1">{subText}</span>
+        <span className="text-xs text-gray-500 dark:text-gray-400 truncate flex-1">{subText}</span>
         <ChevronDown
           size={14}
           className={`text-gray-500 shrink-0 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
@@ -106,11 +106,13 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
                 return (
                   <div
                     key={item.ticker}
-                    className="flex items-center gap-1 bg-gray-800/60 rounded-lg px-2.5 py-1"
+                    className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/60 rounded-lg px-2.5 py-1"
                   >
-                    <span className="text-xs font-medium text-gray-200">{item.name}</span>
+                    <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                      {item.name}
+                    </span>
                     <span
-                      className={`text-xs font-bold ${isOver ? "text-red-400" : "text-blue-400"}`}
+                      className={`text-xs font-bold ${isOver ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}
                     >
                       {isOver ? "▲" : "▼"}
                       {Math.abs(diff).toFixed(1)}%
@@ -123,7 +125,7 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
 
           {/* 안정 상태 - 이탈 없음 메시지 */}
           {status === "stable" && tradeable.length > 0 && (
-            <div className="flex items-center gap-1.5 text-xs text-gray-400 mt-3">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400 mt-3">
               <CheckCircle size={12} className="text-green-500" />
               최대 이탈 {maxDrift.toFixed(1)}% (기준 ±{threshold}%)
             </div>

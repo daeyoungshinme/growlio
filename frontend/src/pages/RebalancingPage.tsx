@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
-import { fetchCompositeSignalStatus } from "@/api/rebalancing";
+import { fetchCompositeSignalStatus, fetchDriftSummary } from "@/api/rebalancing";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -12,6 +12,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
+import DiagnosisSummaryHeader from "@/components/rebalancing/DiagnosisSummaryHeader";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
@@ -136,6 +137,17 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
+  // RebalancingStatusCard도 동일 queryKey로 driftSummary를 조회한다 — 여기서 다른 3개 쿼리와
+  // 같은 렌더 틱에 미리 발화해두면(React Query 캐시 dedup) 콜드 캐시에서도 스태거링 없이
+  // 동시에 조회되어 콜드 캐시 경쟁 창을 줄인다. 또한 이 헤더(DiagnosisSummaryHeader)의
+  // 드리프트 개수 계산에도 재사용한다.
+  const { data: driftSummaries } = useQuery({
+    queryKey: QUERY_KEYS.driftSummary,
+    queryFn: fetchDriftSummary,
+    staleTime: STALE_TIME.MEDIUM,
+    enabled: localTab === "진단",
+  });
+
   return (
     <div className="flex flex-col min-h-full gap-4">
       <div className="px-1">
@@ -152,12 +164,20 @@ export default function RebalancingPage() {
         {localTab === "진단" && (
           <>
             <ErrorBoundary variant="section">
+              <DiagnosisSummaryHeader
+                driftSummaries={driftSummaries}
+                marketSignal={signal}
+                riskMetrics={riskMetrics}
+              />
+            </ErrorBoundary>
+            <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
                   marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
                   signalDisplay="none"
                   showAllInsights={true}
+                  showHeaderBadge={false}
                 />
               </Suspense>
             </ErrorBoundary>

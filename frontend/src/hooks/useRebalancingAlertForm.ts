@@ -222,3 +222,6 @@ export function useRebalancingAlertFormState({
     isPending: upsertMut.isPending || deleteMut.isPending,
   };
 }
+
+/** 알림 모달의 각 섹션 컴포넌트(alertModal/)가 공유하는 폼 상태 타입. */
+export type RebalancingAlertFormState = ReturnType<typeof useRebalancingAlertFormState>;

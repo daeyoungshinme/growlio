@@ -10,6 +10,7 @@ import BankAccountCard from "@/components/assets/BankAccountCard";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import CollapsibleCard from "@/components/common/CollapsibleCard";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),
@@ -295,5 +296,25 @@ describe("CollapsibleSection", () => {
     );
     fireEvent.click(screen.getByText("상세"));
     expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ------- ToggleSwitch -------
+describe("ToggleSwitch", () => {
+  it("checked 상태를 체크박스에 반영한다", () => {
+    render(<ToggleSwitch checked onChange={vi.fn()} ariaLabel="테스트 토글" />);
+    expect(screen.getByRole("checkbox", { name: "테스트 토글" })).toBeChecked();
+  });
+
+  it("클릭 시 onChange를 반전된 값으로 호출한다", () => {
+    const onChange = vi.fn();
+    render(<ToggleSwitch checked={false} onChange={onChange} ariaLabel="테스트 토글" />);
+    fireEvent.click(screen.getByRole("checkbox", { name: "테스트 토글" }));
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+
+  it("disabled이면 체크박스가 비활성화된다", () => {
+    render(<ToggleSwitch checked={false} onChange={vi.fn()} disabled ariaLabel="테스트 토글" />);
+    expect(screen.getByRole("checkbox", { name: "테스트 토글" })).toBeDisabled();
   });
 });
