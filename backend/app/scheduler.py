@@ -53,14 +53,6 @@ def init_scheduler() -> None:
         id="market_signal_alert_check_interval",
         replace_existing=True,
     )
-    from app.jobs.dca_auto_buy import run_dca_auto_execution
-
-    scheduler.add_job(
-        run_dca_auto_execution,
-        CronTrigger(hour=9, minute=0, timezone="Asia/Seoul"),
-        id="dca_auto_execution_daily",
-        replace_existing=True,
-    )
     from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
 
     scheduler.add_job(

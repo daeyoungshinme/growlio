@@ -33,7 +33,7 @@ def _make_mock_db():
 
 def _setup_app(user, db):
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     async def override_auth():
@@ -74,7 +74,7 @@ class TestGetSettings:
             assert data["user_email"] == "test@example.com"
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -92,12 +92,6 @@ class TestGetSettings:
             retirement_target_year=2045,
             annual_dividend_goal=None,
             notification_email=None,
-            auto_dca_enabled=False,
-            auto_dca_day=None,
-            auto_dca_amount=None,
-            auto_dca_portfolio_id=None,
-            auto_dca_account_id=None,
-            auto_dca_last_executed_at=None,
             fcm_token=None,
             composite_signal_alerts_enabled=True,
             goal_candidate_tickers=None,
@@ -124,7 +118,7 @@ class TestGetSettings:
             assert data["goal_short_term_equity_floor_pct"] == 80.0
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -158,7 +152,7 @@ class TestUpdateGoal:
             assert resp.status_code in (200, 422)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -199,7 +193,7 @@ class TestUpdateGoal:
             assert resp.status_code in (200, 422)
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -220,7 +214,7 @@ class TestUpdateGoal:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -246,7 +240,7 @@ class TestUpdateCompositeSignalAlerts:
             assert settings.composite_signal_alerts_enabled is False
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -291,7 +285,7 @@ class TestUpdateGoalCandidateTickers:
             ]
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -312,7 +306,7 @@ class TestUpdateGoalCandidateTickers:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -359,7 +353,7 @@ class TestUpdateGoalRecommendationOptions:
             assert settings.goal_short_term_equity_floor_pct == 60.0
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -384,7 +378,7 @@ class TestUpdateGoalRecommendationOptions:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -404,7 +398,7 @@ class TestUpdateGoalRecommendationOptions:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -424,7 +418,7 @@ class TestUpdateGoalRecommendationOptions:
             assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)
@@ -466,7 +460,7 @@ class TestUpdateDartKey:
             assert resp.status_code == 200
         finally:
             from app.api.deps import get_current_user
-            from app.database import get_db
+            from app.core.database import get_db
 
             app.dependency_overrides.pop(get_current_user, None)
             app.dependency_overrides.pop(get_db, None)

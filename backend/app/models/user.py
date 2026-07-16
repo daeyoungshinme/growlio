@@ -6,7 +6,7 @@ from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, Numeric, St
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.asset import AssetAccount
@@ -60,12 +60,5 @@ class UserSettings(Base):
     # drift가 없어도 리스크 집중/시장 위험 신호가 있으면 추가로 발송 — 신호 자체가 유저 단위이므로 계정 단일 설정
     composite_signal_alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     fcm_token: Mapped[str | None] = mapped_column(String(512))
-    # 자동 DCA (정기매수)
-    auto_dca_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    auto_dca_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    auto_dca_amount: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
-    auto_dca_portfolio_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    auto_dca_account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
-    auto_dca_last_executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="settings")

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid as uuid_mod
 from datetime import UTC, date
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -10,10 +9,10 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.redis_client import get_redis
 from app.enums import AssetClass, GoalRiskTolerance, IndexRegion
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
@@ -115,30 +114,6 @@ class NotificationEmailUpdate(BaseModel):
     notification_email: EmailStr | None = None
 
 
-class AutoDcaUpdate(BaseModel):
-    enabled: bool
-    day: int | None = None
-    amount: float | None = None
-    portfolio_id: str | None = None
-    account_id: str | None = None
-
-    @field_validator("day")
-    @classmethod
-    def validate_day(cls, v: int | None) -> int | None:
-        if v is not None and not (1 <= v <= 28):
-            raise ValueError("실행일은 1~28 사이여야 합니다")
-        return v
-
-    @field_validator("amount")
-    @classmethod
-    def validate_amount(cls, v: float | None) -> float | None:
-        if v is not None and v <= 0:
-            raise ValueError("매수 금액은 0보다 커야 합니다")
-        if v is not None and v > 1_000_000_000:
-            raise ValueError("매수 금액은 10억 원을 초과할 수 없습니다")
-        return v
-
-
 class PushTokenUpdate(BaseModel):
     fcm_token: str | None = None
 
@@ -157,12 +132,6 @@ class SettingsResponse(BaseModel):
     retirement_target_year: int | None = None
     user_email: str
     notification_email: str | None = None
-    auto_dca_enabled: bool = False
-    auto_dca_day: int | None = None
-    auto_dca_amount: float | None = None
-    auto_dca_portfolio_id: str | None = None
-    auto_dca_account_id: str | None = None
-    auto_dca_last_executed_at: str | None = None
     annual_dividend_goal: float | None = None
     fcm_token_stored: bool = False
     composite_signal_alerts_enabled: bool = True
@@ -204,12 +173,6 @@ async def get_settings(
         retirement_target_year=row.retirement_target_year,
         user_email=current_user.email,
         notification_email=row.notification_email,
-        auto_dca_enabled=row.auto_dca_enabled,
-        auto_dca_day=row.auto_dca_day,
-        auto_dca_amount=float(row.auto_dca_amount) if row.auto_dca_amount else None,
-        auto_dca_portfolio_id=str(row.auto_dca_portfolio_id) if row.auto_dca_portfolio_id else None,
-        auto_dca_account_id=str(row.auto_dca_account_id) if row.auto_dca_account_id else None,
-        auto_dca_last_executed_at=row.auto_dca_last_executed_at.isoformat() if row.auto_dca_last_executed_at else None,
         annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal else None,
         fcm_token_stored=bool(row.fcm_token),
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
@@ -339,25 +302,6 @@ async def update_notification_email(
     row.notification_email = req.notification_email or None
     await db.commit()
     return {"detail": "알림 이메일이 저장되었습니다"}
-
-
-@router.put("/auto-dca")
-@limiter.limit("10/minute")
-async def update_auto_dca(
-    request: Request,
-    req: AutoDcaUpdate,
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """자동 DCA 정기매수 설정."""
-    row = await get_or_create_settings(db, current_user.id)
-    row.auto_dca_enabled = req.enabled
-    row.auto_dca_day = req.day
-    row.auto_dca_amount = req.amount
-    row.auto_dca_portfolio_id = uuid_mod.UUID(req.portfolio_id) if req.portfolio_id else None
-    row.auto_dca_account_id = uuid_mod.UUID(req.account_id) if req.account_id else None
-    await db.commit()
-    return {"detail": "자동 정기매수 설정이 저장되었습니다"}
 
 
 @router.put("/composite-signal-alerts")
