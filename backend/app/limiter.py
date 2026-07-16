@@ -1,14 +1,6 @@
-import structlog
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app.config import settings
-
-logger = structlog.get_logger()
-
-try:
-    limiter = Limiter(key_func=get_remote_address, storage_uri=settings.redis_url)
-except Exception as e:
-    # Redis-backed limiter 초기화 실패 시 in-memory fallback — 멀티 인스턴스 환경에서 rate limit 공유 불가
-    logger.error("rate_limiter_redis_fallback", error=str(e), fallback="in_memory")
-    limiter = Limiter(key_func=get_remote_address)
+# in-memory storage — 단일 인스턴스(Render free plan) 배포라 인스턴스 간 rate limit 공유가 불필요.
+# Redis-backed storage는 요청마다 Redis 커맨드를 소모해 Upstash 월간 한도를 빠르게 소진시켰다.
+limiter = Limiter(key_func=get_remote_address)
