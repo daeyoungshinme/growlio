@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import math
 from datetime import date, timedelta
 from typing import Any
@@ -9,9 +10,11 @@ from typing import Any
 import httpx
 import structlog
 
-from app.config import settings
+from app.core.config import settings
 from app.utils.cache_keys import (
+    TTL_INDICATOR_CALENDAR,
     TTL_INDICATOR_HISTORY,
+    economic_indicator_calendar_key,
     economic_indicator_history_key,
     get_cached_json,
     set_cached_json,
@@ -22,6 +25,8 @@ logger = structlog.get_logger()
 # ---------------------------------------------------------------------------
 # 지표 메타데이터 정의
 # ---------------------------------------------------------------------------
+# CPI/Core CPI 외 지표(VIX, T10Y2Y, 하이일드 스프레드, 달러 인덱스 등)는
+# market_signal_service.py가 FRED 시리즈 ID를 직접 호출해 사용하므로 여기 중복 정의하지 않는다.
 
 INDICATORS: dict[str, dict[str, str]] = {
     "CPI_US": {
@@ -42,78 +47,11 @@ INDICATORS: dict[str, dict[str, str]] = {
         "frequency": "monthly",
         "description": "식품·에너지 제외 소비자물가지수",
     },
-    "FED_RATE": {
-        "name": "미국 기준금리",
-        "name_en": "Fed Funds Rate",
-        "source": "fred",
-        "series": "FEDFUNDS",
-        "unit": "%",
-        "frequency": "monthly",
-        "description": "연방준비제도 기준금리 (실효금리)",
-    },
-    "UNEMPLOYMENT_US": {
-        "name": "미국 실업률",
-        "name_en": "US Unemployment Rate",
-        "source": "fred",
-        "series": "UNRATE",
-        "unit": "%",
-        "frequency": "monthly",
-        "description": "민간 실업률 (계절조정)",
-    },
-    "PPI_US": {
-        "name": "미국 PPI",
-        "name_en": "US PPI",
-        "source": "fred",
-        "series": "PPIACO",
-        "unit": "지수",
-        "frequency": "monthly",
-        "description": "생산자물가지수 (기준: 1982=100)",
-    },
-    "VIX": {
-        "name": "VIX 공포지수",
-        "name_en": "VIX Volatility Index",
-        "source": "fred",
-        "series": "VIXCLS",
-        "unit": "지수",
-        "frequency": "daily",
-        "description": "CBOE 변동성 지수 — 시장 불안 심리 측정 (20 이상: 주의, 30 이상: 공포)",
-    },
-    "T10Y2Y": {
-        "name": "장단기 금리차 (10Y-2Y)",
-        "name_en": "10Y-2Y Treasury Yield Spread",
-        "source": "fred",
-        "series": "T10Y2Y",
-        "unit": "%",
-        "frequency": "daily",
-        "description": "10년물-2년물 미국 국채 스프레드 — 역전(-) 시 경기침체 선행지표",
-    },
-    "HIGH_YIELD_SPREAD": {
-        "name": "하이일드 채권 스프레드",
-        "name_en": "US High Yield Spread",
-        "source": "fred",
-        "series": "BAMLH0A0HYM2",
-        "unit": "%",
-        "frequency": "daily",
-        "description": "ICE BofA 하이일드 채권 옵션조정스프레드 — 급등 시 신용 경색·부도위험 확대 신호",
-    },
-    "DOLLAR_INDEX": {
-        "name": "달러 인덱스 (Broad)",
-        "name_en": "Trade Weighted US Dollar Index (Broad)",
-        "source": "fred",
-        "series": "DTWEXBGS",
-        "unit": "지수",
-        "frequency": "daily",
-        "description": "주요 교역국 대비 미 달러 가치 — 급등 시 신흥국·원자재 자금 이탈 신호",
-    },
-    "RATE_2Y": {
-        "name": "미국 2년물 국채금리",
-        "name_en": "US 2-Year Treasury Yield",
-        "source": "fred",
-        "series": "DGS2",
-        "unit": "%",
-        "frequency": "daily",
-        "description": "기준금리 대비 낮을수록 시장의 금리 인하 기대가 큼을 시사",
-    },
+}
+
+_IMPACT: dict[str, str] = {
+    "CPI_US": "High",
+    "CORE_CPI_US": "High",
 }
 
 FRED_BASE = "https://api.stlouisfed.org/fred"
@@ -219,6 +157,76 @@ def _parse_fred_obs(obs: list[dict]) -> list[dict[str, Any]]:
 
 
 # ---------------------------------------------------------------------------
+# 발표 캘린더 (CPI/Core CPI 다음 발표일 조회용 — fetch_inflation_summary 전용 소비자)
+# ---------------------------------------------------------------------------
+
+_CALENDAR_DAYS_AHEAD = 90
+
+
+async def _fetch_fred_calendar_events(days_ahead: int = _CALENDAR_DAYS_AHEAD) -> list[dict[str, Any]]:
+    """FRED에서 각 지표의 향후 발표 예정일을 병렬로 조회해 캘린더 형식으로 반환한다."""
+    today = date.today()
+    cutoff = today + timedelta(days=days_ahead)
+
+    codes = list(INDICATORS.keys())
+    series_ids = [INDICATORS[c]["series"] for c in codes]
+
+    raw_results: list[list[str] | BaseException] = await asyncio.gather(
+        *[_fred_get_release_dates(sid, upcoming=True) for sid in series_ids],
+        return_exceptions=True,
+    )
+
+    events: list[dict[str, Any]] = []
+    for code, dates_or_exc in zip(codes, raw_results, strict=False):
+        if isinstance(dates_or_exc, BaseException):
+            logger.warning("fred_calendar_fetch_failed", code=code, error=str(dates_or_exc))
+            continue
+
+        meta = INDICATORS[code]
+        for release_date in dates_or_exc:
+            try:
+                d = date.fromisoformat(release_date)
+            except (ValueError, TypeError):
+                continue
+            if not (today <= d <= cutoff):
+                continue
+            events.append(
+                {
+                    "event": meta["name"],
+                    "date": d.isoformat(),
+                    "time_kst": None,
+                    "country": "US",
+                    "actual": None,
+                    "estimate": None,
+                    "previous": None,
+                    "impact": _IMPACT.get(code),
+                    "currency": None,
+                }
+            )
+
+    events.sort(key=lambda e: e["date"])
+    return events
+
+
+async def sync_calendar_to_cache(redis) -> list[dict[str, Any]]:
+    """FRED에서 캘린더 이벤트를 조회해 Redis에 저장한다."""
+    events = await _fetch_fred_calendar_events()
+
+    if redis and events:
+        await set_cached_json(redis, economic_indicator_calendar_key(), events, TTL_INDICATOR_CALENDAR)
+        logger.info("fred_calendar_synced", count=len(events))
+
+    return events
+
+
+async def get_calendar_events(redis) -> list[dict[str, Any]]:
+    """캘린더 이벤트를 반환한다. Redis 캐시 hit 시 캐시값, miss 시 FRED 직접 조회."""
+    if (hit := await get_cached_json(redis, economic_indicator_calendar_key())) is not None:
+        return hit
+    return await sync_calendar_to_cache(redis)
+
+
+# ---------------------------------------------------------------------------
 # 공개 서비스 함수
 # ---------------------------------------------------------------------------
 
@@ -231,8 +239,6 @@ async def fetch_inflation_summary(redis=None) -> list[dict[str, Any]]:
 
     리밸런싱 화면 참고용 — history/calendar 캐시를 그대로 재사용하므로 신규 FRED 호출이 없다.
     """
-    from .economic_calendar_service import get_calendar_events  # 순환 임포트 회피
-
     calendar_events = await get_calendar_events(redis)
     next_release_by_name: dict[str, str] = {}
     for event in calendar_events:

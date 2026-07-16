@@ -87,7 +87,7 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=points),
             ),
             patch(
-                "app.services.economic_calendar_service.get_calendar_events",
+                "app.services.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=calendar_events),
             ),
         ):
@@ -109,7 +109,7 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=points),
             ),
             patch(
-                "app.services.economic_calendar_service.get_calendar_events",
+                "app.services.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=[]),
             ),
         ):
@@ -127,7 +127,7 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=[]),
             ),
             patch(
-                "app.services.economic_calendar_service.get_calendar_events",
+                "app.services.economic_indicator_service.get_calendar_events",
                 new=AsyncMock(return_value=[]),
             ),
         ):
