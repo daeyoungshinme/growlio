@@ -75,13 +75,13 @@ cd backend && uv run mypy app/
 - `APP_SECRET_KEY` — JWT 서명 키
 - `DATABASE_URL` — PostgreSQL asyncpg URL
 - `MIGRATION_DATABASE_URL` — Supabase 전용 마이그레이션 DB URL (로컬 Docker는 `DATABASE_URL`과 동일)
-- `REDIS_URL`
+- `REDIS_URL` — 로컬 개발은 Docker Redis(`redis://localhost:6379/0`), 운영은 Upstash(`rediss://...`, TLS) — 스킴만 다르고 코드 분기 없음(`redis.asyncio.from_url`이 스킴으로 자동 판단)
 - `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
 - `ALLOWED_ORIGINS` — CORS 허용 출처 (쉼표 구분, 예: `http://localhost:5173`)
 - `FRONTEND_URL` — 이메일 링크 생성용 프론트엔드 URL
 - `API_SEMAPHORE_LIMIT` — 외부 API 동시 호출 제한 세마포어 크기
 - `REDIS_CACHE_TTL_SECONDS` — 환율 등 Redis 캐시 기본 TTL
-- 기타 튜닝용 env var(환율 fallback, KIS/Kiwoom rate limit, circuit breaker 임계값, DB pool 설정 등)는 `app/config.py`의 `Settings` 클래스 참고 — 전부 기본값 있어 운영 필수 아님
+- 기타 튜닝용 env var(환율 fallback, KIS/Kiwoom rate limit, circuit breaker 임계값, DB pool 설정 등)는 `app/core/config.py`의 `Settings` 클래스 참고 — 전부 기본값 있어 운영 필수 아님
 
 **Supabase** (`supabase.com > Project Settings > API`):
 - `SUPABASE_PROJECT_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
@@ -151,7 +151,8 @@ API Request
 
 services/
 > 파일명 접미사 컨벤션: `*_service.py`(DB/외부 API 연동 포함 유스케이스), `*_calculator.py`/`*_aggregator.py`(순수 계산·집계, 부수효과 없음), 접미사 없는 파일(`yahoo_price.py`, `backtest_metrics.py` 등)은 특정 도메인 유틸 모음. 강제 통일 대상 아님 — 새 파일 추가 시 참고용.
-  ├── asset_service.py        # 계좌별 sync 함수 (대시보드 집계는 asset_aggregator.py로 분리됨)
+  ├── asset_service.py        # 계좌별 sync 함수 + sync_account_now(캐시 무효화·API 응답 포맷 포함, assets.py `/sync` 전용) — 대시보드 집계는 asset_aggregator.py로 분리됨
+  ├── asset_credential_service.py  # 계좌 KIS/키움 자격증명 검증(verify_kis_credentials)·삭제(delete_kis_credentials/delete_kiwoom_credentials) — assets.py 라우터에서 분리
   ├── sync_all_service.py     # "전체 갱신" 백그라운드 배치 동기화 — jobs/asset_sync.py의 _sync_accounts 재사용, Redis로 락/진행상태 관리 (POST /assets/sync-all, GET /assets/sync-all/status)
   ├── auth_service.py         # 회원가입/로그인/JWT 발급
   ├── alerts/                 # 범용 알림 도메인 패키지 (환율/주가/시장신호 체크 + 공통 이력)
@@ -163,7 +164,7 @@ services/
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
-  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices) — 구 rebalancing_order_builder.py
+  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`)
   │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
@@ -174,49 +175,50 @@ services/
   │   ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼 (양쪽 executor 공용)
   │   ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
   │   ├── diagnosis_service.py # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직, alert 아님 (구 rebalancing_diagnosis_service.py)
+  │   ├── overview_enrichment.py # 목표 포트폴리오 중 미보유 종목의 배당수익률·현재가 보완(collect_dividend_map/enrich_overview_with_prices) — rebalancing.py analyze_portfolio 엔드포인트 전용, 헬퍼를 라우터에서 분리
+  │   ├── broker_balance_service.py # KIS/키움 계좌 실시간 잔고 조회(fetch_broker_balance) — rebalancing.py broker-balance 엔드포인트 전용, 헬퍼를 라우터에서 분리
   │   └── _alert_queries.py   # RebalancingAlert portfolio_id+user_id 조회 헬퍼 (rebalancing_alerts.py 라우터에서 분리, 구 _rebalancing_alert_queries.py)
   ├── backtest_service.py     # 백테스트 엔진
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
-  ├── dart_service.py         # DART OpenAPI 연동 — dividend_fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
+  ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
   ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 (목표금액/월적립액/목표연도 → 필요 수익률 역산 → 기존 종목+큐레이션 ETF 중 MVO로 최소분산 포트폴리오 추천). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률을 구하는 순수 계산 함수 (goal_recommendation_service.py 서브모듈)
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
-  ├── dividend_constants.py   # 배당 관련 상수 정의 (배당 주기, fallback 수익률 등)
-  ├── dividend_sync_sources.py # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — dividend_fetcher.py 체인이 호출
-  ├── dividend_plan_service.py # 연배당/월배당 계획 및 목표 달성 현황 서비스
-  ├── dividend/               # 배당 서비스 패키지 (리팩토링됨)
+  ├── dividend/               # 배당 서비스 패키지 — 루트에 흩어져 있던 파일들을 전부 이 아래로 통합
+  │   ├── constants.py        # 배당 관련 정적 상수 + ETF 판별 유틸 (구 dividend_constants.py)
+  │   ├── sync_sources.py     # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — fetcher.py 폴백 체인이 호출 (구 dividend_sync_sources.py)
+  │   ├── fetcher.py          # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백 (구 dividend_fetcher.py)
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
   │   ├── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
+  │   ├── aggregator.py       # 트랜잭션 기반 배당금 집계 (get_dividend_summary, 구 dividend_aggregator.py)
+  │   ├── plan_service.py     # 연배당/월배당 계획 및 목표 달성 현황 서비스 (구 dividend_plan_service.py)
   │   ├── drip_service.py     # 배당 월별 균등화 제안 (calc_monthly_optimization) — 순수 함수
   │   └── _dividend_queries.py # 배당 관련 DB 쿼리 헬퍼
-  ├── dividend_fetcher.py     # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백
-  ├── price_sync_sources.py   # Yahoo 클라우드 IP 차단 대비 국내종목 Naver/pykrx 폴백 가격 조회
+  ├── price_sync_sources.py   # [현재가 조회 그룹] Yahoo 클라우드 IP 차단 대비 국내종목 Naver/pykrx 폴백 가격 조회
   ├── email_service.py        # 이메일 발송
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
-  ├── price_service.py        # 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
+  ├── price_service.py        # [현재가 조회 그룹] 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·ISA 만기 현황·연금(연금저축/IRP) 납입 현황
   ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
-  ├── dividend_aggregator.py  # 배당금 집계 (get_dividend_summary)
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
   ├── _snapshot_queries.py    # latest_snapshot_subquery() — account_id별 max(snapshot_date) SQLAlchemy 서브쿼리 헬퍼
   ├── _account_queries.py     # 활성 계좌 조회 쿼리 헬퍼 (is_active == True 필터, 브로커 계좌 필터, 비활성 포함 단건 조회)
   ├── _position_queries.py    # 포지션 DB 쿼리 헬퍼
   ├── _settings_queries.py    # UserSettings 조회/get-or-create + has_active_kis_credentials 쿼리 헬퍼 (settings.py 라우터에서 분리)
   ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
-  ├── yahoo_price.py          # Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
+  ├── yahoo_price.py          # [현재가 조회 그룹] Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
   ├── composition_calculator.py     # 자산 구성 비중 계산
   ├── trend_calculator.py           # 월별 자산 추이 계산
   ├── returns_calculator.py         # 수익률 계산 (XIRR 등)
-  ├── economic_calendar_service.py  # FRED 경제 캘린더 이벤트 조회
-  ├── economic_indicator_service.py # 미국 주요 경제지표 조회·캐싱
+  ├── economic_indicator_service.py # 미국 CPI/Core CPI 조회·캐싱 + FRED 발표 캘린더 조회(fetch_inflation_summary 전용, 구 economic_calendar_service.py 병합됨)
   ├── email_templates.py            # 이메일 HTML 템플릿 모듈 (email_service.py에서 분리)
   ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
-  ├── market_data_fetcher.py        # 시장 데이터 수집 유틸 (VIX, 금리차 등)
+  ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
   ├── market_signal_service.py      # 복합 시장 위험 신호 평가
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
@@ -237,6 +239,10 @@ schemas/                      # Pydantic 요청/응답 스키마
   │   └── goal.py               # 목표 역산 추천/복합신호 배너: GoalRecommendation*/CompositeSignalStatus
   └── service_dtypes.py       # 서비스 계층 내부 TypedDict (DB/외부 API 응답 형태 고정)
 
+core/                         # 설정·DB·Redis 클라이언트 (구 app/config.py·app/database.py·app/redis_client.py)
+  ├── config.py                # Settings(pydantic-settings) — env var 로딩
+  ├── database.py              # SQLAlchemy async engine/session, Base
+  └── redis_client.py          # Redis 클라이언트 싱글톤, get_redis/close_redis
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants)
 providers/                    # 금융 데이터 provider
@@ -258,12 +264,11 @@ utils/
 limiter.py                    # slowapi 레이트 리미터 (@limiter.limit("X/minute") 데코레이터, request: Request 파라미터 필수)
 jobs/                         # APScheduler 정기 작업
   ├── asset_sync.py           # 15:30 KST intraday + 18:00 KST daily 전체 계좌 스냅샷
-  ├── dca_auto_buy.py         # 매일 09:00 KST DCA 자동매수
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
   ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
-  ├── rebalancing_alert.py    # 매일 08:30 KST 리밸런싱 드리프트 초과 시 이메일 알림
+  ├── rebalancing_alert.py    # 10분 간격(app/scheduler.py:44) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 10분 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함)
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행
