@@ -17,11 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.api.v1._account_deps import get_owned_account
 from app.constants import DOMESTIC_MARKETS
-from app.database import get_db
+from app.core.database import get_db
+from app.core.redis_client import get_redis
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.services.price_service import _price_via_kis, domestic_price_fallback
 from app.services.recommendation_universe import guess_asset_class, resolve_index_region
 from app.utils.cache_keys import (
@@ -169,7 +169,7 @@ async def get_index_region(
     if cached is not None:
         return cached
 
-    from app.services.dividend_sync_sources import sync_naver_etf_index_region
+    from app.services.dividend.sync_sources import sync_naver_etf_index_region
 
     loop = asyncio.get_running_loop()
     fetched = await loop.run_in_executor(None, sync_naver_etf_index_region, ticker)

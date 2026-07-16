@@ -214,7 +214,7 @@ class TestIndexRegion:
         from app.main import app
 
         with (
-            patch("app.services.dividend_sync_sources.sync_naver_etf_index_region") as mock_fetch,
+            patch("app.services.dividend.sync_sources.sync_naver_etf_index_region") as mock_fetch,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/index-region?ticker=AAPL&market=NASDAQ")
@@ -224,8 +224,8 @@ class TestIndexRegion:
 
     def test_krx_ticker_uses_fetched_result_and_caches(self, override_settings):
         """`_mock_redis_singleton`(conftest.py autouse)이 실제 `get_redis()`가 반환하는
-        싱글턴이므로, `app.redis_client.redis_client`를 직접 재설정해 캐시 동작을 검증한다."""
-        import app.redis_client as _rc
+        싱글턴이므로, `app.core.redis_client.redis_client`를 직접 재설정해 캐시 동작을 검증한다."""
+        import app.core.redis_client as _rc
         from app.main import app
 
         _rc.redis_client.get = AsyncMock(return_value=None)
@@ -233,7 +233,7 @@ class TestIndexRegion:
         mock_setex = _rc.redis_client.setex  # 앱 lifespan 종료 시 redis_client가 None으로 리셋되므로 미리 참조 보관
         with (
             patch(
-                "app.services.dividend_sync_sources.sync_naver_etf_index_region",
+                "app.services.dividend.sync_sources.sync_naver_etf_index_region",
                 return_value="OVERSEAS",
             ) as mock_fetch,
             TestClient(app, raise_server_exceptions=False) as client,
@@ -246,13 +246,13 @@ class TestIndexRegion:
 
     def test_krx_ticker_falls_back_when_not_etf(self, override_settings):
         """ETF가 아니면(None 반환) resolve_index_region 폴백(기본값 DOMESTIC)을 사용한다."""
-        import app.redis_client as _rc
+        import app.core.redis_client as _rc
         from app.main import app
 
         _rc.redis_client.get = AsyncMock(return_value=None)
         _rc.redis_client.setex = AsyncMock()
         with (
-            patch("app.services.dividend_sync_sources.sync_naver_etf_index_region", return_value=None),
+            patch("app.services.dividend.sync_sources.sync_naver_etf_index_region", return_value=None),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/index-region?ticker=005930&market=KOSPI")
@@ -260,12 +260,12 @@ class TestIndexRegion:
         assert resp.json() == {"index_region": "DOMESTIC"}
 
     def test_cache_hit_skips_fetch(self, override_settings):
-        import app.redis_client as _rc
+        import app.core.redis_client as _rc
         from app.main import app
 
         _rc.redis_client.get = AsyncMock(return_value=b'{"index_region": "OVERSEAS"}')
         with (
-            patch("app.services.dividend_sync_sources.sync_naver_etf_index_region") as mock_fetch,
+            patch("app.services.dividend.sync_sources.sync_naver_etf_index_region") as mock_fetch,
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/index-region?ticker=133690&market=KOSPI")
@@ -323,7 +323,7 @@ def auth_app():
     """`/stocks/price`, `/stocks/prices-batch`는 인증이 필요하므로 get_current_user/get_db를
     override하고 테스트 후 정리한다."""
     from app.api.deps import get_current_user
-    from app.database import get_db
+    from app.core.database import get_db
     from app.main import app
 
     user = SimpleNamespace(id=uuid.uuid4())

@@ -1,7 +1,7 @@
 """외부 소스(Yahoo Finance, Naver, pykrx, FinanceDataReader)에서 배당 정보를 수집하는 동기 함수들.
 
 모든 함수는 동기(sync)이며 asyncio run_in_executor로 호출한다.
-`dividend_fetcher.py`의 비동기 폴백 체인이 이 모듈의 함수들을 소스별로 호출한다.
+`dividend/fetcher.py`의 비동기 폴백 체인이 이 모듈의 함수들을 소스별로 호출한다.
 """
 
 from __future__ import annotations

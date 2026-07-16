@@ -14,7 +14,7 @@ class TestGetDividendSummary:
     async def test_redis_cache_hit(self, mock_db, override_settings):
         import json
 
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         cached = {
             "annual_received": 500_000.0,
@@ -32,7 +32,7 @@ class TestGetDividendSummary:
 
     @pytest.mark.asyncio
     async def test_returns_summary_with_db_data(self, mock_db, override_settings):
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         # Mock _fetch_dividend_aggregates to return rows
         row_annual = SimpleNamespace(kind="annual", month=None, ticker=None, total=300_000.0)
@@ -43,7 +43,7 @@ class TestGetDividendSummary:
         exec_result.all.return_value = [row_annual, row_monthly, row_ticker]
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend.aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             result = await get_dividend_summary(uuid.uuid4(), mock_db)
 
         assert result["annual_received"] == 300_000.0
@@ -52,7 +52,7 @@ class TestGetDividendSummary:
 
     @pytest.mark.asyncio
     async def test_redis_miss_stores_result(self, mock_db, override_settings):
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
@@ -62,20 +62,20 @@ class TestGetDividendSummary:
         redis.get = AsyncMock(return_value=None)
         redis.setex = AsyncMock()
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend.aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             await get_dividend_summary(uuid.uuid4(), mock_db, redis=redis)
 
         redis.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_rows_returns_zeros(self, mock_db, override_settings):
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        with patch("app.services.dividend_aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
+        with patch("app.services.dividend.aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
             result = await get_dividend_summary(uuid.uuid4(), mock_db)
 
         assert result["annual_received"] == 0.0

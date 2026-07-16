@@ -20,7 +20,7 @@ def mock_redis():
 
 async def _call_fetcher(ticker, market, redis, kis_creds=None, overrides=None, dart_key="test"):
     """fetch_ticker_dividend_info 호출 헬퍼."""
-    from app.services.dividend_fetcher import fetch_ticker_dividend_info
+    from app.services.dividend.fetcher import fetch_ticker_dividend_info
 
     sem = asyncio.Semaphore(1)
     return await fetch_ticker_dividend_info(
@@ -46,7 +46,7 @@ class TestFetchTickerDividendInfo:
             ]
         )
 
-        with patch("app.services.dividend_fetcher.sync_yahoo_dividend_info") as mock_yahoo:
+        with patch("app.services.dividend.fetcher.sync_yahoo_dividend_info") as mock_yahoo:
             result = await _call_fetcher("AAPL", "NASDAQ", mock_redis)
 
         mock_yahoo.assert_not_called()
@@ -62,10 +62,10 @@ class TestFetchTickerDividendInfo:
 
         with (
             patch(
-                "app.services.dividend_fetcher.sync_yahoo_dividend_info",
+                "app.services.dividend.fetcher.sync_yahoo_dividend_info",
                 return_value={"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None},
             ),
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[]) as mock_months,
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]) as mock_months,
         ):
             loop_mock = MagicMock()
             loop_mock.run_in_executor = AsyncMock(side_effect=lambda _, fn, *args: fn(*args) if callable(fn) else None)
@@ -93,9 +93,9 @@ class TestFetchTickerDividendInfo:
         loop_mock.run_in_executor = fake_executor
 
         with (
-            patch("app.services.dividend_fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
-            patch("app.services.dividend_fetcher.sync_naver_stock_dividend_info") as mock_naver,
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
+            patch("app.services.dividend.fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
+            patch("app.services.dividend.fetcher.sync_naver_stock_dividend_info") as mock_naver,
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
             result = await _call_fetcher("AAPL", "NASDAQ", mock_redis)
@@ -106,7 +106,7 @@ class TestFetchTickerDividendInfo:
     @pytest.mark.asyncio
     async def test_known_schedule_used_directly(self, mock_redis, override_settings):
         """KNOWN_DIVIDEND_SCHEDULES에 있는 종목은 배당월 직접 사용."""
-        from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES
+        from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES
 
         # Find a ticker in KNOWN_DIVIDEND_SCHEDULES
         if not KNOWN_DIVIDEND_SCHEDULES:
@@ -129,8 +129,8 @@ class TestFetchTickerDividendInfo:
         loop_mock.run_in_executor = fake_executor
 
         with (
-            patch("app.services.dividend_fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[]),
+            patch("app.services.dividend.fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
             result = await _call_fetcher(known_ticker, known_market, mock_redis)
@@ -155,8 +155,8 @@ class TestFetchTickerDividendInfo:
         loop_mock.run_in_executor = fake_executor
 
         with (
-            patch("app.services.dividend_fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
-            patch("app.services.dividend_fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
+            patch("app.services.dividend.fetcher.sync_yahoo_dividend_info", return_value=yahoo_result),
+            patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
             await _call_fetcher("AAPL", "NASDAQ", mock_redis)

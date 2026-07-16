@@ -10,8 +10,8 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import UserSettings
+from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
-from app.services.dividend_aggregator import get_dividend_summary
 
 _YEARLY_HISTORY_YEARS = 5
 

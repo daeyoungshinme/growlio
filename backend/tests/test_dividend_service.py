@@ -12,18 +12,18 @@ class TestGetDividendSummary:
     @pytest.mark.asyncio
     async def test_returns_zero_when_no_transactions(self, mock_db, override_settings):
         """배당 내역 없으면 연간 수령액 0, 예상 배당금 0."""
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
 
         with (
             patch(
-                "app.services.dividend_aggregator._fetch_dividend_aggregates",
+                "app.services.dividend.aggregator._fetch_dividend_aggregates",
                 new_callable=AsyncMock,
                 return_value=(0.0, [], []),
             ),
             patch(
-                "app.services.dividend_aggregator.get_ticker_dividend_summary",
+                "app.services.dividend.aggregator.get_ticker_dividend_summary",
                 new_callable=AsyncMock,
                 return_value=[],
             ),
@@ -37,18 +37,18 @@ class TestGetDividendSummary:
     @pytest.mark.asyncio
     async def test_sums_annual_received_correctly(self, mock_db, override_settings):
         """_fetch_dividend_aggregates 결과가 annual_received에 반영된다."""
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
 
         with (
             patch(
-                "app.services.dividend_aggregator._fetch_dividend_aggregates",
+                "app.services.dividend.aggregator._fetch_dividend_aggregates",
                 new_callable=AsyncMock,
                 return_value=(80_000.0, [], []),
             ),
             patch(
-                "app.services.dividend_aggregator.get_ticker_dividend_summary",
+                "app.services.dividend.aggregator.get_ticker_dividend_summary",
                 new_callable=AsyncMock,
                 return_value=[],
             ),
@@ -60,7 +60,7 @@ class TestGetDividendSummary:
     @pytest.mark.asyncio
     async def test_estimated_annual_from_ticker_summaries(self, mock_db, override_settings):
         """ticker_summaries의 estimated_annual_krw 합계가 estimated_annual에 반영된다."""
-        from app.services.dividend_aggregator import get_dividend_summary
+        from app.services.dividend.aggregator import get_dividend_summary
 
         user_id = uuid.uuid4()
         ticker_data = [
@@ -70,12 +70,12 @@ class TestGetDividendSummary:
 
         with (
             patch(
-                "app.services.dividend_aggregator._fetch_dividend_aggregates",
+                "app.services.dividend.aggregator._fetch_dividend_aggregates",
                 new_callable=AsyncMock,
                 return_value=(0.0, [], []),
             ),
             patch(
-                "app.services.dividend_aggregator.get_ticker_dividend_summary",
+                "app.services.dividend.aggregator.get_ticker_dividend_summary",
                 new_callable=AsyncMock,
                 return_value=ticker_data,
             ),
@@ -93,7 +93,7 @@ class TestDividendMonthPrediction:
 
     def test_known_schedule_produces_months(self):
         """하드코딩된 종목 배당월 목록이 정수 리스트인지 확인."""
-        from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES
+        from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES
 
         for key, months in KNOWN_DIVIDEND_SCHEDULES.items():
             assert isinstance(months, list)

@@ -17,15 +17,15 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.config import settings
+from app.core.config import settings
+from app.core.redis_client import get_redis
 from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
-from app.redis_client import get_redis
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.calculator import calculate_position_dividend
-from app.services.dividend_constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
-from app.services.dividend_fetcher import fetch_ticker_dividend_info
+from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
+from app.services.dividend.fetcher import fetch_ticker_dividend_info
 from app.utils.cache_keys import (
     TTL_DART,
     TTL_DIVIDEND_INFO,

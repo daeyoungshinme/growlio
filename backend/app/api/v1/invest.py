@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
 from app.schemas.invest import DCAAnalysisResponse
-from app.services import dca_service, dividend_plan_service
+from app.services import dca_service
+from app.services.dividend import plan_service as dividend_plan_service
 
 router = APIRouter(prefix="/invest", tags=["invest"])
 

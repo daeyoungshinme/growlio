@@ -8,7 +8,7 @@ from __future__ import annotations
 import structlog
 
 from app.constants import DOMESTIC_MARKETS
-from app.services.dividend_constants import is_korean_etf
+from app.services.dividend.constants import is_korean_etf
 
 logger = structlog.get_logger()
 

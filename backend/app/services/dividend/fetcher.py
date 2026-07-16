@@ -15,12 +15,12 @@ from redis.asyncio import Redis as AioRedis
 from app.constants import DOMESTIC_MARKETS
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
 from app.services.dart_service import fetch_dart_dividend
-from app.services.dividend_constants import (
+from app.services.dividend.constants import (
     KNOWN_DIVIDEND_INFO,
     KNOWN_DIVIDEND_SCHEDULES,
     is_korean_etf,
 )
-from app.services.dividend_sync_sources import (
+from app.services.dividend.sync_sources import (
     sync_fdr_etf_dividend_info,
     sync_fetch_dividend_months,
     sync_naver_etf_dividend_info,

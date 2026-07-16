@@ -7,9 +7,10 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db
+from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
-from app.redis_client import get_redis
+from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.drip_service import calc_monthly_optimization
 from app.services.dividend.orchestrator import (
     delete_ticker_settings,
@@ -18,7 +19,6 @@ from app.services.dividend.orchestrator import (
     get_ticker_settings,
     upsert_ticker_settings,
 )
-from app.services.dividend_aggregator import get_dividend_summary
 from app.utils.cache_keys import (
     TTL_DIVIDENDS_POSITIONS,
     dividends_positions_key,

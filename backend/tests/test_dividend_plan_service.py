@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.dividend_plan_service import _calc_monthly_projected, get_dividend_plan
+from app.services.dividend.plan_service import _calc_monthly_projected, get_dividend_plan
 
 # ---------------------------------------------------------------------------
 # _calc_monthly_projected 순수 함수 테스트
@@ -135,11 +135,11 @@ class TestGetDividendPlan:
 
         with (
             patch(
-                "app.services.dividend_plan_service.get_ticker_dividend_summary",
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
                 AsyncMock(return_value=TICKER_SUMMARIES),
             ),
             patch(
-                "app.services.dividend_plan_service.get_dividend_summary",
+                "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
@@ -162,11 +162,11 @@ class TestGetDividendPlan:
 
         with (
             patch(
-                "app.services.dividend_plan_service.get_ticker_dividend_summary",
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
                 AsyncMock(return_value=TICKER_SUMMARIES),
             ),
             patch(
-                "app.services.dividend_plan_service.get_dividend_summary",
+                "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
@@ -184,11 +184,11 @@ class TestGetDividendPlan:
 
         with (
             patch(
-                "app.services.dividend_plan_service.get_ticker_dividend_summary",
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
                 AsyncMock(return_value=[]),
             ),
             patch(
-                "app.services.dividend_plan_service.get_dividend_summary",
+                "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value={"annual_received": 0, "monthly_breakdown": []}),
             ),
         ):
@@ -207,11 +207,11 @@ class TestGetDividendPlan:
 
         with (
             patch(
-                "app.services.dividend_plan_service.get_ticker_dividend_summary",
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
                 AsyncMock(return_value=TICKER_SUMMARIES),
             ),
             patch(
-                "app.services.dividend_plan_service.get_dividend_summary",
+                "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
@@ -234,11 +234,11 @@ class TestGetDividendPlan:
 
         with (
             patch(
-                "app.services.dividend_plan_service.get_ticker_dividend_summary",
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
                 AsyncMock(return_value=[]),
             ),
             patch(
-                "app.services.dividend_plan_service.get_dividend_summary",
+                "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value={"annual_received": 0, "monthly_breakdown": []}),
             ),
         ):
