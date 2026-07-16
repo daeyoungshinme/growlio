@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import ANY, AsyncMock, MagicMock
 
 from fastapi.testclient import TestClient
 
@@ -344,4 +344,5 @@ class TestTriggerAccountRebalancingAlertTest:
             user_id=user.id,
             db=db,
             account_id=account_id,
+            redis=ANY,
         )
