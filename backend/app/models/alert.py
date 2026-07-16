@@ -17,7 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
 
-from app.database import Base
+from app.core.database import Base
 
 
 class _AlertMixin:
@@ -113,6 +113,9 @@ class RebalancingAlert(_AlertMixin, Base):
             postgresql_where=text("alert_scope = 'PER_ACCOUNT'"),
         ),
         Index("idx_rebalancing_alerts_user_active", "user_id", "is_active"),
+        # 10분/5분 간격 스케줄 job(check_rebalancing_alerts/_run_auto_execution)은 user_id
+        # 조건 없이 전체 활성 알림을 스캔하므로, user_id가 선두인 위 인덱스로는 서빙되지 않는다.
+        Index("idx_rebalancing_alerts_active_mode", "is_active", "mode"),
     )
 
 
