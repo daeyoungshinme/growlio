@@ -106,8 +106,6 @@ __all__ = [  # noqa: F822
     "check_and_trigger_stock_price_alerts",
     "check_rebalancing_alerts",
     "send_test_rebalancing_alert",
-    "build_rebalancing_orders",
-    "refresh_live_prices",
 ]
 
 
@@ -128,8 +126,4 @@ def __getattr__(name: str):
         from app.services.rebalancing.alert_test import send_test_rebalancing_alert
 
         return send_test_rebalancing_alert
-    if name in ("build_rebalancing_orders", "refresh_live_prices"):
-        import app.services.rebalancing.order_builder as _order_builder
-
-        return getattr(_order_builder, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

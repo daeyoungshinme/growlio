@@ -12,7 +12,7 @@ from app.providers.base import BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.schemas.rebalancing import KisBalancePosition, KisBalanceResponse
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt_kis_credentials
 
 logger = structlog.get_logger()
 
@@ -41,8 +41,10 @@ async def fetch_broker_balance(
     orderable_krw: float | None = None
     if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
         try:
-            app_key = decrypt(account.kis_app_key)
-            app_secret = decrypt(account.kis_app_secret)
+            creds = decrypt_kis_credentials(account)
+            if creds is None:
+                raise ValueError("KIS credentials are not configured for this account")
+            app_key, app_secret = creds
             access_token = await get_access_token(
                 app_key,
                 app_secret,

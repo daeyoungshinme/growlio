@@ -17,6 +17,7 @@ import {
 } from "@/constants/assets";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
 import { usePortfolioItemsEditor } from "@/hooks/usePortfolioItemsEditor";
 import { inferHorizonTaxTypeFromAccounts } from "@/utils/portfolio";
@@ -134,7 +135,7 @@ export default function UnifiedPortfolioEditor({
             <button
               onClick={onClose}
               aria-label="닫기"
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-gray-800 rounded-lg transition-colors`}
             >
               <X size={18} />
             </button>
@@ -164,7 +165,10 @@ export default function UnifiedPortfolioEditor({
                   { value: BASE_TYPE_STOCK_ONLY, label: "주식 자산만" },
                   { value: BASE_TYPE_TOTAL_ASSETS, label: "전체 자산" },
                 ].map(({ value, label }) => (
-                  <label key={value} className="flex items-center gap-2 cursor-pointer">
+                  <label
+                    key={value}
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-2 cursor-pointer`}
+                  >
                     <input
                       type="radio"
                       name="baseType"
@@ -233,7 +237,7 @@ export default function UnifiedPortfolioEditor({
                         qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview),
                       )
                     }
-                    className="flex items-center gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors"
+                    className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors`}
                     title="현재 보유 종목을 현재 비중으로 자동 채웁니다"
                   >
                     <Wand2 size={12} /> 현재 보유 종목으로 채우기
@@ -274,28 +278,28 @@ export default function UnifiedPortfolioEditor({
               <div className="flex flex-wrap gap-2 mt-3">
                 <button
                   onClick={addItem}
-                  className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-700 px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-sm text-blue-600 hover:text-blue-700 px-2 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors`}
                 >
                   <Plus size={14} /> 종목 추가
                 </button>
                 <button
                   onClick={addCash}
                   disabled={items.some((i) => i.ticker === "CASH")}
-                  className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40"
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40`}
                 >
                   <Plus size={14} /> 현금 추가
                 </button>
                 <button
                   onClick={addRealEstate}
                   disabled={items.some((i) => i.market === "KR_PROPERTY")}
-                  className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700 px-2 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40"
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-sm text-amber-600 hover:text-amber-700 px-2 py-1.5 rounded-lg hover:bg-amber-50 transition-colors disabled:opacity-40`}
                 >
                   <Plus size={14} /> 부동산 추가
                 </button>
                 <button
                   onClick={addCashEquivalent}
                   disabled={items.some((i) => i.ticker === CASH_EQUIVALENT_TICKER)}
-                  className="flex items-center gap-1 text-sm text-teal-600 hover:text-teal-700 px-2 py-1.5 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40"
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-sm text-teal-600 hover:text-teal-700 px-2 py-1.5 rounded-lg hover:bg-teal-50 transition-colors disabled:opacity-40`}
                 >
                   <Plus size={14} /> 현금성 자산 추가
                 </button>
@@ -317,14 +321,14 @@ export default function UnifiedPortfolioEditor({
           <div className="flex gap-3 px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4 border-t border-gray-100 dark:border-gray-700 shrink-0">
             <button
               onClick={onClose}
-              className="flex-1 sm:flex-none px-5 py-2.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-1 sm:flex-none px-5 py-2.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
             >
               취소
             </button>
             <button
               onClick={handleSubmit}
               disabled={!name.trim() || !weightOk || saving}
-              className="flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 sm:py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} flex-1 sm:flex-none bg-blue-600 text-white px-5 py-2.5 sm:py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors`}
             >
               {saving ? "저장 중..." : "저장"}
             </button>

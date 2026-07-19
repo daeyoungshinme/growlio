@@ -75,7 +75,8 @@ async def generate_insights(
 
     try:
         dashboard = await get_dashboard_summary(user_id, db, redis)
-    except Exception:
+    except Exception as e:
+        logger.warning("insight_dashboard_summary_failed", user_id=str(user_id), error=str(e))
         dashboard = {}
 
     results = await asyncio.gather(

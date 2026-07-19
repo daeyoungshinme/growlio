@@ -7,7 +7,7 @@ from app.core.database import AsyncSessionLocal
 from app.core.redis_client import get_redis
 from app.kis.auth import _fetch_and_store_token
 from app.models.asset import AssetAccount
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt_kis_credentials
 
 logger = structlog.get_logger()
 
@@ -33,8 +33,15 @@ async def refresh_all_user_tokens() -> None:
     async def _refresh_one(account: AssetAccount) -> None:
         async with sem:
             try:
-                app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
-                app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
+                creds = decrypt_kis_credentials(account)
+                if creds is None:
+                    logger.warning(
+                        "kis_account_token_refresh_skipped",
+                        account_id=str(account.id),
+                        reason="missing_credentials",
+                    )
+                    return
+                app_key, app_secret = creds
                 async with AsyncSessionLocal() as db:
                     await _fetch_and_store_token(
                         app_key,

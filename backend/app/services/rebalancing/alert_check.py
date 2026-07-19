@@ -110,6 +110,7 @@ async def _process_rebalancing_alert(
     email: str,
     composite_level: str,
     db: AsyncSession,
+    data_freshness: str = "LIVE",
     fcm_token: str | None = None,
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
@@ -138,11 +139,12 @@ async def _process_rebalancing_alert(
     # 시장 신호 기반 자동 실행 게이트
     if mode == "AUTO":
         market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-        if is_market_signal_blocking_auto_mode(market_mode, composite_level):
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
             logger.info(
                 "rebalancing_auto_skipped_market_signal",
                 alert_id=str(alert.id),
                 composite_level=composite_level,
+                data_freshness=data_freshness,
                 market_condition_mode=market_mode,
             )
             mode = "NOTIFY"
@@ -205,16 +207,21 @@ async def _process_rebalancing_alert(
     return any_sent
 
 
-async def _get_composite_level(redis) -> str:
-    """전체 알림 루프에서 공용으로 쓸 시장 신호 등급을 1회 조회한다 (실패 시 GREEN 안전 폴백)."""
+async def _get_composite_level(redis) -> tuple[str, str]:
+    """전체 알림 루프에서 공용으로 쓸 시장 신호 등급을 1회 조회한다.
+
+    조회 자체가 실패하면 (composite_level="GREEN", data_freshness="STALE")로 폴백한다 —
+    composite_level만 보면 "안전"으로 오인되므로, data_freshness="STALE"을 함께 반환해
+    `is_market_signal_blocking_auto_mode`가 AUTO를 보수적으로 차단할 수 있게 한다.
+    """
     from app.services.market_signal_service import get_market_signal
 
     try:
         market_signal = await get_market_signal(redis)
-        return market_signal.get("composite_level", "GREEN")
+        return market_signal.get("composite_level", "GREEN"), market_signal.get("data_freshness", "LIVE")
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_alert_check", error=str(exc))
-        return "GREEN"
+        return "GREEN", "STALE"
 
 
 def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is_schedule_day: bool) -> bool:
@@ -306,7 +313,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
     _redis = await get_redis()
     # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
-    composite_level = await _get_composite_level(_redis)
+    composite_level, market_data_freshness = await _get_composite_level(_redis)
 
     result = await db.execute(
         select(
@@ -370,6 +377,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             threshold=threshold,
             email=email,
             composite_level=composite_level,
+            data_freshness=market_data_freshness,
             db=db,
             fcm_token=fcm_token,
             is_composite_triggered=is_composite_triggered,

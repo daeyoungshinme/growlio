@@ -2,7 +2,10 @@ import { Trash2 } from "lucide-react";
 import type { StockSuggestion } from "@/api/assets";
 import type { PortfolioItem } from "@/api/portfolios";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
-import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import {
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 
 interface Props {
   item: PortfolioItem;
@@ -75,7 +78,7 @@ export default function PortfolioItemRow({
           <button
             type="button"
             onClick={() => onStartEditing(idx)}
-            className="text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap flex-shrink-0`}
           >
             변경
           </button>

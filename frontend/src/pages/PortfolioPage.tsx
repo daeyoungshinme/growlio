@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
 import { syncAllAccounts } from "@/api/assets";
@@ -41,7 +41,6 @@ type Tab = (typeof TABS)[number];
 
 export default function PortfolioPage() {
   const qc = useQueryClient();
-  const navigate = useNavigate();
 
   const handleRefresh = useCallback(async () => {
     await invalidateSyncData(qc);
@@ -50,15 +49,6 @@ export default function PortfolioPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const rawTab = searchParams.get("portfolioTab");
-
-  // 구 "포트폴리오 분석" 탭 URL → /rebalancing 리다이렉트
-  useEffect(() => {
-    if (rawTab === "포트폴리오 분석") {
-      const portfolioId = searchParams.get("portfolioId");
-      const target = portfolioId ? `/rebalancing?portfolioId=${portfolioId}` : "/rebalancing";
-      navigate(target, { replace: true });
-    }
-  }, [rawTab, searchParams, navigate]);
 
   const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : "종목 현황";
 

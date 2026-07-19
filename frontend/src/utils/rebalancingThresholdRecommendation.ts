@@ -1,6 +1,6 @@
 import type { AccountTaxType, InvestmentHorizon } from "@/api/assets";
 
-// 백엔드 backend/app/services/rebalancing_order_builder.py::recommend_drift_threshold_pct와 동기화 유지.
+// 이 로직은 프론트에서만 관리되는 단일 소스(백엔드에 대응 함수 없음, 알림 생성 폼 초기값 제안 전용).
 const HORIZON_THRESHOLD_ADJUSTMENT: Record<InvestmentHorizon, number> = {
   SHORT_TERM: -1.5,
   MID_TERM: 0,

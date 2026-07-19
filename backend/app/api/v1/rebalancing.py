@@ -48,6 +48,13 @@ from app.services.rebalancing.service import (
     analyze_rebalancing,
     compute_portfolio_drift_summary,
 )
+from app.utils.cache_keys import (
+    TTL_REBALANCING_ANALYSIS,
+    get_cached_json,
+    portfolio_overview_acct_suffix,
+    rebalancing_analysis_key,
+    set_cached_json,
+)
 
 router = APIRouter(prefix="/rebalancing", tags=["rebalancing"])
 logger = structlog.get_logger()
@@ -81,6 +88,14 @@ async def analyze_portfolio(
 
     portfolio_acct_ids = [uuid.UUID(aid) for aid in portfolio.account_ids] if portfolio.account_ids else None
     effective_ids = account_ids if account_ids is not None else portfolio_acct_ids
+
+    cache_key = rebalancing_analysis_key(
+        current_user.id, portfolio_id, portfolio_overview_acct_suffix(effective_ids), deposit_krw_override
+    )
+    cached = await get_cached_json(redis, cache_key)
+    if cached is not None:
+        return RebalancingAnalysis.model_validate(cached)
+
     overview, base_dividend_items = await asyncio.gather(
         build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis),
         get_ticker_dividend_summary(current_user.id, db),
@@ -136,6 +151,7 @@ async def analyze_portfolio(
         logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
         analysis.diagnosis_context = None
 
+    await set_cached_json(redis, cache_key, analysis.model_dump(mode="json"), TTL_REBALANCING_ANALYSIS)
     return analysis
 
 

@@ -2,9 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, render, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderWithProviders } from "@/test/renderWithProviders";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
-import DividendSection from "@/components/dashboard/DividendSection";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
 
@@ -195,73 +193,5 @@ describe("InvestmentGoalCard", () => {
     fireEvent.click(screen.getByText("달성 예상일 · 진행 상세"));
     // 펼침 후에는 모바일 상세 블록도 렌더되어 2곳에 존재
     expect(screen.getAllByText("실제 달성 예상")).toHaveLength(2);
-  });
-});
-
-describe("DividendSection", () => {
-  it("모든 배당 항목을 표시한다", () => {
-    renderWithProviders(
-      <DividendSection
-        annualReceived={500000}
-        estimatedAnnual={600000}
-        estimatedMonthly={50000}
-        overallDividendYield={2.5}
-      />,
-    );
-    expect(screen.getByText("연간 배당금")).toBeInTheDocument();
-    expect(screen.getByText("실제 배당금")).toBeInTheDocument();
-    expect(screen.getByText("월별 배당금")).toBeInTheDocument();
-  });
-
-  it("estimatedAnnual이 null이면 연간 배당금을 '—'로 표시한다", () => {
-    renderWithProviders(
-      <DividendSection annualReceived={null} estimatedAnnual={null} estimatedMonthly={null} />,
-    );
-    const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("estimatedAnnual > 0이면 수익률도 함께 표시한다", () => {
-    renderWithProviders(
-      <DividendSection
-        annualReceived={500000}
-        estimatedAnnual={600000}
-        estimatedMonthly={50000}
-        overallDividendYield={2.5}
-      />,
-    );
-    expect(screen.getByText("(2.50%)")).toBeInTheDocument();
-  });
-
-  it("overallDividendYield가 없으면 수익률을 표시하지 않는다", () => {
-    renderWithProviders(
-      <DividendSection
-        annualReceived={500000}
-        estimatedAnnual={600000}
-        estimatedMonthly={50000}
-        overallDividendYield={null}
-      />,
-    );
-    expect(screen.queryByText(/%\)/)).toBeNull();
-  });
-
-  it("estimatedAnnual이 0이면 연간 배당금을 '—'로 표시한다", () => {
-    renderWithProviders(
-      <DividendSection annualReceived={0} estimatedAnnual={0} estimatedMonthly={0} />,
-    );
-    const dashes = screen.getAllByText("—");
-    expect(dashes.length).toBeGreaterThanOrEqual(3);
-  });
-
-  it("isLoading이 true이면 스켈레톤을 표시한다", () => {
-    const { container } = renderWithProviders(
-      <DividendSection
-        annualReceived={null}
-        estimatedAnnual={null}
-        estimatedMonthly={null}
-        isLoading
-      />,
-    );
-    expect(container.firstChild).toBeDefined();
   });
 });

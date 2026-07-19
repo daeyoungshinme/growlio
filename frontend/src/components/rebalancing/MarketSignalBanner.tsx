@@ -11,6 +11,7 @@ import type {
   DollarIndexLevel,
   RateCutExpectationLevel,
   ExchangeRateLevel,
+  OilPriceLevel,
 } from "@/api/marketSignals";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
@@ -171,6 +172,27 @@ const EXCHANGE_HINT: Record<ExchangeRateLevel, string> = {
   ELEVATED: "원화 약세 전환 모니터링",
   HIGH: "해외자산 환차익 유리, 원화 약세 우려",
   BREAKOUT: "20일선 상향 돌파, 환헤지 비중 점검",
+};
+
+const OIL_DOT: Record<OilPriceLevel, string> = {
+  NORMAL: "bg-green-500",
+  ELEVATED: "bg-yellow-500",
+  HIGH: "bg-orange-500",
+  BREAKOUT: "bg-red-500",
+};
+
+const OIL_LABEL: Record<OilPriceLevel, string> = {
+  NORMAL: "안정",
+  ELEVATED: "변동 확대",
+  HIGH: "급변동",
+  BREAKOUT: "급변동 심화",
+};
+
+const OIL_HINT: Record<OilPriceLevel, string> = {
+  NORMAL: "유가 안정 국면",
+  ELEVATED: "유가 변동성 확대 모니터링",
+  HIGH: "인플레이션·경기 우려 확대",
+  BREAKOUT: "20일선 대비 급등락, 에너지·인플레이션 민감 자산 점검",
 };
 
 function scoreColor(level: MarketRiskLevel): string {
@@ -377,6 +399,31 @@ export default function MarketSignalBanner({ signal }: Props) {
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {EXCHANGE_HINT[signals.exchange_rate.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 유가 (WTI, 급등/급락 모두 위험 신호) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              유가(WTI)
+            </span>
+            {signals.oil_price ? (
+              <>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${OIL_DOT[signals.oil_price.level]}`}
+                />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  ${signals.oil_price.value.toFixed(1)} ·{" "}
+                  {signals.oil_price.deviation_pct >= 0 ? "+" : ""}
+                  {signals.oil_price.deviation_pct.toFixed(1)}% ·{" "}
+                  {OIL_LABEL[signals.oil_price.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {OIL_HINT[signals.oil_price.level]}
                 </span>
               </>
             ) : (

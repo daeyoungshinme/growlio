@@ -311,48 +311,56 @@ describe("ResetPasswordPage", () => {
 describe("RebalancingTable", () => {
   it("renders without crash with items", () => {
     renderWithProviders(
-      <RebalancingTable
-        analysis={mockAnalysis}
-        portfolioId="p1"
-        accounts={[mockAccount]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
 
   it("shows ticker in table", () => {
     renderWithProviders(
-      <RebalancingTable
-        analysis={mockAnalysis}
-        portfolioId="p1"
-        accounts={[mockAccount]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getAllByText("AAPL").length).toBeGreaterThan(0);
   });
 
   it("shows Apple Inc name", () => {
     renderWithProviders(
-      <RebalancingTable
-        analysis={mockAnalysis}
-        portfolioId="p1"
-        accounts={[mockAccount]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(screen.getAllByText("Apple Inc.").length).toBeGreaterThan(0);
   });
 
   it("renders with account provided", () => {
     renderWithProviders(
-      <RebalancingTable
-        analysis={mockAnalysis}
-        portfolioId="p1"
-        accounts={[mockAccount]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[mockAccount]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
@@ -360,24 +368,28 @@ describe("RebalancingTable", () => {
   it("renders with empty items", () => {
     const emptyAnalysis = { ...mockAnalysis, items: [] };
     renderWithProviders(
-      <RebalancingTable
-        analysis={emptyAnalysis}
-        portfolioId="p1"
-        accounts={[]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={emptyAnalysis}
+          portfolioId="p1"
+          accounts={[]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });
 
   it("renders with no accounts", () => {
     renderWithProviders(
-      <RebalancingTable
-        analysis={mockAnalysis}
-        portfolioId="p1"
-        accounts={[]}
-        onExecuted={vi.fn()}
-      />,
+      <MemoryRouter>
+        <RebalancingTable
+          analysis={mockAnalysis}
+          portfolioId="p1"
+          accounts={[]}
+          onExecuted={vi.fn()}
+        />
+      </MemoryRouter>,
     );
     expect(document.body).toBeDefined();
   });

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { RebalancingAnalysis } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { DividendDiffCell } from "./RebalancingCells";
@@ -23,16 +24,24 @@ export default function RebalancingDividendSection({ analysis }: Props) {
 
   return (
     <div className="bg-gray-100 dark:bg-gray-700/50 rounded-xl p-4 space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div className="text-sm font-medium text-gray-800 dark:text-gray-200">배당 분석</div>
-        {dividendItems.length > 0 && (
-          <button
-            onClick={() => setShowDividendDetail((v) => !v)}
-            className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+        <div className="flex items-center gap-3 shrink-0">
+          <Link
+            to="/invest-plan?tab=배당 계획"
+            className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
-            {showDividendDetail ? "▲ 접기" : "▼ 종목별 상세"}
-          </button>
-        )}
+            배당 목표 확인
+          </Link>
+          {dividendItems.length > 0 && (
+            <button
+              onClick={() => setShowDividendDetail((v) => !v)}
+              className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            >
+              {showDividendDetail ? "▲ 접기" : "▼ 종목별 상세"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 요약 카드 */}

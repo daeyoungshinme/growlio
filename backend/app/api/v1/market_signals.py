@@ -31,6 +31,7 @@ async def get_market_signal_endpoint(
     - signals.dollar_index: 달러 인덱스 20일선 이격도 + 레벨
     - signals.rate_cut_expectation: 2Y-FEDFUNDS 스프레드 기반 금리인하 기대 레벨
     - signals.exchange_rate: 원/달러 환율(DEXKOUS) 20일선 이격도 + 레벨 (예측치 아님, 참고 지표)
+    - signals.oil_price: WTI 현물유가(DCOILWTICO) 20일선 이격도 + 레벨 (급등/급락 모두 위험 신호)
     - fear_greed_contrarian_buy: F&G 25 이하 시 역발상 매수 기회 플래그
     - data_freshness: LIVE | CACHED | PARTIAL | STALE
     """

@@ -1,6 +1,7 @@
 import { apiGet, apiPost } from "./client";
 import type { GoalRiskTolerance } from "./settings";
 import type { AccountTaxType } from "./assets";
+import type { MarketRiskLevel } from "./marketSignals";
 
 export interface RebalancingItem {
   ticker: string;
@@ -291,6 +292,7 @@ export interface GoalRecommendation {
   cagr_lookback_years: number;
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
+  market_signal_level: MarketRiskLevel | null;
 }
 
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
@@ -311,6 +313,7 @@ export interface HorizonGoalRecommendation {
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
   includes_cash_equivalent: boolean;
+  market_signal_level: MarketRiskLevel | null;
   note: string | null;
 }
 

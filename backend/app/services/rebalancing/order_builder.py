@@ -124,45 +124,27 @@ async def refresh_live_prices(
                 item.shares_to_trade = target_qty - (item.current_qty or 0)
 
 
-def is_market_signal_blocking_auto_mode(market_condition_mode: str, composite_level: str) -> bool:
+def is_market_signal_blocking_auto_mode(
+    market_condition_mode: str, composite_level: str, data_freshness: str = "LIVE"
+) -> bool:
     """AUTO 모드에서 시장 신호 등급이 `market_condition_mode` 게이트를 위반하는지 판정한다.
 
-    드리프트 알림 체크(`rebalancing/alert_check.py`)와 AUTO 플랜 생성 job
-    (`jobs/rebalancing_auto_execution.py`)이 동일한 판정 로직을 각각 인라인 구현하던 것을
-    단일화한 순수 함수 — 로깅은 각 호출부 책임으로 남긴다.
+    드리프트 알림 체크(`rebalancing/alert_check.py`), AUTO 플랜 생성 job
+    (`jobs/rebalancing_auto_execution.py`), 원클릭 실행(`api/v1/rebalancing_execution.py`)이
+    동일한 판정 로직을 공유하는 단일화된 순수 함수 — 로깅은 각 호출부 책임으로 남긴다.
+
+    `data_freshness == "STALE"`(시장 신호를 신뢰할 수 있을 만큼 조회하지 못한 상태 —
+    FRED_API_KEY 미설정, 전면 장애 등)이면 CAUTIOUS/STRICT에서 composite_level과 무관하게
+    차단한다. "판단 불가"를 "GREEN(안전)"으로 오인해 실행을 통과시키는 것을 막기 위함 —
+    DISABLED는 애초에 시장 신호를 보지 않으므로 영향받지 않는다.
     """
+    if market_condition_mode == "DISABLED":
+        return False
+    if data_freshness == "STALE":
+        return True
     return (market_condition_mode == "CAUTIOUS" and composite_level == "RED") or (
         market_condition_mode == "STRICT" and composite_level in ("YELLOW", "RED")
     )
-
-
-_HORIZON_THRESHOLD_ADJUSTMENT = {
-    "SHORT_TERM": -1.5,
-    "MID_TERM": 0.0,
-    "LONG_TERM": 1.5,
-}
-_TAX_TYPE_BASE_THRESHOLD_PCT = {
-    "GENERAL": 5.0,
-    "ISA": 7.0,
-    "PENSION_SAVINGS": 7.0,
-    "IRP": 7.0,
-    "OVERSEAS_DEDICATED": 6.5,
-}
-_MIN_RECOMMENDED_THRESHOLD_PCT = 1.0
-_MAX_RECOMMENDED_THRESHOLD_PCT = 20.0
-
-
-def recommend_drift_threshold_pct(tax_type: str, investment_horizon: str) -> float:
-    """계좌 tax_type·investment_horizon 기반 PER_ACCOUNT 알림 임계값 추천치를 계산한다.
-
-    과세이연 계좌(ISA/연금저축/IRP)와 해외전용 계좌는 잦은 매매가 절세 혜택 훼손·FX비용·
-    양도세 유발로 이어지므로 기본 임계값을 넓힌다. 장기 성향은 더 넓게, 단기 성향은 더 좁게
-    조정한다. 어디까지나 알림 생성 UI의 초기값 제안이며, 사용자가 언제든 override 가능하고
-    drift 판정(`rebalancing/service.py`)이나 AUTO 게이트에는 관여하지 않는다.
-    """
-    base = _TAX_TYPE_BASE_THRESHOLD_PCT.get(tax_type, _TAX_TYPE_BASE_THRESHOLD_PCT["GENERAL"])
-    adjustment = _HORIZON_THRESHOLD_ADJUSTMENT.get(investment_horizon, 0.0)
-    return round(min(max(base + adjustment, _MIN_RECOMMENDED_THRESHOLD_PCT), _MAX_RECOMMENDED_THRESHOLD_PCT), 1)
 
 
 def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str, str]:

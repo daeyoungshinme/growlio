@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { AssetAccount, INVESTMENT_HORIZON_LABELS, InvestmentHorizon } from "@/api/assets";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Props {
   accounts: AssetAccount[];
@@ -61,12 +62,15 @@ export default function PortfolioAccountSelector({
             )}
             <div className="flex flex-wrap gap-x-3 sm:gap-x-5 gap-y-2">
               {group.accounts.map((acc) => (
-                <label key={acc.id} className="flex items-center gap-1.5 cursor-pointer">
+                <label
+                  key={acc.id}
+                  className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1.5 cursor-pointer`}
+                >
                   <input
                     type="checkbox"
                     checked={selectedAccountIds.has(acc.id)}
                     onChange={() => onToggleAccount(acc.id)}
-                    className="rounded text-blue-600"
+                    className="w-4 h-4 rounded text-blue-600 shrink-0"
                   />
                   <span className="text-sm text-gray-700 dark:text-gray-300">{acc.name}</span>
                   {acc.is_mock_mode && (

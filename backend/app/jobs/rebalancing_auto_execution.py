@@ -51,9 +51,11 @@ async def _run_auto_execution() -> None:
     try:
         _market_signal = await get_market_signal(redis)
         composite_level: str = _market_signal.get("composite_level", "GREEN")
+        data_freshness: str = _market_signal.get("data_freshness", "LIVE")
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_auto_execution", error=str(exc))
         composite_level = "GREEN"
+        data_freshness = "STALE"
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -78,11 +80,12 @@ async def _run_auto_execution() -> None:
 
             # 시장 신호 게이트 — 계획 생성 시점에만 확인한다(실행/승인 시점 재확인 안 함).
             market_mode = getattr(alert, "market_condition_mode", "DISABLED")
-            if is_market_signal_blocking_auto_mode(market_mode, composite_level):
+            if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
                 logger.info(
                     "rebalancing_auto_skipped_market_signal",
                     alert_id=str(alert.id),
                     composite_level=composite_level,
+                    data_freshness=data_freshness,
                 )
                 continue
 

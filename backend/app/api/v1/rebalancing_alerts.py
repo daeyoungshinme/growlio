@@ -51,6 +51,45 @@ def _reject_if_per_account_scope(portfolio: Portfolio) -> None:
         )
 
 
+async def _validate_auto_execution_account(db: AsyncSession, account_id: uuid.UUID, user_id: uuid.UUID) -> None:
+    """AUTO 모드 실행 계좌(account_id 지정됨)가 KIS 연동 계좌인지 검증한다. 아니면 422."""
+    exec_account = await db.scalar(
+        select(AssetAccount).where(AssetAccount.id == account_id, AssetAccount.user_id == user_id)
+    )
+    if not exec_account or exec_account.asset_type != "STOCK_KIS":
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="자동 실행 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
+        )
+
+
+def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -> None:
+    """AGGREGATE/PER_ACCOUNT 양쪽 upsert가 공유하는 필드 할당 — account_id/alert_scope는 호출부 책임."""
+    alert.threshold_pct = body.threshold_pct
+    alert.schedule_type = body.schedule_type
+    alert.schedule_day_of_week = body.schedule_day_of_week
+    alert.schedule_day_of_month = body.schedule_day_of_month
+    alert.trigger_condition = body.trigger_condition
+    alert.mode = body.mode
+    alert.strategy = body.strategy
+    alert.order_type = body.order_type
+    alert.market_condition_mode = body.market_condition_mode
+    alert.auto_execution_time = body.auto_execution_time
+    alert.notify_time = body.notify_time
+    alert.buy_wait_minutes = body.buy_wait_minutes
+    alert.is_active = True
+
+
+def _format_test_alert_message(email_sent: bool, push_sent: bool) -> str:
+    if email_sent and push_sent:
+        return "테스트 알림 발송 완료 (이메일 ✓, 푸시 ✓)"
+    if email_sent:
+        return "테스트 이메일 발송 완료 (FCM 미설정 또는 토큰 없음)"
+    if push_sent:
+        return "테스트 푸시 발송 완료 (SMTP 미설정)"
+    return "알림 채널 없음 — 이메일 또는 FCM 설정을 확인해주세요"
+
+
 def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
     return RebalancingAlertResponse(
         id=alert.id,
@@ -129,55 +168,14 @@ async def upsert_rebalancing_alert(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="자동 실행 모드에는 KIS 연동 계좌를 선택해야 합니다",
             )
-        exec_account = await db.scalar(
-            select(AssetAccount).where(
-                AssetAccount.id == body.account_id,
-                AssetAccount.user_id == current_user.id,
-            )
-        )
-        if not exec_account or exec_account.asset_type != "STOCK_KIS":
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="자동 실행 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
-            )
+        await _validate_auto_execution_account(db, body.account_id, current_user.id)
 
     alert = await get_alert_by_portfolio(db, portfolio_id, current_user.id)
-    if alert:
-        alert.threshold_pct = body.threshold_pct
-        alert.schedule_type = body.schedule_type
-        alert.schedule_day_of_week = body.schedule_day_of_week
-        alert.schedule_day_of_month = body.schedule_day_of_month
-        alert.trigger_condition = body.trigger_condition
-        alert.mode = body.mode
-        alert.strategy = body.strategy
-        alert.account_id = body.account_id
-        alert.order_type = body.order_type
-        alert.market_condition_mode = body.market_condition_mode
-        alert.auto_execution_time = body.auto_execution_time
-        alert.notify_time = body.notify_time
-        alert.buy_wait_minutes = body.buy_wait_minutes
-        alert.is_active = True
-    else:
-        alert = RebalancingAlert(
-            user_id=current_user.id,
-            portfolio_id=portfolio_id,
-            alert_scope="AGGREGATE",
-            threshold_pct=body.threshold_pct,
-            schedule_type=body.schedule_type,
-            schedule_day_of_week=body.schedule_day_of_week,
-            schedule_day_of_month=body.schedule_day_of_month,
-            trigger_condition=body.trigger_condition,
-            mode=body.mode,
-            strategy=body.strategy,
-            account_id=body.account_id,
-            order_type=body.order_type,
-            market_condition_mode=body.market_condition_mode,
-            auto_execution_time=body.auto_execution_time,
-            notify_time=body.notify_time,
-            buy_wait_minutes=body.buy_wait_minutes,
-            is_active=True,
-        )
+    if not alert:
+        alert = RebalancingAlert(user_id=current_user.id, portfolio_id=portfolio_id, alert_scope="AGGREGATE")
         db.add(alert)
+    _apply_alert_fields(alert, body)
+    alert.account_id = body.account_id
 
     await db.commit()
     await db.refresh(alert)
@@ -215,15 +213,7 @@ async def trigger_rebalancing_alert_test(
 
     email_sent = result["email_sent"]
     push_sent = result["push_sent"]
-
-    if email_sent and push_sent:
-        message = "테스트 알림 발송 완료 (이메일 ✓, 푸시 ✓)"
-    elif email_sent:
-        message = "테스트 이메일 발송 완료 (FCM 미설정 또는 토큰 없음)"
-    elif push_sent:
-        message = "테스트 푸시 발송 완료 (SMTP 미설정)"
-    else:
-        message = "알림 채널 없음 — 이메일 또는 FCM 설정을 확인해주세요"
+    message = _format_test_alert_message(email_sent, push_sent)
 
     return TestAlertResponse(email_sent=email_sent, push_sent=push_sent, message=message)
 
@@ -305,54 +295,13 @@ async def upsert_account_rebalancing_alert(
         )
 
     if body.mode == "AUTO":
-        exec_account = await db.scalar(
-            select(AssetAccount).where(
-                AssetAccount.id == account_id,
-                AssetAccount.user_id == current_user.id,
-            )
-        )
-        if not exec_account or exec_account.asset_type != "STOCK_KIS":
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="자동 실행 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
-            )
+        await _validate_auto_execution_account(db, account_id, current_user.id)
 
     alert = await get_alert_by_portfolio_and_account(db, portfolio_id, account_id, current_user.id)
-    if alert:
-        alert.threshold_pct = body.threshold_pct
-        alert.schedule_type = body.schedule_type
-        alert.schedule_day_of_week = body.schedule_day_of_week
-        alert.schedule_day_of_month = body.schedule_day_of_month
-        alert.trigger_condition = body.trigger_condition
-        alert.mode = body.mode
-        alert.strategy = body.strategy
-        alert.order_type = body.order_type
-        alert.market_condition_mode = body.market_condition_mode
-        alert.auto_execution_time = body.auto_execution_time
-        alert.notify_time = body.notify_time
-        alert.buy_wait_minutes = body.buy_wait_minutes
-        alert.is_active = True
-    else:
-        alert = RebalancingAlert(
-            user_id=current_user.id,
-            portfolio_id=portfolio_id,
-            alert_scope="PER_ACCOUNT",
-            threshold_pct=body.threshold_pct,
-            schedule_type=body.schedule_type,
-            schedule_day_of_week=body.schedule_day_of_week,
-            schedule_day_of_month=body.schedule_day_of_month,
-            trigger_condition=body.trigger_condition,
-            mode=body.mode,
-            strategy=body.strategy,
-            order_type=body.order_type,
-            market_condition_mode=body.market_condition_mode,
-            auto_execution_time=body.auto_execution_time,
-            notify_time=body.notify_time,
-            buy_wait_minutes=body.buy_wait_minutes,
-            is_active=True,
-        )
+    if not alert:
+        alert = RebalancingAlert(user_id=current_user.id, portfolio_id=portfolio_id, alert_scope="PER_ACCOUNT")
         db.add(alert)
-
+    _apply_alert_fields(alert, body)
     # account_id는 PER_ACCOUNT 행에서 "분석 스코프 + AUTO 실행 계좌" 역할 — 항상 path의 계좌로 고정한다.
     alert.account_id = account_id
     alert.alert_scope = "PER_ACCOUNT"
@@ -407,14 +356,6 @@ async def trigger_account_rebalancing_alert_test(
 
     email_sent = result["email_sent"]
     push_sent = result["push_sent"]
-
-    if email_sent and push_sent:
-        message = "테스트 알림 발송 완료 (이메일 ✓, 푸시 ✓)"
-    elif email_sent:
-        message = "테스트 이메일 발송 완료 (FCM 미설정 또는 토큰 없음)"
-    elif push_sent:
-        message = "테스트 푸시 발송 완료 (SMTP 미설정)"
-    else:
-        message = "알림 채널 없음 — 이메일 또는 FCM 설정을 확인해주세요"
+    message = _format_test_alert_message(email_sent, push_sent)
 
     return TestAlertResponse(email_sent=email_sent, push_sent=push_sent, message=message)

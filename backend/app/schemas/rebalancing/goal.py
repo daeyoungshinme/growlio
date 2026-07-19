@@ -24,6 +24,7 @@ class GoalRecommendation(BaseModel):
     cagr_lookback_years: int = 10  # 기대수익률(CAGR) 산출 기간(년) — 진단화면 10년 고정 지표와 다를 수 있음
     risk_tolerance: str = "CONSERVATIVE"  # 적용된 리스크 성향 (CONSERVATIVE/BALANCED/AGGRESSIVE)
     max_weight_pct: float = 40.0  # 적용된 종목당 최대 비중(%)
+    market_signal_level: str | None = None  # GREEN|YELLOW|RED — 추천 비중 계산에 반영된 시장 위험 신호 등급
 
 
 class HorizonGoalRecommendation(BaseModel):
@@ -44,6 +45,7 @@ class HorizonGoalRecommendation(BaseModel):
     # recommended_items에 현금성 자산(CMA·파킹통장) 합성 항목이 포함돼 있는지(SHORT_TERM 전용).
     # True면 실제 매수 가능한 티커가 아니므로 프론트에서 포트폴리오 "적용" 버튼을 숨겨야 한다.
     includes_cash_equivalent: bool = False
+    market_signal_level: str | None = None  # GREEN|YELLOW|RED — 추천 비중 계산에 반영된 시장 위험 신호 등급
     note: str | None = None
 
 

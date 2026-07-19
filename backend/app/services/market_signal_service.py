@@ -1,5 +1,6 @@
 """시장 위험 신호 서비스 — VIX, 장단기 금리차(T10Y2Y), Fear & Greed Index,
-하이일드 스프레드, 달러 인덱스, 금리인하기대(2Y-FEDFUNDS 대체지표), 환율 방향성(DEXKOUS) 통합."""
+하이일드 스프레드, 달러 인덱스, 금리인하기대(2Y-FEDFUNDS 대체지표), 환율 방향성(DEXKOUS),
+유가(WTI) 통합."""
 
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ from app.utils.cache_keys import (
     market_signal_latest_key,
     set_cached_json,
 )
-from app.utils.circuit_breaker import CircuitBreaker, CircuitOpenError
+from app.utils.circuit_breaker import CircuitOpenError, fear_greed_circuit, fred_circuit
 from app.utils.redis_lock import single_flight_fetch
 
 logger = structlog.get_logger()
@@ -44,10 +45,8 @@ _FNG_LABEL_EN_MAP: dict[str, str] = {
     "EXTREME_GREED": "Extreme Greed",
 }
 
-# Fear & Greed API 전용 서킷브레이커 (3회 실패 → 120초 차단)
-fear_greed_circuit = CircuitBreaker("FearGreedAPI", fail_max=3, reset_timeout=120.0)
-# FRED API 서킷브레이커 — VIX·장단기금리차 공유 (4회 실패 → 300초 차단)
-fred_circuit = CircuitBreaker("FREDAPI", fail_max=4, reset_timeout=300.0)
+# Fear & Greed API 전용 서킷브레이커, FRED API 서킷브레이커(VIX·장단기금리차 공유)는
+# app/utils/circuit_breaker.py에서 생성 — 임계값은 config.py의 cb_fng_*/cb_fred_* 필드로 조정
 
 # ---------------------------------------------------------------------------
 # 개별 신호 조회
@@ -327,6 +326,59 @@ async def fetch_exchange_rate_signal(redis: aioredis.Redis | None = None) -> dic
     }
 
 
+async def fetch_oil_price_signal() -> dict[str, Any] | None:
+    """FRED DCOILWTICO(WTI 현물유가) 20일 이동평균 대비 이격도로 유가 급변동 위험을 판단한다.
+
+    달러 인덱스·환율 신호와 달리 방향(급등/급락) 상관없이 절대 이격도를 기준으로 삼는다 —
+    유가 급등(인플레이션·지정학 리스크)과 급락(수요 위축·경기침체 우려) 모두 위험자산에
+    부정적 신호로 해석하기 때문이다.
+    """
+    if not fred_circuit.is_available():
+        logger.warning("fred_circuit_open", signal="oil_price")
+        return None
+    from app.services.economic_indicator_service import _fred_get_observations, _parse_fred_obs
+
+    try:
+        obs = await fred_circuit.call(_fred_get_observations, "DCOILWTICO", limit=30)
+    except (CircuitOpenError, Exception) as exc:
+        logger.warning("oil_price_fetch_failed", error=str(exc))
+        return None
+
+    points = _parse_fred_obs(obs)
+    if len(points) < 20:
+        return None
+
+    recent = points[-20:]
+    ma20 = sum(p["value"] for p in recent) / len(recent)
+    latest = points[-1]
+    if ma20 == 0:
+        return None
+    deviation_pct = (latest["value"] - ma20) / ma20 * 100
+    abs_deviation_pct = abs(deviation_pct)
+
+    if abs_deviation_pct <= 5:
+        level = "NORMAL"
+        sub_score = 0
+    elif abs_deviation_pct <= 10:
+        level = "ELEVATED"
+        sub_score = 1
+    elif abs_deviation_pct <= 15:
+        level = "HIGH"
+        sub_score = 2
+    else:
+        level = "BREAKOUT"
+        sub_score = 3
+
+    return {
+        "value": latest["value"],
+        "ma20": round(ma20, 2),
+        "deviation_pct": round(deviation_pct, 2),
+        "level": level,
+        "date": latest["date"],
+        "sub_score": sub_score,
+    }
+
+
 async def _call_fng_api() -> dict[str, Any]:
     """Alternative.me Fear & Greed Index API를 실제 호출한다."""
     async with httpx.AsyncClient(timeout=8) as client:
@@ -401,10 +453,17 @@ async def fetch_fear_greed_signal() -> dict[str, Any] | None:
 
 # 복합 점수 임계값 — 기존 3개 신호(상한 10) 배점 비율(GREEN 0-20%, YELLOW 30-50%, RED 60-100%)을
 # 6개 신호(상한 20)로 확장하면서 그대로 보존: new_threshold = old_threshold * (20/10)
-# 이후 환율 신호(상한 3) 추가로 상한 23 — 비율(20%/50%)을 유지해 재계산: 23*0.2≈5, 23*0.5≈12
-COMPOSITE_SCORE_MAX = 23
-_GREEN_MAX = 5  # old: 4
-_YELLOW_MAX = 12  # old: 10
+# 이후 환율 신호(상한 3) 추가로 상한 23, 유가 신호(상한 3) 추가로 상한 26 —
+# 비율(약 20%/52%)을 유지해 재계산: 26*0.2≈5→6, 26*0.52≈13→14
+COMPOSITE_SCORE_MAX = 26
+_GREEN_MAX = 6  # old: 5
+_YELLOW_MAX = 14  # old: 12
+
+# 신호 8개 중 이 개수 미만만 조회에 성공하면(예: FRED_API_KEY 미설정으로 6개가 한꺼번에 실패)
+# 남은 신호만으로는 복합 레벨을 신뢰할 수 없다고 판단해 PARTIAL이 아닌 STALE로 취급한다.
+# STALE은 AUTO 실행 게이트(order_builder.is_market_signal_blocking_auto_mode)가
+# CAUTIOUS/STRICT 모드에서 보수적으로 차단하는 트리거이기도 하다.
+_MIN_RELIABLE_SIGNAL_COUNT = 3
 
 
 def compute_composite_signal(
@@ -415,12 +474,14 @@ def compute_composite_signal(
     dollar_index: dict[str, Any] | None = None,
     rate_cut_expectation: dict[str, Any] | None = None,
     exchange_rate: dict[str, Any] | None = None,
+    oil_price: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """일곱 신호를 점수화해 GREEN/YELLOW/RED 복합 레벨을 반환한다.
+    """여덟 신호를 점수화해 GREEN/YELLOW/RED 복합 레벨을 반환한다.
 
-    각 신호 조회 실패 시 해당 점수를 0으로 처리 (안전 방향 처리).
-    총점 0–5 → GREEN, 6–12 → YELLOW, 13–23 → RED (상한 23 = 기존 6개 신호 상한 20에
-    환율 방향성 신호 상한 3을 더한 값, 임계값은 기존 비율 그대로 재확장).
+    각 신호 조회 실패 시 해당 점수를 0으로 처리 (안전 방향 처리) — 단, 성공한 신호 수가
+    `_MIN_RELIABLE_SIGNAL_COUNT` 미만이면 이 "안전 방향 처리"가 오히려 실제 위험을 가리는
+    결과(예: GREEN 오판)를 낳을 수 있어 `data_freshness`를 STALE로 격상시킨다.
+    총점 0–6 → GREEN, 7–14 → YELLOW, 15–26 → RED.
     """
     vix_score = vix["sub_score"] if vix else 0
     yc_score = yield_curve["sub_score"] if yield_curve else 0
@@ -429,7 +490,8 @@ def compute_composite_signal(
     usd_score = dollar_index["sub_score"] if dollar_index else 0
     rate_score = rate_cut_expectation["sub_score"] if rate_cut_expectation else 0
     fx_score = exchange_rate["sub_score"] if exchange_rate else 0
-    total = vix_score + yc_score + fg_score + hy_score + usd_score + rate_score + fx_score
+    oil_score = oil_price["sub_score"] if oil_price else 0
+    total = vix_score + yc_score + fg_score + hy_score + usd_score + rate_score + fx_score + oil_score
 
     if total <= _GREEN_MAX:
         level = "GREEN"
@@ -446,11 +508,12 @@ def compute_composite_signal(
         dollar_index,
         rate_cut_expectation,
         exchange_rate,
+        oil_price,
     )
-    none_count = sum(1 for s in all_signals if s is None)
-    if none_count == len(all_signals):
+    available_count = sum(1 for s in all_signals if s is not None)
+    if available_count == 0 or available_count < _MIN_RELIABLE_SIGNAL_COUNT:
         data_freshness = "STALE"
-    elif none_count > 0:
+    elif available_count < len(all_signals):
         data_freshness = "PARTIAL"
     else:
         data_freshness = "LIVE"
@@ -473,6 +536,7 @@ def compute_composite_signal(
             "dollar_index": dollar_index,
             "rate_cut_expectation": rate_cut_expectation,
             "exchange_rate": exchange_rate,
+            "oil_price": oil_price,
         },
         "computed_at": datetime.now(UTC).isoformat(),
         "data_freshness": data_freshness,
@@ -507,6 +571,7 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             dollar_index,
             rate_cut_expectation,
             exchange_rate,
+            oil_price,
         ) = await _fetch_all_signals(redis)
         result = compute_composite_signal(
             vix,
@@ -516,6 +581,7 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             dollar_index,
             rate_cut_expectation,
             exchange_rate,
+            oil_price,
         )
         ttl = TTL_MARKET_SIGNAL if result["data_freshness"] == "LIVE" else TTL_MARKET_SIGNAL_DEGRADED
         await set_cached_json(redis, cache_key, result, ttl)
@@ -549,8 +615,9 @@ async def _fetch_all_signals(
     dict[str, Any] | None,
     dict[str, Any] | None,
     dict[str, Any] | None,
+    dict[str, Any] | None,
 ]:
-    """일곱 신호를 병렬로 조회한다. 개별 실패가 전체를 막지 않는다."""
+    """여덟 신호를 병렬로 조회한다. 개별 실패가 전체를 막지 않는다."""
     import asyncio
 
     results = await asyncio.gather(
@@ -561,6 +628,7 @@ async def _fetch_all_signals(
         fetch_dollar_index_signal(),
         fetch_rate_cut_expectation_signal(),
         fetch_exchange_rate_signal(redis),
+        fetch_oil_price_signal(),
         return_exceptions=True,
     )
 

@@ -13,6 +13,7 @@ from app.services.market_signal_service import (
     fetch_exchange_rate_signal,
     fetch_fear_greed_signal,
     fetch_high_yield_spread_signal,
+    fetch_oil_price_signal,
     fetch_rate_cut_expectation_signal,
     get_market_signal,
 )
@@ -46,52 +47,58 @@ def _fx(sub_score: int) -> dict:
     return {"sub_score": sub_score, "value": 1380.0, "deviation_pct": 2.0, "level": "ELEVATED"}
 
 
+def _oil(sub_score: int) -> dict:
+    return {"sub_score": sub_score, "value": 78.0, "deviation_pct": 6.0, "level": "ELEVATED"}
+
+
 class TestCompositeLevel:
-    """임계값(GREEN 0-5 / YELLOW 6-12 / RED 13-23)은 기존 6신호(상한 20) 배점 비율을
-    환율 신호(상한 3) 추가로 상한 23까지 재확장한 값 — market_signal_service._GREEN_MAX/_YELLOW_MAX 참고."""
+    """임계값(GREEN 0-6 / YELLOW 7-14 / RED 15-26)은 기존 7신호(상한 23) 배점 비율을
+    유가 신호(상한 3) 추가로 상한 26까지 재확장한 값 — market_signal_service._GREEN_MAX/_YELLOW_MAX 참고."""
 
-    def test_green_when_total_le_5(self):
-        result = compute_composite_signal(_vix(2), _yc(1), _fg(2))
+    def test_green_when_total_le_6(self):
+        result = compute_composite_signal(_vix(2), _yc(1), _fg(2), _hy(0), _usd(0), _rate(0), _fx(1), _oil(0))
         assert result["composite_level"] == "GREEN"
-        assert result["composite_score"] == 5
+        assert result["composite_score"] == 6
 
-    def test_yellow_when_total_6_to_12(self):
-        result = compute_composite_signal(_vix(3), _yc(3), _fg(2), _hy(1), _usd(1), _rate(0), _fx(2))
+    def test_yellow_when_total_7_to_14(self):
+        result = compute_composite_signal(_vix(3), _yc(3), _fg(2), _hy(1), _usd(1), _rate(0), _fx(2), _oil(2))
         assert result["composite_level"] == "YELLOW"
-        assert result["composite_score"] == 12
+        assert result["composite_score"] == 14
 
-    def test_red_when_total_gt_12(self):
-        result = compute_composite_signal(_vix(4), _yc(3), _fg(3), _hy(2), None, None, _fx(1))
+    def test_red_when_total_gt_14(self):
+        result = compute_composite_signal(_vix(4), _yc(3), _fg(3), _hy(2), None, None, _fx(1), _oil(2))
         assert result["composite_level"] == "RED"
-        assert result["composite_score"] == 13
+        assert result["composite_score"] == 15
 
-    def test_green_boundary_at_exactly_5(self):
-        result = compute_composite_signal(_vix(4), None, None, None, None, None, _fx(1))
+    def test_green_boundary_at_exactly_6(self):
+        result = compute_composite_signal(_vix(4), None, None, None, None, None, _fx(1), _oil(1))
         assert result["composite_level"] == "GREEN"
+        assert result["composite_score"] == 6
 
-    def test_yellow_boundary_at_exactly_6(self):
-        result = compute_composite_signal(_vix(2), _yc(2), _fg(1), None, None, None, _fx(1))
+    def test_yellow_boundary_at_exactly_7(self):
+        result = compute_composite_signal(_vix(2), _yc(2), _fg(1), None, None, None, _fx(1), _oil(1))
         assert result["composite_level"] == "YELLOW"
+        assert result["composite_score"] == 7
 
-    def test_red_boundary_at_exactly_13(self):
-        result = compute_composite_signal(_vix(4), _yc(3), _fg(3), _hy(1), None, None, _fx(2))
+    def test_red_boundary_at_exactly_15(self):
+        result = compute_composite_signal(_vix(4), _yc(3), _fg(3), _hy(2), None, None, _fx(2), _oil(1))
         assert result["composite_level"] == "RED"
-        assert result["composite_score"] == 13
+        assert result["composite_score"] == 15
 
     def test_new_signals_alone_can_push_to_red(self):
-        """VIX/YC/FG가 전부 정상이어도 나머지 4신호 상한(HY4+USD3+RATE3+FX3=13)만으로 RED에 도달 가능."""
-        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), _hy(4), _usd(3), _rate(3), _fx(3))
-        assert result["composite_score"] == 13
+        """VIX/YC/FG가 전부 정상이어도 나머지 5신호 상한(HY4+USD3+RATE3+FX3+OIL3=16)만으로 RED에 도달 가능."""
+        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), _hy(4), _usd(3), _rate(3), _fx(3), _oil(3))
+        assert result["composite_score"] == 16
         assert result["composite_level"] == "RED"
 
 
 class TestDataFreshness:
     def test_live_when_all_signals_present(self):
-        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), _hy(0), _usd(0), _rate(0), _fx(0))
+        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), _hy(0), _usd(0), _rate(0), _fx(0), _oil(0))
         assert result["data_freshness"] == "LIVE"
 
     def test_partial_when_one_signal_missing(self):
-        result = compute_composite_signal(_vix(0), None, _fg(0), _hy(0), _usd(0), _rate(0), _fx(0))
+        result = compute_composite_signal(_vix(0), None, _fg(0), _hy(0), _usd(0), _rate(0), _fx(0), _oil(0))
         assert result["data_freshness"] == "PARTIAL"
 
     def test_stale_when_all_signals_missing(self):
@@ -99,6 +106,18 @@ class TestDataFreshness:
         assert result["data_freshness"] == "STALE"
         assert result["composite_level"] == "GREEN"
         assert result["composite_score"] == 0
+
+    def test_stale_when_available_signals_below_reliable_minimum(self):
+        """FRED_API_KEY 미설정 등으로 8개 중 1개만 남으면 PARTIAL이 아닌 STALE로 취급해야
+        AUTO 게이트가 이를 '판단 불가'로 인식하고 CAUTIOUS/STRICT에서 보수적으로 차단할 수 있다.
+        (회귀 테스트 — 과거에는 이 경우도 PARTIAL로 분류되어 GREEN 오판 위험이 있었다)"""
+        result = compute_composite_signal(_vix(0), None, None, None, None, None, None, None)
+        assert result["data_freshness"] == "STALE"
+
+    def test_partial_when_exactly_min_reliable_signals_available(self):
+        """가용 신호가 정확히 최소 신뢰 기준(3개)이면 STALE이 아닌 PARTIAL로 취급된다."""
+        result = compute_composite_signal(_vix(0), _yc(0), _fg(0), None, None, None, None, None)
+        assert result["data_freshness"] == "PARTIAL"
 
 
 class TestFearGreedFlags:
@@ -248,7 +267,7 @@ class TestResultStructure:
             "data_freshness",
         }
         assert required_keys.issubset(result.keys())
-        assert result["composite_score_max"] == 23
+        assert result["composite_score_max"] == 26
 
     def test_signals_nested_structure(self):
         vix = _vix(1)
@@ -258,7 +277,8 @@ class TestResultStructure:
         usd = _usd(1)
         rate = _rate(1)
         fx = _fx(1)
-        result = compute_composite_signal(vix, yc, fg, hy, usd, rate, fx)
+        oil = _oil(1)
+        result = compute_composite_signal(vix, yc, fg, hy, usd, rate, fx, oil)
         assert result["signals"]["vix"] is vix
         assert result["signals"]["yield_curve"] is yc
         assert result["signals"]["fear_greed"] is fg
@@ -266,6 +286,7 @@ class TestResultStructure:
         assert result["signals"]["dollar_index"] is usd
         assert result["signals"]["rate_cut_expectation"] is rate
         assert result["signals"]["exchange_rate"] is fx
+        assert result["signals"]["oil_price"] is oil
 
     def test_signals_nested_structure_new_signals_default_none(self):
         result = compute_composite_signal(_vix(0), _yc(0), _fg(0))
@@ -273,6 +294,7 @@ class TestResultStructure:
         assert result["signals"]["dollar_index"] is None
         assert result["signals"]["rate_cut_expectation"] is None
         assert result["signals"]["exchange_rate"] is None
+        assert result["signals"]["oil_price"] is None
 
     def test_computed_at_is_iso_string(self):
         result = compute_composite_signal(None, None, None)
@@ -474,6 +496,72 @@ class TestExchangeRateSignal:
         assert result is None
 
 
+class TestOilPriceSignal:
+    @staticmethod
+    def _make_obs(latest_value: float, base_value: float = 75.0, n: int = 19) -> list[dict]:
+        """FRED desc 정렬 응답을 흉내낸다 — 최신값 1개 + 과거 n개(base_value 고정)."""
+        obs = [{"date": "2026-07-19", "value": str(latest_value)}]
+        obs += [{"date": f"2026-06-{d:02d}", "value": str(base_value)} for d in range(1, n + 1)]
+        return obs
+
+    @pytest.mark.asyncio
+    async def test_normal_within_5_pct(self):
+        obs = self._make_obs(latest_value=77.0, base_value=75.0)
+        with patch(
+            "app.services.economic_indicator_service._fred_get_observations",
+            AsyncMock(return_value=obs),
+        ):
+            result = await fetch_oil_price_signal()
+        assert result is not None
+        assert result["level"] == "NORMAL"
+        assert result["sub_score"] == 0
+
+    @pytest.mark.asyncio
+    async def test_breakout_above_15_pct_on_spike(self):
+        obs = self._make_obs(latest_value=95.0, base_value=75.0)
+        with patch(
+            "app.services.economic_indicator_service._fred_get_observations",
+            AsyncMock(return_value=obs),
+        ):
+            result = await fetch_oil_price_signal()
+        assert result is not None
+        assert result["level"] == "BREAKOUT"
+        assert result["sub_score"] == 3
+        assert result["deviation_pct"] > 15
+
+    @pytest.mark.asyncio
+    async def test_breakout_above_15_pct_on_crash(self):
+        """유가 급락도 급등과 동일하게 위험 신호로 취급한다(절대 이격도 기준)."""
+        obs = self._make_obs(latest_value=55.0, base_value=75.0)
+        with patch(
+            "app.services.economic_indicator_service._fred_get_observations",
+            AsyncMock(return_value=obs),
+        ):
+            result = await fetch_oil_price_signal()
+        assert result is not None
+        assert result["level"] == "BREAKOUT"
+        assert result["sub_score"] == 3
+        assert result["deviation_pct"] < -15
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_insufficient_history(self):
+        obs = [{"date": "2026-07-19", "value": "78.0"}]
+        with patch(
+            "app.services.economic_indicator_service._fred_get_observations",
+            AsyncMock(return_value=obs),
+        ):
+            result = await fetch_oil_price_signal()
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_circuit_open(self):
+        from app.services import market_signal_service
+
+        with patch.object(market_signal_service.fred_circuit, "is_available", return_value=False):
+            result = await fetch_oil_price_signal()
+        assert result is None
+
+
 class TestGetMarketSignalCachingTtl:
     """일시적 장애(PARTIAL/STALE)가 1시간짜리 캐시에 고착되지 않도록 TTL을 짧게 쓰는지 검증.
 
@@ -484,7 +572,7 @@ class TestGetMarketSignalCachingTtl:
 
     @staticmethod
     def _all_none_signals():
-        return tuple(None for _ in range(7))
+        return tuple(None for _ in range(8))
 
     @pytest.mark.asyncio
     async def test_live_uses_full_ttl(self, mock_redis):
@@ -498,6 +586,7 @@ class TestGetMarketSignalCachingTtl:
             {"sub_score": 0},
             {"sub_score": 0},
             _fx(0),
+            {"sub_score": 0},
         )
         with patch(
             "app.services.market_signal_service._fetch_all_signals",
@@ -527,7 +616,9 @@ class TestGetMarketSignalCachingTtl:
     async def test_partial_uses_degraded_ttl(self, mock_redis):
         from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED
 
-        partial_signals = (_vix(0), None, None, None, None, None, None)
+        # 최소 신뢰 기준(3개)은 충족하되 일부(5개)는 빠진 상태 — PARTIAL로 분류돼야 함.
+        # (3개 미만이면 STALE로 재분류됨 — TestDataFreshness 참고)
+        partial_signals = (_vix(0), _yc(0), _fg(0), None, None, None, None, None)
         with patch(
             "app.services.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=partial_signals),

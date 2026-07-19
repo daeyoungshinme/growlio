@@ -520,7 +520,7 @@ class TestKrPropertyItem:
 
 class TestCashEquivalentItem:
     def test_uses_bank_type_account_balances(self):
-        """CASH_EQUIVALENT 항목은 BANK_ACCOUNT/DEPOSIT/CASH_OTHER 계좌 잔액 합산."""
+        """CASH_EQUIVALENT 항목은 BANK_ACCOUNT/DEPOSIT 계좌 잔액 합산."""
         portfolio = _make_portfolio(
             [
                 {
@@ -537,7 +537,7 @@ class TestCashEquivalentItem:
             "all_positions": [],
             "accounts": [
                 {"asset_type": "BANK_ACCOUNT", "amount_krw": 3_000_000, "include_in_total": True},
-                {"asset_type": "CASH_OTHER", "amount_krw": 2_000_000, "include_in_total": True},
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 2_000_000, "include_in_total": True},
                 {"asset_type": "DEPOSIT", "amount_krw": 1_000_000, "include_in_total": True},
                 # 브로커 예수금 계좌는 집계 대상 아님
                 {"asset_type": "STOCK_KIS", "amount_krw": 4_000_000, "include_in_total": True},
@@ -548,6 +548,30 @@ class TestCashEquivalentItem:
         assert item.shares_to_trade is None
         assert item.current_price_krw is None
         assert item.current_value_krw == pytest.approx(6_000_000)
+
+    def test_cash_other_account_not_counted(self):
+        """CASH_OTHER(예수금·기타)는 개별 종목을 보유할 수 있는 브로커성 계좌이므로
+        CASH_EQUIVALENT(현금성 자산)에 더 이상 합산되지 않는다."""
+        portfolio = _make_portfolio(
+            [
+                {
+                    "ticker": "CASH_EQUIVALENT",
+                    "name": "현금성 자산 (CMA·파킹통장 등)",
+                    "market": "CASH",
+                    "weight": 100,
+                },
+            ]
+        )
+        overview = {
+            "total_assets_krw": 5_000_000,
+            "total_stock_krw": 0,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "CASH_OTHER", "amount_krw": 5_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.items[0].current_value_krw == 0
 
     def test_no_bank_type_accounts_gives_zero(self):
         portfolio = _make_portfolio(
@@ -586,7 +610,7 @@ class TestCashEquivalentItem:
             "total_stock_krw": 0,
             "all_positions": [],
             "accounts": [
-                {"asset_type": "CASH_OTHER", "amount_krw": 1_000_000, "include_in_total": False},
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 1_000_000, "include_in_total": False},
             ],
         }
         result = analyze_rebalancing(portfolio, overview)
@@ -612,7 +636,7 @@ class TestCashEquivalentItem:
             "total_stock_krw": 0,
             "all_positions": [],
             "accounts": [
-                {"asset_type": "CASH_OTHER", "amount_krw": 4_000_000, "include_in_total": True},
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 4_000_000, "include_in_total": True},
             ],
         }
         result = analyze_rebalancing(portfolio, overview)
@@ -646,7 +670,7 @@ class TestCashEquivalentItem:
             "all_positions": [],
             "accounts": [
                 {"asset_type": "REAL_ESTATE", "amount_krw": 8_000_000, "include_in_total": True},
-                {"asset_type": "CASH_OTHER", "amount_krw": 5_000_000, "include_in_total": True},
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 5_000_000, "include_in_total": True},
             ],
         }
         result = analyze_rebalancing(portfolio, overview)
@@ -673,7 +697,7 @@ class TestCashEquivalentItem:
             "total_stock_krw": 0,
             "all_positions": [],
             "accounts": [
-                {"asset_type": "CASH_OTHER", "amount_krw": 1_000_000, "include_in_total": True},
+                {"asset_type": "BANK_ACCOUNT", "amount_krw": 1_000_000, "include_in_total": True},
             ],
         }
         dividend_map = {("CASH_EQUIVALENT", "CASH"): {"dividend_yield": 5.0, "estimated_annual_krw": 50_000}}

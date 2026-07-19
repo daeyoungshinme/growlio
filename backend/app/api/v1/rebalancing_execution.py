@@ -27,6 +27,7 @@ from app.schemas.rebalancing import (
     RebalancingExecutionSummary,
 )
 from app.services.rebalancing.execution_service import execute_rebalancing
+from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
@@ -138,14 +139,14 @@ async def quick_execute_rebalancing(
     try:
         market_signal = await get_market_signal(redis)
         composite_level: str = market_signal.get("composite_level", "GREEN")
+        data_freshness: str = market_signal.get("data_freshness", "LIVE")
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_quick_execute", error=str(exc))
         composite_level = "GREEN"
+        data_freshness = "STALE"
 
     market_mode = getattr(alert_row, "market_condition_mode", "DISABLED")
-    blocked = (market_mode == "CAUTIOUS" and composite_level == "RED") or (
-        market_mode == "STRICT" and composite_level in ("YELLOW", "RED")
-    )
+    blocked = is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness)
     if blocked:
         return QuickExecuteResult(
             status="MARKET_BLOCKED",

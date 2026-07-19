@@ -57,12 +57,14 @@ from app.services.dividend.sync_sources import (
 )
 from app.services.goal_return_solver import solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
+from app.services.market_signal_service import get_market_signal
 from app.services.portfolio_service import build_portfolio_overview
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.recommendation_universe import (
     MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
+    guess_asset_class,
     resolve_index_region,
 )
 from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
@@ -83,6 +85,12 @@ _MIN_CANDIDATES = 2
 _DIVIDEND_FETCH_CONCURRENCY = 8
 _DEFAULT_CAGR_LOOKBACK_YEARS = 10
 _RISK_TOLERANCE_FRONTIER_FRACTION = {"CONSERVATIVE": 0.0, "BALANCED": 0.4, "AGGRESSIVE": 0.8}
+
+_SIGNAL_FRONTIER_DAMPENING = {"RED": 0.3, "YELLOW": 0.7}
+"""시장 위험 신호가 YELLOW/RED일 때 frontier_frac(리스크 성향 보간 비율)을 감쇠시켜 추천 비중을
+최소분산(보수적) 쪽으로 당긴다 — GREEN/신호 조회 실패/STALE은 감쇠 없음(1.0, 기존 동작 유지).
+IRP `equity_ceiling`/단기 `equity_floor` 같은 규제·정책성 하드 제약과는 별개 축이라 함께 건드리지
+않는다 — 시장 신호는 "선택한 리스크 성향 내에서 얼마나 공격적으로 갈지"만 조정한다."""
 
 _HORIZON_RISK_TOLERANCE: dict[str, str] = {
     "SHORT_TERM": "CONSERVATIVE",
@@ -216,6 +224,23 @@ def _cash_equivalent_daily_returns() -> list[float]:
     return [_CASH_EQUIVALENT_CAGR_PCT / 100 / _CASH_EQUIVALENT_RETURN_DAYS] * _CASH_EQUIVALENT_RETURN_DAYS
 
 
+async def _fetch_market_signal_level(redis: RedisType) -> str | None:
+    """추천 비중 계산에 반영할 시장 위험 신호 등급을 안전하게 조회한다.
+
+    조회 실패 또는 `data_freshness="STALE"`(신뢰 불가)이면 감쇠 없이(None) 기존 동작을 유지한다
+    — 참고용 제안이라 fail-open이 적절하며, AUTO 실행 게이트(`is_market_signal_blocking_auto_mode`)와
+    달리 실패 시 보수적으로 차단할 필요가 없다.
+    """
+    try:
+        signal = await get_market_signal(redis)
+    except Exception as e:
+        logger.warning("goal_recommendation_market_signal_failed", error=str(e))
+        return None
+    if signal.get("data_freshness") == "STALE":
+        return None
+    return signal.get("composite_level")
+
+
 def _months_until_year_end(target_year: int) -> int:
     today = date.today()
     delta = relativedelta(date(target_year, 12, 31), today)
@@ -286,6 +311,7 @@ def _optimize_goal_portfolio(
     is_equity: list[bool] | None = None,
     equity_floor: float | None = None,
     equity_ceiling: float | None = None,
+    market_signal_level: str | None = None,
 ) -> tuple[list[dict], float | None, str | None]:
     """분산 최소화 + 목표수익률 제약(SLSQP). (recommended_items, expected_return_pct, note) 반환. 동기 함수.
 
@@ -306,6 +332,10 @@ def _optimize_goal_portfolio(
     "주식 비중 합 ≤ equity_ceiling" 부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산
     비중 ≥ 1-equity_ceiling"도 자동 성립한다. 호출측은 `equity_floor`와 `equity_ceiling`을
     동시에 넘기지 않는다(IRP는 단기 주식 하한 규칙보다 우선하므로 상호 배타적으로 세팅됨).
+
+    `market_signal_level`(GREEN/YELLOW/RED)이 주어지면 `_SIGNAL_FRONTIER_DAMPENING`에 따라
+    `frontier_frac`을 감쇠시켜 최소분산 쪽으로 결과를 당긴다 — `equity_floor`/`equity_ceiling`
+    같은 규제·정책성 하드 제약과는 별개 축이라 함께 조정하지 않는다.
     """
     import numpy as np
     from scipy.optimize import minimize
@@ -373,8 +403,12 @@ def _optimize_goal_portfolio(
 
     note: str | None = None
     frontier_frac = _RISK_TOLERANCE_FRONTIER_FRACTION.get(risk_tolerance, 0.0)
+    signal_dampening = _SIGNAL_FRONTIER_DAMPENING.get(market_signal_level or "", 1.0)
+    effective_frontier_frac = frontier_frac * signal_dampening
+    if signal_dampening < 1.0 and frontier_frac > 0.0:
+        note = f"시장 위험 신호({market_signal_level})를 반영해 추천 비중을 보수적으로 조정했습니다"
 
-    if frontier_frac <= 0.0:
+    if effective_frontier_frac <= 0.0:
         # CONSERVATIVE(또는 미인식 값) — 기존과 동일한 코드 경로, 순수 최소분산 + 부등식 제약
         constraints = [
             {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
@@ -393,7 +427,7 @@ def _optimize_goal_portfolio(
 
         frontier_low = max(natural_return, required_return_pct)
         frontier_high = max_achievable_return
-        target = frontier_low + frontier_frac * max(frontier_high - frontier_low, 0.0)
+        target = frontier_low + effective_frontier_frac * max(frontier_high - frontier_low, 0.0)
         target = min(max(target, required_return_pct), frontier_high)
 
         if frontier_high - frontier_low < 1e-6:
@@ -457,6 +491,11 @@ def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[
 
     보유 종목을 우선 채우고 남는 자리를 큐레이션 ETF로 채우되, `MAX_GOAL_CANDIDATE_TICKERS`를
     넘지 않는다 — 저장 시 `GoalCandidateTickersUpdate` 검증(최대 개수)을 통과해야 하기 때문.
+
+    보유 종목은 `asset_class` 태그가 없으므로 `guess_asset_class(name)`으로 추정치를 채운다 —
+    이 값이 없으면 하위 로직(`c.get("asset_class", "EQUITY")`)이 전부 EQUITY로 취급해, 채권혼합
+    ETF 같은 안전자산 보유종목이 IRP 안전자산 30% 하한 계산에서 위험자산으로 오분류된다.
+    휴리스틱이라 부정확할 수 있으므로 "후보 ETF 관리"에서 사용자가 언제든 수정 가능해야 한다.
     """
     seen: set[tuple[str, str]] = set()
     seed: list[dict[str, str]] = []
@@ -466,7 +505,7 @@ def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[
         if (t, m) in seen:
             continue
         seen.add((t, m))
-        seed.append({"ticker": t, "name": name, "market": m})
+        seed.append({"ticker": t, "name": name, "market": m, "asset_class": guess_asset_class(name)})
     for c in RECOMMENDATION_UNIVERSE:
         if len(seed) >= MAX_GOAL_CANDIDATE_TICKERS:
             break
@@ -671,9 +710,10 @@ async def _compute_goal_recommendation(
     candidates = [(c["ticker"], c["name"], c["market"]) for c in computed_candidates]
     tickers_only = [(t, m) for t, _, m in candidates]
 
-    cagr_map, dividend_map = await asyncio.gather(
+    cagr_map, dividend_map, market_signal_level = await asyncio.gather(
         get_historical_returns(tickers_only, redis=redis, years=cagr_lookback_years),
         _fetch_dividend_yields(tickers_only),
+        _fetch_market_signal_level(redis),
     )
 
     filtered = [
@@ -708,6 +748,7 @@ async def _compute_goal_recommendation(
             required_return_pct,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
+            market_signal_level=market_signal_level,
         ),
     )
 
@@ -729,6 +770,7 @@ async def _compute_goal_recommendation(
         cagr_lookback_years=cagr_lookback_years,
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
+        market_signal_level=market_signal_level,
     )
 
 
@@ -743,33 +785,38 @@ async def _build_horizon_result(
     max_weight: float,
     cagr_lookback_years: int,
     short_term_equity_floor: float,
+    market_signal_level: str | None = None,
     preference_fallback_note: str | None = None,
 ) -> HorizonGoalRecommendation:
     """필터링된(자산군·시장 적합) 후보 목록으로 (기간, 세제유형) 조합 하나에 대한 추천을 계산한다.
 
-    SHORT_TERM은 등록된 BOND/CASH 후보 개수와 무관하게 현금성 자산(CMA·파킹통장) 합성 후보를 항상
-    함께 분석 대상에 포함시켜, 실제 등록 후보가 없으면 100% 현금성 자산으로, 있으면 그 후보들과
-    나란히 MVO로 비중을 분배한다. 등록된 주식(EQUITY) 후보가 있으면 `short_term_equity_floor`
+    SHORT_TERM(비IRP)은 등록된 BOND/CASH 후보 개수와 무관하게 현금성 자산(CMA·파킹통장) 합성
+    후보를 항상 함께 분석 대상에 포함시킨다. 등록된 주식(EQUITY) 후보가 있으면 `short_term_equity_floor`
     비율 이상을 주식에 배분하도록 강제해 지나치게 안전자산 위주로 수렴하지 않게 한다.
 
-    IRP(개인형퇴직연금)는 투자기간과 무관하게 이 현금성 자산 안전판을 항상 포함시키고, 대신
-    `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`(안전자산 최소 30%) 제약을 적용한다 — 퇴직연금 규제(위험자산
-    투자한도 70%)에 근거한 고정 규칙이라 SHORT_TERM의 주식 최소 80% 규칙보다 우선한다(동시에
-    적용 시 상호 모순이라 IRP 조합에서는 단기 주식 하한 규칙 자체를 적용하지 않는다).
+    IRP(개인형퇴직연금)는 투자기간과 무관하게 `_DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT`(안전자산 최소
+    30%) 제약을 적용한다 — 퇴직연금 규제(위험자산 투자한도 70%)에 근거한 고정 규칙이라 SHORT_TERM의
+    주식 최소 80% 규칙보다 우선한다(동시에 적용 시 상호 모순이라 IRP 조합에서는 단기 주식 하한
+    규칙 자체를 적용하지 않는다). 이때 현금성 자산 합성 후보는 **실제로 유효한(시세 데이터가 확보된)
+    BOND/CASH 후보가 하나도 없을 때만** 포함시킨다 — 실보유 안전자산 후보가 있는데도 합성 후보를
+    함께 넣으면, 분산·공분산이 정확히 0인 합성 후보가 MVO 목적함수(순수 분산 최소화) 상 항상
+    우위를 점해 실제로는 절대 비중을 받지 못하고 합성 자산이 30% 전량을 가져가 버리기 때문이다
+    (`_cash_equivalent_daily_returns` 참고). 실보유 후보가 있으면 그 후보만으로, 없으면 합성
+    자산 100%로 안전자산 몫을 채운다.
 
     `preference_fallback_note`는 세제유형별 추종지수 선호 필터(`get_horizon_recommendations`)가
     선호 지역 후보 부족으로 전체 후보로 되돌아갔을 때 그 사실을 안내하기 위해 전달된다 — 이후
     계산되는 다른 note와 함께(있으면 앞에 붙여) 표시된다.
     """
     is_irp = tax_type == AccountTaxType.IRP.value
-    include_cash_equivalent = horizon == "SHORT_TERM" or is_irp
+    safety_net_horizon = horizon == "SHORT_TERM" or is_irp
 
     def _combine_note(msg: str | None) -> str | None:
         if preference_fallback_note and msg:
             return f"{preference_fallback_note} {msg}"
         return preference_fallback_note or msg
 
-    if not include_cash_equivalent and len(eligible_candidates) < _MIN_CANDIDATES:
+    if not safety_net_horizon and len(eligible_candidates) < _MIN_CANDIDATES:
         needs_conservative = horizon == "MID_TERM"
         note = (
             "이 기간에 적합한 후보가 부족합니다 — 후보 ETF 관리에서 채권/현금성 ETF를 추가해주세요"
@@ -783,6 +830,7 @@ async def _build_horizon_result(
             account_count=len(account_ids),
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
+            market_signal_level=market_signal_level,
             note=_combine_note(note),
         )
 
@@ -797,6 +845,8 @@ async def _build_horizon_result(
         for t, name, m, asset_class in candidates
         if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
     ]
+    has_real_safe_asset = any(not is_eq for *_, is_eq in filtered)
+    include_cash_equivalent = (not has_real_safe_asset) if is_irp else (horizon == "SHORT_TERM")
     if include_cash_equivalent:
         filtered.append(
             (
@@ -815,12 +865,16 @@ async def _build_horizon_result(
             account_count=len(account_ids),
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
+            market_signal_level=market_signal_level,
             note=_combine_note("추천에 필요한 수익률 데이터를 가져오지 못했습니다"),
         )
 
     if len(filtered) == 1:
-        # 등록된 실 후보가 하나도 유효하지 않아 현금성 자산 합성 후보만 남은 경우 — 옵티마이저 없이 전액 배분
+        # 유효 후보가 하나뿐인 경우 — 옵티마이저 없이 전액 배분. 현금성 자산 합성 후보만 남았을 수도
+        # 있고(등록된 실 후보가 없거나 전부 시세 데이터 미확보), 실보유 안전자산 후보 하나만 유효했을
+        # 수도 있다(예: 매칭되는 EQUITY 후보가 없어 BOND 후보 1개만 남음) — 둘을 구분해 안내한다.
         _, (tk, name, mk), cagr, _ = filtered[0]
+        is_synthetic = tk == _CASH_EQUIVALENT_TICKER
         return HorizonGoalRecommendation(
             investment_horizon=horizon,
             tax_type=tax_type,
@@ -830,10 +884,15 @@ async def _build_horizon_result(
             expected_return_pct=cagr,
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
-            includes_cash_equivalent=True,
+            market_signal_level=market_signal_level,
+            includes_cash_equivalent=is_synthetic,
             note=_combine_note(
-                "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 "
-                "배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다."
+                (
+                    "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 "
+                    "배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다."
+                )
+                if is_synthetic
+                else None
             ),
         )
 
@@ -873,6 +932,7 @@ async def _build_horizon_result(
             is_equity=f_is_equity,
             equity_floor=equity_floor,
             equity_ceiling=equity_ceiling,
+            market_signal_level=market_signal_level,
         ),
     )
 
@@ -900,6 +960,7 @@ async def _build_horizon_result(
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
         includes_cash_equivalent=includes_cash_equivalent,
+        market_signal_level=market_signal_level,
         note=_combine_note(opt_note),
     )
 
@@ -1014,6 +1075,9 @@ async def _compute_horizon_recommendations(
     if all_added:
         await _persist_added_candidates(db, user_id, all_added)
 
+    # 15개 조합이 동일한 시장 신호 스냅샷을 공유하도록 조합별 반복 조회 대신 한 번만 조회한다.
+    market_signal_level = await _fetch_market_signal_level(redis)
+
     # 2단계: DB에 의존하지 않는 외부 I/O(Yahoo/pykrx 수익률 조회 + SLSQP 최적화)는 조합 수(최대 15개)만큼
     # 동시 실행한다 — `_build_horizon_result`는 `db`를 사용하지 않으므로 AsyncSession 동시성 제약이 없다.
     results = await asyncio.gather(
@@ -1029,7 +1093,8 @@ async def _compute_horizon_recommendations(
                 max_weight,
                 cagr_lookback_years,
                 short_term_equity_floor,
-                preference_fallback_note,
+                market_signal_level=market_signal_level,
+                preference_fallback_note=preference_fallback_note,
             )
             for (
                 horizon_value,

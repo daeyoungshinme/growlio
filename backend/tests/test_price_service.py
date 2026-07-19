@@ -199,7 +199,7 @@ class TestGetHistoricalReturns:
 
         redis = AsyncMock()
         cached_data = {"cumulative_pct": 120.0, "annual_pct": 8.5}
-        redis.get = AsyncMock(return_value=json.dumps(cached_data).encode())
+        redis.mget = AsyncMock(return_value=[json.dumps(cached_data).encode()])
 
         from app.services.price_service import get_historical_returns
 

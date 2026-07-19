@@ -92,6 +92,46 @@ class TestQuickExecuteGates:
         mock_build_plan.assert_not_awaited()
 
     @pytest.mark.asyncio
+    async def test_market_blocked_when_cautious_mode_and_stale_freshness(self, mock_db, mock_request):
+        """시장 신호가 STALE(신뢰 불가)이면 composite_level이 GREEN이어도 CAUTIOUS는 차단한다.
+
+        회귀 테스트 — FRED_API_KEY 미설정 등으로 대부분 신호가 실패해도 과거에는 GREEN으로
+        오판되어 원클릭 실행이 그대로 통과했다."""
+        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+
+        portfolio_id = uuid.uuid4()
+        user = SimpleNamespace(id=uuid.uuid4())
+        portfolio = SimpleNamespace(id=portfolio_id, account_ids=None)
+        alert_row = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=uuid.uuid4(),
+            strategy="FULL",
+            order_type="MARKET",
+            market_condition_mode="CAUTIOUS",
+        )
+        mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
+
+        mock_build_plan = AsyncMock()
+        with (
+            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
+            ),
+            patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
+        ):
+            result = await quick_execute_rebalancing(
+                request=mock_request,
+                portfolio_id=portfolio_id,
+                current_user=user,
+                db=mock_db,
+                redis=None,
+            )
+
+        assert result.status == "MARKET_BLOCKED"
+        mock_build_plan.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_no_drift_when_build_pending_plan_returns_none(self, mock_db, mock_request):
         from app.api.v1.rebalancing_execution import quick_execute_rebalancing
 

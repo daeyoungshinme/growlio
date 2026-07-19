@@ -24,9 +24,11 @@ import { isBankAccount, isStockAccount } from "@/utils/accounts";
 import { fmtKrw } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
+import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 const TAX_TYPE_ORDER: AccountTaxType[] = [
@@ -236,7 +238,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-2.5 py-1 text-xs rounded-full transition-colors ${
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2.5 py-1 text-xs rounded-full transition-colors ${
                 tab === effectiveTab
                   ? "bg-teal-600 text-white"
                   : "bg-white dark:bg-gray-800 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800/50"
@@ -254,7 +256,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                 key={t}
                 type="button"
                 onClick={() => setSelectedTaxType(t)}
-                className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 py-1 text-xs rounded-full border transition-colors ${
                   t === activeTaxType
                     ? "bg-teal-100 dark:bg-teal-800/40 border-teal-400 dark:border-teal-600 text-teal-700 dark:text-teal-300"
                     : "bg-transparent border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400"
@@ -291,7 +293,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                         className="flex items-center justify-between text-xs"
                       >
                         <span className="text-gray-700 dark:text-gray-300">
-                          {item.name} <span className="text-gray-400">({item.ticker})</span>
+                          {item.name}{" "}
+                          <span className="text-gray-400 dark:text-gray-500">({item.ticker})</span>
                         </span>
                         <span className="font-medium text-teal-600 dark:text-teal-400">
                           {item.weight.toFixed(1)}%
@@ -301,7 +304,11 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                   </ul>
 
                   {overallData.note && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 pt-1">
+                    <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 flex items-center gap-1.5 flex-wrap">
+                      {(overallData.market_signal_level === "YELLOW" ||
+                        overallData.market_signal_level === "RED") && (
+                        <MarketSignalLevelBadge level={overallData.market_signal_level} />
+                      )}
                       {overallData.note}
                     </p>
                   )}
@@ -322,7 +329,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                           <select
                             value={selectedOverallTargetId}
                             onChange={(e) => setSelectedOverallTargetId(e.target.value)}
-                            className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                            className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
                           >
                             <option value="">포트폴리오 선택</option>
                             {targetPortfolios.map((p) => (
@@ -339,7 +346,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                             applyOverallMutation.isPending
                           }
                           onClick={() => setConfirmOpen(true)}
-                          className="flex items-center gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
+                          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
                         >
                           {applyOverallMutation.isPending ? (
                             <Loader2 size={12} className="animate-spin" />
@@ -361,7 +368,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                             "추천 포트폴리오",
                           )
                         }
-                        className="flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors"
+                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
                       >
                         <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
                       </button>
@@ -399,7 +406,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       <span className="text-gray-700 dark:text-gray-300">
                         {item.name}
                         {!isCashEquivalentItem(item) && (
-                          <span className="text-gray-400"> ({item.ticker})</span>
+                          <span className="text-gray-400 dark:text-gray-500"> ({item.ticker})</span>
                         )}
                       </span>
                       <span className="font-medium text-teal-600 dark:text-teal-400">
@@ -409,7 +416,11 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                   ))}
                 </ul>
                 {activeHorizonRec.note && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
+                    {(activeHorizonRec.market_signal_level === "YELLOW" ||
+                      activeHorizonRec.market_signal_level === "RED") && (
+                      <MarketSignalLevelBadge level={activeHorizonRec.market_signal_level} />
+                    )}
                     {activeHorizonRec.note}
                   </p>
                 )}
@@ -444,7 +455,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       type="button"
                       disabled={applyHorizonMutation.isPending}
                       onClick={() => setConfirmOpen(true)}
-                      className="flex items-center gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors"
+                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
                     >
                       {applyHorizonMutation.isPending ? (
                         <Loader2 size={12} className="animate-spin" />
@@ -478,7 +489,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                           ],
                         )
                       }
-                      className="flex items-center gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors"
+                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
                     >
                       <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
                     </button>
@@ -492,7 +503,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
           <button
             type="button"
             onClick={() => setManagerOpen(true)}
-            className="flex items-center gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700`}
           >
             <Plus size={12} />
             후보 ETF 관리{candidateCount > 0 && ` (${candidateCount})`}
@@ -500,7 +511,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
           <button
             type="button"
             onClick={() => setOptionsOpen(true)}
-            className="flex items-center gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-600 dark:text-teal-400 hover:text-teal-700`}
           >
             <Settings2 size={12} />
             추천 설정

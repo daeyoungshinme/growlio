@@ -139,6 +139,7 @@ function makeOverallRecommendation(
     cagr_lookback_years: 10,
     risk_tolerance: "CONSERVATIVE",
     max_weight_pct: 40.0,
+    market_signal_level: null,
     ...overrides,
   };
 }
@@ -159,6 +160,7 @@ function makeHorizonRec(
     risk_tolerance: "CONSERVATIVE",
     max_weight_pct: 40,
     includes_cash_equivalent: false,
+    market_signal_level: null,
     note: null,
     ...overrides,
   };

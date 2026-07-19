@@ -155,6 +155,14 @@ const mockSignal: MarketSignalResponse = {
       date: "2024-01-15",
       sub_score: 0,
     },
+    oil_price: {
+      value: 78.0,
+      ma20: 76.0,
+      deviation_pct: 2.6,
+      level: "NORMAL",
+      date: "2024-01-15",
+      sub_score: 0,
+    },
   },
 };
 
@@ -245,22 +253,26 @@ describe("InflationSummaryCard", () => {
 
   it("renders each indicator name and YoY change", () => {
     render(<InflationSummaryCard data={mockInflationSummary} />);
+    fireEvent.click(screen.getByText("물가 지표 (미국)"));
     expect(screen.getByText("미국 CPI")).toBeDefined();
     expect(screen.getByText("+2.0% (전년比)")).toBeDefined();
   });
 
   it("shows next release date when available", () => {
     render(<InflationSummaryCard data={mockInflationSummary} />);
+    fireEvent.click(screen.getByText("물가 지표 (미국)"));
     expect(screen.getByText("2월 13일 발표 예정")).toBeDefined();
   });
 
   it("falls back to a placeholder when release date is unknown", () => {
     render(<InflationSummaryCard data={mockInflationSummary} />);
+    fireEvent.click(screen.getByText("물가 지표 (미국)"));
     expect(screen.getByText("발표일 미정")).toBeDefined();
   });
 
   it("shows a placeholder dash when yoy change is null", () => {
     render(<InflationSummaryCard data={mockInflationSummary} />);
+    fireEvent.click(screen.getByText("물가 지표 (미국)"));
     expect(screen.getByText("— (전년比)")).toBeDefined();
   });
 

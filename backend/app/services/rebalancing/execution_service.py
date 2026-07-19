@@ -14,7 +14,7 @@ from app.kiwoom.order import place_domestic_order as kiwoom_place_order
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services._account_queries import active_accounts_stmt
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt_kis_credentials, decrypt_kiwoom_credentials
 from app.services.rebalancing._kis_order_executor import (
     _execute_sells_with_clamp,
     _execute_single_order,
@@ -24,7 +24,7 @@ from app.services.rebalancing._kiwoom_order_executor import (
     _execute_kiwoom_sells_with_clamp,
     _execute_kiwoom_single_order,
 )
-from app.utils.cache_keys import invalidate_rebalancing_strategy_cache
+from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_rebalancing_strategy_cache
 from app.utils.metrics import rebalancing_execution_count
 
 logger = structlog.get_logger()
@@ -51,19 +51,21 @@ async def _load_account(
 
 async def _load_credentials(account: AssetAccount) -> tuple[str, str]:
     """KIS 계좌 자격증명 로드. 미설정 시 400 에러."""
-    if account.kis_app_key and account.kis_app_secret:
-        return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
-    raise HTTPException(
-        status_code=400,
-        detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.",
-    )
+    creds = decrypt_kis_credentials(account)
+    if creds is None:
+        raise HTTPException(
+            status_code=400,
+            detail="KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요.",
+        )
+    return creds
 
 
 async def _load_kiwoom_credentials(account: AssetAccount) -> tuple[str, str]:
     """키움 계좌 자격증명 로드 (전역 폴백 없음)."""
-    if account.kiwoom_app_key and account.kiwoom_app_secret:
-        return decrypt(account.kiwoom_app_key), decrypt(account.kiwoom_app_secret)
-    raise HTTPException(status_code=400, detail="키움 자격증명이 설정되지 않았습니다.")
+    creds = decrypt_kiwoom_credentials(account)
+    if creds is None:
+        raise HTTPException(status_code=400, detail="키움 자격증명이 설정되지 않았습니다.")
+    return creds
 
 
 def _group_orders_by_account(
@@ -216,9 +218,10 @@ async def execute_rebalancing(
         db, user_id, portfolio_id, triggered_by, strategy, results, total_success, total_fail, total_skipped
     )
 
-    # 실행 후 전략 캐시 무효화 (포트폴리오 구성이 변경되었으므로)
+    # 실행 후 전략·진단 캐시 무효화 (포트폴리오 구성이 변경되었으므로)
     if portfolio_id and redis:
         await invalidate_rebalancing_strategy_cache(redis, user_id, portfolio_id)
+        await invalidate_rebalancing_analysis_cache(redis, user_id, portfolio_id)
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
     return results, execution_id
@@ -236,6 +239,9 @@ async def _execute_kiwoom_account_orders(
     """키움 계좌: 매도(보유수량 clamp) → 매수 순으로 주문을 실행한다."""
     app_key, app_secret = await _load_kiwoom_credentials(account)
     account_no = account.kiwoom_account_no
+    if account_no is None:
+        # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
+        raise HTTPException(status_code=400, detail="키움 계좌번호가 설정되지 않았습니다.")
     access_token = await kiwoom_get_access_token(
         app_key,
         app_secret,
@@ -252,7 +258,7 @@ async def _execute_kiwoom_account_orders(
     account_results: list[OrderResult] = await _execute_kiwoom_sells_with_clamp(
         sells,
         access_token,
-        account_no,  # type: ignore[arg-type]
+        account_no,
         is_mock,
         kiwoom_place_order,
     )
@@ -261,7 +267,7 @@ async def _execute_kiwoom_account_orders(
             await _execute_kiwoom_single_order(
                 order,
                 access_token,
-                account_no,  # type: ignore[arg-type]
+                account_no,
                 is_mock,
                 kiwoom_place_order,
             )
@@ -282,6 +288,9 @@ async def _execute_kis_account_orders(
     """KIS 계좌: strategy가 TWO_PHASE면 예수금→매도→잔여매수 3단계, 아니면 매도(clamp)→매수 순으로 실행한다."""
     app_key, app_secret = await _load_credentials(account)
     account_no = account.kis_account_no
+    if account_no is None:
+        # _load_account가 사전 검증하므로 실행 경로상 도달 불가 — mypy 타입 좁히기 목적
+        raise HTTPException(status_code=400, detail="KIS 계좌번호가 설정되지 않았습니다.")
 
     access_token = await get_access_token(
         app_key,
@@ -299,7 +308,7 @@ async def _execute_kis_account_orders(
             app_key,
             app_secret,
             access_token,
-            account_no,  # type: ignore[arg-type]
+            account_no,
             is_mock,
         )
 
@@ -311,7 +320,7 @@ async def _execute_kis_account_orders(
         app_key,
         app_secret,
         access_token,
-        account_no,  # type: ignore[arg-type]
+        account_no,
         is_mock,
     )
     for order in buys:
@@ -321,7 +330,7 @@ async def _execute_kis_account_orders(
                 app_key,
                 app_secret,
                 access_token,
-                account_no,  # type: ignore[arg-type]
+                account_no,
                 is_mock,
             )
         )

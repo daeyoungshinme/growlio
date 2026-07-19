@@ -27,6 +27,21 @@ from app.services.recommendation_universe import (
 )
 
 
+@pytest.fixture(autouse=True)
+def _mock_market_signal():
+    """`get_market_signal`을 GREEN/LIVE로 고정해 실제 외부 API(FRED 등) 호출을 막는다.
+
+    GREEN은 `_SIGNAL_FRONTIER_DAMPENING`에 없어 감쇠 배율 1.0(기존 동작과 동일)이므로 이 파일의
+    다른 모든 기존 테스트 결과에 영향을 주지 않는다. 시장 신호 반영 자체를 검증하는 테스트는
+    이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
+    """
+    with patch(
+        "app.services.goal_recommendation_service.get_market_signal",
+        AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
+    ):
+        yield
+
+
 class TestSolveRequiredAnnualReturnPct:
     def test_low_return_sufficient_when_deposits_dominate(self):
         r = solve_required_annual_return_pct(pv=0, pmt=1000, n_months=100, goal_amount=90_000)
@@ -175,6 +190,73 @@ class TestOptimizeGoalPortfolio:
         assert conservative_expected < balanced_expected < aggressive_expected
         # 기본 40% 캡 하 달성 가능한 최대 가중평균 CAGR(0.4*15+0.4*6+0.2*3=9.0)을 넘지 않는다.
         assert aggressive_expected <= 9.0 + 0.05
+
+    def test_market_signal_level_dampens_frontier_target(self):
+        """시장 위험 신호가 YELLOW/RED이면 frontier_frac이 감쇠되어 GREEN/None보다 보수적인
+        (기대수익률이 더 낮은) 추천으로 수렴해야 한다 — RED가 YELLOW보다 더 보수적이어야 한다."""
+        random.seed(4)
+        returns_map = {
+            "A": [random.gauss(0.0003, 0.001) for _ in range(252)],
+            "B": [random.gauss(0.0006, 0.006) for _ in range(252)],
+            "C": [random.gauss(0.0006, 0.02) for _ in range(252)],
+        }
+        tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ"), ("C", "C", "NASDAQ")]
+        cagr_pct = [3.0, 6.0, 15.0]
+
+        def _run(market_signal_level: str | None) -> tuple[float, str | None]:
+            _, expected, note = _optimize_goal_portfolio(
+                symbols=["A", "B", "C"],
+                tickers=tickers,
+                cagr_pct=cagr_pct,
+                returns_map=returns_map,
+                required_return_pct=5.0,
+                risk_tolerance="AGGRESSIVE",
+                market_signal_level=market_signal_level,
+            )
+            return expected, note
+
+        green_expected, green_note = _run(None)
+        yellow_expected, yellow_note = _run("YELLOW")
+        red_expected, red_note = _run("RED")
+
+        assert red_expected < yellow_expected < green_expected
+        assert green_note is None
+        assert yellow_note is not None
+        assert "시장 위험 신호(YELLOW)" in yellow_note
+        assert red_note is not None
+        assert "시장 위험 신호(RED)" in red_note
+
+    def test_market_signal_level_no_effect_on_conservative(self):
+        """CONSERVATIVE는 frontier_frac이 이미 0이라 시장 신호 감쇠와 무관하게 결과가 동일해야 한다."""
+        random.seed(4)
+        returns_map = {
+            "A": [random.gauss(0.0003, 0.001) for _ in range(252)],
+            "B": [random.gauss(0.0006, 0.006) for _ in range(252)],
+        }
+        tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
+        cagr_pct = [3.0, 6.0]
+
+        no_signal_items, no_signal_expected, no_signal_note = _optimize_goal_portfolio(
+            symbols=["A", "B"],
+            tickers=tickers,
+            cagr_pct=cagr_pct,
+            returns_map=returns_map,
+            required_return_pct=2.0,
+            risk_tolerance="CONSERVATIVE",
+        )
+        red_items, red_expected, red_note = _optimize_goal_portfolio(
+            symbols=["A", "B"],
+            tickers=tickers,
+            cagr_pct=cagr_pct,
+            returns_map=returns_map,
+            required_return_pct=2.0,
+            risk_tolerance="CONSERVATIVE",
+            market_signal_level="RED",
+        )
+
+        assert no_signal_expected == pytest.approx(red_expected)
+        assert no_signal_items == red_items
+        assert no_signal_note == red_note
 
     def test_risk_tolerance_no_spread_returns_note(self):
         """후보 종목의 CAGR이 전부 동일하면 리스크 성향을 바꿔도 반영할 여지가 없으므로,
@@ -407,6 +489,11 @@ class TestGuessAssetClass:
     def test_bond_keyword_detected(self):
         assert guess_asset_class("KODEX 국고채3년") == "BOND"
         assert guess_asset_class("iShares 20+ Year Treasury Bond ETF") == "BOND"
+
+    def test_bond_mixed_fund_with_country_prefix_detected(self):
+        """'미국채'처럼 국가명+채권 축약형이 붙은 채권혼합형 펀드명도 BOND로 잡혀야 한다
+        (IRP 안전자산 30% 하한 계산에서 실보유 채권혼합 ETF가 위험자산으로 오분류되는 것을 방지)."""
+        assert guess_asset_class("ACE 미국나스닥100미국채혼합50액티브") == "BOND"
 
     def test_cash_keyword_detected(self):
         assert guess_asset_class("KODEX 단기채권") == "CASH"
@@ -699,6 +786,62 @@ class TestGetGoalRecommendation:
         assert result.cagr_lookback_years == 10
         assert result.risk_tolerance == "CONSERVATIVE"
         assert result.max_weight_pct == 40.0
+        # autouse _mock_market_signal이 GREEN을 반환하므로 그대로 echo된다
+        assert result.market_signal_level == "GREEN"
+
+    async def test_market_signal_level_propagates_to_result(self):
+        """시장 위험 신호(RED)가 결과의 market_signal_level에 그대로 반영되어야 한다."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=None,
+            goal_candidate_tickers=None,
+            goal_risk_tolerance="AGGRESSIVE",
+        )
+        cagr_map = {
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+            ("QQQ", "NASDAQ"): {"cagr_pct": 15.0},
+            ("VOO", "NYSE"): {"cagr_pct": 9.0},
+            ("VTI", "NYSE"): {"cagr_pct": 9.5},
+            ("SCHD", "NYSE"): {"cagr_pct": 8.0},
+            ("VYM", "NYSE"): {"cagr_pct": 7.0},
+            ("069500", "KOSPI"): {"cagr_pct": 6.0},
+            ("360750", "KOSPI"): {"cagr_pct": 9.0},
+            ("133690", "KOSPI"): {"cagr_pct": 14.0},
+            ("458730", "KOSPI"): {"cagr_pct": 5.0},
+        }
+        random.seed(7)
+        returns_map = {
+            sym: [random.gauss(0.0005, 0.01) for _ in range(252)]
+            for sym in ["SPY", "QQQ", "VOO", "VTI", "SCHD", "VYM", "069500.KS", "360750.KS", "133690.KS", "458730.KS"]
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_market_signal",
+                AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
+            ),
+        ):
+            mock_db = AsyncMock()
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
+
+        assert result.market_signal_level == "RED"
+        assert result.note is not None
+        assert "시장 위험 신호(RED)" in result.note
 
     async def test_infeasible_required_return_reports_note(self):
         """필요수익률(연 60%)이 해석 가능한 범위 내지만 모든 후보 CAGR을 초과하면 추천 없이 note만 채워진다."""
@@ -829,7 +972,12 @@ class TestGetGoalRecommendation:
             result = await get_goal_recommendation(None, 10_000_000.0, existing_items, settings_row, mock_db)
 
         assert settings_row.goal_candidate_tickers is not None
-        assert {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE"} in settings_row.goal_candidate_tickers
+        assert {
+            "ticker": "SPY",
+            "name": "SPDR S&P 500 ETF",
+            "market": "NYSE",
+            "asset_class": "EQUITY",
+        } in settings_row.goal_candidate_tickers
         assert len(settings_row.goal_candidate_tickers) <= MAX_GOAL_CANDIDATE_TICKERS
         mock_db.commit.assert_awaited_once()
         # 시드된 후보의 시세 데이터가 하나도 없으므로(cagr_map={}) 추천 없이 note만 채워짐
@@ -1867,6 +2015,68 @@ class TestGetHorizonRecommendations:
         safe_weight = sum(i.weight for i in rec.recommended_items if i.ticker != "133690")
         assert safe_weight >= 30.0 - 0.5
 
+    async def test_irp_long_term_uses_real_bond_candidate_instead_of_cash_equivalent(self):
+        """IRP+LONG_TERM(원래 EQUITY만 허용)에서 실보유 BOND 후보가 등록되어 있으면, 안전자산
+        30% 하한을 합성 CASH_EQUIVALENT가 아니라 그 실보유 후보로 채워야 한다.
+
+        회귀 대상 버그: 합성 CASH_EQUIVALENT는 분산·공분산이 0으로 가정되어 있어, 실제 변동성을
+        가진 진짜 채권형 ETF를 등록해도 MVO 목적함수(순수 분산 최소화) 상 항상 그 합성 자산이
+        우위를 점해 안전자산 몫 전체를 가져가 버리는 문제가 있었다 — 실보유 후보를 BOND로 정확히
+        태깅해도 절대 의미 있는 비중을 받지 못했다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {
+                    "ticker": "438100",
+                    "name": "ACE 미국나스닥100미국채혼합50액티브",
+                    "market": "KOSPI",
+                    "asset_class": "BOND",
+                },
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "IRP", account_id)]))
+
+        cagr_map = {
+            ("133690", "KOSPI"): {"cagr_pct": 12.0},
+            ("438100", "KOSPI"): {"cagr_pct": 5.0},
+        }
+        random.seed(23)
+        returns_map = {
+            "133690.KS": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            # 채권혼합형이라도 실제로는 변동성이 0이 아니다 — 이 값이 0에 가까우면 합성 자산과
+            # 사실상 구분이 안 돼 이 회귀 테스트의 취지(0-분산 합성 자산과의 경쟁)가 무의미해진다.
+            "438100.KS": [random.gauss(0.00015, 0.004) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        rec = result.recommendations[0]
+        assert rec.includes_cash_equivalent is False
+        bond_weight = next((i.weight for i in rec.recommended_items if i.ticker == "438100"), 0.0)
+        assert bond_weight >= 20.0
+
     async def test_isa_prefers_overseas_index_tracking_krx_etfs(self):
         """ISA는 국내상장이지만 해외지수를 추종하는 ETF(나스닥100/S&P500/다우존스)를 우선하고,
         국내지수 추종 종목/ETF(KODEX 200/삼성전자)는 후보에서 제외한다.
@@ -1987,6 +2197,65 @@ class TestGetHorizonRecommendations:
         queried_tickers = get_historical_returns_mock.call_args.args[0]
         assert set(queried_tickers) == {("069500", "KOSPI"), ("005930", "KOSPI"), ("000660", "KOSPI")}
         assert {item.ticker for item in rec.recommended_items} <= {"069500", "005930", "000660"}
+
+    async def test_market_signal_level_propagates_to_horizon_result(self):
+        """LONG_TERM(risk_tolerance=AGGRESSIVE)에서 시장 위험 신호(RED)가 결과에 반영되어야 한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "000660", "name": "SK하이닉스", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "133690", "name": "TIGER 미국나스닥100", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "GENERAL", account_id)]))
+
+        cagr_map = {
+            ("069500", "KOSPI"): {"cagr_pct": 6.0},
+            ("005930", "KOSPI"): {"cagr_pct": 7.0},
+            ("000660", "KOSPI"): {"cagr_pct": 8.0},
+            ("133690", "KOSPI"): {"cagr_pct": 14.0},
+            ("360750", "KOSPI"): {"cagr_pct": 9.0},
+        }
+        random.seed(23)
+        returns_map = {
+            sym: [random.gauss(0.0005, 0.01) for _ in range(252)]
+            for sym in ["069500.KS", "005930.KS", "000660.KS", "133690.KS", "360750.KS"]
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 2_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_market_signal",
+                AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        rec = result.recommendations[0]
+        assert rec.market_signal_level == "RED"
+        assert rec.note is not None
+        assert "시장 위험 신호(RED)" in rec.note
 
     async def test_isa_auto_augments_with_curated_etfs_when_none_registered(self):
         """ISA인데 등록된 후보 전부 국내지수 추종이면(해외지수 추종 ETF 없음) 국내 개별주식(005930 등)을

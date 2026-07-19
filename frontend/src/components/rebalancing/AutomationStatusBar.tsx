@@ -1,4 +1,5 @@
 import { Bell, Zap } from "lucide-react";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface ExistingAlertLike {
   mode?: "NOTIFY" | "AUTO";
@@ -25,7 +26,7 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
         }}
         title="리밸런싱 자동화 설정"
         aria-label="리밸런싱 자동화 설정"
-        className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
+        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
           isAuto
             ? "bg-orange-100 dark:bg-orange-950 text-orange-600 dark:text-orange-400 hover:bg-orange-200 dark:hover:bg-orange-900"
             : hasAlert
@@ -57,7 +58,7 @@ export default function AutomationStatusBar({ existingAlert, onOpenAlertModal, c
       )}
       <button
         onClick={onOpenAlertModal}
-        className="self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3"
+        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} self-end sm:self-auto text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap sm:ml-3`}
       >
         {existingAlert ? "설정 변경" : "자동화 설정"}
       </button>

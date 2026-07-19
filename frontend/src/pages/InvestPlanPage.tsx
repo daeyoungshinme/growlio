@@ -9,7 +9,7 @@ import { api } from "@/api/client";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
@@ -134,12 +134,14 @@ export default function InvestPlanPage() {
             </button>
           ))}
         </div>
-        <Link
-          to="/rebalancing?rtab=진단"
-          className="ml-auto text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-        >
-          포트폴리오 비중 진단 보기 →
-        </Link>
+        <div className="ml-auto flex items-center gap-3">
+          <Link
+            to="/rebalancing?rtab=포트폴리오"
+            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            목표 기반 포트폴리오 추천 보기 →
+          </Link>
+        </div>
       </div>
 
       <div ref={tabContentRef}>
@@ -309,14 +311,25 @@ export default function InvestPlanPage() {
         <Modal title="적립 계획 설정 편집" onClose={handleCloseModal} size="md">
           <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
             {[
-              { label: "월 적립액 (원)", key: "monthly_deposit_amount", placeholder: "500000" },
+              {
+                label: "월 적립액 (원)",
+                key: "monthly_deposit_amount",
+                placeholder: "500000",
+                inputMode: "numeric",
+              },
               {
                 label: "목표 연수익률 (%)",
                 key: "goal_annual_return_pct",
                 placeholder: "8",
                 hint: "대시보드 투자 목표 카드에 표시",
+                inputMode: "decimal",
               },
-              { label: "목표 금액 (원)", key: "goal_amount", placeholder: "500000000" },
+              {
+                label: "목표 금액 (원)",
+                key: "goal_amount",
+                placeholder: "500000000",
+                inputMode: "numeric",
+              },
               {
                 label: "투자 시작일",
                 key: "goal_start_date",
@@ -328,24 +341,28 @@ export default function InvestPlanPage() {
                 key: "goal_initial_amount",
                 placeholder: "100000000",
                 hint: "비워두면 스냅샷 자동 사용",
+                inputMode: "numeric",
               },
               {
                 label: "연간 입금 목표 (원)",
                 key: "annual_deposit_goal",
                 placeholder: "24000000",
                 hint: "대시보드 입금 달성률에 표시",
+                inputMode: "numeric",
               },
               {
                 label: "은퇴 목표시점 (연도)",
                 key: "retirement_target_year",
                 placeholder: "2045",
                 hint: "대시보드 투자 목표 카드에 표시",
+                inputMode: "numeric",
               },
-            ].map(({ label, key, placeholder, type, hint }) => (
+            ].map(({ label, key, placeholder, type, hint, inputMode }) => (
               <FormInput
                 key={key}
                 label={label}
                 type={type ?? "number"}
+                inputMode={type ? undefined : (inputMode as "numeric" | "decimal")}
                 value={form[key as keyof typeof form]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 placeholder={placeholder}
@@ -356,14 +373,14 @@ export default function InvestPlanPage() {
             <div className="flex gap-3 pt-4">
               <button
                 onClick={handleCloseModal}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
               >
                 취소
               </button>
               <button
                 onClick={saveSettings}
                 disabled={saving}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
               >
                 {saving ? "저장 중..." : "저장"}
               </button>
@@ -393,6 +410,7 @@ export default function InvestPlanPage() {
             <FormInput
               label="목표 연간 배당금 (원)"
               type="number"
+              inputMode="numeric"
               value={dividendForm.annual_dividend_goal}
               onChange={(e) =>
                 setDividendForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))
@@ -404,14 +422,14 @@ export default function InvestPlanPage() {
             <div className="flex gap-3 pt-4">
               <button
                 onClick={handleDividendCloseModal}
-                className="flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
               >
                 취소
               </button>
               <button
                 onClick={saveDividendSettings}
                 disabled={dividendSaving}
-                className="flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
               >
                 {dividendSaving ? "저장 중..." : "저장"}
               </button>

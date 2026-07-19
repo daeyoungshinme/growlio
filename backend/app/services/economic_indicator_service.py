@@ -1,4 +1,4 @@
-"""경제지표 서비스 — FRED(미국) + ECOS 한국은행(한국) API 연동."""
+"""경제지표 서비스 — FRED(미국) API 연동."""
 
 from __future__ import annotations
 

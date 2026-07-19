@@ -5,11 +5,11 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 
+from app.constants import REDIS_TOKEN_TTL_BUFFER
 from app.kiwoom.constants import (
     KIWOOM_MOCK_BASE_URL,
     KIWOOM_REAL_BASE_URL,
     REDIS_KIWOOM_TOKEN_KEY,
-    REDIS_TOKEN_TTL_BUFFER,
 )
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client

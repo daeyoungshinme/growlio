@@ -148,7 +148,7 @@ def resolve_index_region(ticker: str, market: str, explicit: str | None) -> str:
 
 
 _CASH_NAME_PATTERN = re.compile(r"단기채|파킹|CMA|머니마켓|Money\s*Market|CD\s*금리", re.IGNORECASE)
-_BOND_NAME_PATTERN = re.compile(r"채권|국고채|회사채|Bond|Treasury", re.IGNORECASE)
+_BOND_NAME_PATTERN = re.compile(r"채권|국고채|회사채|국채|Bond|Treasury", re.IGNORECASE)
 
 
 def guess_asset_class(name: str) -> str:

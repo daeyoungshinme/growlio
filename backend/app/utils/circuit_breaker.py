@@ -115,3 +115,5 @@ yahoo_circuit = _make("YahooFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_rese
 dart_circuit = _make("DART", _cfg().cb_default_fail_max, _cfg().cb_ext_reset_timeout)
 naver_circuit = _make("NaverFinance", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
 fdr_circuit = _make("FinanceDataReader", _cfg().cb_ext_fail_max, _cfg().cb_ext_reset_timeout)
+fear_greed_circuit = _make("FearGreedAPI", _cfg().cb_fng_fail_max, _cfg().cb_fng_reset_timeout)
+fred_circuit = _make("FREDAPI", _cfg().cb_fred_fail_max, _cfg().cb_fred_reset_timeout)

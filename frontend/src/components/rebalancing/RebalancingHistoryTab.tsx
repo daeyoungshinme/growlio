@@ -14,6 +14,7 @@ import {
   type RebalancingPlanLegSummary,
 } from "@/api/rebalancingPlan";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateRebalancingPlanData } from "@/utils/queryInvalidation";
 import { extractErrorMessage } from "@/utils/error";
@@ -313,10 +314,10 @@ function PendingPlanRow({
   const sideKrLabel = leg.side === "BUY" ? "매수" : "매도";
 
   return (
-    <div className="border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3">
+    <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center justify-between gap-3 flex-wrap text-left"
+        className="w-full flex items-center justify-between gap-3 flex-wrap text-left px-4 py-3"
       >
         <div className="flex items-center gap-2">
           <span
@@ -341,33 +342,35 @@ function PendingPlanRow({
           )}
         </div>
       </button>
-      <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-        {itemsSummary} ({leg.items.length}건)
-      </p>
-      {leg.error_message && (
-        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{leg.error_message}</p>
-      )}
+      <div className="px-4 pb-3">
+        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+          {itemsSummary} ({leg.items.length}건)
+        </p>
+        {leg.error_message && (
+          <p className="text-xs text-red-600 dark:text-red-400 mt-1">{leg.error_message}</p>
+        )}
 
-      {open && <PendingPlanItemsDetail items={leg.items} />}
+        {open && <PendingPlanItemsDetail items={leg.items} />}
 
-      {leg.status === "PENDING" && leg.actionable && (
-        <div className="flex items-center gap-4 mt-2">
-          <button
-            onClick={() => setConfirming(true)}
-            disabled={isPending}
-            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:opacity-50"
-          >
-            {leg.side === "BUY" ? "지금 매수 실행" : "매도 실행"}
-          </button>
-          <button
-            onClick={onCancel}
-            disabled={isPending}
-            className="text-xs text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 disabled:opacity-50"
-          >
-            {leg.side === "BUY" ? "매수 취소" : "매도 거부"}
-          </button>
-        </div>
-      )}
+        {leg.status === "PENDING" && leg.actionable && (
+          <div className="flex items-center gap-4 mt-2">
+            <button
+              onClick={() => setConfirming(true)}
+              disabled={isPending}
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 disabled:opacity-50`}
+            >
+              {leg.side === "BUY" ? "지금 매수 실행" : "매도 실행"}
+            </button>
+            <button
+              onClick={onCancel}
+              disabled={isPending}
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 disabled:opacity-50`}
+            >
+              {leg.side === "BUY" ? "매수 취소" : "매도 거부"}
+            </button>
+          </div>
+        )}
+      </div>
 
       {confirming && (
         <ConfirmModal
@@ -397,7 +400,12 @@ export default function RebalancingHistoryTab() {
     queryKey: QUERY_KEYS.rebalancingPlans,
     queryFn: () => fetchRecentPlanLegs(30),
     staleTime: 15_000,
-    refetchInterval: 30_000,
+    // 대기 중(PENDING)인 leg가 있을 때만 30초마다 폴링 — 전부 확정된 상태면 서버 상태가 바뀔 일이
+    // 없으므로 탭이 열려 있는 동안 계속 폴링할 필요가 없다.
+    refetchInterval: (query) => {
+      const legs = query.state.data as RebalancingPlanLegSummary[] | undefined;
+      return legs?.some((leg) => leg.status === "PENDING") ? 30_000 : false;
+    },
   });
 
   const cancelMut = useMutation({

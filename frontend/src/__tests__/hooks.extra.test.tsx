@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import React from "react";
 import type { AssetAccount } from "@/api/assets";
 // renderWithProviders is not used here - using createWrapper instead
@@ -499,5 +499,65 @@ describe("useSwipeNavigation", () => {
     expect(removeEventListenerSpy).toHaveBeenCalledWith("touchend", expect.any(Function));
 
     document.body.removeChild(container);
+  });
+});
+
+// AssetsPage(상위 useSwipeTabs) 안에 PortfolioPage/AssetManagementPage(하위 useSwipeTabs)가 중첩되는
+// 실제 구조를 재현 — 안쪽 탭 스와이프가 바깥쪽 페이지 전환 스와이프(useSwipeNavigation)로 전파되지
+// 않는지 검증 (useSwipeNavigation.ts의 useSwipeTabs가 handleSwipe 최상단에서 e.stopPropagation() 호출)
+function fireSwipe(el: Element, deltaX: number) {
+  const start = new Event("touchstart", { bubbles: true });
+  Object.defineProperty(start, "touches", { value: [{ clientX: 200, clientY: 100 }] });
+  el.dispatchEvent(start);
+
+  const end = new Event("touchend", { bubbles: true });
+  Object.defineProperty(end, "changedTouches", {
+    value: [{ clientX: 200 + deltaX, clientY: 100 }],
+  });
+  el.dispatchEvent(end);
+}
+
+describe("useSwipeTabs nested inside useSwipeNavigation", () => {
+  it("stops propagation so an inner tab swipe does not also trigger outer page navigation", async () => {
+    const { useSwipeNavigation, useSwipeTabs } = await import("@/hooks/useSwipeNavigation");
+    const TABS = ["A", "B"] as const;
+
+    function LocationDisplay() {
+      const location = useLocation();
+      return <div data-testid="location">{location.pathname}</div>;
+    }
+
+    function TestTree() {
+      const outerRef = React.useRef<HTMLDivElement>(null);
+      const innerRef = React.useRef<HTMLDivElement>(null);
+      const [activeTab, setActiveTab] = React.useState<(typeof TABS)[number]>("A");
+      useSwipeNavigation(outerRef);
+      useSwipeTabs(innerRef, TABS, activeTab, setActiveTab);
+      return (
+        <div ref={outerRef}>
+          <div ref={innerRef} data-testid="inner">
+            {activeTab}
+          </div>
+          <LocationDisplay />
+        </div>
+      );
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/assets"]}>
+        <TestTree />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("location").textContent).toBe("/assets");
+
+    // 왼쪽으로 스와이프 — 하위 탭은 다음 탭("B")으로, 상위 페이지는 다음 라우트("/rebalancing")로
+    // 전환될 수 있는 조건. stopPropagation이 없다면 두 전환이 동시에 발생해야 한다.
+    act(() => {
+      fireSwipe(screen.getByTestId("inner"), -100);
+    });
+
+    expect(screen.getByTestId("inner").textContent).toBe("B");
+    expect(screen.getByTestId("location").textContent).toBe("/assets");
   });
 });

@@ -1,6 +1,8 @@
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { LineChart, TrendingDown, TrendingUp } from "lucide-react";
 import type { InflationIndicatorSummary } from "@/api/economicIndicators";
 import { fmtPct } from "@/utils/format";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
+import { useCollapsible } from "@/hooks/useCollapsible";
 
 interface Props {
   data: InflationIndicatorSummary[];
@@ -13,16 +15,19 @@ function formatReleaseDate(dateStr: string | null): string {
 }
 
 export default function InflationSummaryCard({ data }: Props) {
+  const [isOpen, toggleOpen] = useCollapsible(false);
+
   if (data.length === 0) return null;
 
   return (
-    <div className="rounded-xl border bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700">
-      <div className="px-4 py-3">
-        <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
-          물가 지표 (미국)
-        </span>
-      </div>
-      <div className="px-4 pb-3 space-y-2.5 border-t border-inherit pt-2.5">
+    <CollapsibleCard
+      icon={LineChart}
+      title="물가 지표 (미국)"
+      isOpen={isOpen}
+      onToggle={toggleOpen}
+      cardClassName="rounded-xl border bg-white border-gray-200 dark:bg-gray-800 dark:border-gray-700 p-4"
+    >
+      <div className="space-y-2.5">
         {data.map((item) => {
           const yoy = item.yoy_change_pct;
           const TrendIcon = yoy != null && yoy < 0 ? TrendingDown : TrendingUp;
@@ -44,6 +49,6 @@ export default function InflationSummaryCard({ data }: Props) {
           );
         })}
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }

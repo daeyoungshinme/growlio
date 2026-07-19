@@ -38,4 +38,3 @@ DOMESTIC_MARKET_DIV = "J"  # 주식
 DOMESTIC_MARKET_DIV_ETF = "E"  # ETF/ETN
 
 REDIS_TOKEN_KEY = "kis_token:{user_id}:{mode}"  # nosec B105 — Redis 키 템플릿; mode: real | mock
-REDIS_TOKEN_TTL_BUFFER = 300  # 만료 5분 전 갱신

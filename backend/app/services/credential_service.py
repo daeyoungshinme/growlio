@@ -5,6 +5,7 @@ from __future__ import annotations
 import binascii
 import os
 import uuid
+from typing import TYPE_CHECKING
 
 import structlog
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -12,6 +13,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+
+if TYPE_CHECKING:
+    from app.models.asset import AssetAccount
 
 logger = structlog.get_logger()
 
@@ -50,6 +54,20 @@ def decrypt(ciphertext_hex: str) -> str:
         raise ValueError("Decryption failed") from e
 
 
+def decrypt_kis_credentials(account: AssetAccount) -> tuple[str, str] | None:
+    """계좌의 KIS App Key/Secret을 복호화한다. 둘 중 하나라도 미설정이면 None."""
+    if not account.kis_app_key or not account.kis_app_secret:
+        return None
+    return decrypt(account.kis_app_key), decrypt(account.kis_app_secret)
+
+
+def decrypt_kiwoom_credentials(account: AssetAccount) -> tuple[str, str] | None:
+    """계좌의 키움 App Key/Secret을 복호화한다. 둘 중 하나라도 미설정이면 None."""
+    if not account.kiwoom_app_key or not account.kiwoom_app_secret:
+        return None
+    return decrypt(account.kiwoom_app_key), decrypt(account.kiwoom_app_secret)
+
+
 async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict | None:
     """유저의 활성 KIS 계좌 자격증명을 조회해 액세스 토큰까지 발급한다.
 
@@ -71,10 +89,10 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     if not account:
         return None
 
-    if not account.kis_app_key or not account.kis_app_secret:
+    creds = decrypt_kis_credentials(account)
+    if creds is None:
         raise ValueError("KIS credentials are not configured for this account")
-    app_key = decrypt(account.kis_app_key)
-    app_secret = decrypt(account.kis_app_secret)
+    app_key, app_secret = creds
     is_mock = account.is_mock_mode
 
     try:

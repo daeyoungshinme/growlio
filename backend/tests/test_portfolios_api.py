@@ -128,6 +128,7 @@ class TestUpdatePortfolio:
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                patch("app.api.v1.portfolios.invalidate_rebalancing_analysis_cache", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -273,7 +274,9 @@ class TestDeletePortfolio:
                 patch(
                     "app.api.v1.portfolios.get_redis",
                     new_callable=AsyncMock,
-                    return_value=AsyncMock(delete=AsyncMock()),
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -562,6 +565,7 @@ class TestUpdatePortfolioExtended:
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                patch("app.api.v1.portfolios.invalidate_rebalancing_analysis_cache", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -588,6 +592,7 @@ class TestUpdatePortfolioExtended:
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                patch("app.api.v1.portfolios.invalidate_rebalancing_analysis_cache", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(
@@ -619,6 +624,7 @@ class TestUpdatePortfolioExtended:
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
                 patch("app.api.v1.portfolios.invalidate_user_caches", AsyncMock()),
+                patch("app.api.v1.portfolios.invalidate_rebalancing_analysis_cache", AsyncMock()),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
                 resp = client.put(

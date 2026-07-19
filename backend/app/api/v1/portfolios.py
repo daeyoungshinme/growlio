@@ -22,6 +22,7 @@ from app.schemas.portfolio import (
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_LIST,
     get_cached_json,
+    invalidate_rebalancing_analysis_cache,
     invalidate_user_caches,
     portfolio_list_key,
     set_cached_json,
@@ -223,6 +224,7 @@ async def update_portfolio(
 
     redis = await get_redis()
     await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+    await invalidate_rebalancing_analysis_cache(redis, current_user.id, portfolio_id)
 
     result2 = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio_id)))
     return result2.scalar_one()
@@ -244,6 +246,7 @@ async def delete_portfolio(
 
     redis = await get_redis()
     await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+    await invalidate_rebalancing_analysis_cache(redis, current_user.id, portfolio_id)
 
 
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)

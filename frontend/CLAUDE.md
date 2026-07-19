@@ -138,6 +138,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
 - `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
+- `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
@@ -153,6 +154,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `usePushNotifications.ts` / `useRegisterRefresh.ts` / `useWidget.ts` — FCM 푸시·홈 위젯 (Android)
 - `useSyncAllWatcher.ts` — "전체 갱신"(계좌 전체 동기화) 백그라운드 진행 상태 폴링. `App.tsx`의 `AppRoutes()` 최상단에서 한 번만 마운트되어 탭 이동과 무관하게 계속 폴링 — 진행 상태는 `stores/syncStore.ts`(Zustand)로 관리
 - `useTransactionFormState.ts` — 거래내역 입력 폼 상태
+- `useCapsLockWarning.ts` — 비밀번호 입력 시 Caps Lock 켜짐 여부 감지 (로그인/회원가입 폼)
 
 새 커스텀 훅은 이 디렉토리에 추가/삭제 시 위 목록도 갱신.
 
@@ -164,7 +166,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`)
-- `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`)). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수 사용
+- `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`: 배지/탭/필터 칩처럼 조밀하게 나열되는 보조 요소용 절충 터치 타겟(36px, 모바일 전용). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수들 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`)
 - `nav.ts` — `BottomNav` 탭 정의 (홈/자산/리밸런싱/계획/설정 5탭)
@@ -225,24 +227,46 @@ cd frontend && npx playwright test
 |--------|----------|
 | 대시보드 집계 | `["dashboard"]` |
 | 포트폴리오 overview | `["portfolio-overview"]` |
+| 포트폴리오 overview (경량) | `["portfolio-overview", "lite"]` |
 | 포트폴리오/백테스트/리밸런싱 탭 | `["portfolios"]` |
 | 전체 계좌 목록 | `["accounts"]` |
 | 계좌별 포지션 | `["account-positions", accountId]` |
+| 계좌별 거래내역 | `["transactions", accountId]` |
 | 전체 거래내역 (무기간) | `["transactions", "all"]` |
 | 연도별 거래내역 | `["transactions", "all", year]` |
 | 배당금 티커별 | `["dividend-by-ticker"]` |
 | 배당금 요약 | `["dividend-summary"]` |
 | 배당금 포지션 | `["dividend-positions"]` |
 | DCA 분석 (InvestPlanPage + DashboardPage) | `["dca-analysis"]` |
+| 배당 계획 (연/월배당) | `["dividend-plan"]` |
+| 배당 월별 균등화 제안 | `["monthly-optimization"]` |
 | 설정 | `["settings"]` |
 | 현재 환율 | `["exchange-rate"]` |
 | 환율 알림 목록 | `["exchange-rate-alerts"]` |
 | 주가 알림 목록 | `["stock-price-alerts"]` |
 | 리밸런싱 알림 목록 | `["rebalancing-alerts"]` |
 | 포트폴리오별 리밸런싱 알림 | `["rebalancing-alert", portfolioId]` |
+| 포트폴리오 내 계좌별 알림 목록 | `["rebalancing-alert", portfolioId, "accounts"]` |
+| 계좌별 개별 알림 | `["rebalancing-alert", portfolioId, "accounts", accountId]` |
+| 리밸런싱 실행 이력 | `["rebalancing-history"]` |
+| 리밸런싱 대기 플랜 목록 | `["rebalancing-plans"]` |
+| 리밸런싱 전략 | `["rebalancing-strategy", portfolioId]` |
+| 드리프트 경량 요약 (대시보드) | `["drift-summary"]` |
 | 세금 추정 요약 | `["tax-summary", year]` |
+| 해외 포지션 양도세 계획 | `["overseas-positions-tax"]` |
+| ISA 만기 현황 | `["isa-status"]` |
+| 연금 납입 현황 | `["pension-contribution", year]` |
+| 자산배분 이력 | `["allocation-history", months]` |
+| 알림 발송 이력 | `["alert-history"]` |
+| 인사이트/진단 | `["insights"]` |
+| 포트폴리오 리스크 지표 | `["portfolio-risk", id]` |
+| 시장 위험 신호 | `["market-signal"]` |
+| 복합신호 (시장/리스크) 상태 | `["composite-signal-status"]` |
+| 목표 역산 추천 (전체 자산) | `["goal-recommendation", "overall"]` |
+| 목표 역산 추천 (투자기간별) | `["goal-recommendation", "by-horizon"]` |
+| CPI/Core CPI 인플레이션 요약 | `["inflation-summary"]` |
 
-> 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지.
+> 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지. 새 키 추가 시 이 표도 함께 갱신.
 
 **mutation 후 캐시 무효화**
 - 트랜잭션 CUD → `["transactions", "all"]` + `["dashboard"]` 동시 무효화.
@@ -283,6 +307,8 @@ cd frontend && npx playwright test
 **포트폴리오 유틸리티 (`src/utils/portfolio.ts`)**
 - `groupPositionsByTicker(positions)` — 종목 배열을 ticker+market 기준으로 집계. 여러 계좌 보유 종목 합산 표시 시 사용.
 - `getPortfolioTargetState(portfolio, stockAccounts)` — 포트폴리오의 연결 계좌가 "목표 포트폴리오"로 전부/일부/전혀 지정 안 됐는지 판별 ("full"/"partial"/"none").
+- `getPortfolioHorizon(portfolio, stockAccounts)` / `getPortfolioHorizonTaxType(portfolio, stockAccounts)` — 포트폴리오의 `investment_horizon`(+`tax_type`) 명시값이 없으면 "기준 포트폴리오"로 지정된 계좌들의 태그가 전부 동일할 때만 역으로 추론. 목표 역산 추천(`RecommendationCard`) 적용 시 어느 포트폴리오가 어느 (기간, 세제유형) 카드를 담당하는지 판별.
+- `inferHorizonTaxTypeFromAccounts(accounts)` — 계좌 목록의 `investment_horizon`/`tax_type`이 전부 동일하면 반환. 추천 비중 카드에서 계좌가 미리 선택된 채로 새 포트폴리오를 만들 때 두 태그 초기값을 채우는 데 사용.
 - `mergeAlertsByPortfolio(alerts)` — PER_ACCOUNT 스코프 포트폴리오의 계좌별 알림을 portfolio_id 기준으로 병합 (하나라도 AUTO면 병합 결과도 AUTO 표시).
 
 **리밸런싱 알림 설명 유틸리티 (`src/utils/rebalancingAlertDescription.ts`)**
@@ -306,6 +332,10 @@ cd frontend && npx playwright test
   ```
 - 직접 `text-red-500` / `text-blue-500` 인라인 작성 금지 (색상 관례 변경 시 일괄 교체 불가).
 
+**리스크 유틸리티 (`src/utils/riskLevel.ts`)**
+- `buildMetrics(m)` — `PortfolioRiskMetrics`를 `RiskMetricsCard` 표시용 `MetricConfig[]`로 변환.
+- `summarizeRiskLevel(...)` — 리스크 레벨(`RiskLevel`: low/medium/high) 판정 + `LEVEL_BADGE` 색상 매핑. `RiskMetricsCard.tsx`/`DiagnosisSummaryHeader.tsx`가 소비.
+
 **배당 유틸리티 (`src/utils/dividendUtils.ts`)**
 - `yieldBadgeClass(yield)` — 배당수익률에 따른 Tailwind 뱃지 클래스 반환 (≥7%: 초록, ≥4%: 에메랄드, ≥2%: 황색).
 - `dividendFreqInfo(months, isManual)` — 월 배열로 배당 주기 레이블·색상 반환 (월배당/분기배당/반기배당/연배당).
@@ -323,6 +353,8 @@ cd frontend && npx playwright test
 **모바일 UI 최소 크기 규칙**
 - 텍스트는 `text-xs`(12px) 미만 임의값(`text-[9px]`, `text-[10px]` 등) 사용 금지 — 모바일 가독성 저하.
 - 인터랙티브 요소(버튼/입력 등) 터치 영역은 `src/constants/uiSizes.ts`의 `TOUCH_TARGET_MIN`(`min-h-[44px] min-w-[44px]`) 사용.
+- 단, 배지/탭/필터 칩/보조 링크/카드 내부 아이콘 버튼처럼 여러 개가 조밀하게 나열되는 요소는 44px 강제 시 시각적으로 뭉툭해져 오히려 가독성이 떨어질 수 있다 — 이 경우 `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px, WCAG AA 24px 이상 충족)를 사용해도 된다.
+- 단, `StockAccountCard.tsx`/`BankAccountCard.tsx`/`PortfolioItemRow.tsx`의 삭제 버튼처럼 이미 앱 전역에 44px로 정착된 아이콘 버튼 패턴은 개별 화면에서 임의로 축소하지 말 것 — 화면 간 일관성이 깨짐.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.

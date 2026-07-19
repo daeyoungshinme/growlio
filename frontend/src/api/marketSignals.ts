@@ -40,6 +40,7 @@ export type RateCutExpectationLevel =
   | "CUT_EXPECTED"
   | "DEEP_CUT_EXPECTED";
 export type ExchangeRateLevel = "NORMAL" | "ELEVATED" | "HIGH" | "BREAKOUT";
+export type OilPriceLevel = "NORMAL" | "ELEVATED" | "HIGH" | "BREAKOUT";
 
 export interface HighYieldSpreadSignal {
   value: number;
@@ -75,6 +76,15 @@ export interface ExchangeRateSignal {
   sub_score: number;
 }
 
+export interface OilPriceSignal {
+  value: number; // WTI 현물유가(DCOILWTICO)
+  ma20: number;
+  deviation_pct: number; // 급등/급락 모두 절대값 기준으로 레벨 판정
+  level: OilPriceLevel;
+  date: string;
+  sub_score: number;
+}
+
 export interface MarketSignalResponse {
   composite_level: MarketRiskLevel;
   composite_score: number;
@@ -89,6 +99,7 @@ export interface MarketSignalResponse {
     dollar_index: DollarIndexSignal | null;
     rate_cut_expectation: RateCutExpectationSignal | null;
     exchange_rate: ExchangeRateSignal | null;
+    oil_price: OilPriceSignal | null;
   };
   computed_at: string;
   data_freshness: "LIVE" | "CACHED" | "PARTIAL" | "STALE";

@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
-from app.services.credential_service import decrypt
+from app.services.credential_service import decrypt_kis_credentials
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
     _sync_calc_returns_batch,
@@ -208,11 +208,12 @@ async def get_historical_returns(
     return_map: dict[tuple[str, str], dict] = {}
     missing: list[tuple[str, str]] = []
 
-    for ticker, market in tickers:
-        cached = None
-        if redis:
-            with contextlib.suppress(RedisError):
-                cached = await redis.get(price_return_key(years, ticker, market))
+    cached_values: list[str | None] = [None] * len(tickers)
+    if redis:
+        with contextlib.suppress(RedisError):
+            cached_values = await redis.mget([price_return_key(years, t, m) for t, m in tickers])
+
+    for (ticker, market), cached in zip(tickers, cached_values, strict=False):
         if cached:
             return_map[(ticker, market)] = json.loads(cached)
         else:
@@ -287,9 +288,12 @@ async def _price_via_kis(
 
     from app.kis.auth import get_access_token
 
+    creds = decrypt_kis_credentials(account)
+    if creds is None:
+        return None
+    app_key, app_secret = creds
+
     try:
-        app_key = decrypt(account.kis_app_key)  # type: ignore[arg-type]
-        app_secret = decrypt(account.kis_app_secret)  # type: ignore[arg-type]
         is_mock = account.is_mock_mode
         token = await get_access_token(
             app_key,
@@ -310,7 +314,8 @@ async def _price_via_kis(
 
             result = await get_overseas_price(app_key, app_secret, token, ticker, market, is_mock=is_mock)
             price = float(result.get("price", 0)) or None
-    except Exception:
+    except Exception as e:
+        logger.warning("kis_price_fetch_failed", ticker=ticker, market=market, error=str(e))
         kis_circuit.record_failure()
         raise
 

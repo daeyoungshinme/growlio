@@ -194,7 +194,8 @@ def fetch_yf_info(
     def _fetch_one(sym: str) -> tuple[str, dict]:
         try:
             return sym, yf.Ticker(sym).info or {}
-        except Exception:
+        except Exception as e:
+            logger.warning("yf_info_fetch_one_failed", symbol=sym, error=str(e))
             return sym, {}
 
     info_map: dict[str, dict] = {}

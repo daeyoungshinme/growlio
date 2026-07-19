@@ -28,6 +28,7 @@ import type { PortfolioDriftSummary } from "@/api/rebalancing";
 import { toast } from "@/utils/toast";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 function SortablePortfolioItem({
   id,
@@ -126,7 +127,8 @@ const PortfolioCard = memo(function PortfolioCard({
         <button
           {...dragHandleListeners}
           onClick={(e) => e.stopPropagation()}
-          className="mt-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none"
+          aria-label="포트폴리오 순서 변경"
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing flex-shrink-0 touch-none`}
         >
           <GripVertical size={14} />
         </button>
@@ -159,14 +161,14 @@ const PortfolioCard = memo(function PortfolioCard({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-0.5 flex-shrink-0 mt-0.5">
+        <div className="flex flex-wrap items-center justify-end gap-0.5 flex-shrink-0 mt-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onOpenEditor(p);
             }}
             aria-label="포트폴리오 수정"
-            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg transition-colors`}
           >
             <Edit2 size={14} />
           </button>
@@ -176,7 +178,7 @@ const PortfolioCard = memo(function PortfolioCard({
               onConfirmDelete(p.id);
             }}
             aria-label="포트폴리오 삭제"
-            className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+            className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors`}
           >
             <Trash2 size={14} />
           </button>
@@ -207,7 +209,7 @@ const PortfolioCard = memo(function PortfolioCard({
           disabled={isTargetPending}
           aria-label="기준 포트폴리오 지정"
           title={tState !== "none" ? "기준 포트폴리오 해제" : "이 포트폴리오를 기준으로 지정"}
-          className={`flex items-center gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-0.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium ${
             tState === "full"
               ? "bg-blue-100 dark:bg-blue-950 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900"
               : tState === "partial"
@@ -323,7 +325,7 @@ export default function PortfolioListSection({
         <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">포트폴리오</h3>
         <button
           onClick={() => onOpenEditor(null)}
-          className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors"
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-gray-700 transition-colors`}
         >
           <Plus size={13} /> 새로 만들기
         </button>

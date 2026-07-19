@@ -108,7 +108,7 @@ cd backend && uv run mypy app/
 
 ### 데이터 모델
 
-- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정. ISA 계좌는 `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`로 의무가입 만기·수동입력 누적손익 관리
+- `AssetAccount` — 계좌 마스터. `asset_type`(BANK_ACCOUNT/DEPOSIT/STOCK_KIS/STOCK_KIWOOM/STOCK_OTHER/CASH_OTHER/REAL_ESTATE/OTHER)과 `data_source`(MANUAL/KIS_API/KIWOOM_API) 조합으로 동작 결정. ISA 계좌는 `isa_open_date`/`isa_type`(GENERAL/PREFERENTIAL)/`isa_manual_cumulative_pnl_krw`로 의무가입 만기·수동입력 누적손익 관리. `tax_type`(GENERAL/ISA/PENSION_SAVINGS/IRP/OVERSEAS_DEDICATED)은 세제 성격(리밸런싱 세금 계산·매도 우선순위에 사용), `investment_horizon`(SHORT_TERM/MID_TERM/LONG_TERM/null)은 투자기간 그룹핑 태그 — 둘 다 `Portfolio`에도 동일 컬럼 존재하며 목표 역산 추천(`goal_recommendation_service.py`, 프론트 `RecommendationCard`)이 어느 포트폴리오가 어느 (기간, 세제유형) 조합을 담당하는지 매칭하는 데 사용
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
@@ -255,7 +255,7 @@ providers/                    # 금융 데이터 provider
   └── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
-  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART 5회→120s. 재시작 시 상태 초기화됨.
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FearGreedAPI 3회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW Redis 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── market_hours.py         # KRX/NYSE 개장 여부 판단
   ├── metrics.py              # Prometheus 커스텀 메트릭 (broker_sync_duration, alert_trigger_count 등) — `/metrics` 엔드포인트로 노출

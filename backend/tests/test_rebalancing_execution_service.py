@@ -371,7 +371,10 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
+            patch(
+                "app.services.rebalancing.execution_service.decrypt_kis_credentials",
+                return_value=("decrypted", "decrypted"),
+            ),
             patch(
                 "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,
@@ -425,7 +428,10 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
+            patch(
+                "app.services.rebalancing.execution_service.decrypt_kis_credentials",
+                return_value=("decrypted", "decrypted"),
+            ),
             patch(
                 "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,
@@ -470,7 +476,10 @@ class TestExecuteRebalancing:
         mock_db.add = MagicMock()
 
         with (
-            patch("app.services.rebalancing.execution_service.decrypt", return_value="decrypted"),
+            patch(
+                "app.services.rebalancing.execution_service.decrypt_kis_credentials",
+                return_value=("decrypted", "decrypted"),
+            ),
             patch(
                 "app.services.rebalancing.execution_service.get_access_token",
                 new_callable=AsyncMock,

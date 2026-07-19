@@ -1174,50 +1174,6 @@ class TestBuildRebalancingOrders:
         assert sell.reference_price == 70000.0
 
 
-class TestRecommendDriftThresholdPct:
-    """recommend_drift_threshold_pct() — PER_ACCOUNT 알림 생성 시 계좌 유형 기반 임계값 추천."""
-
-    def test_general_mid_term_returns_base_default(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("GENERAL", "MID_TERM") == 5.0
-
-    def test_tax_deferred_types_widen_threshold(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        for tax_type in ("ISA", "PENSION_SAVINGS", "IRP"):
-            assert recommend_drift_threshold_pct(tax_type, "MID_TERM") == 7.0
-
-    def test_overseas_dedicated_widens_less_than_tax_deferred(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("OVERSEAS_DEDICATED", "MID_TERM") == 6.5
-
-    def test_short_term_narrows_and_long_term_widens(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") == 3.5
-        assert recommend_drift_threshold_pct("GENERAL", "LONG_TERM") == 6.5
-
-    def test_combined_axis_stacks_adjustment(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("ISA", "LONG_TERM") == 8.5
-        assert recommend_drift_threshold_pct("ISA", "SHORT_TERM") == 5.5
-
-    def test_clamped_to_min_and_max_bounds(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("GENERAL", "SHORT_TERM") >= 1.0
-        assert recommend_drift_threshold_pct("ISA", "LONG_TERM") <= 20.0
-
-    def test_unknown_tax_type_or_horizon_falls_back_to_general_defaults(self):
-        from app.services.rebalancing.order_builder import recommend_drift_threshold_pct
-
-        assert recommend_drift_threshold_pct("UNKNOWN", "MID_TERM") == 5.0
-        assert recommend_drift_threshold_pct("GENERAL", "UNKNOWN") == 5.0
-
-
 class TestRefreshLivePrices:
     """refresh_live_prices() — 자동/원클릭 실행이 수동 실행 모달과 동일하게 실시간 시세를 지정가에 반영하는지 검증."""
 

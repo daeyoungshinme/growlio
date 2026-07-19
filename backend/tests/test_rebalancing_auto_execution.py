@@ -313,6 +313,71 @@ class TestRunAutoExecution:
         mock_gen.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_stale_data_freshness_blocks_cautious_execution(self):
+        """시장 신호를 신뢰할 수 없는 상태(STALE)면 composite_level이 GREEN이어도 CAUTIOUS는 차단한다.
+
+        회귀 테스트 — FRED_API_KEY 미설정 등으로 대부분 신호가 조회 실패해도 과거에는
+        GREEN으로 오판되어 CAUTIOUS 게이트를 통과했다."""
+        mock_db = _make_mock_db()
+        alert = _make_alert(market_condition_mode="CAUTIOUS")
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "STALE"}),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_market_signal_exception_blocks_cautious_execution(self):
+        """market_signal 조회 자체가 예외를 던지면 STALE로 폴백해 CAUTIOUS/STRICT를 보수적으로 차단한다."""
+        mock_db = _make_mock_db()
+        alert = _make_alert(market_condition_mode="CAUTIOUS")
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(side_effect=RuntimeError("timeout")),
+            ),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_generates_plan_and_saves_history_when_drifting(self):
         mock_db = _make_mock_db()
         alert = _make_alert()
