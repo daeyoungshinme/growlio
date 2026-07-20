@@ -521,6 +521,44 @@ class TestGetDashboardSummary:
         assert result["return_goal_gap_pct"] == pytest.approx(-2.0)
 
     @pytest.mark.asyncio
+    async def test_return_goal_gap_pct_falls_back_to_cumulative_return(self, mock_db, override_settings):
+        """xirr_pct/annual_return_pct 둘 다 None(추적 90일 미만)이어도 cumulative_return_pct로 gap 계산."""
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        settings = SimpleNamespace(
+            goal_amount=None,
+            annual_deposit_goal=None,
+            goal_annual_return_pct=7.0,
+            retirement_target_year=None,
+            annual_dividend_goal=None,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings)
+
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(date.today(), 0.0, 0.0, 0.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(return_value=(55_000_000.0, 40_000_000.0, 55_000_000.0, {"STOCK_KIS": 55_000_000.0})),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+            patch("app.services.asset_aggregator.calc_returns", return_value=(None, 12.5)),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        assert result["xirr_pct"] is None
+        assert result["annual_return_pct"] is None
+        assert result["cumulative_return_pct"] == 12.5
+        assert result["return_goal_gap_pct"] == pytest.approx(5.5)
+
+    @pytest.mark.asyncio
     async def test_return_goal_gap_pct_none_without_goal(self, mock_db, override_settings):
         from app.services.asset_aggregator import get_dashboard_summary
 

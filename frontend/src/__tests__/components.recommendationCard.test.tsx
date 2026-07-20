@@ -112,6 +112,8 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     annual_dividend_goal: null,
     fcm_token_stored: false,
     composite_signal_alerts_enabled: true,
+    market_signal_daily_digest_enabled: false,
+    goal_achievement_alerts_enabled: true,
     goal_candidate_tickers: [],
     goal_risk_tolerance: "CONSERVATIVE",
     goal_max_weight_pct: 40.0,
@@ -388,6 +390,84 @@ describe("RecommendationCard", () => {
           "선택한 리스크 성향의 여유 수익률 목표는 종목당 최대 비중 제약 하에서 달성 가능한 최대 기대수익률까지만 반영되었습니다",
         ),
       ).toBeDefined();
+    });
+  });
+
+  describe("추천 비중 변화 배지 (계획 3)", () => {
+    it("shows a drift badge when the applied portfolio has different tickers than the recommendation", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      const portfolio = makePortfolio({
+        id: "target-1",
+        items: [{ ticker: "AAPL", name: "Apple", market: "NASDAQ", weight: 100 }],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: "target-1" })]);
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/추천 비중이 달라졌어요/)).toBeDefined();
+      expect(screen.getByText(/신규 후보 2개/)).toBeDefined();
+    });
+
+    it("does not show a drift badge when the applied portfolio already matches the recommendation", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      const portfolio = makePortfolio({
+        id: "target-1",
+        items: [
+          { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 60 },
+          { ticker: "SCHD", name: "Schwab US Dividend Equity ETF", market: "NYSE", weight: 40 },
+        ],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: "target-1" })]);
+      renderWithProviders(<RecommendationCard />);
+
+      await screen.findByText(/SPY/);
+      expect(screen.queryByText(/추천 비중이 달라졌어요/)).toBeNull();
+    });
+
+    it("shows a drift badge with the max delta for the active horizon recommendation", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      const portfolio = makePortfolio({
+        id: "target-1",
+        name: "단기 포트폴리오",
+        items: [
+          { ticker: "153130", name: "KODEX 단기채권", market: "KOSPI", weight: 50 },
+          { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 50 },
+        ],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ target_portfolio_id: "target-1", investment_horizon: "SHORT_TERM" }),
+      ]);
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("단기"));
+
+      expect(await screen.findByText(/최대 10%p 차이/)).toBeDefined();
+    });
+
+    it("does not show a drift badge for the horizon tab when weights already match", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      const portfolio = makePortfolio({
+        id: "target-1",
+        name: "단기 포트폴리오",
+        items: [
+          { ticker: "153130", name: "KODEX 단기채권", market: "KOSPI", weight: 60 },
+          { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 40 },
+        ],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ target_portfolio_id: "target-1", investment_horizon: "SHORT_TERM" }),
+      ]);
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("단기"));
+      await screen.findByText(/KODEX 단기채권/);
+
+      expect(screen.queryByText(/추천 비중이 달라졌어요/)).toBeNull();
     });
   });
 

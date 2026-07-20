@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import structlog
 
 from app.constants import REDIS_TOKEN_TTL_BUFFER
+from app.exceptions import ProviderTokenError
 from app.kis.constants import (
     KIS_MOCK_BASE_URL,
     KIS_REAL_BASE_URL,
@@ -93,6 +94,11 @@ async def _fetch_and_store_token(
     resp.raise_for_status()
     data = resp.json()
 
+    if "access_token" not in data:
+        logger.error("kis_token_issue_failed", user_id=user_id, account_id=account_id, response=data)
+        detail = data.get("msg1") or data.get("error_description") or "알 수 없는 오류"
+        raise ProviderTokenError(f"KIS 토큰 발급에 실패했습니다: {detail}")
+
     access_token: str = data["access_token"]
     expires_in: int = int(data.get("expires_in", 86400))
     expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
@@ -141,3 +147,58 @@ async def _fetch_and_store_token(
 
     logger.info("kis_token_issued", user_id=user_id, account_id=account_id, is_mock=is_mock)
     return access_token
+
+
+async def promote_user_token_to_account(
+    user_id: str,
+    account_id: str,
+    is_mock: bool,
+    redis,
+    db,
+) -> bool:
+    """계좌 등록 직전 자격증명 검증(verify-kis-credentials)으로 발급된 유저 레벨 토큰을
+    방금 생성된 계좌의 account-scoped 토큰으로 승격한다.
+
+    verify와 등록 직후 첫 동기화는 동일한 app_key/app_secret을 사용하지만 토큰 캐시 키가
+    (user_id, mode) vs account_id로 서로 달라 재사용되지 않았다 — 그 결과 짧은 시간에 KIS
+    토큰 발급 API를 2번 호출하게 되어 KIS의 발급 속도 제한에 걸려 등록 직후 첫 동기화가
+    실패하는 문제가 있었다. 재사용 가능한 유저 레벨 토큰이 없으면 False를 반환하고,
+    호출부는 평소대로 최초 동기화 시점에 새로 발급받는다.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    from app.models.token import KisToken
+
+    row = await db.scalar(
+        select(KisToken).where(
+            KisToken.user_id == user_id,
+            KisToken.account_id == None,  # noqa: E711
+            KisToken.is_mock_mode == is_mock,
+            KisToken.expires_at > datetime.now(UTC),
+        )
+    )
+    if row is None:
+        return False
+
+    stmt = pg_insert(KisToken).values(
+        user_id=user_id,
+        account_id=account_id,
+        access_token=row.access_token,
+        expires_at=row.expires_at,
+        is_mock_mode=is_mock,
+    )
+    stmt = stmt.on_conflict_do_update(
+        index_elements=["account_id"],
+        index_where=KisToken.account_id != None,  # noqa: E711
+        set_={"access_token": row.access_token, "expires_at": row.expires_at},
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    ttl = int((row.expires_at - datetime.now(UTC)).total_seconds() - REDIS_TOKEN_TTL_BUFFER)
+    if ttl > 0:
+        await redis.setex(REDIS_ACCOUNT_TOKEN_KEY.format(account_id=account_id), ttl, row.access_token)
+
+    logger.info("kis_token_promoted_to_account", user_id=user_id, account_id=account_id, is_mock=is_mock)
+    return True

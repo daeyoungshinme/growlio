@@ -175,7 +175,9 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     goal_annual_return_pct = (
         float(settings_row.goal_annual_return_pct) if settings_row and settings_row.goal_annual_return_pct else None
     )
-    actual_return_for_goal = xirr_pct if xirr_pct is not None else annualized_return
+    actual_return_for_goal = (
+        xirr_pct if xirr_pct is not None else annualized_return if annualized_return is not None else cumulative_return
+    )
     return_goal_gap_pct = (
         round(actual_return_for_goal - goal_annual_return_pct, 2)
         if goal_annual_return_pct is not None and actual_return_for_goal is not None

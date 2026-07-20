@@ -102,6 +102,7 @@ const mockSettings = {
   annual_dividend_goal: null,
   fcm_token_stored: false,
   composite_signal_alerts_enabled: false,
+  goal_achievement_alerts_enabled: true,
   goal_candidate_tickers: [],
   goal_risk_tolerance: "BALANCED",
   goal_max_weight_pct: 30,
@@ -220,6 +221,18 @@ describe("SettingsPage", () => {
     });
     expect(screen.getByText("목표 2개 설정됨")).toBeInTheDocument();
     expect(screen.getByText("공격적 · 후보 2개")).toBeInTheDocument();
+  });
+
+  it("목표 달성 알림 토글을 클릭하면 설정을 저장한다", async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("목표 달성 알림")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "목표 달성 알림" }));
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith("/settings/goal-achievement-alerts", { enabled: false });
+    });
   });
 
   it("시장 신호 알림 탭을 클릭하면 MarketSignalAlertSection을 표시한다", async () => {

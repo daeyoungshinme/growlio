@@ -1,11 +1,17 @@
 import { Link } from "react-router-dom";
 import { AlertTriangle } from "lucide-react";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
+import { useMarketSignalDigestToggle } from "@/hooks/useMarketSignalDigestToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import { SectionCard } from "./shared";
 
 export function MarketSignalAlertSection() {
   const { status, toggle, isPending } = useCompositeSignalToggle();
+  const {
+    enabled: digestEnabled,
+    toggle: toggleDigest,
+    isPending: digestPending,
+  } = useMarketSignalDigestToggle();
 
   return (
     <SectionCard title="시장 신호 알림">
@@ -60,6 +66,23 @@ export function MarketSignalAlertSection() {
           )}
         </>
       )}
+
+      <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-1">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          매일 08:30 현재 시장 위험 신호를 등급 변화와 무관하게 요약해 보내드립니다.
+        </p>
+        <div className="flex items-center gap-3 pt-2">
+          <ToggleSwitch
+            checked={digestEnabled}
+            disabled={digestPending}
+            onChange={toggleDigest}
+            ariaLabel="매일 아침 시장신호 요약"
+          />
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            {digestEnabled ? "매일 아침 시장신호 요약 받는 중" : "매일 아침 시장신호 요약 꺼짐"}
+          </span>
+        </div>
+      </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
         최근 발송 이력은 발송 이력 탭에서 확인할 수 있습니다.

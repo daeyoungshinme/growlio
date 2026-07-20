@@ -57,7 +57,22 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
   const hasAssetGoal = data?.goal_amount != null && data.goal_achievement_pct != null;
   const hasDividendGoal =
     data?.annual_dividend_goal != null && data.dividend_goal_achievement_pct != null;
-  const actualReturnPct = data?.xirr_pct ?? data?.annual_return_pct ?? null;
+  const actualReturnPct =
+    data?.xirr_pct ?? data?.annual_return_pct ?? data?.cumulative_return_pct ?? null;
+  const actualReturnSource: "xirr" | "annualized" | "cumulative" | null =
+    data?.xirr_pct != null
+      ? "xirr"
+      : data?.annual_return_pct != null
+        ? "annualized"
+        : data?.cumulative_return_pct != null
+          ? "cumulative"
+          : null;
+  const returnSourceLabel =
+    actualReturnSource === "xirr"
+      ? "XIRR"
+      : actualReturnSource === "annualized"
+        ? "연환산"
+        : "누적, 추적 90일 미만";
   const hasReturnGoal = data?.goal_annual_return_pct != null;
   const canShowReturnGap =
     hasReturnGoal && actualReturnPct != null && data?.return_goal_gap_pct != null;
@@ -146,7 +161,8 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
             behindLabel: "미달",
           })}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-            목표 {data!.goal_annual_return_pct}% · 실제 {actualReturnPct!.toFixed(1)}% (XIRR)
+            목표 {data!.goal_annual_return_pct}% · 실제 {actualReturnPct!.toFixed(1)}% (
+            {returnSourceLabel})
           </p>
         </>
       ) : hasReturnGoal ? (
@@ -462,6 +478,15 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           </Link>
         </div>
       )}
+
+      <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
+        <Link
+          to="/rebalancing?rtab=포트폴리오"
+          className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline"
+        >
+          목표에 맞는 포트폴리오 추천 보기 <ArrowRight size={12} />
+        </Link>
+      </div>
     </div>
   );
 }

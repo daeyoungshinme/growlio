@@ -139,6 +139,29 @@ class TestGeneratePendingPlanForAlert:
         assert abs((sell_leg.deadline_at - expected_close).total_seconds()) < 5
 
     @pytest.mark.asyncio
+    async def test_order_value_cap_clamps_quantity(self, mock_db):
+        """1건당 거래대금 상한(auto_rebalancing_max_order_value_krw)을 넘는 수량은 축소된다."""
+        alert = _make_alert(strategy="BUY_ONLY")
+        portfolio = _make_portfolio()
+        # 5주 × 70,000원 = 350,000원 — 한도 100,000원이면 최대 1주까지만 허용
+        drifting = [
+            _make_drift_item(ticker="005930", diff_krw=350000.0, shares_to_trade=5.0, current_price_krw=70000.0)
+        ]
+
+        with (
+            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch.object(svc.settings, "auto_rebalancing_max_order_value_krw", 100_000.0),
+        ):
+            plan, buy_token, _ = await svc.generate_pending_plan_for_alert(
+                alert, portfolio, drifting, mock_db, {}, "GREEN"
+            )
+
+        assert plan is not None
+        assert buy_token is not None
+        assert plan.legs[0].items[0].quantity == 1
+
+    @pytest.mark.asyncio
     async def test_no_orders_returns_none_tuple(self, mock_db):
         alert = _make_alert()
         portfolio = _make_portfolio()

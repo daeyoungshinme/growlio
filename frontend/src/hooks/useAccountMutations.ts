@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import { createAccount, updateAccount, deleteAccount, syncAccount } from "@/api/assets";
-import { extractErrorMessage } from "@/utils/error";
+import { extractErrorMessage, getHttpStatus } from "@/utils/error";
 import { invalidateAccountData, invalidateSyncData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 
@@ -39,8 +39,9 @@ export function useAccountMutations({
           await syncAccount(data.id);
           void invalidateAll();
           toast("계좌가 추가되었습니다", "success");
-        } catch {
-          toast("초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.");
+        } catch (e) {
+          const fallback = "초기 동기화 실패. 계좌 카드의 동기화 버튼으로 재시도하세요.";
+          toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
         } finally {
           setSyncingStockIds((prev) => {
             const next = new Set(prev);
@@ -132,9 +133,10 @@ export function useAccountMutations({
         await syncAccount(id);
         await invalidateSyncData(queryClient);
         toast("동기화 완료", "success");
-      } catch {
+      } catch (e) {
         const broker = acc?.asset_type === "STOCK_KIWOOM" ? "키움" : "KIS";
-        toast(`동기화 실패. ${broker} API 자격증명을 확인하세요.`);
+        const fallback = `동기화 실패. ${broker} API 자격증명을 확인하세요.`;
+        toast(getHttpStatus(e) != null ? extractErrorMessage(e, fallback) : fallback);
       } finally {
         setSyncingStockIds((prev) => {
           const next = new Set(prev);

@@ -122,6 +122,14 @@ class CompositeSignalAlertsUpdate(BaseModel):
     enabled: bool
 
 
+class MarketSignalDigestUpdate(BaseModel):
+    enabled: bool
+
+
+class GoalAchievementAlertsUpdate(BaseModel):
+    enabled: bool
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -135,6 +143,8 @@ class SettingsResponse(BaseModel):
     annual_dividend_goal: float | None = None
     fcm_token_stored: bool = False
     composite_signal_alerts_enabled: bool = True
+    market_signal_daily_digest_enabled: bool = False
+    goal_achievement_alerts_enabled: bool = True
     goal_candidate_tickers: list[GoalCandidateTicker] = []
     goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     goal_max_weight_pct: float = 40.0
@@ -176,6 +186,8 @@ async def get_settings(
         annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal else None,
         fcm_token_stored=bool(row.fcm_token),
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
+        market_signal_daily_digest_enabled=row.market_signal_daily_digest_enabled,
+        goal_achievement_alerts_enabled=row.goal_achievement_alerts_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
         goal_risk_tolerance=(
             GoalRiskTolerance(row.goal_risk_tolerance) if row.goal_risk_tolerance else GoalRiskTolerance.CONSERVATIVE
@@ -317,6 +329,36 @@ async def update_composite_signal_alerts(
     row.composite_signal_alerts_enabled = req.enabled
     await db.commit()
     return {"detail": "복합신호 알림 설정이 저장되었습니다"}
+
+
+@router.put("/market-signal-digest")
+@limiter.limit("10/minute")
+async def update_market_signal_digest(
+    request: Request,
+    req: MarketSignalDigestUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """시장신호 매일 요약(08:30 KST) 수신 여부 — 등급 전환 시 즉시 알림과 별개의 옵트인 설정."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.market_signal_daily_digest_enabled = req.enabled
+    await db.commit()
+    return {"detail": "시장신호 매일 요약 설정이 저장되었습니다"}
+
+
+@router.put("/goal-achievement-alerts")
+@limiter.limit("10/minute")
+async def update_goal_achievement_alerts(
+    request: Request,
+    req: GoalAchievementAlertsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """자산/입금/배당 목표 달성 알림(이메일·푸시) 수신 여부."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.goal_achievement_alerts_enabled = req.enabled
+    await db.commit()
+    return {"detail": "목표 달성 알림 설정이 저장되었습니다"}
 
 
 @router.put("/push-token")

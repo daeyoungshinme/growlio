@@ -97,3 +97,13 @@ async def _search_yahoo(q: str, limit: int) -> list[dict]:
         if len(results) >= limit:
             break
     return results
+
+
+async def resolve_english_name(ticker: str) -> str | None:
+    """티커로 Yahoo Finance를 조회해 영문 캐노니컬 종목명을 반환한다. 정확히 일치하는 결과가
+    없으면 None (브로커 원본 이름으로 폴백하도록 호출부에서 처리)."""
+    results = await _search_yahoo(ticker, limit=5)
+    for r in results:
+        if r["ticker"].upper() == ticker.upper():
+            return r["name"]
+    return None

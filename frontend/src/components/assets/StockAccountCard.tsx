@@ -65,13 +65,16 @@ export default function StockAccountCard({
             className="min-w-0"
             textClassName="text-base font-semibold text-gray-900 dark:text-gray-50 truncate"
           />
-          {/* 줄2: 텍스트 정보(truncate) + 배지(넘치면 다음 줄로) */}
-          <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 min-w-0">
-            {(account.institution || accountNo) && (
-              <span className="text-xs text-gray-400 dark:text-gray-500 truncate min-w-0">
+          {/* 줄2: 기관명·계좌번호 (truncate, 항상 1줄) */}
+          {(account.institution || accountNo) && (
+            <div className="mt-1 min-w-0">
+              <span className="text-xs text-gray-400 dark:text-gray-500 truncate block">
                 {[account.institution, accountNo].filter(Boolean).join(" · ")}
               </span>
-            )}
+            </div>
+          )}
+          {/* 줄3: 배지 (넘치면 다음 줄로 — 현재 라벨 조합 기준 사실상 1줄) */}
+          <div className="flex flex-wrap items-center gap-1.5 gap-y-1 mt-1 min-w-0">
             <span className="px-1.5 py-px bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs rounded-full shrink-0">
               {typeLabel}
             </span>
@@ -158,7 +161,7 @@ export default function StockAccountCard({
         </div>
       </div>
       {hasStats && (
-        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+        <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 grid grid-cols-3 gap-x-4 gap-y-2">
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
             <p className="text-xs font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
@@ -169,13 +172,26 @@ export default function StockAccountCard({
             <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
             <p className={`text-xs font-semibold mt-0.5 ${pnlColor(pnl)}`}>
               {pnl >= 0 ? "+" : ""}
-              {fmtKrw(pnl)}({fmtPct(ret)})
+              {fmtKrw(pnl)}
+            </p>
+            <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
+            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
+              {fmtKrw(stats!.deposit_total)}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
+            <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
+              {fmtKrw(stats!.dividend_total)}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
             <div className="flex items-start gap-1 mt-0.5">
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 {(() => {
                   const krw = account.deposit_krw ?? 0;
                   const usd = account.deposit_usd ?? 0;
@@ -206,18 +222,6 @@ export default function StockAccountCard({
                 <Pencil size={12} />
               </button>
             </div>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
-            <p className="text-xs font-semibold text-blue-600 dark:text-blue-400 mt-0.5">
-              {fmtKrw(stats!.deposit_total)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
-            <p className="text-xs font-semibold text-green-600 dark:text-green-400 mt-0.5">
-              {fmtKrw(stats!.dividend_total)}
-            </p>
           </div>
         </div>
       )}

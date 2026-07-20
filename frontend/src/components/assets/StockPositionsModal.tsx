@@ -151,7 +151,8 @@ export default function StockPositionsModal({
       {/* KIS 읽기전용 배너 */}
       {readonly && (
         <div className="px-6 py-2 bg-blue-50 dark:bg-blue-950 border-b border-blue-100 dark:border-blue-900 text-xs text-blue-600 dark:text-blue-400">
-          KIS/LS 계좌는 동기화로 자동 업데이트됩니다. 종목을 직접 편집하려면 수동 계좌를 사용하세요.
+          KIS/키움 계좌는 동기화로 자동 업데이트됩니다. 종목을 직접 편집하려면 수동 계좌를
+          사용하세요.
         </div>
       )}
 

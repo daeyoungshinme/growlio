@@ -16,6 +16,7 @@ import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
 import { useAllocationHistory } from "@/hooks/useAllocationHistory";
+import { useCollapsible } from "@/hooks/useCollapsible";
 
 const TYPE_COLORS: Record<string, string> = {
   STOCK_DOMESTIC: "#2563EB",
@@ -35,7 +36,10 @@ const DEFAULT_COLOR = "#94A3B8";
 
 function AllocationHistoryChart() {
   const isDark = useThemeStore((s) => s.isDark);
-  const [isOpen, setIsOpen] = useState(() => window.innerWidth >= 1024);
+  const [isOpen, toggleOpen] = useCollapsible(
+    () => window.innerWidth >= 1024,
+    "growlio:dashboard:allocationHistoryOpen",
+  );
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [months, setMonths] = useState(12);
@@ -58,11 +62,7 @@ function AllocationHistoryChart() {
   return (
     <div className="card">
       <div className="flex items-center justify-between">
-        <button
-          onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-2"
-          aria-expanded={isOpen}
-        >
+        <button onClick={toggleOpen} className="flex items-center gap-2" aria-expanded={isOpen}>
           <div className="p-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
             <BarChart2 size={16} className="text-gray-500 dark:text-gray-400" />
           </div>

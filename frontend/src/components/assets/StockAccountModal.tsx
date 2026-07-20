@@ -420,7 +420,10 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
                   type="checkbox"
                   id="mock-mode"
                   checked={form.is_mock_mode ?? true}
-                  onChange={(e) => set("is_mock_mode", e.target.checked)}
+                  onChange={(e) => {
+                    set("is_mock_mode", e.target.checked);
+                    if (isKis) resetVerify();
+                  }}
                   className="w-4 h-4 text-blue-600"
                 />
                 <label htmlFor="mock-mode" className="text-sm text-gray-700 dark:text-gray-300">

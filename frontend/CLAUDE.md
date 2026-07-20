@@ -77,7 +77,7 @@ make build-android-release         # APK Release 빌드
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — DART API 키, 알림 설정(공통 수신 이메일/환율/주가/시장 신호/발송 이력), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
+- `/settings` — DART API 키, 알림 설정(목표 달성/공통 수신 이메일/환율/주가/시장 신호/발송 이력), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
@@ -140,7 +140,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
-- `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림 on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
+- `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
+- `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
@@ -317,6 +318,10 @@ cd frontend && npx playwright test
 **리밸런싱 임계값 추천 유틸리티 (`src/utils/rebalancingThresholdRecommendation.ts`)**
 - 목표 역산 추천 옵션(계좌 투자기간 태그 등) 기반으로 드리프트 임계값을 추천. `useRebalancingAlertForm.ts`에서 사용.
 
+**추천 비중 변화 감지 유틸리티 (`src/utils/recommendationDrift.ts`)**
+- `computeRecommendationDrift(recommended, current)` — 추천 비중과 목표 포트폴리오의 현재 비중을 ticker+market 기준 비교해 `{ maxDeltaPct, newCandidateCount }` 반환.
+- `hasSignificantDrift(drift)` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) 이상 차이 나거나 신규 후보가 있으면 true. `RecommendationCard.tsx`가 "추천이 달라졌어요" 배지 노출 여부 판단에 사용.
+
 **진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
 - `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.
 - `buildCombinedStatusNote(needsCount, marketLevel)` — "이탈 종목 발견 + 시장상황"을 결합한 한 줄 설명 생성.
@@ -388,6 +393,7 @@ cd frontend && npx playwright test
 - 리밸런싱 주문 실행 후: `invalidateRebalancingHistoryData(queryClient)`.
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient)` — 대기 플랜 목록 + 실행 이력 무효화.
 - 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
+- 시장신호 매일 요약 알림 설정 변경 후: `invalidateMarketSignalDigestData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 

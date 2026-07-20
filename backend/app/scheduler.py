@@ -109,5 +109,13 @@ def init_scheduler() -> None:
         id="goal_achievement_check_daily",
         replace_existing=True,
     )
+    from app.jobs.market_signal_daily_digest import run_market_signal_daily_digest
+
+    scheduler.add_job(
+        run_market_signal_daily_digest,
+        CronTrigger(hour=8, minute=30, timezone="Asia/Seoul"),
+        id="market_signal_daily_digest",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

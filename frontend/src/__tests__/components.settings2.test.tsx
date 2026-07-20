@@ -41,8 +41,11 @@ vi.mock("@/api/portfolios", () => ({
 }));
 
 vi.mock("@/api/settings", () => ({
-  fetchSettings: vi.fn().mockResolvedValue({ has_dart: false }),
+  fetchSettings: vi
+    .fn()
+    .mockResolvedValue({ has_dart: false, market_signal_daily_digest_enabled: false }),
   updateCompositeSignalAlerts: vi.fn().mockResolvedValue(undefined),
+  updateMarketSignalDigest: vi.fn().mockResolvedValue(undefined),
   updateGoalCandidateTickers: vi.fn().mockResolvedValue({}),
 }));
 
@@ -101,7 +104,11 @@ vi.mock("@/lib/supabase", () => ({
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
+import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { fetchCompositeSignalStatus } from "@/api/rebalancing";
+import { fetchSettings } from "@/api/settings";
+import { fetchRebalancingAlerts, type RebalancingAlert } from "@/api/alerts";
+import { fetchPortfolios, type Portfolio } from "@/api/portfolios";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import type { RebalancingAnalysis, RebalancingItem } from "@/api/rebalancing";
@@ -268,6 +275,99 @@ describe("MarketSignalAlertSection", () => {
     expect(warning).toBeDefined();
     const link = screen.getByText("리밸런싱 탭에서 설정하기");
     expect(link.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
+  });
+
+  it("shows a separate daily digest toggle, defaulting to off", async () => {
+    renderSection();
+    expect(await screen.findByLabelText("매일 아침 시장신호 요약")).toBeDefined();
+    expect(screen.getByText("매일 아침 시장신호 요약 꺼짐")).toBeDefined();
+  });
+
+  it("reflects the daily digest opt-in state when already enabled", async () => {
+    vi.mocked(fetchSettings).mockResolvedValueOnce({
+      has_dart: false,
+      market_signal_daily_digest_enabled: true,
+    } as Awaited<ReturnType<typeof fetchSettings>>);
+    renderSection();
+    expect(await screen.findByText("매일 아침 시장신호 요약 받는 중")).toBeDefined();
+  });
+});
+
+// =========================================
+// RebalancingAlertSummaryCard
+// =========================================
+const mockAlert = (overrides: Partial<RebalancingAlert> = {}): RebalancingAlert => ({
+  id: "alert1",
+  portfolio_id: "p1",
+  is_active: true,
+  threshold_pct: 5,
+  schedule_type: "WEEKLY",
+  schedule_day_of_week: 1,
+  schedule_day_of_month: null,
+  trigger_condition: "DRIFT_ONLY",
+  mode: "NOTIFY",
+  strategy: "FULL",
+  account_id: null,
+  order_type: "MARKET",
+  market_condition_mode: "DISABLED",
+  auto_execution_time: null,
+  notify_time: "09:00",
+  buy_wait_minutes: 30,
+  last_triggered_at: null,
+  created_at: "2024-01-01",
+  updated_at: "2024-01-01",
+  ...overrides,
+});
+
+const mockPortfolio = (overrides: Partial<Portfolio> = {}): Portfolio => ({
+  id: "p1",
+  name: "테스트 포트폴리오",
+  items: [],
+  base_type: "STOCK_ONLY",
+  sort_order: 0,
+  created_at: "2024-01-01",
+  updated_at: "2024-01-01",
+  ...overrides,
+});
+
+describe("RebalancingAlertSummaryCard", () => {
+  const renderCard = () =>
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingAlertSummaryCard />
+      </MemoryRouter>,
+    );
+
+  it("shows empty state when there are no alerts", async () => {
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([]);
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([mockPortfolio()]);
+    renderCard();
+    expect(await screen.findByText(/아직 설정된 리밸런싱 알림이 없어요/)).toBeDefined();
+  });
+
+  it("shows portfolio/alert counts when alerts exist", async () => {
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([mockAlert()]);
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([
+      mockPortfolio({ id: "p1" }),
+      mockPortfolio({ id: "p2" }),
+    ]);
+    renderCard();
+    expect(await screen.findByText(/포트폴리오 2개 중 1개에 알림 설정됨/)).toBeDefined();
+  });
+
+  it("mentions AUTO count when at least one merged alert is AUTO mode", async () => {
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([mockAlert({ mode: "AUTO" })]);
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([mockPortfolio()]);
+    renderCard();
+    expect(await screen.findByText(/AUTO 1개/)).toBeDefined();
+  });
+
+  it("links to the rebalancing portfolio tab", async () => {
+    vi.mocked(fetchRebalancingAlerts).mockResolvedValueOnce([]);
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([]);
+    renderCard();
+    const link = await screen.findByText(/아직 설정된 리밸런싱 알림이 없어요/);
+    expect(link.closest("a")?.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
   });
 });
 

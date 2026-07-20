@@ -24,6 +24,7 @@ from app.services.email_templates import (
     exchange_rate_alert_template,
     goal_achievement_template,
     market_signal_change_template,
+    market_signal_daily_digest_template,
     monthly_report_template,
     password_reset_template,
     rebalancing_alert_template,
@@ -359,4 +360,19 @@ async def send_market_signal_change_alert(
         return True
     except Exception as e:
         logger.error("market_signal_change_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_market_signal_daily_digest_alert(to_email: str, level: str, reason: str | None) -> bool:
+    """매일 시장 신호 요약 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = market_signal_daily_digest_template(level, reason)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("market_signal_daily_digest_email_sent", to=to_email, level=level)
+        return True
+    except Exception as e:
+        logger.error("market_signal_daily_digest_email_failed", to=to_email, error=str(e))
         return False

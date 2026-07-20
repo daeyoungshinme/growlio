@@ -103,3 +103,40 @@ async def test_run_stock_price_alert_check_calls_service():
         await run_stock_price_alert_check()
 
     mock_check.assert_called_once_with(mock_db, mock_redis)
+
+
+@pytest.mark.asyncio
+async def test_run_market_signal_daily_digest_calls_service():
+    """run_market_signal_daily_digest가 send_market_signal_daily_digest를 redis와 함께 호출한다."""
+    mock_db = _make_mock_db()
+    mock_redis = MagicMock()
+
+    with (
+        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
+        patch("app.jobs.market_signal_daily_digest.send_market_signal_daily_digest", new=AsyncMock()) as mock_send,
+    ):
+        from app.jobs.market_signal_daily_digest import run_market_signal_daily_digest
+
+        await run_market_signal_daily_digest()
+
+    mock_send.assert_called_once_with(mock_db, mock_redis)
+
+
+@pytest.mark.asyncio
+async def test_run_market_signal_daily_digest_handles_exception():
+    """send_market_signal_daily_digest 예외 발생 시 Job이 크래시하지 않는다."""
+    mock_db = _make_mock_db()
+    mock_redis = MagicMock()
+
+    with (
+        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
+        patch(
+            "app.jobs.market_signal_daily_digest.send_market_signal_daily_digest",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ),
+    ):
+        from app.jobs.market_signal_daily_digest import run_market_signal_daily_digest
+
+        await run_market_signal_daily_digest()  # 예외 전파 없어야 함

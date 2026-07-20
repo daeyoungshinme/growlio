@@ -1,10 +1,12 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { screen, render, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
+import InvestmentSnapshotCard from "@/components/dashboard/InvestmentSnapshotCard";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
+import type { PortfolioOverview } from "@/types";
 
 function renderGoalCard(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -105,6 +107,12 @@ describe("InvestmentGoalCard", () => {
     expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
   });
 
+  it("목표가 설정되어 있으면 목표 역산 추천으로 가는 딥링크를 표시한다", () => {
+    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
+    const link = screen.getByText("목표에 맞는 포트폴리오 추천 보기").closest("a");
+    expect(link).toHaveAttribute("href", "/rebalancing?rtab=포트폴리오");
+  });
+
   it("DCA 타임라인이 없으면 은퇴 목표까지 남은 기간을 카운트다운으로 표시한다", () => {
     renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
     const yearsLeft = 2050 - new Date().getFullYear();
@@ -143,6 +151,20 @@ describe("InvestmentGoalCard", () => {
     renderGoalCard(<InvestmentGoalCard data={data} />);
     expect(screen.getAllByText("-2.0%p")[0]).toBeInTheDocument();
     expect(screen.getAllByText("미달")[0]).toBeInTheDocument();
+  });
+
+  it("XIRR/연환산이 모두 없어도 누적 수익률로 목표 달성 gap을 표시한다", () => {
+    const data = {
+      ...baseDashboard,
+      goal_annual_return_pct: 7.0,
+      xirr_pct: null,
+      annual_return_pct: null,
+      cumulative_return_pct: 12.5,
+      return_goal_gap_pct: 5.5,
+    };
+    renderGoalCard(<InvestmentGoalCard data={data} />);
+    expect(screen.queryAllByText("실제 수익률 계산 중")).toHaveLength(0);
+    expect(screen.getAllByText(/실제 12\.5% \(누적, 추적 90일 미만\)/)[0]).toBeInTheDocument();
   });
 
   it("목표 연수익률이 미설정이면 해당 칸에 미설정 안내와 설정하기 링크가 표시된다", () => {
@@ -193,5 +215,45 @@ describe("InvestmentGoalCard", () => {
     fireEvent.click(screen.getByText("달성 예상일 · 진행 상세"));
     // 펼침 후에는 모바일 상세 블록도 렌더되어 2곳에 존재
     expect(screen.getAllByText("실제 달성 예상")).toHaveLength(2);
+  });
+});
+
+describe("InvestmentSnapshotCard", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  const overview: PortfolioOverview = {
+    total_assets_krw: 100_000_000,
+    total_stock_krw: 80_000_000,
+    total_non_stock_krw: 20_000_000,
+    total_invested_krw: 70_000_000,
+    unrealized_pnl_krw: 10_000_000,
+    stock_return_pct: 14.3,
+    asset_type_allocation: [],
+    stock_allocation: [],
+    all_positions: [],
+    accounts: [],
+  };
+
+  it("보유 주식 자산이 없으면 아무것도 렌더링하지 않는다", () => {
+    const { container } = renderGoalCard(
+      <InvestmentSnapshotCard overview={{ ...overview, total_stock_krw: 0 }} data={undefined} />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("기본적으로 펼쳐진 상태로 평가액/투자원금/평가손익을 표시한다", () => {
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    expect(screen.getByText("주식 투자 현황")).toBeInTheDocument();
+    expect(screen.getByText("평가액")).toBeInTheDocument();
+    expect(screen.getByText("투자원금")).toBeInTheDocument();
+  });
+
+  it("헤더를 클릭하면 접히고, 접힌 상태는 localStorage에 영속화된다", () => {
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
+    expect(screen.queryByText("평가액")).not.toBeInTheDocument();
+    expect(localStorage.getItem("growlio:dashboard:investmentSnapshotOpen")).toBe("false");
   });
 });

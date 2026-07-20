@@ -27,6 +27,9 @@ import { useBiometric } from "@/hooks/useBiometric";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
+import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlertsToggle";
+import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
@@ -78,6 +81,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   REBALANCING: "리밸런싱 알림",
   STOCK_PRICE: "주가 알림",
   MARKET_SIGNAL: "시장 신호 알림",
+  MARKET_SIGNAL_DIGEST: "시장신호 매일 요약",
   GOAL_ASSET: "자산 목표 달성 알림",
   GOAL_DEPOSIT: "입금 목표 달성 알림",
   GOAL_DIVIDEND: "배당 목표 달성 알림",
@@ -186,6 +190,11 @@ export default function SettingsPage() {
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const authEmail = useAuthStore((s) => s.email);
+  const {
+    enabled: goalAlertsEnabled,
+    toggle: toggleGoalAlerts,
+    isPending: goalAlertsPending,
+  } = useGoalAchievementAlertsToggle();
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -325,22 +334,26 @@ export default function SettingsPage() {
       {/* 알림 설정 그룹 */}
       <div ref={alertSectionRef}>
         <SectionCard title="알림 설정">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
-            리밸런싱 비중 이탈 알림 및 자동 실행 설정은{" "}
-            <Link
-              to="/rebalancing?rtab=포트폴리오"
-              className="text-blue-600 dark:text-blue-400 underline"
-            >
-              리밸런싱 탭
-            </Link>
-            에서 포트폴리오별로 설정합니다.
-          </p>
+          <RebalancingAlertSummaryCard />
 
           {/* 공통 알림 수신 이메일 — 전체 알림 유형에 적용 */}
           <NotificationEmailSection
             userEmail={current?.user_email}
             onSettingsChange={invalidateSettings}
           />
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
+            </p>
+            <ToggleSwitch
+              checked={goalAlertsEnabled}
+              disabled={goalAlertsPending}
+              onChange={toggleGoalAlerts}
+              ariaLabel="목표 달성 알림"
+            />
+          </div>
 
           {/* 알림 탭 */}
           <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">

@@ -34,7 +34,7 @@ export default function StockAccountSummaryCard({ perAccountStats, overview, usd
       <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">
         증권계좌 전체 요약
       </p>
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-3">
+      <div className="grid grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>
           <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
@@ -45,14 +45,9 @@ export default function StockAccountSummaryCard({ perAccountStats, overview, usd
           <p className="text-xs text-gray-400 dark:text-gray-500">평가손익</p>
           <p className={`text-sm font-semibold mt-0.5 ${pnlColor(pnl)}`}>
             {pnl >= 0 ? "+" : ""}
-            {fmtKrw(pnl)}({fmtPct(ret)})
+            {fmtKrw(pnl)}
           </p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
-          <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
-            {fmtKrw(totalDepositKrw)}
-          </p>
+          <p className={`text-xs font-medium ${pnlColor(pnl)}`}>({fmtPct(ret)})</p>
         </div>
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">누적 입금</p>
@@ -64,6 +59,12 @@ export default function StockAccountSummaryCard({ perAccountStats, overview, usd
           <p className="text-xs text-gray-400 dark:text-gray-500">누적 배당</p>
           <p className="text-sm font-semibold text-green-600 dark:text-green-400 mt-0.5">
             {fmtKrw(totalDividend)}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-400 dark:text-gray-500">예수금</p>
+          <p className="text-sm font-semibold text-gray-900 dark:text-gray-50 mt-0.5">
+            {fmtKrw(totalDepositKrw)}
           </p>
         </div>
       </div>

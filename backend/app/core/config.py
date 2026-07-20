@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     cb_fred_fail_max: int = 4  # FRED API 실패 임계값
     cb_fred_reset_timeout: float = 300.0  # FRED API 복구 대기(초)
 
+    # AUTO 리밸런싱(대기 플랜 생성) 1건 주문당 최대 거래대금 — 초과분은 매수/매도 수량을 이 한도 이내로
+    # 축소한다(0으로 줄어들면 해당 주문은 건너뜀). 계산 버그로 인한 과다 주문을 막는 안전장치.
+    auto_rebalancing_max_order_value_krw: float = 50_000_000.0
+
     migration_database_url: str = ""  # Alembic 전용 Direct connection (비워두면 DATABASE_URL 사용)
 
     # DB 커넥션 풀 설정 (PgBouncer session mode 한도 15 기준 — 총합 7로 여유 확보)

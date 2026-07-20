@@ -256,6 +256,32 @@ class TestRunGoalAchievementCheck:
         assert push_kwargs["data"] == {"type": "GOAL_DIVIDEND"}
 
     @pytest.mark.asyncio
+    async def test_query_filters_by_goal_achievement_alerts_enabled(self):
+        """알림이 꺼진 유저를 애초에 쿼리 대상에서 제외하도록 WHERE절에 필터가 포함된다."""
+        mock_session = AsyncMock()
+        execute_result = MagicMock()
+        execute_result.all.return_value = []
+        captured_stmt = {}
+
+        async def capture_execute(stmt):
+            captured_stmt["stmt"] = stmt
+            return execute_result
+
+        mock_session.execute = AsyncMock(side_effect=capture_execute)
+        mock_session.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
+            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+        ):
+            from app.jobs.goal_achievement import run_goal_achievement_check
+
+            await run_goal_achievement_check()
+
+        assert "goal_achievement_alerts_enabled" in str(captured_stmt["stmt"])
+
+    @pytest.mark.asyncio
     async def test_exception_does_not_stop_other_users(self):
         """한 유저 실패해도 다른 유저 처리 계속."""
         user1 = _make_user()

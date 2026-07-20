@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
@@ -16,11 +15,12 @@ from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
 from app.providers._error_mapping import map_http_status_error, map_network_error
+from app.providers._overseas_cache import fetch_overseas_cached
+from app.providers._overseas_name_enrichment import enrich_overseas_names
 from app.providers._retry import with_token_refresh
-from app.providers.base import BalanceResult, BrokerProvider, Position, raw_krw_to_position
+from app.providers.base import BalanceResult, BrokerProvider, raw_to_position
 from app.providers.http_client import MaxRetriesExceededError
 from app.services.credential_service import decrypt
-from app.utils.cache_keys import TTL_HAS_OVERSEAS_FALSE, TTL_HAS_OVERSEAS_TRUE, has_overseas_key
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 if TYPE_CHECKING:
@@ -79,14 +79,12 @@ class KISProvider(BrokerProvider):
                     account_no,
                     is_mock=is_mock,
                 ),
-                _fetch_overseas_cached(
-                    app_key,
-                    app_secret,
-                    access_token,
-                    account_no,
-                    is_mock,
+                fetch_overseas_cached(
+                    lambda: get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock),
                     account.id,
                     redis,
+                    token_expired_exc=KisTokenExpiredError,
+                    broker_name="KIS",
                 ),
             )
 
@@ -133,11 +131,12 @@ class KISProvider(BrokerProvider):
             float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
         )
 
+        overseas_positions = await enrich_overseas_names(overseas["positions"], redis)
         all_raw = domestic["positions"] + [
-            {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas["positions"]
+            {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas_positions
         ]
 
-        positions = [_raw_to_position(p, usd_krw_rate) for p in all_raw]
+        positions = [raw_to_position(p, usd_krw_rate) for p in all_raw]
 
         stock_value_krw = domestic["total_value_krw"] + overseas_value_krw
         total_value_krw = stock_value_krw + domestic["deposit_krw"] + overseas_deposit_krw
@@ -155,60 +154,3 @@ class KISProvider(BrokerProvider):
             usd_krw_rate=usd_krw_rate,
             extra={"source": "KIS_API", "snapshot_date": date.today()},
         )
-
-
-_EMPTY_OVERSEAS: dict = {"positions": [], "total_value_usd": 0.0, "deposit_usd": 0.0}
-
-
-async def _fetch_overseas_cached(
-    app_key: str,
-    app_secret: str,
-    access_token: str,
-    account_no: str,
-    is_mock: bool,
-    account_id: uuid.UUID,
-    redis: aioredis.Redis,
-) -> dict:
-    """해외 잔고 조회 — Redis 캐시로 국내 전용 계좌의 해외 API 호출을 건너뛴다."""
-    cached = await redis.get(has_overseas_key(account_id))
-    if cached == b"0":
-        return dict(_EMPTY_OVERSEAS)
-    result = await _safe_overseas(app_key, app_secret, access_token, account_no, is_mock)
-    has_ov = bool(result["positions"])
-    await redis.setex(
-        has_overseas_key(account_id),
-        TTL_HAS_OVERSEAS_TRUE if has_ov else TTL_HAS_OVERSEAS_FALSE,
-        "1" if has_ov else "0",
-    )
-    return result
-
-
-async def _safe_overseas(app_key: str, app_secret: str, access_token: str, account_no: str, is_mock: bool) -> dict:
-    """해외 잔고 조회. KisTokenExpiredError는 re-raise, 나머지 오류는 warn 후 빈 결과 반환."""
-    try:
-        return await get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock)
-    except KisTokenExpiredError:
-        raise
-    except Exception as e:
-        logger.warning("kis_overseas_fetch_failed", account_no=account_no, error=str(e))
-        return dict(_EMPTY_OVERSEAS)
-
-
-def _raw_to_position(p: dict, usd_krw_rate: float) -> Position:
-    if p.get("currency") == "USD":
-        avg_usd = float(p.get("avg_price", 0))
-        cur_usd = float(p.get("current_price", 0))
-        qty = int(p.get("qty", 0))
-        return Position(
-            ticker=p["ticker"],
-            name=p["name"],
-            market=p["market"],
-            qty=qty,
-            avg_price=avg_usd * usd_krw_rate,
-            current_price=cur_usd * usd_krw_rate,
-            currency="USD",
-            value_krw=float(p.get("value_krw", cur_usd * usd_krw_rate * qty)),
-            avg_price_usd=avg_usd,
-            usd_rate=usd_krw_rate,
-        )
-    return raw_krw_to_position(p)

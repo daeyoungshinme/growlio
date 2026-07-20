@@ -158,6 +158,10 @@ interface Props {
   /** false면 헤더의 "N개 필요" 배지를 숨긴다 — 상위에 DiagnosisSummaryHeader 등 동일 정보를
    * 이미 보여주는 통합 헤더가 있을 때 중복 표시를 피하기 위함 (기본값 true, 대시보드 카드는 유지). */
   showHeaderBadge?: boolean;
+  /** false면 "이탈 종목 + 시장상황" 결합 안내 문구를 숨긴다 — DiagnosisSummaryHeader가 동일
+   * buildCombinedStatusNote() 결과를 이미 상단에 표시하는 진단 탭에서 중복을 피하기 위함
+   * (기본값 true, 대시보드 카드는 유지). */
+  showCombinedNote?: boolean;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -178,6 +182,7 @@ export default function RebalancingStatusCard({
   showDriftRows = false,
   maxDriftRows,
   showHeaderBadge = true,
+  showCombinedNote = true,
 }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
@@ -287,7 +292,7 @@ export default function RebalancingStatusCard({
       )}
 
       {/* 이탈 종목 + 시장상황 결합 안내 */}
-      {combinedStatusNote && (
+      {showCombinedNote && combinedStatusNote && (
         <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-1.5 mb-2">
           {combinedStatusNote}
         </p>

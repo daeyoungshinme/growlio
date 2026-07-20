@@ -646,3 +646,22 @@ def market_signal_change_template(old_level: str, new_level: str, reason: str | 
         "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
     )
     return subject, html
+
+
+def market_signal_daily_digest_template(level: str, reason: str | None) -> tuple[str, str]:
+    """매일 08:30 KST 발송되는 시장 위험 신호 요약 이메일 — 등급 전환 여부와 무관하게 발송."""
+    label = _SIGNAL_LEVEL_LABEL.get(level, level)
+    color = _SIGNAL_LEVEL_COLOR.get(level, "#374151")
+    subject = f"[Growlio] 오늘의 시장 신호 — {label}"
+    table = _kv_table([("오늘의 시장 신호", f"<span style='color:{color};font-weight:bold;'>{label}</span>")])
+    body = table
+    body += f"<p style='color:#64748b;font-size:13px;margin-top:12px;'>{reason or '오늘도 안정적입니다.'}</p>"
+    html = _email_div(
+        "오늘의 시장 신호",
+        color,
+        body,
+        "이 알림은 매일 08:30 KST에 등급 전환 여부와 무관하게 발송됩니다.<br>"
+        "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
+        "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
+    )
+    return subject, html

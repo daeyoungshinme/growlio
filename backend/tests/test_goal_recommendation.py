@@ -143,6 +143,80 @@ class TestOptimizeGoalPortfolio:
         assert items
         assert max(i["weight"] for i in items) <= 25.0 + 0.5
 
+    def test_dividend_floor_shifts_weight_toward_high_yield_candidate(self):
+        """dividend_yields+required_dividend_yield_pct를 주면 가중평균 배당수익률이 목표 이상이 되도록
+        고배당 종목 비중이 강제된다 — 배당 목표를 최적화 입력으로 반영하는지 검증하는 핵심 테스트."""
+        random.seed(9)
+        returns_map = {
+            "GROWTH": [random.gauss(0.0006, 0.01) for _ in range(252)],
+            "DIVIDEND": [random.gauss(0.0003, 0.01) for _ in range(252)],
+        }
+        tickers = [("GROWTH", "성장주 ETF", "NASDAQ"), ("DIVIDEND", "고배당 ETF", "NASDAQ")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["GROWTH", "DIVIDEND"],
+            tickers=tickers,
+            cagr_pct=[8.0, 6.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            max_weight=1.0,
+            dividend_yields=[0.5, 6.0],
+            required_dividend_yield_pct=4.0,
+        )
+
+        assert note is None
+        dividend_weight = next(i["weight"] for i in items if i["ticker"] == "DIVIDEND")
+        # 4%를 채우려면 최소 (4-0.5)/(6-0.5) ≈ 63.6% 이상이 DIVIDEND에 배분돼야 한다
+        assert dividend_weight >= 63.0
+
+    def test_dividend_floor_unreachable_falls_back_with_note_but_still_recommends(self):
+        """큐레이션 후보만으로 배당 목표를 달성할 수 없으면 제약을 적용하지 않고(fail-soft) note로
+        안내하되, 자산 목표 기준 추천 자체는 계속 반환한다."""
+        random.seed(10)
+        returns_map = {
+            "A": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "B": [random.gauss(0.0003, 0.01) for _ in range(252)],
+        }
+        tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
+
+        items, expected, note = _optimize_goal_portfolio(
+            symbols=["A", "B"],
+            tickers=tickers,
+            cagr_pct=[8.0, 6.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            dividend_yields=[1.0, 1.5],
+            required_dividend_yield_pct=10.0,  # 후보 중 최대 배당수익률(1.5%)보다 훨씬 높아 달성 불가
+        )
+
+        assert items
+        assert expected is not None
+        assert note is not None
+        assert "배당 목표" in note
+
+    def test_dividend_floor_not_applied_when_required_pct_none(self):
+        """required_dividend_yield_pct가 None이면(배당 목표 미설정) dividend_yields가 주어져도
+        제약을 적용하지 않는다 — 기존 동작(배당 목표 미반영) 그대로 유지."""
+        random.seed(11)
+        returns_map = {
+            "A": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "B": [random.gauss(0.0003, 0.01) for _ in range(252)],
+        }
+        tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
+
+        items, _, note = _optimize_goal_portfolio(
+            symbols=["A", "B"],
+            tickers=tickers,
+            cagr_pct=[8.0, 6.0],
+            returns_map=returns_map,
+            required_return_pct=-50.0,
+            dividend_yields=[1.0, 8.0],
+            required_dividend_yield_pct=None,
+        )
+
+        assert items
+        assert note is None
+
     def test_risk_tolerance_frontier_raises_expected_return_monotonically(self):
         """CONSERVATIVE는 기존과 동일한 부등식 제약(순수 최소분산)을 쓰고, BALANCED/AGGRESSIVE는
         자연 수익률↔최대 달성가능 수익률 사이를 성향 비율로 보간한 지점을 등식 제약으로 고정하므로
@@ -788,6 +862,61 @@ class TestGetGoalRecommendation:
         assert result.max_weight_pct == 40.0
         # autouse _mock_market_signal이 GREEN을 반환하므로 그대로 echo된다
         assert result.market_signal_level == "GREEN"
+
+    async def test_achievable_dividend_goal_shifts_weight_to_high_yield_candidates(self):
+        """배당 목표가 달성 가능한 범위면 required_dividend_yield_pct가 실제 비중 계산에 반영되어
+        고배당 후보(SCHD/VYM) 비중이 함께 높아진다 — A1(배당목표 MVO 미반영) 수정 검증."""
+        settings_row = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            retirement_target_year=9999,
+            monthly_deposit_amount=1_000_000.0,
+            annual_deposit_goal=None,
+            annual_dividend_goal=300_000.0,  # base_krw 10,000,000 대비 required_dividend_yield_pct = 3.0%
+            goal_candidate_tickers=None,
+            goal_max_weight_pct=100.0,  # 종목당 상한을 풀어 배당 제약이 실제로 비중을 좌우하게 함
+        )
+        cagr_map = {
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+            ("QQQ", "NASDAQ"): {"cagr_pct": 15.0},
+            ("VOO", "NYSE"): {"cagr_pct": 9.0},
+            ("VTI", "NYSE"): {"cagr_pct": 9.5},
+            ("SCHD", "NYSE"): {"cagr_pct": 8.0},
+            ("VYM", "NYSE"): {"cagr_pct": 7.0},
+            ("069500", "KOSPI"): {"cagr_pct": 6.0},
+            ("360750", "KOSPI"): {"cagr_pct": 9.0},
+            ("133690", "KOSPI"): {"cagr_pct": 14.0},
+            ("458730", "KOSPI"): {"cagr_pct": 5.0},
+        }
+        random.seed(7)
+        returns_map = {
+            sym: [random.gauss(0.0005, 0.01) for _ in range(252)]
+            for sym in ["SPY", "QQQ", "VOO", "VTI", "SCHD", "VYM", "069500.KS", "360750.KS", "133690.KS", "458730.KS"]
+        }
+        dividend_map = {("SCHD", "NYSE"): 3.5, ("VYM", "NYSE"): 2.9}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            mock_db = AsyncMock()
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
+
+        assert result.required_dividend_yield_pct == pytest.approx(3.0)
+        high_yield_weight = sum(i.weight for i in result.recommended_items if i.ticker in ("SCHD", "VYM"))
+        # 배당 후보 중 SCHD 하나만으로도 3%를 채울 수 있어(비중상한 100%) 제약이 비구속적일 수 있지만,
+        # 배당수익률이 0인 나머지 8개 후보만으로는 목표를 채울 수 없으므로 고배당 후보 비중이 0일 수는 없다.
+        assert high_yield_weight > 0.0
+        assert result.note is None or "배당 목표" not in result.note
 
     async def test_market_signal_level_propagates_to_result(self):
         """시장 위험 신호(RED)가 결과의 market_signal_level에 그대로 반영되어야 한다."""

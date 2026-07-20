@@ -182,6 +182,7 @@ export default function RebalancingPage() {
                   signalDisplay="none"
                   showAllInsights={true}
                   showHeaderBadge={false}
+                  showCombinedNote={false}
                 />
               </Suspense>
             </ErrorBoundary>

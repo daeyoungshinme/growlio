@@ -94,6 +94,8 @@ class TestGetSettings:
             notification_email=None,
             fcm_token=None,
             composite_signal_alerts_enabled=True,
+            market_signal_daily_digest_enabled=False,
+            goal_achievement_alerts_enabled=True,
             goal_candidate_tickers=None,
             goal_risk_tolerance=None,
             goal_max_weight_pct=None,
@@ -252,6 +254,76 @@ class TestUpdateCompositeSignalAlerts:
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/composite-signal-alerts", json={"enabled": True})
+        assert resp.status_code == 401
+
+
+class TestUpdateMarketSignalDigest:
+    def test_put_market_signal_digest_returns_200_and_sets_flag(self, override_settings):
+        """시장신호 매일 요약(08:30 KST) 수신 여부를 유저 단위로 저장한다 — 기본값 OFF의 옵트인 설정."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(market_signal_daily_digest_enabled=False)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/market-signal-digest",
+                    json={"enabled": True},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.market_signal_daily_digest_enabled is True
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_market_signal_digest_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/market-signal-digest", json={"enabled": True})
+        assert resp.status_code == 401
+
+
+class TestUpdateGoalAchievementAlerts:
+    def test_put_goal_achievement_alerts_returns_200_and_sets_flag(self, override_settings):
+        """자산/입금/배당 목표 달성 알림 수신 여부를 유저 단위로 저장한다 — 기본값 ON에서 끌 수 있어야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(goal_achievement_alerts_enabled=True)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-achievement-alerts",
+                    json={"enabled": False},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.goal_achievement_alerts_enabled is False
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_achievement_alerts_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/goal-achievement-alerts", json={"enabled": True})
         assert resp.status_code == 401
 
 

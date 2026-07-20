@@ -1174,6 +1174,66 @@ class TestBuildRebalancingOrders:
         assert sell.reference_price == 70000.0
 
 
+class TestClampOrdersToMaxValue:
+    """clamp_orders_to_max_value() — AUTO 대기 플랜 생성 시 1건당 거래대금 상한 안전장치."""
+
+    def test_order_under_cap_passes_through_unchanged(self):
+        from app.services.rebalancing.order_builder import build_rebalancing_orders, clamp_orders_to_max_value
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0)
+        ]
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(buy_account))
+
+        clamped = clamp_orders_to_max_value(orders, 50_000_000.0)
+
+        assert len(clamped) == 1
+        assert clamped[0].quantity == 3
+
+    def test_order_over_cap_is_clamped_down(self):
+        from app.services.rebalancing.order_builder import build_rebalancing_orders, clamp_orders_to_max_value
+
+        buy_account = uuid.uuid4()
+        # 100주 × 50,000원 = 5,000,000원 — 한도 1,000,000원이면 최대 20주까지만 허용
+        drifting = [
+            _make_drift_item(ticker="000660", diff_krw=5_000_000.0, shares_to_trade=100.0, current_price_krw=50000.0)
+        ]
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(buy_account))
+
+        clamped = clamp_orders_to_max_value(orders, 1_000_000.0)
+
+        assert len(clamped) == 1
+        assert clamped[0].quantity == 20
+
+    def test_order_that_cannot_afford_even_one_share_is_dropped(self):
+        from app.services.rebalancing.order_builder import build_rebalancing_orders, clamp_orders_to_max_value
+
+        buy_account = uuid.uuid4()
+        drifting = [
+            _make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=50000.0)
+        ]
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(buy_account))
+
+        clamped = clamp_orders_to_max_value(orders, 10_000.0)  # 1주(50,000원)도 못 사는 한도
+
+        assert clamped == []
+
+    def test_order_without_reference_price_passes_through(self):
+        """참조가를 알 수 없는 주문은 검증할 수 없으므로 그대로 통과시킨다(기존 동작 유지)."""
+        from app.services.rebalancing.order_builder import build_rebalancing_orders, clamp_orders_to_max_value
+
+        buy_account = uuid.uuid4()
+        drifting = [_make_drift_item(ticker="000660", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=None)]
+        orders = build_rebalancing_orders(drifting, {}, "FULL", "MARKET", str(buy_account))
+        assert orders[0].reference_price is None
+
+        clamped = clamp_orders_to_max_value(orders, 1.0)
+
+        assert len(clamped) == 1
+        assert clamped[0].quantity == 3
+
+
 class TestRefreshLivePrices:
     """refresh_live_prices() — 자동/원클릭 실행이 수동 실행 모달과 동일하게 실시간 시세를 지정가에 반영하는지 검증."""
 

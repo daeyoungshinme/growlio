@@ -20,12 +20,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.config import settings
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.rebalancing_plan import RebalancingPlan, RebalancingPlanItem, RebalancingPlanLeg
 from app.services.alerts.alert_service import save_alert_history
-from app.services.rebalancing.order_builder import build_rebalancing_orders, filter_drifting_items, refresh_live_prices
+from app.services.rebalancing.order_builder import (
+    build_rebalancing_orders,
+    clamp_orders_to_max_value,
+    filter_drifting_items,
+    refresh_live_prices,
+)
 
 logger = structlog.get_logger()
 
@@ -93,6 +99,7 @@ async def generate_pending_plan_for_alert(
     orders = build_rebalancing_orders(
         drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
     )
+    orders = clamp_orders_to_max_value(orders, settings.auto_rebalancing_max_order_value_krw)
     if not orders:
         return None, None, None
 

@@ -34,6 +34,8 @@ export interface SettingsData {
   annual_dividend_goal: number | null;
   fcm_token_stored: boolean;
   composite_signal_alerts_enabled: boolean;
+  market_signal_daily_digest_enabled: boolean;
+  goal_achievement_alerts_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
   goal_risk_tolerance: GoalRiskTolerance;
   goal_max_weight_pct: number;
@@ -48,6 +50,12 @@ export const registerPushToken = (fcm_token: string | null) =>
 
 export const updateCompositeSignalAlerts = (enabled: boolean) =>
   apiPut("/settings/composite-signal-alerts", { enabled });
+
+export const updateMarketSignalDigest = (enabled: boolean) =>
+  apiPut("/settings/market-signal-digest", { enabled });
+
+export const updateGoalAchievementAlerts = (enabled: boolean) =>
+  apiPut("/settings/goal-achievement-alerts", { enabled });
 
 export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
   apiPut("/settings/goal-candidate-tickers", { tickers });

@@ -100,10 +100,10 @@ async def _fetch_and_store_token(
 
     access_token: str = data["token"]  # 키움은 token (표준 access_token 아님)
 
-    # 키움 응답: expires_dt = "YYYY-MM-DD HH:MM:SS" 형식 문자열
+    # 키움 응답: expires_dt = "YYYYMMDDHHMMSS" 형식 문자열 (구분자 없음)
     expires_dt_str: str | None = data.get("expires_dt")
     if expires_dt_str:
-        expires_at = datetime.strptime(expires_dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
+        expires_at = datetime.strptime(expires_dt_str, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
     else:
         expires_at = datetime.now(UTC) + timedelta(seconds=86400)
 

@@ -124,6 +124,51 @@ async def refresh_live_prices(
                 item.shares_to_trade = target_qty - (item.current_qty or 0)
 
 
+def clamp_orders_to_max_value(orders: list[Any], max_order_value_krw: float) -> list[Any]:
+    """주문 1건당 거래대금(수량 × 참조가)이 max_order_value_krw를 넘지 않도록 수량을 축소한다.
+
+    AUTO 대기 플랜 생성(`plan_service.generate_pending_plan_for_alert`)의 마지막 단계에서
+    호출되는 안전장치 — 드리프트/가격 계산 버그로 비정상적으로 큰 수량이 생성되더라도 계좌
+    잔고만큼 무제한 매매되는 것을 막는다. 참조가(`reference_price`)를 모르는 주문(가격 조회
+    실패 등)은 검증할 수 없으므로 그대로 통과시킨다 — 기존 동작 유지.
+    """
+    clamped: list[Any] = []
+    for order in orders:
+        price = getattr(order, "reference_price", None)
+        if not price or price <= 0:
+            clamped.append(order)
+            continue
+
+        max_qty = int(max_order_value_krw // price)
+        if order.quantity <= max_qty:
+            clamped.append(order)
+            continue
+
+        if max_qty <= 0:
+            logger.warning(
+                "auto_order_value_cap_skipped",
+                ticker=order.ticker,
+                side=order.side,
+                requested_qty=order.quantity,
+                reference_price=price,
+                max_order_value_krw=max_order_value_krw,
+            )
+            continue
+
+        logger.warning(
+            "auto_order_value_cap_clamped",
+            ticker=order.ticker,
+            side=order.side,
+            requested_qty=order.quantity,
+            clamped_qty=max_qty,
+            reference_price=price,
+            max_order_value_krw=max_order_value_krw,
+        )
+        clamped.append(order.model_copy(update={"quantity": max_qty}))
+
+    return clamped
+
+
 def is_market_signal_blocking_auto_mode(
     market_condition_mode: str, composite_level: str, data_freshness: str = "LIVE"
 ) -> bool:

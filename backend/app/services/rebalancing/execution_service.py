@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.kis.auth import get_access_token
 from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
-from app.kiwoom.order import place_domestic_order as kiwoom_place_order
 from app.models.asset import AssetAccount, RebalancingExecution, RebalancingExecutionResult
 from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderResult
 from app.services._account_queries import active_accounts_stmt
@@ -260,7 +259,6 @@ async def _execute_kiwoom_account_orders(
         access_token,
         account_no,
         is_mock,
-        kiwoom_place_order,
     )
     for order in buys:
         account_results.append(
@@ -269,7 +267,6 @@ async def _execute_kiwoom_account_orders(
                 access_token,
                 account_no,
                 is_mock,
-                kiwoom_place_order,
             )
         )
     return account_results

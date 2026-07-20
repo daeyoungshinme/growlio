@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.market_signal_service import get_last_composite_level, set_last_composite_level
+from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 
 
 class TestLastLevelRoundTrip:
@@ -142,3 +143,219 @@ class TestCheckMarketSignalLevelChange:
 
         mock_db.execute.assert_not_called()
         mock_redis.setex.assert_not_called()
+
+
+class TestAlreadySentDigestToday:
+    @pytest.mark.asyncio
+    async def test_returns_false_when_no_history(self, mock_db):
+        from app.services.alerts.market_signal_alert_service import _already_sent_digest_today
+
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = None
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        assert await _already_sent_digest_today(mock_db, uuid.uuid4()) is False
+
+    @pytest.mark.asyncio
+    async def test_returns_true_when_history_exists(self, mock_db):
+        from app.services.alerts.market_signal_alert_service import _already_sent_digest_today
+
+        result_mock = MagicMock()
+        result_mock.scalar.return_value = uuid.uuid4()
+        mock_db.execute = AsyncMock(return_value=result_mock)
+
+        assert await _already_sent_digest_today(mock_db, uuid.uuid4()) is True
+
+
+class TestSendMarketSignalDailyDigest:
+    @pytest.mark.asyncio
+    async def test_fetch_failure_is_swallowed(self, mock_db, mock_redis):
+        """시장 신호 조회 실패 시 예외를 삼키고 구독자 조회조차 하지 않는다."""
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        with patch(
+            "app.services.alerts.market_signal_alert_service.get_market_signal",
+            new=AsyncMock(side_effect=RuntimeError("boom")),
+        ):
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_db.execute.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_no_subscribers_sends_nothing(self, mock_db, mock_redis):
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+        ):
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_sends_email_and_push_and_saves_history(self, mock_db, mock_redis):
+        """구독 유저에게 이메일+푸시 발송 후 이력 저장 + 커밋."""
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)
+        user_settings = SimpleNamespace(notification_email=None, fcm_token="token-abc")
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(user, user_settings)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        history_result = MagicMock()
+        history_result.scalar.return_value = None  # 아직 오늘 발송 안 함
+
+        per_user_session = AsyncMock()
+        per_user_session.execute = AsyncMock(return_value=history_result)
+        per_user_session.add = MagicMock()
+        per_user_session.commit = AsyncMock()
+        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
+        per_user_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "RED"}),
+            ),
+            patch(
+                "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
+                return_value=per_user_session,
+            ),
+            patch(
+                "app.services.email_service.send_market_signal_daily_digest_alert",
+                new=AsyncMock(return_value=True),
+            ) as mock_email,
+            patch(
+                "app.services.push_service.send_push_to_user",
+                new=AsyncMock(return_value=True),
+            ) as mock_push,
+        ):
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_email.assert_called_once_with("user@example.com", "RED", _MARKET_NOTES["RED"])
+        mock_push.assert_called_once()
+        push_kwargs = mock_push.call_args.kwargs
+        assert push_kwargs["fcm_token"] == "token-abc"
+        assert push_kwargs["data"] == {"type": "MARKET_SIGNAL_DIGEST"}
+        per_user_session.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_green_level_uses_fallback_reason(self, mock_db, mock_redis):
+        """GREEN은 _MARKET_NOTES에 None이 매핑되어 있으므로 안내 문구로 대체한다(빈 메시지 방지)."""
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)
+        user_settings = SimpleNamespace(notification_email=None, fcm_token=None)
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(user, user_settings)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        history_result = MagicMock()
+        history_result.scalar.return_value = None
+
+        per_user_session = AsyncMock()
+        per_user_session.execute = AsyncMock(return_value=history_result)
+        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
+        per_user_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
+                return_value=per_user_session,
+            ),
+            patch(
+                "app.services.email_service.send_market_signal_daily_digest_alert",
+                new=AsyncMock(return_value=True),
+            ) as mock_email,
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=False)),
+        ):
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_email.assert_called_once_with("user@example.com", "GREEN", "오늘도 안정적입니다.")
+
+    @pytest.mark.asyncio
+    async def test_skips_user_already_notified_today(self, mock_db, mock_redis):
+        """오늘 이미 발송된 유저는 건너뛴다 — 스케줄러 재시작/misfire 중복 발송 방지."""
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        user = SimpleNamespace(id=uuid.uuid4(), email="user@example.com", is_active=True)
+        user_settings = SimpleNamespace(notification_email=None, fcm_token=None)
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(user, user_settings)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        history_result = MagicMock()
+        history_result.scalar.return_value = uuid.uuid4()  # 이미 발송됨
+
+        per_user_session = AsyncMock()
+        per_user_session.execute = AsyncMock(return_value=history_result)
+        per_user_session.__aenter__ = AsyncMock(return_value=per_user_session)
+        per_user_session.__aexit__ = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
+                return_value=per_user_session,
+            ),
+            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+        ):
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_email.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_one_user_failure_does_not_stop_others(self, mock_db, mock_redis):
+        """한 유저 처리 중 예외가 발생해도 다른 유저 처리는 계속된다."""
+        from app.services.alerts.market_signal_alert_service import send_market_signal_daily_digest
+
+        user1 = SimpleNamespace(id=uuid.uuid4(), email="u1@example.com", is_active=True)
+        user2 = SimpleNamespace(id=uuid.uuid4(), email="u2@example.com", is_active=True)
+        settings1 = SimpleNamespace(notification_email=None, fcm_token=None)
+        settings2 = SimpleNamespace(notification_email=None, fcm_token=None)
+
+        subscribers_result = MagicMock()
+        subscribers_result.all.return_value = [(user1, settings1), (user2, settings2)]
+        mock_db.execute = AsyncMock(return_value=subscribers_result)
+
+        def session_factory():
+            session = AsyncMock()
+            session.__aenter__ = AsyncMock(return_value=session)
+            session.__aexit__ = AsyncMock(return_value=None)
+            session.execute = AsyncMock(side_effect=RuntimeError("db down"))
+            return session
+
+        with (
+            patch(
+                "app.services.alerts.market_signal_alert_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.services.alerts.market_signal_alert_service.AsyncSessionLocal",
+                side_effect=session_factory,
+            ),
+            patch("app.services.email_service.send_market_signal_daily_digest_alert", new=AsyncMock()) as mock_email,
+        ):
+            # 두 유저 모두 세션 조회 단계에서 실패하지만 예외가 전체를 막지 않아야 한다.
+            await send_market_signal_daily_digest(mock_db, mock_redis)
+
+        mock_email.assert_not_called()

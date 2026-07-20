@@ -9,6 +9,7 @@ from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
 from app.core.redis_client import get_redis
+from app.kis.auth import promote_user_token_to_account
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Transaction
 from app.models.user import User
@@ -159,6 +160,12 @@ async def create_account(
     db.add(account)
     await db.commit()
     await db.refresh(account)
+    if req.data_source == "KIS_API":
+        # 직전 "자격증명 확인" 단계에서 발급된 유저 레벨 토큰을 이 계좌로 승격 —
+        # 등록 직후 프론트가 자동으로 호출하는 첫 동기화가 새 토큰을 또 발급받으려다
+        # KIS 토큰 발급 속도 제한에 걸려 실패하는 것을 방지한다.
+        redis = await get_redis()
+        await promote_user_token_to_account(str(current_user.id), str(account.id), account.is_mock_mode, redis, db)
     if account.manual_amount:
         await _upsert_snapshot(
             db,

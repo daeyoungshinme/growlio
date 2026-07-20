@@ -415,6 +415,32 @@ class TestBuildPortfolioOverviewWithAccounts:
         assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
 
     @pytest.mark.asyncio
+    async def test_kiwoom_stock_account_positions_included_in_all_positions(self, override_settings):
+        """STOCK_KIWOOM 계좌 보유종목도 all_positions에 포함되어야 한다 — 과거 STOCK_TYPES
+        frozenset에서 STOCK_KIWOOM이 누락되어 종목 상세가 통째로 빠지던 회귀 방지."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        snap_id = uuid.uuid4()
+
+        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIWOOM")
+        snapshot = _make_snapshot(snap_id, acc_id)
+        position = _make_position(snap_id, acc_id)
+
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        assert len(result["all_positions"]) == 1
+        assert result["all_positions"][0]["ticker"] == "005930"
+
+    @pytest.mark.asyncio
     async def test_current_positions_added_to_cur_pos_map(self, override_settings):
         """현재 보유 포지션(snapshot_id=None) 있을 때 cur_pos_map 채움 (line 199)."""
         db = AsyncMock()

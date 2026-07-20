@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { ArrowRight, TrendingUp } from "lucide-react";
 import { fmtKrwShort } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
+import { useCollapsible } from "@/hooks/useCollapsible";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
 import type { PortfolioOverview } from "@/types";
 import type { DashboardData } from "@/api/dashboard";
 
@@ -11,6 +13,8 @@ interface Props {
 }
 
 export default function InvestmentSnapshotCard({ overview, data }: Props) {
+  const [isOpen, toggleOpen] = useCollapsible(true, "growlio:dashboard:investmentSnapshotOpen");
+
   if (!overview || !overview.total_stock_krw || overview.total_stock_krw <= 0) return null;
 
   const pnl = overview.unrealized_pnl_krw;
@@ -19,20 +23,22 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
     data?.estimated_annual_dividends != null && data.estimated_annual_dividends > 0;
 
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-          <TrendingUp size={16} className="text-blue-500" />
-          주식 투자 현황
-        </h2>
+    <CollapsibleCard
+      icon={TrendingUp}
+      iconColorClassName="text-blue-500"
+      title="주식 투자 현황"
+      headerRight={
         <Link
           to="/assets?tab=투자현황"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
           자세히 보기
         </Link>
-      </div>
-
+      }
+      isOpen={isOpen}
+      onToggle={toggleOpen}
+      collapsedHint={`평가액 ${fmtKrwShort(overview.total_stock_krw)}원`}
+    >
       {/* 평가액 / 투자원금 / 평가손익 */}
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div>
@@ -104,6 +110,6 @@ export default function InvestmentSnapshotCard({ overview, data }: Props) {
           </Link>
         </div>
       )}
-    </div>
+    </CollapsibleCard>
   );
 }

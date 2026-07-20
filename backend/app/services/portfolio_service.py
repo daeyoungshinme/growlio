@@ -36,7 +36,9 @@ ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.REAL_ESTATE: "부동산",
 }
 
-STOCK_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_OTHER, AssetType.CASH_OTHER})
+STOCK_TYPES: frozenset[str] = frozenset(
+    {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER, AssetType.CASH_OTHER}
+)
 
 # 브로커 계좌: deposit_krw를 보유하는 유형 (예수금 합산 대상)
 _BROKER_TYPES: frozenset[str] = frozenset(

@@ -48,6 +48,7 @@ async def run_goal_achievement_check() -> None:
             .join(UserSettings, User.id == UserSettings.user_id)
             .where(
                 User.is_active == True,  # noqa: E712
+                UserSettings.goal_achievement_alerts_enabled == True,  # noqa: E712
                 UserSettings.goal_amount.isnot(None)
                 | UserSettings.annual_deposit_goal.isnot(None)
                 | UserSettings.annual_dividend_goal.isnot(None),

@@ -110,45 +110,56 @@ class TestLoadAccount:
 
 
 class TestExecuteKiwoomSingleOrder:
-    """_execute_kiwoom_single_order: 키움 단건 주문 실행."""
+    """_execute_kiwoom_single_order: 키움 단건 주문 실행 (국내/해외)."""
 
     @pytest.mark.asyncio
     async def test_skips_zero_quantity(self, override_settings):
+        from app.services.rebalancing import _kiwoom_order_executor
         from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=0)
-        result = await _execute_kiwoom_single_order(order, "token", "12345", False, AsyncMock())
+        with patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock()):
+            result = await _execute_kiwoom_single_order(order, "token", "12345", False)
 
         assert result.status == "SKIPPED"
 
     @pytest.mark.asyncio
-    async def test_skips_overseas_market(self, override_settings):
+    async def test_overseas_market_executes_via_place_overseas_order(self, override_settings):
+        from app.services.rebalancing import _kiwoom_order_executor
         from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(ticker="AAPL", market="NASDAQ", quantity=5)
-        result = await _execute_kiwoom_single_order(order, "token", "12345", False, AsyncMock())
+        with patch.object(
+            _kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "ORD002"})
+        ) as overseas_fn:
+            result = await _execute_kiwoom_single_order(order, "token", "12345", False)
 
-        assert result.status == "SKIPPED"
-        assert "국내주식" in result.error_msg
+        assert result.status == "SUCCESS"
+        assert result.order_no == "ORD002"
+        overseas_fn.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_success_on_successful_order(self, override_settings):
+        from app.services.rebalancing import _kiwoom_order_executor
         from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
-        mock_place = AsyncMock(return_value={"order_no": "ORD001"})
-        result = await _execute_kiwoom_single_order(order, "token", "12345", True, mock_place)
+        with patch.object(
+            _kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "ORD001"})
+        ):
+            result = await _execute_kiwoom_single_order(order, "token", "12345", True)
 
         assert result.status == "SUCCESS"
         assert result.order_no == "ORD001"
 
     @pytest.mark.asyncio
     async def test_returns_failed_on_exception(self, override_settings):
+        from app.services.rebalancing import _kiwoom_order_executor
         from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
-        mock_place = AsyncMock(side_effect=Exception("API 오류"))
-        result = await _execute_kiwoom_single_order(order, "token", "12345", True, mock_place)
+        with patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(side_effect=Exception("API 오류"))):
+            result = await _execute_kiwoom_single_order(order, "token", "12345", True)
 
         assert result.status == "FAILED"
         assert result.error_msg is not None
@@ -283,7 +294,7 @@ class TestExecuteKiwoomSellsWithClamp:
     async def test_empty_sells_returns_empty(self, override_settings):
         from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_sells_with_clamp
 
-        result = await _execute_kiwoom_sells_with_clamp([], "token", "12345", True, AsyncMock())
+        result = await _execute_kiwoom_sells_with_clamp([], "token", "12345", True)
         assert result == []
 
     @pytest.mark.asyncio
@@ -294,10 +305,11 @@ class TestExecuteKiwoomSellsWithClamp:
         mock_balance = AsyncMock(return_value={"positions": [{"ticker": "005930", "qty": 4}]})
         mock_place = AsyncMock(return_value={"order_no": "ORD001"})
 
-        with patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance):
-            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp(
-                [order], "token", "12345", True, mock_place
-            )
+        with (
+            patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", mock_place),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp([order], "token", "12345", True)
 
         assert results[0].status == "SUCCESS"
         _, kwargs = mock_place.call_args
@@ -310,10 +322,11 @@ class TestExecuteKiwoomSellsWithClamp:
         order = _make_order(ticker="005930", side="SELL", quantity=10)
         mock_balance = AsyncMock(return_value={"positions": []})
 
-        with patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance):
-            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp(
-                [order], "token", "12345", True, AsyncMock()
-            )
+        with (
+            patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", mock_balance),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock()),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_sells_with_clamp([order], "token", "12345", True)
 
         assert len(results) == 1
         assert results[0].status == "SKIPPED"

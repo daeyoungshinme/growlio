@@ -211,7 +211,7 @@ import DividendTab from "@/components/portfolio/DividendTab";
 import { AnalysisPanel } from "@/components/portfolio-analysis/AnalysisPanel";
 import RebalancingStatusCard from "@/components/dashboard/RebalancingStatusCard";
 import { fetchPortfolios } from "@/api/portfolios";
-import { analyzePortfolio } from "@/api/rebalancing";
+import { analyzePortfolio, fetchDriftSummary } from "@/api/rebalancing";
 import AssetsPage from "@/pages/AssetsPage";
 import TopLoadingBar from "@/components/common/TopLoadingBar";
 
@@ -610,6 +610,44 @@ describe("RebalancingStatusCard", () => {
     );
     await waitFor(() => {
       expect(container.firstChild).not.toBeNull();
+    });
+  });
+
+  it("showCombinedNote=false이면 결합 안내 문구를 숨긴다 (진단 탭에서 DiagnosisSummaryHeader와 중복 방지)", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
+      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
+    ] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard
+          marketSignal={{ composite_level: "RED" } as never}
+          showCombinedNote={false}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.getByText("투자 현황 진단")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("showCombinedNote 기본값(true)이면 결합 안내 문구를 표시한다", async () => {
+    vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
+    vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
+      { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },
+    ] as never);
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard marketSignal={{ composite_level: "RED" } as never} />
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(
+        screen.getByText(/시장 위험 신호가 높은 국면에서 이탈 종목이 발견되었습니다/),
+      ).toBeInTheDocument();
     });
   });
 });

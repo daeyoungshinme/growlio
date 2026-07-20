@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Anchor, FolderPlus, Loader2, Plus, Settings2, Target } from "lucide-react";
+import { Anchor, FolderPlus, Loader2, Plus, RefreshCw, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CASH_EQUIVALENT_TICKER,
@@ -29,6 +29,11 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import {
+  computeRecommendationDrift,
+  hasSignificantDrift,
+  type RecommendationDrift,
+} from "@/utils/recommendationDrift";
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
 const TAX_TYPE_ORDER: AccountTaxType[] = [
@@ -52,6 +57,24 @@ function normalizeWeights(items: GoalRecommendationItem[]) {
   const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
   if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
   return normalized;
+}
+
+function driftBadgeLabel(drift: RecommendationDrift): string {
+  const parts: string[] = [];
+  if (drift.maxDeltaPct > 0) parts.push(`최대 ${drift.maxDeltaPct}%p 차이`);
+  if (drift.newCandidateCount > 0) parts.push(`신규 후보 ${drift.newCandidateCount}개`);
+  return `시장 상황이 바뀌어 추천 비중이 달라졌어요 · ${parts.join(" · ")}`;
+}
+
+/** 마지막으로 적용한 목표 비중과 지금 다시 계산한 추천 비중을 비교해 유의미하게 달라졌을 때만
+ * 노출되는 배지 — 사용자가 화면을 열 때마다 직접 비교하지 않아도 되도록 한다. */
+function RecommendationDriftBadge({ drift }: { drift: RecommendationDrift }) {
+  return (
+    <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
+      <RefreshCw size={12} className="shrink-0" />
+      {driftBadgeLabel(drift)}
+    </p>
+  );
 }
 
 interface Props {
@@ -224,6 +247,15 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
   const isCashEquivalentItem = (item: GoalRecommendationItem) =>
     item.ticker === CASH_EQUIVALENT_TICKER;
 
+  const overallDrift =
+    hasOverallRecommendation && overallConfirmTarget
+      ? computeRecommendationDrift(overallData.recommended_items, overallConfirmTarget.items)
+      : null;
+  const horizonDrift =
+    activeHorizonRec && activeHorizonRec.recommended_items.length > 0 && horizonTargetPortfolio
+      ? computeRecommendationDrift(activeHorizonRec.recommended_items, horizonTargetPortfolio.items)
+      : null;
+
   return (
     <>
       <div className="rounded-xl border border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-900/20 p-4 space-y-2">
@@ -285,6 +317,10 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       ` (배당수익률 약 ${overallData.expected_dividend_yield_pct.toFixed(1)}%)`}
                     를 기대할 수 있습니다.
                   </p>
+
+                  {overallDrift && hasSignificantDrift(overallDrift) && (
+                    <RecommendationDriftBadge drift={overallDrift} />
+                  )}
 
                   <ul className="space-y-1">
                     {overallData.recommended_items.map((item) => (
@@ -394,6 +430,10 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                 activeHorizonRec.expected_return_pct != null &&
                 ` · 기대수익률 ${activeHorizonRec.expected_return_pct.toFixed(1)}%`}
             </p>
+
+            {horizonDrift && hasSignificantDrift(horizonDrift) && (
+              <RecommendationDriftBadge drift={horizonDrift} />
+            )}
 
             {activeHorizonRec.recommended_items.length > 0 ? (
               <>

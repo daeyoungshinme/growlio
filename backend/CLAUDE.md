@@ -159,12 +159,12 @@ services/
   │   ├── alert_service.py    # 알림 공통 저장·조회(save_alert_history/apply_alert_trigger/list_alert_history). `check_and_trigger_alerts`/`check_and_trigger_stock_price_alerts`/`check_rebalancing_alerts` 등은 순환 참조 회피용 `__getattr__` 지연 re-export shim(실제 구현은 alerts/exchange_rate_service.py·alerts/stock_price_service.py·rebalancing/alert_check.py·rebalancing/alert_test.py·rebalancing/order_builder.py) — 의도된 설계, 제거 대상 아님
   │   ├── exchange_rate_service.py # 환율 알림 조건 체크 서비스 (구 exchange_rate_alert_service.py)
   │   ├── stock_price_service.py   # 주가 알림 조건 체크 서비스 (구 stock_price_alert_service.py)
-  │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림. `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing/alert_check.py·rebalancing/diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing/alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
+  │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림 + 매일 08:30 KST 요약 다이제스트(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing/alert_check.py·rebalancing/diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing/alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
   │   └── calculator.py       # 알림 조건 판단 로직 (구 alert_calculator.py, alert_service.py에서 분리)
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
-  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py
+  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py. `clamp_orders_to_max_value()`는 1건당 거래대금이 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만원)를 넘지 않도록 축소하는 안전장치 — `plan_service.generate_pending_plan_for_alert()`(AUTO/quick-execute 공용 대기 플랜 생성 경로)가 호출
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`)
   │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
@@ -183,7 +183,7 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
-  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)가 있으면 필요 배당수익률도 제약으로 함께 전달(전체 자산 기준만, 큐레이션 후보로 달성 불가하면 fail-soft로 무시). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
   ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB/Redis 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈
   ├── goal_candidate_service.py  # 목표 역산 추천 후보 종목 관리/영속화(세제유형별 필터링, 동시요청 lost-update 방지 락) — goal_recommendation_service.py 서브모듈
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률을 구하는 순수 계산 함수 (goal_recommendation_service.py 서브모듈)
@@ -261,6 +261,7 @@ providers/                    # 금융 데이터 provider
   ├── manual_provider.py      # 수동 입력 provider
   ├── _token_cache.py         # 토큰 캐싱 헬퍼
   ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
+  ├── _overseas_cache.py      # KIS/키움 공용 해외 잔고 조회 캐시 헬퍼(has_overseas Redis 플래그로 해외 보유 없는 계좌의 API 콜 스킵)
   └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
@@ -278,7 +279,8 @@ jobs/                         # APScheduler 정기 작업
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
   ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
   ├── rebalancing_alert.py    # 10분 간격(app/scheduler.py:44) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
-  ├── market_signal_alert.py  # 10분 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
+  ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
+  ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함)
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행
   ├── rebalancing_plan_sell_expiry.py  # 매일 15:31 KST — 당일 미응답 매도 승인 요청 만료 처리

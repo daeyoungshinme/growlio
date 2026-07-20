@@ -57,6 +57,7 @@ TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7
 TTL_GOAL_RECOMMENDATION = 600  # 목표 역산 추천(전체/기간별) 10분 — 설정 변경 시 명시적으로 무효화됨
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
+TTL_OVERSEAS_STOCK_NAME = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 7일 — 회사명은 사실상 불변
 
 # ---------------------------------------------------------------------------
 # 캐시 스키마 버전 상수
@@ -135,6 +136,10 @@ def alloc_history_key(user_id: uuid.UUID, months: int) -> str:
 
 def has_overseas_key(account_id: uuid.UUID) -> str:
     return f"{_env_prefix()}has_overseas:{account_id}"
+
+
+def overseas_stock_name_key(ticker: str) -> str:
+    return f"{_env_prefix()}overseas_stock_name:{ticker}"
 
 
 def dividend_summary_key(user_id: uuid.UUID) -> str:
