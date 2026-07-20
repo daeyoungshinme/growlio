@@ -3,10 +3,11 @@ from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, field_validator, model_validator
 
-from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, IsaType, TransactionType
+from app.enums import AccountTaxType, AssetType, DataSource, InvestmentHorizon, IsaType
 from app.models.asset import VALID_MARKETS
+from app.schemas._validators import validate_non_negative_amount, validate_positive_amount
 
 
 class ManualPosition(BaseModel):
@@ -124,25 +125,6 @@ class RealEstateDetails(BaseModel):
         return self
 
 
-_MAX_AMOUNT_KRW = 100_000_000_000  # 1000억 KRW
-
-
-def _validate_positive(v: float | None) -> float | None:
-    if v is not None and v <= 0:
-        raise ValueError("금액은 0보다 커야 합니다")
-    if v is not None and v > _MAX_AMOUNT_KRW:
-        raise ValueError(f"금액은 {_MAX_AMOUNT_KRW:,}원을 초과할 수 없습니다")
-    return v
-
-
-def _validate_non_negative(v: float | None) -> float | None:
-    if v is not None and v < 0:
-        raise ValueError("금액은 0 이상이어야 합니다")
-    if v is not None and v > _MAX_AMOUNT_KRW:
-        raise ValueError(f"금액은 {_MAX_AMOUNT_KRW:,}원을 초과할 수 없습니다")
-    return v
-
-
 class AssetAccountCreate(BaseModel):
     name: str
     asset_type: AssetType
@@ -171,12 +153,12 @@ class AssetAccountCreate(BaseModel):
     @field_validator("deposit_krw", "deposit_usd")
     @classmethod
     def deposit_non_negative(cls, v: float | None) -> float | None:
-        return _validate_non_negative(v)
+        return validate_non_negative_amount(v)
 
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
-        return _validate_positive(v)
+        return validate_positive_amount(v)
 
     @model_validator(mode="after")
     def kis_credentials_required(self) -> "AssetAccountCreate":
@@ -216,12 +198,12 @@ class AssetAccountUpdate(BaseModel):
     @field_validator("manual_amount")
     @classmethod
     def manual_amount_positive(cls, v: float | None) -> float | None:
-        return _validate_positive(v)
+        return validate_positive_amount(v)
 
     @field_validator("deposit_krw", "deposit_usd")
     @classmethod
     def deposit_non_negative(cls, v: float | None) -> float | None:
-        return _validate_non_negative(v)
+        return validate_non_negative_amount(v)
 
 
 class AssetAccountResponse(BaseModel):
@@ -275,83 +257,6 @@ class AssetSnapshotResponse(BaseModel):
     source: str
 
     model_config = {"from_attributes": True}
-
-
-class TransactionCreate(BaseModel):
-    account_id: UUID | None = None
-    transaction_type: TransactionType
-    amount: float
-    transaction_date: date
-    ticker: str | None = None
-    notes: str | None = None
-    fee: float | None = None
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float) -> float:
-        return _validate_positive(v)  # type: ignore[return-value]
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return _validate_non_negative(v)
-
-
-class TransactionUpdate(BaseModel):
-    transaction_type: TransactionType | None = None
-    amount: float | None = None
-    transaction_date: date | None = None
-    ticker: str | None = None
-    notes: str | None = None
-    fee: float | None = None
-
-    @field_validator("amount")
-    @classmethod
-    def amount_positive(cls, v: float | None) -> float | None:
-        return _validate_positive(v)
-
-    @field_validator("fee")
-    @classmethod
-    def fee_non_negative(cls, v: float | None) -> float | None:
-        return _validate_non_negative(v)
-
-
-class TransactionResponse(BaseModel):
-    id: UUID
-    account_id: UUID | None
-    transaction_type: TransactionType
-    amount: float
-    fee: float | None
-    transaction_date: date
-    ticker: str | None
-    notes: str | None
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-class DashboardResponse(BaseModel):
-    total_assets_krw: float
-    asset_allocation: list[dict]
-    goal_amount: float | None
-    goal_achievement_pct: float | None
-    stock_return_pct: float
-    annual_return_pct: float | None
-    monthly_trend: list[dict]
-    annual_deposit_goal: float | None = None
-    annual_deposit_current: float = 0.0
-    deposit_achievement_pct: float | None = None
-    annual_dividends_received: float | None = None
-    estimated_annual_dividends: float | None = None
-    dividend_monthly_breakdown: list[dict] = []
-    cumulative_return_pct: float | None = None
-    xirr_pct: float | None = Field(None, ge=-99, le=1000)
-    xirr_is_estimated: bool = False
-    goal_annual_return_pct: float | None = None
-    return_goal_gap_pct: float | None = None
-    retirement_target_year: int | None = None
-    annual_dividend_goal: float | None = None
-    dividend_goal_achievement_pct: float | None = None
 
 
 class KisCredentialVerifyRequest(BaseModel):

@@ -9,7 +9,7 @@
 `index_region`(DOMESTIC/OVERSEAS)은 상장거래소가 아니라 **추종 지수의 지역**을 나타낸다.
 `133690 TIGER 미국나스닥100`처럼 KRX(국내) 상장이지만 해외지수를 추종하는 ETF가 있어
 상장거래소만으로는 구분할 수 없다 — 세제유형별(ISA/연금저축/IRP는 해외지수, 일반은 국내지수)
-후보 선호도 필터링(`goal_recommendation_service._TAX_TYPE_INDEX_REGION_PREFERENCE`)에 쓰인다.
+후보 선호도 필터링(`goal_candidate_service._TAX_TYPE_INDEX_REGION_PREFERENCE`)에 쓰인다.
 """
 
 import re

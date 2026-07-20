@@ -51,6 +51,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     invalidate_asset_account_caches,
     set_cached_json,
+    sync_lock_key,
 )
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount
@@ -354,7 +355,7 @@ async def sync_account(
     account = await _get_owned_account(account_id, current_user.id, db)
     redis = await get_redis()
 
-    lock_key = f"sync_lock:{account_id}"
+    lock_key = sync_lock_key(account_id)
     async with redis_lock(redis, lock_key, ttl=120) as acquired:
         if not acquired:
             raise HTTPException(

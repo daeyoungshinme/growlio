@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, RedisType
+from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, RedisType, efficient_frontier_key
 
 logger = structlog.get_logger()
 _MIN_POSITIONS = 2  # 최적화에 필요한 최소 종목 수
@@ -176,7 +176,7 @@ async def get_efficient_frontier(  # noqa: C901
 ) -> dict:
     """효율적 프론티어 데이터 반환. compare_portfolio_id 지정 시 목표 포트폴리오 위치도 포함."""
     acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
-    cache_key = f"efficient_frontier:{user_id}:{compare_portfolio_id or ''}:{acct_suffix}"
+    cache_key = efficient_frontier_key(user_id, compare_portfolio_id, acct_suffix)
 
     if redis:
         try:

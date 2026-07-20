@@ -270,7 +270,7 @@ class TestComputeCorrelation:
     @pytest.mark.asyncio
     async def test_empty_portfolios_returns_empty(self, mock_db, override_settings):
         """포트폴리오 없으면 빈 결과."""
-        from app.services.backtest_service import compute_correlation
+        from app.services.correlation_service import compute_correlation
 
         mock_db.execute = AsyncMock(return_value=_exec_result([]))
 
@@ -287,7 +287,7 @@ class TestComputeCorrelation:
     @pytest.mark.asyncio
     async def test_portfolio_with_items_calls_executor(self, mock_db, override_settings):
         """종목이 있으면 executor를 통해 상관관계 계산."""
-        from app.services.backtest_service import compute_correlation
+        from app.services.correlation_service import compute_correlation
 
         port = _make_portfolio()
         exec_res = MagicMock()

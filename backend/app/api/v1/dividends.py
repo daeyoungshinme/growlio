@@ -12,10 +12,9 @@ from app.limiter import limiter
 from app.models.user import User
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.drip_service import calc_monthly_optimization
-from app.services.dividend.orchestrator import (
+from app.services.dividend.orchestrator import get_position_dividend_yields, get_ticker_dividend_summary
+from app.services.dividend.ticker_settings_service import (
     delete_ticker_settings,
-    get_position_dividend_yields,
-    get_ticker_dividend_summary,
     get_ticker_settings,
     upsert_ticker_settings,
 )

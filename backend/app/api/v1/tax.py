@@ -10,7 +10,8 @@ from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.user import User
 from app.services.isa_service import get_isa_status_summary
-from app.services.tax_service import calc_pension_contribution_status, get_overseas_positions_detail, get_tax_summary
+from app.services.pension_contribution_service import calc_pension_contribution_status
+from app.services.tax_service import get_overseas_positions_detail, get_tax_summary
 from app.utils.cache_keys import TTL_TAX_OVERSEAS, get_cached_json, set_cached_json, tax_overseas_key
 
 router = APIRouter(prefix="/tax", tags=["tax"])

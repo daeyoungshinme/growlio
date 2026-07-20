@@ -2,6 +2,24 @@
 
 from typing import Any
 
+MAX_AMOUNT_KRW = 100_000_000_000  # 1000억 KRW
+
+
+def validate_positive_amount(v: float | None) -> float | None:
+    if v is not None and v <= 0:
+        raise ValueError("금액은 0보다 커야 합니다")
+    if v is not None and v > MAX_AMOUNT_KRW:
+        raise ValueError(f"금액은 {MAX_AMOUNT_KRW:,}원을 초과할 수 없습니다")
+    return v
+
+
+def validate_non_negative_amount(v: float | None) -> float | None:
+    if v is not None and v < 0:
+        raise ValueError("금액은 0 이상이어야 합니다")
+    if v is not None and v > MAX_AMOUNT_KRW:
+        raise ValueError(f"금액은 {MAX_AMOUNT_KRW:,}원을 초과할 수 없습니다")
+    return v
+
 
 def validate_portfolio_weights(items: list[Any]) -> list[Any]:
     """비중 합계가 100인지 검증한다. items가 비어 있으면 ValueError를 발생시킨다."""

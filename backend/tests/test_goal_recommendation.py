@@ -566,7 +566,7 @@ class TestApplyIndexRegionPreference:
         candidates = [
             {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
         ]
-        with patch("app.services.goal_recommendation_service.RECOMMENDATION_UNIVERSE", []):
+        with patch("app.services.goal_candidate_service.RECOMMENDATION_UNIVERSE", []):
             filtered, note, added = _apply_index_region_preference(candidates, "ISA", capacity_remaining=20)
         assert filtered == candidates
         assert added == []

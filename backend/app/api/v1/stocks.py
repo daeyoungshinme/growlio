@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import asyncio
-import re
 import uuid
 from functools import partial
 
-import httpx
 import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
@@ -23,7 +21,8 @@ from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.user import User
 from app.services.price_service import _price_via_kis, domestic_price_fallback
-from app.services.recommendation_universe import guess_asset_class, resolve_index_region
+from app.services.recommendation_universe import resolve_index_region
+from app.services.stock_search_service import _has_korean, _search_naver, _search_yahoo
 from app.utils.cache_keys import (
     TTL_ETF_INDEX_REGION,
     TTL_PRICE_CURRENT,
@@ -40,95 +39,6 @@ from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 logger = structlog.get_logger()
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
-
-EXCHANGE_TO_MARKET: dict[str, str] = {
-    "KSC": "KOSPI",
-    "KOE": "KOSDAQ",
-    "NMS": "NASDAQ",
-    "NGM": "NASDAQ",
-    "NCM": "NASDAQ",
-    "NYQ": "NYSE",
-    "PCX": "NYSE",
-    "ASE": "AMEX",
-}
-
-_KOREAN_RE = re.compile(r"[가-힣]")
-
-
-def _has_korean(text: str) -> bool:
-    return bool(_KOREAN_RE.search(text))
-
-
-async def _search_naver(q: str, limit: int) -> list[dict]:
-    """네이버 금융 자동완성 — 한글 종목명 검색용."""
-    url = "https://ac.stock.naver.com/ac"
-    params = {"q": q, "target": "stock,index"}
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(url, params=params)
-            r.raise_for_status()
-            data = r.json()
-    except Exception as e:
-        logger.warning("naver_search_failed", q=q, error=str(e))
-        return []
-
-    results = []
-    for item in data.get("items", []):
-        type_code = item.get("typeCode", "")
-        market = type_code if type_code in ("KOSPI", "KOSDAQ") else type_code
-        ticker = item.get("code", "")
-        name = item.get("name", "")
-        results.append(
-            {
-                "ticker": ticker,
-                "name": name,
-                "market": market,
-                "exchange": type_code,
-                "asset_class": guess_asset_class(name),
-                "index_region": resolve_index_region(ticker, market, None),
-            }
-        )
-        if len(results) >= limit:
-            break
-    return results
-
-
-async def _search_yahoo(q: str, limit: int) -> list[dict]:
-    """Yahoo Finance 검색 — 영문명·티커 검색용."""
-    url = "https://query1.finance.yahoo.com/v1/finance/search"
-    params: dict[str, str | int] = {"q": q, "quotesCount": limit, "newsCount": 0, "listsCount": 0}
-    headers = {"User-Agent": "Mozilla/5.0"}
-    try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            r = await client.get(url, params=params, headers=headers)
-            r.raise_for_status()
-            data = r.json()
-    except Exception as e:
-        logger.warning("yahoo_search_failed", q=q, error=str(e))
-        return []
-
-    results = []
-    for item in data.get("quotes", []):
-        if item.get("quoteType") not in ("EQUITY", "ETF"):
-            continue
-        exchange = item.get("exchange", "")
-        market = EXCHANGE_TO_MARKET.get(exchange, exchange)
-        symbol: str = item.get("symbol", "")
-        ticker = symbol.removesuffix(".KS").removesuffix(".KQ")
-        name = item.get("shortname") or item.get("longname") or symbol
-        results.append(
-            {
-                "ticker": ticker,
-                "name": name,
-                "market": market,
-                "exchange": exchange,
-                "asset_class": guess_asset_class(name),
-                "index_region": resolve_index_region(ticker, market, None),
-            }
-        )
-        if len(results) >= limit:
-            break
-    return results
 
 
 @router.get("/search")

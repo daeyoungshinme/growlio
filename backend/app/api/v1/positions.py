@@ -20,7 +20,7 @@ from app.schemas.asset import ManualPosition, PositionListResponse
 from app.services._position_queries import fetch_manual_positions
 from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
-from app.utils.cache_keys import invalidate_asset_account_caches
+from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_position_pnl
 from app.utils.redis_lock import redis_lock
@@ -88,7 +88,7 @@ async def save_positions(
     account = await get_owned_account(account_id, current_user.id, db)
     redis = await get_redis()
 
-    lock_key = f"sync_lock:{account_id}"
+    lock_key = sync_lock_key(account_id)
     async with redis_lock(redis, lock_key, ttl=30) as acquired:
         if not acquired:
             raise HTTPException(
@@ -165,7 +165,7 @@ async def sync_position_prices(
     account = await get_owned_account(account_id, current_user.id, db)
     redis = await get_redis()
 
-    lock_key = f"sync_lock:{account_id}"
+    lock_key = sync_lock_key(account_id)
     async with redis_lock(redis, lock_key, ttl=60) as acquired:
         if not acquired:
             raise HTTPException(

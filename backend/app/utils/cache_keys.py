@@ -44,6 +44,7 @@ TTL_MARKET_SIGNAL_DEGRADED = 60  # 일부/전체 신호 조회 실패(PARTIAL·S
 TTL_FACTOR_ANALYSIS = 3600  # 팩터 분석 1시간
 TTL_PORTFOLIO_OPTIMIZER = 3600  # 포트폴리오 최적화 1시간
 TTL_RISK_ANALYSIS = 3600  # 위험 분석 1시간
+TTL_INSIGHTS = 3600  # 스마트 인사이트 & 포트폴리오 진단 1시간
 TTL_REBALANCING_STRATEGY = 3600  # 리밸런싱 전략 1시간
 TTL_JOB_LOCK_REBALANCING_AUTO = 3600  # 리밸런싱 자동 실행 분산 락 (중복 실행 방지)
 TTL_JOB_LOCK_REBALANCING_PLAN_BUY = 300  # 리밸런싱 매수 대기 플랜 실행 분산 락 (1분 간격 job, 중복 실행 방지)
@@ -168,6 +169,11 @@ def sync_all_status_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}sync_all:status:{user_id}"
 
 
+def sync_lock_key(account_id: uuid.UUID) -> str:
+    """계좌 동시 sync 방지 분산 락 키 (assets.py/positions.py sync 엔드포인트 공용)."""
+    return f"{_env_prefix()}sync_lock:{account_id}"
+
+
 def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}alerts:exchange_rate:{user_id}"
 
@@ -217,6 +223,28 @@ def market_signal_latest_key() -> str:
 def market_signal_last_level_key() -> str:
     """등급 변화 감지 job이 마지막으로 관측한 composite_level을 저장하는 키."""
     return f"{_env_prefix()}market:signal:last_level"
+
+
+def factor_analysis_key(user_id: uuid.UUID, acct_suffix: str) -> str:
+    return f"{_env_prefix()}factor_analysis:{user_id}:{acct_suffix}"
+
+
+def factor_analysis_portfolio_key(portfolio_id: uuid.UUID | str) -> str:
+    """저장된 포트폴리오 단위 팩터 분석 캐시 — user_id를 포함하지 않으므로
+    `invalidate_all_user_caches`의 user_id 패턴 매칭 대상이 아니다(기존부터 그랬음, 이번 변경으로 달라지지 않음)."""
+    return f"{_env_prefix()}factor_analysis:portfolio:{portfolio_id}"
+
+
+def risk_key(user_id: uuid.UUID, portfolio_id: str | None) -> str:
+    return f"{_env_prefix()}risk:{user_id}:{portfolio_id or 'all'}"
+
+
+def efficient_frontier_key(user_id: uuid.UUID, compare_portfolio_id: str | None, acct_suffix: str) -> str:
+    return f"{_env_prefix()}efficient_frontier:{user_id}:{compare_portfolio_id or ''}:{acct_suffix}"
+
+
+def insights_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}insights:{user_id}"
 
 
 def composite_alert_sent_key(user_id: uuid.UUID, day: str) -> str:

@@ -10,6 +10,7 @@ import httpx
 import structlog
 
 from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
+from app.providers._error_mapping import map_http_status_error, map_network_error
 from app.providers._retry import with_token_refresh
 from app.providers.base import BalanceResult, BrokerProvider, raw_krw_to_position
 from app.services.credential_service import decrypt
@@ -77,15 +78,9 @@ class KiwoomProvider(BrokerProvider):
         except KiwoomApiError as e:
             raise ProviderApiError(f"키움 계좌 조회 실패: {e.msg} (코드={e.return_code})") from e
         except httpx.HTTPStatusError as e:
-            if e.response.status_code >= 500:
-                raise ProviderApiError("키움 API 오류: 모의투자/실계좌 설정을 확인하세요.", http_status=502) from e
-            try:
-                msg = e.response.json().get("return_msg") or str(e)
-            except Exception:
-                msg = str(e)
-            raise ProviderApiError(f"키움 API 오류: {msg}") from e
+            raise map_http_status_error(e, broker_name="키움", message_key="return_msg") from e
         except (httpx.ConnectError, httpx.TimeoutException) as e:
-            raise ProviderNetworkError("키움 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from e
+            raise map_network_error("키움") from e
         except RuntimeError as e:
             msg = str(e)
             if "토큰 발급 실패" in msg:

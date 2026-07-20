@@ -21,7 +21,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_naver
+        from app.services.stock_search_service import _search_naver
 
         mock_resp = MM()
         mock_resp.json.return_value = {"items": [{"code": "005930", "name": "삼성전자", "typeCode": "KOSPI"}]}
@@ -42,7 +42,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_naver
+        from app.services.stock_search_service import _search_naver
 
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -59,7 +59,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_naver
+        from app.services.stock_search_service import _search_naver
 
         many_items = [{"code": f"00593{i}", "name": f"종목{i}", "typeCode": "KOSPI"} for i in range(10)]
         mock_resp = MM()
@@ -80,7 +80,7 @@ class TestSearchNaverUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_naver
+        from app.services.stock_search_service import _search_naver
 
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -110,7 +110,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_yahoo
+        from app.services.stock_search_service import _search_yahoo
 
         mock_resp = MM()
         mock_resp.json.return_value = {
@@ -133,7 +133,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_yahoo
+        from app.services.stock_search_service import _search_yahoo
 
         with p("httpx.AsyncClient") as mock_client_cls:
             mock_ctx = MM()
@@ -150,7 +150,7 @@ class TestSearchYahooUnit:
         from unittest.mock import MagicMock as MM
         from unittest.mock import patch as p
 
-        from app.api.v1.stocks import _search_yahoo
+        from app.services.stock_search_service import _search_yahoo
 
         mock_resp = MM()
         mock_resp.json.return_value = {

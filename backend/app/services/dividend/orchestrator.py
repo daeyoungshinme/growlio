@@ -12,27 +12,20 @@ import uuid
 from datetime import date
 
 import structlog
-from sqlalchemy import func, select, text
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import settings
 from app.core.redis_client import get_redis
-from app.models.asset import AssetAccount, AssetSnapshot, UserTickerSettings
+from app.models.asset import AssetAccount, AssetSnapshot
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.calculator import calculate_position_dividend
 from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
-from app.utils.cache_keys import (
-    TTL_DART,
-    TTL_DIVIDEND_INFO,
-    dividend_info_key,
-    dividend_months_key,
-    dividend_ticker_summary_key,
-)
+from app.utils.cache_keys import TTL_DART, TTL_DIVIDEND_INFO, dividend_ticker_summary_key
 from app.utils.currency import get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -352,75 +345,3 @@ async def get_position_dividend_yields(user_id: uuid.UUID, db: AsyncSession) -> 
             continue
         results.append(item)
     return results
-
-
-# ── ticker 설정 CRUD ───────────────────────────────────────
-
-
-async def get_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession) -> dict | None:
-    row = await db.scalar(
-        select(UserTickerSettings).where(
-            UserTickerSettings.user_id == user_id,
-            UserTickerSettings.ticker == ticker,
-            UserTickerSettings.market == market,
-        )
-    )
-    if not row:
-        return None
-    return {
-        "ticker": row.ticker,
-        "market": row.market,
-        "dividend_months": list(row.dividend_months or []),
-        "is_manual": True,
-    }
-
-
-async def upsert_ticker_settings(
-    user_id: uuid.UUID, ticker: str, market: str, dividend_months: list[int], db: AsyncSession
-) -> dict:
-    stmt = (
-        pg_insert(UserTickerSettings)
-        .values(user_id=user_id, ticker=ticker, market=market, dividend_months=dividend_months)
-        .on_conflict_do_update(
-            constraint="uq_user_ticker_settings",
-            set_={"dividend_months": dividend_months, "updated_at": func.now()},
-        )
-    )
-    await db.execute(stmt)
-    await db.commit()
-
-    redis = await get_redis()
-    current_year = date.today().year
-    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
-    await redis.delete(dividend_info_key(ticker, market))
-    logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
-
-    return {
-        "ticker": ticker,
-        "market": market,
-        "dividend_months": dividend_months,
-        "is_manual": True,
-    }
-
-
-async def delete_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, db: AsyncSession) -> bool:
-    row = await db.scalar(
-        select(UserTickerSettings).where(
-            UserTickerSettings.user_id == user_id,
-            UserTickerSettings.ticker == ticker,
-            UserTickerSettings.market == market,
-        )
-    )
-    if not row:
-        return False
-    await db.delete(row)
-    await db.commit()
-
-    redis = await get_redis()
-    current_year = date.today().year
-    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
-    await redis.delete(dividend_months_key(ticker, market))
-    await redis.delete(dividend_info_key(ticker, market))
-    logger.info("ticker_settings_deleted", user_id=str(user_id), ticker=ticker, market=market)
-
-    return True

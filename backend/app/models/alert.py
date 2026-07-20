@@ -58,7 +58,6 @@ class RebalancingAlert(_AlertMixin, Base):
     portfolio_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("portfolios.id", ondelete="CASCADE"), nullable=False
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     threshold_pct: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
     schedule_type: Mapped[str] = mapped_column(String(12), nullable=False, default="DAILY")
     schedule_day_of_week: Mapped[int | None] = mapped_column(Integer, nullable=True)

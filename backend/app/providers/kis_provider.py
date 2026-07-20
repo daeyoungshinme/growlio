@@ -10,11 +10,12 @@ from typing import TYPE_CHECKING
 import httpx
 import structlog
 
-from app.exceptions import ProviderApiError, ProviderCredentialError, ProviderNetworkError
+from app.exceptions import ProviderApiError, ProviderCredentialError
 from app.kis.auth import get_access_token
 from app.kis.balance import get_domestic_balance, get_overseas_balance
 from app.kis.client import KisApiError, KisTokenExpiredError
 from app.kis.overseas_quote import get_overseas_price
+from app.providers._error_mapping import map_http_status_error, map_network_error
 from app.providers._retry import with_token_refresh
 from app.providers.base import BalanceResult, BrokerProvider, Position, raw_krw_to_position
 from app.providers.http_client import MaxRetriesExceededError
@@ -103,15 +104,9 @@ class KISProvider(BrokerProvider):
         except MaxRetriesExceededError as e:
             raise ProviderApiError("KIS API 속도 제한 초과. 잠시 후 다시 시도하세요.", http_status=429) from e
         except httpx.HTTPStatusError as e:
-            if e.response.status_code >= 500:
-                raise ProviderApiError("KIS API 오류: 모의투자/실계좌 설정을 확인하세요.", http_status=502) from e
-            try:
-                msg = e.response.json().get("msg1") or str(e)
-            except Exception:
-                msg = str(e)
-            raise ProviderApiError(f"KIS API 오류: {msg}") from e
+            raise map_http_status_error(e, broker_name="KIS", message_key="msg1") from e
         except (httpx.ConnectError, httpx.TimeoutException) as e:
-            raise ProviderNetworkError("KIS 서버에 연결할 수 없습니다. 잠시 후 다시 시도하세요.") from e
+            raise map_network_error("KIS") from e
 
         if last_token is None:
             raise RuntimeError("last_token이 설정되지 않음: _get_token이 호출되지 않았습니다.")

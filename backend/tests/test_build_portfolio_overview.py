@@ -363,6 +363,58 @@ class TestBuildPortfolioOverviewWithAccounts:
         assert result["total_assets_krw"] == 0
 
     @pytest.mark.asyncio
+    async def test_stock_account_deposit_split_into_cash_stock_bucket(self, override_settings):
+        """증권 계좌(KIS)의 예수금은 CASH_STOCK 버킷으로, 포지션 평가금만 STOCK_KIS 버킷으로 분리된다."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        snap_id = uuid.uuid4()
+
+        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIS")
+        snapshot = _make_snapshot(snap_id, acc_id)  # amount_krw=10,000,000
+        position = _make_position(snap_id, acc_id)  # current_price=80,000 * qty=10 = 800,000 평가금
+
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        by_type = {a["type"]: a["amount_krw"] for a in result["asset_type_allocation"]}
+        assert by_type["STOCK_KIS"] == pytest.approx(800_000)
+        assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
+
+    @pytest.mark.asyncio
+    async def test_kiwoom_stock_account_deposit_also_split(self, override_settings):
+        """키움 증권 계좌(STOCK_KIWOOM)도 동일하게 예수금이 CASH_STOCK으로 분리된다."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        snap_id = uuid.uuid4()
+
+        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIWOOM")
+        snapshot = _make_snapshot(snap_id, acc_id)  # amount_krw=10,000,000
+        position = _make_position(snap_id, acc_id)  # 평가금 800,000
+
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        by_type = {a["type"]: a["amount_krw"] for a in result["asset_type_allocation"]}
+        assert by_type["STOCK_KIWOOM"] == pytest.approx(800_000)
+        assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
+
+    @pytest.mark.asyncio
     async def test_current_positions_added_to_cur_pos_map(self, override_settings):
         """현재 보유 포지션(snapshot_id=None) 있을 때 cur_pos_map 채움 (line 199)."""
         db = AsyncMock()

@@ -17,15 +17,9 @@ from app.services.tax_service import (
     _get_rates,
     get_overseas_positions_detail,
 )
-from app.utils.cache_keys import RedisType, get_cached_json, set_cached_json
+from app.utils.cache_keys import TTL_INSIGHTS, RedisType, get_cached_json, insights_key, set_cached_json
 
 logger = structlog.get_logger()
-
-TTL_INSIGHTS = 3600  # 1시간
-
-
-def insights_key(user_id: uuid.UUID) -> str:
-    return f"insights:{user_id}"
 
 
 # ---------------------------------------------------------------------------

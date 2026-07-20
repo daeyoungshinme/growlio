@@ -13,7 +13,7 @@ from app.core.redis_client import get_redis
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
-from app.schemas.asset import TransactionCreate, TransactionResponse, TransactionUpdate
+from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
 from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches, monthly_trend_key
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])

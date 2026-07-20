@@ -23,7 +23,7 @@ from app.utils.cache_keys import (
     portfolio_overview_lite_key,
     set_cached_json,
 )
-from app.utils.pnl import calc_net_asset_amount, calc_position_pnl
+from app.utils.pnl import calc_net_asset_amount, calc_position_pnl, eval_value
 
 ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.BANK_ACCOUNT: "통장잔고",
@@ -31,6 +31,7 @@ ASSET_TYPE_LABELS: dict[str, str] = {
     AssetType.STOCK_KIS: "주식(KIS)",
     AssetType.STOCK_OTHER: "주식(타증권)",
     AssetType.CASH_OTHER: "예수금(기타)",
+    AssetType.CASH_STOCK: "예수금(증권계좌)",
     AssetType.OTHER: "기타자산",
     AssetType.REAL_ESTATE: "부동산",
 }
@@ -41,6 +42,9 @@ STOCK_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_OT
 _BROKER_TYPES: frozenset[str] = frozenset(
     {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER, AssetType.CASH_OTHER}
 )
+
+# 전체 자산 구성 집계 시 포지션 평가금/예수금을 분리하는 대상 (composition_calculator._STOCK_TYPES와 동일)
+_EQUITY_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER})
 
 
 async def _fetch_latest_snapshots(acc_ids: list[uuid.UUID], db: AsyncSession) -> dict[str, AssetSnapshot]:
@@ -157,11 +161,22 @@ def _accumulate_account_totals(
     total_invested_krw: float,
     unrealized_pnl_krw: float,
     asset_type_totals: dict[str, float],
+    raw_positions: list[Position],
 ) -> tuple[float, float, float]:
-    """계좌 금액을 전체 합계에 누적하고 갱신된 (total_assets, total_invested, unrealized_pnl)을 반환한다."""
+    """계좌 금액을 전체 합계에 누적하고 갱신된 (total_assets, total_invested, unrealized_pnl)을 반환한다.
+
+    증권 계좌(_EQUITY_TYPES)는 포지션 평가금과 예수금을 분리해 각각 acc.asset_type / CASH_STOCK 버킷에 담는다
+    (composition_calculator.build_asset_totals와 동일한 분리 방식 — 대시보드·계좌관리 화면 간 현금/주식 비중 일치 목적).
+    """
     if acc.include_in_total:
         total_assets_krw += amount_krw
-        asset_type_totals[acc.asset_type] = asset_type_totals.get(acc.asset_type, 0) + amount_krw
+        if acc.asset_type in _EQUITY_TYPES:
+            stock_equity = eval_value(raw_positions) if raw_positions else 0.0
+            cash = amount_krw - stock_equity
+            asset_type_totals[acc.asset_type] = asset_type_totals.get(acc.asset_type, 0) + stock_equity
+            asset_type_totals[AssetType.CASH_STOCK] = asset_type_totals.get(AssetType.CASH_STOCK, 0) + cash
+        else:
+            asset_type_totals[acc.asset_type] = asset_type_totals.get(acc.asset_type, 0) + amount_krw
     if acc.asset_type in STOCK_TYPES:
         total_invested_krw += invested
         unrealized_pnl_krw += pnl
@@ -271,6 +286,7 @@ async def build_portfolio_overview(
             total_invested_krw,
             unrealized_pnl_krw,
             asset_type_totals,
+            raw_positions,
         )
 
         account_row = _build_account_row(

@@ -22,7 +22,8 @@ from app.schemas.backtest import (
     CorrelationRequest,
     CorrelationResult,
 )
-from app.services.backtest_service import compute_correlation, run_backtest
+from app.services.backtest_service import run_backtest
+from app.services.correlation_service import compute_correlation
 from app.utils.cache_keys import TTL_BACKTEST, backtest_key, correlation_key
 
 router = APIRouter(prefix="/backtest", tags=["backtest"])

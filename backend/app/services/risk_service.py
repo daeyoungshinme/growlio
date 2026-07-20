@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, set_cached_json
+from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, risk_key, set_cached_json
 from app.utils.redis_lock import single_flight_fetch
 
 logger = structlog.get_logger()
@@ -107,7 +107,7 @@ async def get_portfolio_risk_metrics(
     redis: RedisType = None,
     portfolio_id: str | None = None,
 ) -> dict:
-    cache_key = f"risk:{user_id}:{portfolio_id or 'all'}"
+    cache_key = risk_key(user_id, portfolio_id)
 
     async def _read_cache() -> dict | None:
         return await get_cached_json(redis, cache_key)

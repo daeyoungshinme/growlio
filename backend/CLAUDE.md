@@ -178,11 +178,14 @@ services/
   │   ├── overview_enrichment.py # 목표 포트폴리오 중 미보유 종목의 배당수익률·현재가 보완(collect_dividend_map/enrich_overview_with_prices) — rebalancing.py analyze_portfolio 엔드포인트 전용, 헬퍼를 라우터에서 분리
   │   ├── broker_balance_service.py # KIS/키움 계좌 실시간 잔고 조회(fetch_broker_balance) — rebalancing.py broker-balance 엔드포인트 전용, 헬퍼를 라우터에서 분리
   │   └── _alert_queries.py   # RebalancingAlert portfolio_id+user_id 조회 헬퍼 (rebalancing_alerts.py 라우터에서 분리, 구 _rebalancing_alert_queries.py)
-  ├── backtest_service.py     # 백테스트 엔진
+  ├── backtest_service.py     # 백테스트 엔진 (상관관계 분석은 correlation_service.py로 분리됨)
+  ├── correlation_service.py  # 포트폴리오 내 종목 간 월별 수익률 상관관계 분석 — backtest_service.py에서 분리 (별도 스키마 CorrelationRequest/Result 사용)
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
-  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 (목표금액/월적립액/목표연도 → 필요 수익률 역산 → 기존 종목+큐레이션 ETF 중 MVO로 최소분산 포트폴리오 추천). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB/Redis 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈
+  ├── goal_candidate_service.py  # 목표 역산 추천 후보 종목 관리/영속화(세제유형별 필터링, 동시요청 lost-update 방지 락) — goal_recommendation_service.py 서브모듈
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률을 구하는 순수 계산 함수 (goal_recommendation_service.py 서브모듈)
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
   ├── dividend/               # 배당 서비스 패키지 — 루트에 흩어져 있던 파일들을 전부 이 아래로 통합
@@ -190,7 +193,8 @@ services/
   │   ├── sync_sources.py     # 외부 소스별 동기 배당 조회 함수(Yahoo/Naver/pykrx/FDR) — fetcher.py 폴백 체인이 호출 (구 dividend_sync_sources.py)
   │   ├── fetcher.py          # 멀티소스 폴백 체인: Naver → yfinance → KIS ETF → pykrx → FDR → KIS 일반 → DART → 정적 폴백 (구 dividend_fetcher.py)
   │   ├── calculator.py       # 순수 계산 함수 — DB·외부 API 의존 없음, 단위 테스트 용이
-  │   ├── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현
+  │   ├── orchestrator.py     # DB·Redis·외부 fetch 조율, get_dividend_data() 등 구현 (ticker 설정 CRUD는 ticker_settings_service.py로 분리됨)
+  │   ├── ticker_settings_service.py # 사용자별 배당월 수동 설정(UserTickerSettings) CRUD — orchestrator.py에서 분리
   │   ├── aggregator.py       # 트랜잭션 기반 배당금 집계 (get_dividend_summary, 구 dividend_aggregator.py)
   │   ├── plan_service.py     # 연배당/월배당 계획 및 목표 달성 현황 서비스 (구 dividend_plan_service.py)
   │   ├── drip_service.py     # 배당 월별 균등화 제안 (calc_monthly_optimization) — 순수 함수
@@ -200,7 +204,9 @@ services/
   ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # [현재가 조회 그룹] 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
-  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·ISA 만기 현황·연금(연금저축/IRP) 납입 현황
+  ├── stock_search_service.py # 종목명·티커 검색 — 네이버 금융(한글)/Yahoo Finance(영문·티커) 연동 (stocks.py 라우터에서 분리)
+  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계 (연금 납입 현황은 pension_contribution_service.py로 분리됨)
+  ├── pension_contribution_service.py # 연금저축/IRP 계좌군 세액공제 한도(600만원/900만원) 납입 현황 — tax_service.py에서 분리
   ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산
   ├── snapshot_service.py     # 스냅샷 upsert·포지션 sync 헬퍼 (_upsert_snapshot, sync_snapshot_positions, get_latest_snapshot_with_positions)
@@ -230,6 +236,8 @@ services/
 schemas/                      # Pydantic 요청/응답 스키마
   ├── _validators.py          # 공용 field_validator 헬퍼
   ├── asset.py / auth.py / backtest.py / invest.py / portfolio.py
+  ├── transaction.py           # 입출금/배당 내역 스키마 (구 asset.py, transactions.py 라우터 전용)
+  ├── dashboard.py              # 대시보드 응답 스키마 (구 asset.py, dashboard.py 라우터 전용)
   ├── rebalancing/             # 리밸런싱 스키마 패키지 (구 rebalancing.py 단일 파일, 453줄 → 책임별 분리) — `__init__.py`가 전체 재노출하므로 `from app.schemas.rebalancing import X` 호출부는 변경 없음
   │   ├── analysis.py          # 분석 결과: TickerAccountInfo/RebalancingItem/CurrentHolding/TaxImpactItem/DiagnosisContext/RebalancingAnalysis
   │   ├── execution.py         # 실행/실행이력: ExecutionOrderItem/ExecutionRequest/KisBalance*/OrderResult/ExecutionResult/RebalancingExecution*
@@ -252,7 +260,8 @@ providers/                    # 금융 데이터 provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── manual_provider.py      # 수동 입력 provider
   ├── _token_cache.py         # 토큰 캐싱 헬퍼
-  └── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
+  ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
+  └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
   ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FearGreedAPI 3회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
