@@ -36,7 +36,7 @@ export const BANK_TYPE_LABELS: Record<string, string> = {
 };
 
 export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"];
-export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER"];
+export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"];
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];
 
 export { DOMESTIC_MARKETS } from "./markets";

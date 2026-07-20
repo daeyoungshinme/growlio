@@ -40,6 +40,7 @@ vi.mock("@/api/client", () => {
 
 import { supabase } from "@/lib/supabase";
 import { api } from "@/api/client";
+import { useAuthStore } from "@/stores/authStore";
 
 // We test the store by calling its actions directly
 // Re-import fresh store state per test by resetting the module
@@ -365,6 +366,48 @@ describe("authStore — resetPassword", () => {
     } as never);
     const store = await getStore();
     await expect(store.resetPassword("badpass")).rejects.toThrow("update failed");
+  });
+});
+
+describe("authStore — changePassword", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useAuthStore.setState({ email: "user@example.com" });
+  });
+
+  it("현재 비밀번호 검증과 새 비밀번호 변경을 순서대로 수행한다", async () => {
+    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+      data: { user: { id: "user-1" }, session: {} },
+      error: null,
+    } as never);
+    vi.mocked(supabase.auth.updateUser).mockResolvedValue({ data: {}, error: null } as never);
+    const store = await getStore();
+    await store.changePassword("oldpass123", "newpass123");
+    expect(supabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: "user@example.com",
+      password: "oldpass123",
+    });
+    expect(supabase.auth.updateUser).toHaveBeenCalledWith({ password: "newpass123" });
+  });
+
+  it("현재 비밀번호가 틀리면 재인증 단계에서 에러를 던지고 updateUser를 호출하지 않는다", async () => {
+    vi.mocked(supabase.auth.signInWithPassword).mockResolvedValue({
+      data: { user: null, session: null },
+      error: new Error("Invalid login credentials"),
+    } as never);
+    const store = await getStore();
+    await expect(store.changePassword("wrongpass", "newpass123")).rejects.toThrow(
+      "현재 비밀번호가 일치하지 않습니다.",
+    );
+    expect(supabase.auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it("로그인 이메일이 없으면 에러를 던진다", async () => {
+    useAuthStore.setState({ email: null });
+    const store = await getStore();
+    await expect(store.changePassword("oldpass123", "newpass123")).rejects.toThrow(
+      "로그인 정보를 확인할 수 없습니다.",
+    );
   });
 });
 

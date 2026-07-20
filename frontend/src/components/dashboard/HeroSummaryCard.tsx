@@ -141,14 +141,14 @@ export default memo(function HeroSummaryCard({
                     showLegend={false}
                   />
                 </div>
-                <div className="flex flex-row flex-wrap gap-x-1.5 gap-y-0.5 justify-center">
+                <div className="grid grid-cols-2 gap-x-1.5 gap-y-0.5 w-full">
                   {allocationChartData.map((item, i) => (
-                    <div key={i} className="flex items-center gap-1">
+                    <div key={i} className="flex items-center gap-1 min-w-0 w-full">
                       <span
                         className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                         style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }}
                       />
-                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 leading-tight truncate min-w-0">
                         {item.name} {item.pct.toFixed(0)}%
                         <span className="text-gray-400 dark:text-gray-500 ml-0.5">
                           · {fmtKrwShort(item.value)}

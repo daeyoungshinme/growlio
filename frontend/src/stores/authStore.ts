@@ -26,6 +26,7 @@ export interface AuthState {
   findAccount: (displayName: string) => Promise<string>;
   forgotPassword: (email: string) => Promise<void>;
   resetPassword: (newPassword: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   resendConfirmationEmail: (email: string) => Promise<void>;
 }
 
@@ -63,7 +64,7 @@ function getOptimisticAuthState(): OptimisticAuth {
   }
 }
 
-export const useAuthStore = create<AuthState>((set) => {
+export const useAuthStore = create<AuthState>((set, get) => {
   const setLoggedIn = (user: { email?: string | null; id: string }, needsReset = false) =>
     set({
       isAuthenticated: true,
@@ -219,6 +220,21 @@ export const useAuthStore = create<AuthState>((set) => {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
       set({ needsPasswordReset: false });
+    },
+
+    changePassword: async (currentPassword: string, newPassword: string) => {
+      const email = get().email;
+      if (!email) throw new Error("로그인 정보를 확인할 수 없습니다.");
+
+      // 현재 비밀번호 재인증 — 세션이 유효해도 본인 확인 없이 변경되지 않도록 검증
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (verifyError) throw new Error("현재 비밀번호가 일치하지 않습니다.");
+
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
     },
 
     resendConfirmationEmail: async (email: string) => {

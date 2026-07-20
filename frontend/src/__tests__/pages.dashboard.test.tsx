@@ -134,6 +134,24 @@ describe("DashboardPage", () => {
     expect(screen.getByText("데이터를 불러오지 못했습니다")).toBeInTheDocument();
   });
 
+  it("data가 캐시되어 있으면 백그라운드 refetch 에러가 있어도 기존 콘텐츠를 유지한다", () => {
+    vi.mocked(useDashboardData).mockReturnValue({
+      data: mockDashboardData as never,
+      isLoading: false,
+      error: new Error("background refetch failed"),
+      dataUpdatedAt: Date.now(),
+      overview: mockOverview as never,
+      dcaData: undefined,
+      accounts: [{ id: "acc-1" }] as never,
+      accountsLoading: false,
+      exchangeRate: 1350,
+      marketSignal: undefined,
+    });
+    renderDashboard();
+    expect(screen.queryByText("데이터를 불러오지 못했습니다")).not.toBeInTheDocument();
+    expect(screen.getByTestId("hero-summary")).toBeInTheDocument();
+  });
+
   it("accounts가 없고 accountsLoading이 false이면 '자산 없음' 화면을 표시한다", () => {
     vi.mocked(useDashboardData).mockReturnValue({
       data: mockDashboardData as never,

@@ -176,6 +176,7 @@ describe("MonthlyAchievementTable", () => {
     ];
     renderWithProviders(<MonthlyAchievementTable data={pastData} />);
     expect(screen.getByText(/월별 계획 대비 달성율/)).toBeDefined();
+    expect(screen.getByText(/목표를 변경하면 과거 수치도 새 기준으로 다시/)).toBeDefined();
   });
 });
 

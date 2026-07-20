@@ -75,11 +75,19 @@ vi.mock("@/components/settings/DeleteAccountModal", () => ({
     </div>
   ),
 }));
+vi.mock("@/components/settings/ChangePasswordModal", () => ({
+  default: ({ onClose }: { onClose: () => void }) => (
+    <div data-testid="change-password-modal">
+      <button onClick={onClose}>password-modal-close</button>
+    </div>
+  ),
+}));
 
 import SettingsPage from "@/pages/SettingsPage";
 import { api } from "@/api/client";
 import { toast } from "@/utils/toast";
 import { fetchAlertHistory } from "@/api/alerts";
+import { useAuthStore } from "@/stores/authStore";
 
 const mockSettings = {
   has_kis: false,
@@ -123,6 +131,26 @@ describe("SettingsPage", () => {
       return Promise.resolve({ data: {} });
     });
     vi.mocked(fetchAlertHistory).mockResolvedValue([]);
+    useAuthStore.setState({
+      isAuthenticated: true,
+      userId: "user-1",
+      email: "user@example.com",
+      needsPasswordReset: false,
+    });
+  });
+
+  it("계정 정보 카드에 로그인 이메일을 표시하고, 비밀번호 변경 버튼으로 모달을 열고 닫는다", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("change-password-modal")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "비밀번호 변경" }));
+    expect(screen.getByTestId("change-password-modal")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "password-modal-close" }));
+    expect(screen.queryByTestId("change-password-modal")).not.toBeInTheDocument();
   });
 
   it("기본 섹션들을 렌더링한다", async () => {
@@ -135,6 +163,17 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByTestId("stock-price-alert-section")).toBeInTheDocument();
     });
+  });
+
+  it("DART 안내 문구에 opendart.fss.or.kr 발급 링크를 표시한다", async () => {
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByText("opendart.fss.or.kr")).toBeInTheDocument();
+    });
+    expect(screen.getByText("opendart.fss.or.kr").closest("a")).toHaveAttribute(
+      "href",
+      "https://opendart.fss.or.kr",
+    );
   });
 
   it("다른 설정 카드에 계좌 연동/목표/추천 옵션 요약과 딥링크를 표시한다", async () => {

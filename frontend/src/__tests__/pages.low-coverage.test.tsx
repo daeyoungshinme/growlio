@@ -263,6 +263,7 @@ import InvestPlanPage from "@/pages/InvestPlanPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import SettingsPage from "@/pages/SettingsPage";
+import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -303,6 +304,47 @@ describe("AssetManagementPage", () => {
   it("설명 텍스트가 표시된다", () => {
     renderPage(<AssetManagementPage />);
     expect(screen.getByText("계좌를 등록하고 입출금·배당 내역을 관리합니다.")).toBeInTheDocument();
+  });
+
+  it("증권계좌 예수금(CASH_STOCK)을 주식이 아닌 현금으로 집계한다", () => {
+    vi.mocked(useAssetManagementData).mockReturnValue({
+      accounts: [],
+      isLoading: false,
+      overview: {
+        total_assets_krw: 10_000_000,
+        total_stock_krw: 6_000_000,
+        total_non_stock_krw: 4_000_000,
+        total_invested_krw: 6_000_000,
+        unrealized_pnl_krw: 0,
+        stock_return_pct: 0,
+        asset_type_allocation: [
+          {
+            type: "STOCK_KIS",
+            name: "STOCK_KIS",
+            label: "주식(KIS)",
+            amount_krw: 6_000_000,
+            pct: 60,
+          },
+          {
+            type: "CASH_STOCK",
+            name: "CASH_STOCK",
+            label: "예수금(증권계좌)",
+            amount_krw: 4_000_000,
+            pct: 40,
+          },
+        ],
+        stock_allocation: [],
+        all_positions: [],
+        accounts: [],
+      },
+      allTx: [],
+      usdRate: 1350,
+    });
+
+    renderPage(<AssetManagementPage />);
+
+    expect(screen.getByText("주식").nextElementSibling).toHaveTextContent("+60.00%");
+    expect(screen.getByText("현금").nextElementSibling).toHaveTextContent("+40.00%");
   });
 });
 

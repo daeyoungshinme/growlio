@@ -51,7 +51,10 @@ export default function AchievementTable({
   return (
     <div className={flat ? undefined : "card"}>
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">{title}</h3>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">{subtitle}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+        현재 설정된 목표 기준으로 계산되며, 목표를 변경하면 과거 수치도 새 기준으로 다시 계산됩니다.
+      </p>
       {/* 모바일 카드 뷰 */}
       <div
         className={`sm:hidden divide-y divide-gray-100 dark:divide-gray-700 ${

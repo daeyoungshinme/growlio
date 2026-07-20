@@ -11,6 +11,7 @@ import {
   Target,
   Sparkles,
   ChevronRight,
+  KeyRound,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -20,6 +21,7 @@ import { type SettingsData } from "@/api/settings";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
+import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
@@ -30,6 +32,7 @@ import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSec
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
 import DeleteAccountModal from "@/components/settings/DeleteAccountModal";
+import ChangePasswordModal from "@/components/settings/ChangePasswordModal";
 import { SectionCard, ConnectedBadge } from "@/components/settings/shared";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -181,6 +184,8 @@ export default function SettingsPage() {
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);
   const [showDeleteAccount, setShowDeleteAccount] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const authEmail = useAuthStore((s) => s.email);
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -236,8 +241,15 @@ export default function SettingsPage() {
         badge={current?.has_dart ? <ConnectedBadge /> : undefined}
       >
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          opendart.fss.or.kr에서 발급받은 API 키를 입력하세요. 국내 주식 배당 데이터 조회에
-          사용됩니다.
+          <a
+            href="https://opendart.fss.or.kr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 underline"
+          >
+            opendart.fss.or.kr
+          </a>
+          에서 발급받은 API 키를 입력하세요. 국내 주식 배당 데이터 조회에 사용됩니다.
         </p>
         <div>
           <label className={labelClass}>API Key</label>
@@ -266,6 +278,21 @@ export default function SettingsPage() {
             </button>
           )}
         </div>
+      </SectionCard>
+
+      {/* 계정 정보 */}
+      <SectionCard title="계정 정보">
+        <div>
+          <label className={labelClass}>로그인 이메일</label>
+          <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">{authEmail ?? "—"}</p>
+        </div>
+        <button
+          onClick={() => setShowChangePassword(true)}
+          className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${TOUCH_TARGET_ROW}`}
+        >
+          <KeyRound size={18} />
+          비밀번호 변경
+        </button>
       </SectionCard>
 
       {/* 다른 설정 — 계좌 연동/목표/추천 옵션은 각 기능 페이지에서 편집, 여기서는 상태 요약 + 딥링크만 제공 */}
@@ -432,6 +459,7 @@ export default function SettingsPage() {
       </div>
 
       {showDeleteAccount && <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />}
+      {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
     </div>
   );
 }

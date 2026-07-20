@@ -109,7 +109,6 @@ export default function DashboardPage() {
   const {
     data,
     isLoading,
-    error,
     dataUpdatedAt,
     overview,
     dcaData,
@@ -119,7 +118,7 @@ export default function DashboardPage() {
     marketSignal,
   } = useDashboardData();
 
-  if (!isLoading && (error || !data))
+  if (!isLoading && !data)
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
