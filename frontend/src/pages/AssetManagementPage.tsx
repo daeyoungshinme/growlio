@@ -5,6 +5,7 @@ import {
   RealEstateAccountModal,
   RealEstateEditModal,
   RealEstateAccountCard,
+  RealEstateSummaryCard,
 } from "@/components/assets/RealEstateSection";
 import BankAccountCard from "@/components/assets/BankAccountCard";
 
@@ -221,6 +222,7 @@ export default function AssetManagementPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                <RealEstateSummaryCard accounts={realEstateAccounts} />
                 {realEstateAccounts.map((account) => (
                   <RealEstateAccountCard
                     key={account.id}

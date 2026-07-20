@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { LineChart } from "lucide-react";
 import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
@@ -8,10 +9,12 @@ import { fetchCompositeSignalStatus, fetchDriftSummary } from "@/api/rebalancing
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import DiagnosisSummaryHeader from "@/components/rebalancing/DiagnosisSummaryHeader";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
@@ -28,7 +31,7 @@ const PortfolioExecutionTab = lazy(
 const RebalancingHistoryTab = lazy(() => import("../components/rebalancing/RebalancingHistoryTab"));
 const BacktestTab = lazy(() => import("../components/rebalancing/BacktestTab"));
 
-const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "백테스팅", "이력"] as const;
+const REBALANCING_PAGE_TABS = ["진단", "포트폴리오", "이력"] as const;
 type RebalancingPageTab = (typeof REBALANCING_PAGE_TABS)[number];
 
 export default function RebalancingPage() {
@@ -92,6 +95,10 @@ export default function RebalancingPage() {
   const [prefillItems, setPrefillItems] = useState<PortfolioItem[] | null>(null);
   const [prefillName, setPrefillName] = useState("");
   const [prefillAccountIds, setPrefillAccountIds] = useState<string[] | null>(null);
+  const [isBacktestOpen, toggleBacktestOpen] = useCollapsible(
+    false,
+    "growlio:rebalancing:backtest-section-open",
+  );
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
@@ -244,16 +251,20 @@ export default function RebalancingPage() {
                 </Suspense>
               </div>
             )}
+            <ErrorBoundary variant="section">
+              <CollapsibleCard
+                icon={LineChart}
+                title="백테스트"
+                isOpen={isBacktestOpen}
+                onToggle={toggleBacktestOpen}
+                collapsedHint="과거 데이터로 포트폴리오 성과를 시뮬레이션해볼 수 있어요"
+              >
+                <Suspense fallback={<SkeletonCard />}>
+                  <BacktestTab />
+                </Suspense>
+              </CollapsibleCard>
+            </ErrorBoundary>
           </>
-        )}
-
-        {/* ── 백테스팅 탭 ── */}
-        {localTab === "백테스팅" && (
-          <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard />}>
-              <BacktestTab />
-            </Suspense>
-          </ErrorBoundary>
         )}
 
         {/* ── 이력 탭 ── */}

@@ -89,7 +89,7 @@ make build-android-release         # APK Release 빌드
 - `Toaster.tsx` — `growlio:toast` 이벤트 구독 전역 토스트 UI
 
 **컴포넌트 디렉토리 (`src/components/`):**
-assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings
+assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analysis, rebalancing, settings, tax
 
 **컨텍스트 (`src/context/`):**
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.

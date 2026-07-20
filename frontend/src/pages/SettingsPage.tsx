@@ -22,6 +22,8 @@ import { toast } from "@/utils/toast";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLogout } from "@/hooks/useLogout";
 import { useBiometric } from "@/hooks/useBiometric";
+import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
+import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
@@ -78,10 +80,17 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   GOAL_DIVIDEND: "배당 목표 달성 알림",
 };
 
+const ALERT_HISTORY_PAGE_SIZE = 50;
+
 function AlertHistorySection() {
-  const { data: history, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.alertHistory,
-    queryFn: () => fetchAlertHistory({ limit: 50 }),
+  const [limit, setLimit] = useState(ALERT_HISTORY_PAGE_SIZE);
+  const {
+    data: history,
+    isLoading,
+    isFetching,
+  } = useQuery({
+    queryKey: [...QUERY_KEYS.alertHistory, limit],
+    queryFn: () => fetchAlertHistory({ limit }),
     staleTime: STALE_TIME.SHORT,
   });
 
@@ -94,34 +103,45 @@ function AlertHistorySection() {
           발송된 알림 이력이 없습니다.
         </p>
       ) : (
-        <div className="max-h-64 overflow-y-auto space-y-2">
-          {history.map((item: AlertHistoryItem) => (
-            <div
-              key={item.id}
-              className="flex items-start gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
-            >
-              <Bell size={13} className="text-blue-400 mt-0.5 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
-                    {ALERT_TYPE_LABELS[item.alert_type] ?? item.alert_type}
-                  </span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {new Date(item.created_at).toLocaleString("ko-KR", {
-                      month: "numeric",
-                      day: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </span>
+        <>
+          <div className="max-h-64 overflow-y-auto space-y-2">
+            {history.map((item: AlertHistoryItem) => (
+              <div
+                key={item.id}
+                className="flex items-start gap-2.5 p-2.5 bg-gray-50 dark:bg-gray-800/50 rounded-lg"
+              >
+                <Bell size={13} className="text-blue-400 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                      {ALERT_TYPE_LABELS[item.alert_type] ?? item.alert_type}
+                    </span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
+                      {new Date(item.created_at).toLocaleString("ko-KR", {
+                        month: "numeric",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 leading-relaxed">
+                    {item.message}
+                  </p>
                 </div>
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5 leading-relaxed">
-                  {item.message}
-                </p>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {history.length >= limit && (
+            <button
+              onClick={() => setLimit((l) => l + ALERT_HISTORY_PAGE_SIZE)}
+              disabled={isFetching}
+              className="w-full mt-2 py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {isFetching ? "불러오는 중..." : "더 보기"}
+            </button>
+          )}
+        </>
       )}
     </SectionCard>
   );
@@ -156,6 +176,7 @@ export default function SettingsPage() {
 
   const logout = useLogout();
   const { isAvailable, isEnabled, setEnabled } = useBiometric();
+  const pushStatus = usePushNotificationStore((s) => s.status);
   const qc = useQueryClient();
   const [dart, setDart] = useState({ api_key: "" });
   const [saving, setSaving] = useState<string | null>(null);
@@ -353,6 +374,43 @@ export default function SettingsPage() {
                 {isEnabled ? "켜짐" : "꺼짐"}
               </span>
             </button>
+          )}
+          {isNativePlatform() && (
+            <>
+              <button
+                onClick={() => {
+                  if (pushStatus === "registered") {
+                    void disablePushNotifications();
+                  } else {
+                    void retryPushRegistration();
+                  }
+                }}
+                disabled={pushStatus === "requesting"}
+                className={`w-full gap-3 px-3 py-2 rounded-lg text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 ${TOUCH_TARGET_ROW}`}
+                aria-pressed={pushStatus === "registered"}
+              >
+                <Bell
+                  size={18}
+                  className={pushStatus === "registered" ? "text-blue-500" : undefined}
+                />
+                푸시 알림
+                <span
+                  className={`ml-auto text-xs font-medium ${pushStatus === "registered" ? "text-blue-500" : "text-gray-400"}`}
+                >
+                  {pushStatus === "registered"
+                    ? "켜짐"
+                    : pushStatus === "requesting"
+                      ? "확인 중..."
+                      : "꺼짐"}
+                </span>
+              </button>
+              {pushStatus === "denied" && (
+                <p className="px-3 -mt-1 mb-1 text-xs text-amber-600 dark:text-amber-400">
+                  알림 권한이 거부되어 있어요. 기기 설정 &gt; 앱 &gt; Growlio에서 알림을
+                  허용해주세요.
+                </p>
+              )}
+            </>
           )}
           <button
             onClick={logout}

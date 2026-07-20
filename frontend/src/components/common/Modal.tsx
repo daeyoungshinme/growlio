@@ -15,6 +15,8 @@ interface Props {
   title?: string;
   size?: keyof typeof SIZE_CLASSES;
   closeOnBackdrop?: boolean;
+  /** true면 모바일(<sm)에서 오버레이가 하단 네비게이션 위 공간까지만 채워, 네비가 계속 보이고 탭 가능한 상태로 유지된다 (긴 실행 흐름 중 이탈 허용 용도). 데스크탑(sm+)은 항상 inset-0. */
+  avoidBottomNav?: boolean;
 }
 
 export default function Modal({
@@ -23,14 +25,20 @@ export default function Modal({
   title,
   size = "md",
   closeOnBackdrop = false,
+  avoidBottomNav = false,
 }: Props) {
   const { dialogRef, overlayRef } = useModalBehavior(onClose);
   const titleId = useId();
 
+  const overlayPositionClass = avoidBottomNav
+    ? "fixed inset-x-0 top-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] sm:inset-0"
+    : "fixed inset-0 pb-[env(safe-area-inset-bottom)]";
+  const overlayZClass = avoidBottomNav ? "z-40 sm:z-[60]" : "z-[60]";
+
   return (
     <div
       ref={overlayRef}
-      className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-[env(safe-area-inset-bottom)]"
+      className={`${overlayPositionClass} bg-black/40 flex items-end sm:items-center justify-center ${overlayZClass} sm:p-4`}
       onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div

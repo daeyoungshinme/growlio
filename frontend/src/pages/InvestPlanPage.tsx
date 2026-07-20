@@ -1,6 +1,6 @@
 import { lazy, Suspense, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
 import { useDividendPlanSettings } from "@/hooks/useDividendPlanSettings";
@@ -16,6 +16,7 @@ const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjection
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
+import GoalRecommendationPreviewCard from "@/components/invest/GoalRecommendationPreviewCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import { fmtKrw } from "@/utils/format";
@@ -134,17 +135,14 @@ export default function InvestPlanPage() {
             </button>
           ))}
         </div>
-        <div className="ml-auto flex items-center gap-3">
-          <Link
-            to="/rebalancing?rtab=포트폴리오"
-            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            목표 기반 포트폴리오 추천 보기 →
-          </Link>
-        </div>
       </div>
 
       <div ref={tabContentRef}>
+        <ErrorBoundary variant="section">
+          <div className="mb-4">
+            <GoalRecommendationPreviewCard />
+          </div>
+        </ErrorBoundary>
         {/* 적립 계획 탭 */}
         {activeTab === "적립 계획" && (
           <>

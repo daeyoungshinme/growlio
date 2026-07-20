@@ -11,6 +11,35 @@ import { useAuthStore } from "@/stores/authStore";
 import { toast } from "@/utils/toast";
 import { isNativePlatform } from "@/utils/platform";
 import { registerPushToken } from "@/api/settings";
+import { usePushNotificationStore } from "@/stores/pushNotificationStore";
+
+/** 설정탭 "다시 시도" 버튼 등에서 등록을 재시도할 때 사용 — 실제 토큰 수신은 usePushNotifications()가
+ * 마운트해둔 "registration" 리스너가 처리하므로, 여기서는 권한 재요청 + register() 호출만 한다. */
+export async function retryPushRegistration(): Promise<void> {
+  const { setStatus } = usePushNotificationStore.getState();
+  if (!isNativePlatform()) {
+    setStatus("unsupported");
+    return;
+  }
+  const { PushNotifications } = await import("@capacitor/push-notifications");
+  setStatus("requesting");
+  const permission = await PushNotifications.requestPermissions();
+  if (permission.receive !== "granted") {
+    setStatus("denied");
+    return;
+  }
+  await PushNotifications.register();
+}
+
+/** 설정탭에서 푸시 알림을 끌 때 사용 — 백엔드에 저장된 FCM 토큰을 삭제한다. */
+export async function disablePushNotifications(): Promise<void> {
+  const { setStatus } = usePushNotificationStore.getState();
+  try {
+    await registerPushToken(null);
+  } finally {
+    setStatus("disabled");
+  }
+}
 
 /** 백엔드 push_service.py의 data.type 값 → 앱 내 딥링크 경로 매핑 (data가 없거나 알 수 없는 type이면 null). */
 export function resolvePushDeepLink(
@@ -44,9 +73,14 @@ export function resolvePushDeepLink(
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const navigate = useNavigate();
+  const setStatus = usePushNotificationStore((s) => s.setStatus);
 
   useEffect(() => {
-    if (!isNativePlatform() || !isAuthenticated) return;
+    if (!isNativePlatform()) {
+      setStatus("unsupported");
+      return;
+    }
+    if (!isAuthenticated) return;
 
     const handles: PluginListenerHandle[] = [];
     let cancelled = false;
@@ -54,8 +88,13 @@ export function usePushNotifications() {
     async function setup() {
       const { PushNotifications } = await import("@capacitor/push-notifications");
 
+      setStatus("requesting");
       const permission = await PushNotifications.requestPermissions();
-      if (cancelled || permission.receive !== "granted") return;
+      if (cancelled) return;
+      if (permission.receive !== "granted") {
+        setStatus("denied");
+        return;
+      }
 
       await PushNotifications.register();
 
@@ -64,8 +103,10 @@ export function usePushNotifications() {
         if (cancelled) return;
         try {
           await registerPushToken(value);
+          setStatus("registered");
         } catch {
           // 푸시는 선택적 기능 — 실패해도 앱 동작에 영향 없음
+          setStatus("error");
         }
       });
 
@@ -100,5 +141,5 @@ export function usePushNotifications() {
       cancelled = true;
       handles.forEach((h) => h.remove());
     };
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, setStatus]);
 }

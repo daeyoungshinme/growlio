@@ -37,10 +37,10 @@ import DCAProjectionChart from "@/components/invest/DCAProjectionChart";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
-import TaxPlannerSection from "@/components/invest/TaxPlannerSection";
-import { TaxSimulationCard } from "@/components/invest/TaxSimulationCard";
-import { TaxRecommendationList } from "@/components/invest/TaxRecommendationList";
-import { TaxPositionTable } from "@/components/invest/TaxPositionTable";
+import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
+import { TaxSimulationCard } from "@/components/tax/TaxSimulationCard";
+import { TaxRecommendationList } from "@/components/tax/TaxRecommendationList";
+import { TaxPositionTable } from "@/components/tax/TaxPositionTable";
 
 // ------- DCAProjectionChart -------
 describe("DCAProjectionChart", () => {
