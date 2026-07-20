@@ -262,6 +262,7 @@ providers/                    # 금융 데이터 provider
   ├── _token_cache.py         # 토큰 캐싱 헬퍼
   ├── _retry.py               # 토큰 갱신 재시도 공용 헬퍼
   ├── _overseas_cache.py      # KIS/키움 공용 해외 잔고 조회 캐시 헬퍼(has_overseas Redis 플래그로 해외 보유 없는 계좌의 API 콜 스킵)
+  ├── _overseas_name_enrichment.py # 해외 포지션 종목명 한글/영문 혼재 방지 — 동기화 시점에 티커 기준 영문 캐노니컬 이름 조회(stock_search_service.resolve_english_name) 후 Redis 캐싱, 조회 실패 시 브로커 원본명 폴백
   └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # Redis 캐시 키 빌더 (`dividend_ticker_summary_key` 등)
