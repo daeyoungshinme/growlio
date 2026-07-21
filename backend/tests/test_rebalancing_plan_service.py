@@ -279,6 +279,51 @@ class TestNotifyPlanGenerated:
         mock_email.assert_not_awaited()
 
 
+# ── notify_tax_gate_blocked ────────────────────────────────────
+
+
+class TestNotifyTaxGateBlocked:
+    @pytest.mark.asyncio
+    async def test_sends_email_and_push_and_marks_dedup(self, mock_db):
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+        blocked = svc.TaxGateBlocked(estimated_tax_krw=200_000.0, max_tax_impact_krw=100_000.0)
+
+        mock_email = AsyncMock(return_value=True)
+        mock_redis = MagicMock()
+        with (
+            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.utils.cache_keys.get_cached_json", new=AsyncMock(return_value=None)),
+            patch("app.utils.cache_keys.set_cached_json", new=AsyncMock()) as mock_set_cached,
+        ):
+            await svc.notify_tax_gate_blocked(
+                alert, portfolio, blocked, "user@test.com", "fcm-token", mock_redis, mock_db
+            )
+
+        mock_email.assert_awaited_once_with("user@test.com", portfolio.name, 200_000.0, 100_000.0)
+        mock_set_cached.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_already_sent_today(self, mock_db):
+        """같은 알림에 대해 하루 1회만 발송 — 5분 tick마다 스팸처럼 가지 않도록 dedup."""
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+        blocked = svc.TaxGateBlocked(estimated_tax_krw=200_000.0, max_tax_impact_krw=100_000.0)
+
+        mock_email = AsyncMock()
+        with (
+            patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
+            patch("app.utils.cache_keys.get_cached_json", new=AsyncMock(return_value=True)),
+        ):
+            await svc.notify_tax_gate_blocked(
+                alert, portfolio, blocked, "user@test.com", "fcm-token", MagicMock(), mock_db
+            )
+
+        mock_email.assert_not_awaited()
+
+
 # ── get_plan_leg_by_token ─────────────────────────────────────
 
 
@@ -469,18 +514,22 @@ class TestApproveSellLeg:
         mock_db.get = AsyncMock(return_value=plan)
         mock_db.refresh = AsyncMock()
 
+        mock_notify_failed = AsyncMock()
         with (
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch(
                 "app.services.rebalancing.execution_service.execute_rebalancing",
                 new=AsyncMock(side_effect=RuntimeError("broker error")),
             ),
+            patch("app.services.rebalancing.plan_service._notify_leg_execution_failed", new=mock_notify_failed),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             result = await svc.approve_sell_leg(locked_leg, mock_db, MagicMock(), decided_by="USER_EMAIL")
 
         assert result is None
         assert locked_leg.status == "FAILED"
         assert locked_leg.error_message == "broker error"
+        mock_notify_failed.assert_awaited_once_with(plan, "SELL", "broker error", mock_db)
 
     @pytest.mark.asyncio
     async def test_rejects_buy_side_leg(self, mock_db):
@@ -661,6 +710,63 @@ class TestExecuteDueBuyLegs:
         assert count == 1
         assert locked_leg.status == "EXECUTED"
         assert locked_leg.execution_id == execution_id
+
+    @pytest.mark.asyncio
+    async def test_market_signal_gate_blocks_execution_and_leaves_leg_pending(self, mock_db):
+        """대기시간 동안 시장 상황이 악화되면 실행 직전 재확인해 건너뛴다 — leg는 PENDING으로 남아
+        다음 tick(1분 간격)에 재시도되고, 계속 막히면 장마감 시 EXPIRED로 자연 정리된다."""
+        from app.models.alert import RebalancingAlert
+        from app.models.rebalancing_plan import RebalancingPlan
+
+        leg_id = uuid.uuid4()
+        plan_id = uuid.uuid4()
+        alert_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id,
+            plan_id=plan_id,
+            side="BUY",
+            status="PENDING",
+            decided_at=None,
+            decided_by=None,
+            execution_id=None,
+            error_message=None,
+            token_consumed_at=None,
+        )
+        plan = SimpleNamespace(
+            id=plan_id,
+            alert_id=alert_id,
+            user_id=uuid.uuid4(),
+            account_id=uuid.uuid4(),
+            portfolio_id=uuid.uuid4(),
+            strategy="BUY_ONLY",
+        )
+        alert = SimpleNamespace(id=alert_id, market_condition_mode="STRICT")
+
+        async def _get_side_effect(model, _pk):
+            if model is RebalancingPlan:
+                return plan
+            if model is RebalancingAlert:
+                return alert
+            return None
+
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(side_effect=_get_side_effect)
+
+        with (
+            patch("app.utils.market_hours.is_korean_market_open", return_value=True),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "YELLOW", "data_freshness": "LIVE"}),
+            ),
+        ):
+            count = await svc.execute_due_buy_legs(mock_db, MagicMock())
+
+        assert count == 0
+        assert locked_leg.status == "PENDING"
+        assert locked_leg.token_consumed_at is None
 
     @pytest.mark.asyncio
     async def test_no_due_legs_returns_zero(self, mock_db):

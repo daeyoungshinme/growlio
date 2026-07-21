@@ -124,6 +124,64 @@ class TestGetAllocationHistory:
         redis.setex.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_account_id_passed_as_query_param(self, mock_db, override_settings):
+        from app.services.portfolio_history_service import get_allocation_history
+
+        captured_params = []
+
+        async def mock_execute(query, params=None):
+            captured_params.append(params)
+            result = MagicMock()
+            result.all.return_value = []
+            return result
+
+        mock_db.execute = mock_execute
+        account_id = uuid.uuid4()
+
+        await get_allocation_history(uuid.uuid4(), mock_db, months=3, account_id=account_id)
+
+        assert len(captured_params) == 2  # asset_type 쿼리 + market breakdown 쿼리
+        assert all(p["account_id"] == str(account_id) for p in captured_params)
+
+    @pytest.mark.asyncio
+    async def test_no_account_id_passes_none(self, mock_db, override_settings):
+        from app.services.portfolio_history_service import get_allocation_history
+
+        captured_params = []
+
+        async def mock_execute(query, params=None):
+            captured_params.append(params)
+            result = MagicMock()
+            result.all.return_value = []
+            return result
+
+        mock_db.execute = mock_execute
+
+        await get_allocation_history(uuid.uuid4(), mock_db, months=3)
+
+        assert all(p["account_id"] is None for p in captured_params)
+
+    @pytest.mark.asyncio
+    async def test_account_id_uses_separate_cache_key(self, mock_db, override_settings):
+        from app.services.portfolio_history_service import get_allocation_history
+
+        redis = AsyncMock()
+        redis.get = AsyncMock(return_value=None)
+        redis.setex = AsyncMock()
+
+        exec_result = MagicMock()
+        exec_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=exec_result)
+
+        user_id = uuid.uuid4()
+        account_id = uuid.uuid4()
+        await get_allocation_history(user_id, mock_db, redis=redis, months=3, account_id=account_id)
+        await get_allocation_history(user_id, mock_db, redis=redis, months=3)
+
+        keys_used = [call.args[0] for call in redis.get.call_args_list]
+        assert len(set(keys_used)) == 2
+
+    @pytest.mark.asyncio
     async def test_zero_total_months_excluded(self, mock_db, override_settings):
         from app.services.portfolio_history_service import get_allocation_history
 

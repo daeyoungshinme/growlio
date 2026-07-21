@@ -8,15 +8,15 @@ const inputClass = `w-full ${INPUT_SM}`;
 interface Props {
   form: RebalancingAlertFormState;
   targetAccountId?: string;
-  targetAccountIsKis: boolean;
-  kisExecutionAccounts: AssetAccount[];
+  targetAccountIsAutoEligible: boolean;
+  autoExecutionAccounts: AssetAccount[];
 }
 
 export function AlertModeSection({
   form,
   targetAccountId,
-  targetAccountIsKis,
-  kisExecutionAccounts,
+  targetAccountIsAutoEligible,
+  autoExecutionAccounts,
 }: Props) {
   return (
     <>
@@ -27,7 +27,7 @@ export function AlertModeSection({
           {MODE_OPTIONS.map(({ value: m, label, desc }) => {
             const isAutoDisabled =
               m === "AUTO" &&
-              (targetAccountId ? !targetAccountIsKis : kisExecutionAccounts.length === 0);
+              (targetAccountId ? !targetAccountIsAutoEligible : autoExecutionAccounts.length === 0);
             return (
               <label
                 key={m}
@@ -58,8 +58,8 @@ export function AlertModeSection({
                   {isAutoDisabled && (
                     <div className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                       {targetAccountId
-                        ? "KIS 연동 계좌만 자동 실행 가능"
-                        : "연동된 KIS 계좌가 없어 자동 실행을 사용할 수 없습니다"}
+                        ? "KIS/키움 연동 계좌만 자동 실행 가능"
+                        : "연동된 KIS/키움 계좌가 없어 자동 실행을 사용할 수 없습니다"}
                     </div>
                   )}
                 </div>

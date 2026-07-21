@@ -348,6 +348,45 @@ class TestRebalancingAlertExtended:
         assert created_alert["obj"].account_id == exec_account_id
         assert created_alert["obj"].alert_scope == "AGGREGATE"
 
+    def test_upsert_rebalancing_alert_auto_mode_accepts_kiwoom_account(self, override_settings):
+        """키움 연동 계좌도 AUTO 실행 계좌로 지정할 수 있어야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        exec_account_id = uuid.uuid4()
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        exec_account = SimpleNamespace(id=exec_account_id, user_id=user.id, asset_type="STOCK_KIWOOM")
+        now = datetime.now(UTC)
+        db.scalar = AsyncMock(side_effect=[portfolio_orm, exec_account, None])
+
+        created_alert = {}
+
+        def _capture_add(obj):
+            created_alert["obj"] = obj
+
+        db.add = MagicMock(side_effect=_capture_add)
+
+        def _refresh(obj):
+            obj.id = uuid.uuid4()
+            obj.is_active = True
+            obj.last_triggered_at = None
+            obj.deposit_accounts = []
+            obj.created_at = now
+            obj.updated_at = now
+
+        db.refresh = AsyncMock(side_effect=_refresh)
+        app = _setup_app(user, db)
+        payload = {
+            "portfolio_id": str(portfolio_id),
+            "threshold_pct": 5.0,
+            "mode": "AUTO",
+            "account_id": str(exec_account_id),
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
+        assert resp.status_code in (200, 201)
+        assert created_alert["obj"].account_id == exec_account_id
+
     def test_upsert_rebalancing_alert_auto_to_notify_disables_auto_and_stays_gettable(self, override_settings):
         """회귀 테스트: AGGREGATE+AUTO 알림을 NOTIFY로 전환(자동 리밸런싱 해제)해도
 
@@ -445,6 +484,55 @@ class TestRebalancingAlertExtended:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
         assert resp.status_code == 422
+
+    def test_rebalancing_alert_tax_gate_enabled_without_max_rejected(self, override_settings):
+        """세금영향 게이트를 켜면서 상한 금액을 비워두면 422 — '켜져 있는데 상한 없음'은 항상 설정 실수."""
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        db.scalar = AsyncMock(return_value=portfolio_orm)
+        app = _setup_app(user, db)
+        payload = {
+            "portfolio_id": str(portfolio_id),
+            "threshold_pct": 5.0,
+            "tax_impact_gate_mode": "ENABLED",
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
+        assert resp.status_code == 422
+        assert "상한" in resp.json()["detail"]
+
+    def test_rebalancing_alert_tax_gate_enabled_with_max_saved(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio_id = uuid.uuid4()
+        portfolio_orm = SimpleNamespace(id=portfolio_id, user_id=user.id, name="테스트")
+        now = datetime.now(UTC)
+        db.scalar = AsyncMock(side_effect=[portfolio_orm, None])
+
+        def _refresh(obj):
+            obj.id = uuid.uuid4()
+            obj.is_active = True
+            obj.last_triggered_at = None
+            obj.deposit_accounts = []
+            obj.created_at = now
+            obj.updated_at = now
+
+        db.refresh = AsyncMock(side_effect=_refresh)
+        app = _setup_app(user, db)
+        payload = {
+            "portfolio_id": str(portfolio_id),
+            "threshold_pct": 5.0,
+            "tax_impact_gate_mode": "ENABLED",
+            "max_tax_impact_krw": 500000.0,
+        }
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio_id}", json=payload)
+        assert resp.status_code in (200, 201)
+        body = resp.json()
+        assert body["tax_impact_gate_mode"] == "ENABLED"
+        assert body["max_tax_impact_krw"] == 500000.0
 
     def test_test_rebalancing_alert_not_found(self, override_settings):
         """알림 미설정 시 404 반환."""

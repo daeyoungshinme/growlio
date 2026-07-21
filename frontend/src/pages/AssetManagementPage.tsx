@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, Building2, TrendingUp, Home } from "lucide-react";
 import {
@@ -35,7 +36,23 @@ const TABS = ASSET_MANAGEMENT_TABS;
 type Tab = (typeof TABS)[number];
 
 export default function AssetManagementPage() {
-  const [tab, setTab] = useState<Tab>("은행계좌");
+  // 온보딩 딥링크(`/assets?tab=계좌관리&atab=증권계좌`)등이 특정 서브탭으로 바로 진입할 수
+  // 있도록 URL 쿼리로 동기화한다(PortfolioPage의 `portfolioTab` 패턴과 동일).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get("atab");
+  const tab: Tab = TABS.includes(rawTab as Tab) ? (rawTab as Tab) : "은행계좌";
+  const setTab = useCallback(
+    (next: Tab) => {
+      setSearchParams(
+        (prev) => {
+          prev.set("atab", next);
+          return prev;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, tab, setTab);
 

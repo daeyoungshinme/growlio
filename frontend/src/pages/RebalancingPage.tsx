@@ -6,6 +6,7 @@ import { fetchMarketSignal } from "@/api/marketSignals";
 import { fetchInflationSummary } from "@/api/economicIndicators";
 import { fetchPortfolioRisk } from "@/api/risk";
 import { fetchCompositeSignalStatus, fetchDriftSummary } from "@/api/rebalancing";
+import { fetchPortfolios } from "@/api/portfolios";
 import type { PortfolioItem } from "@/api/portfolios";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import Tabs from "@/components/common/Tabs";
@@ -125,6 +126,16 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
+  // RebalancingStatusCard/PortfolioManageTab도 동일 queryKey로 조회하므로(캐시 dedup),
+  // 여기서 미리 발화해 진단탭 첫 방문 시 "포트폴리오 0개" CTA 판별에 사용한다.
+  const { data: portfoliosRaw } = useQuery({
+    queryKey: QUERY_KEYS.portfolios,
+    queryFn: fetchPortfolios,
+    staleTime: STALE_TIME.MEDIUM,
+    enabled: localTab === "진단",
+  });
+  const portfolioCount = portfoliosRaw ? portfoliosRaw.length : undefined;
+
   const { data: inflationSummary } = useQuery({
     queryKey: QUERY_KEYS.inflationSummary,
     queryFn: fetchInflationSummary,
@@ -172,6 +183,8 @@ export default function RebalancingPage() {
                 driftSummaries={driftSummaries}
                 marketSignal={signal}
                 riskMetrics={riskMetrics}
+                portfolioCount={portfolioCount}
+                onCreatePortfolio={() => handleTabChange("포트폴리오")}
               />
             </ErrorBoundary>
             <ErrorBoundary variant="section">

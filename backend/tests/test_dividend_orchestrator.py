@@ -109,6 +109,31 @@ class TestCollectPositions:
         result = await _collect_positions(uuid.uuid4(), mock_db)
         assert result == {}
 
+    @pytest.mark.asyncio
+    async def test_account_id_adds_extra_equality_filter(self, mock_db, override_settings):
+        """account_id 지정 시 JOIN 조건과 별개로 asset_accounts.id 필터가 추가로 붙어야 한다."""
+        from app.services.dividend.orchestrator import _collect_positions
+
+        captured = {}
+
+        async def mock_execute(query):
+            captured["query"] = query
+            result = MagicMock()
+            result.all.return_value = []
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _collect_positions(uuid.uuid4(), mock_db)
+        without_filter_count = str(captured["query"]).count("asset_accounts.id = ")
+
+        await _collect_positions(uuid.uuid4(), mock_db, account_id=uuid.uuid4())
+        with_filter_count = str(captured["query"]).count("asset_accounts.id = ")
+
+        # JOIN 조건(asset_accounts.id == asset_snapshots.account_id)은 항상 존재하므로,
+        # account_id 지정 시 WHERE 절에 동등 비교가 하나 더 추가되어야 한다.
+        assert with_filter_count == without_filter_count + 1
+
 
 class TestLoadUserOverrides:
     @pytest.mark.asyncio

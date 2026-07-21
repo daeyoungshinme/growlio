@@ -265,14 +265,40 @@ class TestUpsertAccountRebalancingAlert:
         assert existing.threshold_pct == 12.0
         assert existing.account_id == acc1
 
-    def test_auto_mode_with_non_kis_account_rejected(self, override_settings):
+    def test_auto_mode_with_kiwoom_account_accepted(self, override_settings):
         user = _make_user()
         db = _make_mock_db()
         acc1, acc2 = uuid.uuid4(), uuid.uuid4()
         portfolio = _make_portfolio(user.id, "PER_ACCOUNT", [acc1, acc2])
-        non_kis_account = SimpleNamespace(id=acc1, user_id=user.id, asset_type="STOCK_KIWOOM")
+        kiwoom_account = SimpleNamespace(id=acc1, user_id=user.id, asset_type="STOCK_KIWOOM")
+        now = datetime.now(UTC)
+        # 1st scalar: _get_portfolio_with_accounts, 2nd: exec_account lookup for AUTO validation,
+        # 3rd: get_alert_by_portfolio_and_account(기존 알림 없음)
+        db.scalar = AsyncMock(side_effect=[portfolio, kiwoom_account, None])
+
+        def _refresh(obj):
+            obj.id = uuid.uuid4()
+            obj.is_active = True
+            obj.last_triggered_at = None
+            obj.created_at = now
+            obj.updated_at = now
+
+        db.refresh = AsyncMock(side_effect=_refresh)
+        app = _setup_app(user, db)
+        payload = {"portfolio_id": str(portfolio.id), "threshold_pct": 5.0, "mode": "AUTO"}
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put(f"/api/v1/alerts/rebalancing/{portfolio.id}/accounts/{acc1}", json=payload)
+        assert resp.status_code == 200
+        assert resp.json()["account_id"] == str(acc1)
+
+    def test_auto_mode_with_non_broker_account_rejected(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        acc1, acc2 = uuid.uuid4(), uuid.uuid4()
+        portfolio = _make_portfolio(user.id, "PER_ACCOUNT", [acc1, acc2])
+        manual_account = SimpleNamespace(id=acc1, user_id=user.id, asset_type="STOCK_OTHER")
         # 1st scalar: _get_portfolio_with_accounts, 2nd: exec_account lookup for AUTO validation
-        db.scalar = AsyncMock(side_effect=[portfolio, non_kis_account])
+        db.scalar = AsyncMock(side_effect=[portfolio, manual_account])
         app = _setup_app(user, db)
         payload = {"portfolio_id": str(portfolio.id), "threshold_pct": 5.0, "mode": "AUTO"}
         with TestClient(app, raise_server_exceptions=False) as client:

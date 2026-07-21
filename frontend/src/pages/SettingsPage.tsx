@@ -28,6 +28,7 @@ import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePush
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlertsToggle";
+import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
@@ -85,6 +86,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   GOAL_ASSET: "자산 목표 달성 알림",
   GOAL_DEPOSIT: "입금 목표 달성 알림",
   GOAL_DIVIDEND: "배당 목표 달성 알림",
+  MONTHLY_REPORT: "월간 리포트",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;
@@ -195,6 +197,11 @@ export default function SettingsPage() {
     toggle: toggleGoalAlerts,
     isPending: goalAlertsPending,
   } = useGoalAchievementAlertsToggle();
+  const {
+    enabled: monthlyReportEnabled,
+    toggle: toggleMonthlyReport,
+    isPending: monthlyReportPending,
+  } = useMonthlyReportAlertsToggle();
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -352,6 +359,19 @@ export default function SettingsPage() {
               disabled={goalAlertsPending}
               onChange={toggleGoalAlerts}
               ariaLabel="목표 달성 알림"
+            />
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
+            </p>
+            <ToggleSwitch
+              checked={monthlyReportEnabled}
+              disabled={monthlyReportPending}
+              onChange={toggleMonthlyReport}
+              ariaLabel="월간 리포트"
             />
           </div>
 

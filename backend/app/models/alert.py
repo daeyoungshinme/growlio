@@ -88,6 +88,10 @@ class RebalancingAlert(_AlertMixin, Base):
     # AUTO 모드 매수 주문 대기시간(분) — 플랜 이메일 발송 후 이 시간 뒤 자동 실행(그 사이 취소 가능).
     # 매도는 대기시간이 아닌 이메일 승인 필요(당일 장마감 미응답 시 자동 만료).
     buy_wait_minutes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="10")
+    # 세금영향 게이트: DISABLED(기본) | ENABLED — 켜져 있으면 매도로 인한 추정 양도세가
+    # max_tax_impact_krw를 초과할 때 AUTO 플랜 생성을 건너뛴다. market_condition_mode와 대칭 설계.
+    tax_impact_gate_mode: Mapped[str] = mapped_column(String(10), nullable=False, server_default="DISABLED")
+    max_tax_impact_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

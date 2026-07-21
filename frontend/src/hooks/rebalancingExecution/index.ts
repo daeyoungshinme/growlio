@@ -176,8 +176,14 @@ export function useRebalancingExecution({
   }
 
   function getLimitPriceNative(key: string, ticker: string, market: string): number {
-    if (key in limitPriceOverrides) return limitPriceOverrides[key];
-    return isOverseasMarket(market) ? (livePricesUsd[ticker] ?? 0) : (livePricesKrw[ticker] ?? 0);
+    const raw =
+      key in limitPriceOverrides
+        ? limitPriceOverrides[key]
+        : isOverseasMarket(market)
+          ? (livePricesUsd[ticker] ?? 0)
+          : (livePricesKrw[ticker] ?? 0);
+    // 해외 주문 지정가는 센트 단위(소수점 2자리)까지만 허용 — Yahoo 등 원본 시세의 부동소수점 오차 제거.
+    return isOverseasMarket(market) ? Math.round(raw * 100) / 100 : raw;
   }
 
   function getEstimateKrw(key: string, ticker: string, market: string, qty: number): number | null {

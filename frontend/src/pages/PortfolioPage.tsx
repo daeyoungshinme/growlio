@@ -3,7 +3,7 @@ import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
-import { syncAllAccounts } from "@/api/assets";
+import { fetchAccounts, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
@@ -23,8 +23,9 @@ import { isNativePlatform } from "@/utils/platform";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { PORTFOLIO_TABS } from "@/constants/tabs";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { SELECT_SM } from "@/constants/inputStyles";
 import type { PortfolioOverview } from "@/types";
-import { isPortfolioAccount } from "@/utils/accounts";
+import { isPortfolioAccount, isStockAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
 const TaxOptimizationCard = lazy(
@@ -33,9 +34,15 @@ const TaxOptimizationCard = lazy(
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
+const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 
 const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
-const fetchOverview = () => api.get<PortfolioOverview>("/portfolio/overview").then((r) => r.data);
+const fetchOverview = (accountId?: string | null) =>
+  api
+    .get<PortfolioOverview>("/portfolio/overview", {
+      params: { account_id: accountId || undefined },
+    })
+    .then((r) => r.data);
 const TABS = PORTFOLIO_TABS;
 type Tab = (typeof TABS)[number];
 
@@ -64,6 +71,22 @@ export default function PortfolioPage() {
     },
     [setSearchParams],
   );
+
+  const selectedAccountId = searchParams.get("account") || null;
+
+  const handleAccountChange = useCallback(
+    (next: string) => {
+      setSearchParams(
+        (prev) => {
+          if (next) prev.set("account", next);
+          else prev.delete("account");
+          return prev;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const isSyncingAll = useSyncStore((s) => s.isSyncingAll);
   const syncDone = useSyncStore((s) => s.done);
   const syncTotal = useSyncStore((s) => s.total);
@@ -83,9 +106,19 @@ export default function PortfolioPage() {
     });
   }, []);
 
+  const { data: accountsList } = useQuery({
+    queryKey: QUERY_KEYS.accounts,
+    queryFn: fetchAccounts,
+    staleTime: STALE_TIME.LONG,
+  });
+  const accountOptions = useMemo(
+    () => (accountsList ?? []).filter((a) => isStockAccount(a.asset_type)),
+    [accountsList],
+  );
+
   const { data, isLoading, error } = useQuery({
-    queryKey: QUERY_KEYS.portfolioOverview,
-    queryFn: fetchOverview,
+    queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId),
+    queryFn: () => fetchOverview(selectedAccountId),
     staleTime: STALE_TIME.EXCHANGE_RATE,
     refetchInterval: isNativePlatform() ? false : REFETCH_INTERVAL.PORTFOLIO,
   });
@@ -96,7 +129,7 @@ export default function PortfolioPage() {
     dividendByTicker,
     isLoading: divLoading,
     isError: divError,
-  } = useDividendData(!isLoading && !!data);
+  } = useDividendData(!isLoading && !!data, selectedAccountId);
 
   const handleSyncAll = async () => {
     try {
@@ -156,7 +189,9 @@ export default function PortfolioPage() {
       <div className="flex flex-col items-center justify-center h-64 gap-3">
         <p className="text-sm text-red-500">데이터를 불러오지 못했습니다</p>
         <button
-          onClick={() => qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview })}
+          onClick={() =>
+            qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview(selectedAccountId) })
+          }
           className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
         >
           다시 시도
@@ -168,14 +203,26 @@ export default function PortfolioPage() {
     <div className="space-y-6">
       {/* 상단 요약 */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 p-3 sm:p-5">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <p className="text-xs tracking-wide uppercase font-semibold text-gray-400 dark:text-gray-500">
             주식 총평가액
           </p>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 dark:text-gray-500">
-              {stockAccounts.length}개 증권사 계좌
-            </span>
+            {accountOptions.length > 0 && (
+              <select
+                value={selectedAccountId ?? ""}
+                onChange={(e) => handleAccountChange(e.target.value)}
+                className={SELECT_SM}
+                aria-label="계좌 선택"
+              >
+                <option value="">전체 계좌 ({stockAccounts.length}개)</option>
+                {accountOptions.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            )}
             <button
               onClick={handleSyncAll}
               disabled={isSyncingAll}
@@ -204,6 +251,15 @@ export default function PortfolioPage() {
           )}
         </div>
       </div>
+
+      <ErrorBoundary variant="section">
+        <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
+          <AllocationHistoryChart
+            accountId={selectedAccountId}
+            storageKey="growlio:portfolio:allocationHistoryOpen"
+          />
+        </Suspense>
+      </ErrorBoundary>
 
       {/* 탭 */}
       <div>
@@ -265,7 +321,7 @@ export default function PortfolioPage() {
         {tab === "세금" && (
           <ErrorBoundary variant="section">
             <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-              <TaxOptimizationCard />
+              <TaxOptimizationCard accountId={selectedAccountId} />
             </Suspense>
           </ErrorBoundary>
         )}

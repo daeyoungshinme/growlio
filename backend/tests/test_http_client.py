@@ -28,6 +28,16 @@ class TestIsRateLimitBody:
         resp.json.return_value = {"msg_cd": "EGW00101"}
         assert _is_rate_limit_body(resp) is False
 
+    def test_detects_kiwoom_return_code_5(self):
+        resp = MagicMock()
+        resp.json.return_value = {"return_code": 5, "return_msg": "허용된 요청 개수를 초과하였습니다"}
+        assert _is_rate_limit_body(resp) is True
+
+    def test_returns_false_for_other_kiwoom_return_codes(self):
+        resp = MagicMock()
+        resp.json.return_value = {"return_code": 7, "return_msg": "종목 정보가 없습니다"}
+        assert _is_rate_limit_body(resp) is False
+
     def test_returns_false_when_json_fails(self):
         resp = MagicMock()
         resp.json.side_effect = Exception("parse error")

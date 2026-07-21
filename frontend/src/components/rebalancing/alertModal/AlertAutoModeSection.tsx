@@ -1,13 +1,19 @@
 import { Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import type { AssetAccount } from "@/api/assets";
 import type { MarketSignalResponse } from "@/api/marketSignals";
+import { fetchSettings } from "@/api/settings";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 import {
   STRATEGY_OPTIONS,
   BUY_WAIT_MINUTES_OPTIONS,
   MARKET_CONDITION_OPTIONS,
+  TAX_IMPACT_GATE_OPTIONS,
 } from "@/constants/rebalancingConfig";
+import { fmtKrw } from "@/utils/format";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 
 const inputClass = `w-full ${INPUT_SM}`;
@@ -16,7 +22,7 @@ interface Props {
   form: RebalancingAlertFormState;
   targetAccountId?: string;
   targetAccountName?: string;
-  kisExecutionAccounts: AssetAccount[];
+  autoExecutionAccounts: AssetAccount[];
   canSwitchToPerAccount?: boolean;
   switchToPerAccountMut: { mutate: () => void; isPending: boolean };
   marketSignal?: MarketSignalResponse;
@@ -26,22 +32,35 @@ export function AlertAutoModeSection({
   form,
   targetAccountId,
   targetAccountName,
-  kisExecutionAccounts,
+  autoExecutionAccounts,
   canSwitchToPerAccount,
   switchToPerAccountMut,
   marketSignal,
 }: Props) {
+  const { data: settingsData } = useQuery({
+    queryKey: QUERY_KEYS.settings,
+    queryFn: fetchSettings,
+    staleTime: STALE_TIME.LONG,
+  });
+
   return (
     <div className="space-y-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800">
       <p className="text-xs text-orange-600 dark:text-orange-400 font-medium">
         ⚠️ 자동 실행 모드는 실제 매매 주문이 발생합니다. 조건 충족 시 계획을 이메일로 먼저
         알려드립니다 — 매수는 대기시간 후 자동 실행(취소 가능), 매도는 이메일 승인이 필요하며 당일
         장마감까지 미응답 시 자동 취소됩니다.
+        {settingsData && (
+          <>
+            {" "}
+            안전장치로 1건당 거래대금은 {fmtKrw(settingsData.auto_rebalancing_max_order_value_krw)}
+            을 넘지 않도록 자동으로 축소됩니다.
+          </>
+        )}
       </p>
 
       <div>
         <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-          실행 계좌 (KIS)
+          실행 계좌
         </label>
         {targetAccountId ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
@@ -50,13 +69,13 @@ export function AlertAutoModeSection({
               (계좌별 독립 설정 대상)
             </span>
           </div>
-        ) : kisExecutionAccounts.length === 0 ? (
+        ) : autoExecutionAccounts.length === 0 ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            KIS 연동 계좌가 없습니다. 자산관리에서 KIS 계좌를 추가해주세요.
+            KIS/키움 연동 계좌가 없습니다. 자산관리에서 계좌를 추가해주세요.
           </p>
-        ) : kisExecutionAccounts.length === 1 ? (
+        ) : autoExecutionAccounts.length === 1 ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300">
-            <span>{kisExecutionAccounts[0].name}</span>
+            <span>{autoExecutionAccounts[0].name}</span>
             <span className="text-xs text-gray-400 dark:text-gray-500">(자동 선택)</span>
           </div>
         ) : (
@@ -66,7 +85,7 @@ export function AlertAutoModeSection({
             onChange={(e) => form.setAccountId(e.target.value)}
           >
             <option value="">계좌 선택</option>
-            {kisExecutionAccounts.map((a) => (
+            {autoExecutionAccounts.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.name}
               </option>
@@ -194,6 +213,44 @@ export function AlertAutoModeSection({
             </option>
           ))}
         </select>
+      </div>
+
+      {/* ── 세금영향 게이트 ── */}
+      <div className="pt-1 border-t border-orange-200/30 dark:border-orange-800/30">
+        <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">세금영향 게이트</p>
+        <select
+          className={inputClass}
+          value={form.taxImpactGateMode}
+          onChange={(e) => form.setTaxImpactGateMode(e.target.value as "DISABLED" | "ENABLED")}
+        >
+          {TAX_IMPACT_GATE_OPTIONS.map(({ value, label, desc }) => (
+            <option key={value} value={value}>
+              {label} — {desc}
+            </option>
+          ))}
+        </select>
+        {form.taxImpactGateMode === "ENABLED" && (
+          <div className="mt-2">
+            <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+              추정 양도세 상한 (원)
+            </label>
+            <input
+              type="number"
+              min={1}
+              step={10000}
+              placeholder="예: 500000"
+              value={form.maxTaxImpactKrw ?? ""}
+              onChange={(e) =>
+                form.setMaxTaxImpactKrw(e.target.value === "" ? null : Number(e.target.value))
+              }
+              className={inputClass}
+            />
+            <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+              매도로 인한 추정 양도세가 이 금액을 넘으면 이번 자동 실행 계획을 만들지 않고
+              보류합니다 (참고용 추정치 — 앱에서 알림으로 안내).
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

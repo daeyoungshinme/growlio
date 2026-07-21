@@ -17,8 +17,10 @@ export interface OverseasPositionDetail {
   unrealized_pnl_pct: number;
 }
 
-export const fetchOverseasPositionsTax = () =>
-  apiGet<OverseasPositionDetail[]>("/tax/overseas-positions");
+export const fetchOverseasPositionsTax = (accountId?: string | null) =>
+  apiGet<OverseasPositionDetail[]>("/tax/overseas-positions", {
+    params: { account_id: accountId || undefined },
+  });
 
 export interface HarvestingRecommendation {
   ticker: string;
@@ -70,8 +72,10 @@ export interface TaxSummary {
   };
 }
 
-export const fetchTaxSummary = (year?: number) =>
-  apiGet<TaxSummary>("/tax/summary", { params: year ? { year } : undefined });
+export const fetchTaxSummary = (year?: number, accountId?: string | null) =>
+  apiGet<TaxSummary>("/tax/summary", {
+    params: { year: year || undefined, account_id: accountId || undefined },
+  });
 
 export interface IsaAccountStatus {
   account_id: string;

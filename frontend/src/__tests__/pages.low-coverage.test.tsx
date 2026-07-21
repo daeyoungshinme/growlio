@@ -405,6 +405,10 @@ describe("InvestPlanPage", () => {
       handleCloseModal: vi.fn(),
       openEdit: vi.fn(),
       saveSettings: vi.fn(),
+      wizardMode: false,
+      wizardStep: 1,
+      setWizardStep: vi.fn(),
+      openWizard: vi.fn(),
     });
     const { container } = renderPage(<InvestPlanPage />);
     expect(screen.queryByText("적립 계획")).not.toBeInTheDocument();

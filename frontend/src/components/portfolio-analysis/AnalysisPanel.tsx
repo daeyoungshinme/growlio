@@ -9,6 +9,7 @@ import RebalancingTable from "@/components/rebalancing/RebalancingTable";
 import { RebalancingAccountSyncSection } from "@/components/rebalancing/RebalancingAccountSyncSection";
 import RebalancingStrategyCard from "@/components/rebalancing/RebalancingStrategyCard";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import { useAnalysisState } from "@/hooks/useAnalysisState";
 
 function StrategyAnalysisSection({
@@ -159,12 +160,28 @@ export function AnalysisPanel({
         )}
       </div>
 
+      {/* 최초 분석 중 — 아직 표시할 이전 결과가 없을 때만 스켈레톤 */}
+      {mode === "rebalancing" && analyzing && !analysis && <SkeletonCard rows={4} />}
+
       {/* 리밸런싱 결과 */}
       {mode === "rebalancing" && analysis && (
-        <div ref={analysisResultRef} className="card pb-20 sm:pb-0">
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-100 mb-4">
-            {analysis.portfolio_name} — 리밸런싱 분석
-          </h3>
+        <div ref={analysisResultRef} className="card pb-20 sm:pb-0 relative">
+          {analyzing && (
+            <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-3">
+              <Loader2 size={12} className="animate-spin" /> 재분석 중...
+            </div>
+          )}
+          {!analyzing && error && (
+            <div className="flex items-center justify-between gap-2 text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-lg px-3 py-2 mb-3">
+              <span>{error}</span>
+              <button
+                onClick={handleRebalancingAnalysis}
+                className="flex-none flex items-center gap-1 font-medium hover:text-red-600 dark:hover:text-red-300 transition-colors"
+              >
+                <RefreshCw size={12} /> 다시 시도
+              </button>
+            </div>
+          )}
           {(() => {
             const currentPortfolio = portfolios.find(
               (p) => p.id === analysis.portfolio_id.toString(),
@@ -204,8 +221,16 @@ export function AnalysisPanel({
           })()}
         </div>
       )}
-      {mode === "rebalancing" && error && (
-        <div className="flex items-center justify-center h-48 text-sm text-red-500">{error}</div>
+      {mode === "rebalancing" && error && !analysis && (
+        <div className="card flex flex-col items-center justify-center gap-3 py-10 text-center">
+          <p className="text-sm text-red-500">{error}</p>
+          <button
+            onClick={handleRebalancingAnalysis}
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          >
+            <RefreshCw size={13} /> 다시 시도
+          </button>
+        </div>
       )}
 
       {/* 전략 분석 결과 */}

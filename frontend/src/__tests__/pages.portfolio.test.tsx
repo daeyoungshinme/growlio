@@ -30,6 +30,7 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/assets", () => ({
   syncAllAccounts: vi.fn().mockResolvedValue({ total: 2, status: "started" }),
+  fetchAccounts: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("@/hooks/useRegisterRefresh", () => ({
@@ -54,6 +55,9 @@ vi.mock("../components/portfolio/DomesticForeignBar", () => ({
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
 }));
+vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
+  default: () => <div data-testid="allocation-chart">AllocationHistoryChart</div>,
+}));
 
 vi.mock("@/components/assets/StockHoldingsTable", () => ({
   default: () => <div data-testid="stock-holdings-table">StockHoldingsTable</div>,
@@ -74,7 +78,7 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 import PortfolioPage from "@/pages/PortfolioPage";
 import { api } from "@/api/client";
 import { toast } from "@/utils/toast";
-import { syncAllAccounts } from "@/api/assets";
+import { fetchAccounts, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 
 const mockPortfolioData = {
@@ -262,6 +266,10 @@ describe("PortfolioPage", () => {
   });
 
   it("계좌 수를 표시한다", async () => {
+    vi.mocked(fetchAccounts).mockResolvedValueOnce([
+      { id: "acc-1", asset_type: "STOCK_KIS", name: "KIS 계좌" },
+      { id: "acc-2", asset_type: "STOCK_KIWOOM", name: "키움 계좌" },
+    ] as never);
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -269,7 +277,7 @@ describe("PortfolioPage", () => {
     });
     renderPortfolio();
     await waitFor(() => {
-      expect(screen.getByText("2개 증권사 계좌")).toBeInTheDocument();
+      expect(screen.getByText("전체 계좌 (2개)")).toBeInTheDocument();
     });
   });
 

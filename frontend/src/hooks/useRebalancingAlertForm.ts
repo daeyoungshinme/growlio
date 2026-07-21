@@ -10,6 +10,7 @@ import {
   type MarketConditionMode,
   type RebalancingAlert,
   type ScheduleType,
+  type TaxImpactGateMode,
   type TriggerCondition,
 } from "@/api/alerts";
 import { fetchAccounts, type AccountTaxType, type InvestmentHorizon } from "@/api/assets";
@@ -66,13 +67,13 @@ export function useRebalancingAlertQueries({
     (a) => (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") && a.is_active,
   );
 
-  const kisAccounts = brokerAccounts.filter(
-    (a) => a.asset_type === "STOCK_KIS" && (accountIds == null || accountIds.includes(a.id)),
+  const executionEligibleAccounts = brokerAccounts.filter(
+    (a) => accountIds == null || accountIds.includes(a.id),
   );
 
-  const kisExecutionAccounts = accounts.filter(
+  const autoExecutionAccounts = accounts.filter(
     (a) =>
-      a.asset_type === "STOCK_KIS" &&
+      (a.asset_type === "STOCK_KIS" || a.asset_type === "STOCK_KIWOOM") &&
       a.is_active &&
       (accountIds == null || accountIds.includes(a.id)),
   );
@@ -80,15 +81,17 @@ export function useRebalancingAlertQueries({
   const targetAccount = targetAccountId
     ? accounts.find((a) => a.id === targetAccountId)
     : undefined;
-  const targetAccountIsKis = targetAccountId ? targetAccount?.asset_type === "STOCK_KIS" : true;
+  const targetAccountIsAutoEligible = targetAccountId
+    ? targetAccount?.asset_type === "STOCK_KIS" || targetAccount?.asset_type === "STOCK_KIWOOM"
+    : true;
 
   return {
     alert: alert ?? null,
     isLoading: isLoading || (targetAccountId ? accountsLoading : false),
     brokerAccounts,
-    kisAccounts,
-    kisExecutionAccounts,
-    targetAccountIsKis,
+    executionEligibleAccounts,
+    autoExecutionAccounts,
+    targetAccountIsAutoEligible,
     targetAccountTaxType: targetAccount?.tax_type,
     targetAccountInvestmentHorizon: targetAccount?.investment_horizon,
     marketSignal,
@@ -143,6 +146,12 @@ export function useRebalancingAlertFormState({
   );
   const [notifyTime, setNotifyTime] = useState<string>(alert?.notify_time ?? "08:30");
   const [buyWaitMinutes, setBuyWaitMinutes] = useState<number>(alert?.buy_wait_minutes ?? 10);
+  const [taxImpactGateMode, setTaxImpactGateMode] = useState<TaxImpactGateMode>(
+    alert?.tax_impact_gate_mode ?? "DISABLED",
+  );
+  const [maxTaxImpactKrw, setMaxTaxImpactKrw] = useState<number | null>(
+    alert?.max_tax_impact_krw ?? null,
+  );
 
   const upsertMut = useMutation({
     mutationFn: () => {
@@ -160,6 +169,9 @@ export function useRebalancingAlertFormState({
         auto_execution_time: mode === "AUTO" && autoExecutionTime ? autoExecutionTime : null,
         notify_time: notifyTime,
         buy_wait_minutes: buyWaitMinutes,
+        tax_impact_gate_mode: mode === "AUTO" ? taxImpactGateMode : "DISABLED",
+        max_tax_impact_krw:
+          mode === "AUTO" && taxImpactGateMode === "ENABLED" ? maxTaxImpactKrw : null,
       };
       return targetAccountId
         ? upsertAccountRebalancingAlert(portfolioId, targetAccountId, body)
@@ -216,6 +228,10 @@ export function useRebalancingAlertFormState({
     setNotifyTime,
     buyWaitMinutes,
     setBuyWaitMinutes,
+    taxImpactGateMode,
+    setTaxImpactGateMode,
+    maxTaxImpactKrw,
+    setMaxTaxImpactKrw,
     // mutations
     upsertMut,
     deleteMut,

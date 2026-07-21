@@ -11,6 +11,7 @@ import contextlib
 import hashlib
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
@@ -30,10 +31,30 @@ from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
     clamp_orders_to_max_value,
     filter_drifting_items,
+    is_tax_impact_blocking_auto_mode,
     refresh_live_prices,
 )
 
 logger = structlog.get_logger()
+
+
+@dataclass(frozen=True)
+class TaxGateBlocked:
+    """`build_pending_plan_for_alert`가 세금영향 게이트로 차단됐을 때 반환하는 sentinel.
+
+    알림 발송에 필요한 추정치를 함께 실어 나른다."""
+
+    estimated_tax_krw: float
+    max_tax_impact_krw: float
+
+
+@dataclass(frozen=True)
+class MarketSignalGateBlocked:
+    """AUTO 계획 생성이 시장신호 게이트로 차단됐을 때 알림에 필요한 컨텍스트를 실어 나르는 sentinel."""
+
+    composite_level: str
+    market_condition_mode: str
+    data_freshness: str
 
 
 def _generate_token() -> tuple[str, str]:
@@ -178,12 +199,12 @@ async def build_pending_plan_for_alert(
     order_type_override: Literal["MARKET", "LIMIT"] | None = None,
     account_id_override: uuid.UUID | None = None,
     redis: Any = None,
-) -> tuple[RebalancingPlan, str | None, str | None] | None:
+) -> tuple[RebalancingPlan, str | None, str | None] | None | TaxGateBlocked:
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
     AUTO 스케줄러 job과 수동 "지금 테스트 실행" 모두 이 함수로 플랜을 생성해 두 경로가
     동일한 계획 생성 로직(및 이메일 발송 파이프라인)을 공유하도록 한다.
-    반환: (plan, buy_token, sell_token) | None — 드리프트가 없으면 None.
+    반환: (plan, buy_token, sell_token) | None(드리프트 없음) | TaxGateBlocked(세금영향 게이트 차단).
     """
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.alert_scope import resolve_effective_account_ids
@@ -200,6 +221,21 @@ async def build_pending_plan_for_alert(
     if not drifting:
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
         return None
+
+    tax_gate_mode = getattr(alert, "tax_impact_gate_mode", "DISABLED")
+    max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
+    if tax_gate_mode == "ENABLED" and max_tax_impact_krw is not None:
+        from app.services.rebalancing.diagnosis_service import _build_tax_preview
+
+        _total_gain, estimated_tax_krw, _fee, _notes, _items = _build_tax_preview(analysis, overview)
+        if is_tax_impact_blocking_auto_mode(tax_gate_mode, estimated_tax_krw, max_tax_impact_krw):
+            logger.info(
+                "rebalancing_plan_blocked_tax_impact",
+                alert_id=str(alert.id),
+                estimated_tax_krw=estimated_tax_krw,
+                max_tax_impact_krw=max_tax_impact_krw,
+            )
+            return TaxGateBlocked(estimated_tax_krw=estimated_tax_krw, max_tax_impact_krw=float(max_tax_impact_krw))
 
     plan, buy_token, sell_token = await generate_pending_plan_for_alert(
         alert,
@@ -290,6 +326,106 @@ async def notify_plan_generated(
         ),
     )
     return email_sent
+
+
+async def notify_tax_gate_blocked(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    blocked: TaxGateBlocked,
+    email: str | None,
+    fcm_token: str | None,
+    redis: Any,
+    db: AsyncSession,
+) -> None:
+    """세금영향 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup)."""
+    from app.services.email_service import send_tax_impact_gate_blocked_email
+    from app.services.push_service import send_push_to_user
+    from app.utils.cache_keys import (
+        TTL_TAX_IMPACT_GATE_ALERT_SENT,
+        get_cached_json,
+        set_cached_json,
+        tax_impact_gate_alert_sent_key,
+    )
+
+    today = datetime.now(tz=UTC).date().isoformat()
+    dedup_key = tax_impact_gate_alert_sent_key(alert.id, today)
+    if await get_cached_json(redis, dedup_key):
+        return
+
+    if email:
+        try:
+            await send_tax_impact_gate_blocked_email(
+                email, portfolio.name, blocked.estimated_tax_krw, blocked.max_tax_impact_krw
+            )
+        except Exception as exc:
+            logger.error("tax_impact_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
+
+    push_body = f"세금영향 상한 초과로 이번 계획을 만들지 않았습니다 (추정 양도세 {blocked.estimated_tax_krw:,.0f}원)."
+    with contextlib.suppress(Exception):
+        await send_push_to_user(
+            user_id=alert.user_id,
+            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
+            body=push_body,
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING_TAX_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
+        )
+
+    history_message = (
+        f"리밸런싱 자동화 보류(세금영향 상한 초과): {portfolio.name} — 추정 양도세 {blocked.estimated_tax_krw:,.0f}원"
+    )
+    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
+    await db.commit()
+
+    await set_cached_json(redis, dedup_key, True, TTL_TAX_IMPACT_GATE_ALERT_SENT)
+
+
+async def notify_market_signal_gate_blocked(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    blocked: MarketSignalGateBlocked,
+    email: str | None,
+    fcm_token: str | None,
+    redis: Any,
+    db: AsyncSession,
+) -> None:
+    """시장신호 게이트로 계획 생성이 보류됐음을 알린다 — 같은 알림에 대해 하루 1회만 발송(dedup)."""
+    from app.services.email_service import send_market_signal_gate_blocked_email
+    from app.services.push_service import send_push_to_user
+    from app.utils.cache_keys import (
+        TTL_MARKET_SIGNAL_GATE_ALERT_SENT,
+        get_cached_json,
+        market_signal_gate_alert_sent_key,
+        set_cached_json,
+    )
+
+    today = datetime.now(tz=UTC).date().isoformat()
+    dedup_key = market_signal_gate_alert_sent_key(alert.id, today)
+    if await get_cached_json(redis, dedup_key):
+        return
+
+    if email:
+        try:
+            await send_market_signal_gate_blocked_email(
+                email, portfolio.name, blocked.composite_level, blocked.market_condition_mode
+            )
+        except Exception as exc:
+            logger.error("market_signal_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
+
+    push_body = f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
+    with contextlib.suppress(Exception):
+        await send_push_to_user(
+            user_id=alert.user_id,
+            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
+            body=push_body,
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING_MARKET_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
+        )
+
+    history_message = f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
+    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
+    await db.commit()
+
+    await set_cached_json(redis, dedup_key, True, TTL_MARKET_SIGNAL_GATE_ALERT_SENT)
 
 
 async def get_plan_leg_by_token(
@@ -450,6 +586,48 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
         )
 
 
+async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_message: str, db: AsyncSession) -> None:
+    """leg 실행 자체가 예외로 실패했을 때(개별 종목 실패가 아닌 전체 실패) 이메일/푸시로 알린다.
+
+    개별 종목 주문 실패는 `_send_leg_execution_email`의 완료 리포트(total_fail)로 이미 안내되지만,
+    leg 실행 자체가 예외를 던진 경우(자격증명 오류, 브로커 토큰 발급 실패 등)는 실행 리포트가
+    아예 생성되지 않아 사용자가 이력 탭을 직접 열어보지 않으면 알 방법이 없었다 — 그 공백을 메운다.
+    """
+    from app.models.user import User, UserSettings
+    from app.services.email_service import send_rebalancing_plan_execution_failed_email
+    from app.services.push_service import send_push_to_user
+
+    row = await db.execute(
+        select(Portfolio.name, User.email, UserSettings.notification_email, UserSettings.fcm_token)
+        .select_from(User)
+        .outerjoin(Portfolio, Portfolio.id == plan.portfolio_id)
+        .outerjoin(UserSettings, UserSettings.user_id == User.id)
+        .where(User.id == plan.user_id)
+    )
+    info = row.first()
+    if info is None:
+        return
+    portfolio_name, user_email, notification_email, fcm_token = info
+    portfolio_name = portfolio_name or "포트폴리오"
+    email = notification_email or user_email
+
+    if email:
+        try:
+            await send_rebalancing_plan_execution_failed_email(email, portfolio_name, side, error_message)
+        except Exception as exc:
+            logger.error("rebalancing_plan_execution_failed_email_error", plan_id=str(plan.id), error=str(exc))
+
+    with contextlib.suppress(Exception):
+        side_label = "매수" if side == "BUY" else "매도"
+        await send_push_to_user(
+            user_id=plan.user_id,
+            title=f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}",
+            body="이번 계획은 체결되지 않았습니다. 앱에서 확인해주세요.",
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING_PLAN_EXECUTION_FAILED", "portfolio_id": str(plan.portfolio_id or "")},
+        )
+
+
 async def _execute_leg(
     locked: RebalancingPlanLeg, plan: RebalancingPlan, db: AsyncSession, redis, decided_by: str
 ) -> uuid.UUID | None:
@@ -476,7 +654,11 @@ async def _execute_leg(
         locked.error_message = str(exc)
         locked.decided_at = datetime.now(tz=UTC)
         locked.decided_by = decided_by
+        await save_alert_history(
+            db, plan.user_id, "REBALANCING", f"리밸런싱 자동화 {'매수' if locked.side == 'BUY' else '매도'} 실행 실패"
+        )
         await db.commit()
+        await _notify_leg_execution_failed(plan, locked.side, str(exc), db)
         return None
 
     locked.status = "EXECUTED"
@@ -515,7 +697,15 @@ async def approve_buy_leg(leg: RebalancingPlanLeg, db: AsyncSession, redis, deci
 
 
 async def execute_due_buy_legs(db: AsyncSession, redis) -> int:
-    """대기시간이 지난 PENDING BUY leg를 실행한다. 대기 중 장마감을 넘겼으면 EXPIRED 처리(익일 이월 안 함)."""
+    """대기시간이 지난 PENDING BUY leg를 실행한다. 대기 중 장마감을 넘겼으면 EXPIRED 처리(익일 이월 안 함).
+
+    실행 직전 시장 신호 게이트를 다시 확인한다 — 계획 생성 시점엔 안전했더라도 대기시간(수 분~수십 분)
+    동안 시장 상황이 악화될 수 있어서다(계획 생성 시점 1회만 확인하던 기존 동작의 공백). 차단되면
+    leg는 PENDING으로 남아 다음 tick(1분 간격)에 재시도되고, 장마감까지 계속 막히면 위 EXPIRED 처리로
+    자연 정리된다 — 별도 알림 없이 조용히 보류(계획 생성 자체를 건너뛰는 시장신호 게이트와 동일한 정책).
+    """
+    from app.models.alert import RebalancingAlert
+    from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
     from app.utils.market_hours import is_korean_market_open
 
     now = datetime.now(tz=UTC)
@@ -527,6 +717,12 @@ async def execute_due_buy_legs(db: AsyncSession, redis) -> int:
         )
     )
     due_leg_ids = [row[0] for row in result.all()]
+    if not due_leg_ids:
+        return 0
+
+    from app.services.market_signal_service import get_market_signal_for_auto_gate
+
+    composite_level, data_freshness = await get_market_signal_for_auto_gate(redis)
 
     processed = 0
     for leg_id in due_leg_ids:
@@ -543,12 +739,25 @@ async def execute_due_buy_legs(db: AsyncSession, redis) -> int:
             processed += 1
             continue
 
-        locked.token_consumed_at = now
-        await db.commit()
-
         plan = await db.get(RebalancingPlan, locked.plan_id)
         if plan is None:
             continue
+
+        plan_alert_id = getattr(plan, "alert_id", None)
+        alert = await db.get(RebalancingAlert, plan_alert_id) if plan_alert_id else None
+        market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+        if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
+            logger.info(
+                "rebalancing_plan_buy_execution_skipped_market_signal",
+                leg_id=str(locked.id),
+                composite_level=composite_level,
+                data_freshness=data_freshness,
+            )
+            continue
+
+        locked.token_consumed_at = now
+        await db.commit()
+
         execution_id = await _execute_leg(locked, plan, db, redis, "SYSTEM_AUTO")
         if execution_id:
             await _send_leg_execution_email(plan, execution_id, db)

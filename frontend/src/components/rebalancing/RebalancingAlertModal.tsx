@@ -44,8 +44,8 @@ export default function RebalancingAlertModal({
   const {
     alert,
     isLoading,
-    kisExecutionAccounts,
-    targetAccountIsKis,
+    autoExecutionAccounts,
+    targetAccountIsAutoEligible,
     targetAccountTaxType,
     targetAccountInvestmentHorizon,
     marketSignal,
@@ -70,8 +70,8 @@ export default function RebalancingAlertModal({
           <AlertFormBody
             key={alert?.id ?? "new"}
             alert={alert}
-            kisExecutionAccounts={kisExecutionAccounts}
-            targetAccountIsKis={targetAccountIsKis}
+            autoExecutionAccounts={autoExecutionAccounts}
+            targetAccountIsAutoEligible={targetAccountIsAutoEligible}
             portfolioId={portfolioId}
             targetAccountId={targetAccountId}
             targetAccountName={targetAccountName}
@@ -94,8 +94,8 @@ import type { MarketSignalResponse } from "@/api/marketSignals";
 
 function AlertFormBody({
   alert,
-  kisExecutionAccounts,
-  targetAccountIsKis,
+  autoExecutionAccounts,
+  targetAccountIsAutoEligible,
   portfolioId,
   targetAccountId,
   targetAccountName,
@@ -107,8 +107,8 @@ function AlertFormBody({
   marketSignal,
 }: {
   alert: RebalancingAlert | null;
-  kisExecutionAccounts: AssetAccount[];
-  targetAccountIsKis: boolean;
+  autoExecutionAccounts: AssetAccount[];
+  targetAccountIsAutoEligible: boolean;
   portfolioId: string;
   targetAccountId?: string;
   targetAccountName?: string;
@@ -136,9 +136,9 @@ function AlertFormBody({
       setAccountId(targetAccountId);
       return;
     }
-    if (kisExecutionAccounts.length !== 1) return;
-    setAccountId(kisExecutionAccounts[0].id);
-  }, [mode, setAccountId, kisExecutionAccounts, targetAccountId]);
+    if (autoExecutionAccounts.length !== 1) return;
+    setAccountId(autoExecutionAccounts[0].id);
+  }, [mode, setAccountId, autoExecutionAccounts, targetAccountId]);
 
   const hasAlert = !!alert;
   const queryClient = useQueryClient();
@@ -160,15 +160,15 @@ function AlertFormBody({
       <AlertModeSection
         form={form}
         targetAccountId={targetAccountId}
-        targetAccountIsKis={targetAccountIsKis}
-        kisExecutionAccounts={kisExecutionAccounts}
+        targetAccountIsAutoEligible={targetAccountIsAutoEligible}
+        autoExecutionAccounts={autoExecutionAccounts}
       />
       {form.mode === "AUTO" && (
         <AlertAutoModeSection
           form={form}
           targetAccountId={targetAccountId}
           targetAccountName={targetAccountName}
-          kisExecutionAccounts={kisExecutionAccounts}
+          autoExecutionAccounts={autoExecutionAccounts}
           canSwitchToPerAccount={canSwitchToPerAccount}
           switchToPerAccountMut={switchToPerAccountMut}
           marketSignal={marketSignal}

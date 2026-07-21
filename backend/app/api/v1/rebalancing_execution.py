@@ -29,6 +29,7 @@ from app.schemas.rebalancing import (
 from app.services.rebalancing.execution_service import execute_rebalancing
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
+    TaxGateBlocked,
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
     notify_plan_generated,
@@ -164,6 +165,13 @@ async def quick_execute_rebalancing(
         account_id_override=body.account_id if body else None,
         redis=redis,
     )
+    if isinstance(generated, TaxGateBlocked):
+        return QuickExecuteResult(
+            status="TAX_BLOCKED",
+            message=f"매도로 인한 추정 양도세(약 {generated.estimated_tax_krw:,.0f}원)가 설정하신 상한"
+            f"({generated.max_tax_impact_krw:,.0f}원)을 초과해 실행이 보류됩니다. "
+            "자동화 설정의 세금영향 상한을 확인해주세요.",
+        )
     if generated is None:
         return QuickExecuteResult(
             status="NO_DRIFT",

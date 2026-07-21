@@ -405,6 +405,34 @@ describe("useGoalSettings", () => {
     });
     expect(result.current.editing).toBe(false);
   });
+
+  it("openWizard opens the modal in wizard mode starting at step 1", async () => {
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings(), { wrapper });
+    expect(result.current.wizardMode).toBe(false);
+    await act(async () => {
+      await result.current.openWizard();
+    });
+    expect(result.current.editing).toBe(true);
+    expect(result.current.wizardMode).toBe(true);
+    expect(result.current.wizardStep).toBe(1);
+  });
+
+  it("openEdit opens the modal in flat mode (wizardMode false)", async () => {
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings(), { wrapper });
+    await act(async () => {
+      await result.current.openWizard();
+      result.current.setWizardStep(3);
+    });
+    await act(async () => {
+      await result.current.openEdit();
+    });
+    expect(result.current.editing).toBe(true);
+    expect(result.current.wizardMode).toBe(false);
+  });
 });
 
 // ============================================

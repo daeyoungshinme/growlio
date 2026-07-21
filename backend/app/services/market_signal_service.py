@@ -593,6 +593,21 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
     return await single_flight_fetch(redis, cache_key, _read_cache, _fetch_and_cache)
 
 
+async def get_market_signal_for_auto_gate(redis: aioredis.Redis | None) -> tuple[str, str]:
+    """AUTO 실행 게이트 판정용 (composite_level, data_freshness) — 조회 자체가 실패하면 안전하게 STALE로 폴백.
+
+    "판단 불가"를 "GREEN(안전)"으로 오인해 게이트를 통과시키는 사고를 막기 위해, 조회 실패 시
+    `data_freshness="STALE"`을 반환한다 — `is_market_signal_blocking_auto_mode`가 CAUTIOUS/STRICT에서
+    이를 무조건 차단으로 취급한다.
+    """
+    try:
+        signal = await get_market_signal(redis)
+        return signal.get("composite_level", "GREEN"), signal.get("data_freshness", "LIVE")
+    except Exception as exc:
+        logger.warning("market_signal_fetch_failed_for_auto_gate", error=str(exc))
+        return "GREEN", "STALE"
+
+
 async def get_last_composite_level(redis: aioredis.Redis | None) -> str | None:
     """등급 변화 감지 job이 마지막으로 관측한 composite_level을 조회한다. 없으면 None."""
     if redis is None:

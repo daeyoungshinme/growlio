@@ -46,9 +46,9 @@ def _months_ago_start_date(months: int, today: date | None = None) -> date:
 
 
 async def _fetch_monthly_by_asset_type(
-    db: AsyncSession, user_id: uuid.UUID, start_date: date
+    db: AsyncSession, user_id: uuid.UUID, start_date: date, account_id: uuid.UUID | None = None
 ) -> dict[str, dict[str, float]]:
-    """전체 계좌 최신 스냅샷 기준 월별 asset_type별 금액 집계."""
+    """계좌 최신 스냅샷 기준 월별 asset_type별 금액 집계. account_id 지정 시 해당 계좌만 집계."""
     result = await db.execute(
         text("""
             WITH ranked AS (
@@ -66,13 +66,14 @@ async def _fetch_monthly_by_asset_type(
                     AND a.is_active = TRUE
                     AND a.include_in_total = TRUE
                     AND s.snapshot_date >= :start_date
+                    AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))
             )
             SELECT month, asset_type, SUM(amount_krw) AS amount_krw
             FROM ranked WHERE rn = 1
             GROUP BY month, asset_type
             ORDER BY month, asset_type
         """),
-        {"uid": str(user_id), "start_date": start_date},
+        {"uid": str(user_id), "start_date": start_date, "account_id": str(account_id) if account_id else None},
     )
     monthly: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for row in result.all():
@@ -81,9 +82,12 @@ async def _fetch_monthly_by_asset_type(
 
 
 async def _fetch_stock_breakdown_by_market(
-    db: AsyncSession, user_id: uuid.UUID, start_date: date
+    db: AsyncSession, user_id: uuid.UUID, start_date: date, account_id: uuid.UUID | None = None
 ) -> dict[str, dict[str, float]]:
-    """주식 계좌의 positions.market 기반 국내(STOCK_DOMESTIC)/해외(STOCK_FOREIGN) 월별 금액 산출."""
+    """주식 계좌의 positions.market 기반 국내(STOCK_DOMESTIC)/해외(STOCK_FOREIGN) 월별 금액 산출.
+
+    account_id 지정 시 해당 계좌만 집계.
+    """
     result = await db.execute(
         text("""
             WITH ranked AS (
@@ -101,6 +105,7 @@ async def _fetch_stock_breakdown_by_market(
                     AND a.include_in_total = TRUE
                     AND a.asset_type IN ('STOCK_KIS', 'STOCK_KIWOOM', 'STOCK_OTHER')
                     AND s.snapshot_date >= :start_date
+                    AND (CAST(:account_id AS uuid) IS NULL OR a.id = CAST(:account_id AS uuid))
             ),
             last_stock AS (
                 SELECT snapshot_id, month FROM ranked WHERE rn = 1
@@ -119,7 +124,7 @@ async def _fetch_stock_breakdown_by_market(
             HAVING SUM(COALESCE(p.value_krw, p.qty * p.current_price, p.qty * p.avg_price, 0)) > 0
             ORDER BY ls.month, asset_type
         """),
-        {"uid": str(user_id), "start_date": start_date},
+        {"uid": str(user_id), "start_date": start_date, "account_id": str(account_id) if account_id else None},
     )
     position_data: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for row in result.all():
@@ -165,23 +170,30 @@ def _build_allocation_output(monthly: dict[str, dict[str, float]]) -> list[dict]
     return output
 
 
-async def get_allocation_history(user_id: uuid.UUID, db: AsyncSession, months: int = 12, redis=None) -> list[dict]:
+async def get_allocation_history(
+    user_id: uuid.UUID,
+    db: AsyncSession,
+    months: int = 12,
+    redis=None,
+    account_id: uuid.UUID | None = None,
+) -> list[dict]:
     """월별 자산 유형별 배분 이력 조회.
 
     각 월의 마지막 스냅샷 기준으로 asset_type별 금액/비중을 반환한다.
     주식 계좌는 positions.market으로 국내/해외 분리를 시도하고,
     포지션 데이터가 없는 월은 원래 asset_type으로 fallback한다.
     is_active = TRUE 필터 필수 — 비활성 계좌 스냅샷 합산 방지.
+    account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
     """
-    cache_key = alloc_history_key(user_id, months)
+    cache_key = alloc_history_key(user_id, months, str(account_id) if account_id else "all")
     cached = await get_cached_json(redis, cache_key)
     if cached is not None:
         return cached
 
     start_date = _months_ago_start_date(months)
 
-    monthly = await _fetch_monthly_by_asset_type(db, user_id, start_date)
-    position_data = await _fetch_stock_breakdown_by_market(db, user_id, start_date)
+    monthly = await _fetch_monthly_by_asset_type(db, user_id, start_date, account_id)
+    position_data = await _fetch_stock_breakdown_by_market(db, user_id, start_date, account_id)
     _merge_stock_breakdown(monthly, position_data)
 
     output = _build_allocation_output(monthly)

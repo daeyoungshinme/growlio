@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Anchor, FolderPlus, Loader2, Plus, RefreshCw, Settings2, Target } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Anchor,
+  ArrowRight,
+  FolderPlus,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Settings2,
+  Target,
+} from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CASH_EQUIVALENT_TICKER,
@@ -302,9 +312,17 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
         {effectiveTab === "전체" ? (
           !overallData.is_configured ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {overallData.note ?? "목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {overallData.note ?? "목표금액·목표연도를 설정하면 추천을 받을 수 있습니다"}
+              </p>
+              <Link
+                to="/invest-plan"
+                className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+              >
+                목표 설정하러 가기 <ArrowRight size={12} />
+              </Link>
+            </div>
           ) : (
             <>
               {hasOverallRecommendation ? (

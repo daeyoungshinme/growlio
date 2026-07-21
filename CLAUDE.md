@@ -102,6 +102,12 @@ growlio/
 
 ---
 
+## 계획 문서 (`docs/plans/`)
+
+대규모 개선 작업은 세션 단위로 독립 실행 가능한 계획서로 쪼개 `docs/plans/`에 저장 — 각 파일은 자기완결적(self-contained)이며 `docs/plans/README.md`가 전체 인덱스(상태/영역/의존성/리스크 표) 역할. 새 로드맵 작업을 시작하기 전 `docs/plans/README.md`에서 관련 항목이 이미 완료/보류 처리됐는지 먼저 확인 — 계획서는 작성 시점의 스냅샷일 뿐이므로, 계획서 내용과 실제 코드가 다르면 코드를 우선.
+
+---
+
 ## Key Constraints (공통)
 
 - `avg_price` 및 모든 금액 컬럼은 **항상 KRW** — 해외 종목은 프론트에서 USD × 환율 변환 후 전송
@@ -115,3 +121,4 @@ growlio/
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
 - alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
+- **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것

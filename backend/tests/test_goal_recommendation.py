@@ -11,14 +11,17 @@ import pytest
 
 from app.services.goal_recommendation_service import (
     _apply_index_region_preference,
-    _months_until_year_end,
     _optimize_goal_portfolio,
     _persist_added_candidates,
     existing_items_from_positions,
     get_goal_recommendation,
     get_horizon_recommendations,
 )
-from app.services.goal_return_solver import solve_required_annual_return_pct
+from app.services.goal_return_solver import (
+    months_until_year_end,
+    solve_required_annual_return_pct,
+    solve_required_monthly_deposit,
+)
 from app.services.recommendation_universe import (
     MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
@@ -64,16 +67,44 @@ class TestSolveRequiredAnnualReturnPct:
         assert r is None
 
 
+class TestSolveRequiredMonthlyDeposit:
+    def test_known_case_matches_fv_formula(self):
+        pv, annual_return_pct, n = 10_000_000.0, 6.0, 120
+        r_m = annual_return_pct / 100 / 12
+        pmt = 500_000.0
+        goal_amount = pv * (1 + r_m) ** n + pmt * (((1 + r_m) ** n - 1) / r_m)
+
+        solved = solve_required_monthly_deposit(pv, annual_return_pct, n, goal_amount)
+
+        assert solved == pytest.approx(pmt, abs=1.0)
+
+    def test_zero_return_matches_linear_formula(self):
+        pv, n, goal_amount = 10_000_000.0, 60, 40_000_000.0
+        solved = solve_required_monthly_deposit(pv, 0.0, n, goal_amount)
+        assert solved == pytest.approx((goal_amount - pv) / n, abs=0.01)
+
+    def test_already_sufficient_returns_zero(self):
+        solved = solve_required_monthly_deposit(
+            pv=200_000_000.0, annual_return_pct=6.0, n_months=12, goal_amount=100_000_000.0
+        )
+        assert solved == 0.0
+
+    def test_higher_assumed_return_lowers_required_deposit(self):
+        low = solve_required_monthly_deposit(pv=0.0, annual_return_pct=4.0, n_months=120, goal_amount=100_000_000.0)
+        high = solve_required_monthly_deposit(pv=0.0, annual_return_pct=10.0, n_months=120, goal_amount=100_000_000.0)
+        assert high < low
+
+
 class TestMonthsUntilYearEnd:
     def test_future_year_is_positive(self):
         from datetime import date
 
-        assert _months_until_year_end(date.today().year + 5) > 0
+        assert months_until_year_end(date.today().year + 5) > 0
 
     def test_past_year_is_non_positive(self):
         from datetime import date
 
-        assert _months_until_year_end(date.today().year - 5) <= 0
+        assert months_until_year_end(date.today().year - 5) <= 0
 
 
 class TestOptimizeGoalPortfolio:

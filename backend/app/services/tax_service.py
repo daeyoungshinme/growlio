@@ -153,8 +153,10 @@ def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float, rates: _TaxR
     }
 
 
-async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> dict[str, Any]:
-    """연도별 세금 추정 요약.
+async def get_tax_summary(
+    user_id: uuid.UUID, year: int, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> dict[str, Any]:
+    """연도별 세금 추정 요약. account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
 
     - 배당소득세: 실수령 배당금 × 15.4% (정확)
     - 해외 양도세: 미실현 손익 기준 추정치 (250만원 공제 후 22%)
@@ -164,13 +166,13 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     """
     rates = _get_rates(year)
     dividend_income, total_fees = await asyncio.gather(
-        _calc_dividend_income(user_id, year, db),
-        _calc_total_fees(user_id, year, db),
+        _calc_dividend_income(user_id, year, db, account_id),
+        _calc_total_fees(user_id, year, db, account_id),
     )
     dividend_tax = dividend_income * rates["dividend"]
 
     overseas_unrealized, domestic_stock_krw, domestic_unrealized, tax_deferred_value_krw = await _calc_stock_unrealized(
-        user_id, db
+        user_id, db, account_id
     )
     overseas_gain_taxable = max(0.0, overseas_unrealized - rates["overseas_deduction"])
     overseas_tax_estimated = overseas_gain_taxable * rates["overseas_gain"]
@@ -180,7 +182,7 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     total_financial_income = dividend_income + max(0.0, overseas_unrealized)
     comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
 
-    positions = await get_overseas_positions_detail(user_id, db)
+    positions = await get_overseas_positions_detail(user_id, db, account_id)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
     geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
 
@@ -211,12 +213,20 @@ async def get_tax_summary(user_id: uuid.UUID, year: int, db: AsyncSession) -> di
     }
 
 
-async def get_overseas_positions_detail(user_id: uuid.UUID, db: AsyncSession) -> list[dict]:
+async def get_overseas_positions_detail(
+    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> list[dict]:
     """해외 종목별 미실현 손익 목록 반환.
 
-    최신 스냅샷 기준. 수익·손실 종목 모두 포함.
+    최신 스냅샷 기준. 수익·손실 종목 모두 포함. account_id 지정 시 해당 계좌만 집계.
     """
     subq = latest_snapshot_subquery(user_id=user_id)
+    conditions = [
+        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
+    ]
+    if account_id is not None:
+        conditions.append(AssetAccount.id == account_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -225,10 +235,7 @@ async def get_overseas_positions_detail(user_id: uuid.UUID, db: AsyncSession) ->
             (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
-        )
+        .where(*conditions)
     )
     rows = result.all()
 
@@ -302,39 +309,53 @@ def _build_harvesting_recommendations(
     return recommendations
 
 
-async def _calc_total_fees(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
-    result = await db.execute(
-        select(func.sum(Transaction.fee).label("total")).where(
-            Transaction.user_id == user_id,
-            Transaction.fee.is_not(None),
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-    )
+async def _calc_total_fees(
+    user_id: uuid.UUID, year: int, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> float:
+    conditions = [
+        Transaction.user_id == user_id,
+        Transaction.fee.is_not(None),
+        func.extract("year", Transaction.transaction_date) == year,
+    ]
+    if account_id is not None:
+        conditions.append(Transaction.account_id == account_id)
+    result = await db.execute(select(func.sum(Transaction.fee).label("total")).where(*conditions))
     total = result.scalar()
     return float(total) if total else 0.0
 
 
-async def _calc_dividend_income(user_id: uuid.UUID, year: int, db: AsyncSession) -> float:
-    result = await db.execute(
-        select(func.sum(Transaction.amount).label("total")).where(
-            Transaction.user_id == user_id,
-            Transaction.transaction_type == "DIVIDEND",
-            func.extract("year", Transaction.transaction_date) == year,
-        )
-    )
+async def _calc_dividend_income(
+    user_id: uuid.UUID, year: int, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> float:
+    conditions = [
+        Transaction.user_id == user_id,
+        Transaction.transaction_type == "DIVIDEND",
+        func.extract("year", Transaction.transaction_date) == year,
+    ]
+    if account_id is not None:
+        conditions.append(Transaction.account_id == account_id)
+    result = await db.execute(select(func.sum(Transaction.amount).label("total")).where(*conditions))
     total = result.scalar()
     return float(total) if total else 0.0
 
 
-async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[float, float, float, float]:
+async def _calc_stock_unrealized(
+    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
+) -> tuple[float, float, float, float]:
     """최신 스냅샷 기준 해외/국내 미실현 손익과 국내 평가액 반환.
 
     ISA/연금저축/IRP(과세이연) 계좌 보유분은 국내/해외 미실현손익 합산에서 제외하고
-    tax_deferred_value_krw로 별도 집계한다.
+    tax_deferred_value_krw로 별도 집계한다. account_id 지정 시 해당 계좌만 집계.
 
     Returns: (overseas_unrealized_krw, domestic_stock_value_krw, domestic_unrealized_krw, tax_deferred_value_krw)
     """
     subq = latest_snapshot_subquery(user_id=user_id)
+    conditions = [
+        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
+    ]
+    if account_id is not None:
+        conditions.append(AssetAccount.id == account_id)
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -343,10 +364,7 @@ async def _calc_stock_unrealized(user_id: uuid.UUID, db: AsyncSession) -> tuple[
             (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
-        )
+        .where(*conditions)
     )
     rows = result.all()
 

@@ -116,10 +116,13 @@ async def _process_rebalancing_alert(
     composite_reason: str | None = None,
     redis: Any = None,
     ticker_account_map: dict[str, list] | None = None,
+    automation_note: str | None = None,
 ) -> bool:
     """단일 리밸런싱 알림을 처리 (AUTO 실행 또는 이메일/FCM 발송).
 
     이메일·FCM 중 하나라도 성공하면 True 반환. 둘 다 실패하면 False 반환.
+    `automation_note`는 AUTO 모드가 시장신호 게이트로 이번만 NOTIFY로 강등됐을 때 그 사유를
+    담아 이메일 본문에 노출하기 위한 것 — 호출부(`check_rebalancing_alerts`)가 계산해 전달한다.
     """
     from app.services.email_service import send_rebalancing_alert
     from app.services.push_service import send_push_to_user
@@ -178,6 +181,7 @@ async def _process_rebalancing_alert(
             is_composite_triggered=is_composite_triggered,
             composite_reason=composite_reason,
             order_preview_items=order_preview_items,
+            automation_note=automation_note,
         )
     except Exception as exc:
         logger.error("rebalancing_alert_email_failed", alert_id=str(alert.id), error=str(exc))
@@ -367,6 +371,12 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             continue
         items_to_show, is_scheduled_report, is_composite_triggered = selected
 
+        automation_note = None
+        if getattr(alert, "mode", "NOTIFY") == "AUTO":
+            market_mode = getattr(alert, "market_condition_mode", "DISABLED")
+            if is_market_signal_blocking_auto_mode(market_mode, composite_level, market_data_freshness):
+                automation_note = f"시장 위험 신호({composite_level})로 이번엔 자동 실행 대신 알림만 발송됐습니다."
+
         email = notification_email or user_email
         triggered = await _process_rebalancing_alert(
             alert=alert,
@@ -384,6 +394,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             composite_reason=composite_reason,
             redis=_redis,
             ticker_account_map=analysis.ticker_account_map,
+            automation_note=automation_note,
         )
         if not triggered:
             continue
@@ -393,11 +404,15 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             if drifting
             else ("복합 리스크 신호" if is_composite_triggered else "정기 보고")
         )
+        history_automation_suffix = f", 자동실행→알림 전환({composite_level})" if automation_note else ""
         await save_alert_history(
             db,
             alert.user_id,
             "REBALANCING",
-            (f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) [시장신호: {composite_level}]"),
+            (
+                f"리밸런싱 알림: {portfolio.name} — {drift_desc} ({alert.schedule_type}) "
+                f"[시장신호: {composite_level}]{history_automation_suffix}"
+            ),
         )
         # AUTO 모드는 last_triggered_at을 갱신하지 않는다.
         # 인트라데이 잡(rebalancing_auto_execution)에서 실제 실행 후 갱신하므로,

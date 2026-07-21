@@ -25,12 +25,15 @@ from app.services.email_templates import (
     goal_achievement_template,
     market_signal_change_template,
     market_signal_daily_digest_template,
+    market_signal_gate_blocked_template,
     monthly_report_template,
     password_reset_template,
     rebalancing_alert_template,
     rebalancing_execution_template,
+    rebalancing_plan_execution_failed_template,
     rebalancing_plan_pending_template,
     stock_price_alert_template,
+    tax_impact_gate_blocked_template,
     test_email_template,
 )
 
@@ -90,6 +93,7 @@ async def send_rebalancing_alert(
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
     order_preview_items: list | None = None,
+    automation_note: str | None = None,
 ) -> bool:
     """리밸런싱 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
     if not _email_configured():
@@ -108,6 +112,7 @@ async def send_rebalancing_alert(
         composite_reason=composite_reason,
         order_preview_items=order_preview_items,
         app_link=app_link,
+        automation_note=automation_note,
     )
     try:
         await _send_html_email(to_email, subject, html)
@@ -153,6 +158,57 @@ async def send_rebalancing_execution_email(
         return True
     except Exception as e:
         logger.error("rebalancing_execution_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_rebalancing_plan_execution_failed_email(
+    to_email: str, portfolio_name: str, side: str, error_message: str | None
+) -> bool:
+    """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = rebalancing_plan_execution_failed_template(portfolio_name, side, error_message)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("rebalancing_plan_execution_failed_email_sent", to=to_email, portfolio=portfolio_name, side=side)
+        return True
+    except Exception as e:
+        logger.error("rebalancing_plan_execution_failed_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_tax_impact_gate_blocked_email(
+    to_email: str, portfolio_name: str, estimated_tax_krw: float, max_tax_impact_krw: float
+) -> bool:
+    """세금영향 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = tax_impact_gate_blocked_template(portfolio_name, estimated_tax_krw, max_tax_impact_krw)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("tax_impact_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
+        return True
+    except Exception as e:
+        logger.error("tax_impact_gate_blocked_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_market_signal_gate_blocked_email(
+    to_email: str, portfolio_name: str, composite_level: str, market_condition_mode: str
+) -> bool:
+    """시장신호 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = market_signal_gate_blocked_template(portfolio_name, composite_level, market_condition_mode)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("market_signal_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
+        return True
+    except Exception as e:
+        logger.error("market_signal_gate_blocked_email_failed", to=to_email, error=str(e))
         return False
 
 

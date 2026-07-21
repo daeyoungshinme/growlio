@@ -4,11 +4,14 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 /** 계좌 sync 후 — portfolio + dashboard + 배당 데이터 + 인사이트 + 드리프트 */
 export function invalidateSyncData(qc: QueryClient) {
   return Promise.all([
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTicker }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummary }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.insights }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioRisk() }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
@@ -20,11 +23,16 @@ export function invalidateSyncData(qc: QueryClient) {
 export function invalidateAccountData(qc: QueryClient) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverview }),
-    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewLite }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolioOverviewBase }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.dashboard }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.transactionsAll }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.isaStatus }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendByTickerBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.dividendPositionsBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.taxSummaryBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.overseasPositionsTaxBase }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.allocationHistoryBase }),
   ]);
 }
 
@@ -107,6 +115,11 @@ export function invalidateMarketSignalDigestData(qc: QueryClient) {
 
 /** 목표 달성 알림(자산/입금/배당) 수신 여부 설정 변경 후 */
 export function invalidateGoalAchievementAlertsData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+}
+
+/** 월간 리포트 수신 여부 설정 변경 후 */
+export function invalidateMonthlyReportAlertsData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 

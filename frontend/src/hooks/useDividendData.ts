@@ -11,28 +11,43 @@ export interface DividendSummary {
   monthly_ticker_breakdown: { month: string; ticker: string | null; amount: number }[];
 }
 
-export function useDividendData(enabled: boolean) {
+export function useDividendData(enabled: boolean, accountId?: string | null) {
   const {
     data: dividendPositions = [],
     isLoading,
     isError,
   } = useQuery({
-    queryKey: QUERY_KEYS.dividendPositions,
-    queryFn: () => api.get<DividendYield[]>("/dividends/positions").then((r) => r.data),
+    queryKey: QUERY_KEYS.dividendPositions(accountId),
+    queryFn: () =>
+      api
+        .get<
+          DividendYield[]
+        >("/dividends/positions", { params: { account_id: accountId || undefined } })
+        .then((r) => r.data),
     staleTime: STALE_TIME.LONG,
     enabled,
   });
 
   const { data: dividendSummary } = useQuery({
-    queryKey: QUERY_KEYS.dividendSummary,
-    queryFn: () => api.get<DividendSummary>("/dividends/summary").then((r) => r.data),
+    queryKey: QUERY_KEYS.dividendSummary(accountId),
+    queryFn: () =>
+      api
+        .get<DividendSummary>("/dividends/summary", {
+          params: { account_id: accountId || undefined },
+        })
+        .then((r) => r.data),
     staleTime: STALE_TIME.LONG,
     enabled,
   });
 
   const { data: dividendByTicker = [] } = useQuery({
-    queryKey: QUERY_KEYS.dividendByTicker,
-    queryFn: () => api.get<DividendByTicker[]>("/dividends/by-ticker").then((r) => r.data),
+    queryKey: QUERY_KEYS.dividendByTicker(accountId),
+    queryFn: () =>
+      api
+        .get<
+          DividendByTicker[]
+        >("/dividends/by-ticker", { params: { account_id: accountId || undefined } })
+        .then((r) => r.data),
     staleTime: STALE_TIME.LONG,
     enabled,
   });

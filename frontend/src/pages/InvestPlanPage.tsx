@@ -1,5 +1,5 @@
 import { lazy, Suspense, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Settings2, Wand2 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useGoalSettings } from "@/hooks/useGoalSettings";
@@ -25,6 +25,7 @@ import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import Modal from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 
 const TABS = ["적립 계획", "배당 계획"] as const;
 type Tab = (typeof TABS)[number];
@@ -70,6 +71,10 @@ export default function InvestPlanPage() {
     handleCloseModal,
     openEdit,
     saveSettings,
+    wizardMode,
+    wizardStep,
+    setWizardStep,
+    openWizard,
   } = useGoalSettings();
 
   const {
@@ -157,13 +162,22 @@ export default function InvestPlanPage() {
                     적립식 DCA 복리계산 및 목표 달성 현황
                   </p>
                 </div>
-                <button
-                  onClick={openEdit}
-                  className="shrink-0 flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <Settings2 size={15} />
-                  설정 편집
-                </button>
+                <div className="shrink-0 flex items-center gap-2">
+                  <button
+                    onClick={openWizard}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                  >
+                    <Wand2 size={15} />
+                    가이드로 설정
+                  </button>
+                  <button
+                    onClick={openEdit}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
+                    <Settings2 size={15} />
+                    설정 편집
+                  </button>
+                </div>
               </div>
               <div
                 className={`grid gap-4 ${showAllStats ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}
@@ -249,7 +263,7 @@ export default function InvestPlanPage() {
                 <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
                   월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
                   있습니다.{" "}
-                  <button onClick={openEdit} className="underline font-medium">
+                  <button onClick={openWizard} className="underline font-medium">
                     지금 설정하기
                   </button>
                 </div>
@@ -304,8 +318,21 @@ export default function InvestPlanPage() {
         )}
       </div>
 
-      {/* 적립 계획 설정 편집 모달 */}
-      {editing && (
+      {/* 적립 계획 설정 편집 마법사 (신규/재설정 가이드) */}
+      {editing && wizardMode && (
+        <GoalSettingWizard
+          form={form}
+          setForm={setForm}
+          step={wizardStep}
+          setStep={setWizardStep}
+          saving={saving}
+          onSave={saveSettings}
+          onClose={handleCloseModal}
+        />
+      )}
+
+      {/* 적립 계획 설정 편집 모달 (플랫 폼, 재설정용) */}
+      {editing && !wizardMode && (
         <Modal title="적립 계획 설정 편집" onClose={handleCloseModal} size="md">
           <div className="overflow-y-auto overscroll-contain px-6 pb-6 pt-2 space-y-4 flex-1">
             {[

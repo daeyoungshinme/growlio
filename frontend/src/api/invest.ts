@@ -65,3 +65,24 @@ export interface DividendPlanData {
 }
 
 export const fetchDividendPlan = () => apiGet<DividendPlanData>("/invest/dividend-plan");
+
+export interface DepositGuideItem {
+  annual_return_pct: number;
+  required_monthly_deposit: number;
+  required_annual_deposit: number;
+}
+
+export interface GoalFeasibilityPreview {
+  required_return_pct: number | null;
+  pv: number;
+  n_months: number;
+  note: string | null;
+  deposit_guide: DepositGuideItem[];
+}
+
+export const fetchGoalFeasibility = (params: {
+  goal_amount: number;
+  target_year: number;
+  monthly_deposit_amount?: number;
+  initial_amount?: number;
+}) => apiGet<GoalFeasibilityPreview>("/invest/goal-feasibility", { params });

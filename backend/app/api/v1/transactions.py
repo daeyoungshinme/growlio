@@ -14,7 +14,12 @@ from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
 from app.schemas.transaction import TransactionCreate, TransactionResponse, TransactionUpdate
-from app.utils.cache_keys import dashboard_summary_key, dividend_summary_key, invalidate_user_caches, monthly_trend_key
+from app.utils.cache_keys import (
+    dashboard_summary_key,
+    invalidate_dividend_caches,
+    invalidate_user_caches,
+    monthly_trend_key,
+)
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
@@ -126,13 +131,15 @@ async def delete_transaction(
 
 
 async def _invalidate_tx_caches(user_id: UUID) -> None:
+    from datetime import date
+
     redis = await get_redis()
     await invalidate_user_caches(
         redis,
         dashboard_summary_key(user_id),
-        dividend_summary_key(user_id),
         monthly_trend_key(user_id),
     )
+    await invalidate_dividend_caches(redis, user_id, date.today().year)
 
 
 async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:

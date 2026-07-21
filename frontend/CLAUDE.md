@@ -104,6 +104,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드 (DashboardPage).
 - **`components/dashboard/TaxHorizonSummarySection.tsx`** — 위 두 카드를 묶는 세금 현황 요약 섹션 (DashboardPage).
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load).
+- **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 4단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안 — `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
 
@@ -142,6 +143,8 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
+- `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `goal_achievement_alerts_enabled` 필드 사용, `PUT /settings/goal-achievement-alerts` 호출. 기본값 `true` (미설정 시 수신)
+- `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `["settings"]` 쿼리의 `monthly_report_enabled` 필드 사용, `PUT /settings/monthly-report-alerts` 호출. 기본값 `true` (미설정 시 수신)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
@@ -166,7 +169,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `tabs.ts` — 탭 배열 + 타입: `ASSETS_TOP_TABS`("투자현황"/"계좌관리", AssetsPage 상위 탭), `ASSET_MANAGEMENT_TABS`("은행계좌"/"증권계좌"/"부동산"/"입출금·배당", 계좌관리 내부 탭), `PORTFOLIO_TABS`
 - `transaction.ts` — 거래 유형 한국어 레이블 맵 (`TX_LABELS`: DEPOSIT/WITHDRAWAL/DIVIDEND)
 - `validation.ts` — 포트폴리오 비중 허용 오차 (`PORTFOLIO_WEIGHT_TOLERANCE`)
-- `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`)
+- `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
 - `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`: 배지/탭/필터 칩처럼 조밀하게 나열되는 보조 요소용 절충 터치 타겟(36px, 모바일 전용). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수들 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
 - `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`)
@@ -227,7 +230,7 @@ cd frontend && npx playwright test
 | 데이터 | queryKey |
 |--------|----------|
 | 대시보드 집계 | `["dashboard"]` |
-| 포트폴리오 overview | `["portfolio-overview"]` |
+| 포트폴리오 overview (accountId 지정 시 계좌별, 미지정 시 "all") | `["portfolio-overview", accountId]` — `portfolioOverviewBase`(`["portfolio-overview"]`)는 무효화 프리픽스 전용 |
 | 포트폴리오 overview (경량) | `["portfolio-overview", "lite"]` |
 | 포트폴리오/백테스트/리밸런싱 탭 | `["portfolios"]` |
 | 전체 계좌 목록 | `["accounts"]` |
@@ -235,9 +238,9 @@ cd frontend && npx playwright test
 | 계좌별 거래내역 | `["transactions", accountId]` |
 | 전체 거래내역 (무기간) | `["transactions", "all"]` |
 | 연도별 거래내역 | `["transactions", "all", year]` |
-| 배당금 티커별 | `["dividend-by-ticker"]` |
-| 배당금 요약 | `["dividend-summary"]` |
-| 배당금 포지션 | `["dividend-positions"]` |
+| 배당금 티커별 (accountId 지정 시 계좌별) | `["dividend-by-ticker", accountId]` — `dividendByTickerBase` 무효화 전용 |
+| 배당금 요약 (accountId 지정 시 계좌별) | `["dividend-summary", accountId]` — `dividendSummaryBase` 무효화 전용 |
+| 배당금 포지션 (accountId 지정 시 계좌별) | `["dividend-positions", accountId]` — `dividendPositionsBase` 무효화 전용 |
 | DCA 분석 (InvestPlanPage + DashboardPage) | `["dca-analysis"]` |
 | 배당 계획 (연/월배당) | `["dividend-plan"]` |
 | 배당 월별 균등화 제안 | `["monthly-optimization"]` |
@@ -253,11 +256,11 @@ cd frontend && npx playwright test
 | 리밸런싱 대기 플랜 목록 | `["rebalancing-plans"]` |
 | 리밸런싱 전략 | `["rebalancing-strategy", portfolioId]` |
 | 드리프트 경량 요약 (대시보드) | `["drift-summary"]` |
-| 세금 추정 요약 | `["tax-summary", year]` |
-| 해외 포지션 양도세 계획 | `["overseas-positions-tax"]` |
+| 세금 추정 요약 (accountId 지정 시 계좌별) | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용 |
+| 해외 포지션 양도세 계획 (accountId 지정 시 계좌별) | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용 |
 | ISA 만기 현황 | `["isa-status"]` |
 | 연금 납입 현황 | `["pension-contribution", year]` |
-| 자산배분 이력 | `["allocation-history", months]` |
+| 자산배분 이력 (accountId 지정 시 계좌별, PortfolioPage/DashboardPage 공용) | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용 |
 | 알림 발송 이력 | `["alert-history"]` |
 | 인사이트/진단 | `["insights"]` |
 | 포트폴리오 리스크 지표 | `["portfolio-risk", id]` |
@@ -265,14 +268,16 @@ cd frontend && npx playwright test
 | 복합신호 (시장/리스크) 상태 | `["composite-signal-status"]` |
 | 목표 역산 추천 (전체 자산) | `["goal-recommendation", "overall"]` |
 | 목표 역산 추천 (투자기간별) | `["goal-recommendation", "by-horizon"]` |
+| 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰 | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]` |
 | CPI/Core CPI 인플레이션 요약 | `["inflation-summary"]` |
 
 > 모든 키는 `src/constants/queryKeys.ts`의 `QUERY_KEYS` 상수에서 import. 문자열 하드코딩 금지. 새 키 추가 시 이 표도 함께 갱신.
 
 **mutation 후 캐시 무효화**
 - 트랜잭션 CUD → `["transactions", "all"]` + `["dashboard"]` 동시 무효화.
-- 계좌 sync → `["portfolio-overview"]` + `["dashboard"]` 무효화.
-- 계좌 CUD (자산관리에서) → `["accounts"]` + `["portfolio-overview"]` + `["dashboard"]` 동시 무효화.
+- 계좌 sync → `portfolioOverviewBase`(전체 계좌 필터 조합 포함) + `["dashboard"]` + 배당/세금/자산배분이력 Base 키 무효화.
+- 계좌 CUD (자산관리에서) → `["accounts"]` + `portfolioOverviewBase` + `["dashboard"]` + 배당/세금/자산배분이력 Base 키 무효화.
+- 배당/세금/자산배분이력은 `account_id` 쿼리 파라미터별로 캐시가 분기되므로(투자현황 탭 계좌 필터), 무효화 시 항상 `xxxBase`(prefix) 키를 사용 — 특정 accountId 키만 지우면 다른 계좌 조합의 캐시가 stale로 남음.
 
 > 수동 `invalidateQueries` 호출 금지 — `src/utils/queryInvalidation.ts`의 유틸 함수 사용 (하단 참고).
 
@@ -394,6 +399,8 @@ cd frontend && npx playwright test
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient)` — 대기 플랜 목록 + 실행 이력 무효화.
 - 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
 - 시장신호 매일 요약 알림 설정 변경 후: `invalidateMarketSignalDigestData(queryClient)`.
+- 목표 달성 알림 설정 변경 후: `invalidateGoalAchievementAlertsData(queryClient)`.
+- 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 

@@ -192,6 +192,22 @@ def is_market_signal_blocking_auto_mode(
     )
 
 
+def is_tax_impact_blocking_auto_mode(
+    gate_mode: str, estimated_tax_krw: float, max_tax_impact_krw: float | None
+) -> bool:
+    """AUTO 모드에서 매도로 인한 추정 양도세가 `tax_impact_gate_mode` 게이트를 위반하는지 판정한다.
+
+    `market_condition_mode`/`is_market_signal_blocking_auto_mode`와 대칭인 순수 함수.
+    `ENABLED`인데 상한액이 아직 설정되지 않았으면(예: 마이그레이션 직후 기본값) 안전하게 통과시킨다 —
+    "설정 안 함"을 "무제한 차단"으로 오인해 AUTO를 예기치 않게 멈추는 것을 막기 위함.
+    """
+    if gate_mode != "ENABLED":
+        return False
+    if max_tax_impact_krw is None:
+        return False
+    return estimated_tax_krw > max_tax_impact_krw
+
+
 def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str, str]:
     """ticker_account_map에 등장하는 모든 계좌의 account_id → tax_type 맵을 구성한다.
 

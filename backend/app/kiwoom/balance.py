@@ -12,6 +12,8 @@ ChunSam/kiwoom-mcp-server 교차검증)으로 요청/응답 필드명을 확정.
 import asyncio
 from typing import Any
 
+import structlog
+
 from app.kiwoom.client import KiwoomApiError, kiwoom_request
 from app.kiwoom.constants import (
     API_ID_DOMESTIC_BALANCE,
@@ -19,6 +21,8 @@ from app.kiwoom.constants import (
     API_ID_OVERSEAS_BALANCE,
     API_ID_OVERSEAS_DEPOSIT,
 )
+
+logger = structlog.get_logger()
 
 _OVERSEAS_ACCOUNT_PATH = "/api/us/acnt"
 # ust21070의 stex_tp/stk_cd는 실측 결과 "둘 다 비움" 또는 "둘 다 지정"만 허용된다 —
@@ -151,9 +155,14 @@ async def _fetch_overseas_all(access_token: str, *, is_mock: bool) -> list[dict[
 async def _resolve_overseas_market(access_token: str, stk_cd: str, *, is_mock: bool) -> str:
     """stex_tp(ND/NY/NA)를 stk_cd와 함께 각각 넣어 실제 성공하는 조합으로 상장 거래소를 판별한다.
 
-    잘못된 거래소를 넣으면 1903 오류가 나므로, 이 오류만 "매칭 안 됨"으로 삼키고 다른
-    예외는 그대로 전파한다. 셋 다 실패(보유는 되어있는데 조회가 전부 안 되는 이례적인
-    경우)하면 가장 흔한 NASDAQ으로 폴백한다.
+    이 프로빙은 본질적으로 최선 노력(best-effort) 호출이므로 1903(거래소 불일치,
+    KiwoomApiError) 뿐 아니라 rate limit 소진(MaxRetriesExceededError) 등 임의의 예외도
+    전부 "매칭 안 됨"으로 삼킨다 — 여기서 예외가 전파되면 get_overseas_balance()의
+    바깥쪽 gather 전체가 실패해 해외 잔고 전체가 EMPTY_OVERSEAS로 치환되고 기존에 저장된
+    해외 Position까지 삭제되는 결과로 이어지므로(asset_service.sync_account 참고),
+    종목 하나의 프로빙 실패가 다른 종목/조합에 영향을 주지 않도록 격리한다.
+    셋 다 실패(보유는 되어있는데 조회가 전부 안 되는 이례적인 경우)하면 가장 흔한
+    NASDAQ으로 폴백한다.
     """
     headers = _auth_headers(access_token, API_ID_OVERSEAS_BALANCE)
 
@@ -165,13 +174,18 @@ async def _resolve_overseas_market(access_token: str, stk_cd: str, *, is_mock: b
                 is_mock=is_mock,
                 headers=headers,
                 json={"stex_tp": stex_tp, "stk_cd": stk_cd},
+                quiet=True,  # 1903(거래소 불일치)은 프로빙의 정상 결과이지 오류가 아님
             )
             return stex_tp
-        except KiwoomApiError:
+        except Exception as e:
+            if not isinstance(e, KiwoomApiError):
+                logger.warning("kiwoom_overseas_market_probe_failed", stk_cd=stk_cd, stex_tp=stex_tp, error=str(e))
             return None
 
     results = await asyncio.gather(*(_try(stex_tp) for stex_tp in _STEX_TP_MARKETS))
     matched = next((tp for tp in results if tp), None)
+    if matched is None:
+        logger.warning("kiwoom_overseas_market_unresolved", stk_cd=stk_cd)
     return _STEX_TP_MARKETS.get(matched or "", "NASDAQ")
 
 

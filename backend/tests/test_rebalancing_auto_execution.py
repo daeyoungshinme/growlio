@@ -269,6 +269,79 @@ class TestRunAutoExecution:
         mock_gen.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_tax_gate_blocked_notifies_instead_of_crashing(self):
+        """build_pending_plan_for_alert()가 TaxGateBlocked를 반환하면 3-tuple로 언패킹하지 않고
+        notify_tax_gate_blocked()를 호출한 뒤 다음 alert로 넘어가야 한다."""
+        from app.services.rebalancing.plan_service import TaxGateBlocked
+
+        mock_db = _make_mock_db()
+        alert = _make_alert(tax_impact_gate_mode="ENABLED", max_tax_impact_krw=100_000.0)
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        blocked = TaxGateBlocked(estimated_tax_krw=200_000.0, max_tax_impact_krw=100_000.0)
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=blocked),
+            ) as mock_gen,
+            patch("app.jobs.rebalancing_auto_execution.notify_tax_gate_blocked", new=AsyncMock()) as mock_notify,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()  # TaxGateBlocked를 (plan, buy, sell)로 언패킹하면 여기서 예외 발생
+
+        mock_gen.assert_called_once()
+        mock_notify.assert_called_once()
+        assert mock_notify.call_args.args[0] is alert
+        assert mock_notify.call_args.args[1] is portfolio
+        assert mock_notify.call_args.args[2] is blocked
+
+    @pytest.mark.asyncio
+    async def test_market_signal_blocked_notifies_with_gate_context(self):
+        """시장신호 게이트로 차단되면 build_pending_plan_for_alert()를 아예 호출하지 않고
+        notify_market_signal_gate_blocked()에 등급·게이트 모드·데이터 신선도를 실어 전달해야 한다."""
+        from app.services.rebalancing.plan_service import MarketSignalGateBlocked
+
+        mock_db = _make_mock_db()
+        alert = _make_alert(market_condition_mode="STRICT")
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            _patch_common(mock_db, composite_level="RED"),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_not_called()
+        mock_notify.assert_called_once()
+        assert mock_notify.call_args.args[0] is alert
+        assert mock_notify.call_args.args[1] is portfolio
+        blocked = mock_notify.call_args.args[2]
+        assert isinstance(blocked, MarketSignalGateBlocked)
+        assert blocked.composite_level == "RED"
+        assert blocked.market_condition_mode == "STRICT"
+
+    @pytest.mark.asyncio
     async def test_cautious_mode_with_red_signal_blocks_execution(self):
         mock_db = _make_mock_db()
         alert = _make_alert(market_condition_mode="CAUTIOUS")
@@ -283,12 +356,16 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+        mock_notify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_strict_mode_with_yellow_signal_blocks_execution(self):
@@ -305,12 +382,16 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+        mock_notify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_stale_data_freshness_blocks_cautious_execution(self):
@@ -339,12 +420,16 @@ class TestRunAutoExecution:
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+        mock_notify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_market_signal_exception_blocks_cautious_execution(self):
@@ -370,12 +455,16 @@ class TestRunAutoExecution:
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+            patch(
+                "app.jobs.rebalancing_auto_execution.notify_market_signal_gate_blocked", new=AsyncMock()
+            ) as mock_notify,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+        mock_notify.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_generates_plan_and_saves_history_when_drifting(self):
@@ -553,6 +642,82 @@ class TestBuildPendingPlanForAlert:
 
         assert result is not None
         mock_gen.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_tax_gate_blocks_when_estimated_tax_exceeds_max(self):
+        from app.services.rebalancing.plan_service import TaxGateBlocked, build_pending_plan_for_alert
+
+        alert = _make_alert(threshold_pct=5.0, tax_impact_gate_mode="ENABLED", max_tax_impact_krw=100_000.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
+        mock_db = _make_mock_db()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch(
+                "app.services.rebalancing.diagnosis_service._build_tax_preview",
+                return_value=(500_000.0, 200_000.0, 0.0, [], []),
+            ),
+            patch("app.services.rebalancing.plan_service.generate_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+        ):
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert isinstance(result, TaxGateBlocked)
+        assert result.estimated_tax_krw == 200_000.0
+        assert result.max_tax_impact_krw == 100_000.0
+        mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tax_gate_enabled_but_under_threshold_still_generates_plan(self):
+        alert = _make_alert(threshold_pct=5.0, tax_impact_gate_mode="ENABLED", max_tax_impact_krw=1_000_000.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
+        mock_db = _make_mock_db()
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch(
+                "app.services.rebalancing.diagnosis_service._build_tax_preview",
+                return_value=(500_000.0, 200_000.0, 0.0, [], []),
+            ),
+            patch(
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ) as mock_gen,
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert result == (plan, "buy-token", None)
+        mock_gen.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_tax_gate_disabled_skips_tax_preview_entirely(self):
+        """DISABLED(기본값)면 _build_tax_preview 자체를 호출하지 않는다 — 불필요한 계산 스킵."""
+        alert = _make_alert(threshold_pct=5.0)  # tax_impact_gate_mode 기본 DISABLED
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(items=[SimpleNamespace(weight_diff_pct=10.0)], ticker_account_map={})
+        mock_db = _make_mock_db()
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.diagnosis_service._build_tax_preview") as mock_tax_preview,
+            patch(
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ),
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        mock_tax_preview.assert_not_called()
 
 
 class TestAutoExecutionPlanGenerationFailure:

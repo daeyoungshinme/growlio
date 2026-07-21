@@ -34,17 +34,26 @@ const TYPE_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = "#94A3B8";
 
-function AllocationHistoryChart() {
+interface AllocationHistoryChartProps {
+  /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
+  accountId?: string | null;
+  /** 접기/펼치기 상태 localStorage 키 (같은 페이지에 여러 인스턴스를 둘 때 충돌 방지용) */
+  storageKey?: string;
+}
+
+function AllocationHistoryChart({
+  accountId,
+  storageKey = "growlio:dashboard:allocationHistoryOpen",
+}: AllocationHistoryChartProps) {
   const isDark = useThemeStore((s) => s.isDark);
-  const [isOpen, toggleOpen] = useCollapsible(
-    () => window.innerWidth >= 1024,
-    "growlio:dashboard:allocationHistoryOpen",
-  );
+  const [isOpen, toggleOpen] = useCollapsible(() => window.innerWidth >= 1024, storageKey);
   const [showDetail, setShowDetail] = useState(false);
   const [expandedMonth, setExpandedMonth] = useState<string | null>(null);
   const [months, setMonths] = useState(12);
-  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } =
-    useAllocationHistory(months);
+  const { isLoading, chartData, allTypes, labelMap, reversedMonthly } = useAllocationHistory(
+    months,
+    accountId,
+  );
 
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
 

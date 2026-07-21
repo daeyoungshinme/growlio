@@ -55,9 +55,15 @@ interface Props {
   analysis: RebalancingAnalysis;
   alertThreshold?: number;
   onExecute?: () => void;
+  portfolioName?: string;
 }
 
-export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onExecute }: Props) {
+export default function RebalancingDiagnosisCard({
+  analysis,
+  alertThreshold,
+  onExecute,
+  portfolioName,
+}: Props) {
   const threshold = alertThreshold ?? DEFAULT_THRESHOLD;
   const [isOpen, toggleOpen] = useCollapsible(true);
 
@@ -98,6 +104,13 @@ export default function RebalancingDiagnosisCard({ analysis, alertThreshold, onE
         <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${cfg.badge}`}>
           {cfg.label}
         </span>
+      }
+      headerRight={
+        portfolioName && (
+          <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[40%]">
+            {portfolioName}
+          </span>
+        )
       }
       collapsedHint={subText}
       isOpen={isOpen}

@@ -170,7 +170,7 @@ async def get_stock_price(
             usd_rate = await get_usd_krw_rate(redis)
         result = {
             "price_krw": round(price * usd_rate) if usd_rate else None,
-            "price_usd": price,
+            "price_usd": round(price, 2),
             "usd_rate": usd_rate or None,
         }
     else:
@@ -292,7 +292,7 @@ async def get_stock_prices_batch(
         if market in OVERSEAS_MARKETS:
             entry = {
                 "price_krw": round(price * usd_rate) if usd_rate else None,
-                "price_usd": price,
+                "price_usd": round(price, 2),
                 "usd_rate": usd_rate or None,
             }
         else:

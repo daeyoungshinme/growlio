@@ -35,6 +35,7 @@ export const deleteExchangeRateAlert = (id: string) => apiDelete(`/alerts/exchan
 export type ScheduleType = "DAILY" | "WEEKLY" | "MONTHLY" | "QUARTERLY" | "SEMIANNUAL" | "ANNUAL";
 export type MarketConditionMode = "DISABLED" | "CAUTIOUS" | "STRICT";
 export type TriggerCondition = "DRIFT_ONLY" | "SCHEDULE_ONLY" | "BOTH";
+export type TaxImpactGateMode = "DISABLED" | "ENABLED";
 
 export interface RebalancingAlert {
   id: string;
@@ -53,6 +54,8 @@ export interface RebalancingAlert {
   auto_execution_time: string | null;
   notify_time: string;
   buy_wait_minutes: number;
+  tax_impact_gate_mode: TaxImpactGateMode;
+  max_tax_impact_krw: number | null;
   last_triggered_at: string | null;
   created_at: string;
   updated_at: string;
@@ -73,6 +76,8 @@ export interface RebalancingAlertUpsert {
   auto_execution_time: string | null;
   notify_time: string;
   buy_wait_minutes: number;
+  tax_impact_gate_mode: TaxImpactGateMode;
+  max_tax_impact_krw: number | null;
 }
 
 export const fetchRebalancingAlerts = () => apiGet<RebalancingAlert[]>("/alerts/rebalancing");

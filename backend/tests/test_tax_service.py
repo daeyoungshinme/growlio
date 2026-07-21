@@ -314,6 +314,27 @@ class TestCalcTotalFeesDb:
 
         assert result == 0.0
 
+    @pytest.mark.asyncio
+    async def test_account_id_adds_extra_filter_condition(self, mock_db, override_settings):
+        captured = {}
+
+        async def mock_execute(query):
+            captured["query"] = query
+            result = MagicMock()
+            result.scalar.return_value = 0
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _calc_total_fees(uuid.uuid4(), 2024, mock_db)
+        without_filter = str(captured["query"])
+
+        await _calc_total_fees(uuid.uuid4(), 2024, mock_db, account_id=uuid.uuid4())
+        with_filter = str(captured["query"])
+
+        assert "transactions.account_id" not in without_filter
+        assert "transactions.account_id" in with_filter
+
 
 class TestCalcDividendIncomeDb:
     @pytest.mark.asyncio
@@ -335,3 +356,24 @@ class TestCalcDividendIncomeDb:
         result = await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
 
         assert result == 0.0
+
+    @pytest.mark.asyncio
+    async def test_account_id_adds_extra_filter_condition(self, mock_db, override_settings):
+        captured = {}
+
+        async def mock_execute(query):
+            captured["query"] = query
+            result = MagicMock()
+            result.scalar.return_value = 0
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _calc_dividend_income(uuid.uuid4(), 2024, mock_db)
+        without_filter = str(captured["query"])
+
+        await _calc_dividend_income(uuid.uuid4(), 2024, mock_db, account_id=uuid.uuid4())
+        with_filter = str(captured["query"])
+
+        assert "transactions.account_id" not in without_filter
+        assert "transactions.account_id" in with_filter

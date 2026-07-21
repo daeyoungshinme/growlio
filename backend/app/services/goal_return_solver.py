@@ -6,8 +6,23 @@
 
 from __future__ import annotations
 
+from datetime import date
+
+from dateutil.relativedelta import relativedelta
+
 _LO_ANNUAL_RETURN = -0.9
 _HI_ANNUAL_RETURN = 5.0  # 연 500% — 이 이상 필요하면 사실상 달성 불가능한 목표로 간주
+
+# 월 적립액 가이드에 사용하는 가정 수익률 프리셋 — GoalRecommendationOptionsModal의
+# 리스크 성향 레이블(보수적/중립/공격적)과 동일한 어휘를 사용한다.
+DEPOSIT_GUIDE_PRESET_RETURNS_PCT: tuple[float, ...] = (4.0, 7.0, 10.0)
+
+
+def months_until_year_end(target_year: int) -> int:
+    """오늘부터 `target_year`년 12월 31일까지 남은 개월 수."""
+    today = date.today()
+    delta = relativedelta(date(target_year, 12, 31), today)
+    return delta.years * 12 + delta.months
 
 
 def _future_value(pv: float, pmt: float, annual_r: float, n_months: int) -> float:
@@ -46,3 +61,27 @@ def solve_required_annual_return_pct(
         return None
 
     return round(brentq(f, _LO_ANNUAL_RETURN, _HI_ANNUAL_RETURN) * 100, 2)
+
+
+def solve_required_monthly_deposit(
+    pv: float,
+    annual_return_pct: float,
+    n_months: int,
+    goal_amount: float,
+) -> float:
+    """가정 연평균 수익률로 목표를 달성하기 위해 필요한 월 적립액을 닫힌 형태로 역산한다.
+
+    `solve_required_annual_return_pct`와 반대 방향 계산 — 수익률을 고정하고 월 적립액을
+    미지수로 풀이하므로 대수적으로 바로 풀린다(root-finding 불필요). pv만으로 이미 목표를
+    초과 달성하면 0을 반환한다(월 적립 불필요).
+    """
+    r_m = annual_return_pct / 100 / 12
+    if abs(r_m) < 1e-12:
+        pmt = (goal_amount - pv) / n_months
+    else:
+        try:
+            growth = (1 + r_m) ** n_months
+        except OverflowError:
+            return 0.0
+        pmt = (goal_amount - pv * growth) / ((growth - 1) / r_m)
+    return round(max(pmt, 0.0), 2)

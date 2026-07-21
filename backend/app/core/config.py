@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     kis_rate_per_second: float = 0.9  # KIS 1s 제한 대비 11% 버퍼
     kiwoom_semaphore_limit: int = 5
     kiwoom_default_retries: int = 3
+    kiwoom_rate_per_second: float = 4.0  # 관측된 유량=5/s(ust21070) 대비 20% 버퍼
 
     # Circuit breaker 공통 임계값
     cb_default_fail_max: int = 5  # 실패 횟수 임계값 (기본)

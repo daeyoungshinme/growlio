@@ -412,6 +412,20 @@ class TestStockPrice:
         assert resp.status_code == 200
         mock_domestic.assert_not_called()
 
+    def test_overseas_price_usd_rounded_to_two_decimals(self, override_settings, auth_app):
+        """Yahoo 원본 시세는 부동소수점 오차로 소수점이 길어질 수 있음 — 지정가 표시/주문 단위(센트)에
+        맞춰 price_usd를 2자리로 반올림해 반환해야 한다."""
+        app, _, _ = auth_app
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch("app.services.yahoo_price._sync_yahoo_price", return_value=180.336789),
+            patch("app.services.yahoo_price._sync_usdkrw", return_value=1350.0),
+        ):
+            resp = client.get("/api/v1/stocks/price?ticker=AAPL&market=NASDAQ")
+        assert resp.status_code == 200
+        assert resp.json()["price_usd"] == 180.34
+
     def test_kis_fallback_used_as_last_resort(self, override_settings, auth_app):
         """Yahoo/Naver/pykrx 모두 실패하고 account_id가 주어지면 소유 계좌 검증 후 KIS로 조회한다."""
         app, user, db = auth_app
@@ -494,6 +508,21 @@ class TestStockPricesBatch:
         assert resp.status_code == 200
         data = resp.json()
         assert data["402970"]["price_krw"] == 15500.0
+
+    def test_overseas_price_usd_rounded_to_two_decimals(self, override_settings, auth_app):
+        app, _, _ = auth_app
+
+        with (
+            TestClient(app, raise_server_exceptions=False) as client,
+            patch("app.services.yahoo_price._sync_yahoo_batch", return_value={"AAPL": 180.336789}),
+            patch("app.services.yahoo_price._sync_usdkrw", return_value=1350.0),
+        ):
+            resp = client.post(
+                "/api/v1/stocks/prices-batch",
+                json={"items": [{"ticker": "AAPL", "market": "NASDAQ"}]},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["AAPL"]["price_usd"] == 180.34
 
     def test_kis_fallback_used_when_account_id_provided_and_others_fail(self, override_settings, auth_app):
         app, user, db = auth_app

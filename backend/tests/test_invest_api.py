@@ -6,6 +6,7 @@ import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -106,6 +107,112 @@ class TestDcaAnalysis:
             resp = client.get("/api/v1/invest/dca-analysis")
         data = resp.json()
         assert "projection_months" in data
+
+
+class TestGoalFeasibility:
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={"goal_amount": 500_000_000, "target_year": 2040, "initial_amount": 100_000_000},
+            )
+        assert resp.status_code == 401
+
+    def test_computes_required_return_with_explicit_initial_amount(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={
+                    "goal_amount": 500_000_000,
+                    "target_year": 2040,
+                    "monthly_deposit_amount": 1_000_000,
+                    "initial_amount": 100_000_000,
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["required_return_pct"] is not None
+        assert data["pv"] == 100_000_000
+        assert data["note"] is None
+        assert len(data["deposit_guide"]) == 3
+        monthly_deposits = [item["required_monthly_deposit"] for item in data["deposit_guide"]]
+        assert monthly_deposits == sorted(monthly_deposits, reverse=True)  # 가정 수익률이 높을수록 필요 적립액↓
+        for item in data["deposit_guide"]:
+            assert item["required_annual_deposit"] == pytest.approx(item["required_monthly_deposit"] * 12)
+
+    def test_falls_back_to_current_asset_total_when_initial_amount_omitted(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.invest.build_asset_totals",
+                AsyncMock(return_value=(200_000_000, 0, 0, {})),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={"goal_amount": 500_000_000, "target_year": 2040, "monthly_deposit_amount": 1_000_000},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["pv"] == 200_000_000
+
+    def test_already_achieved_returns_none_with_note(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={"goal_amount": 100_000_000, "target_year": 2040, "initial_amount": 200_000_000},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["required_return_pct"] is None
+        assert data["note"] == "이미 목표 금액을 달성했습니다"
+        assert data["deposit_guide"] == []
+
+    def test_past_target_year_returns_none_with_note(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={"goal_amount": 500_000_000, "target_year": 2020, "initial_amount": 100_000_000},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["required_return_pct"] is None
+        assert "목표 연도가 이미 지났습니다" in data["note"]
+
+    def test_infeasible_goal_returns_none_with_note(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={
+                    "goal_amount": 1_000_000_000_000,
+                    "target_year": 2027,
+                    "monthly_deposit_amount": 0,
+                    "initial_amount": 100_000_000,
+                },
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["required_return_pct"] is None
+        assert "달성이 매우 어려운 목표" in data["note"]
 
 
 _MOCK_DIVIDEND_PLAN = {

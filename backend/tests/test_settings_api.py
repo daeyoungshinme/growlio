@@ -72,6 +72,7 @@ class TestGetSettings:
             assert data["has_kis"] is False
             assert data["has_dart"] is False
             assert data["user_email"] == "test@example.com"
+            assert data["auto_rebalancing_max_order_value_krw"] == 50_000_000.0
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
@@ -96,6 +97,7 @@ class TestGetSettings:
             composite_signal_alerts_enabled=True,
             market_signal_daily_digest_enabled=False,
             goal_achievement_alerts_enabled=True,
+            monthly_report_enabled=True,
             goal_candidate_tickers=None,
             goal_risk_tolerance=None,
             goal_max_weight_pct=None,
@@ -118,6 +120,7 @@ class TestGetSettings:
             assert data["goal_max_weight_pct"] == 40.0
             assert data["goal_cagr_lookback_years"] == 10
             assert data["goal_short_term_equity_floor_pct"] == 80.0
+            assert data["auto_rebalancing_max_order_value_krw"] == 50_000_000.0
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
@@ -324,6 +327,41 @@ class TestUpdateGoalAchievementAlerts:
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/goal-achievement-alerts", json={"enabled": True})
+        assert resp.status_code == 401
+
+
+class TestUpdateMonthlyReportAlerts:
+    def test_put_monthly_report_alerts_returns_200_and_sets_flag(self, override_settings):
+        """월간 리포트 수신 여부를 유저 단위로 저장한다 — 기본값 ON에서 끌 수 있어야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(monthly_report_enabled=True)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/monthly-report-alerts",
+                    json={"enabled": False},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.monthly_report_enabled is False
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_monthly_report_alerts_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/monthly-report-alerts", json={"enabled": True})
         assert resp.status_code == 401
 
 

@@ -1,6 +1,8 @@
+import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { renderWithProviders } from "@/test/renderWithProviders";
+import { MemoryRouter } from "react-router-dom";
+import { renderWithProviders as renderWithProvidersBase } from "@/test/renderWithProviders";
 import type {
   GoalRecommendation,
   HorizonGoalRecommendation,
@@ -53,6 +55,11 @@ vi.mock("@/hooks/useStockSearch", () => ({
 vi.mock("@/utils/toast", () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
 
 import RecommendationCard from "@/components/rebalancing/RecommendationCard";
+
+// RecommendationCard가 목표 미설정 안내에 <Link>(react-router-dom)를 렌더링하므로 Router 컨텍스트가 필요하다.
+function renderWithProviders(ui: ReactNode) {
+  return renderWithProvidersBase(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 function makePortfolio(overrides: Partial<Portfolio> = {}): Portfolio {
   return {
@@ -114,11 +121,13 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     composite_signal_alerts_enabled: true,
     market_signal_daily_digest_enabled: false,
     goal_achievement_alerts_enabled: true,
+    monthly_report_enabled: true,
     goal_candidate_tickers: [],
     goal_risk_tolerance: "CONSERVATIVE",
     goal_max_weight_pct: 40.0,
     goal_cagr_lookback_years: 10,
     goal_short_term_equity_floor_pct: 80.0,
+    auto_rebalancing_max_order_value_krw: 50_000_000.0,
     ...overrides,
   };
 }

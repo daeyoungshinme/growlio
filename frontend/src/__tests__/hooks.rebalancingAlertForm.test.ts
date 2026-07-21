@@ -99,6 +99,8 @@ const mockAlert: RebalancingAlert = {
   auto_execution_time: null,
   notify_time: "08:30",
   buy_wait_minutes: 10,
+  tax_impact_gate_mode: "DISABLED",
+  max_tax_impact_krw: null,
   is_active: true,
   last_triggered_at: null,
   created_at: "2024-01-01T00:00:00Z",
@@ -160,7 +162,7 @@ describe("useRebalancingAlertQueries", () => {
     expect(result.current.brokerAccounts.map((a) => a.id)).toEqual(["a1", "a2"]);
   });
 
-  it("kisAccounts는 accountIds 필터를 적용한다", async () => {
+  it("executionEligibleAccounts는 accountIds 필터를 적용한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS1" } as never,
@@ -173,15 +175,15 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.kisAccounts).toHaveLength(1);
-    expect(result.current.kisAccounts[0].id).toBe("a1");
+    expect(result.current.executionEligibleAccounts).toHaveLength(1);
+    expect(result.current.executionEligibleAccounts[0].id).toBe("a1");
   });
 
-  it("accountIds가 null이면 모든 KIS 계좌를 반환한다", async () => {
+  it("accountIds가 null이면 모든 KIS/키움 계좌를 반환한다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS1" } as never,
-      { id: "a2", asset_type: "STOCK_KIS", is_active: true, name: "KIS2" } as never,
+      { id: "a2", asset_type: "STOCK_KIWOOM", is_active: true, name: "키움1" } as never,
     ]);
 
     const { result } = renderHook(
@@ -190,10 +192,10 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.kisAccounts).toHaveLength(2);
+    expect(result.current.executionEligibleAccounts).toHaveLength(2);
   });
 
-  it("targetAccountId가 없으면 targetAccountIsKis는 true다", async () => {
+  it("targetAccountId가 없으면 targetAccountIsAutoEligible는 true다", async () => {
     vi.mocked(fetchRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([]);
 
@@ -202,10 +204,10 @@ describe("useRebalancingAlertQueries", () => {
     });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.targetAccountIsKis).toBe(true);
+    expect(result.current.targetAccountIsAutoEligible).toBe(true);
   });
 
-  it("targetAccountId가 KIS 계좌면 targetAccountIsKis는 true다", async () => {
+  it("targetAccountId가 KIS 계좌면 targetAccountIsAutoEligible는 true다", async () => {
     vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       { id: "a1", asset_type: "STOCK_KIS", is_active: true, name: "KIS" } as never,
@@ -217,10 +219,10 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.targetAccountIsKis).toBe(true);
+    expect(result.current.targetAccountIsAutoEligible).toBe(true);
   });
 
-  it("targetAccountId가 키움 계좌면 targetAccountIsKis는 false다", async () => {
+  it("targetAccountId가 키움 계좌면 targetAccountIsAutoEligible는 true다", async () => {
     vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([
       { id: "a2", asset_type: "STOCK_KIWOOM", is_active: true, name: "키움" } as never,
@@ -232,10 +234,10 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.targetAccountIsKis).toBe(false);
+    expect(result.current.targetAccountIsAutoEligible).toBe(true);
   });
 
-  it("targetAccountId에 해당하는 계좌가 없으면 targetAccountIsKis는 false다", async () => {
+  it("targetAccountId에 해당하는 계좌가 없으면 targetAccountIsAutoEligible는 false다", async () => {
     vi.mocked(fetchAccountRebalancingAlert).mockResolvedValue(null as never);
     vi.mocked(fetchAccounts).mockResolvedValue([]);
 
@@ -245,7 +247,7 @@ describe("useRebalancingAlertQueries", () => {
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.targetAccountIsKis).toBe(false);
+    expect(result.current.targetAccountIsAutoEligible).toBe(false);
   });
 });
 
@@ -329,6 +331,75 @@ describe("useRebalancingAlertFormState", () => {
 
     expect(toast).toHaveBeenCalledWith("설정이 저장되었습니다", "success");
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it("taxImpactGateMode 기본값은 DISABLED이고 alert 값으로 초기화된다", () => {
+    const { result: withoutAlert } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+    expect(withoutAlert.current.taxImpactGateMode).toBe("DISABLED");
+    expect(withoutAlert.current.maxTaxImpactKrw).toBeNull();
+
+    const { result: withAlert } = renderHook(
+      () =>
+        useRebalancingAlertFormState({
+          alert: { ...mockAlert, tax_impact_gate_mode: "ENABLED", max_tax_impact_krw: 500000 },
+          portfolioId: "port-1",
+          onClose,
+        }),
+      { wrapper: createWrapper() },
+    );
+    expect(withAlert.current.taxImpactGateMode).toBe("ENABLED");
+    expect(withAlert.current.maxTaxImpactKrw).toBe(500000);
+  });
+
+  it("AUTO 모드 + 세금영향 게이트 ENABLED 시 upsert body에 상한액이 포함된다", async () => {
+    vi.mocked(upsertRebalancingAlert).mockResolvedValue(mockAlert);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.setMode("AUTO");
+      result.current.setAccountId("acc-1");
+      result.current.setTaxImpactGateMode("ENABLED");
+      result.current.setMaxTaxImpactKrw(300000);
+    });
+
+    await act(async () => {
+      await result.current.upsertMut.mutateAsync();
+    });
+
+    expect(upsertRebalancingAlert).toHaveBeenCalledWith(
+      "port-1",
+      expect.objectContaining({ tax_impact_gate_mode: "ENABLED", max_tax_impact_krw: 300000 }),
+    );
+  });
+
+  it("NOTIFY 모드에서는 세금영향 게이트가 항상 DISABLED로 저장된다", async () => {
+    vi.mocked(upsertRebalancingAlert).mockResolvedValue(mockAlert);
+
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.setTaxImpactGateMode("ENABLED");
+      result.current.setMaxTaxImpactKrw(300000);
+    });
+
+    await act(async () => {
+      await result.current.upsertMut.mutateAsync();
+    });
+
+    expect(upsertRebalancingAlert).toHaveBeenCalledWith(
+      "port-1",
+      expect.objectContaining({ tax_impact_gate_mode: "DISABLED", max_tax_impact_krw: null }),
+    );
   });
 
   it("deleteMut 성공 시 onClose와 toast를 호출한다", async () => {

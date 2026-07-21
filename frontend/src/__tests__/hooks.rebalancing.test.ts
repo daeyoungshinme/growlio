@@ -851,4 +851,55 @@ describe("useRebalancingExecution", () => {
 
     expect(result.current.state.orderType).toBe("LIMIT");
   });
+
+  it("getLimitPriceNative — 해외종목은 소수점 2자리로 반올림해 반환한다", async () => {
+    const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.dispatch({
+        type: "PRICES_DONE",
+        krw: {},
+        usd: { AAPL: 180.336789 },
+        usdRate: 1350,
+      });
+    });
+
+    expect(result.current.getLimitPriceNative("sell_AAPL_acc1", "AAPL", "NASDAQ")).toBe(180.34);
+  });
+
+  it("getLimitPriceNative — 사용자가 직접 입력한 해외 지정가도 소수점 2자리로 반올림한다", async () => {
+    const { fetchAllBrokerBalances } = await import("@/api/rebalancing");
+    vi.mocked(fetchAllBrokerBalances).mockResolvedValue([]);
+
+    const { result } = renderHook(
+      () =>
+        useRebalancingExecution({
+          portfolioId: "p1",
+          analysis: mockAnalysis,
+          accounts: mockKisAccounts,
+        }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.dispatch({
+        type: "SET_LIMIT_PRICE",
+        key: "sell_AAPL_acc1",
+        price: 233.34 - 1e-14, // 부동소수점 오차로 소수점이 길어진 값 시뮬레이션
+      });
+    });
+
+    expect(result.current.getLimitPriceNative("sell_AAPL_acc1", "AAPL", "NASDAQ")).toBe(233.34);
+  });
 });

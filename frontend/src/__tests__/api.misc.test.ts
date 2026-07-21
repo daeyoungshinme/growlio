@@ -91,19 +91,25 @@ describe("api/tax", () => {
   it("fetchOverseasPositionsTax calls GET /tax/overseas-positions", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     await fetchOverseasPositionsTax();
-    expect(api.get).toHaveBeenCalledWith("/tax/overseas-positions");
+    expect(api.get).toHaveBeenCalledWith("/tax/overseas-positions", {
+      params: { account_id: undefined },
+    });
   });
 
   it("fetchTaxSummary calls GET /tax/summary without year", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchTaxSummary();
-    expect(api.get).toHaveBeenCalledWith("/tax/summary", { params: undefined });
+    expect(api.get).toHaveBeenCalledWith("/tax/summary", {
+      params: { year: undefined, account_id: undefined },
+    });
   });
 
   it("fetchTaxSummary calls GET /tax/summary with year", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchTaxSummary(2024);
-    expect(api.get).toHaveBeenCalledWith("/tax/summary", { params: { year: 2024 } });
+    expect(api.get).toHaveBeenCalledWith("/tax/summary", {
+      params: { year: 2024, account_id: undefined },
+    });
   });
 });
 

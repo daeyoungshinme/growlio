@@ -144,7 +144,9 @@ class TestCreateTransaction:
                 patch(
                     "app.api.v1.transactions.get_redis",
                     new_callable=AsyncMock,
-                    return_value=AsyncMock(delete=AsyncMock()),
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -258,7 +260,9 @@ class TestUpdateTransaction:
                 patch(
                     "app.api.v1.transactions.get_redis",
                     new_callable=AsyncMock,
-                    return_value=AsyncMock(delete=AsyncMock()),
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -283,7 +287,9 @@ class TestUpdateTransaction:
                 patch(
                     "app.api.v1.transactions.get_redis",
                     new_callable=AsyncMock,
-                    return_value=AsyncMock(delete=AsyncMock()),
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -347,7 +353,9 @@ class TestDeleteTransaction:
                 patch(
                     "app.api.v1.transactions.get_redis",
                     new_callable=AsyncMock,
-                    return_value=AsyncMock(delete=AsyncMock()),
+                    return_value=AsyncMock(
+                        delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
+                    ),
                 ),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):

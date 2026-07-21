@@ -640,6 +640,63 @@ class TestAutoModeUnaffectedByCompositeTrigger:
         # AUTO는 last_triggered_at을 daily job에서 갱신하지 않는다 (기존 동작 불변).
         assert alert.last_triggered_at is None
 
+    @pytest.mark.asyncio
+    async def test_auto_mode_demoted_by_market_signal_gate_carries_reason_in_email_and_history(self, mock_db):
+        """AUTO가 시장신호 게이트로 이번만 NOTIFY로 강등되면, 발송되는 드리프트 이메일과
+        AlertHistory 메시지에 강등 사유가 함께 담겨야 한다(사유가 서버 로그에만 남던 기존 침묵 방지)."""
+        user_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        alert = SimpleNamespace(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            portfolio_id=portfolio_id,
+            schedule_type="DAILY",
+            schedule_day_of_week=None,
+            schedule_day_of_month=None,
+            last_triggered_at=None,
+            threshold_pct=5.0,
+            trigger_condition="DRIFT_ONLY",
+            mode="AUTO",
+            account_id=uuid.uuid4(),
+            strategy="BUY_ONLY",
+            order_type="MARKET",
+            notify_time=_current_notify_time(),
+            market_condition_mode="CAUTIOUS",
+        )
+        portfolio = SimpleNamespace(
+            id=portfolio_id, name="Test Portfolio", account_ids=None, base_type="STOCK", items=[]
+        )
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "user@example.com", None, None, True)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        drifting_item = SimpleNamespace(
+            ticker="AAPL", market="NASDAQ", name="Apple", weight_diff_pct=15.0, diff_krw=500_000, shares_to_trade=5.0
+        )
+        analysis = SimpleNamespace(items=[drifting_item], ticker_account_map={})
+        overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "RED", "data_freshness": "LIVE"}),
+            ),
+            patch("app.services.rebalancing.alert_check.save_alert_history", new=AsyncMock()) as mock_history,
+        ):
+            from app.services.rebalancing.alert_check import check_rebalancing_alerts
+
+            await check_rebalancing_alerts(mock_db)
+
+        mock_email.assert_called_once()
+        assert "RED" in mock_email.call_args.kwargs["automation_note"]
+
+        mock_history.assert_called_once()
+        history_message = mock_history.call_args.args[3]
+        assert "자동실행→알림 전환" in history_message
+
 
 # ── trigger_condition=BOTH 테스트 ─────────────────────────────
 
@@ -1232,6 +1289,37 @@ class TestClampOrdersToMaxValue:
 
         assert len(clamped) == 1
         assert clamped[0].quantity == 3
+
+
+class TestIsTaxImpactBlockingAutoMode:
+    """is_tax_impact_blocking_auto_mode() — market_condition_mode 게이트와 대칭인 세금영향 게이트 순수함수."""
+
+    def test_disabled_mode_never_blocks(self):
+        from app.services.rebalancing.order_builder import is_tax_impact_blocking_auto_mode
+
+        assert is_tax_impact_blocking_auto_mode("DISABLED", 10_000_000.0, 100.0) is False
+
+    def test_enabled_but_no_max_never_blocks(self):
+        """상한이 설정 안 됐으면(마이그레이션 직후 등) 안전하게 통과시킨다 — '무제한 차단' 오인 방지."""
+        from app.services.rebalancing.order_builder import is_tax_impact_blocking_auto_mode
+
+        assert is_tax_impact_blocking_auto_mode("ENABLED", 10_000_000.0, None) is False
+
+    def test_enabled_under_threshold_passes(self):
+        from app.services.rebalancing.order_builder import is_tax_impact_blocking_auto_mode
+
+        assert is_tax_impact_blocking_auto_mode("ENABLED", 400_000.0, 500_000.0) is False
+
+    def test_enabled_over_threshold_blocks(self):
+        from app.services.rebalancing.order_builder import is_tax_impact_blocking_auto_mode
+
+        assert is_tax_impact_blocking_auto_mode("ENABLED", 600_000.0, 500_000.0) is True
+
+    def test_enabled_exactly_at_threshold_passes(self):
+        """상한과 정확히 같으면 초과가 아니므로 통과 — market_condition_mode의 등급 경계와 동일한 관례(초과만 차단)."""
+        from app.services.rebalancing.order_builder import is_tax_impact_blocking_auto_mode
+
+        assert is_tax_impact_blocking_auto_mode("ENABLED", 500_000.0, 500_000.0) is False
 
 
 class TestRefreshLivePrices:

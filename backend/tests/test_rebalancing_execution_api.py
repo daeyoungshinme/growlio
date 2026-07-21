@@ -165,6 +165,47 @@ class TestQuickExecuteGates:
 
         assert result.status == "NO_DRIFT"
 
+    @pytest.mark.asyncio
+    async def test_tax_blocked_when_build_pending_plan_returns_tax_gate_blocked(self, mock_db, mock_request):
+        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.services.rebalancing.plan_service import TaxGateBlocked
+
+        portfolio_id = uuid.uuid4()
+        user = SimpleNamespace(id=uuid.uuid4())
+        portfolio = SimpleNamespace(id=portfolio_id, account_ids=None)
+        alert_row = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=uuid.uuid4(),
+            strategy="FULL",
+            order_type="MARKET",
+            market_condition_mode="DISABLED",
+        )
+        mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
+        blocked = TaxGateBlocked(estimated_tax_krw=600_000.0, max_tax_impact_krw=500_000.0)
+
+        with (
+            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=blocked),
+            ),
+        ):
+            result = await quick_execute_rebalancing(
+                request=mock_request,
+                portfolio_id=portfolio_id,
+                current_user=user,
+                db=mock_db,
+                redis=None,
+            )
+
+        assert result.status == "TAX_BLOCKED"
+        assert "600,000" in result.message
+        assert "500,000" in result.message
+
 
 class TestQuickExecutePlanGenerated:
     @pytest.mark.asyncio

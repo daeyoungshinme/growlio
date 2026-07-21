@@ -130,6 +130,7 @@ def rebalancing_alert_template(
     composite_reason: str | None = None,
     order_preview_items: list | None = None,
     app_link: str | None = None,
+    automation_note: str | None = None,
 ) -> tuple[str, str]:
     _SCHEDULE_LABEL: dict[str, str] = {
         "DAILY": "매일",
@@ -150,6 +151,16 @@ def rebalancing_alert_template(
             "</div>"
         )
         if is_test
+        else ""
+    )
+    automation_note_banner = (
+        (
+            "<div style='background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;"
+            "padding:10px 14px;margin-bottom:16px;font-size:13px;color:#92400e;'>"
+            f"{automation_note}"
+            "</div>"
+        )
+        if automation_note
         else ""
     )
 
@@ -216,6 +227,7 @@ def rebalancing_alert_template(
     )
     body = (
         f"{test_banner}"
+        f"{automation_note_banner}"
         f"<p style='color:#374151;margin-top:8px;'>{subheading}</p>"
         f"<table style='width:100%;border-collapse:collapse;margin-top:16px;font-size:13px;'>"
         f"<thead><tr style='background:#f1f5f9;'>"
@@ -620,6 +632,80 @@ def account_deletion_template() -> tuple[str, str]:
 
 _SIGNAL_LEVEL_LABEL: dict[str, str] = {"GREEN": "안정", "YELLOW": "주의", "RED": "위험"}
 _SIGNAL_LEVEL_COLOR: dict[str, str] = {"GREEN": "#16a34a", "YELLOW": "#d97706", "RED": "#dc2626"}
+
+
+def rebalancing_plan_execution_failed_template(
+    portfolio_name: str, side: str, error_message: str | None
+) -> tuple[str, str]:
+    """AUTO 매수/매도 leg 실행 자체가 예외로 실패했을 때(개별 종목 실패가 아닌 leg 전체 실패) 발송."""
+    side_label = "매수" if side == "BUY" else "매도"
+    subject = f"[Growlio] 리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("실행 유형", f"자동 {side_label}"),
+            ("실패 사유", error_message or "알 수 없는 오류"),
+        ]
+    )
+    html = _email_div(
+        "리밸런싱 자동화 실행 실패",
+        "#dc2626",
+        table,
+        "이번 자동 실행 계획은 체결되지 않았습니다. Growlio 앱 리밸런싱 &gt; 이력 탭에서 상세 내용을 확인하고, "
+        "필요 시 직접 리밸런싱을 실행해주세요.",
+    )
+    return subject, html
+
+
+def tax_impact_gate_blocked_template(
+    portfolio_name: str, estimated_tax_krw: float, max_tax_impact_krw: float
+) -> tuple[str, str]:
+    """세금영향 게이트로 이번 자동 실행 계획 생성이 보류됐을 때 발송."""
+    subject = f"[Growlio] 리밸런싱 자동화 보류 — 세금영향 상한 초과 ({portfolio_name})"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("추정 양도세", f"약 {estimated_tax_krw:,.0f} 원"),
+            ("설정된 상한", f"{max_tax_impact_krw:,.0f} 원"),
+        ]
+    )
+    html = _email_div(
+        "리밸런싱 자동화 보류 — 세금영향 상한 초과",
+        "#d97706",
+        table,
+        "매도로 인해 예상되는 양도세가 설정하신 상한을 초과해 이번 자동 실행 계획을 만들지 않았습니다. "
+        "드리프트가 유지되면 다음 실행 시각에 다시 확인합니다. 상한은 리밸런싱 자동화 설정에서 조정할 수 있습니다. "
+        "이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
+    )
+    return subject, html
+
+
+def market_signal_gate_blocked_template(
+    portfolio_name: str, composite_level: str, market_condition_mode: str
+) -> tuple[str, str]:
+    """시장신호 게이트로 이번 자동 실행 계획 생성이 보류됐을 때 발송."""
+    level_label = _SIGNAL_LEVEL_LABEL.get(composite_level, composite_level)
+    level_color = _SIGNAL_LEVEL_COLOR.get(composite_level, "#374151")
+    mode_label = {"CAUTIOUS": "신중(YELLOW/RED 차단)", "STRICT": "엄격(RED만 차단)"}.get(
+        market_condition_mode, market_condition_mode
+    )
+    subject = f"[Growlio] 리밸런싱 자동화 보류 — 시장신호 게이트 ({portfolio_name})"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("현재 시장 신호", f"<span style='color:{level_color};font-weight:bold;'>{level_label}</span>"),
+            ("설정된 게이트", mode_label),
+        ]
+    )
+    html = _email_div(
+        "리밸런싱 자동화 보류 — 시장신호 게이트",
+        level_color,
+        table,
+        "현재 시장 위험 신호가 설정하신 자동화 게이트 조건에 해당해 이번 자동 실행 계획을 만들지 않았습니다. "
+        "신호가 완화되면 다음 실행 시각에 다시 확인합니다. 게이트 조건은 리밸런싱 자동화 설정에서 조정할 수 있습니다. "
+        "이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
+    )
+    return subject, html
 
 
 def market_signal_change_template(old_level: str, new_level: str, reason: str | None) -> tuple[str, str]:

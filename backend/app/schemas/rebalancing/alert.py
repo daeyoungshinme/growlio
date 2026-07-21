@@ -25,6 +25,9 @@ class RebalancingAlertCreate(BaseModel):
     notify_time: str = "08:30"
     # AUTO 모드 매수 대기시간(분) — 플랜 이메일 발송 후 이 시간 뒤 자동 실행(취소 가능)
     buy_wait_minutes: int = 10
+    # 세금영향 게이트: DISABLED(기본) | ENABLED — 매도로 인한 추정 양도세가 max_tax_impact_krw를 넘으면 AUTO 보류
+    tax_impact_gate_mode: Literal["DISABLED", "ENABLED"] = "DISABLED"
+    max_tax_impact_krw: float | None = None
 
     @field_validator("threshold_pct")
     @classmethod
@@ -80,6 +83,13 @@ class RebalancingAlertCreate(BaseModel):
             raise ValueError("매수 대기시간은 1~120분 사이여야 합니다")
         return v
 
+    @field_validator("max_tax_impact_krw")
+    @classmethod
+    def validate_max_tax_impact_krw(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("세금영향 상한은 0보다 커야 합니다")
+        return v
+
 
 class AlertScopeUpdate(BaseModel):
     alert_scope: Literal["AGGREGATE", "PER_ACCOUNT"]
@@ -108,6 +118,8 @@ class RebalancingAlertResponse(BaseModel):
     auto_execution_time: str | None
     notify_time: str
     buy_wait_minutes: int
+    tax_impact_gate_mode: str
+    max_tax_impact_krw: float | None
     last_triggered_at: datetime | None
     created_at: datetime
     updated_at: datetime

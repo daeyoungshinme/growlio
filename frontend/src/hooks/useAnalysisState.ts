@@ -25,7 +25,13 @@ export function useAnalysisState({
 
   const triggerRebalancingAnalysis = useCallback(
     async (id: string, depositKrwOverride?: number) => {
-      setState({ mode: "rebalancing", analysis: null, analyzing: true, error: null });
+      // 재분석 시 이전 결과(analysis)를 유지한 채 analyzing만 세워 화면이 비는 깜빡임을 방지
+      setState((s) => ({
+        mode: "rebalancing",
+        analysis: s.mode === "rebalancing" ? s.analysis : null,
+        analyzing: true,
+        error: null,
+      }));
       try {
         const result = await analyzePortfolio(id, undefined, depositKrwOverride);
         setState((s) => ({ ...s, analysis: result, analyzing: false }));

@@ -54,6 +54,8 @@ function alert(overrides: Partial<RebalancingAlert>): RebalancingAlert {
     auto_execution_time: null,
     notify_time: "08:30",
     buy_wait_minutes: 10,
+    tax_impact_gate_mode: "DISABLED",
+    max_tax_impact_krw: null,
     is_active: true,
     last_triggered_at: null,
     created_at: "2024-01-01T00:00:00Z",

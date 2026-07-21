@@ -55,9 +55,15 @@ describe("useDividendData", () => {
     expect(result.current.dividendPositions).toEqual(MOCK_POSITIONS);
     expect(result.current.dividendSummary).toEqual(MOCK_SUMMARY);
     expect(result.current.dividendByTicker).toEqual(MOCK_BY_TICKER);
-    expect(mockGet).toHaveBeenCalledWith("/dividends/positions");
-    expect(mockGet).toHaveBeenCalledWith("/dividends/summary");
-    expect(mockGet).toHaveBeenCalledWith("/dividends/by-ticker");
+    expect(mockGet).toHaveBeenCalledWith("/dividends/positions", {
+      params: { account_id: undefined },
+    });
+    expect(mockGet).toHaveBeenCalledWith("/dividends/summary", {
+      params: { account_id: undefined },
+    });
+    expect(mockGet).toHaveBeenCalledWith("/dividends/by-ticker", {
+      params: { account_id: undefined },
+    });
   });
 
   it("enabled=false일 때 API를 호출하지 않고 기본값을 반환한다", () => {

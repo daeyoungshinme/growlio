@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,12 +24,19 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 async def portfolio_allocation_history(
     request: Request,
     months: int = Query(default=12, ge=3, le=36),
+    account_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """월별 자산 유형별 배분 이력 — 최근 N개월."""
+    """월별 자산 유형별 배분 이력 — 최근 N개월. account_id 미지정 시 전체 계좌 통합 기준."""
     redis = await get_redis()
-    return await get_allocation_history(current_user.id, db, months=months, redis=redis)
+    return await get_allocation_history(
+        current_user.id,
+        db,
+        months=months,
+        redis=redis,
+        account_id=uuid.UUID(account_id) if account_id else None,
+    )
 
 
 @router.get("/overview")
@@ -35,12 +44,14 @@ async def portfolio_allocation_history(
 async def portfolio_overview(
     request: Request,
     lite: bool = Query(default=False),
+    account_id: str | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """모든 계좌 자산을 통합해 포트폴리오 전체 현황을 반환한다."""
+    """계좌 자산을 통합해 포트폴리오 현황을 반환한다. account_id 미지정 시 전체 계좌 통합 기준."""
     redis = await get_redis()
-    return await build_portfolio_overview(current_user.id, db, redis=redis, lite=lite)
+    account_ids = [uuid.UUID(account_id)] if account_id else None
+    return await build_portfolio_overview(current_user.id, db, account_ids=account_ids, redis=redis, lite=lite)
 
 
 # ---------------------------------------------------------------------------

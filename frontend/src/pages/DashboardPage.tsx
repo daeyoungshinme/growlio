@@ -44,7 +44,7 @@ function OnboardingChecklist() {
               </p>
             </div>
             <Link
-              to="/assets?tab=계좌관리"
+              to="/assets?tab=계좌관리&atab=증권계좌"
               className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
             >
               등록하기 →
@@ -61,7 +61,12 @@ function OnboardingChecklist() {
                 목표 비중을 설정해 리밸런싱을 관리하세요.
               </p>
             </div>
-            <span className="shrink-0 text-xs text-gray-300 dark:text-gray-600">계좌 등록 후</span>
+            <Link
+              to="/rebalancing?rtab=포트폴리오"
+              className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              둘러보기 →
+            </Link>
           </li>
 
           <li className="flex items-start gap-3">

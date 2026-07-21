@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { api } from "@/api/client";
@@ -35,6 +35,8 @@ export function useGoalSettings() {
   const queryClient = useQueryClient();
   const location = useLocation();
   const autoOpenTriggeredRef = useRef(false);
+  const [wizardMode, setWizardMode] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: QUERY_KEYS.dcaAnalysis,
@@ -56,7 +58,7 @@ export function useGoalSettings() {
     startEditing,
   } = useEditableSettingsForm<GoalForm>(EMPTY_FORM);
 
-  const openEdit = useCallback(async () => {
+  const buildCurrentForm = useCallback(async (): Promise<GoalForm> => {
     const s = data?.settings;
     let annual_deposit_goal = "";
     let retirement_target_year = "";
@@ -69,7 +71,7 @@ export function useGoalSettings() {
         ? String(settingsData.retirement_target_year)
         : "";
     }
-    startEditing({
+    return {
       monthly_deposit_amount: s?.monthly_deposit_amount ? String(s.monthly_deposit_amount) : "",
       goal_annual_return_pct: s?.goal_annual_return_pct ? String(s.goal_annual_return_pct) : "",
       goal_amount: s?.goal_amount ? String(s.goal_amount) : "",
@@ -77,8 +79,19 @@ export function useGoalSettings() {
       goal_initial_amount: s?.goal_initial_amount ? String(s.goal_initial_amount) : "",
       annual_deposit_goal,
       retirement_target_year,
-    });
-  }, [data, startEditing]);
+    };
+  }, [data]);
+
+  const openEdit = useCallback(async () => {
+    setWizardMode(false);
+    startEditing(await buildCurrentForm());
+  }, [buildCurrentForm, startEditing]);
+
+  const openWizard = useCallback(async () => {
+    setWizardMode(true);
+    setWizardStep(1);
+    startEditing(await buildCurrentForm());
+  }, [buildCurrentForm, startEditing]);
 
   useEffect(() => {
     if (location.state?.openEdit && !autoOpenTriggeredRef.current && !isLoading && data) {
@@ -90,9 +103,9 @@ export function useGoalSettings() {
   useEffect(() => {
     if (!isLoading && !autoOpenTriggeredRef.current && data && !data.is_configured) {
       autoOpenTriggeredRef.current = true;
-      void openEdit();
+      void openWizard();
     }
-  }, [isLoading, data, openEdit]);
+  }, [isLoading, data, openWizard]);
 
   const saveSettings = async () => {
     setSaving(true);
@@ -105,7 +118,8 @@ export function useGoalSettings() {
           ? Number(form.goal_annual_return_pct)
           : null,
         goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
-        goal_start_date: form.goal_start_date || null,
+        goal_start_date:
+          form.goal_start_date || (wizardMode ? new Date().toISOString().slice(0, 10) : null),
         goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
         annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
         retirement_target_year: form.retirement_target_year
@@ -137,5 +151,9 @@ export function useGoalSettings() {
     handleCloseModal,
     openEdit,
     saveSettings,
+    wizardMode,
+    wizardStep,
+    setWizardStep,
+    openWizard,
   };
 }

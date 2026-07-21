@@ -18,9 +18,13 @@ from app.models.user import User, UserSettings
 from app.services.alerts.calculator import already_fired_today
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
+    MarketSignalGateBlocked,
+    TaxGateBlocked,
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
+    notify_market_signal_gate_blocked,
     notify_plan_generated,
+    notify_tax_gate_blocked,
 )
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
 from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
@@ -44,18 +48,10 @@ async def run_rebalancing_auto_execution() -> None:
 
 
 async def _run_auto_execution() -> None:
-    from app.services.market_signal_service import get_market_signal
+    from app.services.market_signal_service import get_market_signal_for_auto_gate
 
     redis = await get_redis()
-
-    try:
-        _market_signal = await get_market_signal(redis)
-        composite_level: str = _market_signal.get("composite_level", "GREEN")
-        data_freshness: str = _market_signal.get("data_freshness", "LIVE")
-    except Exception as exc:
-        logger.warning("market_signal_fetch_failed_in_auto_execution", error=str(exc))
-        composite_level = "GREEN"
-        data_freshness = "STALE"
+    composite_level, data_freshness = await get_market_signal_for_auto_gate(redis)
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -78,7 +74,10 @@ async def _run_auto_execution() -> None:
             if already_fired_today(alert):
                 continue
 
-            # 시장 신호 게이트 — 계획 생성 시점에만 확인한다(실행/승인 시점 재확인 안 함).
+            email = notification_email or user_email
+
+            # 시장 신호 게이트 — 계획 생성 시점에 확인한다. 매수 실행 직전(1분 간격 job)에도
+            # 재확인한다(rebalancing_plan_buy_execution.py) — 대기시간 동안 상황이 바뀔 수 있어서다.
             market_mode = getattr(alert, "market_condition_mode", "DISABLED")
             if is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness):
                 logger.info(
@@ -86,6 +85,14 @@ async def _run_auto_execution() -> None:
                     alert_id=str(alert.id),
                     composite_level=composite_level,
                     data_freshness=data_freshness,
+                )
+                blocked_by_signal = MarketSignalGateBlocked(
+                    composite_level=composite_level,
+                    market_condition_mode=market_mode,
+                    data_freshness=data_freshness,
+                )
+                await notify_market_signal_gate_blocked(
+                    alert, portfolio, blocked_by_signal, email, fcm_token, redis, db
                 )
                 continue
 
@@ -98,11 +105,13 @@ async def _run_auto_execution() -> None:
             except Exception as exc:
                 logger.error("rebalancing_auto_plan_generation_failed", alert_id=str(alert.id), error=str(exc))
                 continue
+
+            if isinstance(generated, TaxGateBlocked):
+                await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, redis, db)
+                continue
             if generated is None:
                 continue
             plan_obj, buy_token, sell_token = generated
-
-            email = notification_email or user_email
             await notify_plan_generated(
                 plan_obj, alert, portfolio, buy_token, sell_token, email, fcm_token, composite_level, db
             )

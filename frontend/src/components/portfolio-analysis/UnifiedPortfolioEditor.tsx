@@ -234,7 +234,7 @@ export default function UnifiedPortfolioEditor({
                     type="button"
                     onClick={() =>
                       fillFromHoldings(
-                        qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview),
+                        qc.getQueryData<PortfolioOverview>(QUERY_KEYS.portfolioOverview()),
                       )
                     }
                     className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 px-2 py-1 rounded-lg transition-colors`}

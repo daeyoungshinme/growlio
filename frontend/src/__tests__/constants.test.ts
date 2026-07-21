@@ -17,14 +17,14 @@ import { ASSET_MANAGEMENT_TABS, PORTFOLIO_TABS } from "@/constants/tabs";
 describe("QUERY_KEYS", () => {
   it("정적 키들이 배열 형태로 정의되어 있다", () => {
     expect(QUERY_KEYS.dashboard).toEqual(["dashboard"]);
-    expect(QUERY_KEYS.portfolioOverview).toEqual(["portfolio-overview"]);
+    expect(QUERY_KEYS.portfolioOverviewBase).toEqual(["portfolio-overview"]);
     expect(QUERY_KEYS.portfolioOverviewLite).toEqual(["portfolio-overview", "lite"]);
     expect(QUERY_KEYS.portfolios).toEqual(["portfolios"]);
     expect(QUERY_KEYS.accounts).toEqual(["accounts"]);
     expect(QUERY_KEYS.transactionsAll).toEqual(["transactions", "all"]);
-    expect(QUERY_KEYS.dividendByTicker).toEqual(["dividend-by-ticker"]);
-    expect(QUERY_KEYS.dividendSummary).toEqual(["dividend-summary"]);
-    expect(QUERY_KEYS.dividendPositions).toEqual(["dividend-positions"]);
+    expect(QUERY_KEYS.dividendByTickerBase).toEqual(["dividend-by-ticker"]);
+    expect(QUERY_KEYS.dividendSummaryBase).toEqual(["dividend-summary"]);
+    expect(QUERY_KEYS.dividendPositionsBase).toEqual(["dividend-positions"]);
     expect(QUERY_KEYS.dcaAnalysis).toEqual(["dca-analysis"]);
     expect(QUERY_KEYS.settings).toEqual(["settings"]);
     expect(QUERY_KEYS.exchangeRate).toEqual(["exchange-rate"]);
@@ -36,7 +36,7 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.insights).toEqual(["insights"]);
     expect(QUERY_KEYS.monthlyOptimization).toEqual(["monthly-optimization"]);
     expect(QUERY_KEYS.marketSignal).toEqual(["market-signal"]);
-    expect(QUERY_KEYS.overseasPositionsTax).toEqual(["overseas-positions-tax"]);
+    expect(QUERY_KEYS.overseasPositionsTaxBase).toEqual(["overseas-positions-tax"]);
   });
 
   it("동적 키 팩토리 함수들이 올바른 키를 반환한다", () => {
@@ -44,8 +44,13 @@ describe("QUERY_KEYS", () => {
     expect(QUERY_KEYS.transactions("acc-2")).toEqual(["transactions", "acc-2"]);
     expect(QUERY_KEYS.allTransactions(2024)).toEqual(["transactions", "all", 2024]);
     expect(QUERY_KEYS.rebalancingAlert("port-1")).toEqual(["rebalancing-alert", "port-1"]);
-    expect(QUERY_KEYS.taxSummary(2024)).toEqual(["tax-summary", 2024]);
-    expect(QUERY_KEYS.allocationHistory(12)).toEqual(["allocation-history", 12]);
+    expect(QUERY_KEYS.taxSummary(2024)).toEqual(["tax-summary", 2024, "all"]);
+    expect(QUERY_KEYS.taxSummary(2024, "acc-1")).toEqual(["tax-summary", 2024, "acc-1"]);
+    expect(QUERY_KEYS.allocationHistory(12)).toEqual(["allocation-history", 12, "all"]);
+    expect(QUERY_KEYS.allocationHistory(12, "acc-1")).toEqual(["allocation-history", 12, "acc-1"]);
+    expect(QUERY_KEYS.portfolioOverview()).toEqual(["portfolio-overview", "all"]);
+    expect(QUERY_KEYS.portfolioOverview("acc-1")).toEqual(["portfolio-overview", "acc-1"]);
+    expect(QUERY_KEYS.dividendSummary("acc-1")).toEqual(["dividend-summary", "acc-1"]);
     expect(QUERY_KEYS.portfolioRisk("p-1")).toEqual(["portfolio-risk", "p-1"]);
     expect(QUERY_KEYS.rebalancingStrategy("p-3")).toEqual(["rebalancing-strategy", "p-3"]);
   });

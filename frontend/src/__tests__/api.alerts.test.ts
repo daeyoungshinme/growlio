@@ -161,6 +161,8 @@ describe("api/alerts — rebalancing alerts", () => {
       auto_execution_time: null,
       notify_time: "08:30",
       buy_wait_minutes: 10,
+      tax_impact_gate_mode: "DISABLED",
+      max_tax_impact_krw: null,
     });
     expect(api.put).toHaveBeenCalledWith(
       "/alerts/rebalancing/port-1",

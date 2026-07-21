@@ -4,10 +4,10 @@ import { fetchAllocationHistory } from "@/api/portfolios";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 
-export function useAllocationHistory(months = 12) {
+export function useAllocationHistory(months = 12, accountId?: string | null) {
   const { data, isLoading } = useQuery({
-    queryKey: QUERY_KEYS.allocationHistory(months),
-    queryFn: () => fetchAllocationHistory(months),
+    queryKey: QUERY_KEYS.allocationHistory(months, accountId),
+    queryFn: () => fetchAllocationHistory(months, accountId),
     staleTime: STALE_TIME.LONG,
     gcTime: STALE_TIME.LONG,
   });

@@ -20,8 +20,10 @@ export interface AllocationHistoryPoint {
   allocations: AllocationTypeItem[];
 }
 
-export const fetchAllocationHistory = (months: number) =>
-  apiGet<AllocationHistoryPoint[]>("/portfolio/allocation-history", { params: { months } });
+export const fetchAllocationHistory = (months: number, accountId?: string | null) =>
+  apiGet<AllocationHistoryPoint[]>("/portfolio/allocation-history", {
+    params: { months, account_id: accountId || undefined },
+  });
 
 export interface PortfolioItem {
   ticker: string;

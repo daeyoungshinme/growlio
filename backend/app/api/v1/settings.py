@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.enums import AssetClass, GoalRiskTolerance, IndexRegion
 from app.limiter import limiter
@@ -130,6 +131,10 @@ class GoalAchievementAlertsUpdate(BaseModel):
     enabled: bool
 
 
+class MonthlyReportAlertsUpdate(BaseModel):
+    enabled: bool
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -145,11 +150,15 @@ class SettingsResponse(BaseModel):
     composite_signal_alerts_enabled: bool = True
     market_signal_daily_digest_enabled: bool = False
     goal_achievement_alerts_enabled: bool = True
+    monthly_report_enabled: bool = True
     goal_candidate_tickers: list[GoalCandidateTicker] = []
     goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     goal_max_weight_pct: float = 40.0
     goal_cagr_lookback_years: int = 10
     goal_short_term_equity_floor_pct: float = 80.0
+    # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
+    # 1건당 거래대금 안전장치 상한을 안내하기 위해 노출한다 (app/services/rebalancing/order_builder.py 참고).
+    auto_rebalancing_max_order_value_krw: float = 50_000_000.0
 
 
 @router.get("", response_model=SettingsResponse)
@@ -172,6 +181,7 @@ async def get_settings(
             annual_deposit_goal=None,
             user_email=current_user.email,
             notification_email=None,
+            auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
         )
     return SettingsResponse(
         has_kis=has_kis,
@@ -188,6 +198,7 @@ async def get_settings(
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
         market_signal_daily_digest_enabled=row.market_signal_daily_digest_enabled,
         goal_achievement_alerts_enabled=row.goal_achievement_alerts_enabled,
+        monthly_report_enabled=row.monthly_report_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
         goal_risk_tolerance=(
             GoalRiskTolerance(row.goal_risk_tolerance) if row.goal_risk_tolerance else GoalRiskTolerance.CONSERVATIVE
@@ -197,6 +208,7 @@ async def get_settings(
         goal_short_term_equity_floor_pct=(
             float(row.goal_short_term_equity_floor_pct) if row.goal_short_term_equity_floor_pct else 80.0
         ),
+        auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
     )
 
 
@@ -359,6 +371,21 @@ async def update_goal_achievement_alerts(
     row.goal_achievement_alerts_enabled = req.enabled
     await db.commit()
     return {"detail": "목표 달성 알림 설정이 저장되었습니다"}
+
+
+@router.put("/monthly-report-alerts")
+@limiter.limit("10/minute")
+async def update_monthly_report_alerts(
+    request: Request,
+    req: MonthlyReportAlertsUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """매월 1일 발송되는 월간 포트폴리오 리포트 수신 여부."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.monthly_report_enabled = req.enabled
+    await db.commit()
+    return {"detail": "월간 리포트 설정이 저장되었습니다"}
 
 
 @router.put("/push-token")

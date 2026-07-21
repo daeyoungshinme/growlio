@@ -8,6 +8,7 @@ import pytest
 
 from app.kiwoom.balance import get_domestic_balance, get_overseas_balance
 from app.kiwoom.client import KiwoomApiError
+from app.providers.http_client import MaxRetriesExceededError
 
 
 def _ust21070_item(stk_cd="QQQ", name="Invesco QQQ Trust", qty="000000005"):
@@ -78,14 +79,50 @@ class TestGetOverseasBalance:
 
     @pytest.mark.asyncio
     async def test_all_exchange_probes_fail_falls_back_to_nasdaq(self):
-        """세 거래소 조합이 전부 실패하는 이례적 상황에서도 예외 없이 NASDAQ으로 폴백해야 한다."""
+        """세 거래소 조합이 전부 실패하는 이례적 상황에서도 예외 없이 NASDAQ으로 폴백하고,
+        (프로빙 도중의 기대된 실패와 구분되는) 명시적 경고 로그를 1회 남겨야 한다."""
         bulk_items = [_ust21070_item(stk_cd="QQQ")]
         dispatch = _make_dispatch(bulk_items, {})  # 어떤 조합도 매칭 안 됨 → 전부 KiwoomApiError
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=dispatch),
+            patch("app.kiwoom.balance.logger") as mock_logger,
+        ):
+            result = await get_overseas_balance("token", "1234567890", is_mock=True)
+
+        assert result["positions"][0]["market"] == "NASDAQ"
+        mock_logger.warning.assert_called_once_with("kiwoom_overseas_market_unresolved", stk_cd="QQQ")
+
+    @pytest.mark.asyncio
+    async def test_single_probe_failure_isolated_from_other_combos_and_tickers(self):
+        """한 거래소 조합 프로빙이 KiwoomApiError(1903)가 아닌 다른 예외(예: rate limit
+        소진으로 인한 MaxRetriesExceededError)를 던져도, 나머지 조합/다른 종목 결과는
+        영향받지 않고 get_overseas_balance() 전체가 실패하지 않아야 한다 — 이 예외가
+        전파되면 해외 잔고 전체가 EMPTY_OVERSEAS로 치환되고 기존 Position까지 삭제되는
+        상위 버그(asset_service.sync_account)로 이어짐."""
+        bulk_items = [_ust21070_item(stk_cd="QQQ"), _ust21070_item(stk_cd="DBC")]
+
+        async def dispatch(method, path, *, is_mock, headers, json=None, **kwargs):
+            assert path == "/api/us/acnt"
+            if headers["api-id"] == "ust21110":
+                return _ust21110_response()
+            if not json:
+                return {"result_list": bulk_items}
+            stk_cd, stex_tp = json["stk_cd"], json["stex_tp"]
+            if stk_cd == "QQQ" and stex_tp == "ND":
+                raise MaxRetriesExceededError("kiwoom API 속도 제한 초과 (재시도 3회)")
+            if stk_cd == "QQQ" and stex_tp == "NA":
+                return {"result_list": [{"stk_cd": stk_cd}]}
+            if stk_cd == "DBC" and stex_tp == "ND":
+                return {"result_list": [{"stk_cd": stk_cd}]}
+            raise KiwoomApiError("7", "종목 정보가 없습니다")
 
         with patch("app.kiwoom.balance.kiwoom_request", side_effect=dispatch):
             result = await get_overseas_balance("token", "1234567890", is_mock=True)
 
-        assert result["positions"][0]["market"] == "NASDAQ"
+        by_ticker = {p["ticker"]: p for p in result["positions"]}
+        assert by_ticker["QQQ"]["market"] == "AMEX"
+        assert by_ticker["DBC"]["market"] == "NASDAQ"
 
     @pytest.mark.asyncio
     async def test_zero_qty_positions_excluded_before_exchange_probe(self):

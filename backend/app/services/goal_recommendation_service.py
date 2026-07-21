@@ -37,10 +37,9 @@ from __future__ import annotations
 import asyncio
 import functools
 import uuid
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 
 import structlog
-from dateutil.relativedelta import relativedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,7 +73,7 @@ from app.services.goal_candidate_service import (
     existing_items_from_positions,
 )
 from app.services.goal_portfolio_optimizer import _MAX_WEIGHT, _MIN_CANDIDATES, _optimize_goal_portfolio
-from app.services.goal_return_solver import solve_required_annual_return_pct
+from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.market_signal_service import get_market_signal
 from app.services.portfolio_service import build_portfolio_overview
@@ -153,12 +152,6 @@ async def _fetch_market_signal_level(redis: RedisType) -> str | None:
     if signal.get("data_freshness") == "STALE":
         return None
     return signal.get("composite_level")
-
-
-def _months_until_year_end(target_year: int) -> int:
-    today = date.today()
-    delta = relativedelta(date(target_year, 12, 31), today)
-    return delta.years * 12 + delta.months
 
 
 def _not_configured(note: str) -> GoalRecommendation:
@@ -265,7 +258,7 @@ async def _compute_goal_recommendation(
     target_year = int(settings_row.retirement_target_year)
 
     pv = base_krw
-    n_months = _months_until_year_end(target_year)
+    n_months = months_until_year_end(target_year)
 
     required_dividend_yield_pct = (
         round(float(settings_row.annual_dividend_goal) / pv * 100, 2)

@@ -52,6 +52,8 @@ TTL_DIVIDENDS_POSITIONS = 3600  # 종목별 배당수익률 1시간
 TTL_TAX_OVERSEAS = 86400  # 해외 미실현 손익 24시간
 TTL_MARKET_SIGNAL_LAST_LEVEL = 7 * 24 * 3600  # 시장 신호 등급 변화 감지 마지막 값 (job이 계속 갱신, 만료는 안전망)
 TTL_COMPOSITE_ALERT_SENT = 86400  # 복합 리스크/시장 신호 알림 유저당 1일 1회 제한 플래그
+TTL_TAX_IMPACT_GATE_ALERT_SENT = 86400  # 세금영향 게이트로 AUTO 계획 생성이 보류됐다는 알림, 알림당 1일 1회 제한 플래그
+TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계획 생성 보류 알림, 알림당 1일 1회 제한 플래그
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
 TTL_GOAL_RECOMMENDATION = 600  # 목표 역산 추천(전체/기간별) 10분 — 설정 변경 시 명시적으로 무효화됨
@@ -110,8 +112,8 @@ def monthly_trend_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}monthly_trend:{user_id}"
 
 
-def dividend_ticker_summary_key(user_id: uuid.UUID, year: int) -> str:
-    return f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}"
+def dividend_ticker_summary_key(user_id: uuid.UUID, year: int, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}:{acct_suffix}"
 
 
 def dividend_months_key(ticker: str, market: str) -> str:
@@ -130,8 +132,8 @@ def correlation_key(user_id: uuid.UUID, param_hash: str) -> str:
     return f"{_env_prefix()}correlation:{user_id}:{param_hash}"
 
 
-def alloc_history_key(user_id: uuid.UUID, months: int) -> str:
-    return f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:{months}"
+def alloc_history_key(user_id: uuid.UUID, months: int, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:{months}:{acct_suffix}"
 
 
 def has_overseas_key(account_id: uuid.UUID) -> str:
@@ -142,8 +144,8 @@ def overseas_stock_name_key(ticker: str) -> str:
     return f"{_env_prefix()}overseas_stock_name:{ticker}"
 
 
-def dividend_summary_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}dividend_summary:{user_id}"
+def dividend_summary_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}dividend_summary:{user_id}:{acct_suffix}"
 
 
 def portfolio_overview_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
@@ -183,8 +185,8 @@ def exchange_rate_alerts_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}alerts:exchange_rate:{user_id}"
 
 
-def dividends_positions_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}dividends:positions:{user_id}"
+def dividends_positions_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}dividends:positions:{user_id}:{acct_suffix}"
 
 
 def rebalancing_strategy_key(user_id: uuid.UUID, portfolio_id: uuid.UUID | str, acct_suffix: str) -> str:
@@ -201,8 +203,8 @@ def rebalancing_analysis_key(
     return f"{_env_prefix()}rebalancing_analysis:{user_id}:{portfolio_id}:{acct_suffix}:{override_part}"
 
 
-def tax_overseas_key(user_id: uuid.UUID) -> str:
-    return f"{_env_prefix()}tax:overseas:{user_id}"
+def tax_overseas_key(user_id: uuid.UUID, acct_suffix: str = "all") -> str:
+    return f"{_env_prefix()}tax:overseas:{user_id}:{acct_suffix}"
 
 
 def goal_recommendation_key(user_id: uuid.UUID) -> str:
@@ -259,6 +261,22 @@ def composite_alert_sent_key(user_id: uuid.UUID, day: str) -> str:
     포트폴리오 알림을 갖고 있어도 하루 1건만 발송하도록 제한한다.
     """
     return f"{_env_prefix()}rebalancing:composite_sent:{user_id}:{day}"
+
+
+def tax_impact_gate_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:
+    """세금영향 게이트로 AUTO 계획 생성이 보류됐다는 알림이 발송된 알림+일자를 기록하는 키(중복 발송 억제).
+
+    5분 간격 job이 매 tick마다 같은 사유로 계속 차단할 수 있어, 알림당 하루 1건만 발송하도록 제한한다.
+    """
+    return f"{_env_prefix()}rebalancing:tax_gate_sent:{alert_id}:{day}"
+
+
+def market_signal_gate_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:
+    """시장신호 게이트로 AUTO 계획 생성이 보류됐다는 알림이 발송된 알림+일자를 기록하는 키(중복 발송 억제).
+
+    `tax_impact_gate_alert_sent_key`와 동일한 이유(5분 간격 job의 매 tick 재차단) — 알림당 하루 1건만 발송한다.
+    """
+    return f"{_env_prefix()}rebalancing:market_gate_sent:{alert_id}:{day}"
 
 
 async def get_cached_json(redis: RedisType, key: str) -> Any:
@@ -340,6 +358,15 @@ async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> Non
     await _scan_unlink(redis, f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:*")
 
 
+async def invalidate_dividend_caches(redis: RedisType, user_id: uuid.UUID, year: int) -> None:
+    """dividend_summary/dividend_ticker_summary/dividends_positions 캐시를 계좌 조합(acct_suffix)
+    전체에 대해 SCAN+UNLINK로 삭제한다 — `_invalidate_alloc_history`와 동일한 이유(무효화 시점엔
+    어떤 account_id 조합이 캐시됐는지 알 수 없음)."""
+    await _scan_unlink(redis, f"{_env_prefix()}dividend_summary:{user_id}:*")
+    await _scan_unlink(redis, f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}:*")
+    await _scan_unlink(redis, f"{_env_prefix()}dividends:positions:{user_id}:*")
+
+
 async def invalidate_goal_recommendation_caches(redis: RedisType, user_id: uuid.UUID) -> None:
     """목표 역산 추천(전체/기간별) 캐시를 삭제한다 — 목표 설정, 후보 ETF, 계좌 포지션 변경 시 호출."""
     await invalidate_user_caches(
@@ -404,14 +431,13 @@ async def invalidate_asset_account_caches(
     _year = year if year is not None else _date.today().year
     keys = [
         dashboard_summary_key(user_id),
-        dividend_summary_key(user_id),
-        dividend_ticker_summary_key(user_id, _year),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
     ]
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
     await invalidate_user_caches(redis, *keys)
+    await invalidate_dividend_caches(redis, user_id, _year)
     await invalidate_portfolio_overview_cache(redis, user_id)
     await invalidate_rebalancing_analysis_cache_all(redis, user_id)
 
@@ -422,14 +448,12 @@ async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: 
 
     _year = year if year is not None else _date.today().year
     await _invalidate_alloc_history(redis, user_id)
+    await invalidate_dividend_caches(redis, user_id, _year)
+    await _scan_unlink(redis, f"{_env_prefix()}tax:overseas:{user_id}:*")
     await invalidate_user_caches(
         redis,
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
-        dividend_summary_key(user_id),
-        dividend_ticker_summary_key(user_id, _year),
-        dividends_positions_key(user_id),
-        tax_overseas_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
     )

@@ -10,21 +10,26 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { SELECT_SM } from "@/constants/inputStyles";
 
-export default function TaxOptimizationCard() {
+interface TaxOptimizationCardProps {
+  /** 특정 계좌만 필터링해 조회 (미지정 시 전체 계좌 통합) */
+  accountId?: string | null;
+}
+
+export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear);
   const [plannerOpen, setPlannerOpen] = useState(false);
   const [geumtOpen, setGeumtOpen] = useState(false);
 
   const { data: taxData, isLoading: taxLoading } = useQuery({
-    queryKey: QUERY_KEYS.taxSummary(taxYear),
-    queryFn: () => fetchTaxSummary(taxYear),
+    queryKey: QUERY_KEYS.taxSummary(taxYear, accountId),
+    queryFn: () => fetchTaxSummary(taxYear, accountId),
     staleTime: STALE_TIME.LONG,
   });
 
   const { data: positionsData, isLoading: posLoading } = useQuery({
-    queryKey: QUERY_KEYS.overseasPositionsTax,
-    queryFn: fetchOverseasPositionsTax,
+    queryKey: QUERY_KEYS.overseasPositionsTax(accountId),
+    queryFn: () => fetchOverseasPositionsTax(accountId),
     staleTime: STALE_TIME.MEDIUM,
     enabled: plannerOpen,
   });

@@ -1,4 +1,9 @@
-import type { MarketConditionMode, ScheduleType, TriggerCondition } from "@/api/alerts";
+import type {
+  MarketConditionMode,
+  ScheduleType,
+  TaxImpactGateMode,
+  TriggerCondition,
+} from "@/api/alerts";
 
 export const SCHEDULE_OPTIONS: { value: ScheduleType; label: string }[] = [
   { value: "DAILY", label: "매일" },
@@ -86,3 +91,13 @@ export const MARKET_CONDITION_OPTIONS: {
   { value: "CAUTIOUS", label: "신중", desc: "고위험(RED) 신호 시 자동 실행 중단" },
   { value: "STRICT", label: "엄격", desc: "중위험(YELLOW) 이상에서 자동 실행 중단" },
 ];
+
+export const TAX_IMPACT_GATE_OPTIONS: { value: TaxImpactGateMode; label: string; desc: string }[] =
+  [
+    { value: "DISABLED", label: "끄기", desc: "세금영향과 무관하게 자동 실행" },
+    {
+      value: "ENABLED",
+      label: "켜기",
+      desc: "매도로 인한 추정 양도세가 상한을 넘으면 자동 실행 보류",
+    },
+  ];

@@ -51,15 +51,28 @@ def _reject_if_per_account_scope(portfolio: Portfolio) -> None:
         )
 
 
+_AUTO_EXECUTION_ASSET_TYPES = {"STOCK_KIS", "STOCK_KIWOOM"}
+
+
 async def _validate_auto_execution_account(db: AsyncSession, account_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    """AUTO 모드 실행 계좌(account_id 지정됨)가 KIS 연동 계좌인지 검증한다. 아니면 422."""
+    """AUTO 모드 실행 계좌(account_id 지정됨)가 KIS/키움 연동 계좌인지 검증한다. 아니면 422."""
     exec_account = await db.scalar(
         select(AssetAccount).where(AssetAccount.id == account_id, AssetAccount.user_id == user_id)
     )
-    if not exec_account or exec_account.asset_type != "STOCK_KIS":
+    if not exec_account or exec_account.asset_type not in _AUTO_EXECUTION_ASSET_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="자동 실행 계좌는 KIS 연동 계좌만 사용할 수 있습니다",
+            detail="자동 실행 계좌는 KIS/키움 연동 계좌만 사용할 수 있습니다",
+        )
+
+
+def _validate_tax_gate_fields(body: RebalancingAlertCreate) -> None:
+    """세금영향 게이트가 ENABLED인데 상한액이 비어있으면 422 — market_condition_mode와 달리 등급이 아닌
+    금액 임계값이라 "켜져 있는데 상한 없음"은 항상 설정 실수다."""
+    if body.tax_impact_gate_mode == "ENABLED" and body.max_tax_impact_krw is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="세금영향 게이트를 켜려면 상한 금액을 입력해야 합니다",
         )
 
 
@@ -77,6 +90,8 @@ def _apply_alert_fields(alert: RebalancingAlert, body: RebalancingAlertCreate) -
     alert.auto_execution_time = body.auto_execution_time
     alert.notify_time = body.notify_time
     alert.buy_wait_minutes = body.buy_wait_minutes
+    alert.tax_impact_gate_mode = body.tax_impact_gate_mode
+    alert.max_tax_impact_krw = body.max_tax_impact_krw
     alert.is_active = True
 
 
@@ -91,6 +106,7 @@ def _format_test_alert_message(email_sent: bool, push_sent: bool) -> str:
 
 
 def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
+    max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
     return RebalancingAlertResponse(
         id=alert.id,
         portfolio_id=alert.portfolio_id,
@@ -108,6 +124,8 @@ def _build_response(alert: RebalancingAlert) -> RebalancingAlertResponse:
         auto_execution_time=getattr(alert, "auto_execution_time", None),
         notify_time=getattr(alert, "notify_time", "08:30"),
         buy_wait_minutes=getattr(alert, "buy_wait_minutes", 10),
+        tax_impact_gate_mode=getattr(alert, "tax_impact_gate_mode", "DISABLED"),
+        max_tax_impact_krw=(float(max_tax_impact_krw) if max_tax_impact_krw is not None else None),
         last_triggered_at=alert.last_triggered_at,
         created_at=alert.created_at,
         updated_at=alert.updated_at,
@@ -166,9 +184,10 @@ async def upsert_rebalancing_alert(
         if body.account_id is None:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="자동 실행 모드에는 KIS 연동 계좌를 선택해야 합니다",
+                detail="자동 실행 모드에는 KIS/키움 연동 계좌를 선택해야 합니다",
             )
         await _validate_auto_execution_account(db, body.account_id, current_user.id)
+    _validate_tax_gate_fields(body)
 
     alert = await get_alert_by_portfolio(db, portfolio_id, current_user.id)
     if not alert:
@@ -296,6 +315,7 @@ async def upsert_account_rebalancing_alert(
 
     if body.mode == "AUTO":
         await _validate_auto_execution_account(db, account_id, current_user.id)
+    _validate_tax_gate_fields(body)
 
     alert = await get_alert_by_portfolio_and_account(db, portfolio_id, account_id, current_user.id)
     if not alert:

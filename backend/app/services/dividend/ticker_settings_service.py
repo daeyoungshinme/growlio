@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import get_redis
 from app.models.asset import UserTickerSettings
-from app.utils.cache_keys import dividend_info_key, dividend_months_key, dividend_ticker_summary_key
+from app.utils.cache_keys import dividend_info_key, dividend_months_key, invalidate_dividend_caches
 
 logger = structlog.get_logger()
 
@@ -51,7 +51,7 @@ async def upsert_ticker_settings(
 
     redis = await get_redis()
     current_year = date.today().year
-    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
+    await invalidate_dividend_caches(redis, user_id, current_year)
     await redis.delete(dividend_info_key(ticker, market))
     logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
 
@@ -78,7 +78,7 @@ async def delete_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, d
 
     redis = await get_redis()
     current_year = date.today().year
-    await redis.delete(dividend_ticker_summary_key(user_id, current_year))
+    await invalidate_dividend_caches(redis, user_id, current_year)
     await redis.delete(dividend_months_key(ticker, market))
     await redis.delete(dividend_info_key(ticker, market))
     logger.info("ticker_settings_deleted", user_id=str(user_id), ticker=ticker, market=market)

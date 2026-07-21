@@ -267,7 +267,9 @@ describe("api/tax", () => {
   it("fetchOverseasPositionsTax calls GET /tax/overseas-positions", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: [] });
     const result = await fetchOverseasPositionsTax();
-    expect(api.get).toHaveBeenCalledWith("/tax/overseas-positions");
+    expect(api.get).toHaveBeenCalledWith("/tax/overseas-positions", {
+      params: { account_id: undefined },
+    });
     expect(result).toEqual([]);
   });
 
@@ -288,13 +290,17 @@ describe("api/tax", () => {
     };
     vi.mocked(api.get).mockResolvedValue({ data: mockSummary });
     const result = await fetchTaxSummary();
-    expect(api.get).toHaveBeenCalledWith("/tax/summary", { params: undefined });
+    expect(api.get).toHaveBeenCalledWith("/tax/summary", {
+      params: { year: undefined, account_id: undefined },
+    });
     expect(result).toEqual(mockSummary);
   });
 
   it("fetchTaxSummary calls GET /tax/summary with year", async () => {
     vi.mocked(api.get).mockResolvedValue({ data: {} });
     await fetchTaxSummary(2023);
-    expect(api.get).toHaveBeenCalledWith("/tax/summary", { params: { year: 2023 } });
+    expect(api.get).toHaveBeenCalledWith("/tax/summary", {
+      params: { year: 2023, account_id: undefined },
+    });
   });
 });

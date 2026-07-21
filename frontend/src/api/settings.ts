@@ -36,11 +36,13 @@ export interface SettingsData {
   composite_signal_alerts_enabled: boolean;
   market_signal_daily_digest_enabled: boolean;
   goal_achievement_alerts_enabled: boolean;
+  monthly_report_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
   goal_risk_tolerance: GoalRiskTolerance;
   goal_max_weight_pct: number;
   goal_cagr_lookback_years: number;
   goal_short_term_equity_floor_pct: number;
+  auto_rebalancing_max_order_value_krw: number;
 }
 
 export const fetchSettings = (): Promise<SettingsData> => apiGet<SettingsData>("/settings");
@@ -56,6 +58,9 @@ export const updateMarketSignalDigest = (enabled: boolean) =>
 
 export const updateGoalAchievementAlerts = (enabled: boolean) =>
   apiPut("/settings/goal-achievement-alerts", { enabled });
+
+export const updateMonthlyReportAlerts = (enabled: boolean) =>
+  apiPut("/settings/monthly-report-alerts", { enabled });
 
 export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
   apiPut("/settings/goal-candidate-tickers", { tickers });

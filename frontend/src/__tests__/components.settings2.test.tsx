@@ -313,6 +313,8 @@ const mockAlert = (overrides: Partial<RebalancingAlert> = {}): RebalancingAlert 
   auto_execution_time: null,
   notify_time: "09:00",
   buy_wait_minutes: 30,
+  tax_impact_gate_mode: "DISABLED",
+  max_tax_impact_krw: null,
   last_triggered_at: null,
   created_at: "2024-01-01",
   updated_at: "2024-01-01",

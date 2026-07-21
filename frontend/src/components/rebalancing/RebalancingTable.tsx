@@ -68,15 +68,18 @@ export default function RebalancingTable({
         analysis={analysis}
         alertThreshold={alertThreshold}
         onExecute={kisAccounts.length > 0 ? () => setExecutionOpen(true) : undefined}
+        portfolioName={analysis.portfolio_name}
       />
+
+      {/* 재분석 권장 배너 — 데스크탑/모바일 공통 노출 */}
+      {isStale && (
+        <span className="inline-flex text-xs text-amber-600 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/40 rounded-lg px-2.5 py-1">
+          분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
+        </span>
+      )}
 
       {/* 실행 버튼 행 (데스크탑) */}
       <div className="hidden sm:flex items-center gap-2">
-        {isStale && (
-          <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-700/40 rounded-lg px-2.5 py-1">
-            분석 {Math.floor(minutesOld)}분 경과 — 재분석 권장
-          </span>
-        )}
         <div className="flex items-center gap-2 ml-auto">
           {kisAccounts.length === 0 && (
             <span className="text-xs text-gray-500 dark:text-gray-400">
@@ -161,6 +164,11 @@ export default function RebalancingTable({
         className="sm:hidden fixed bottom-16 left-0 right-0 px-4 z-20"
         style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}
       >
+        {kisAccounts.length === 0 && (
+          <div className="text-center text-xs text-gray-500 dark:text-gray-400 bg-white/90 dark:bg-gray-900/90 rounded-t-lg px-2 py-1">
+            KIS 증권계좌 연동 시 자동 주문 가능
+          </div>
+        )}
         <button
           onClick={() => setExecutionOpen(true)}
           disabled={kisAccounts.length === 0}
