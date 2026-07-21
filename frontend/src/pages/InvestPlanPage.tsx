@@ -16,7 +16,6 @@ const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjection
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
-import GoalRecommendationPreviewCard from "@/components/invest/GoalRecommendationPreviewCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import { fmtKrw } from "@/utils/format";
@@ -143,11 +142,6 @@ export default function InvestPlanPage() {
       </div>
 
       <div ref={tabContentRef}>
-        <ErrorBoundary variant="section">
-          <div className="mb-4">
-            <GoalRecommendationPreviewCard />
-          </div>
-        </ErrorBoundary>
         {/* 적립 계획 탭 */}
         {activeTab === "적립 계획" && (
           <>

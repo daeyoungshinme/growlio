@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, fireEvent } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { DCAProjectionPoint, GoalTimeline, YearlyAchievement } from "@/api/invest";
 import type { OverseasPositionDetail } from "@/api/tax";
@@ -33,8 +34,14 @@ vi.mock("@/hooks/useTaxSimulation", async () => {
   return actual;
 });
 
+vi.mock("@/api/rebalancing", () => ({
+  fetchOverallGoalRecommendation: vi.fn(),
+}));
+
 import DCAProjectionChart from "@/components/invest/DCAProjectionChart";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
+import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
+import type { GoalRecommendation } from "@/api/rebalancing";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
 import TaxPlannerSection from "@/components/tax/TaxPlannerSection";
@@ -103,41 +110,175 @@ describe("GoalTimelineCard", () => {
     current_progress_pct: 65.5,
     on_track: true,
     lead_lag_months: 4,
+    acceleration_scenarios: [],
   };
 
-  it("renders with timeline data", () => {
-    renderWithProviders(<GoalTimelineCard timeline={mockTimeline} goalAmount={100000000} />);
-    expect(screen.getByText("목표 달성 전망")).toBeDefined();
+  const notConfiguredRecommendation: GoalRecommendation = {
+    generated_at: "2026-07-21T00:00:00Z",
+    is_configured: false,
+    required_return_pct: null,
+    required_dividend_yield_pct: null,
+    recommended_items: [],
+    expected_return_pct: null,
+    expected_dividend_yield_pct: null,
+    note: null,
+    cagr_lookback_years: 10,
+    risk_tolerance: "CONSERVATIVE",
+    max_weight_pct: 40,
+    market_signal_level: null,
+  };
+
+  function renderCard(timeline: GoalTimeline, goalAmount: number | null) {
+    return renderWithProviders(
+      <MemoryRouter>
+        <GoalTimelineCard timeline={timeline} goalAmount={goalAmount} />
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.mocked(fetchOverallGoalRecommendation).mockResolvedValue(notConfiguredRecommendation);
+  });
+
+  it("renders with timeline data", async () => {
+    renderCard(mockTimeline, 100000000);
+    expect(await screen.findByText("목표 달성 전망")).toBeDefined();
     expect(screen.getByText("65.5%")).toBeDefined();
   });
 
-  it("renders 앞서고 있음 when lead > 0", () => {
-    renderWithProviders(<GoalTimelineCard timeline={mockTimeline} goalAmount={100000000} />);
-    expect(screen.getByText(/개월 앞서고 있음/)).toBeDefined();
+  it("renders 앞서고 있음 when lead > 0", async () => {
+    renderCard(mockTimeline, 100000000);
+    expect(await screen.findByText(/개월 앞서고 있음/)).toBeDefined();
   });
 
-  it("renders 뒤처지고 있음 when lead < 0", () => {
+  it("renders 뒤처지고 있음 when lead < 0", async () => {
     const laggingTimeline = { ...mockTimeline, lead_lag_months: -3, on_track: false };
-    renderWithProviders(<GoalTimelineCard timeline={laggingTimeline} goalAmount={100000000} />);
-    expect(screen.getByText(/개월 뒤처지고 있음/)).toBeDefined();
+    renderCard(laggingTimeline, 100000000);
+    expect(await screen.findByText(/개월 뒤처지고 있음/)).toBeDefined();
   });
 
-  it("renders 계획과 정확히 일치 when lead = 0", () => {
+  it("renders 계획과 정확히 일치 when lead = 0", async () => {
     const exactTimeline = { ...mockTimeline, lead_lag_months: 0 };
-    renderWithProviders(<GoalTimelineCard timeline={exactTimeline} goalAmount={100000000} />);
-    expect(screen.getByText("계획과 정확히 일치")).toBeDefined();
+    renderCard(exactTimeline, 100000000);
+    expect(await screen.findByText("계획과 정확히 일치")).toBeDefined();
   });
 
-  it("renders with null progress", () => {
+  it("renders with null progress", async () => {
     const nullTimeline = { ...mockTimeline, current_progress_pct: null, on_track: null };
-    renderWithProviders(<GoalTimelineCard timeline={nullTimeline} goalAmount={null} />);
-    expect(screen.getByText("목표 달성 전망")).toBeDefined();
+    renderCard(nullTimeline, null);
+    expect(await screen.findByText("목표 달성 전망")).toBeDefined();
   });
 
-  it("shows on_track badge when on_track = false", () => {
+  it("shows on_track badge when on_track = false", async () => {
     const offTrack = { ...mockTimeline, on_track: false };
-    renderWithProviders(<GoalTimelineCard timeline={offTrack} goalAmount={null} />);
-    expect(screen.getByText(/계획 미달/)).toBeDefined();
+    renderCard(offTrack, null);
+    expect(await screen.findByText(/계획 미달/)).toBeDefined();
+  });
+
+  it("hides acceleration section when no scenarios and no recommendation", async () => {
+    renderCard(mockTimeline, 100000000);
+    await screen.findByText("목표 달성 전망");
+    expect(screen.queryByText("더 빨리 달성하려면?")).toBeNull();
+  });
+
+  it("renders acceleration scenarios with both levers and the portfolio CTA", async () => {
+    const withScenarios = {
+      ...mockTimeline,
+      acceleration_scenarios: [
+        {
+          years_earlier: 1,
+          new_expected_goal_date: "2025-01",
+          required_monthly_deposit: 1_250_000,
+          required_annual_deposit: 15_000_000,
+          extra_monthly_deposit: 250_000,
+          required_return_pct: 9.5,
+          extra_return_pct: 2.5,
+        },
+        {
+          years_earlier: 2,
+          new_expected_goal_date: "2024-01",
+          required_monthly_deposit: 1_666_667,
+          required_annual_deposit: 20_000_004,
+          extra_monthly_deposit: 666_667,
+          required_return_pct: null,
+          extra_return_pct: null,
+        },
+      ],
+    };
+    renderCard(withScenarios, 100000000);
+    expect(await screen.findByText("더 빨리 달성하려면?")).toBeDefined();
+    expect(screen.getByText("1년 앞당기기")).toBeDefined();
+    expect(screen.getByText("2년 앞당기기")).toBeDefined();
+    expect(screen.getByText("연 9.5%")).toBeDefined();
+    expect(screen.getByText("이 방법으로는 달성이 어려워요")).toBeDefined();
+    const ctas = screen.getAllByText(/수익률을 높이는 포트폴리오 추천 보기/);
+    expect(ctas).toHaveLength(1);
+    expect(ctas[0].closest("a")).toHaveAttribute("href", "/rebalancing?rtab=포트폴리오");
+  });
+
+  it("shows the goal-recommendation summary once the recommendation query resolves", async () => {
+    vi.mocked(fetchOverallGoalRecommendation).mockResolvedValue({
+      ...notConfiguredRecommendation,
+      is_configured: true,
+      required_return_pct: 7.2,
+      expected_return_pct: 8.5,
+      recommended_items: [{ ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 100 }],
+    });
+    renderCard(mockTimeline, 100000000);
+    expect(await screen.findByText("목표 달성 필요 수익률")).toBeDefined();
+    expect(screen.getByText("+7.20%")).toBeDefined();
+    expect(screen.getByText("+8.50%")).toBeDefined();
+    expect(screen.getByText("추천 종목 1개")).toBeDefined();
+  });
+
+  it("marks a scenario achievable when the recommended portfolio's expected return covers it", async () => {
+    vi.mocked(fetchOverallGoalRecommendation).mockResolvedValue({
+      ...notConfiguredRecommendation,
+      is_configured: true,
+      required_return_pct: 7.2,
+      expected_return_pct: 10,
+    });
+    const withScenarios = {
+      ...mockTimeline,
+      acceleration_scenarios: [
+        {
+          years_earlier: 1,
+          new_expected_goal_date: "2025-01",
+          required_monthly_deposit: 1_250_000,
+          required_annual_deposit: 15_000_000,
+          extra_monthly_deposit: 250_000,
+          required_return_pct: 9.5,
+          extra_return_pct: 2.5,
+        },
+      ],
+    };
+    renderCard(withScenarios, 100000000);
+    expect(await screen.findByText("추천 포트폴리오로 달성 가능")).toBeDefined();
+  });
+
+  it("marks a scenario as short when the recommended portfolio's expected return falls short", async () => {
+    vi.mocked(fetchOverallGoalRecommendation).mockResolvedValue({
+      ...notConfiguredRecommendation,
+      is_configured: true,
+      required_return_pct: 7.2,
+      expected_return_pct: 8,
+    });
+    const withScenarios = {
+      ...mockTimeline,
+      acceleration_scenarios: [
+        {
+          years_earlier: 1,
+          new_expected_goal_date: "2025-01",
+          required_monthly_deposit: 1_250_000,
+          required_annual_deposit: 15_000_000,
+          extra_monthly_deposit: 250_000,
+          required_return_pct: 9.5,
+          extra_return_pct: 2.5,
+        },
+      ],
+    };
+    renderCard(withScenarios, 100000000);
+    expect(await screen.findByText("추천 포트폴리오로는 1.5%p 부족")).toBeDefined();
   });
 });
 

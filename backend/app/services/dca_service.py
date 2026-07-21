@@ -13,9 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
 from app.services.composition_calculator import build_asset_totals
+from app.services.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
 from app.utils.cache_keys import RedisType
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
+
+# 가속 시나리오("N년 더 빨리 달성하려면 월 적립액을 얼마로 늘려야 하는지") 프리셋
+_ACCELERATION_YEARS_PRESETS: tuple[int, ...] = (1, 2, 3)
 
 
 async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
@@ -89,7 +93,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisTyp
     total_assets_krw, *_rest = await build_asset_totals(user_id, db, redis)
 
     goal_timeline = _calc_goal_timeline(
-        initial_value, pmt, r, goal_amount, total_assets_krw, start_date, months_to_goal
+        initial_value, pmt, r, goal_amount, total_assets_krw, start_date, months_to_goal, annual_return_pct
     )
 
     return {
@@ -254,6 +258,7 @@ def _calc_goal_timeline(
     current_actual: float,
     start_date: date,
     months_to_goal: int | None,
+    annual_return_pct: float,
 ) -> dict[str, Any]:
     today = datetime.now(UTC).date()
     elapsed = _elapsed_months(start_date, today)
@@ -276,6 +281,7 @@ def _calc_goal_timeline(
     # 실제 자산 기준으로 목표 달성까지 남은 개월 탐색 (앞서는/뒤처지는 개월 계산)
     lead_lag_months: int | None = None
     actual_expected_goal_date: str | None = None
+    acceleration_scenarios: list[dict[str, Any]] = []
     if months_to_goal and current_actual and projected_now > 0:
         actual_months_to_goal = _calc_months_to_goal(current_actual, pmt, r, goal_amount)
         if actual_months_to_goal:
@@ -285,6 +291,11 @@ def _calc_goal_timeline(
             actual_expected = today + relativedelta(months=actual_months_to_goal)
             actual_expected_goal_date = actual_expected.strftime("%Y-%m")
 
+            if current_actual < goal_amount:
+                acceleration_scenarios = _calc_acceleration_scenarios(
+                    current_actual, pmt, annual_return_pct, goal_amount, actual_months_to_goal, today
+                )
+
     return {
         "months_to_goal": months_to_goal,
         "expected_goal_date": expected_goal_date,
@@ -292,7 +303,43 @@ def _calc_goal_timeline(
         "current_progress_pct": current_progress_pct,
         "on_track": on_track,
         "lead_lag_months": lead_lag_months,
+        "acceleration_scenarios": acceleration_scenarios,
     }
+
+
+def _calc_acceleration_scenarios(
+    pv: float,
+    pmt: float,
+    annual_return_pct: float,
+    goal_amount: float,
+    actual_months_to_goal: int,
+    today: date,
+) -> list[dict[str, Any]]:
+    """현재 페이스보다 N년 더 빨리 목표를 달성하려면 월 적립액(또는 수익률)을 얼마로 늘려야 하는지 역산."""
+    scenarios = []
+    for years in _ACCELERATION_YEARS_PRESETS:
+        target_n_months = actual_months_to_goal - years * 12
+        if target_n_months <= 0:
+            continue
+        required_monthly_deposit = solve_required_monthly_deposit(pv, annual_return_pct, target_n_months, goal_amount)
+        # 적립액은 현재(pmt) 그대로 두고 수익률만 높인다면 필요한 연수익률 — 탐색범위 밖이면 None
+        required_return_pct = solve_required_annual_return_pct(pv, pmt, target_n_months, goal_amount)
+        extra_return_pct = (
+            round(required_return_pct - annual_return_pct, 2) if required_return_pct is not None else None
+        )
+        new_expected = today + relativedelta(months=target_n_months)
+        scenarios.append(
+            {
+                "years_earlier": years,
+                "new_expected_goal_date": new_expected.strftime("%Y-%m"),
+                "required_monthly_deposit": required_monthly_deposit,
+                "required_annual_deposit": round(required_monthly_deposit * 12, 2),
+                "extra_monthly_deposit": round(max(required_monthly_deposit - pmt, 0.0), 2),
+                "required_return_pct": required_return_pct,
+                "extra_return_pct": extra_return_pct,
+            }
+        )
+    return scenarios
 
 
 def _elapsed_months(start: date, end: date) -> int:

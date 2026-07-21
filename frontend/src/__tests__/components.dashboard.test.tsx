@@ -60,6 +60,7 @@ function makeDcaData(expectedGoalDate: string | null): DCAAnalysisData {
       current_progress_pct: 15.0,
       on_track: true,
       lead_lag_months: 0,
+      acceleration_scenarios: [],
     },
     is_configured: true,
   };

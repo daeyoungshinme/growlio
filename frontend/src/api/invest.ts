@@ -16,6 +16,16 @@ export interface YearlyAchievement {
   has_data: boolean;
 }
 
+export interface GoalAccelerationScenario {
+  years_earlier: number;
+  new_expected_goal_date: string;
+  required_monthly_deposit: number;
+  required_annual_deposit: number;
+  extra_monthly_deposit: number;
+  required_return_pct: number | null;
+  extra_return_pct: number | null;
+}
+
 export interface GoalTimeline {
   months_to_goal: number | null;
   expected_goal_date: string | null;
@@ -23,6 +33,7 @@ export interface GoalTimeline {
   current_progress_pct: number | null;
   on_track: boolean | null;
   lead_lag_months: number | null;
+  acceleration_scenarios: GoalAccelerationScenario[];
 }
 
 export interface DCASettings {

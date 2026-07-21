@@ -17,6 +17,17 @@ class YearlyAchievement(BaseModel):
     has_data: bool
 
 
+class GoalAccelerationScenario(BaseModel):
+    years_earlier: int
+    new_expected_goal_date: str  # "2036-04"
+    required_monthly_deposit: float
+    required_annual_deposit: float
+    extra_monthly_deposit: float  # 현재 월 적립액 대비 추가로 필요한 금액
+    # 적립액은 그대로 두고 수익률만 높인다면 필요한 연수익률(%) — 탐색범위(-90%~500%) 밖이면 None(달성 어려움)
+    required_return_pct: float | None
+    extra_return_pct: float | None  # 현재 가정 수익률(goal_annual_return_pct) 대비 추가로 필요한 %p
+
+
 class GoalTimeline(BaseModel):
     months_to_goal: int | None
     expected_goal_date: str | None  # "2039-01" — 최초 계획 기준 달성 예정일
@@ -24,6 +35,8 @@ class GoalTimeline(BaseModel):
     current_progress_pct: float | None  # 대시보드 goal_achievement_pct와 동일 소스(총자산÷목표금액)
     on_track: bool | None
     lead_lag_months: int | None  # 양수=앞서는 개월, 음수=뒤처지는 개월
+    # 현재 페이스보다 N년 더 빨리 달성하려면 월 적립액을 얼마로 늘려야 하는지 역산 — 목표 미달성 시에만 채워짐
+    acceleration_scenarios: list[GoalAccelerationScenario] = []
 
 
 class DCASettings(BaseModel):

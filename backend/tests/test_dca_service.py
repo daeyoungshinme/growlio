@@ -11,6 +11,7 @@ import pytest
 from app.services.dca_service import (
     _build_projection_curve,
     _build_yearly_achievements,
+    _calc_acceleration_scenarios,
     _calc_goal_timeline,
     _calc_months_to_goal,
     _elapsed_months,
@@ -240,7 +241,7 @@ class TestGetDcaAnalysis:
 
 class TestCalcGoalTimeline:
     def test_returns_required_keys(self, override_settings):
-        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 50_000_000.0, 0.0, date(2024, 1, 1), 50)
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 50_000_000.0, 0.0, date(2024, 1, 1), 50, 0.0)
         for key in (
             "months_to_goal",
             "expected_goal_date",
@@ -248,25 +249,26 @@ class TestCalcGoalTimeline:
             "current_progress_pct",
             "on_track",
             "lead_lag_months",
+            "acceleration_scenarios",
         ):
             assert key in result
 
     def test_none_months_to_goal_gives_no_expected_date(self, override_settings):
-        result = _calc_goal_timeline(0.0, 1.0, 0.0, 1e15, 0.0, date(2024, 1, 1), None)
+        result = _calc_goal_timeline(0.0, 1.0, 0.0, 1e15, 0.0, date(2024, 1, 1), None, 0.0)
         assert result["months_to_goal"] is None
         assert result["expected_goal_date"] is None
 
     def test_expected_goal_date_set_when_months_given(self, override_settings):
-        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 12_000_000.0, 0.0, date(2024, 1, 1), 12)
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 12_000_000.0, 0.0, date(2024, 1, 1), 12, 0.0)
         assert result["months_to_goal"] == 12
         assert result["expected_goal_date"] is not None
 
     def test_progress_pct_half_goal(self, override_settings):
-        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 10_000_000.0, 5_000_000.0, date(2024, 1, 1), None)
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 10_000_000.0, 5_000_000.0, date(2024, 1, 1), None, 0.0)
         assert result["current_progress_pct"] == 50.0
 
     def test_zero_goal_amount_gives_none_progress(self, override_settings):
-        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 0.0, 1_000_000.0, date(2024, 1, 1), None)
+        result = _calc_goal_timeline(0.0, 1_000_000.0, 0.0, 0.0, 1_000_000.0, date(2024, 1, 1), None, 0.0)
         assert result["current_progress_pct"] is None
 
     def test_with_return_rate(self, override_settings):
@@ -278,6 +280,7 @@ class TestCalcGoalTimeline:
             current_actual=12_000_000.0,
             start_date=date(2020, 1, 1),
             months_to_goal=120,
+            annual_return_pct=6.0,
         )
         assert result["months_to_goal"] == 120
         assert result["on_track"] is not None
@@ -291,6 +294,7 @@ class TestCalcGoalTimeline:
             current_actual=9_000_000.0,
             start_date=date(2024, 1, 1),
             months_to_goal=10,
+            annual_return_pct=0.0,
         )
         assert result["lead_lag_months"] is not None or result["actual_expected_goal_date"] is not None
 
@@ -303,8 +307,85 @@ class TestCalcGoalTimeline:
             current_actual=0.0,
             start_date=date(2024, 1, 1),
             months_to_goal=50,
+            annual_return_pct=0.0,
         )
         assert result["lead_lag_months"] is None
+
+
+# ── acceleration_scenarios ("N년 더 빨리 달성하려면?" 역산) ─────
+
+
+class TestAccelerationScenarios:
+    def test_monotonic_increase_with_years_earlier(self, override_settings):
+        """더 많이 앞당길수록(years_earlier가 클수록) 필요 월 적립액도 커져야 한다."""
+        result = _calc_goal_timeline(
+            initial_value=0.0,
+            pmt=1_000_000.0,
+            r=0.0,
+            goal_amount=60_000_000.0,
+            current_actual=1_000.0,
+            start_date=date(2020, 1, 1),
+            months_to_goal=60,
+            annual_return_pct=0.0,
+        )
+        scenarios = result["acceleration_scenarios"]
+        assert len(scenarios) == 3
+        years = [s["years_earlier"] for s in scenarios]
+        assert years == sorted(years)
+        deposits = [s["required_monthly_deposit"] for s in scenarios]
+        assert deposits == sorted(deposits)
+        extras = [s["extra_monthly_deposit"] for s in scenarios]
+        assert extras == sorted(extras)
+        assert all(e > 0 for e in extras)
+        assert all(s["required_annual_deposit"] == round(s["required_monthly_deposit"] * 12, 2) for s in scenarios)
+        # 더 많이 앞당길수록(짧은 기간) 적립액 고정 시 필요한 수익률도 커져야 한다
+        returns = [s["required_return_pct"] for s in scenarios]
+        assert all(r is not None for r in returns)
+        assert returns == sorted(returns)
+        assert all(s["extra_return_pct"] == round(s["required_return_pct"] - 0.0, 2) for s in scenarios)
+
+    def test_empty_when_goal_already_achieved(self, override_settings):
+        result = _calc_goal_timeline(
+            initial_value=0.0,
+            pmt=1_000_000.0,
+            r=0.0,
+            goal_amount=60_000_000.0,
+            current_actual=100_000_000.0,
+            start_date=date(2020, 1, 1),
+            months_to_goal=60,
+            annual_return_pct=0.0,
+        )
+        assert result["acceleration_scenarios"] == []
+
+    def test_excludes_presets_with_non_positive_target_months(self, override_settings):
+        """실제 페이스가 이미 12개월 이내면 1년 이상 앞당기는 프리셋은 의미가 없으므로 제외된다."""
+        result = _calc_goal_timeline(
+            initial_value=0.0,
+            pmt=1_000_000.0,
+            r=0.0,
+            goal_amount=10_000_000.0,
+            current_actual=1_000.0,
+            start_date=date(2020, 1, 1),
+            months_to_goal=10,
+            annual_return_pct=0.0,
+        )
+        assert result["acceleration_scenarios"] == []
+
+    def test_required_return_pct_none_when_unreachable(self, override_settings):
+        """적립액 고정 시 탐색범위(연 -90%~500%) 안에서 해가 없으면 None(이 방법으론 달성 어려움)."""
+        scenarios = _calc_acceleration_scenarios(
+            pv=0.0,
+            pmt=1.0,
+            annual_return_pct=0.0,
+            goal_amount=1e15,
+            actual_months_to_goal=13,  # years=1 → target_n_months=1만 포함
+            today=date(2024, 1, 1),
+        )
+        assert len(scenarios) == 1
+        assert scenarios[0]["required_return_pct"] is None
+        assert scenarios[0]["extra_return_pct"] is None
+        # 적립액 쪽 역산(solve_required_monthly_deposit)은 대수적 계산이라 극단값에서도 None이 아니어야 함
+        assert scenarios[0]["required_monthly_deposit"] is not None
 
 
 # ── get_dca_analysis (설정된 케이스) ─────────────────────────
