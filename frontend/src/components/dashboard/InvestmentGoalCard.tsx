@@ -275,9 +275,7 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
         {goalChips.map((chip) => (
           <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-0.5 truncate">
-              {chip.label}
-            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-0.5 truncate">{chip.label}</p>
             {chip.isSet ? (
               <>
                 {chip.content}
@@ -478,15 +476,6 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
           </Link>
         </div>
       )}
-
-      <div className="border-t border-gray-100 dark:border-gray-700 pt-2 mt-2">
-        <Link
-          to="/rebalancing?rtab=포트폴리오"
-          className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline"
-        >
-          목표에 맞는 포트폴리오 추천 보기 <ArrowRight size={12} />
-        </Link>
-      </div>
     </div>
   );
 }

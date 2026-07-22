@@ -65,14 +65,32 @@ describe("GoalSettingWizard", () => {
   beforeEach(() => {
     fetchPortfolioOverviewLite.mockReset();
     fetchGoalFeasibility.mockReset();
-    fetchPortfolioOverviewLite.mockResolvedValue({ total_assets_krw: 100_000_000 });
+    fetchPortfolioOverviewLite.mockResolvedValue({
+      total_assets_krw: 100_000_000,
+      asset_type_allocation: [],
+    });
   });
 
   it("1단계: 현재 자산 힌트를 표시한다", async () => {
     renderWizard();
     expect(screen.getByText("현재 자산 확인")).toBeInTheDocument();
     await waitFor(() => {
-      expect(screen.getByText(/현재 총자산 약/)).toBeInTheDocument();
+      expect(screen.getByText(/현재 투자자산\(부동산 제외\) 약/)).toBeInTheDocument();
+    });
+  });
+
+  it("1단계: 부동산 자산은 현재 자산 힌트/초기값에서 제외된다", async () => {
+    fetchPortfolioOverviewLite.mockResolvedValue({
+      total_assets_krw: 100_000_000,
+      asset_type_allocation: [
+        { type: "STOCK_KIS", amount_krw: 60_000_000, label: "국내주식", pct: 60 },
+        { type: "REAL_ESTATE", amount_krw: 40_000_000, label: "부동산", pct: 40 },
+      ],
+    });
+    renderWizard();
+    await waitFor(() => {
+      // 총자산 100M 중 부동산 40M을 뺀 60M만 초기 자산으로 반영되어야 함
+      expect(screen.getByText(/현재 투자자산\(부동산 제외\) 약 6,000만원/)).toBeInTheDocument();
     });
   });
 
@@ -86,6 +104,7 @@ describe("GoalSettingWizard", () => {
     fireEvent.change(screen.getByLabelText(/목표 금액 \(원\)/), { target: { value: "500000000" } });
     fireEvent.change(screen.getByLabelText(/목표 시점 \(연도\)/), { target: { value: "2045" } });
     expect(screen.getByRole("button", { name: "다음" })).not.toBeDisabled();
+    expect(screen.getByText("500,000,000원 (5.00억원)")).toBeInTheDocument();
   });
 
   it("3단계: 월 적립액을 입력하면 연간 입금 목표가 자동 계산된다", () => {

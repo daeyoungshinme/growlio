@@ -70,15 +70,18 @@ vi.mock("@/components/common/FormInput", () => ({
     value,
     onChange,
     placeholder,
+    preview,
   }: {
     label: string;
     value: string;
     onChange: React.ChangeEventHandler<HTMLInputElement>;
     placeholder?: string;
+    preview?: string;
   }) => (
     <div>
       <label htmlFor={label}>{label}</label>
       <input id={label} value={value} onChange={onChange} placeholder={placeholder} />
+      {preview && <p>{preview}</p>}
     </div>
   ),
 }));
@@ -245,6 +248,22 @@ describe("InvestPlanPage", () => {
     await waitFor(() => {
       expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
     });
+  });
+
+  it("shows live comma/unit preview under amount fields as the user types", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /설정 편집/ })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /설정 편집/ }));
+    await waitFor(() => {
+      expect(screen.getByText("적립 계획 설정 편집")).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText("목표 금액 (원)"), {
+      target: { value: "500000000" },
+    });
+    expect(screen.getByText("500,000,000원 (5.00억원)")).toBeInTheDocument();
   });
 
   it("saves settings successfully", async () => {

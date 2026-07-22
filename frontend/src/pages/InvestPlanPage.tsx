@@ -18,7 +18,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
 import YearlyAchievementTable from "@/components/invest/YearlyAchievementTable";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { invalidateDcaData } from "@/utils/queryInvalidation";
 import FormInput from "@/components/common/FormInput";
 import ConfirmModal from "@/components/common/ConfirmModal";
@@ -335,6 +335,7 @@ export default function InvestPlanPage() {
                 key: "monthly_deposit_amount",
                 placeholder: "500000",
                 inputMode: "numeric",
+                isAmount: true,
               },
               {
                 label: "목표 연수익률 (%)",
@@ -348,6 +349,7 @@ export default function InvestPlanPage() {
                 key: "goal_amount",
                 placeholder: "500000000",
                 inputMode: "numeric",
+                isAmount: true,
               },
               {
                 label: "투자 시작일",
@@ -361,6 +363,7 @@ export default function InvestPlanPage() {
                 placeholder: "100000000",
                 hint: "비워두면 스냅샷 자동 사용",
                 inputMode: "numeric",
+                isAmount: true,
               },
               {
                 label: "연간 입금 목표 (원)",
@@ -368,6 +371,7 @@ export default function InvestPlanPage() {
                 placeholder: "24000000",
                 hint: "대시보드 입금 달성률에 표시",
                 inputMode: "numeric",
+                isAmount: true,
               },
               {
                 label: "은퇴 목표시점 (연도)",
@@ -376,18 +380,22 @@ export default function InvestPlanPage() {
                 hint: "대시보드 투자 목표 카드에 표시",
                 inputMode: "numeric",
               },
-            ].map(({ label, key, placeholder, type, hint, inputMode }) => (
-              <FormInput
-                key={key}
-                label={label}
-                type={type ?? "number"}
-                inputMode={type ? undefined : (inputMode as "numeric" | "decimal")}
-                value={form[key as keyof typeof form]}
-                onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                placeholder={placeholder}
-                hint={hint}
-              />
-            ))}
+            ].map(({ label, key, placeholder, type, hint, inputMode, isAmount }) => {
+              const value = form[key as keyof typeof form];
+              return (
+                <FormInput
+                  key={key}
+                  label={label}
+                  type={type ?? "number"}
+                  inputMode={type ? undefined : (inputMode as "numeric" | "decimal")}
+                  value={value}
+                  onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  preview={isAmount && value ? fmtKrwPreview(Number(value)) : undefined}
+                  hint={hint}
+                />
+              );
+            })}
 
             <div className="flex gap-3 pt-4">
               <button
@@ -435,6 +443,11 @@ export default function InvestPlanPage() {
                 setDividendForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))
               }
               placeholder="10000000"
+              preview={
+                dividendForm.annual_dividend_goal
+                  ? fmtKrwPreview(Number(dividendForm.annual_dividend_goal))
+                  : undefined
+              }
               hint="예상 연배당이 이 금액을 넘으면 목표 달성"
             />
 

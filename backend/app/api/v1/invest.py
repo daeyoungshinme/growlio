@@ -9,7 +9,7 @@ from app.limiter import limiter
 from app.models.user import User
 from app.schemas.invest import DCAAnalysisResponse, DepositGuideItem, GoalFeasibilityPreview
 from app.services import dca_service
-from app.services.composition_calculator import build_asset_totals
+from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.dividend import plan_service as dividend_plan_service
 from app.services.goal_return_solver import (
     DEPOSIT_GUIDE_PRESET_RETURNS_PCT,
@@ -56,7 +56,8 @@ async def get_goal_feasibility(
         pv = initial_amount
     else:
         redis = await get_redis()
-        pv, *_rest = await build_asset_totals(current_user.id, db, redis)
+        total_assets_krw, _, _, by_type = await build_asset_totals(current_user.id, db, redis)
+        pv = exclude_real_estate(total_assets_krw, by_type)
 
     n_months = months_until_year_end(target_year)
     if n_months <= 0:

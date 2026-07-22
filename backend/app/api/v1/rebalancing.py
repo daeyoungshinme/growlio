@@ -167,7 +167,14 @@ async def get_overall_goal_recommendation_endpoint(
     overview = await build_portfolio_overview(current_user.id, db, redis=redis)
     settings_row = await get_settings_row(db, current_user.id)
 
-    base_krw = float(overview.get("total_assets_krw", 0))
+    # 부동산은 목표 역산 추천 MVO 엔진의 후보에 포함되지 않으므로(성장 미모델링) 필요
+    # 수익률 역산의 원금(base_krw)에서 제외 — 그렇지 않으면 부동산 추가만으로 필요
+    # 수익률이 부당하게 낮아지거나 "이미 달성"으로 잘못 판정된다.
+    real_estate_krw = next(
+        (item["amount_krw"] for item in overview.get("asset_type_allocation", []) if item.get("type") == "REAL_ESTATE"),
+        0.0,
+    )
+    base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
     pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
     existing_items = existing_items_from_positions(pos_map)
     return await get_goal_recommendation(redis, base_krw, existing_items, settings_row, db)

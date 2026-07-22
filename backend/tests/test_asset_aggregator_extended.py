@@ -485,6 +485,51 @@ class TestGetDashboardSummary:
         assert result["return_goal_gap_pct"] == pytest.approx(1.5)
 
     @pytest.mark.asyncio
+    async def test_goal_pct_excludes_real_estate_but_total_assets_includes_it(self, mock_db, override_settings):
+        """부동산 순자산은 목표 달성률(goal_achievement_pct) 계산에서는 제외하되,
+        total_assets_krw(총자산 카드·자산배분 차트)에는 그대로 포함되어야 한다."""
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        settings = SimpleNamespace(
+            goal_amount=100_000_000.0,
+            annual_deposit_goal=None,
+            goal_annual_return_pct=None,
+            retirement_target_year=None,
+            annual_dividend_goal=None,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings)
+
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(None, 0.0, 0.0, 0.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(
+                    return_value=(
+                        90_000_000.0,
+                        40_000_000.0,
+                        50_000_000.0,
+                        {"STOCK_KIS": 50_000_000.0, "REAL_ESTATE": 40_000_000.0},
+                    )
+                ),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": None, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        # 총자산 90M 중 부동산 40M을 뺀 투자자산 50M 기준 → 50%
+        assert result["goal_achievement_pct"] == pytest.approx(50.0)
+        # 총자산 카드 자체는 부동산을 포함한 90M 그대로
+        assert result["total_assets_krw"] == pytest.approx(90_000_000.0)
+
+    @pytest.mark.asyncio
     async def test_return_goal_gap_pct_falls_back_to_annualized_return(self, mock_db, override_settings):
         from app.services.asset_aggregator import get_dashboard_summary
 

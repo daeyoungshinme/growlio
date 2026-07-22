@@ -279,6 +279,14 @@ describe("RealEstateAccountModal", () => {
     );
     expect(screen.getByText("저장 중...")).toBeDefined();
   });
+
+  it("shows live comma/unit preview under the 시세 field as the user types", () => {
+    renderWithProviders(
+      <RealEstateAccountModal onClose={vi.fn()} onSubmit={vi.fn()} isLoading={false} />,
+    );
+    fireEvent.change(screen.getByLabelText(/현재 시세/), { target: { value: "800000000" } });
+    expect(screen.getByText("800,000,000원 (8.00억원)")).toBeInTheDocument();
+  });
 });
 
 // ------- RealEstateEditModal -------

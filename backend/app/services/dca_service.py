@@ -10,9 +10,10 @@ from dateutil.relativedelta import relativedelta
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
-from app.services.composition_calculator import build_asset_totals
+from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
 from app.utils.cache_keys import RedisType
 
@@ -90,10 +91,13 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisTyp
 
     # 대시보드 "자산 목표 달성률"과 동일한 소스(build_asset_totals)를 사용해
     # 두 화면의 진행율이 항상 일치하도록 함 — 월별 스냅샷 CTE와는 별도 계산.
-    total_assets_krw, *_rest = await build_asset_totals(user_id, db, redis)
+    # 부동산은 목표 역산 추천/DCA 복리 곡선 어느 쪽도 성장을 모델링하지 않으므로 제외
+    # (부동산 추가만으로 진행율이 왜곡되는 것을 방지 — investable_assets_krw).
+    total_assets_krw, _, _, by_type = await build_asset_totals(user_id, db, redis)
+    investable_assets_krw = exclude_real_estate(total_assets_krw, by_type)
 
     goal_timeline = _calc_goal_timeline(
-        initial_value, pmt, r, goal_amount, total_assets_krw, start_date, months_to_goal, annual_return_pct
+        initial_value, pmt, r, goal_amount, investable_assets_krw, start_date, months_to_goal, annual_return_pct
     )
 
     return {
@@ -116,6 +120,7 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
             AssetSnapshot.snapshot_date >= start_date,
             AssetAccount.is_active == True,  # noqa: E712
             AssetAccount.include_in_total == True,  # noqa: E712
+            AssetAccount.asset_type != AssetType.REAL_ESTATE,
         )
         .group_by(AssetSnapshot.snapshot_date)
         .order_by(AssetSnapshot.snapshot_date.asc())
@@ -133,6 +138,7 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
             AssetSnapshot.snapshot_date < start_date,
             AssetAccount.is_active == True,  # noqa: E712
             AssetAccount.include_in_total == True,  # noqa: E712
+            AssetAccount.asset_type != AssetType.REAL_ESTATE,
         )
         .group_by(AssetSnapshot.snapshot_date)
         .order_by(AssetSnapshot.snapshot_date.desc())
@@ -161,6 +167,7 @@ async def _get_monthly_actual_values(user_id: uuid.UUID, start_date: date, db: A
               AND s.snapshot_date >= :start_date
               AND a.is_active = true
               AND a.include_in_total = true
+              AND a.asset_type != 'REAL_ESTATE'
             GROUP BY s.account_id, to_char(s.snapshot_date, 'YYYY-MM')
         )
         SELECT pam.month, sum(s.amount_krw) AS total
@@ -172,6 +179,7 @@ async def _get_monthly_actual_values(user_id: uuid.UUID, start_date: date, db: A
         WHERE s.user_id = :user_id
           AND a.is_active = true
           AND a.include_in_total = true
+          AND a.asset_type != 'REAL_ESTATE'
         GROUP BY pam.month
         ORDER BY pam.month
     """)

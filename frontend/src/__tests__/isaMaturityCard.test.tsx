@@ -74,6 +74,7 @@ describe("IsaMaturityCard", () => {
     fireEvent.click(screen.getByText("직접 입력"));
     const input = screen.getByPlaceholderText("누적손익(원)");
     fireEvent.change(input, { target: { value: "5000000" } });
+    expect(screen.getByText("5,000,000원 (500만원)")).toBeInTheDocument();
     fireEvent.click(screen.getByText("저장"));
 
     await waitFor(() => expect(updateIsaPnlOverride).toHaveBeenCalledWith("acc1", 5_000_000));

@@ -13,7 +13,7 @@ import {
   MARKET_CONDITION_OPTIONS,
   TAX_IMPACT_GATE_OPTIONS,
 } from "@/constants/rebalancingConfig";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 
 const inputClass = `w-full ${INPUT_SM}`;
@@ -245,6 +245,11 @@ export function AlertAutoModeSection({
               }
               className={inputClass}
             />
+            {form.maxTaxImpactKrw != null && form.maxTaxImpactKrw > 0 && (
+              <p className="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">
+                {fmtKrwPreview(form.maxTaxImpactKrw)}
+              </p>
+            )}
             <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
               매도로 인한 추정 양도세가 이 금액을 넘으면 이번 자동 실행 계획을 만들지 않고
               보류합니다 (참고용 추정치 — 앱에서 알림으로 안내).

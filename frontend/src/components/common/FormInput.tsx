@@ -5,6 +5,8 @@ interface Props extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
   label: string;
   hint?: string;
   error?: string;
+  /** 입력 중인 값을 실시간으로 에코하는 프리뷰 문구 (예: 콤마 구분 금액). error 유무와 무관하게 항상 표시 */
+  preview?: string;
   inputSize?: "sm" | "md";
 }
 
@@ -12,6 +14,7 @@ export default function FormInput({
   label,
   hint,
   error,
+  preview,
   inputSize = "sm",
   id,
   required,
@@ -35,6 +38,9 @@ export default function FormInput({
         required={required}
         {...inputProps}
       />
+      {preview && (
+        <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">{preview}</p>
+      )}
       {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
       {hint && !error && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{hint}</p>}
     </div>

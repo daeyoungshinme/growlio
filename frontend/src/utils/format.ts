@@ -37,6 +37,16 @@ export function fmtKrwShort(n: number): string {
 }
 
 /**
+ * 입력 중인 금액을 콤마 구분 + 억/만원 단위 병기로 표시 (실시간 입력값 확인용)
+ * 예: 5_000_000 → "5,000,000원 (500만원)", 3_000 → "3,000원"
+ */
+export function fmtKrwPreview(n: number): string {
+  const exact = `${Math.floor(n).toLocaleString()}원`;
+  if (Math.abs(n) < 1e4) return exact;
+  return `${exact} (${fmtKrw(n)})`;
+}
+
+/**
  * USD → KRW 환산 (반올림). rate가 없으면 0 반환.
  * 예: convertUsdToKrw(100, 1350) → 135000
  */

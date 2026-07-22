@@ -4,7 +4,7 @@ import Modal from "@/components/common/Modal";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
 
 interface Props {
@@ -186,6 +186,11 @@ export default function BankAccountModal({ initialAccount, onClose, onSubmit, is
                 className={`flex-1 ${INPUT_SM}`}
               />
             </div>
+            {(depositKrw ?? 0) > 0 && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 pl-10">
+                {fmtKrwPreview(depositKrw ?? 0)}
+              </p>
+            )}
             <AmountUnitButtons
               onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)}
               className="pl-10"

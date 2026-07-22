@@ -37,71 +37,129 @@ export function GeumtSimulationSection({ sim, currentOverseasTax }: Props) {
           보유 주식 미실현 손익이 없습니다.
         </p>
       ) : (
-        <div className="rounded-xl border border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900 overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-violet-50 dark:bg-violet-900/20">
-                <th className="text-left px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
-                  구분
-                </th>
-                <th className="text-right px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
-                  국내 주식
-                </th>
-                <th className="text-right px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
-                  해외 주식
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              <tr>
-                <td className="px-3 py-2 text-gray-500 dark:text-gray-400">미실현 손익</td>
-                <td
-                  className={`px-3 py-2 text-right font-medium ${pnlColor(sim.domestic_gain_krw)}`}
-                >
-                  {fmtKrw(sim.domestic_gain_krw)}
-                </td>
-                <td
-                  className={`px-3 py-2 text-right font-medium ${pnlColor(sim.overseas_gain_krw)}`}
-                >
-                  {fmtKrw(sim.overseas_gain_krw)}
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 text-gray-500 dark:text-gray-400">기본공제</td>
-                <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-300">
-                  −{fmtKrw(sim.domestic_deduction_krw)}
-                </td>
-                <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-300">
-                  −{fmtKrw(sim.overseas_deduction_krw)}
-                </td>
-              </tr>
-              <tr>
-                <td className="px-3 py-2 text-gray-500 dark:text-gray-400">과세 표준</td>
-                <td
-                  className={`px-3 py-2 text-right font-medium ${pnlColor(sim.domestic_taxable_krw)}`}
-                >
-                  {fmtKrw(sim.domestic_taxable_krw)}
-                </td>
-                <td
-                  className={`px-3 py-2 text-right font-medium ${pnlColor(sim.overseas_taxable_krw)}`}
-                >
-                  {fmtKrw(sim.overseas_taxable_krw)}
-                </td>
-              </tr>
-              <tr className="bg-violet-50/50 dark:bg-violet-900/10">
-                <td className="px-3 py-2 font-semibold text-violet-700 dark:text-violet-400">
-                  금투세(추정)
-                </td>
-                <td className="px-3 py-2 text-right font-bold text-violet-700 dark:text-violet-400">
-                  {fmtKrw(sim.domestic_tax_krw)}
-                </td>
-                <td className="px-3 py-2 text-right font-bold text-violet-700 dark:text-violet-400">
-                  {fmtKrw(sim.overseas_tax_krw)}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* 모바일: 시장별 카드 레이아웃 */}
+          <div className="sm:hidden space-y-2">
+            {(
+              [
+                {
+                  key: "domestic",
+                  label: "국내 주식",
+                  gain: sim.domestic_gain_krw,
+                  deduction: sim.domestic_deduction_krw,
+                  taxable: sim.domestic_taxable_krw,
+                  tax: sim.domestic_tax_krw,
+                },
+                {
+                  key: "overseas",
+                  label: "해외 주식",
+                  gain: sim.overseas_gain_krw,
+                  deduction: sim.overseas_deduction_krw,
+                  taxable: sim.overseas_taxable_krw,
+                  tax: sim.overseas_tax_krw,
+                },
+              ] as const
+            ).map((mkt) => (
+              <div
+                key={mkt.key}
+                className="rounded-xl border border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900 p-3 space-y-1.5"
+              >
+                <p className="text-xs font-semibold text-violet-600 dark:text-violet-400">
+                  {mkt.label}
+                </p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">미실현 손익</span>
+                  <span className={`font-medium ${pnlColor(mkt.gain)}`}>{fmtKrw(mkt.gain)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">기본공제</span>
+                  <span className="text-gray-600 dark:text-gray-300">−{fmtKrw(mkt.deduction)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">과세 표준</span>
+                  <span className={`font-medium ${pnlColor(mkt.taxable)}`}>
+                    {fmtKrw(mkt.taxable)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm pt-1.5 border-t border-gray-100 dark:border-gray-800">
+                  <span className="font-semibold text-violet-700 dark:text-violet-400">
+                    금투세(추정)
+                  </span>
+                  <span className="font-bold text-violet-700 dark:text-violet-400">
+                    {fmtKrw(mkt.tax)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 데스크탑: 테이블 레이아웃 */}
+          <div className="hidden sm:block overflow-x-auto rounded-xl border border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-violet-50 dark:bg-violet-900/20">
+                  <th className="text-left px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
+                    구분
+                  </th>
+                  <th className="text-right px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
+                    국내 주식
+                  </th>
+                  <th className="text-right px-3 py-2 text-violet-600 dark:text-violet-400 font-medium">
+                    해외 주식
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                <tr>
+                  <td className="px-3 py-2 text-gray-500 dark:text-gray-400">미실현 손익</td>
+                  <td
+                    className={`px-3 py-2 text-right font-medium ${pnlColor(sim.domestic_gain_krw)}`}
+                  >
+                    {fmtKrw(sim.domestic_gain_krw)}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right font-medium ${pnlColor(sim.overseas_gain_krw)}`}
+                  >
+                    {fmtKrw(sim.overseas_gain_krw)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-gray-500 dark:text-gray-400">기본공제</td>
+                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-300">
+                    −{fmtKrw(sim.domestic_deduction_krw)}
+                  </td>
+                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-300">
+                    −{fmtKrw(sim.overseas_deduction_krw)}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2 text-gray-500 dark:text-gray-400">과세 표준</td>
+                  <td
+                    className={`px-3 py-2 text-right font-medium ${pnlColor(sim.domestic_taxable_krw)}`}
+                  >
+                    {fmtKrw(sim.domestic_taxable_krw)}
+                  </td>
+                  <td
+                    className={`px-3 py-2 text-right font-medium ${pnlColor(sim.overseas_taxable_krw)}`}
+                  >
+                    {fmtKrw(sim.overseas_taxable_krw)}
+                  </td>
+                </tr>
+                <tr className="bg-violet-50/50 dark:bg-violet-900/10">
+                  <td className="px-3 py-2 font-semibold text-violet-700 dark:text-violet-400">
+                    금투세(추정)
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-violet-700 dark:text-violet-400">
+                    {fmtKrw(sim.domestic_tax_krw)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-bold text-violet-700 dark:text-violet-400">
+                    {fmtKrw(sim.overseas_tax_krw)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {hasGain && (

@@ -7,10 +7,11 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { invalidateAccountData } from "@/utils/queryInvalidation";
 import { INPUT_SM } from "@/constants/inputStyles";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 function MaturityBadge({ status }: { status: IsaAccountStatus }) {
   if (status.needs_open_date) {
@@ -85,34 +86,41 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
       )}
       <div className="mt-1.5">
         {editing ? (
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              inputMode="decimal"
-              className={`${INPUT_SM} w-32`}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="누적손익(원)"
-            />
-            <button
-              onClick={() => mutation.mutate(Number(value) || 0)}
-              disabled={mutation.isPending}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
-            >
-              저장
-            </button>
-            <button
-              onClick={() => setEditing(false)}
-              className="text-xs text-gray-400 dark:text-gray-500 hover:underline"
-            >
-              취소
-            </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="decimal"
+                className={`${INPUT_SM} w-32`}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                placeholder="누적손익(원)"
+              />
+              <button
+                onClick={() => mutation.mutate(Number(value) || 0)}
+                disabled={mutation.isPending}
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50`}
+              >
+                저장
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-gray-400 dark:text-gray-500 hover:underline`}
+              >
+                취소
+              </button>
+            </div>
+            {value !== "" && !Number.isNaN(Number(value)) && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                {fmtKrwPreview(Number(value))}
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex items-center gap-3">
             <button
               onClick={() => setEditing(true)}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline`}
             >
               직접 입력
             </button>
@@ -120,7 +128,7 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
               <button
                 onClick={() => mutation.mutate(null)}
                 disabled={mutation.isPending}
-                className="text-xs text-gray-400 dark:text-gray-500 hover:underline disabled:opacity-50"
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-gray-400 dark:text-gray-500 hover:underline disabled:opacity-50`}
               >
                 자동 추정으로 되돌리기
               </button>

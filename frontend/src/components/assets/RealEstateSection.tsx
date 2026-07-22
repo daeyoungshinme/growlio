@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import type { AssetAccount, AssetAccountCreate, RealEstateDetails } from "@/api/assets";
 import Modal from "@/components/common/Modal";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { FORM_LABEL, INPUT_SM } from "@/constants/inputStyles";
 import { REAL_ESTATE_ASSET_TYPE } from "@/constants/assets";
@@ -133,6 +133,11 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
                 placeholder="예: 800000000"
                 className={inputCls}
               />
+              {marketValue > 0 && (
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                  {fmtKrwPreview(marketValue)}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="re-create-purchase-price" className={FORM_LABEL}>
@@ -148,6 +153,11 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
                 placeholder="예: 600000000"
                 className={inputCls}
               />
+              {form.purchase_price && (
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                  {fmtKrwPreview(Number(form.purchase_price))}
+                </p>
+              )}
             </div>
           </div>
           <div>
@@ -164,6 +174,11 @@ export function RealEstateAccountModal({ onClose, onSubmit, isLoading }: CreateM
               placeholder="0"
               className={inputCls}
             />
+            {mortgage > 0 && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                {fmtKrwPreview(mortgage)}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input
@@ -342,6 +357,11 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
                 onChange={(e) => setForm({ ...form, market_value: e.target.value })}
                 className={inputCls}
               />
+              {marketValue > 0 && (
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                  {fmtKrwPreview(marketValue)}
+                </p>
+              )}
             </div>
             <div>
               <label htmlFor="re-edit-purchase-price" className={FORM_LABEL}>
@@ -356,6 +376,11 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
                 onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
                 className={inputCls}
               />
+              {form.purchase_price && (
+                <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                  {fmtKrwPreview(Number(form.purchase_price))}
+                </p>
+              )}
             </div>
           </div>
           <div>
@@ -371,6 +396,11 @@ export function RealEstateEditModal({ account, onClose, onSubmit, isLoading }: E
               onChange={(e) => setForm({ ...form, mortgage_balance: e.target.value })}
               className={inputCls}
             />
+            {mortgage > 0 && (
+              <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                {fmtKrwPreview(mortgage)}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <input

@@ -12,6 +12,7 @@ import { toast } from "@/utils/toast";
 import Modal from "@/components/common/Modal";
 import { PositionsTable } from "./PositionsTable";
 import type { Position } from "@/hooks/usePositionsEditor";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Summary {
   total_invested: number;
@@ -141,7 +142,8 @@ export default function StockPositionsModal({
           )}
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400"
+            aria-label="닫기"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 dark:text-gray-400`}
           >
             <X size={18} />
           </button>

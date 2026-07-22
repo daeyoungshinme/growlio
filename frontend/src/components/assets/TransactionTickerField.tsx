@@ -1,6 +1,8 @@
 import type { StockSuggestion } from "@/api/assets";
 import type { TransactionCreate } from "@/api/transactions";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
+import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useForm } from "@/hooks/useForm";
 
 interface AccountPosition {
@@ -45,7 +47,7 @@ export default function TransactionTickerField({
         <label className="text-xs font-medium text-gray-600 dark:text-gray-400">종목 (선택)</label>
         {accountPositions.length > 0 && !tickerDirect ? (
           <select
-            className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`mt-1 w-full ${INPUT_SM}`}
             value={ticker || ""}
             onChange={(e) => {
               if (e.target.value === "__direct__") {
@@ -75,7 +77,7 @@ export default function TransactionTickerField({
                   setTimeout(() => setShowTickerSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)
                 }
                 placeholder="종목명 또는 코드 검색"
-                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full ${INPUT_SM}`}
               />
               {tickerSearchLoading && (
                 <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -115,7 +117,7 @@ export default function TransactionTickerField({
                   set("ticker", "");
                   onTickerQueryChange("");
                 }}
-                className="shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
+                className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap`}
               >
                 ← 목록
               </button>
@@ -130,7 +132,29 @@ export default function TransactionTickerField({
           <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
             보유 종목 참고
           </p>
-          <div className="max-h-28 overflow-y-auto">
+          {/* 모바일 카드 뷰 */}
+          <div className="sm:hidden max-h-28 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700">
+            {accountPositions.map((p) => (
+              <button
+                key={p.ticker}
+                type="button"
+                onClick={() => {
+                  set("ticker", p.name);
+                  setTickerDirect(false);
+                  onTickerQueryChange("");
+                }}
+                className="w-full flex items-center justify-between gap-2 py-1.5 text-left hover:bg-white dark:hover:bg-gray-700 transition-colors"
+              >
+                <span className="text-xs text-gray-700 dark:text-gray-300">{p.name}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                  {p.qty?.toLocaleString() ?? "—"}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* 데스크탑 테이블 뷰 */}
+          <div className="hidden sm:block max-h-28 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-gray-400 dark:text-gray-500">

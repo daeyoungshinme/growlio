@@ -6,6 +6,7 @@ import EmptyState from "@/components/common/EmptyState";
 import { updateAccount, type AssetAccount } from "@/api/assets";
 import { fetchTransactions, deleteTransaction, type Transaction } from "@/api/transactions";
 import { TransactionForm } from "./TransactionForm";
+import DepositReflectPrompt from "./DepositReflectPrompt";
 import { fmtKrw } from "@/utils/format";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
@@ -135,43 +136,45 @@ export default function TransactionHistoryTab({ accounts }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={filterAccountId}
-          onChange={(e) => setFilterAccountId(e.target.value)}
-          className={INPUT_SM}
-        >
-          <option value="">전체 계좌</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value)}
-          className={INPUT_SM}
-        >
-          <option value="">전체 유형</option>
-          <option value="DEPOSIT">입금</option>
-          <option value="WITHDRAWAL">출금</option>
-          <option value="DIVIDEND">배당</option>
-        </select>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(Number(e.target.value))}
-          className={INPUT_SM}
-        >
-          {YEAR_OPTIONS.map((y) => (
-            <option key={y} value={y}>
-              {y}년
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="grid grid-cols-3 gap-2 sm:flex sm:w-auto">
+          <select
+            value={filterAccountId}
+            onChange={(e) => setFilterAccountId(e.target.value)}
+            className={`${INPUT_SM} w-full sm:w-auto`}
+          >
+            <option value="">전체 계좌</option>
+            {accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className={`${INPUT_SM} w-full sm:w-auto`}
+          >
+            <option value="">전체 유형</option>
+            <option value="DEPOSIT">입금</option>
+            <option value="WITHDRAWAL">출금</option>
+            <option value="DIVIDEND">배당</option>
+          </select>
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
+            className={`${INPUT_SM} w-full sm:w-auto`}
+          >
+            {YEAR_OPTIONS.map((y) => (
+              <option key={y} value={y}>
+                {y}년
+              </option>
+            ))}
+          </select>
+        </div>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="ml-auto flex items-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="sm:ml-auto flex items-center justify-center gap-1.5 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
         >
           {showForm ? <ChevronUp size={16} /> : <Plus size={16} />}
           내역 추가
@@ -189,56 +192,21 @@ export default function TransactionHistoryTab({ accounts }: Props) {
       )}
 
       {depositPrompt && (
-        <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
-          <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-1">
-            예수금에 반영할까요?
-          </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mb-3">
-            {fmtKrw(depositPrompt.currentDeposit)}
-            {" → "}
-            {fmtKrw(
-              Math.max(
-                0,
-                depositPrompt.currentDeposit +
-                  (depositPrompt.txType === "WITHDRAWAL"
-                    ? -depositPrompt.amount
-                    : depositPrompt.amount),
-              ),
-            )}
-            {" ("}
-            {depositPrompt.txType === "WITHDRAWAL" ? "-" : "+"}
-            {fmtKrw(depositPrompt.amount)}
-            {")"}
-          </p>
-          <div className="flex gap-2">
-            <button
-              onClick={() => {
-                const next = Math.max(
-                  0,
-                  depositPrompt.currentDeposit +
-                    (depositPrompt.txType === "WITHDRAWAL"
-                      ? -depositPrompt.amount
-                      : depositPrompt.amount),
-                );
-                void updateAccount(depositPrompt.accountId, { deposit_krw: next })
-                  .then(() => {
-                    void invalidateAccountData(qc);
-                  })
-                  .catch(() => {});
-                setDepositPrompt(null);
-              }}
-              className="px-4 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              반영
-            </button>
-            <button
-              onClick={() => setDepositPrompt(null)}
-              className="px-4 py-1.5 text-gray-500 dark:text-gray-400 text-xs rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-            >
-              건너뜀
-            </button>
-          </div>
-        </div>
+        <DepositReflectPrompt
+          depositKrw={depositPrompt.currentDeposit}
+          amount={depositPrompt.amount}
+          txType={depositPrompt.txType}
+          className="rounded-2xl p-4"
+          onApply={(next) => {
+            void updateAccount(depositPrompt.accountId, { deposit_krw: next })
+              .then(() => {
+                void invalidateAccountData(qc);
+              })
+              .catch(() => {});
+            setDepositPrompt(null);
+          }}
+          onSkip={() => setDepositPrompt(null)}
+        />
       )}
 
       <div className="card-overflow">

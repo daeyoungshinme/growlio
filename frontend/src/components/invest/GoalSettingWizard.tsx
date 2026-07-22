@@ -9,7 +9,7 @@ import { fetchGoalFeasibility } from "@/api/invest";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
-import { fmtKrw, fmtPct } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview, fmtPct } from "@/utils/format";
 import { classifyGoalFeasibility } from "@/utils/goalFeasibility";
 import type { GoalForm } from "@/hooks/useGoalSettings";
 
@@ -48,7 +48,11 @@ export default function GoalSettingWizard({
     queryFn: fetchPortfolioOverviewLite,
     staleTime: STALE_TIME.MEDIUM,
   });
-  const currentAssets = overview?.total_assets_krw ?? null;
+  // 부동산은 목표 역산 추천/DCA 복리 곡선이 성장을 모델링하지 않으므로 투자자산
+  // 초기값에서 제외 — 목표 진행율 추적 기준(dca_service.py)과 일치시킨다.
+  const realEstateKrw =
+    overview?.asset_type_allocation?.find((a) => a.type === "REAL_ESTATE")?.amount_krw ?? 0;
+  const currentAssets = overview ? overview.total_assets_krw - realEstateKrw : null;
 
   const goalAmountNum = form.goal_amount ? Number(form.goal_amount) : 0;
   const targetYearNum = form.retirement_target_year ? Number(form.retirement_target_year) : 0;
@@ -129,9 +133,14 @@ export default function GoalSettingWizard({
               value={form.goal_initial_amount}
               onChange={(e) => setForm((f) => ({ ...f, goal_initial_amount: e.target.value }))}
               placeholder={currentAssets != null ? String(Math.round(currentAssets)) : "100000000"}
+              preview={
+                form.goal_initial_amount
+                  ? fmtKrwPreview(Number(form.goal_initial_amount))
+                  : undefined
+              }
               hint={
                 currentAssets != null
-                  ? `현재 총자산 약 ${fmtKrw(currentAssets)} — 비워두면 이 값이 자동 사용됩니다`
+                  ? `현재 투자자산(부동산 제외) 약 ${fmtKrw(currentAssets)} — 비워두면 이 값이 자동 사용됩니다`
                   : "비워두면 스냅샷 자동 사용"
               }
             />
@@ -162,6 +171,7 @@ export default function GoalSettingWizard({
               value={form.goal_amount}
               onChange={(e) => setForm((f) => ({ ...f, goal_amount: e.target.value }))}
               placeholder="500000000"
+              preview={form.goal_amount ? fmtKrwPreview(Number(form.goal_amount)) : undefined}
             />
             <FormInput
               label="목표 시점 (연도)"
@@ -197,6 +207,11 @@ export default function GoalSettingWizard({
                 }));
               }}
               placeholder="500000"
+              preview={
+                form.monthly_deposit_amount
+                  ? fmtKrwPreview(Number(form.monthly_deposit_amount))
+                  : undefined
+              }
             />
             <FormInput
               label="연간 입금 목표 (원)"
@@ -205,6 +220,11 @@ export default function GoalSettingWizard({
               value={form.annual_deposit_goal}
               onChange={(e) => setForm((f) => ({ ...f, annual_deposit_goal: e.target.value }))}
               placeholder="6000000"
+              preview={
+                form.annual_deposit_goal
+                  ? fmtKrwPreview(Number(form.annual_deposit_goal))
+                  : undefined
+              }
               hint="월 적립액 × 12로 자동 계산 — 대시보드 입금 달성률에 표시, 직접 조정 가능"
             />
 

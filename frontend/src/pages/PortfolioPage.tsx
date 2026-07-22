@@ -7,6 +7,7 @@ import { fetchAccounts, syncAllAccounts } from "@/api/assets";
 import { useSyncStore } from "@/stores/syncStore";
 import { useDividendData } from "@/hooks/useDividendData";
 import StockHoldingsTable from "@/components/assets/StockHoldingsTable";
+import HorizonSummaryCard from "@/components/dashboard/HorizonSummaryCard";
 import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
@@ -31,10 +32,10 @@ import { api } from "@/api/client";
 const TaxOptimizationCard = lazy(
   () => import("../components/portfolio-analysis/TaxOptimizationCard"),
 );
+const TaxLimitsSection = lazy(() => import("../components/portfolio-analysis/TaxLimitsSection"));
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
-const AllocationHistoryChart = lazy(() => import("../components/dashboard/AllocationHistoryChart"));
 
 const CHARTS_OPEN_KEY = "portfolio:chartsOpen";
 const fetchOverview = (accountId?: string | null) =>
@@ -252,14 +253,13 @@ export default function PortfolioPage() {
         </div>
       </div>
 
-      <ErrorBoundary variant="section">
-        <Suspense fallback={<SkeletonCard rows={3} height="h-10" />}>
-          <AllocationHistoryChart
-            accountId={selectedAccountId}
-            storageKey="growlio:portfolio:allocationHistoryOpen"
-          />
-        </Suspense>
-      </ErrorBoundary>
+      {/* 특정 계좌 선택 시 overview.accounts가 해당 계좌 1건으로 축소되어
+          상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
+      {!selectedAccountId && (
+        <ErrorBoundary variant="section">
+          <HorizonSummaryCard overview={data} />
+        </ErrorBoundary>
+      )}
 
       {/* 탭 */}
       <div>
@@ -319,11 +319,18 @@ export default function PortfolioPage() {
         )}
 
         {tab === "세금" && (
-          <ErrorBoundary variant="section">
-            <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-              <TaxOptimizationCard accountId={selectedAccountId} />
-            </Suspense>
-          </ErrorBoundary>
+          <div className="space-y-6">
+            <ErrorBoundary variant="section">
+              <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
+                <TaxLimitsSection />
+              </Suspense>
+            </ErrorBoundary>
+            <ErrorBoundary variant="section">
+              <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+                <TaxOptimizationCard accountId={selectedAccountId} />
+              </Suspense>
+            </ErrorBoundary>
+          </div>
         )}
       </div>
     </div>

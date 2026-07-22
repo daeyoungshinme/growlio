@@ -5,6 +5,7 @@ import {
   fmtKrw,
   fmtKrwNullable,
   fmtKrwPrice,
+  fmtKrwPreview,
   fmtKrwShort,
   fmtMonth,
   fmtPct,
@@ -76,6 +77,22 @@ describe("fmtKrwShort", () => {
 
   it("소수점 절삭 (원 단위)", () => {
     expect(fmtKrwShort(3500.75)).toBe("3,500");
+  });
+});
+
+describe("fmtKrwPreview", () => {
+  it("만원 미만은 콤마 구분 원 단위만 표시", () => {
+    expect(fmtKrwPreview(3_000)).toBe("3,000원");
+    expect(fmtKrwPreview(0)).toBe("0원");
+  });
+
+  it("만원 이상은 콤마 구분 + 억/만원 단위 병기", () => {
+    expect(fmtKrwPreview(5_000_000)).toBe("5,000,000원 (500만원)");
+    expect(fmtKrwPreview(150_000_000)).toBe("150,000,000원 (1.50억원)");
+  });
+
+  it("음수 처리", () => {
+    expect(fmtKrwPreview(-50_000)).toBe("-50,000원 (-5만원)");
   });
 });
 

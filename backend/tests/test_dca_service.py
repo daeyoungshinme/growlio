@@ -521,3 +521,35 @@ class TestGetDcaAnalysisConfigured:
 
         assert result["is_configured"] is True
         assert result["goal_timeline"]["current_progress_pct"] == 50.0
+
+    @pytest.mark.asyncio
+    async def test_current_progress_pct_excludes_real_estate(self, mock_db, override_settings):
+        """부동산 계좌 순자산은 목표 진행율 계산에서 제외되어야 한다 — 부동산은 목표 역산
+        추천/DCA 복리 곡선 어느 쪽도 성장을 모델링하지 않으므로, 부동산을 추가/편집한다고
+        해서 진행율이 왜곡되어서는 안 된다."""
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        settings_obj = SimpleNamespace(
+            monthly_deposit_amount=1_000_000,
+            goal_annual_return_pct=7.0,
+            goal_amount=50_000_000.0,
+            goal_start_date=datetime(2020, 1, 1),
+            goal_initial_amount=10_000_000,
+        )
+        mock_db.scalar = AsyncMock(return_value=settings_obj)
+
+        execute_result = MagicMock()
+        execute_result.first.return_value = None
+        execute_result.all.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        # 총자산 45M 중 20M이 부동산 순자산 → 투자자산 기준 25M/50M = 50%
+        with patch(
+            "app.services.dca_service.build_asset_totals",
+            AsyncMock(return_value=(45_000_000.0, 0.0, 0.0, {"REAL_ESTATE": 20_000_000.0})),
+        ):
+            result = await get_dca_analysis(uuid.uuid4(), mock_db)
+
+        assert result["is_configured"] is True
+        assert result["goal_timeline"]["current_progress_pct"] == 50.0

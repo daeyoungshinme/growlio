@@ -217,7 +217,7 @@ export default function StockAccountCard({
               <button
                 onClick={() => onEdit(account)}
                 aria-label="예수금 수정"
-                className="p-2.5 sm:p-1.5 text-gray-300 hover:text-blue-400 transition-colors shrink-0"
+                className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 dark:hover:text-blue-400 transition-colors shrink-0`}
               >
                 <Pencil size={12} />
               </button>

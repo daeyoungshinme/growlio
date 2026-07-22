@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useStockSearch } from "@/hooks/useStockSearch";
 import { SEARCH_DROPDOWN_HIDE_DELAY } from "@/constants/timers";
 import { INPUT_MD, LABEL_MD } from "@/constants/inputStyles";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 interface Position {
   ticker: string;
@@ -84,7 +85,7 @@ export function TickerSearchField({
               onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
               onBlur={() => setTimeout(() => setShowSuggestions(false), SEARCH_DROPDOWN_HIDE_DELAY)}
               placeholder="종목명 또는 코드 검색"
-              className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`w-full ${INPUT_MD}`}
             />
             {isSearching && (
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">
@@ -124,7 +125,7 @@ export function TickerSearchField({
             <button
               type="button"
               onClick={handleBackToList}
-              className="shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap"
+              className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} shrink-0 px-2 text-xs text-blue-500 hover:text-blue-700 whitespace-nowrap`}
             >
               ← 목록
             </button>

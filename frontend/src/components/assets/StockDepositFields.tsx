@@ -1,5 +1,5 @@
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
-import { fmtKrw } from "@/utils/format";
+import { fmtKrw, fmtKrwPreview } from "@/utils/format";
 
 interface Props {
   mode: "create" | "edit";
@@ -49,6 +49,11 @@ export default function StockDepositFields({
               원
             </span>
           </div>
+          {(depositKrw ?? 0) > 0 && (
+            <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+              {fmtKrwPreview(depositKrw ?? 0)}
+            </p>
+          )}
           <AmountUnitButtons onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)} />
         </div>
         <div>
@@ -113,6 +118,11 @@ export default function StockDepositFields({
         />
         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">원</span>
       </div>
+      {(depositKrw ?? 0) > 0 && (
+        <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+          {fmtKrwPreview(depositKrw ?? 0)}
+        </p>
+      )}
       <AmountUnitButtons onAdd={(delta) => setDepositKrw((depositKrw ?? 0) + delta)} />
       <div className="relative">
         <label htmlFor="stock-deposit-usd-edit" className="sr-only">

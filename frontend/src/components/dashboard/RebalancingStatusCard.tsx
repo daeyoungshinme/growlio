@@ -162,6 +162,9 @@ interface Props {
    * buildCombinedStatusNote() 결과를 이미 상단에 표시하는 진단 탭에서 중복을 피하기 위함
    * (기본값 true, 대시보드 카드는 유지). */
   showCombinedNote?: boolean;
+  /** 접기/펼치기 상태 localStorage 키 — 미지정 시 저장하지 않음(RebalancingPage 진단탭처럼
+   * 같은 컴포넌트를 다른 맥락으로 재사용할 때 대시보드와 상태가 뒤섞이지 않도록 기본값 없음). */
+  storageKey?: string;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -183,8 +186,9 @@ export default function RebalancingStatusCard({
   maxDriftRows,
   showHeaderBadge = true,
   showCombinedNote = true,
+  storageKey,
 }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(true);
+  const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,

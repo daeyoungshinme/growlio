@@ -9,7 +9,7 @@ import {
   Transaction,
   updateTransaction,
 } from "@/api/transactions";
-import { convertUsdToKrw } from "@/utils/format";
+import { convertUsdToKrw, fmtKrwPreview } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
@@ -20,6 +20,11 @@ import { transactionSchema } from "@/schemas/transaction";
 import { useTransactionFormState } from "@/hooks/useTransactionFormState";
 import TransactionTickerField from "./TransactionTickerField";
 import DepositReflectPrompt from "./DepositReflectPrompt";
+import { INPUT_SM } from "@/constants/inputStyles";
+import {
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 
 interface Props {
   accountId: string;
@@ -155,7 +160,7 @@ export default function TransactionModal({
         <button
           onClick={onClose}
           aria-label="닫기"
-          className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors`}
         >
           <X size={18} aria-hidden="true" className="text-gray-500 dark:text-gray-400" />
         </button>
@@ -169,7 +174,7 @@ export default function TransactionModal({
             <button
               key={t}
               onClick={() => handleTxTypeChange(t)}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg border transition-colors ${
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 text-sm font-medium rounded-lg border transition-colors ${
                 form.transaction_type === t
                   ? "bg-blue-600 text-white border-blue-600"
                   : "border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-blue-300"
@@ -192,7 +197,7 @@ export default function TransactionModal({
                       key={c}
                       type="button"
                       onClick={() => handleCurrencySwitch(c)}
-                      className={`px-1.5 py-0.5 rounded transition-colors ${
+                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-1.5 rounded transition-colors ${
                         currency === c
                           ? "bg-blue-600 text-white"
                           : "text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
@@ -211,7 +216,7 @@ export default function TransactionModal({
                   <input
                     type="number"
                     inputMode="decimal"
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full ${INPUT_SM}`}
                     value={amountUsd || ""}
                     onChange={(e) => handleUsdAmountChange(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
@@ -226,15 +231,22 @@ export default function TransactionModal({
                 )}
               </div>
             ) : (
-              <input
-                type="number"
-                inputMode="decimal"
-                className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={form.amount || ""}
-                onChange={(e) => set("amount", Number(e.target.value))}
-                placeholder="예: 500000"
-                min={0}
-              />
+              <div>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  className={`mt-1 w-full ${INPUT_SM}`}
+                  value={form.amount || ""}
+                  onChange={(e) => set("amount", Number(e.target.value))}
+                  placeholder="예: 500000"
+                  min={0}
+                />
+                {form.amount > 0 && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                    {fmtKrwPreview(form.amount)}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           {/* 날짜 */}
@@ -250,7 +262,7 @@ export default function TransactionModal({
             <input
               id="tx-date"
               type="date"
-              className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={`mt-1 w-full ${INPUT_SM}`}
               value={form.transaction_date}
               onChange={(e) => set("transaction_date", e.target.value)}
             />
@@ -285,7 +297,7 @@ export default function TransactionModal({
           </label>
           <input
             id="tx-notes"
-            className="mt-1 w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className={`mt-1 w-full ${INPUT_SM}`}
             value={form.notes || ""}
             onChange={(e) => set("notes", e.target.value)}
             placeholder="메모 입력"

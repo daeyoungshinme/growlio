@@ -7,7 +7,6 @@ import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import HeroSummaryCard from "@/components/dashboard/HeroSummaryCard";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
-import TaxHorizonSummarySection from "@/components/dashboard/TaxHorizonSummarySection";
 import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfolioBanner";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -178,6 +177,7 @@ export default function DashboardPage() {
               signalDisplay="badge"
               marketSignal={marketSignal}
               onPortfolioSelect={(id) => navigate(`/rebalancing?rtab=포트폴리오&portfolioId=${id}`)}
+              storageKey="growlio:dashboard:rebalancingStatusOpen"
             />
           </Suspense>
         </ErrorBoundary>
@@ -187,16 +187,11 @@ export default function DashboardPage() {
           <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
         </ErrorBoundary>
 
-        {/* 주식 투자 현황 */}
+        {/* 주식 투자 현황 (투자기간별 자산현황·배당·세금 한도 요약 포함) */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard />}>
             <InvestmentSnapshotCard overview={overview} data={data} />
           </Suspense>
-        </ErrorBoundary>
-
-        {/* 세제·기간 현황 (투자기간/ISA/연금저축·IRP 통합, 니치 정보라 하단 배치) */}
-        <ErrorBoundary variant="section">
-          <TaxHorizonSummarySection overview={overview} />
         </ErrorBoundary>
 
         {/* 자산 추이 — 과거지향 정보라 최하단 유지 */}

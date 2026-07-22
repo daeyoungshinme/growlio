@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { Pencil } from "lucide-react";
+import { INPUT_SM } from "@/constants/inputStyles";
+import {
+  TOUCH_TARGET_COMPACT_MOBILE_ONLY,
+  TOUCH_TARGET_MIN_MOBILE_ONLY,
+} from "@/constants/uiSizes";
 
 interface Props {
   name: string;
@@ -34,7 +39,7 @@ export default function EditableNameField({
 
   if (editMode) {
     return (
-      <div className={`flex items-center gap-1.5 ${className ?? ""}`}>
+      <div className={`flex flex-wrap items-center gap-1.5 ${className ?? ""}`}>
         <input
           type="text"
           value={value}
@@ -44,17 +49,17 @@ export default function EditableNameField({
             if (e.key === "Enter") handleSave();
             if (e.key === "Escape") handleCancel();
           }}
-          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2 py-0.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className={`flex-1 min-w-0 ${INPUT_SM}`}
         />
         <button
           onClick={handleSave}
-          className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium"
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium`}
         >
           저장
         </button>
         <button
           onClick={handleCancel}
-          className="text-xs text-gray-400 dark:text-gray-500 hover:underline"
+          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} px-2 text-xs text-gray-400 dark:text-gray-500 hover:underline`}
         >
           취소
         </button>
@@ -72,7 +77,7 @@ export default function EditableNameField({
         }}
         title="계좌명 수정"
         aria-label="계좌명 수정"
-        className="p-2.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0"
+        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors shrink-0`}
       >
         <Pencil size={pencilSize} />
       </button>

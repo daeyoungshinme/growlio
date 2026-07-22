@@ -10,7 +10,7 @@ import {
 } from "@/api/transactions";
 import { useExchangeRate } from "@/hooks/useExchangeRate";
 import { useForm } from "@/hooks/useForm";
-import { formatUsdAsKrw } from "@/utils/format";
+import { formatUsdAsKrw, fmtKrwPreview } from "@/utils/format";
 import { invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { TX_LABELS, TX_TYPES, CURRENCY_TYPES } from "@/constants/transaction";
@@ -250,6 +250,11 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
                   placeholder="예: 500000"
                   className={`${inputCls} mt-1`}
                 />
+                {form.amount > 0 && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">
+                    {fmtKrwPreview(form.amount)}
+                  </p>
+                )}
                 <AmountUnitButtons
                   onAdd={(delta) => setField("amount", (form.amount ?? 0) + delta)}
                 />
@@ -301,6 +306,7 @@ export function TransactionForm({ accounts, editingTx, onSuccess, onCancel }: Pr
           value={form.fee ?? ""}
           onChange={(e) => setField("fee", e.target.value ? Number(e.target.value) : undefined)}
           placeholder="예: 350"
+          preview={form.fee ? fmtKrwPreview(form.fee) : undefined}
         />
         <div className="flex justify-end gap-2">
           <button

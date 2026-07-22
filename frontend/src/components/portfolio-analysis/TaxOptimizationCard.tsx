@@ -85,41 +85,39 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             </div>
           )}
 
-          <div className="flex divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
-            <div className="flex-1 min-w-0 px-3 py-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-200 dark:divide-gray-700 bg-gray-50 dark:bg-gray-800 rounded-xl overflow-hidden">
+            <div className="min-w-0 px-3 py-2.5">
               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
                 배당소득세
               </p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.dividend_tax_krw)}
               </p>
-              <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
                 배당수령 {fmtKrw(taxData.dividend_income_krw)} ×{" "}
                 {taxData.rates.dividend_tax_rate_pct}%
               </p>
             </div>
-            <div className="flex-1 min-w-0 px-3 py-2.5">
+            <div className="min-w-0 px-3 py-2.5">
               <p className="text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
                 해외 양도세
               </p>
               <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5 truncate">
                 {fmtKrw(taxData.overseas_tax_estimated_krw)}
               </p>
-              <p className="hidden sm:block text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">
                 미실현 {fmtKrw(taxData.overseas_unrealized_gain_krw)} (
                 {taxData.rates.overseas_tax_rate_pct}%)
               </p>
             </div>
-            <div className="flex-1 min-w-0 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20">
+            <div className="min-w-0 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20">
               <p className="text-xs text-blue-600 dark:text-blue-400 font-medium truncate">
                 예상 납부
               </p>
               <p className="text-base font-bold text-blue-700 dark:text-blue-300 mt-0.5 truncate">
                 {fmtKrw(taxData.total_estimated_tax_krw)}
               </p>
-              <p className="hidden sm:block text-xs text-blue-500 dark:text-blue-500 mt-0.5">
-                {taxYear}년 기준
-              </p>
+              <p className="text-xs text-blue-500 dark:text-blue-500 mt-0.5">{taxYear}년 기준</p>
             </div>
           </div>
 

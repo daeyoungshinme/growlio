@@ -7,6 +7,7 @@ import { pnlColor } from "@/utils/colors";
 import type { PortfolioPosition, DividendYield } from "@/types";
 import EmptyState from "@/components/common/EmptyState";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const MOBILE_CARD_VIRTUALIZE_THRESHOLD = 10;
 const MOBILE_CARD_HEIGHT = 80; // 카드 평균 높이 (px)
@@ -178,13 +179,13 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="종목명 또는 티커 검색"
-                className={`${INPUT_SM} pl-8 pr-8`}
+                className={`${INPUT_SM} pl-8 pr-10`}
               />
               {query && (
                 <button
                   onClick={() => setQuery("")}
                   aria-label="검색어 지우기"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded"
+                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} absolute right-0 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded`}
                 >
                   <X size={14} />
                 </button>

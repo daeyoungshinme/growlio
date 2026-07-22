@@ -100,9 +100,10 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 - **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동).
 - **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
-- **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드 (DashboardPage).
-- **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드 (DashboardPage).
-- **`components/dashboard/TaxHorizonSummarySection.tsx`** — 위 두 카드를 묶는 세금 현황 요약 섹션 (DashboardPage).
+- **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
+- **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
+- **`components/dashboard/TaxLimitsBanner.tsx`** — `InvestmentSnapshotCard`("주식 투자 현황") 안에 4번째 하위 섹션으로 임베드되는 세금 한도 요약 행. ISA 임박 만기/한도초과·연금공제 달성률을 한 줄로 보여주고 `/assets?tab=투자현황&portfolioTab=세금`으로 딥링크(상세 카드 자체는 여전히 홈에 렌더하지 않음). 계산 로직은 `useTaxLimitsSummary` 훅(`hooks/useTaxLimitsSummary.ts`)에 있으며, 같은 훅을 `InvestmentSnapshotCard`가 헤더 경고 배지·collapsedHint 계산에도 재사용한다(React Query 캐시 공유로 요청 중복 없음).
+- **`components/portfolio-analysis/TaxLimitsSection.tsx`** — 자산탭 세금 서브탭에서 `IsaMaturityCard`/`PensionContributionCard`를 묶는 접이식 카드("한도·기한 현황"). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음).
 - **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load).
 - **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 4단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안 — `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
 
@@ -125,6 +126,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
 - `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
+- `useTaxLimitsSummary.ts` — ISA 만기·연금 공제한도·세금 추정 현황을 한 줄 요약(`parts`/`warningText`)으로 계산. `TaxLimitsBanner.tsx`(본문)와 `InvestmentSnapshotCard.tsx`(헤더 경고 배지·collapsedHint) 양쪽에서 호출
 - `useAssetManagementData.ts` — 자산관리 페이지 전용 데이터 훅 (accounts + portfolio overview + transactions 통합)
 - `useAssetModals.ts` — 자산관리 페이지 모달 열기/닫기 상태 통합 관리
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
@@ -260,7 +262,7 @@ cd frontend && npx playwright test
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별) | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용 |
 | ISA 만기 현황 | `["isa-status"]` |
 | 연금 납입 현황 | `["pension-contribution", year]` |
-| 자산배분 이력 (accountId 지정 시 계좌별, PortfolioPage/DashboardPage 공용) | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용 |
+| 자산배분 이력 (DashboardPage 전용, accountId 지정 시 계좌별) | `["allocation-history", months, accountId]` — `allocationHistoryBase` 무효화 전용 |
 | 알림 발송 이력 | `["alert-history"]` |
 | 인사이트/진단 | `["insights"]` |
 | 포트폴리오 리스크 지표 | `["portfolio-risk", id]` |

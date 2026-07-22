@@ -166,6 +166,26 @@ class TestGoalFeasibility:
         data = resp.json()
         assert data["pv"] == 200_000_000
 
+    def test_fallback_excludes_real_estate_from_asset_total(self, override_settings):
+        """initial_amount 미지정 시 폴백으로 쓰는 총자산에서 부동산 순자산은 제외해야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+        with (
+            patch(
+                "app.api.v1.invest.build_asset_totals",
+                AsyncMock(return_value=(200_000_000, 0, 0, {"REAL_ESTATE": 80_000_000})),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get(
+                "/api/v1/invest/goal-feasibility",
+                params={"goal_amount": 500_000_000, "target_year": 2040, "monthly_deposit_amount": 1_000_000},
+            )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["pv"] == 120_000_000
+
     def test_already_achieved_returns_none_with_note(self, override_settings):
         user = _make_user()
         db = _make_mock_db()

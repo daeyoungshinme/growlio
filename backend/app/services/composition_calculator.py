@@ -163,3 +163,13 @@ async def build_asset_totals(
         total_assets_krw += amount
 
     return total_assets_krw, total_invested, stock_value, by_type
+
+
+def exclude_real_estate(total_assets_krw: float, by_type: dict[str, float]) -> float:
+    """목표 진행율·필요수익률 등 '투자자산' 기준 계산에서 부동산 순자산을 제외한다.
+
+    부동산은 목표 역산 추천(MVO)의 후보에 포함되지 않고 DCA 복리 곡선도 부동산 가치
+    상승을 모델링하지 않으므로, 부동산을 포함한 총자산을 그대로 쓰면 부동산 추가만으로
+    진행율이 왜곡된다. 대시보드 총자산/자산배분 등 순자산 표시에는 영향 없음(호출부 한정).
+    """
+    return total_assets_krw - by_type.get(AssetType.REAL_ESTATE, 0.0)

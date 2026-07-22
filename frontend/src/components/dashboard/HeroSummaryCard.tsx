@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { pnlColor } from "@/utils/colors";
 import { ASSET_TYPE_LABELS } from "@/constants";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
 import type { DashboardData } from "@/api/dashboard";
 
@@ -89,7 +90,7 @@ export default memo(function HeroSummaryCard({
                 <button
                   onClick={onSync}
                   disabled={syncing}
-                  className="lg:hidden p-2 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50"
+                  className={`lg:hidden -m-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors disabled:opacity-50 ${TOUCH_TARGET_MIN_MOBILE_ONLY}`}
                   aria-label="데이터 갱신"
                 >
                   <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />

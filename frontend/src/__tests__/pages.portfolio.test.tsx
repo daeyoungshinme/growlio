@@ -31,6 +31,7 @@ vi.mock("@/api/client", () => {
 vi.mock("@/api/assets", () => ({
   syncAllAccounts: vi.fn().mockResolvedValue({ total: 2, status: "started" }),
   fetchAccounts: vi.fn().mockResolvedValue([]),
+  INVESTMENT_HORIZON_LABELS: { SHORT_TERM: "단기", MID_TERM: "중기", LONG_TERM: "장기" },
 }));
 
 vi.mock("@/hooks/useRegisterRefresh", () => ({
@@ -55,8 +56,8 @@ vi.mock("../components/portfolio/DomesticForeignBar", () => ({
 vi.mock("../components/portfolio-analysis/TaxOptimizationCard", () => ({
   default: () => <div data-testid="tax-optimization">TaxOptimizationCard</div>,
 }));
-vi.mock("../components/dashboard/AllocationHistoryChart", () => ({
-  default: () => <div data-testid="allocation-chart">AllocationHistoryChart</div>,
+vi.mock("../components/portfolio-analysis/TaxLimitsSection", () => ({
+  default: () => <div data-testid="tax-limits-section">TaxLimitsSection</div>,
 }));
 
 vi.mock("@/components/assets/StockHoldingsTable", () => ({
@@ -216,7 +217,7 @@ describe("PortfolioPage", () => {
     });
   });
 
-  it("'세금' 탭을 선택하면 TaxOptimizationCard가 렌더링된다", async () => {
+  it("'세금' 탭을 선택하면 TaxLimitsSection과 TaxOptimizationCard가 함께 렌더링된다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -224,6 +225,7 @@ describe("PortfolioPage", () => {
     });
     renderPortfolio("?portfolioTab=세금");
     await waitFor(() => {
+      expect(screen.getByTestId("tax-limits-section")).toBeInTheDocument();
       expect(screen.getByTestId("tax-optimization")).toBeInTheDocument();
     });
   });
@@ -279,6 +281,75 @@ describe("PortfolioPage", () => {
     await waitFor(() => {
       expect(screen.getByText("전체 계좌 (2개)")).toBeInTheDocument();
     });
+  });
+
+  it("계좌에 투자기간 태그가 있으면 투자기간별 자산현황이 표시된다", async () => {
+    const horizonData = {
+      ...mockPortfolioData,
+      accounts: [
+        {
+          id: "acc-1",
+          asset_type: "STOCK_KIS",
+          name: "KIS 계좌",
+          amount_krw: 30_000_000,
+          investment_horizon: "LONG_TERM",
+        },
+        {
+          id: "acc-2",
+          asset_type: "STOCK_KIWOOM",
+          name: "키움 계좌",
+          amount_krw: 20_000_000,
+          investment_horizon: "SHORT_TERM",
+        },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: horizonData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    await waitFor(() => {
+      expect(screen.getByText("투자기간별 자산현황")).toBeInTheDocument();
+    });
+  });
+
+  it("특정 계좌를 선택하면 투자기간 태그가 있어도 투자기간별 자산현황을 표시하지 않는다", async () => {
+    const horizonData = {
+      ...mockPortfolioData,
+      accounts: [
+        {
+          id: "acc-1",
+          asset_type: "STOCK_KIS",
+          name: "KIS 계좌",
+          amount_krw: 30_000_000,
+          investment_horizon: "LONG_TERM",
+        },
+      ],
+    };
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: horizonData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio("?account=acc-1");
+    await waitFor(() => {
+      expect(screen.getByText("주식 총평가액")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
+  });
+
+  it("계좌에 투자기간 태그가 없으면 투자기간별 자산현황을 표시하지 않는다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio();
+    await waitFor(() => {
+      expect(screen.getByText("주식 총평가액")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
   });
 
   it("전체 갱신 버튼을 클릭하면 백그라운드 동기화를 시작하고 진행 상태를 표시한다", async () => {

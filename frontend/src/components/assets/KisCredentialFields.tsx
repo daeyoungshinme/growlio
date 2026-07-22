@@ -1,6 +1,7 @@
 import { CheckCircle, XCircle } from "lucide-react";
 import type { AssetAccountCreate } from "@/api/assets";
 import { INPUT_SM } from "@/constants/inputStyles";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useForm } from "@/hooks/useForm";
 
 interface Props {
@@ -99,7 +100,7 @@ export default function KisCredentialFields({
             type="button"
             onClick={onVerify}
             disabled={verifyState === "loading" || !form.kis_app_key || !form.kis_app_secret}
-            className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50 transition-colors`}
           >
             {verifyState === "loading" ? "확인 중..." : "자격증명 확인"}
           </button>

@@ -21,22 +21,14 @@ export default function SetupTargetPortfolioBanner() {
   return (
     <div
       role="status"
-      className="flex items-start gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4"
+      className="flex items-center gap-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl px-4 py-2.5"
     >
-      <Anchor
-        size={20}
-        className="mt-0.5 shrink-0 text-blue-500 dark:text-blue-400"
-        aria-hidden="true"
-      />
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-blue-900 dark:text-blue-200">
-          전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요
-        </p>
-        <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">
-          계좌를 선택하지 않으면 전체 투자 자산을 기준으로 목표 비중과 리밸런싱을 관리할 수
-          있습니다.
-        </p>
+      <div className="p-1.5 rounded-lg shrink-0 bg-blue-100/60 dark:bg-blue-900/40">
+        <Anchor size={16} className="text-blue-500 dark:text-blue-400" aria-hidden="true" />
       </div>
+      <p className="flex-1 min-w-0 text-sm font-medium text-blue-900 dark:text-blue-200 truncate">
+        전체 투자 자산에 대한 기준 포트폴리오를 만들어보세요
+      </p>
       <Link
         to="/rebalancing?rtab=포트폴리오"
         className="shrink-0 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"

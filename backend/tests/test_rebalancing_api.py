@@ -131,6 +131,73 @@ class TestRebalancingHistory:
             app.dependency_overrides.pop(get_db, None)
 
 
+class TestGoalRecommendationEndpoint:
+    def test_base_krw_excludes_real_estate(self, override_settings):
+        """부동산은 목표 역산 추천 MVO 엔진의 후보가 아니고 성장도 모델링되지 않으므로,
+        필요 수익률 역산 원금(base_krw)에서 제외되어야 한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings_row = SimpleNamespace(goal_amount=100_000_000.0)
+        db.scalar = AsyncMock(return_value=settings_row)
+
+        overview = {
+            "total_assets_krw": 90_000_000.0,
+            "asset_type_allocation": [
+                {"type": "STOCK_KIS", "amount_krw": 50_000_000.0},
+                {"type": "REAL_ESTATE", "amount_krw": 40_000_000.0},
+            ],
+        }
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_redis",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    new_callable=AsyncMock,
+                    return_value=overview,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_settings_row",
+                    new_callable=AsyncMock,
+                    return_value=settings_row,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.query_latest_position_map",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_goal_recommendation",
+                    new_callable=AsyncMock,
+                    return_value={
+                        "generated_at": "2024-01-01T00:00:00Z",
+                        "is_configured": True,
+                        "required_return_pct": 5.0,
+                    },
+                ) as mock_get_rec,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    "/api/v1/rebalancing/goal-recommendation",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            # 총자산 90M - 부동산 40M = 투자자산 50M이 필요수익률 역산 원금으로 전달되어야 함
+            call_args = mock_get_rec.call_args
+            assert call_args.args[1] == 50_000_000.0
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+
 class TestDriftSummary:
     def test_composite_signal_alerts_disabled_forces_has_composite_signal_false(self, override_settings):
         """유저가 composite_signal_alerts_enabled=False로 꺼두면, 실제 신호 상태와 무관하게

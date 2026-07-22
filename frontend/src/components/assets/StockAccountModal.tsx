@@ -5,6 +5,8 @@ import Tooltip from "@/components/common/Tooltip";
 import type { AssetAccount, AssetAccountCreate } from "@/api/assets";
 import { ACCOUNT_TAX_TYPE_LABELS, INVESTMENT_HORIZON_LABELS, ISA_TYPE_LABELS } from "@/api/assets";
 import { INPUT_SM, TEXTAREA_SM } from "@/constants/inputStyles";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { useCurrencyInput } from "@/hooks/useCurrencyInput";
 import { useForm } from "@/hooks/useForm";
 import { useKisCredentialVerify } from "@/hooks/useKisCredentialVerify";
@@ -79,6 +81,9 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
     !isKis || isEdit || (kisAccountNoValid && !!form.kis_app_key && !!form.kis_app_secret);
 
   const { verifyState, verifyError, verify, reset: resetVerify } = useKisCredentialVerify();
+
+  const [depositSectionOpen, toggleDepositSection] = useCollapsible(true);
+  const [credentialSectionOpen, toggleCredentialSection] = useCollapsible(true);
 
   const handleVerify = async () => {
     if (!form.kis_app_key || !form.kis_app_secret) return;
@@ -269,7 +274,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label
                   htmlFor="stock-tax-type"
@@ -324,7 +329,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
             </div>
 
             {form.tax_type === "ISA" && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label
                     htmlFor="stock-isa-open-date"
@@ -365,71 +370,88 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
               </div>
             )}
 
-            {/* MANUAL 예수금 */}
-            {form.data_source === "MANUAL" && (
-              <StockDepositFields
-                mode="create"
-                depositKrw={depositKrw}
-                depositUsd={depositUsd}
-                setDepositKrw={setDepositKrw}
-                setDepositUsd={setDepositUsd}
-                usdRate={usdRate}
-                usdAsKrw={usdAsKrw}
-                totalKrw={totalKrw}
-                hasAnyDeposit={hasAnyDeposit}
-              />
+            {/* 예수금 */}
+            {(form.data_source === "MANUAL" || (isEdit && form.data_source !== "MANUAL")) && (
+              <CollapsibleSection
+                label="예수금"
+                isOpen={depositSectionOpen}
+                onToggle={toggleDepositSection}
+              >
+                {form.data_source === "MANUAL" ? (
+                  <StockDepositFields
+                    mode="create"
+                    depositKrw={depositKrw}
+                    depositUsd={depositUsd}
+                    setDepositKrw={setDepositKrw}
+                    setDepositUsd={setDepositUsd}
+                    usdRate={usdRate}
+                    usdAsKrw={usdAsKrw}
+                    totalKrw={totalKrw}
+                    hasAnyDeposit={hasAnyDeposit}
+                  />
+                ) : (
+                  <StockDepositFields
+                    mode="edit"
+                    depositKrw={depositKrw}
+                    depositUsd={depositUsd}
+                    setDepositKrw={setDepositKrw}
+                    setDepositUsd={setDepositUsd}
+                    usdRate={usdRate}
+                    usdAsKrw={usdAsKrw}
+                    totalKrw={totalKrw}
+                    hasAnyDeposit={hasAnyDeposit}
+                  />
+                )}
+              </CollapsibleSection>
             )}
 
-            {/* 편집 모드: KIS/키움 예수금 수동 보정 */}
-            {isEdit && form.data_source !== "MANUAL" && (
-              <StockDepositFields
-                mode="edit"
-                depositKrw={depositKrw}
-                depositUsd={depositUsd}
-                setDepositKrw={setDepositKrw}
-                setDepositUsd={setDepositUsd}
-                usdRate={usdRate}
-                usdAsKrw={usdAsKrw}
-                totalKrw={totalKrw}
-                hasAnyDeposit={hasAnyDeposit}
-              />
-            )}
+            {/* 계좌 연동 자격증명 */}
+            {(form.data_source === "KIS_API" || form.data_source === "KIWOOM_API") && (
+              <CollapsibleSection
+                label="계좌 연동 자격증명"
+                isOpen={credentialSectionOpen}
+                onToggle={toggleCredentialSection}
+              >
+                <div className="space-y-3">
+                  {form.data_source === "KIS_API" && (
+                    <KisCredentialFields
+                      form={form}
+                      set={set}
+                      isEdit={isEdit}
+                      kisAccountNoValid={kisAccountNoValid}
+                      verifyState={verifyState}
+                      verifyError={verifyError}
+                      onVerify={handleVerify}
+                      onCredentialChange={resetVerify}
+                    />
+                  )}
 
-            {/* KIS 자격증명 */}
-            {form.data_source === "KIS_API" && (
-              <KisCredentialFields
-                form={form}
-                set={set}
-                isEdit={isEdit}
-                kisAccountNoValid={kisAccountNoValid}
-                verifyState={verifyState}
-                verifyError={verifyError}
-                onVerify={handleVerify}
-                onCredentialChange={resetVerify}
-              />
-            )}
+                  {form.data_source === "KIWOOM_API" && (
+                    <KiwoomCredentialFields form={form} set={set} isEdit={isEdit} />
+                  )}
 
-            {/* 키움 자격증명 */}
-            {form.data_source === "KIWOOM_API" && (
-              <KiwoomCredentialFields form={form} set={set} isEdit={isEdit} />
-            )}
-
-            {!isEdit && form.data_source !== "MANUAL" && (
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="mock-mode"
-                  checked={form.is_mock_mode ?? true}
-                  onChange={(e) => {
-                    set("is_mock_mode", e.target.checked);
-                    if (isKis) resetVerify();
-                  }}
-                  className="w-4 h-4 text-blue-600"
-                />
-                <label htmlFor="mock-mode" className="text-sm text-gray-700 dark:text-gray-300">
-                  테스트/모의투자 환경 사용
-                </label>
-              </div>
+                  {!isEdit && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="mock-mode"
+                        checked={form.is_mock_mode ?? true}
+                        onChange={(e) => {
+                          set("is_mock_mode", e.target.checked);
+                          if (isKis) resetVerify();
+                        }}
+                        className="w-4 h-4 text-blue-600"
+                      />
+                      <label
+                        htmlFor="mock-mode"
+                        className="text-sm text-gray-700 dark:text-gray-300"
+                      >
+                        테스트/모의투자 환경 사용
+                      </label>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleSection>
             )}
 
             <div>

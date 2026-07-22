@@ -1,12 +1,44 @@
-import { describe, it, expect, beforeEach } from "vitest";
-import { screen, render, fireEvent } from "@testing-library/react";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { screen, render, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import InvestmentGoalCard from "@/components/dashboard/InvestmentGoalCard";
 import InvestmentSnapshotCard from "@/components/dashboard/InvestmentSnapshotCard";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
+import type { IsaStatusSummary, TaxSummary } from "@/api/tax";
 import type { PortfolioOverview } from "@/types";
+
+const fetchIsaStatus = vi.fn();
+const fetchPensionContribution = vi.fn();
+const fetchTaxSummary = vi.fn();
+
+vi.mock("@/api/tax", () => ({
+  fetchIsaStatus: (...args: unknown[]) => fetchIsaStatus(...args),
+  fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
+  fetchTaxSummary: (...args: unknown[]) => fetchTaxSummary(...args),
+}));
+
+const emptyIsa: IsaStatusSummary = { accounts: [], note: "" };
+
+const emptyTaxSummary: TaxSummary = {
+  year: 2026,
+  dividend_income_krw: 0,
+  dividend_tax_krw: 0,
+  overseas_unrealized_gain_krw: 0,
+  overseas_gain_deduction_krw: 0,
+  overseas_tax_estimated_krw: 0,
+  domestic_stock_value_krw: 0,
+  domestic_unrealized_gain_krw: 0,
+  domestic_large_holder_warning: false,
+  comprehensive_tax_warning: false,
+  total_estimated_tax_krw: 0,
+  total_fees_krw: 0,
+  harvesting_recommendations: [],
+  financial_investment_tax_simulation: {} as TaxSummary["financial_investment_tax_simulation"],
+  note: "",
+  rates: { dividend_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
+};
 
 function renderGoalCard(ui: React.ReactElement) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -106,12 +138,6 @@ describe("InvestmentGoalCard", () => {
   it("data가 undefined면 목표 미설정 안내를 표시한다", () => {
     renderGoalCard(<InvestmentGoalCard data={undefined} />);
     expect(screen.getByText(/투자 목표가 설정되지 않았습니다/)).toBeInTheDocument();
-  });
-
-  it("목표가 설정되어 있으면 목표 역산 추천으로 가는 딥링크를 표시한다", () => {
-    renderGoalCard(<InvestmentGoalCard data={baseDashboard} />);
-    const link = screen.getByText("목표에 맞는 포트폴리오 추천 보기").closest("a");
-    expect(link).toHaveAttribute("href", "/rebalancing?rtab=포트폴리오");
   });
 
   it("DCA 타임라인이 없으면 은퇴 목표까지 남은 기간을 카운트다운으로 표시한다", () => {
@@ -222,6 +248,9 @@ describe("InvestmentGoalCard", () => {
 describe("InvestmentSnapshotCard", () => {
   beforeEach(() => {
     localStorage.clear();
+    fetchIsaStatus.mockReset().mockResolvedValue(emptyIsa);
+    fetchPensionContribution.mockReset().mockResolvedValue(undefined);
+    fetchTaxSummary.mockReset().mockResolvedValue(emptyTaxSummary);
   });
 
   const overview: PortfolioOverview = {
@@ -256,5 +285,96 @@ describe("InvestmentSnapshotCard", () => {
     fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
     expect(screen.queryByText("평가액")).not.toBeInTheDocument();
     expect(localStorage.getItem("growlio:dashboard:investmentSnapshotOpen")).toBe("false");
+  });
+
+  it("투자기간 태그가 없으면 투자기간별 자산현황 섹션을 표시하지 않는다", () => {
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
+  });
+
+  it("투자기간 태그가 있는 계좌가 있으면 투자기간별 자산현황이 카드 안에 임베드된다", () => {
+    const overviewWithHorizon: PortfolioOverview = {
+      ...overview,
+      accounts: [
+        {
+          id: "acc-1",
+          name: "장기 계좌",
+          asset_type: "STOCK_KIS",
+          asset_type_label: "증권(KIS)",
+          data_source: "KIS_API",
+          institution: null,
+          amount_krw: 80_000_000,
+          invested_krw: 70_000_000,
+          unrealized_pnl: 10_000_000,
+          position_count: 3,
+          positions: [],
+          investment_horizon: "LONG_TERM",
+        },
+      ],
+    };
+    renderGoalCard(<InvestmentSnapshotCard overview={overviewWithHorizon} data={undefined} />);
+    expect(screen.getByText("투자기간별 자산현황")).toBeInTheDocument();
+  });
+
+  it("ISA/연금/세금 추정 정보가 전혀 없으면 세금 한도 요약 섹션을 표시하지 않는다", async () => {
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
+    expect(screen.queryByText(/ISA|연금공제|예상세금/)).not.toBeInTheDocument();
+  });
+
+  it("ISA 만기가 임박하면 세금 한도 요약이 카드 안에 임베드된다", async () => {
+    fetchIsaStatus.mockResolvedValue({
+      accounts: [
+        {
+          account_id: "acc1",
+          account_name: "일반형 ISA",
+          isa_type: "GENERAL",
+          isa_open_date: "2023-01-01",
+          maturity_date: "2026-09-01",
+          is_mature: false,
+          days_remaining: 45,
+          needs_open_date: false,
+          estimated_cumulative_pnl_krw: 500_000,
+          is_manual_override: false,
+          tax_free_limit_krw: 2_000_000,
+          taxable_excess_krw: 0,
+          estimated_tax_krw: 0,
+        },
+      ],
+      note: "",
+    } as IsaStatusSummary);
+
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    expect(await screen.findByText("ISA D-45")).toBeInTheDocument();
+  });
+
+  it("종합과세 경고가 있으면 카드 헤더에 경고 배지가 뜨고, 카드를 접어도 유지된다", async () => {
+    fetchTaxSummary.mockResolvedValue({
+      ...emptyTaxSummary,
+      comprehensive_tax_warning: true,
+      total_estimated_tax_krw: 1_320_000,
+    });
+
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    expect(await screen.findByLabelText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
+    expect(screen.getByText("주의")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
+    expect(screen.queryByText("평가액")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
+    expect(screen.getByText("주의")).toBeInTheDocument();
+  });
+
+  it("접힘 상태의 힌트에 평가액과 함께 세금 한도 요약이 표시된다", async () => {
+    fetchTaxSummary.mockResolvedValue({
+      ...emptyTaxSummary,
+      total_estimated_tax_krw: 500_000,
+    });
+
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    await screen.findByText(/예상세금/);
+
+    fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
+    expect(screen.getByText(/평가액 .*원 · 예상세금/)).toBeInTheDocument();
   });
 });

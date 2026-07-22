@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { ReactNode, useId } from "react";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 
 const SIZE_CLASSES = {
   sm: "max-w-sm",
@@ -60,7 +61,7 @@ export default function Modal({
             <button
               onClick={onClose}
               aria-label="닫기"
-              className="p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors`}
             >
               <X size={18} className="text-gray-500 dark:text-gray-400" />
             </button>

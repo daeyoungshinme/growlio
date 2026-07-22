@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.user import UserSettings
 from app.services.composition_calculator import (
     build_asset_totals,
+    exclude_real_estate,
     fetch_position_maps,
     get_latest_snapshot_rows,
     get_no_snap_accounts,
@@ -166,8 +167,12 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         annualized_return, cumulative_return = None, None
     stock_return_pct = ((stock_value / total_invested) - 1) * 100 if total_invested > 0 else 0.0
 
+    # 부동산은 목표 역산 추천/DCA 복리 곡선 어느 쪽도 성장을 모델링하지 않으므로 목표
+    # 달성률 계산에서는 제외한다(부동산 추가만으로 % 왜곡 방지) — total_assets_krw
+    # 필드 자체(자산배분 차트 등)는 그대로 부동산을 포함해 반환한다.
     goal = float(settings_row.goal_amount) if settings_row and settings_row.goal_amount else None
-    goal_pct = (total_assets_krw / goal * 100) if goal else None
+    investable_assets_krw = exclude_real_estate(total_assets_krw, by_type)
+    goal_pct = (investable_assets_krw / goal * 100) if goal else None
     annual_deposit_goal = (
         float(settings_row.annual_deposit_goal) if settings_row and settings_row.annual_deposit_goal else None
     )

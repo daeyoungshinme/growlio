@@ -69,9 +69,12 @@ export default function GoalTimelineCard({ timeline, goalAmount, flat }: Props) 
 
   return (
     <div className={flat ? undefined : "card"}>
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-4">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-1">
         목표 달성 전망
       </h3>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">
+        부동산 등 실물자산은 제외, 투자자산 기준
+      </p>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">현재 진행율</p>
