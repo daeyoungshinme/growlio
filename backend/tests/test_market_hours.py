@@ -78,6 +78,43 @@ class TestIsUsMarketOpen:
         assert is_us_market_open(datetime(2024, 1, _SUN, 12, 0, tzinfo=_EST)) is False
 
 
+class TestUsMarketCloseDatetime:
+    def test_returns_today_close_in_et_winter(self):
+        """겨울(EST, UTC-5) — 마감 16:00 ET는 KST로 보면 다음날 06:00."""
+        from app.utils.market_hours import us_market_close_datetime
+
+        now = datetime(2024, 1, _MON, 10, 0, tzinfo=_EST)
+        close = us_market_close_datetime(now)
+
+        assert close.hour == 16
+        assert close.minute == 0
+        assert close.tzinfo is not None
+
+        close_kst = close.astimezone(_KST)
+        assert close_kst.day == _MON + 1
+        assert close_kst.hour == 6
+
+    def test_returns_today_close_in_et_summer_dst(self):
+        """여름(EDT, UTC-4) — 마감 16:00 ET는 KST로 보면 다음날 05:00 (DST로 1시간 당겨짐)."""
+        from app.utils.market_hours import us_market_close_datetime
+
+        # 2024-07-08: Monday (EDT 적용 기간)
+        now = datetime(2024, 7, 8, 10, 0, tzinfo=_EST)
+        close = us_market_close_datetime(now)
+
+        assert close.hour == 16
+        close_kst = close.astimezone(_KST)
+        assert close_kst.day == 9
+        assert close_kst.hour == 5
+
+    def test_defaults_to_current_time_when_now_omitted(self):
+        from app.utils.market_hours import us_market_close_datetime
+
+        close = us_market_close_datetime()
+        assert close.hour == 16
+        assert close.minute == 0
+
+
 class TestIsAlertExecutionTime:
     def test_none_alert_time_always_true(self):
         from app.utils.market_hours import is_alert_execution_time

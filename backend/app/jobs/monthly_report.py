@@ -8,8 +8,8 @@ from datetime import date
 import structlog
 from sqlalchemy import select
 
+from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.redis_client import get_redis
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
@@ -28,7 +28,7 @@ def _prev_month_label(today: date) -> str:
 
 async def run_monthly_report() -> None:
     """매월 1일 — 활성 유저에게 전월 포트폴리오 요약 리포트 이메일 발송."""
-    redis = await get_redis()
+    cache = await get_cache_store()
     report_month = _prev_month_label(date.today())
 
     async with AsyncSessionLocal() as db:
@@ -39,12 +39,12 @@ async def run_monthly_report() -> None:
 
     sem = asyncio.Semaphore(_MONTHLY_REPORT_CONCURRENCY)
     await asyncio.gather(
-        *(_send_report_for_user(user, settings_row, redis, report_month, sem) for user, settings_row in users)
+        *(_send_report_for_user(user, settings_row, cache, report_month, sem) for user, settings_row in users)
     )
 
 
 async def _send_report_for_user(
-    user: User, settings_row: UserSettings, redis, report_month: str, sem: asyncio.Semaphore
+    user: User, settings_row: UserSettings, cache, report_month: str, sem: asyncio.Semaphore
 ) -> None:
     async with sem:
         # monthly_report_enabled=False이면 이메일 및 인앱 알림 건너뜀
@@ -55,7 +55,7 @@ async def _send_report_for_user(
         to_email = settings_row.notification_email or user.email
         try:
             async with AsyncSessionLocal() as db:
-                summary = await get_dashboard_summary(user.id, db, redis)
+                summary = await get_dashboard_summary(user.id, db, cache)
 
             monthly_trend: list[dict] = summary.get("monthly_trend") or []
             mom_change_krw: float | None = None

@@ -29,7 +29,6 @@ def override_settings(monkeypatch):
     monkeypatch.setenv("KIS_CRED_ENCRYPTION_KEY", "a" * 64)
     monkeypatch.setenv("APP_SECRET_KEY", "test-secret-key-for-pytest-at-least-32")
     monkeypatch.setenv("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/test")
-    monkeypatch.setenv("REDIS_URL", "redis://localhost:6379/0")
     monkeypatch.setenv("DART_API_KEY", "test-dart-key")
     from app.core.config import settings as _settings
 
@@ -77,6 +76,8 @@ def mock_db() -> AsyncMock:
     """AsyncSession mock."""
     session = AsyncMock(spec=AsyncSession)
     session.scalar = AsyncMock(return_value=None)
+    # durable_state.get_durable()가 호출하는 session.get() 기본값 — 저장된 값 없음(캐시 미스)
+    session.get = AsyncMock(return_value=None)
 
     # execute 결과: scalars().all() 체이닝 지원
     execute_result = MagicMock()
@@ -93,16 +94,16 @@ def mock_db() -> AsyncMock:
     return session
 
 
-# ── Redis Mock ──────────────────────────────────────────────
+# ── Cache Mock ──────────────────────────────────────────────
 
 
 @pytest.fixture
-def mock_redis() -> AsyncMock:
-    redis = AsyncMock()
-    redis.get = AsyncMock(return_value=None)
-    redis.set = AsyncMock()
-    redis.setex = AsyncMock()
-    return redis
+def mock_cache() -> AsyncMock:
+    cache = AsyncMock()
+    cache.get = AsyncMock(return_value=None)
+    cache.set = AsyncMock()
+    cache.setex = AsyncMock()
+    return cache
 
 
 # ── 모델 팩토리 ─────────────────────────────────────────────
@@ -244,25 +245,14 @@ def mock_request():
 
 
 @pytest.fixture(autouse=True)
-def _mock_redis_singleton():
-    """Redis singleton을 AsyncMock으로 교체 — Docker 없이 모든 테스트 실행 가능."""
-    import app.core.redis_client as _rc
+def _reset_cache_store():
+    """in-memory 캐시 store singleton을 테스트마다 새로 초기화 — 테스트 간 상태 누수 방지."""
+    import app.core.cache_store as _cs
 
-    redis_mock = AsyncMock()
-    redis_mock.ping = AsyncMock(return_value=True)
-    redis_mock.get = AsyncMock(return_value=None)
-    redis_mock.set = AsyncMock()
-    redis_mock.setex = AsyncMock()
-    redis_mock.delete = AsyncMock()
-    redis_mock.exists = AsyncMock(return_value=0)
-    redis_mock.expire = AsyncMock()
-    redis_mock.scan = AsyncMock(return_value=(0, []))
-    redis_mock.unlink = AsyncMock()
-
-    old = _rc.redis_client
-    _rc.redis_client = redis_mock
-    yield redis_mock
-    _rc.redis_client = old
+    old = _cs.cache_store
+    _cs.cache_store = None
+    yield
+    _cs.cache_store = old
 
 
 @pytest.fixture(autouse=True)
@@ -273,13 +263,3 @@ def _mock_scheduler(monkeypatch):
     monkeypatch.setattr(sched.scheduler, "start", lambda: None)
     monkeypatch.setattr(sched.scheduler, "shutdown", lambda: None)
     monkeypatch.setattr("app.main.init_scheduler", lambda: None)
-
-
-@pytest.fixture
-def mock_redis_for_app():
-    """FastAPI app lifespan의 Redis 연결을 무력화하는 패치 컨텍스트."""
-    from unittest.mock import AsyncMock, patch
-
-    redis_mock = AsyncMock()
-    redis_mock.ping = AsyncMock(return_value=True)
-    return patch("app.core.redis_client.get_redis", return_value=redis_mock)

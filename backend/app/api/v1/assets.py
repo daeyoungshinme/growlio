@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.api.v1 import positions as _positions_module
 from app.api.v1._account_deps import get_owned_account as _get_owned_account
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.kis.auth import promote_user_token_to_account
 from app.limiter import limiter
 from app.models.asset import AssetAccount, Transaction
@@ -55,8 +55,8 @@ from app.utils.cache_keys import (
     sync_lock_key,
 )
 from app.utils.currency import fetch_usd_krw
+from app.utils.inproc_lock import inproc_lock
 from app.utils.pnl import calc_net_asset_amount
-from app.utils.redis_lock import redis_lock
 
 _CREDENTIAL_FIELDS: set[str] = {"kis_app_key", "kis_app_secret", "kiwoom_app_key", "kiwoom_app_secret"}
 # 시장가 변동이 없는 순수 현금성 계좌 — 잔액 변경은 전액 입출금으로 간주
@@ -100,7 +100,7 @@ async def verify_kis_credentials(
     db: AsyncSession = Depends(get_db),
 ):
     """KIS 자격증명 유효성 확인 (계좌 생성 없이)."""
-    redis = await get_redis()
+    cache = await get_cache_store()
     try:
         await _verify_kis_credentials_service(
             req.kis_app_key,
@@ -108,7 +108,7 @@ async def verify_kis_credentials(
             req.is_mock,
             current_user.id,
             db,
-            redis,
+            cache,
         )
     except httpx.HTTPStatusError as e:
         if e.response.status_code in (400, 401, 403):
@@ -164,8 +164,8 @@ async def create_account(
         # 직전 "자격증명 확인" 단계에서 발급된 유저 레벨 토큰을 이 계좌로 승격 —
         # 등록 직후 프론트가 자동으로 호출하는 첫 동기화가 새 토큰을 또 발급받으려다
         # KIS 토큰 발급 속도 제한에 걸려 실패하는 것을 방지한다.
-        redis = await get_redis()
-        await promote_user_token_to_account(str(current_user.id), str(account.id), account.is_mock_mode, redis, db)
+        cache = await get_cache_store()
+        await promote_user_token_to_account(str(current_user.id), str(account.id), account.is_mock_mode, cache, db)
     if account.manual_amount:
         await _upsert_snapshot(
             db,
@@ -213,15 +213,15 @@ async def get_account(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    redis = await get_redis()
+    cache = await get_cache_store()
     cache_key = account_detail_key(current_user.id, account_id)
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
     account = await _get_owned_account(account_id, current_user.id, db)
     response = _account_response(account)
-    await set_cached_json(redis, cache_key, response.model_dump(mode="json"), TTL_ACCOUNT_DETAIL)
+    await set_cached_json(cache, cache_key, response.model_dump(mode="json"), TTL_ACCOUNT_DETAIL)
     return response
 
 
@@ -269,8 +269,8 @@ async def update_account(
         )
         await db.commit()
     if req.deposit_krw is not None or req.deposit_usd is not None:
-        redis = await get_redis()
-        usd_rate = await fetch_usd_krw(redis)
+        cache = await get_cache_store()
+        usd_rate = await fetch_usd_krw(cache)
         latest_snap, pos_list = await get_latest_snapshot_with_positions(db, account.id)
 
         pos_value = sum(
@@ -310,8 +310,8 @@ async def update_account(
                 )
         await db.commit()
 
-    _redis = await get_redis()
-    await invalidate_asset_account_caches(_redis, account.user_id, account.id)
+    _cache = await get_cache_store()
+    await invalidate_asset_account_caches(_cache, account.user_id, account.id)
     return _account_response(account)
 
 
@@ -323,8 +323,8 @@ async def delete_account_kis_credentials(
 ):
     """계좌별 KIS API 자격증명을 삭제한다. 이후 전역 자격증명으로 폴백된다."""
     account = await _get_owned_account(account_id, current_user.id, db)
-    redis = await get_redis()
-    await delete_kis_credentials(account, db, redis)
+    cache = await get_cache_store()
+    await delete_kis_credentials(account, db, cache)
 
 
 @router.delete("/{account_id}/kiwoom-credentials", status_code=status.HTTP_204_NO_CONTENT)
@@ -335,8 +335,8 @@ async def delete_account_kiwoom_credentials(
 ):
     """계좌별 키움 API 자격증명을 삭제한다."""
     account = await _get_owned_account(account_id, current_user.id, db)
-    redis = await get_redis()
-    await delete_kiwoom_credentials(account, db, redis)
+    cache = await get_cache_store()
+    await delete_kiwoom_credentials(account, db, cache)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -348,7 +348,7 @@ async def delete_account(
     account = await _get_owned_account(account_id, current_user.id, db)
     account.is_active = False
     await db.commit()
-    await invalidate_asset_account_caches(await get_redis(), current_user.id, account_id)
+    await invalidate_asset_account_caches(await get_cache_store(), current_user.id, account_id)
 
 
 @router.post("/{account_id}/sync")
@@ -360,16 +360,16 @@ async def sync_account(
     db: AsyncSession = Depends(get_db),
 ):
     account = await _get_owned_account(account_id, current_user.id, db)
-    redis = await get_redis()
+    cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)
-    async with redis_lock(redis, lock_key, ttl=120) as acquired:
+    async with inproc_lock(cache, lock_key, ttl=120) as acquired:
         if not acquired:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="이미 동기화가 진행 중입니다. 잠시 후 다시 시도하세요.",
             )
-        return await _sync_account_now(account, current_user.id, db, redis)
+        return await _sync_account_now(account, current_user.id, db, cache)
 
 
 @router.post("/sync-all")
@@ -467,6 +467,6 @@ async def update_isa_pnl_override(
     account.isa_manual_cumulative_pnl_krw = body.cumulative_pnl_krw
     await db.commit()
     await db.refresh(account)
-    redis = await get_redis()
-    await invalidate_asset_account_caches(redis, current_user.id, account.id)
+    cache = await get_cache_store()
+    await invalidate_asset_account_caches(cache, current_user.id, account.id)
     return _account_response(account)

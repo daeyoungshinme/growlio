@@ -233,63 +233,41 @@ class TestGetFactorAnalysisForPortfolio:
         assert result["portfolio_name"] == "테스트포트폴리오"
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+    async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
         cached = {
             "holdings": [],
             "portfolio_factors": {"value": 55.0, "growth": 45.0, "size": 50.0, "momentum": 60.0},
             "position_count": 2,
             "note": "cached",
         }
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
+        result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, cache=cache)
 
         assert result["position_count"] == 2
         mock_db.scalar.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
-        from redis.exceptions import RedisError
-
-        redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=RedisError("redis unavailable"))
-
-        item = SimpleNamespace(ticker="005930", market="KOSPI", name="삼성전자", weight=100)
-        portfolio = MagicMock()
-        portfolio.items = [item]
-        portfolio.name = "테스트"
-        mock_db.scalar = AsyncMock(return_value=portfolio)
-
-        factor_data = {"005930.KS": {"pe_ratio": 10.0, "pb_ratio": 1.0, "market_cap": 1e11, "momentum_pct": 3.0}}
-        with patch("asyncio.get_running_loop") as mock_loop:
-            mock_executor = AsyncMock(return_value=factor_data)
-            mock_loop.return_value.run_in_executor = mock_executor
-
-            result = await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
-
-        assert result["position_count"] == 1
-
-    @pytest.mark.asyncio
-    async def test_redis_cache_written_on_success(self, mock_db, override_settings):
+    async def test_cache_cache_written_on_success(self, mock_db, override_settings):
         item = SimpleNamespace(ticker="035420", market="KOSPI", name="NAVER", weight=100)
         portfolio = MagicMock()
         portfolio.items = [item]
         portfolio.name = "포트폴리오"
         mock_db.scalar = AsyncMock(return_value=portfolio)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         factor_data = {"035420.KS": {"pe_ratio": 30.0, "pb_ratio": 3.0, "market_cap": 1e11, "momentum_pct": 10.0}}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_executor = AsyncMock(return_value=factor_data)
             mock_loop.return_value.run_in_executor = mock_executor
 
-            await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, redis=redis)
+            await get_factor_analysis_for_portfolio("some-portfolio-id", mock_db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_zero_total_weight_returns_empty(self, mock_db, override_settings):
@@ -320,34 +298,20 @@ class TestGetFactorAnalysis:
         assert result["holdings"] == []
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+    async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
         cached = {
             "holdings": [],
             "portfolio_factors": {"value": 55.0, "growth": 45.0, "size": 50.0, "momentum": 60.0},
             "position_count": 3,
             "note": "cached",
         }
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_factor_analysis(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_factor_analysis(uuid.uuid4(), mock_db, cache=cache)
 
         assert result["position_count"] == 3
         mock_db.execute.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
-        from redis.exceptions import RedisError
-
-        redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=RedisError("redis error"))
-
-        exec_result = MagicMock()
-        exec_result.all.return_value = []
-        mock_db.execute = AsyncMock(return_value=exec_result)
-
-        result = await get_factor_analysis(uuid.uuid4(), mock_db, redis=redis)
-        assert result["position_count"] == 0
 
     @pytest.mark.asyncio
     async def test_with_positions_calls_executor(self, mock_db, override_settings):
@@ -382,22 +346,22 @@ class TestGetFactorAnalysis:
         assert h["weight_pct"] == 100.0
 
     @pytest.mark.asyncio
-    async def test_redis_no_cache_write_when_no_positions(self, mock_db, override_settings):
-        """포지션 없을 때 조기 반환되므로 Redis cache 쓰기 없음."""
+    async def test_cache_no_cache_write_when_no_positions(self, mock_db, override_settings):
+        """포지션 없을 때 조기 반환되므로 Cache cache 쓰기 없음."""
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
-        await get_factor_analysis(uuid.uuid4(), mock_db, redis=redis)
-        redis.setex.assert_not_called()
+        await get_factor_analysis(uuid.uuid4(), mock_db, cache=cache)
+        cache.setex.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_cache_write_on_success(self, mock_db, override_settings):
-        """포지션 있을 때 최종 결과를 Redis에 캐시 저장한다."""
+    async def test_cache_cache_write_on_success(self, mock_db, override_settings):
+        """포지션 있을 때 최종 결과를 Cache에 캐시 저장한다."""
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos = SimpleNamespace(
@@ -414,13 +378,13 @@ class TestGetFactorAnalysis:
         pos_result.scalars.return_value.all.return_value = [pos]
         mock_db.execute = AsyncMock(side_effect=[snap_result, pos_result])
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         factor_data = {"005930.KS": {"pe_ratio": 10.0, "pb_ratio": 1.0, "market_cap": 3e11, "momentum_pct": 5.0}}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_loop.return_value.run_in_executor = AsyncMock(return_value=factor_data)
-            await get_factor_analysis(uuid.uuid4(), mock_db, redis=redis)
+            await get_factor_analysis(uuid.uuid4(), mock_db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()

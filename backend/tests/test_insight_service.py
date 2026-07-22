@@ -149,16 +149,16 @@ class TestCheckTaxLossHarvest:
 
 class TestGenerateInsights:
     @pytest.mark.asyncio
-    async def test_redis_cache_hit(self, mock_db, override_settings):
+    async def test_cache_cache_hit(self, mock_db, override_settings):
         import json
 
         from app.services.insight_service import generate_insights
 
         cached = [{"type": "CONCENTRATION", "severity": "WARNING", "title": "테스트", "detail": "d"}]
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await generate_insights(uuid.uuid4(), mock_db, redis=redis)
+        result = await generate_insights(uuid.uuid4(), mock_db, cache=cache)
         assert len(result) == 1
         mock_db.execute.assert_not_called()
 
@@ -187,9 +187,9 @@ class TestGenerateInsights:
         from app.services.insight_service import generate_insights
 
         cached = [{"type": "OLD", "severity": "INFO", "title": "old", "detail": "old"}]
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache.setex = AsyncMock()
 
         with (
             patch(
@@ -199,7 +199,7 @@ class TestGenerateInsights:
             patch("app.services.insight_service._check_rebalancing_opportunity", new=AsyncMock(return_value=[])),
             patch("app.services.insight_service._check_tax_loss_harvest", new=AsyncMock(return_value=[])),
         ):
-            await generate_insights(uuid.uuid4(), mock_db, redis=redis, force_refresh=True)
+            await generate_insights(uuid.uuid4(), mock_db, cache=cache, force_refresh=True)
 
         # Should not use cached value since force_refresh=True
-        redis.get.assert_not_called()
+        cache.get.assert_not_called()

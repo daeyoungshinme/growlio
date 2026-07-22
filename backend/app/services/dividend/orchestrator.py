@@ -1,6 +1,6 @@
 """배당 서비스 오케스트레이터.
 
-DB 조회·Redis 캐시·외부 fetch를 조율해 배당금 집계 결과를 생성한다.
+DB 조회·캐시·외부 fetch를 조율해 배당금 집계 결과를 생성한다.
 순수 계산 로직 → calculator.py
 """
 
@@ -12,12 +12,12 @@ import uuid
 from datetime import date
 
 import structlog
-from sqlalchemy import select, text
+from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.core.redis_client import get_redis
 from app.models.asset import AssetAccount, AssetSnapshot
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.credential_service import get_kis_user_credentials
@@ -25,7 +25,12 @@ from app.services.dividend._dividend_queries import fetch_dart_api_key, load_use
 from app.services.dividend.calculator import calculate_position_dividend
 from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES as KNOWN_DIVIDEND_SCHEDULES
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
-from app.utils.cache_keys import TTL_DART, TTL_DIVIDEND_INFO, dividend_ticker_summary_key
+from app.utils.cache_keys import (
+    TTL_DART,
+    TTL_DIVIDEND_INFO,
+    dividend_ticker_summary_key,
+    portfolio_overview_acct_suffix,
+)
 from app.utils.currency import get_usd_krw_rate
 
 logger = structlog.get_logger()
@@ -34,11 +39,11 @@ _DIVIDEND_FETCH_SEM = asyncio.Semaphore(settings.api_semaphore_limit)
 
 
 async def _collect_positions(
-    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
+    user_id: uuid.UUID, db: AsyncSession, account_ids: list[uuid.UUID] | None = None
 ) -> dict[tuple[str, str], dict]:
     """활성 주식 계좌의 최신 스냅샷에서 (ticker, market) → 포지션 정보 맵 수집.
 
-    account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
+    account_ids 지정 시 해당 계좌들만 집계(미지정 시 전체 계좌 통합).
     """
     subq = latest_snapshot_subquery(user_id=user_id)
     snap_date_match = (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date)
@@ -46,8 +51,8 @@ async def _collect_positions(
         AssetAccount.is_active == True,  # noqa: E712
         AssetAccount.asset_type.like("STOCK%"),
     ]
-    if account_id is not None:
-        conditions.append(AssetAccount.id == account_id)
+    if account_ids:
+        conditions.append(AssetAccount.id.in_(account_ids))
     result = await db.execute(
         select(AssetSnapshot, AssetAccount)
         .options(selectinload(AssetSnapshot.position_items))
@@ -141,24 +146,28 @@ def _build_ticker_output_entry(
 
 
 async def _fetch_received_dividends_by_ticker(
-    db: AsyncSession, user_id: uuid.UUID, year: int, account_id: uuid.UUID | None = None
+    db: AsyncSession, user_id: uuid.UUID, year: int, account_ids: list[uuid.UUID] | None = None
 ) -> dict[str, float]:
     """올해 배당 실수령액을 ticker별로 합산 조회한다 (미분류 거래는 '__unclassified__' 키).
 
-    account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
+    account_ids 지정 시 해당 계좌들만 집계(미지정 시 전체 계좌 통합).
     """
-    result = await db.execute(
-        text("""
-            SELECT COALESCE(ticker, '__unclassified__') AS ticker_key, SUM(amount) AS total
-            FROM transactions
-            WHERE user_id = :uid
-              AND transaction_type = 'DIVIDEND'
-              AND EXTRACT(year FROM transaction_date) = :yr
-              AND (CAST(:account_id AS uuid) IS NULL OR account_id = CAST(:account_id AS uuid))
-            GROUP BY 1
-        """),
-        {"uid": str(user_id), "yr": year, "account_id": str(account_id) if account_id else None},
-    )
+    base_sql = """
+        SELECT COALESCE(ticker, '__unclassified__') AS ticker_key, SUM(amount) AS total
+        FROM transactions
+        WHERE user_id = :uid
+          AND transaction_type = 'DIVIDEND'
+          AND EXTRACT(year FROM transaction_date) = :yr
+    """
+    params: dict = {"uid": str(user_id), "yr": year}
+    if account_ids:
+        stmt = text(base_sql + " AND account_id IN :account_ids GROUP BY 1").bindparams(
+            bindparam("account_ids", expanding=True)
+        )
+        params["account_ids"] = [str(a) for a in account_ids]
+    else:
+        stmt = text(base_sql + " GROUP BY 1")
+    result = await db.execute(stmt, params)
     return {row.ticker_key: float(row.total) for row in result}
 
 
@@ -180,7 +189,7 @@ def _normalize_received_map_by_ticker(
 
 async def _fetch_estimated_dividend_map(
     positions: dict[tuple[str, str], dict],
-    redis,
+    cache,
     kis_creds,
     dart_key,
     overrides: dict,
@@ -191,7 +200,7 @@ async def _fetch_estimated_dividend_map(
     async def _fetch_estimated(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, _ = await fetch_ticker_dividend_info(
-            ticker, market, redis, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
+            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
             ticker=ticker,
@@ -288,34 +297,34 @@ def _assemble_ticker_dividend_output(
 
 
 async def get_ticker_dividend_summary(
-    user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
+    user_id: uuid.UUID, db: AsyncSession, account_ids: list[uuid.UUID] | None = None
 ) -> list[dict]:
-    """종목별 실수령(올해) + 예상 배당금 통합. Redis 24h 캐시. account_id 지정 시 해당 계좌만 집계."""
+    """종목별 실수령(올해) + 예상 배당금 통합. 24h 캐시. account_ids 지정 시 해당 계좌들만 집계."""
     current_year = date.today().year
-    cache_key = dividend_ticker_summary_key(user_id, current_year, str(account_id) if account_id else "all")
+    cache_key = dividend_ticker_summary_key(user_id, current_year, portfolio_overview_acct_suffix(account_ids))
 
-    redis = await get_redis()
-    cached = await redis.get(cache_key)
+    cache = await get_cache_store()
+    cached = await cache.get(cache_key)
     if cached:
         logger.info("dividend_by_ticker_cache_hit", user_id=str(user_id))
         return json.loads(cached)
 
-    received_map = await _fetch_received_dividends_by_ticker(db, user_id, current_year, account_id)
-    positions = await _collect_positions(user_id, db, account_id)
+    received_map = await _fetch_received_dividends_by_ticker(db, user_id, current_year, account_ids)
+    positions = await _collect_positions(user_id, db, account_ids)
     received_map = _normalize_received_map_by_ticker(received_map, positions)
 
     overrides = await load_user_dividend_overrides(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
-    usd_krw_rate: float = await get_usd_krw_rate(redis)
+    usd_krw_rate: float = await get_usd_krw_rate(cache)
 
-    estimated_map = await _fetch_estimated_dividend_map(positions, redis, kis_creds, dart_key, overrides, usd_krw_rate)
+    estimated_map = await _fetch_estimated_dividend_map(positions, cache, kis_creds, dart_key, overrides, usd_krw_rate)
 
     output = _assemble_ticker_dividend_output(received_map, estimated_map, positions)
 
     has_yield = any(item.get("investment_yield", 0) > 0 for item in output)
     ttl = TTL_DIVIDEND_INFO if has_yield else TTL_DART
-    await redis.setex(cache_key, ttl, json.dumps(output))
+    await cache.setex(cache_key, ttl, json.dumps(output))
     logger.info("dividend_by_ticker_computed", user_id=str(user_id), count=len(output))
     return output
 
@@ -324,17 +333,17 @@ async def get_position_dividend_yields(
     user_id: uuid.UUID, db: AsyncSession, account_id: uuid.UUID | None = None
 ) -> list[dict]:
     """보유 종목별 배당수익률과 예상 배당금을 반환한다. account_id 지정 시 해당 계좌만 집계."""
-    positions = await _collect_positions(user_id, db, account_id)
+    positions = await _collect_positions(user_id, db, [account_id] if account_id else None)
     overrides = await load_user_dividend_overrides(user_id, db)
     dart_key = await fetch_dart_api_key(user_id, db)
     kis_creds = await get_kis_user_credentials(user_id, db)
 
-    redis = await get_redis()
+    cache = await get_cache_store()
 
     async def fetch_one(ticker: str, market: str, value_krw: float, invested_krw: float, qty: float) -> dict:
         override_months = overrides.get((ticker, market))
         yield_decimal, dps, months, ex_dividend_date = await fetch_ticker_dividend_info(
-            ticker, market, redis, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
+            ticker, market, cache, _DIVIDEND_FETCH_SEM, kis_creds, dart_key, overrides
         )
         return calculate_position_dividend(
             ticker=ticker,

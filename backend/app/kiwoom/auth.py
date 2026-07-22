@@ -1,15 +1,15 @@
-"""키움증권 REST API OAuth2 토큰 발급 — Redis 캐시 → DB → API 순으로 시도."""
+"""키움증권 REST API OAuth2 토큰 발급 — 캐시 → DB → API 순으로 시도."""
 
 import json
 from datetime import UTC, datetime, timedelta
 
 import structlog
 
-from app.constants import REDIS_TOKEN_TTL_BUFFER
+from app.constants import TOKEN_CACHE_TTL_BUFFER
 from app.kiwoom.constants import (
     KIWOOM_MOCK_BASE_URL,
     KIWOOM_REAL_BASE_URL,
-    REDIS_KIWOOM_TOKEN_KEY,
+    KIWOOM_TOKEN_CACHE_KEY,
 )
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
@@ -22,17 +22,17 @@ async def get_access_token(
     app_secret: str,
     *,
     is_mock: bool,
-    redis,
+    cache,
     db,
     user_id: str,
     account_id: str,
     force_refresh: bool = False,
 ) -> str:
-    """키움 액세스 토큰 조회 — Redis 캐시 → DB → 키움 API 순으로 시도.
+    """키움 액세스 토큰 조회 — 캐시 → DB → 키움 API 순으로 시도.
 
     키움은 전역 자격증명 없으므로 account_id는 항상 필수.
     """
-    cache_key = REDIS_KIWOOM_TOKEN_KEY.format(account_id=account_id)
+    cache_key = KIWOOM_TOKEN_CACHE_KEY.format(account_id=account_id)
 
     async def _query_token_row():
         from sqlalchemy import select
@@ -52,13 +52,13 @@ async def get_access_token(
             app_key,
             app_secret,
             is_mock=is_mock,
-            redis=redis,
+            cache=cache,
             db=db,
             user_id=user_id,
             account_id=account_id,
         )
 
-    return await get_or_fetch_token(cache_key, redis, force_refresh, REDIS_TOKEN_TTL_BUFFER, _query_token_row, _fetch)
+    return await get_or_fetch_token(cache_key, cache, force_refresh, TOKEN_CACHE_TTL_BUFFER, _query_token_row, _fetch)
 
 
 async def _fetch_and_store_token(
@@ -66,7 +66,7 @@ async def _fetch_and_store_token(
     app_secret: str,
     *,
     is_mock: bool,
-    redis,
+    cache,
     db,
     user_id: str,
     account_id: str,
@@ -107,11 +107,11 @@ async def _fetch_and_store_token(
     else:
         expires_at = datetime.now(UTC) + timedelta(seconds=86400)
 
-    # Redis 캐시 저장
-    cache_key = REDIS_KIWOOM_TOKEN_KEY.format(account_id=account_id)
+    # 캐시 저장
+    cache_key = KIWOOM_TOKEN_CACHE_KEY.format(account_id=account_id)
     remaining = int((expires_at - datetime.now(UTC)).total_seconds())
-    ttl = remaining - REDIS_TOKEN_TTL_BUFFER
-    await redis.setex(cache_key, max(ttl, 60), access_token)
+    ttl = remaining - TOKEN_CACHE_TTL_BUFFER
+    await cache.setex(cache_key, max(ttl, 60), access_token)
 
     # DB upsert (account_id unique 제약 기반)
     from sqlalchemy.dialects.postgresql import insert as pg_insert

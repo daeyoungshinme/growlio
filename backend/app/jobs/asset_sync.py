@@ -4,8 +4,8 @@ from collections.abc import Awaitable, Callable
 import structlog
 from sqlalchemy import select
 
+from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.redis_client import get_redis
 from app.models.asset import AssetAccount
 from app.services.asset_service import sync_account
 
@@ -27,7 +27,7 @@ async def _sync_accounts(
     각 계좌는 자신만의 짧게 스코프된 AsyncSessionLocal을 열어서 사용하므로,
     이 함수를 호출하는 쪽의 요청 DB 커넥션을 오래 붙잡지 않는다.
     """
-    redis = await get_redis()
+    cache = await get_cache_store()
     failed: list[tuple[str, str, str]] = []
     sem = asyncio.Semaphore(_ACCOUNT_SYNC_CONCURRENCY)
     done_count = 0
@@ -42,7 +42,7 @@ async def _sync_accounts(
                     # merge로 새 세션에 편입해야 sync_account() 내부의 account.deposit_krw 등
                     # 속성 변경이 commit 시 실제로 반영된다.
                     merged_account = await db.merge(account)
-                    await sync_account(merged_account, db, redis)
+                    await sync_account(merged_account, db, cache)
                 logger.info("account_synced", job=job_name, account_id=str(account.id), name=account.name)
             except Exception as e:
                 logger.error(

@@ -18,7 +18,7 @@ class TestRunDailyAssetSync:
 
         with (
             patch("app.jobs.asset_sync.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.asset_sync.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.asset_sync.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
@@ -40,7 +40,7 @@ class TestRunDailyAssetSync:
 
         with (
             patch("app.jobs.asset_sync.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.asset_sync.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.asset_sync.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
@@ -62,7 +62,7 @@ class TestRunDailyAssetSync:
 
         call_count = 0
 
-        async def mock_sync_side_effect(account, db, redis):
+        async def mock_sync_side_effect(account, db, cache):
             nonlocal call_count
             call_count += 1
             if account.name == "계좌A":
@@ -70,7 +70,7 @@ class TestRunDailyAssetSync:
 
         with (
             patch("app.jobs.asset_sync.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.asset_sync.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.asset_sync.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.asset_sync.sync_account", side_effect=mock_sync_side_effect),
         ):
             from app.jobs.asset_sync import run_daily_asset_sync
@@ -94,7 +94,7 @@ class TestRunIntradayAssetSync:
 
         with (
             patch("app.jobs.asset_sync.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.asset_sync.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.asset_sync.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.asset_sync.sync_account", new_callable=AsyncMock) as mock_sync,
         ):
             from app.jobs.asset_sync import run_intraday_asset_sync

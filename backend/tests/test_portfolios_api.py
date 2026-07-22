@@ -7,7 +7,6 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
-from redis.exceptions import RedisError
 
 
 def _make_user():
@@ -123,7 +122,7 @@ class TestUpdatePortfolio:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -161,7 +160,7 @@ class TestListPortfolios:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock()),
                 ),
@@ -194,7 +193,7 @@ class TestCreatePortfolio:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None), setex=AsyncMock(), delete=AsyncMock()),
                 ),
@@ -243,7 +242,7 @@ class TestDeletePortfolio:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -272,7 +271,7 @@ class TestDeletePortfolio:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
@@ -304,7 +303,7 @@ class TestReorderPortfolios:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -373,7 +372,7 @@ class TestCreatePortfolioExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -409,7 +408,7 @@ class TestCreatePortfolioExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -459,7 +458,7 @@ class TestCreatePortfolioExtended:
 
 class TestListPortfoliosExtended:
     def test_returns_cached_data_on_cache_hit(self, override_settings):
-        """Redis 캐시 히트 시 DB 조회 없이 반환 (lines 74-76)."""
+        """Cache 캐시 히트 시 DB 조회 없이 반환 (lines 74-76)."""
         user = _make_user()
         db = _make_mock_db()
 
@@ -481,7 +480,7 @@ class TestListPortfoliosExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=cached)),
                 ),
@@ -490,50 +489,6 @@ class TestListPortfoliosExtended:
                 resp = client.get("/api/v1/portfolios")
             assert resp.status_code == 200
             assert len(resp.json()) == 1
-        finally:
-            _cleanup(app)
-
-    def test_cache_read_exception_falls_through(self, override_settings):
-        """Redis 캐시 읽기 실패 시 DB 조회로 폴백 (lines 75-76)."""
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        try:
-            with (
-                patch(
-                    "app.api.v1.portfolios.get_redis",
-                    new_callable=AsyncMock,
-                    return_value=AsyncMock(
-                        get=AsyncMock(side_effect=RedisError("redis error")),
-                        setex=AsyncMock(),
-                    ),
-                ),
-                TestClient(app, raise_server_exceptions=False) as client,
-            ):
-                resp = client.get("/api/v1/portfolios")
-            assert resp.status_code == 200
-        finally:
-            _cleanup(app)
-
-    def test_cache_write_exception_still_returns_data(self, override_settings):
-        """Redis 캐시 쓰기 실패 시도 데이터 반환 (lines 90-91)."""
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        try:
-            with (
-                patch(
-                    "app.api.v1.portfolios.get_redis",
-                    new_callable=AsyncMock,
-                    return_value=AsyncMock(
-                        get=AsyncMock(return_value=None),
-                        setex=AsyncMock(side_effect=RedisError("redis write error")),
-                    ),
-                ),
-                TestClient(app, raise_server_exceptions=False) as client,
-            ):
-                resp = client.get("/api/v1/portfolios")
-            assert resp.status_code == 200
         finally:
             _cleanup(app)
 
@@ -560,7 +515,7 @@ class TestUpdatePortfolioExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -587,7 +542,7 @@ class TestUpdatePortfolioExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),
@@ -619,7 +574,7 @@ class TestUpdatePortfolioExtended:
         try:
             with (
                 patch(
-                    "app.api.v1.portfolios.get_redis",
+                    "app.api.v1.portfolios.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(delete=AsyncMock()),
                 ),

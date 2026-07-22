@@ -2,19 +2,19 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 
-from app.constants import REDIS_TOKEN_TTL_BUFFER
+from app.constants import TOKEN_CACHE_TTL_BUFFER
 from app.exceptions import ProviderTokenError
 from app.kis.constants import (
     KIS_MOCK_BASE_URL,
     KIS_REAL_BASE_URL,
-    REDIS_TOKEN_KEY,
+    TOKEN_CACHE_KEY,
 )
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
 
-REDIS_ACCOUNT_TOKEN_KEY = "kis_token:account:{account_id}"  # nosec B105 — Redis 키 템플릿
+ACCOUNT_TOKEN_CACHE_KEY = "kis_token:account:{account_id}"  # nosec B105 — 캐시 키 템플릿
 
 
 async def get_access_token(
@@ -22,21 +22,21 @@ async def get_access_token(
     app_secret: str,
     *,
     is_mock: bool,
-    redis,
+    cache,
     db,
     user_id: str,
     account_id: str | None = None,
     force_refresh: bool = False,
 ) -> str:
-    """KIS 액세스 토큰 조회 — Redis 캐시 → DB → KIS API 순으로 시도.
+    """KIS 액세스 토큰 조회 — 캐시 → DB → KIS API 순으로 시도.
 
     account_id가 있으면 계좌별 토큰 캐시를 사용하고,
     없으면 기존 유저 레벨 캐시를 사용한다.
     """
     if account_id:
-        cache_key = REDIS_ACCOUNT_TOKEN_KEY.format(account_id=account_id)
+        cache_key = ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id)
     else:
-        cache_key = REDIS_TOKEN_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
+        cache_key = TOKEN_CACHE_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
 
     async def _query_token_row():
         from sqlalchemy import select
@@ -66,13 +66,13 @@ async def get_access_token(
             app_key,
             app_secret,
             is_mock=is_mock,
-            redis=redis,
+            cache=cache,
             db=db,
             user_id=user_id,
             account_id=account_id,
         )
 
-    return await get_or_fetch_token(cache_key, redis, force_refresh, REDIS_TOKEN_TTL_BUFFER, _query_token_row, _fetch)
+    return await get_or_fetch_token(cache_key, cache, force_refresh, TOKEN_CACHE_TTL_BUFFER, _query_token_row, _fetch)
 
 
 async def _fetch_and_store_token(
@@ -80,7 +80,7 @@ async def _fetch_and_store_token(
     app_secret: str,
     *,
     is_mock: bool,
-    redis,
+    cache,
     db,
     user_id: str,
     account_id: str | None = None,
@@ -103,13 +103,13 @@ async def _fetch_and_store_token(
     expires_in: int = int(data.get("expires_in", 86400))
     expires_at = datetime.now(UTC) + timedelta(seconds=expires_in)
 
-    # Redis 캐시 저장
+    # 캐시 저장
     if account_id:
-        cache_key = REDIS_ACCOUNT_TOKEN_KEY.format(account_id=account_id)
+        cache_key = ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id)
     else:
-        cache_key = REDIS_TOKEN_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
-    ttl = expires_in - REDIS_TOKEN_TTL_BUFFER
-    await redis.setex(cache_key, max(ttl, 60), access_token)
+        cache_key = TOKEN_CACHE_KEY.format(user_id=user_id, mode="mock" if is_mock else "real")
+    ttl = expires_in - TOKEN_CACHE_TTL_BUFFER
+    await cache.setex(cache_key, max(ttl, 60), access_token)
 
     # DB upsert
     from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -153,7 +153,7 @@ async def promote_user_token_to_account(
     user_id: str,
     account_id: str,
     is_mock: bool,
-    redis,
+    cache,
     db,
 ) -> bool:
     """계좌 등록 직전 자격증명 검증(verify-kis-credentials)으로 발급된 유저 레벨 토큰을
@@ -196,9 +196,9 @@ async def promote_user_token_to_account(
     await db.execute(stmt)
     await db.commit()
 
-    ttl = int((row.expires_at - datetime.now(UTC)).total_seconds() - REDIS_TOKEN_TTL_BUFFER)
+    ttl = int((row.expires_at - datetime.now(UTC)).total_seconds() - TOKEN_CACHE_TTL_BUFFER)
     if ttl > 0:
-        await redis.setex(REDIS_ACCOUNT_TOKEN_KEY.format(account_id=account_id), ttl, row.access_token)
+        await cache.setex(ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id), ttl, row.access_token)
 
     logger.info("kis_token_promoted_to_account", user_id=user_id, account_id=account_id, is_mock=is_mock)
     return True

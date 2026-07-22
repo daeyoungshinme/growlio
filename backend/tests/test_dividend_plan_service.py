@@ -92,7 +92,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_redis():
+def mock_cache():
     return MagicMock()
 
 
@@ -127,7 +127,7 @@ YEARLY_ROWS = [
 
 class TestGetDividendPlan:
     @pytest.mark.asyncio
-    async def test_no_goal_returns_none_achievement(self, user_id, mock_db, mock_redis):
+    async def test_no_goal_returns_none_achievement(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=None)
         execute_result = MagicMock()
         execute_result.fetchall.return_value = YEARLY_ROWS
@@ -143,7 +143,7 @@ class TestGetDividendPlan:
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
-            result = await get_dividend_plan(user_id, mock_db, mock_redis)
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         assert result["annual_dividend_goal"] is None
         assert result["goal_achievement_pct"] is None
@@ -154,7 +154,7 @@ class TestGetDividendPlan:
         assert len(result["yearly_received"]) == 3
 
     @pytest.mark.asyncio
-    async def test_with_goal_calculates_achievement(self, user_id, mock_db, mock_redis):
+    async def test_with_goal_calculates_achievement(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=3_600_000)
         execute_result = MagicMock()
         execute_result.fetchall.return_value = []
@@ -170,13 +170,13 @@ class TestGetDividendPlan:
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
-            result = await get_dividend_plan(user_id, mock_db, mock_redis)
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         assert result["annual_dividend_goal"] == 3_600_000
         assert result["goal_achievement_pct"] == 50.0  # 1_800_000 / 3_600_000 * 100
 
     @pytest.mark.asyncio
-    async def test_no_settings_row_returns_none_goal(self, user_id, mock_db, mock_redis):
+    async def test_no_settings_row_returns_none_goal(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = None
         execute_result = MagicMock()
         execute_result.fetchall.return_value = []
@@ -192,14 +192,14 @@ class TestGetDividendPlan:
                 AsyncMock(return_value={"annual_received": 0, "monthly_breakdown": []}),
             ),
         ):
-            result = await get_dividend_plan(user_id, mock_db, mock_redis)
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         assert result["annual_dividend_goal"] is None
         assert result["estimated_annual_krw"] == 0
         assert result["estimated_monthly_krw"] == 0
 
     @pytest.mark.asyncio
-    async def test_monthly_projected_sums_correctly(self, user_id, mock_db, mock_redis):
+    async def test_monthly_projected_sums_correctly(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=None)
         execute_result = MagicMock()
         execute_result.fetchall.return_value = []
@@ -215,7 +215,7 @@ class TestGetDividendPlan:
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
         ):
-            result = await get_dividend_plan(user_id, mock_db, mock_redis)
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         projected = {p["month"]: p["amount_krw"] for p in result["monthly_projected"]}
         # 월 4: 005930(1_200_000/4=300_000) + QQQ(600_000/4=150_000) = 450_000
@@ -226,7 +226,7 @@ class TestGetDividendPlan:
         assert projected[2] == 0
 
     @pytest.mark.asyncio
-    async def test_yearly_received_mapped_correctly(self, user_id, mock_db, mock_redis):
+    async def test_yearly_received_mapped_correctly(self, user_id, mock_db, mock_cache):
         mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=None)
         execute_result = MagicMock()
         execute_result.fetchall.return_value = YEARLY_ROWS
@@ -242,7 +242,7 @@ class TestGetDividendPlan:
                 AsyncMock(return_value={"annual_received": 0, "monthly_breakdown": []}),
             ),
         ):
-            result = await get_dividend_plan(user_id, mock_db, mock_redis)
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         years = result["yearly_received"]
         assert len(years) == 3

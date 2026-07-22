@@ -1,4 +1,4 @@
-"""월별 자산 추이 계산 — DB·Redis 의존, 비즈니스 로직 없음."""
+"""월별 자산 추이 계산 — DB·캐시 의존, 비즈니스 로직 없음."""
 
 from __future__ import annotations
 
@@ -7,13 +7,13 @@ import uuid
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.utils.cache_keys import TTL_MONTHLY_TREND, RedisType, get_cached_json, monthly_trend_key, set_cached_json
+from app.utils.cache_keys import TTL_MONTHLY_TREND, CacheStoreType, get_cached_json, monthly_trend_key, set_cached_json
 
 
-async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> list[dict]:
+async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> list[dict]:
     """최근 12개월 월별 총자산 추이. is_active/include_in_total 계좌만 집계."""
     cache_key = monthly_trend_key(user_id)
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -44,5 +44,5 @@ async def get_monthly_trend(user_id: uuid.UUID, db: AsyncSession, redis: RedisTy
     )
     data = [{"month": str(row.month), "total_krw": float(row.total_krw)} for row in result]
 
-    await set_cached_json(redis, cache_key, data, TTL_MONTHLY_TREND)
+    await set_cached_json(cache, cache_key, data, TTL_MONTHLY_TREND)
     return data

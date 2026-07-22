@@ -137,15 +137,15 @@ export function AlertAutoModeSection({
         </label>
         <input
           type="time"
-          min="09:00"
-          max="15:00"
           step={300}
           value={form.autoExecutionTime}
           onChange={(e) => form.setAutoExecutionTime(e.target.value)}
           className={inputClass}
         />
         <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
-          장 중(09:00~15:00 KST) 지정 시각에 자동 실행됩니다.
+          지정 시각에 자동 실행됩니다 — 종목별 소속 시장(국내 KRX 09:00~15:30 KST / 해외 NYSE
+          09:30~16:00 ET)에 맞춰 실행 여부가 자동 판단되므로, 해외 종목 위주라면 저녁~새벽 시간도
+          지정할 수 있습니다.
         </p>
       </div>
 

@@ -321,7 +321,8 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         mock_email.assert_called_once()
         assert mock_email.call_args.kwargs["is_composite_triggered"] is True
         assert "분산도" in mock_email.call_args.kwargs["composite_reason"]
-        mock_db.commit.assert_called_once()
+        # commit 2회: (1) 복합신호 dedup 플래그 저장(set_durable 내부) (2) 알림 루프의 last_triggered_at 저장
+        assert mock_db.commit.call_count == 2
 
     @pytest.mark.asyncio
     async def test_no_drift_no_composite_signal_skips(self, mock_db):
@@ -444,12 +445,12 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         analysis = SimpleNamespace(items=[_make_no_drift_item()], ticker_account_map={})
         overview = {"total_stock_krw": 10_000_000, "all_positions": [], "total_assets_krw": 10_000_000}
 
-        composite_flag_store: dict[str, bool] = {}
+        composite_flag_store: dict[str, str] = {}
 
-        async def fake_get_cached_json(_redis, key):
+        async def fake_get_durable(_db, key):
             return composite_flag_store.get(key)
 
-        async def fake_set_cached_json(_redis, key, value, ttl):
+        async def fake_set_durable(_db, key, value, ttl=None):
             composite_flag_store[key] = value
 
         with (
@@ -460,8 +461,8 @@ class TestCheckRebalancingAlertsCompositeTrigger:
                 "app.services.rebalancing.alert_check.fetch_market_and_risk_signal",
                 new=AsyncMock(return_value=("GREEN", {"data_available": True, "diversification_score": 20})),
             ),
-            patch("app.services.rebalancing.alert_check.get_cached_json", side_effect=fake_get_cached_json),
-            patch("app.services.rebalancing.alert_check.set_cached_json", side_effect=fake_set_cached_json),
+            patch("app.services.rebalancing.alert_check.get_durable", side_effect=fake_get_durable),
+            patch("app.services.rebalancing.alert_check.set_durable", side_effect=fake_set_durable),
         ):
             from app.services.rebalancing.alert_check import check_rebalancing_alerts
 
@@ -511,7 +512,7 @@ class TestCheckRebalancingAlertsCompositeTrigger:
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=overview)),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
             patch("app.services.email_service.send_rebalancing_alert", new=AsyncMock(return_value=True)) as mock_email,
-            patch("app.services.rebalancing.alert_check.get_cached_json", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.alert_check.get_durable", new=AsyncMock(return_value="1")),
         ):
             from app.services.rebalancing.alert_check import check_rebalancing_alerts
 

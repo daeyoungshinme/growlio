@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
-from redis.asyncio import Redis
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,13 +13,16 @@ from app.models.user import UserSettings
 from app.services.dividend.aggregator import get_dividend_summary
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 
+if TYPE_CHECKING:
+    from app.core.cache_store import CacheStore
+
 _YEARLY_HISTORY_YEARS = 5
 
 
 async def get_dividend_plan(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Redis | None = None,
+    cache: CacheStore | None = None,
 ) -> dict:
     """연배당 목표 달성 현황 및 월별/연도별 배당 분포 반환."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
@@ -27,7 +30,7 @@ async def get_dividend_plan(
         float(settings_row.annual_dividend_goal) if settings_row and settings_row.annual_dividend_goal else None
     )
 
-    # 종목별 예상 배당 (Redis 캐시 활용)
+    # 종목별 예상 배당 (캐시 활용)
     ticker_summaries = await get_ticker_dividend_summary(user_id, db)
 
     estimated_annual_krw = sum(float(item.get("estimated_annual_krw") or 0) for item in ticker_summaries)
@@ -37,8 +40,8 @@ async def get_dividend_plan(
     if annual_dividend_goal and annual_dividend_goal > 0:
         goal_achievement_pct = round(estimated_annual_krw / annual_dividend_goal * 100, 1)
 
-    # 올해 실수령 배당 + 월별 내역 (Redis 캐시 활용)
-    summary = await get_dividend_summary(user_id, db, redis)
+    # 올해 실수령 배당 + 월별 내역 (캐시 활용)
+    summary = await get_dividend_summary(user_id, db, cache)
     actual_annual_received_krw = float(summary.get("annual_received") or 0)
     monthly_received = summary.get("monthly_breakdown", [])
 

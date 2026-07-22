@@ -19,7 +19,9 @@ class RebalancingAlertCreate(BaseModel):
     account_id: uuid.UUID | None = None
     order_type: Literal["MARKET", "LIMIT"] = "MARKET"
     market_condition_mode: Literal["DISABLED", "CAUTIOUS", "STRICT"] = "DISABLED"
-    # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30"). None이면 장 개시 후 첫 tick에 실행
+    # AUTO 모드 실행 시각 (HH:MM KST, 예: "09:30" 또는 해외 종목용 "22:30"). None이면 장 개시 후
+    # 첫 tick에 실행. 시장 개장 여부는 종목별 소속 시장(국내 KRX/해외 NYSE)에 맞춰 leg 단위로
+    # 자동 판단되므로 이 필드는 시각 형식만 검증한다.
     auto_execution_time: str | None = None
     # NOTIFY 모드 알림 발송 시각 (HH:MM KST, 기본: "08:30")
     notify_time: str = "08:30"
@@ -60,8 +62,8 @@ class RebalancingAlertCreate(BaseModel):
             hour, minute = int(hh), int(mm)
         except (ValueError, AttributeError):
             raise ValueError("실행 시각은 HH:MM 형식이어야 합니다 (예: 09:30)") from None
-        if not (9 <= hour <= 15) or not (0 <= minute <= 59):
-            raise ValueError("실행 시각은 09:00~15:00 KST 범위여야 합니다")
+        if not (0 <= hour <= 23) or not (0 <= minute <= 59):
+            raise ValueError("실행 시각은 00:00~23:59 KST 범위여야 합니다")
         return f"{hour:02d}:{minute:02d}"
 
     @field_validator("notify_time")

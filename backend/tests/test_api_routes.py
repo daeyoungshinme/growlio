@@ -1,36 +1,15 @@
 """주요 API 엔드포인트 HTTP 상태코드 통합 테스트.
 
 FastAPI TestClient + 의존성 오버라이드 패턴 사용 (raise_server_exceptions=False).
-실제 DB/Redis 없이 인증·라우팅·응답 구조만 검증한다.
+실제 DB 없이 인증·라우팅·응답 구조만 검증한다. lifespan의 scheduler 무력화는
+conftest.py의 autouse `_mock_scheduler`가 전역 처리한다.
 """
 
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
-
-
-@pytest.fixture(autouse=True)
-def mock_redis_and_scheduler(monkeypatch):
-    """lifespan 시 Redis·Scheduler 없이도 앱이 시작되도록 모킹한다."""
-    import app.core.redis_client as redis_mod
-    import app.scheduler as scheduler_mod
-
-    mock_redis = AsyncMock()
-    mock_redis.ping = AsyncMock(return_value=True)
-    mock_redis.aclose = AsyncMock()
-    mock_redis.get = AsyncMock(return_value=None)
-
-    # redis_client 전역 변수를 mock으로 사전 교체 → get_redis()가 바로 반환
-    monkeypatch.setattr(redis_mod, "redis_client", mock_redis)
-    # scheduler start/shutdown을 no-op으로 대체
-    monkeypatch.setattr(scheduler_mod.scheduler, "start", lambda: None)
-    monkeypatch.setattr(scheduler_mod.scheduler, "shutdown", lambda: None)
-    yield
-    redis_mod.redis_client = None
-
 
 # ── 공통 헬퍼 ─────────────────────────────────────────────────
 
@@ -87,12 +66,12 @@ class TestHealth:
     """GET /health — 인증 불필요."""
 
     def test_health_returns_200_or_503(self, override_settings):
-        """Redis 없이도 /health 엔드포인트 자체는 응답한다."""
+        """Cache 없이도 /health 엔드포인트 자체는 응답한다."""
         from app.main import app
 
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/health")
-        # Redis 연결 불가 시 503, 가능 시 200
+        # Cache 연결 불가 시 503, 가능 시 200
         assert resp.status_code in (200, 503)
 
 
@@ -145,7 +124,7 @@ class TestAssetsRoutes:
         app, user, db = _get_app_with_auth()
         try:
             with (
-                patch("app.api.v1.assets.get_redis", new_callable=AsyncMock),
+                patch("app.api.v1.assets.get_cache_store", new_callable=AsyncMock),
                 patch("app.utils.currency.fetch_usd_krw", new_callable=AsyncMock, return_value=1350.0),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -185,7 +164,7 @@ class TestPortfolioRoutes:
         }
         try:
             with (
-                patch("app.api.v1.portfolio_analysis.get_redis", new_callable=AsyncMock),
+                patch("app.api.v1.portfolio_analysis.get_cache_store", new_callable=AsyncMock),
                 patch(
                     "app.api.v1.portfolio_analysis.build_portfolio_overview",
                     new_callable=AsyncMock,

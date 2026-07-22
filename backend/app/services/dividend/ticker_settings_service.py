@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.models.asset import UserTickerSettings
 from app.utils.cache_keys import dividend_info_key, dividend_months_key, invalidate_dividend_caches
 
@@ -49,10 +49,10 @@ async def upsert_ticker_settings(
     await db.execute(stmt)
     await db.commit()
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     current_year = date.today().year
-    await invalidate_dividend_caches(redis, user_id, current_year)
-    await redis.delete(dividend_info_key(ticker, market))
+    await invalidate_dividend_caches(cache, user_id, current_year)
+    await cache.delete(dividend_info_key(ticker, market))
     logger.info("ticker_settings_upserted", user_id=str(user_id), ticker=ticker, market=market)
 
     return {
@@ -76,11 +76,11 @@ async def delete_ticker_settings(user_id: uuid.UUID, ticker: str, market: str, d
     await db.delete(row)
     await db.commit()
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     current_year = date.today().year
-    await invalidate_dividend_caches(redis, user_id, current_year)
-    await redis.delete(dividend_months_key(ticker, market))
-    await redis.delete(dividend_info_key(ticker, market))
+    await invalidate_dividend_caches(cache, user_id, current_year)
+    await cache.delete(dividend_months_key(ticker, market))
+    await cache.delete(dividend_info_key(ticker, market))
     logger.info("ticker_settings_deleted", user_id=str(user_id), ticker=ticker, market=market)
 
     return True

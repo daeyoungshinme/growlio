@@ -67,7 +67,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
-            result = await sync_account(account, mock_db, redis=MagicMock())
+            result = await sync_account(account, mock_db, cache=MagicMock())
 
         assert result is fake_snapshot
         mock_provider.sync.assert_called_once()
@@ -95,7 +95,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
-            await sync_account(account, mock_db, redis=MagicMock())
+            await sync_account(account, mock_db, cache=MagicMock())
 
         assert account.deposit_krw == 1_000_000.0
 
@@ -123,7 +123,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
-            await sync_account(account, mock_db, redis=MagicMock())
+            await sync_account(account, mock_db, cache=MagicMock())
 
         assert account.deposit_usd == 500.0
 
@@ -160,7 +160,7 @@ class TestSyncAccount:
             patch("app.services.asset_service.invalidate_account_caches", new=AsyncMock()),
             patch("app.services.asset_service.broker_sync_duration"),
         ):
-            await sync_account(account, mock_db, redis=MagicMock())
+            await sync_account(account, mock_db, cache=MagicMock())
 
         # db.execute was called for delete operation
         mock_db.execute.assert_called()

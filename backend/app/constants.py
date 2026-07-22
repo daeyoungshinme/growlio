@@ -20,4 +20,4 @@ CASH_EQUIVALENT_ACCOUNT_TYPES: frozenset[str] = frozenset({"BANK_ACCOUNT", "DEPO
 (CMA·파킹통장·예적금 등 은행성 계좌). CASH_OTHER는 제외 — 개별 종목(Position)을 보유할 수 있는
 브로커성 계좌이므로 portfolio_service.STOCK_TYPES 쪽에서 종목 단위로 추적된다."""
 
-REDIS_TOKEN_TTL_BUFFER: int = 300  # 만료 5분 전 갱신 — KIS/키움 토큰 갱신 공용(app/kis/auth.py, app/kiwoom/auth.py)
+TOKEN_CACHE_TTL_BUFFER: int = 300  # 만료 5분 전 갱신 — KIS/키움 토큰 갱신 공용(app/kis/auth.py, app/kiwoom/auth.py)

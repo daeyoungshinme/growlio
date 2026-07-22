@@ -71,16 +71,16 @@ class TestGeneratePendingPlanForAlert:
         ]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
-            plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
+            plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, {}, "GREEN"
             )
 
         assert plan is not None
-        assert buy_token is not None
-        assert sell_token is None
+        assert len(buy_tokens) == 1
+        assert sell_tokens == []
         assert len(plan.legs) == 1
         assert plan.legs[0].side == "BUY"
         assert plan.legs[0].items[0].quantity == 5
@@ -94,7 +94,7 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
@@ -118,7 +118,7 @@ class TestGeneratePendingPlanForAlert:
 
         before = datetime.now(tz=UTC)
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
@@ -149,7 +149,7 @@ class TestGeneratePendingPlanForAlert:
         ]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
             patch.object(svc.settings, "auto_rebalancing_max_order_value_krw", 100_000.0),
         ):
@@ -168,12 +168,12 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(shares_to_trade=None)]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             result = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
-        assert result == (None, None, None)
+        assert result == (None, [], [])
 
     @pytest.mark.asyncio
     async def test_sell_with_no_holding_account_produces_no_sell_leg(self, mock_db):
@@ -183,16 +183,16 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0)]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
-            plan, buy_token, sell_token = await svc.generate_pending_plan_for_alert(
+            plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
                 alert, portfolio, drifting, mock_db, {}, "GREEN"
             )
 
         assert plan is None
-        assert buy_token is None
-        assert sell_token is None
+        assert buy_tokens == []
+        assert sell_tokens == []
 
     @pytest.mark.asyncio
     async def test_explicitly_refreshes_legs_after_commit(self, mock_db):
@@ -202,12 +202,105 @@ class TestGeneratePendingPlanForAlert:
         drifting = [_make_drift_item(ticker="005930", diff_krw=100000.0, shares_to_trade=5.0)]
 
         with (
-            patch("app.core.redis_client.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
         ):
             plan, _, _ = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
 
         mock_db.refresh.assert_awaited_once_with(plan, attribute_names=["legs"])
+
+    @pytest.mark.asyncio
+    async def test_mixed_kr_us_buy_creates_two_legs(self, mock_db):
+        """국내+해외 매수가 섞여 있으면 leg가 시장별로(KR/US) 분리 생성돼야 한다 — 두 시장은
+        개장시간이 달라 하나의 leg로 묶으면 실행/만료를 leg 단위로 정확히 판단할 수 없다."""
+        alert = _make_alert(strategy="BUY_ONLY")
+        portfolio = _make_portfolio()
+        drifting = [
+            _make_drift_item(ticker="005930", market="KOSPI", diff_krw=100000.0, shares_to_trade=5.0),
+            _make_drift_item(
+                ticker="AAPL", market="NASDAQ", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=200000.0
+            ),
+        ]
+
+        with (
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+        ):
+            plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
+                alert, portfolio, drifting, mock_db, {}, "GREEN"
+            )
+
+        assert plan is not None
+        assert sell_tokens == []
+        assert len(buy_tokens) == 2
+        assert {mkt for mkt, _ in buy_tokens} == {"KR", "US"}
+        assert len(plan.legs) == 2
+        legs_by_market = {leg.market: leg for leg in plan.legs}
+        assert set(legs_by_market) == {"KR", "US"}
+        for leg in plan.legs:
+            assert leg.side == "BUY"
+            assert len(leg.items) == 1
+
+        us_item = legs_by_market["US"].items[0]
+        assert us_item.order_type == "LIMIT"
+        assert us_item.limit_price == 200000.0
+
+    @pytest.mark.asyncio
+    async def test_overseas_market_order_without_price_is_skipped(self, mock_db):
+        """참고가(reference_price)를 구하지 못한 해외 MARKET 주문은 무인 실행 리스크가 있어
+        LIMIT으로 강제 변환할 수 없으므로 스킵된다(익일 이월 없이 조용히 누락)."""
+        alert = _make_alert(strategy="BUY_ONLY")
+        portfolio = _make_portfolio()
+        drifting = [
+            _make_drift_item(
+                ticker="AAPL", market="NASDAQ", diff_krw=100000.0, shares_to_trade=3.0, current_price_krw=None
+            ),
+        ]
+
+        with (
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+        ):
+            result = await svc.generate_pending_plan_for_alert(alert, portfolio, drifting, mock_db, {}, "GREEN")
+
+        assert result == (None, [], [])
+
+    @pytest.mark.asyncio
+    async def test_mixed_kr_us_sell_uses_market_appropriate_deadlines(self, mock_db):
+        from app.utils.market_hours import korean_market_close_datetime, us_market_close_datetime
+
+        alert = _make_alert(strategy="FULL")
+        portfolio = _make_portfolio()
+        kr_holder = uuid.uuid4()
+        us_holder = uuid.uuid4()
+        ticker_account_map = {
+            "005930": [_make_ticker_account(kr_holder, quantity=10)],
+            "AAPL": [_make_ticker_account(us_holder, quantity=10)],
+        }
+        drifting = [
+            _make_drift_item(ticker="005930", market="KOSPI", diff_krw=-100000.0, shares_to_trade=-5.0),
+            _make_drift_item(
+                ticker="AAPL", market="NASDAQ", diff_krw=-100000.0, shares_to_trade=-3.0, current_price_krw=200000.0
+            ),
+        ]
+
+        with (
+            patch("app.core.cache_store.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+        ):
+            plan, buy_tokens, sell_tokens = await svc.generate_pending_plan_for_alert(
+                alert, portfolio, drifting, mock_db, ticker_account_map, "GREEN"
+            )
+
+        assert buy_tokens == []
+        assert len(sell_tokens) == 2
+        sell_legs = {leg.market: leg for leg in plan.legs if leg.side == "SELL"}
+        assert set(sell_legs) == {"KR", "US"}
+
+        expected_kr_close = korean_market_close_datetime().astimezone(UTC)
+        expected_us_close = us_market_close_datetime().astimezone(UTC)
+        assert abs((sell_legs["KR"].deadline_at - expected_kr_close).total_seconds()) < 5
+        assert abs((sell_legs["US"].deadline_at - expected_us_close).total_seconds()) < 5
 
 
 # ── notify_plan_generated ────────────────────────────────────
@@ -216,11 +309,13 @@ class TestGeneratePendingPlanForAlert:
 class TestNotifyPlanGenerated:
     @pytest.mark.asyncio
     async def test_sell_only_plan_still_sends_email(self, mock_db):
-        """buy_token이 없어도(매도 전용 플랜) sell_token만 있으면 이메일을 발송해야 한다 —
-        buy_token 유무로만 게이트하면 매도전용 드리프트에서 이메일이 조용히 스킵된다."""
+        """buy leg가 없어도(매도 전용 플랜) sell leg만 있으면 이메일을 발송해야 한다 —
+        buy leg 유무로만 게이트하면 매도전용 드리프트에서 이메일이 조용히 스킵된다."""
         alert = _make_alert()
         portfolio = _make_portfolio()
-        sell_leg = SimpleNamespace(side="SELL", items=[SimpleNamespace(ticker="005930")], deadline_at=datetime.now(UTC))
+        sell_leg = SimpleNamespace(
+            side="SELL", market="KR", items=[SimpleNamespace(ticker="005930")], deadline_at=datetime.now(UTC)
+        )
         plan = SimpleNamespace(id=uuid.uuid4(), account_id=None, legs=[sell_leg])
 
         mock_email = AsyncMock(return_value=True)
@@ -230,14 +325,15 @@ class TestNotifyPlanGenerated:
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
-                plan, alert, portfolio, None, "sell-token", "user@test.com", None, "GREEN", mock_db
+                plan, alert, portfolio, [], [("KR", "sell-token")], "user@test.com", None, "GREEN", mock_db
             )
 
         assert email_sent is True
         mock_email.assert_awaited_once()
         _, kwargs = mock_email.call_args
-        assert kwargs["buy_cancel_token"] is None
-        assert kwargs["sell_action_token"] == "sell-token"
+        assert kwargs["buy_legs"] == []
+        assert len(kwargs["sell_legs"]) == 1
+        assert kwargs["sell_legs"][0].token == "sell-token"
 
     @pytest.mark.asyncio
     async def test_no_tokens_skips_email(self, mock_db):
@@ -252,7 +348,7 @@ class TestNotifyPlanGenerated:
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
-                plan, alert, portfolio, None, None, "user@test.com", None, "GREEN", mock_db
+                plan, alert, portfolio, [], [], "user@test.com", None, "GREEN", mock_db
             )
 
         assert email_sent is False
@@ -262,7 +358,9 @@ class TestNotifyPlanGenerated:
     async def test_no_email_address_skips_send(self, mock_db):
         alert = _make_alert()
         portfolio = _make_portfolio()
-        buy_leg = SimpleNamespace(side="BUY", items=[SimpleNamespace(ticker="005930")], deadline_at=datetime.now(UTC))
+        buy_leg = SimpleNamespace(
+            side="BUY", market="KR", items=[SimpleNamespace(ticker="005930")], deadline_at=datetime.now(UTC)
+        )
         plan = SimpleNamespace(id=uuid.uuid4(), account_id=None, legs=[buy_leg])
 
         mock_email = AsyncMock()
@@ -272,7 +370,7 @@ class TestNotifyPlanGenerated:
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
         ):
             email_sent = await svc.notify_plan_generated(
-                plan, alert, portfolio, "buy-token", None, None, None, "GREEN", mock_db
+                plan, alert, portfolio, [("KR", "buy-token")], [], None, None, "GREEN", mock_db
             )
 
         assert email_sent is False
@@ -290,20 +388,17 @@ class TestNotifyTaxGateBlocked:
         blocked = svc.TaxGateBlocked(estimated_tax_krw=200_000.0, max_tax_impact_krw=100_000.0)
 
         mock_email = AsyncMock(return_value=True)
-        mock_redis = MagicMock()
         with (
             patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
             patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
-            patch("app.utils.cache_keys.get_cached_json", new=AsyncMock(return_value=None)),
-            patch("app.utils.cache_keys.set_cached_json", new=AsyncMock()) as mock_set_cached,
+            patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
+            patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
         ):
-            await svc.notify_tax_gate_blocked(
-                alert, portfolio, blocked, "user@test.com", "fcm-token", mock_redis, mock_db
-            )
+            await svc.notify_tax_gate_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
 
         mock_email.assert_awaited_once_with("user@test.com", portfolio.name, 200_000.0, 100_000.0)
-        mock_set_cached.assert_awaited_once()
+        mock_set_durable.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_skips_when_already_sent_today(self, mock_db):
@@ -315,11 +410,9 @@ class TestNotifyTaxGateBlocked:
         mock_email = AsyncMock()
         with (
             patch("app.services.email_service.send_tax_impact_gate_blocked_email", new=mock_email),
-            patch("app.utils.cache_keys.get_cached_json", new=AsyncMock(return_value=True)),
+            patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
-            await svc.notify_tax_gate_blocked(
-                alert, portfolio, blocked, "user@test.com", "fcm-token", MagicMock(), mock_db
-            )
+            await svc.notify_tax_gate_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
 
         mock_email.assert_not_awaited()
 
@@ -641,6 +734,7 @@ class TestExecuteDueBuyLegs:
         locked_leg = SimpleNamespace(
             id=leg_id,
             side="BUY",
+            market="KR",
             status="PENDING",
             deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5),
             decided_at=None,
@@ -678,6 +772,7 @@ class TestExecuteDueBuyLegs:
             id=leg_id,
             plan_id=plan_id,
             side="BUY",
+            market="KR",
             status="PENDING",
             items=[item],
             decided_at=None,
@@ -727,6 +822,7 @@ class TestExecuteDueBuyLegs:
             id=leg_id,
             plan_id=plan_id,
             side="BUY",
+            market="KR",
             status="PENDING",
             decided_at=None,
             decided_by=None,
@@ -778,6 +874,92 @@ class TestExecuteDueBuyLegs:
 
         assert count == 0
 
+    @pytest.mark.asyncio
+    async def test_us_leg_executes_when_nyse_open_even_if_krx_closed(self, mock_db):
+        """KR/US leg는 독립적으로 게이팅된다 — KRX가 닫혀 있어도 US leg는 NYSE 개장 여부로 실행 판단한다."""
+        leg_id = uuid.uuid4()
+        plan_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        item = SimpleNamespace(
+            ticker="AAPL",
+            name="Apple",
+            market="NASDAQ",
+            quantity=3,
+            account_id=str(uuid.uuid4()),
+            order_type="LIMIT",
+            limit_price=200000.0,
+            reference_price=200000.0,
+        )
+        locked_leg = SimpleNamespace(
+            id=leg_id,
+            plan_id=plan_id,
+            side="BUY",
+            market="US",
+            status="PENDING",
+            items=[item],
+            decided_at=None,
+            decided_by=None,
+            execution_id=None,
+            error_message=None,
+            token_consumed_at=None,
+        )
+        plan = SimpleNamespace(
+            id=plan_id, user_id=uuid.uuid4(), account_id=uuid.uuid4(), portfolio_id=uuid.uuid4(), strategy="BUY_ONLY"
+        )
+
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=plan)
+        mock_db.refresh = AsyncMock()
+
+        execution_id = uuid.uuid4()
+        with (
+            patch("app.utils.market_hours.is_korean_market_open", return_value=False),
+            patch("app.utils.market_hours.is_us_market_open", return_value=True),
+            patch("app.services.price_service.fetch_prices_batch", new=AsyncMock(return_value={})),
+            patch(
+                "app.services.rebalancing.execution_service.execute_rebalancing",
+                new=AsyncMock(return_value=([], execution_id)),
+            ),
+            patch("app.services.rebalancing.plan_service._send_leg_execution_email", new=AsyncMock()),
+        ):
+            count = await svc.execute_due_buy_legs(mock_db, MagicMock())
+
+        assert count == 1
+        assert locked_leg.status == "EXECUTED"
+        assert locked_leg.execution_id == execution_id
+
+    @pytest.mark.asyncio
+    async def test_us_leg_expires_when_nyse_closed_even_if_krx_open(self, mock_db):
+        """반대 방향도 독립적 — KRX가 열려 있어도 US leg는 NYSE가 닫혀 있으면 EXPIRED 처리된다."""
+        leg_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id,
+            side="BUY",
+            market="US",
+            status="PENDING",
+            deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5),
+            decided_at=None,
+            decided_by=None,
+            error_message=None,
+        )
+
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+
+        with (
+            patch("app.utils.market_hours.is_korean_market_open", return_value=True),
+            patch("app.utils.market_hours.is_us_market_open", return_value=False),
+        ):
+            count = await svc.execute_due_buy_legs(mock_db, MagicMock())
+
+        assert count == 1
+        assert locked_leg.status == "EXPIRED"
+        assert locked_leg.error_message == "market_closed_before_execution"
+
 
 # ── expire_due_sell_legs ──────────────────────────────────────
 
@@ -820,6 +1002,32 @@ class TestExpireDueSellLegs:
         count = await svc.expire_due_sell_legs(mock_db)
 
         assert count == 0
+
+    @pytest.mark.asyncio
+    async def test_expires_us_leg_with_next_day_kst_deadline(self, mock_db):
+        """해외(US) SELL leg는 마감시각이 다음날(KST 기준) 새벽으로 찍히지만, deadline_at은 항상
+        절대 UTC 시각으로 저장되므로 시장 구분 없이 `deadline_at <= now`만으로 정확히 만료된다 —
+        이 job에 시장별 분기 로직이 필요 없음을 보이는 회귀 테스트."""
+        leg_id = uuid.uuid4()
+        plan_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id, plan_id=plan_id, side="SELL", market="US", status="PENDING", decided_at=None, decided_by=None
+        )
+        plan = SimpleNamespace(id=plan_id, user_id=uuid.uuid4())
+
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.get = AsyncMock(return_value=plan)
+
+        with patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save:
+            count = await svc.expire_due_sell_legs(mock_db)
+
+        assert count == 1
+        assert locked_leg.status == "EXPIRED"
+        assert locked_leg.decided_by == "SYSTEM_EXPIRY"
+        mock_save.assert_called_once()
 
 
 # ── has_pending_plan_for_alert / list_recent_plan_legs ───────

@@ -208,22 +208,22 @@ async def _fetch_fred_calendar_events(days_ahead: int = _CALENDAR_DAYS_AHEAD) ->
     return events
 
 
-async def sync_calendar_to_cache(redis) -> list[dict[str, Any]]:
-    """FRED에서 캘린더 이벤트를 조회해 Redis에 저장한다."""
+async def sync_calendar_to_cache(cache) -> list[dict[str, Any]]:
+    """FRED에서 캘린더 이벤트를 조회해 캐시에 저장한다."""
     events = await _fetch_fred_calendar_events()
 
-    if redis and events:
-        await set_cached_json(redis, economic_indicator_calendar_key(), events, TTL_INDICATOR_CALENDAR)
+    if cache and events:
+        await set_cached_json(cache, economic_indicator_calendar_key(), events, TTL_INDICATOR_CALENDAR)
         logger.info("fred_calendar_synced", count=len(events))
 
     return events
 
 
-async def get_calendar_events(redis) -> list[dict[str, Any]]:
-    """캘린더 이벤트를 반환한다. Redis 캐시 hit 시 캐시값, miss 시 FRED 직접 조회."""
-    if (hit := await get_cached_json(redis, economic_indicator_calendar_key())) is not None:
+async def get_calendar_events(cache) -> list[dict[str, Any]]:
+    """캘린더 이벤트를 반환한다. 캐시 hit 시 캐시값, miss 시 FRED 직접 조회."""
+    if (hit := await get_cached_json(cache, economic_indicator_calendar_key())) is not None:
         return hit
-    return await sync_calendar_to_cache(redis)
+    return await sync_calendar_to_cache(cache)
 
 
 # ---------------------------------------------------------------------------
@@ -234,12 +234,12 @@ async def get_calendar_events(redis) -> list[dict[str, Any]]:
 _INFLATION_CODES = ("CPI_US", "CORE_CPI_US")
 
 
-async def fetch_inflation_summary(redis=None) -> list[dict[str, Any]]:
+async def fetch_inflation_summary(cache=None) -> list[dict[str, Any]]:
     """CPI·Core CPI 요약 반환: 최신값, 전월/전년 대비 변화율, 다음 발표일.
 
     리밸런싱 화면 참고용 — history/calendar 캐시를 그대로 재사용하므로 신규 FRED 호출이 없다.
     """
-    calendar_events = await get_calendar_events(redis)
+    calendar_events = await get_calendar_events(cache)
     next_release_by_name: dict[str, str] = {}
     for event in calendar_events:
         name = event.get("event")
@@ -250,7 +250,7 @@ async def fetch_inflation_summary(redis=None) -> list[dict[str, Any]]:
     summaries: list[dict[str, Any]] = []
     for code in _INFLATION_CODES:
         meta = INDICATORS[code]
-        points = await fetch_indicator_history(code, months=13, redis=redis)
+        points = await fetch_indicator_history(code, months=13, cache=cache)
         if not points:
             continue
 
@@ -278,14 +278,14 @@ async def fetch_inflation_summary(redis=None) -> list[dict[str, Any]]:
     return summaries
 
 
-async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> list[dict[str, Any]]:
-    """지표의 최근 N개월 시계열 반환, Redis 6시간 캐시."""
+async def fetch_indicator_history(code: str, months: int = 24, cache=None) -> list[dict[str, Any]]:
+    """지표의 최근 N개월 시계열 반환, 6시간 캐시."""
     meta = INDICATORS.get(code)
     if not meta:
         return []
 
     cache_key = economic_indicator_history_key(code, months)
-    if (hit := await get_cached_json(redis, cache_key)) is not None:
+    if (hit := await get_cached_json(cache, cache_key)) is not None:
         return hit
 
     raw = await _fred_get_observations(meta["series"], limit=months + 3)
@@ -294,5 +294,5 @@ async def fetch_indicator_history(code: str, months: int = 24, redis=None) -> li
     # 최근 months개만 반환
     result = points[-months:] if len(points) > months else points
 
-    await set_cached_json(redis, cache_key, result, TTL_INDICATOR_HISTORY)
+    await set_cached_json(cache, cache_key, result, TTL_INDICATOR_HISTORY)
     return result

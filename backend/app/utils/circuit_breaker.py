@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 from collections.abc import Callable
 from enum import StrEnum
@@ -39,16 +40,27 @@ class CircuitBreaker:
         self._failures = 0
         self._opened_at: float = 0.0
         self._state = _State.CLOSED
+        # HALF_OPEN 진입 시 여러 동시 호출(예: asyncio.gather로 같은 서킷을 공유하는
+        # 복수 신호 조회) 중 단 하나만 실제로 시도하도록 하는 프로브 슬롯. 이게 없으면
+        # 동시 호출 중 하나만 실패해도 나머지가 성공했는지와 무관하게 즉시 재오픈되어
+        # 서킷이 회복하지 못하고 계속 열린 채로 "플래핑"할 수 있다.
+        self._half_open_probe_claimed = False
+        self._probe_lock = asyncio.Lock()
 
     @property
     def state(self) -> _State:
         if self._state == _State.OPEN and time.monotonic() - self._opened_at >= self.reset_timeout:
             self._state = _State.HALF_OPEN
+            self._half_open_probe_claimed = False
             logger.info("circuit_half_open", name=self.name)
         return self._state
 
     def is_available(self) -> bool:
-        """CLOSED 또는 HALF_OPEN → True, OPEN → False."""
+        """CLOSED 또는 HALF_OPEN → True, OPEN → False.
+
+        비-mutating 프리뷰용 — 프로브 슬롯을 소모하지 않는다. 실제 호출 시도 전
+        사전 체크로만 쓰고, 프로브 점유·해제는 `call()`에서만 일어난다.
+        """
         return self.state != _State.OPEN
 
     def record_success(self) -> None:
@@ -56,12 +68,14 @@ class CircuitBreaker:
             logger.info("circuit_closed", name=self.name)
         self._failures = 0
         self._state = _State.CLOSED
+        self._half_open_probe_claimed = False
 
     def record_failure(self) -> None:
         self._failures += 1
         if self._failures >= self.fail_max or self._state == _State.HALF_OPEN:
             self._state = _State.OPEN
             self._opened_at = time.monotonic()
+            self._half_open_probe_claimed = False
             logger.warning(
                 "circuit_opened",
                 name=self.name,
@@ -72,19 +86,32 @@ class CircuitBreaker:
     async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """func을 서킷 브레이커로 보호해서 호출한다.
 
-        OPEN 상태면 즉시 CircuitOpenError를 raise한다.
+        OPEN 상태면 즉시 CircuitOpenError를 raise한다. HALF_OPEN 상태에서는 동시
+        호출 중 하나만 프로브로 통과시키고 나머지는 OPEN과 동일하게 즉시 차단한다
+        (표준 서킷 브레이커 시맨틱 — 여러 동시 시도 중 일부 실패로 인해 성공한
+        시도까지 무의미해지는 것을 방지).
         설정/인증 오류(ProviderCredentialError, *AuthError)는 실패로 카운트하지 않는다.
         """
-        if not self.is_available():
+        current = self.state
+        if current == _State.OPEN:
             raise CircuitOpenError(
                 f"{self.name} API가 일시적으로 응답하지 않습니다 ({self.reset_timeout:.0f}초 후 자동 재시도)."
             )
+        if current == _State.HALF_OPEN:
+            async with self._probe_lock:
+                if self._half_open_probe_claimed:
+                    raise CircuitOpenError(f"{self.name} API 복구 확인 중입니다 (다른 요청이 이미 재시도 중).")
+                self._half_open_probe_claimed = True
         try:
             result = await func(*args, **kwargs)
             self.record_success()
             return result
         except Exception as exc:
             if _is_bypass(exc):
+                # record_failure()를 거치지 않으므로 프로브 슬롯을 여기서 직접 해제 —
+                # 안 하면 HALF_OPEN 상태가 영구히 "프로브 진행 중"으로 멈춰 이후 모든
+                # 호출이 계속 차단된다.
+                self._half_open_probe_claimed = False
                 raise
             self.record_failure()
             raise

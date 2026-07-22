@@ -100,7 +100,7 @@ class TestDashboardApi:
             app.dependency_overrides.pop(get_db, None)
 
     def test_returns_200_when_cache_hit(self, override_settings):
-        """Redis 캐시 히트 시에도 200 응답."""
+        """Cache 캐시 히트 시에도 200 응답."""
         import json
 
         from app.api.deps import get_current_user
@@ -118,11 +118,11 @@ class TestDashboardApi:
 
         app.dependency_overrides[get_current_user] = override_auth
         app.dependency_overrides[get_db] = override_db
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=json.dumps(_MOCK_DASHBOARD))
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=json.dumps(_MOCK_DASHBOARD))
         try:
             with (
-                patch("app.api.v1.dashboard.get_redis", new_callable=AsyncMock, return_value=mock_redis),
+                patch("app.api.v1.dashboard.get_cache_store", new_callable=AsyncMock, return_value=mock_cache),
                 patch(
                     "app.api.v1.dashboard.get_dashboard_summary",
                     new_callable=AsyncMock,

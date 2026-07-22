@@ -20,7 +20,7 @@ logger = structlog.get_logger()
 async def fetch_broker_balance(
     account: AssetAccount,
     db: AsyncSession,
-    redis,
+    cache,
 ) -> KisBalanceResponse:
     """KIS 또는 키움 계좌 실시간 잔고를 조회해 KisBalanceResponse로 반환한다.
 
@@ -36,7 +36,7 @@ async def fetch_broker_balance(
     else:
         raise ValueError(f"지원하지 않는 계좌 유형: {account.asset_type}")
 
-    result = await provider.sync(account, db, redis)
+    result = await provider.sync(account, db, cache)
 
     orderable_krw: float | None = None
     if account.asset_type == "STOCK_KIS" and account.kis_app_key and account.kis_app_secret and account.kis_account_no:
@@ -49,7 +49,7 @@ async def fetch_broker_balance(
                 app_key,
                 app_secret,
                 is_mock=account.is_mock_mode,
-                redis=redis,
+                cache=cache,
                 db=db,
                 user_id=str(account.user_id),
                 account_id=str(account.id),

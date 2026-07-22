@@ -2,7 +2,7 @@
 
 `portfolio_optimizer.py`의 SLSQP 골격을 재사용하되, 기대수익률로 CAGR을 쓰고 목표수익률
 이상을 제약으로 둔다는 점이 다르다 — 일반 효율적 프론티어 최적화는 `portfolio_optimizer.py`
-참고. DB/Redis 의존 없는 순수 계산이라 `goal_recommendation_service.py`에서 분리했다.
+참고. DB 의존 없는 순수 계산이라 `goal_recommendation_service.py`에서 분리했다.
 """
 
 from __future__ import annotations

@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
 from app.services.isa_service import get_isa_status_summary
@@ -27,13 +27,13 @@ async def overseas_positions_tax(
     db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
     """해외 종목별 미실현 손익 목록. account_id 미지정 시 전체 계좌 통합 기준."""
-    redis = await get_redis()
+    cache = await get_cache_store()
     cache_key = tax_overseas_key(current_user.id, account_id or "all")
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
     result = await get_overseas_positions_detail(current_user.id, db, uuid.UUID(account_id) if account_id else None)
-    await set_cached_json(redis, cache_key, result, TTL_TAX_OVERSEAS)
+    await set_cached_json(cache, cache_key, result, TTL_TAX_OVERSEAS)
     return result
 
 

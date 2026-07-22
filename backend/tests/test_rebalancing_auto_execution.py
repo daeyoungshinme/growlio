@@ -59,12 +59,13 @@ def _make_portfolio(**kwargs) -> SimpleNamespace:
     return SimpleNamespace(**defaults)
 
 
-def _make_plan(*, buy_count: int = 1, sell_count: int = 0, account_id=None) -> SimpleNamespace:
+def _make_plan(*, buy_count: int = 1, sell_count: int = 0, account_id=None, market="KR") -> SimpleNamespace:
     legs = []
     if buy_count:
         legs.append(
             SimpleNamespace(
                 side="BUY",
+                market=market,
                 items=[SimpleNamespace(ticker="005930")] * buy_count,
                 deadline_at="2026-01-01T00:00:00+00:00",
             )
@@ -73,6 +74,7 @@ def _make_plan(*, buy_count: int = 1, sell_count: int = 0, account_id=None) -> S
         legs.append(
             SimpleNamespace(
                 side="SELL",
+                market=market,
                 items=[SimpleNamespace(ticker="000660")] * sell_count,
                 deadline_at="2026-01-01T06:30:00+00:00",
             )
@@ -85,25 +87,26 @@ def _make_plan(*, buy_count: int = 1, sell_count: int = 0, account_id=None) -> S
 
 class TestRunRebalancingAutoExecution:
     @pytest.mark.asyncio
-    async def test_market_closed_skips_redis_and_execution(self):
+    async def test_market_closed_skips_cache_and_execution(self):
         with (
             patch("app.jobs.rebalancing_auto_execution.is_korean_market_open", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.get_redis") as mock_get_redis,
+            patch("app.jobs.rebalancing_auto_execution.is_us_market_open", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store") as mock_get_cache,
         ):
             from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
 
             await run_rebalancing_auto_execution()
 
-        mock_get_redis.assert_not_called()
+        mock_get_cache.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_lock_not_acquired_skips_auto_execution(self):
-        mock_redis = MagicMock()
+        mock_cache = MagicMock()
 
         with (
             patch("app.jobs.rebalancing_auto_execution.is_korean_market_open", return_value=True),
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=mock_redis)),
-            patch("app.jobs.rebalancing_auto_execution.redis_lock", return_value=_make_lock_cm(False)),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=mock_cache)),
+            patch("app.jobs.rebalancing_auto_execution.inproc_lock", return_value=_make_lock_cm(False)),
             patch("app.jobs.rebalancing_auto_execution._run_auto_execution", new=AsyncMock()) as mock_run,
         ):
             from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
@@ -114,12 +117,12 @@ class TestRunRebalancingAutoExecution:
 
     @pytest.mark.asyncio
     async def test_dispatches_when_market_open_and_lock_acquired(self):
-        mock_redis = MagicMock()
+        mock_cache = MagicMock()
 
         with (
             patch("app.jobs.rebalancing_auto_execution.is_korean_market_open", return_value=True),
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=mock_redis)),
-            patch("app.jobs.rebalancing_auto_execution.redis_lock", return_value=_make_lock_cm(True)),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=mock_cache)),
+            patch("app.jobs.rebalancing_auto_execution.inproc_lock", return_value=_make_lock_cm(True)),
             patch("app.jobs.rebalancing_auto_execution._run_auto_execution", new=AsyncMock()) as mock_run,
         ):
             from app.jobs.rebalancing_auto_execution import run_rebalancing_auto_execution
@@ -134,10 +137,10 @@ class TestRunRebalancingAutoExecution:
 
 @contextmanager
 def _patch_common(mock_db, composite_level="GREEN"):
-    """공통 patch 세트 — get_redis/AsyncSessionLocal/market_signal/이메일·푸시·이력 저장."""
+    """공통 patch 세트 — get_cache_store/AsyncSessionLocal/market_signal/이메일·푸시·이력 저장."""
     with ExitStack() as stack:
         stack.enter_context(
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock()))
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock()))
         )
         stack.enter_context(patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db))
         stack.enter_context(
@@ -178,7 +181,7 @@ class TestRunAutoExecution:
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
                 "app.services.market_signal_service.get_market_signal",
@@ -189,7 +192,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
-                new=AsyncMock(return_value=(_make_plan(), "buy-token", None)),
+                new=AsyncMock(return_value=(_make_plan(), [("KR", "buy-token")], [])),
             ) as mock_gen,
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
@@ -408,7 +411,7 @@ class TestRunAutoExecution:
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
                 "app.services.market_signal_service.get_market_signal",
@@ -443,7 +446,7 @@ class TestRunAutoExecution:
         mock_db.execute = AsyncMock(return_value=execute_result)
 
         with (
-            patch("app.jobs.rebalancing_auto_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_auto_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
             patch("app.jobs.rebalancing_auto_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
                 "app.services.market_signal_service.get_market_signal",
@@ -484,7 +487,7 @@ class TestRunAutoExecution:
             patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
-                new=AsyncMock(return_value=(_make_plan(), "buy-token", None)),
+                new=AsyncMock(return_value=(_make_plan(), [("KR", "buy-token")], [])),
             ),
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save,
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()) as mock_email,
@@ -513,9 +516,9 @@ class TestRunAutoExecution:
 
         call_count = 0
 
-        async def _gen_side_effect(alert, portfolio, db, composite_level, redis=None):
+        async def _gen_side_effect(alert, portfolio, db, composite_level, cache=None):
             nonlocal call_count
-            result = None if call_count == 0 else (_make_plan(), "buy-token", None)
+            result = None if call_count == 0 else (_make_plan(), [("KR", "buy-token")], [])
             call_count += 1
             return result
 

@@ -14,7 +14,7 @@ from app.kiwoom.auth import _fetch_and_store_token
 
 class TestFetchAndStoreTokenExpiresDt:
     @pytest.mark.asyncio
-    async def test_parses_actual_kiwoom_expires_dt_format(self, override_settings, mock_redis, mock_db):
+    async def test_parses_actual_kiwoom_expires_dt_format(self, override_settings, mock_cache, mock_db):
         """키움 API는 expires_dt를 'YYYYMMDDHHMMSS'(구분자 없음)로 응답한다 —
         'YYYY-MM-DD HH:MM:SS' 포맷을 가정하면 ValueError로 동기화 전체가 실패한다."""
         response = httpx.Response(
@@ -30,7 +30,7 @@ class TestFetchAndStoreTokenExpiresDt:
                 "app-key",
                 "app-secret",
                 is_mock=True,
-                redis=mock_redis,
+                cache=mock_cache,
                 db=mock_db,
                 user_id=str(uuid.uuid4()),
                 account_id=str(uuid.uuid4()),

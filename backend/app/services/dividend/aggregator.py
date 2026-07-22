@@ -5,31 +5,33 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import date
+from typing import TYPE_CHECKING
 
 import structlog
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.utils.cache_keys import TTL_DIVIDEND_SUMMARY, dividend_summary_key, set_cached_json
 
+if TYPE_CHECKING:
+    from app.core.cache_store import CacheStore
+
 logger = structlog.get_logger()
 
 
 async def get_dividend_summary(
-    user_id: uuid.UUID, db: AsyncSession, redis: Redis | None = None, account_id: uuid.UUID | None = None
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStore | None = None, account_id: uuid.UUID | None = None
 ) -> dict:
     """연간 배당 요약. account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합)."""
     acct_suffix = str(account_id) if account_id else "all"
     cache_key = dividend_summary_key(user_id, acct_suffix)
-    if redis:
+    if cache:
         try:
-            cached = await redis.get(cache_key)
+            cached = await cache.get(cache_key)
             if cached:
                 return json.loads(cached)
-        except (RedisError, json.JSONDecodeError):
+        except json.JSONDecodeError:
             logger.warning("dividend_cache_read_error", user_id=str(user_id))
 
     current_year = date.today().year
@@ -38,7 +40,7 @@ async def get_dividend_summary(
         user_id, db, current_year, account_id
     )
 
-    ticker_summaries = await get_ticker_dividend_summary(user_id, db, account_id)
+    ticker_summaries = await get_ticker_dividend_summary(user_id, db, [account_id] if account_id else None)
     estimated_annual = sum(
         item["estimated_annual_krw"] for item in ticker_summaries if item.get("estimated_annual_krw", 0) > 0
     )
@@ -50,7 +52,7 @@ async def get_dividend_summary(
         "estimated_annual": estimated_annual,
     }
 
-    await set_cached_json(redis, cache_key, result, TTL_DIVIDEND_SUMMARY)
+    await set_cached_json(cache, cache_key, result, TTL_DIVIDEND_SUMMARY)
     return result
 
 

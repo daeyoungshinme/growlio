@@ -18,8 +18,6 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
-      - key: REDIS_URL
-        sync: false
       - key: ALLOWED_ORIGINS
         sync: false
       - key: SUPABASE_PROJECT_URL

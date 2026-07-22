@@ -6,7 +6,6 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from redis.exceptions import RedisError
 
 from app.utils.cache_keys import (
     alloc_history_key,
@@ -139,33 +138,27 @@ class TestInvalidateRebalancingStrategyCache:
         portfolio_id = "portfolio-1"
         written_key = rebalancing_strategy_key(uid, portfolio_id, "acct-a_acct-b")
 
-        redis = AsyncMock()
-        redis.scan = AsyncMock(return_value=(0, [written_key]))
-        redis.unlink = AsyncMock()
+        cache = AsyncMock()
+        cache.scan = AsyncMock(return_value=(0, [written_key]))
+        cache.unlink = AsyncMock()
 
-        await invalidate_rebalancing_strategy_cache(redis, uid, portfolio_id)
+        await invalidate_rebalancing_strategy_cache(cache, uid, portfolio_id)
 
-        redis.scan.assert_called_once()
-        _, kwargs = redis.scan.call_args
+        cache.scan.assert_called_once()
+        _, kwargs = cache.scan.call_args
         pattern = kwargs["match"]
         assert str(uid) in pattern
         assert portfolio_id in pattern
         assert pattern.endswith(":*")
-        redis.unlink.assert_called_once_with(written_key)
+        cache.unlink.assert_called_once_with(written_key)
 
 
 class TestInvalidateUserCaches:
     @pytest.mark.asyncio
-    async def test_calls_redis_delete(self, override_settings):
-        redis = AsyncMock()
-        await invalidate_user_caches(redis, "key1", "key2")
-        redis.delete.assert_called_once_with("key1", "key2")
-
-    @pytest.mark.asyncio
-    async def test_suppresses_redis_error(self, override_settings):
-        redis = AsyncMock()
-        redis.delete.side_effect = RedisError("fail")
-        await invalidate_user_caches(redis, "key1")  # should not raise
+    async def test_calls_cache_delete(self, override_settings):
+        cache = AsyncMock()
+        await invalidate_user_caches(cache, "key1", "key2")
+        cache.delete.assert_called_once_with("key1", "key2")
 
 
 # ── currency ─────────────────────────────────────────────────────────────────
@@ -173,30 +166,23 @@ class TestInvalidateUserCaches:
 
 class TestGetUsdKrwRate:
     @pytest.mark.asyncio
-    async def test_returns_fallback_when_redis_is_none(self, override_settings):
+    async def test_returns_fallback_when_cache_is_none(self, override_settings):
         rate = await get_usd_krw_rate(None)
         assert rate > 0
 
     @pytest.mark.asyncio
     async def test_returns_cached_value_when_available(self, override_settings):
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=b"1350.5")
-        rate = await get_usd_krw_rate(redis)
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=b"1350.5")
+        rate = await get_usd_krw_rate(cache)
         assert rate == pytest.approx(1350.5)
 
     @pytest.mark.asyncio
     async def test_returns_fallback_when_cache_miss(self, override_settings):
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        rate = await get_usd_krw_rate(redis, fallback_rate=1300.0)
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        rate = await get_usd_krw_rate(cache, fallback_rate=1300.0)
         assert rate == pytest.approx(1300.0)
-
-    @pytest.mark.asyncio
-    async def test_suppresses_redis_error_and_returns_fallback(self, override_settings):
-        redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=RedisError("connection error"))
-        rate = await get_usd_krw_rate(redis, fallback_rate=1400.0)
-        assert rate == pytest.approx(1400.0)
 
     @pytest.mark.asyncio
     async def test_custom_fallback_rate_used(self, override_settings):
@@ -206,28 +192,22 @@ class TestGetUsdKrwRate:
 
 class TestCacheUsdKrwRate:
     @pytest.mark.asyncio
-    async def test_stores_rate_in_redis(self, override_settings):
-        redis = AsyncMock()
-        await cache_usd_krw_rate(redis, 1350.0)
-        redis.setex.assert_called_once()
-        args = redis.setex.call_args[0]
+    async def test_stores_rate_in_cache(self, override_settings):
+        cache = AsyncMock()
+        await cache_usd_krw_rate(cache, 1350.0)
+        cache.setex.assert_called_once()
+        args = cache.setex.call_args[0]
         assert "1350.0" in args
 
     @pytest.mark.asyncio
-    async def test_does_nothing_when_redis_none(self, override_settings):
+    async def test_does_nothing_when_cache_none(self, override_settings):
         await cache_usd_krw_rate(None, 1350.0)  # should not raise
 
     @pytest.mark.asyncio
     async def test_does_nothing_when_rate_zero(self, override_settings):
-        redis = AsyncMock()
-        await cache_usd_krw_rate(redis, 0)
-        redis.setex.assert_not_called()
-
-    @pytest.mark.asyncio
-    async def test_suppresses_redis_error(self, override_settings):
-        redis = AsyncMock()
-        redis.setex.side_effect = RedisError("fail")
-        await cache_usd_krw_rate(redis, 1350.0)  # should not raise
+        cache = AsyncMock()
+        await cache_usd_krw_rate(cache, 0)
+        cache.setex.assert_not_called()
 
 
 # ── fetch_usd_krw (force_refresh) ────────────────────────────
@@ -238,94 +218,94 @@ class TestFetchUsdKrw:
     async def test_no_force_refresh_returns_cache(self, override_settings):
         from app.utils.currency import fetch_usd_krw
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=b"1350.0")
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=b"1350.0")
 
-        rate = await fetch_usd_krw(redis, force_refresh=False)
+        rate = await fetch_usd_krw(cache, force_refresh=False)
         assert rate == pytest.approx(1350.0)
 
     @pytest.mark.asyncio
     async def test_force_refresh_returns_fetched(self, override_settings):
         from app.utils.currency import fetch_usd_krw
 
-        redis = AsyncMock()
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.setex = AsyncMock()
 
         with patch("app.services.yahoo_price._sync_usdkrw", return_value=1380.0):
             loop_mock = AsyncMock()
             loop_mock.run_in_executor = AsyncMock(return_value=1380.0)
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                rate = await fetch_usd_krw(redis, force_refresh=True)
+                rate = await fetch_usd_krw(cache, force_refresh=True)
 
         assert rate == pytest.approx(1380.0)
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_force_refresh_fallback_when_fetch_fails(self, override_settings):
         from app.utils.currency import fetch_usd_krw
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=b"1300.0")
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=b"1300.0")
 
         loop_mock = AsyncMock()
         loop_mock.run_in_executor = AsyncMock(return_value=None)
 
         with patch("asyncio.get_running_loop", return_value=loop_mock):
-            rate = await fetch_usd_krw(redis, force_refresh=True)
+            rate = await fetch_usd_krw(cache, force_refresh=True)
 
         assert rate == pytest.approx(1300.0)
 
 
-# ── redis_lock ────────────────────────────────────────────────
+# ── inproc_lock ────────────────────────────────────────────────
 
 
-class TestRedisLock:
+class TestCacheLock:
     @pytest.mark.asyncio
     async def test_lock_acquired_yields_true_and_releases(self, override_settings):
         """락 획득 성공 시 True yield 후 해제."""
         import uuid as _uuid_mod
 
-        from app.utils.redis_lock import redis_lock
+        from app.utils.inproc_lock import inproc_lock
 
         fixed_id = _uuid_mod.UUID("12345678-1234-5678-1234-567812345678")
         fixed_str = str(fixed_id)
 
-        redis = AsyncMock()
-        redis.set = AsyncMock(return_value=True)
-        redis.get = AsyncMock(return_value=fixed_str)
-        redis.delete = AsyncMock()
+        cache = AsyncMock()
+        cache.set = AsyncMock(return_value=True)
+        cache.get = AsyncMock(return_value=fixed_str)
+        cache.delete = AsyncMock()
 
-        with patch("app.utils.redis_lock.uuid.uuid4", return_value=fixed_id):
-            async with redis_lock(redis, "test:lock:key") as acquired:
+        with patch("app.utils.inproc_lock.uuid.uuid4", return_value=fixed_id):
+            async with inproc_lock(cache, "test:lock:key") as acquired:
                 assert acquired is True
 
-        redis.delete.assert_called_once()
+        cache.delete.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_lock_not_acquired_yields_false(self, override_settings):
         """락 획득 실패 시 False yield."""
-        from app.utils.redis_lock import redis_lock
+        from app.utils.inproc_lock import inproc_lock
 
-        redis = AsyncMock()
-        redis.set = AsyncMock(return_value=None)
+        cache = AsyncMock()
+        cache.set = AsyncMock(return_value=None)
 
-        async with redis_lock(redis, "test:lock:key") as acquired:
+        async with inproc_lock(cache, "test:lock:key") as acquired:
             assert acquired is False
 
-        redis.delete.assert_not_called()
+        cache.delete.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_lock_not_released_if_stolen(self, override_settings):
         """락 값이 다를 경우 (다른 프로세스가 재획득) 삭제하지 않는다."""
-        from app.utils.redis_lock import redis_lock
+        from app.utils.inproc_lock import inproc_lock
 
-        redis = AsyncMock()
-        redis.set = AsyncMock(return_value=True)
-        redis.get = AsyncMock(return_value="different-value")
-        redis.delete = AsyncMock()
+        cache = AsyncMock()
+        cache.set = AsyncMock(return_value=True)
+        cache.get = AsyncMock(return_value="different-value")
+        cache.delete = AsyncMock()
 
-        async with redis_lock(redis, "test:lock:key") as acquired:
+        async with inproc_lock(cache, "test:lock:key") as acquired:
             assert acquired is True
 
-        redis.delete.assert_not_called()
+        cache.delete.assert_not_called()

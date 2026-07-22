@@ -9,7 +9,7 @@ from sqlalchemy import extract, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import PaginationDep, get_current_user, get_db, get_owned_or_404
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
@@ -133,13 +133,13 @@ async def delete_transaction(
 async def _invalidate_tx_caches(user_id: UUID) -> None:
     from datetime import date
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     await invalidate_user_caches(
-        redis,
+        cache,
         dashboard_summary_key(user_id),
         monthly_trend_key(user_id),
     )
-    await invalidate_dividend_caches(redis, user_id, date.today().year)
+    await invalidate_dividend_caches(cache, user_id, date.today().year)
 
 
 async def _get_owned_tx(tx_id: UUID, user_id: UUID, db: AsyncSession) -> Transaction:

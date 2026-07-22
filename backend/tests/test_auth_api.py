@@ -332,14 +332,14 @@ class TestDeleteAccount:
         _configure_empty_execute(db)
         app = _setup_app(user, db)
 
-        redis_mock = AsyncMock()
-        redis_mock.scan = AsyncMock(return_value=(0, []))
-        redis_mock.delete = AsyncMock()
+        cache_mock = AsyncMock()
+        cache_mock.scan = AsyncMock(return_value=(0, []))
+        cache_mock.delete = AsyncMock()
 
         with (
             patch("app.api.v1.auth.verify_password", AsyncMock(return_value=True)),
             patch("app.api.v1.auth.delete_supabase_user", AsyncMock(return_value=None)),
-            patch("app.api.v1.auth.get_redis", AsyncMock(return_value=redis_mock)),
+            patch("app.api.v1.auth.get_cache_store", AsyncMock(return_value=cache_mock)),
             patch("app.services.email_service.send_account_deletion_email", AsyncMock(return_value=True)),
             TestClient(app, raise_server_exceptions=False) as client,
         ):

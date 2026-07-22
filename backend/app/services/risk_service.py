@@ -1,7 +1,7 @@
 """포트폴리오 위험 분석 서비스.
 
 VaR, 베타, 연율화 변동성, 분산도 점수를 계산한다.
-yfinance 1년 일별 수익률 데이터를 기반으로 하며 Redis 1시간 캐시를 사용한다.
+yfinance 1년 일별 수익률 데이터를 기반으로 하며 1시간 캐시를 사용한다.
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_RISK_ANALYSIS, RedisType, get_cached_json, risk_key, set_cached_json
-from app.utils.redis_lock import single_flight_fetch
+from app.utils.cache_keys import TTL_RISK_ANALYSIS, CacheStoreType, get_cached_json, risk_key, set_cached_json
+from app.utils.inproc_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 _SP500_SYMBOL = "^GSPC"
@@ -104,13 +104,13 @@ def _calc_diversification_score(
 async def get_portfolio_risk_metrics(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     portfolio_id: str | None = None,
 ) -> dict:
     cache_key = risk_key(user_id, portfolio_id)
 
     async def _read_cache() -> dict | None:
-        return await get_cached_json(redis, cache_key)
+        return await get_cached_json(cache, cache_key)
 
     cached = await _read_cache()
     if cached is not None:
@@ -184,13 +184,13 @@ async def get_portfolio_risk_metrics(
             "note": "1년 일별 수익률 기반 추정값 (yfinance)" if len(portfolio_rets) >= 10 else "데이터 불충분",
         }
 
-        await set_cached_json(redis, cache_key, result_data, TTL_RISK_ANALYSIS)
+        await set_cached_json(cache, cache_key, result_data, TTL_RISK_ANALYSIS)
         return result_data
 
-    if redis is None:
+    if cache is None:
         return await _fetch_and_cache()
 
-    return await single_flight_fetch(redis, cache_key, _read_cache, _fetch_and_cache)
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
 def _empty_risk_result() -> dict:

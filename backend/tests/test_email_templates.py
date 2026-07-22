@@ -232,16 +232,20 @@ class TestRebalancingPlanPendingTemplate:
             ticker=ticker, name="삼성전자", market="KOSPI", quantity=5, order_type="MARKET", limit_price=None
         )
 
+    def _section(self, market="KR", ticker="005930", link="https://growlio.app/rebalancing/plan-confirm?token=t"):
+        return {
+            "market": market,
+            "items": [self._item(ticker)],
+            "deadline_at": datetime.now(UTC),
+            "link": link,
+        }
+
     def test_sell_only_plan_renders_without_buy_section(self):
         subject, html = rebalancing_plan_pending_template(
             portfolio_name="성장 포트폴리오",
             account_name="증권계좌",
-            buy_items=[],
-            buy_deadline_at=None,
-            buy_cancel_link=None,
-            sell_items=[self._item()],
-            sell_deadline_at=datetime.now(UTC),
-            sell_action_link="https://growlio.app/rebalancing/plan-confirm?token=sell-token",
+            buy_sections=[],
+            sell_sections=[self._section(link="https://growlio.app/rebalancing/plan-confirm?token=sell-token")],
         )
 
         assert "매도" in subject
@@ -254,12 +258,8 @@ class TestRebalancingPlanPendingTemplate:
         subject, html = rebalancing_plan_pending_template(
             portfolio_name="성장 포트폴리오",
             account_name=None,
-            buy_items=[self._item()],
-            buy_deadline_at=datetime.now(UTC),
-            buy_cancel_link="https://growlio.app/rebalancing/plan-confirm?token=buy-token",
-            sell_items=[],
-            sell_deadline_at=None,
-            sell_action_link=None,
+            buy_sections=[self._section(link="https://growlio.app/rebalancing/plan-confirm?token=buy-token")],
+            sell_sections=[],
         )
 
         assert "매수" in subject
@@ -271,14 +271,31 @@ class TestRebalancingPlanPendingTemplate:
         subject, html = rebalancing_plan_pending_template(
             portfolio_name="성장 포트폴리오",
             account_name=None,
-            buy_items=[self._item("005930")],
-            buy_deadline_at=datetime.now(UTC),
-            buy_cancel_link="https://growlio.app/rebalancing/plan-confirm?token=buy-token",
-            sell_items=[self._item("000660")],
-            sell_deadline_at=datetime.now(UTC),
-            sell_action_link="https://growlio.app/rebalancing/plan-confirm?token=sell-token",
+            buy_sections=[
+                self._section("KR", "005930", "https://growlio.app/rebalancing/plan-confirm?token=buy-token")
+            ],
+            sell_sections=[
+                self._section("KR", "000660", "https://growlio.app/rebalancing/plan-confirm?token=sell-token")
+            ],
         )
 
         assert "매수/매도" in subject
         assert "매수 취소하기" in html
         assert "매도 확인하러 가기" in html
+
+    def test_mixed_kr_us_legs_render_separate_sections_with_market_labels(self):
+        subject, html = rebalancing_plan_pending_template(
+            portfolio_name="성장 포트폴리오",
+            account_name=None,
+            buy_sections=[
+                self._section("KR", "005930", "https://growlio.app/rebalancing/plan-confirm?token=buy-kr"),
+                self._section("US", "AAPL", "https://growlio.app/rebalancing/plan-confirm?token=buy-us"),
+            ],
+            sell_sections=[],
+        )
+
+        assert "매수" in subject
+        assert "매수 주문 (국내)" in html
+        assert "매수 주문 (미국)" in html
+        assert "token=buy-kr" in html
+        assert "token=buy-us" in html

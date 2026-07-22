@@ -16,11 +16,11 @@ from typing import Any
 
 import structlog
 
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.jobs.asset_sync import _sync_accounts
 from app.models.asset import AssetAccount
 from app.utils.cache_keys import TTL_SYNC_ALL_STATUS, get_cached_json, set_cached_json, sync_all_status_key
-from app.utils.redis_lock import redis_lock
+from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
 
@@ -33,15 +33,15 @@ def _lock_key(user_id: uuid.UUID) -> str:
 
 async def get_sync_all_status(user_id: uuid.UUID) -> dict[str, Any]:
     """현재 유저의 "전체 갱신" 진행 상태를 조회한다. 기록이 없으면 idle."""
-    redis = await get_redis()
-    status = await get_cached_json(redis, sync_all_status_key(user_id))
+    cache = await get_cache_store()
+    status = await get_cached_json(cache, sync_all_status_key(user_id))
     return status or {"status": "idle"}
 
 
 async def is_sync_all_running(user_id: uuid.UUID) -> bool:
     """다른 "전체 갱신"이 이미 진행 중인지 확인한다 (락 존재 여부)."""
-    redis = await get_redis()
-    return bool(await redis.get(_lock_key(user_id)))
+    cache = await get_cache_store()
+    return bool(await cache.get(_lock_key(user_id)))
 
 
 async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None:
@@ -49,17 +49,17 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
 
     락 획득~해제를 이 코루틴이 전 구간 소유한다 (요청-응답 생명주기와 독립적).
     """
-    redis = await get_redis()
+    cache = await get_cache_store()
     status_key = sync_all_status_key(user_id)
     total = len(accounts)
 
-    async with redis_lock(redis, _lock_key(user_id), ttl=_LOCK_TTL_SECONDS) as acquired:
+    async with inproc_lock(cache, _lock_key(user_id), ttl=_LOCK_TTL_SECONDS) as acquired:
         if not acquired:
             logger.info("sync_all_already_running", user_id=str(user_id))
             return
 
         await set_cached_json(
-            redis,
+            cache,
             status_key,
             {
                 "status": "running",
@@ -73,7 +73,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
 
         async def on_progress(done: int, total_: int) -> None:
             await set_cached_json(
-                redis,
+                cache,
                 status_key,
                 {"status": "running", "total": total_, "done": done, "failed": 0},
                 TTL_SYNC_ALL_STATUS,
@@ -84,7 +84,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
         except Exception as e:
             logger.error("sync_all_failed", user_id=str(user_id), error=str(e))
             await set_cached_json(
-                redis,
+                cache,
                 status_key,
                 {"status": "error", "total": total, "done": 0, "failed": total},
                 TTL_SYNC_ALL_STATUS,
@@ -92,7 +92,7 @@ async def run_sync_all(user_id: uuid.UUID, accounts: list[AssetAccount]) -> None
             return
 
         await set_cached_json(
-            redis,
+            cache,
             status_key,
             {"status": "done", "total": total, "done": total, "failed": len(failed)},
             TTL_SYNC_ALL_STATUS,

@@ -14,7 +14,7 @@ from app.services.alerts.calculator import should_trigger_stock_price
 logger = structlog.get_logger()
 
 
-async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
+async def check_and_trigger_stock_price_alerts(db: AsyncSession, cache) -> None:
     """활성 주가 알림을 조회하고 조건 충족 시 이메일/푸시 발송 후 비활성화."""
     from app.services.email_service import send_stock_price_alert
     from app.services.price_service import fetch_prices_batch
@@ -36,7 +36,7 @@ async def check_and_trigger_stock_price_alerts(db: AsyncSession, redis) -> None:
 
     sample_user_id = rows[0][0].user_id
     unique_tickers = list({(a.ticker, a.market) for a, _, _, _ in rows})
-    price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, redis)
+    price_map = await fetch_prices_batch(sample_user_id, unique_tickers, db, cache)
 
     triggered_count = 0
     for alert, user_email, notification_email, fcm_token in rows:

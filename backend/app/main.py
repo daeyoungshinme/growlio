@@ -18,9 +18,9 @@ from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import Response
 
 from app.api.v1.router import router
+from app.core.cache_store import close_cache_store
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.redis_client import close_redis, get_redis
 from app.exceptions import (
     AppError,
     ProviderApiError,
@@ -53,7 +53,7 @@ if settings.sentry_dsn:
 
 _SECRET_PATTERN = re.compile(
     r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
-    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|redis_url|database_url)"
+    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|database_url)"
     r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{4,}",
     re.IGNORECASE,
 )
@@ -65,15 +65,6 @@ def _sanitize(text: str) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Redis 연결 확인 — 실패 시 즉시 종료
-    try:
-        redis = await get_redis()
-        await redis.ping()  # type: ignore[misc]  # redis-py ping() 오버로드 스텁 이슈
-        logger.info("redis_connected")
-    except Exception as e:
-        logger.error("redis_startup_failed", error=str(e))
-        raise RuntimeError(f"Redis에 연결할 수 없습니다: {e}") from e
-
     if settings.app_env == "production" and not settings.metrics_token:
         logger.warning("metrics_token_unset", message="/metrics 엔드포인트가 차단됩니다. METRICS_TOKEN을 설정하세요.")
 
@@ -82,7 +73,7 @@ async def lifespan(app: FastAPI):
     yield
     scheduler.shutdown()
     await close_http_client()
-    await close_redis()
+    await close_cache_store()
     logger.info("app_stopped")
 
 
@@ -227,7 +218,6 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 @app.get("/health")
 async def health():
     db_ok = False
-    redis_ok = False
     try:
         async for db in get_db():
             await db.execute(text("SELECT 1"))
@@ -235,14 +225,7 @@ async def health():
     except Exception as e:
         logger.error("health_check_db_failed", error=str(e))
 
-    try:
-        redis = await get_redis()
-        await redis.ping()
-        redis_ok = True
-    except Exception as e:
-        logger.error("health_check_redis_failed", error=str(e))
-
-    if db_ok and redis_ok:
+    if db_ok:
         return {"status": "ok"}
     return JSONResponse(status_code=503, content={"status": "unavailable"})
 

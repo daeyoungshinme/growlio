@@ -339,16 +339,16 @@ class TestExecuteRebalancing:
     """execute_rebalancing: 주문 그룹화 및 SELL-BUY 순서 검증."""
 
     @pytest.mark.asyncio
-    async def test_raises_400_when_no_orders(self, mock_db, mock_redis, override_settings):
+    async def test_raises_400_when_no_orders(self, mock_db, mock_cache, override_settings):
         from app.services.rebalancing.execution_service import execute_rebalancing
 
         user_id = uuid.uuid4()
         with pytest.raises(HTTPException) as exc:
-            await execute_rebalancing(user_id, None, [], mock_db, mock_redis)
+            await execute_rebalancing(user_id, None, [], mock_db, mock_cache)
         assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_sell_before_buy_execution_order(self, mock_db, mock_redis, override_settings):
+    async def test_sell_before_buy_execution_order(self, mock_db, mock_cache, override_settings):
         """SELL 주문이 BUY 주문보다 먼저 실행되어야 한다."""
         from app.services.rebalancing.execution_service import execute_rebalancing
 
@@ -399,13 +399,13 @@ class TestExecuteRebalancing:
                 side_effect=mock_execute_sells_with_clamp,
             ),
         ):
-            await execute_rebalancing(user_id, account.id, [buy_order, sell_order], mock_db, mock_redis)
+            await execute_rebalancing(user_id, account.id, [buy_order, sell_order], mock_db, mock_cache)
 
         # SELL이 BUY보다 먼저 실행되어야 함
         assert executed_tickers.index("SELL:A") < executed_tickers.index("BUY:B")
 
     @pytest.mark.asyncio
-    async def test_continues_after_individual_order_failure(self, mock_db, mock_redis, override_settings):
+    async def test_continues_after_individual_order_failure(self, mock_db, mock_cache, override_settings):
         """첫 주문 실패 시 나머지 주문은 계속 진행되어야 한다."""
         from app.services.rebalancing.execution_service import execute_rebalancing
 
@@ -452,7 +452,7 @@ class TestExecuteRebalancing:
             ),
             patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
-            results, _execution_id = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_redis)
+            results, _execution_id = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_cache)
 
         # 두 주문 모두 실행 시도됨
         assert call_count == 2
@@ -461,7 +461,7 @@ class TestExecuteRebalancing:
 
     @pytest.mark.asyncio
     async def test_one_account_group_failure_does_not_lose_other_group_results(
-        self, mock_db, mock_redis, override_settings
+        self, mock_db, mock_cache, override_settings
     ):
         """한 계좌 그룹 처리 중 예외가 발생해도 다른 계좌 그룹의 정상 결과는 보존돼야 한다."""
         from app.services.rebalancing.execution_service import execute_rebalancing
@@ -501,7 +501,7 @@ class TestExecuteRebalancing:
             patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
         ):
             results, _execution_id = await execute_rebalancing(
-                user_id, None, [valid_order, broken_order], mock_db, mock_redis
+                user_id, None, [valid_order, broken_order], mock_db, mock_cache
             )
 
         assert len(results) == 2

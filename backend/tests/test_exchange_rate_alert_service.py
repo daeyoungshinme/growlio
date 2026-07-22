@@ -133,22 +133,22 @@ class TestCheckAndTriggerAlerts:
         assert alert.trigger_count == 1
 
     @pytest.mark.asyncio
-    async def test_passes_redis_through_to_fetch_usd_krw(self, mock_db):
-        """redis 인자를 넘기면 fetch_usd_krw에도 그대로 전달된다 (usd_krw_rate 캐시 갱신 보장).
+    async def test_passes_cache_through_to_fetch_usd_krw(self, mock_db):
+        """cache 인자를 넘기면 fetch_usd_krw에도 그대로 전달된다 (usd_krw_rate 캐시 갱신 보장).
 
         회귀 테스트: 과거 fetch_usd_krw(None, force_refresh=True)로 하드코딩되어 있어
-        job이 5분마다 실시간 환율을 가져오고도 Redis에 캐싱하지 않던 버그(시장신호 배너가
+        job이 5분마다 실시간 환율을 가져오고도 Cache에 캐싱하지 않던 버그(시장신호 배너가
         fallback 1300원을 표시)를 방지한다.
         """
         mock_db.execute.return_value.all.return_value = []
-        mock_redis = object()
+        mock_cache = object()
 
         with patch(_FETCH_RATE, new_callable=AsyncMock, return_value=1320.0) as mock_fetch:
             from app.services.alerts.exchange_rate_service import check_and_trigger_alerts
 
-            await check_and_trigger_alerts(mock_db, mock_redis)
+            await check_and_trigger_alerts(mock_db, mock_cache)
 
-        mock_fetch.assert_called_once_with(mock_redis, force_refresh=True)
+        mock_fetch.assert_called_once_with(mock_cache, force_refresh=True)
 
     @pytest.mark.asyncio
     async def test_email_failure_skips_alert(self, mock_db):

@@ -35,12 +35,8 @@ from app.services.rebalancing.order_builder import (
     is_market_signal_blocking_auto_mode,
     refresh_live_prices,
 )
-from app.utils.cache_keys import (
-    TTL_COMPOSITE_ALERT_SENT,
-    composite_alert_sent_key,
-    get_cached_json,
-    set_cached_json,
-)
+from app.utils.cache_keys import TTL_COMPOSITE_ALERT_SENT, composite_alert_sent_key
+from app.utils.durable_state import get_durable, set_durable
 from app.utils.market_hours import is_alert_execution_time
 from app.utils.metrics import alert_trigger_count
 
@@ -55,16 +51,20 @@ logger = structlog.get_logger()
 _KST = timezone(timedelta(hours=9))
 
 
-async def _composite_alert_sent_today(redis: Any, user_id: uuid.UUID) -> bool:
-    """오늘(KST) 이 유저에게 복합신호만으로 리밸런싱 알림이 이미 발송되었는지 확인한다."""
+async def _composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> bool:
+    """오늘(KST) 이 유저에게 복합신호만으로 리밸런싱 알림이 이미 발송되었는지 확인한다.
+
+    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반
+    durable_state를 사용한다.
+    """
     today = datetime.now(tz=_KST).date().isoformat()
-    return bool(await get_cached_json(redis, composite_alert_sent_key(user_id, today)))
+    return bool(await get_durable(db, composite_alert_sent_key(user_id, today)))
 
 
-async def _mark_composite_alert_sent_today(redis: Any, user_id: uuid.UUID) -> None:
+async def _mark_composite_alert_sent_today(db: AsyncSession, user_id: uuid.UUID) -> None:
     """복합신호만으로 발송한 뒤, 오늘 이 유저에게는 더 이상 중복 발송하지 않도록 표시한다."""
     today = datetime.now(tz=_KST).date().isoformat()
-    await set_cached_json(redis, composite_alert_sent_key(user_id, today), True, TTL_COMPOSITE_ALERT_SENT)
+    await set_durable(db, composite_alert_sent_key(user_id, today), "1", ttl=TTL_COMPOSITE_ALERT_SENT)
 
 
 def _select_items_to_show(
@@ -114,7 +114,7 @@ async def _process_rebalancing_alert(
     fcm_token: str | None = None,
     is_composite_triggered: bool = False,
     composite_reason: str | None = None,
-    redis: Any = None,
+    cache: Any = None,
     ticker_account_map: dict[str, list] | None = None,
     automation_note: str | None = None,
 ) -> bool:
@@ -205,13 +205,13 @@ async def _process_rebalancing_alert(
             email_sent=email_sent,
             push_sent=push_sent,
         )
-    elif is_composite_triggered and redis is not None:
+    elif is_composite_triggered and cache is not None:
         # 복합신호는 유저 단위로 동일하게 평가되므로, 여러 포트폴리오에 걸친 중복 발송을 막기 위해 표시한다.
-        await _mark_composite_alert_sent_today(redis, alert.user_id)
+        await _mark_composite_alert_sent_today(db, alert.user_id)
     return any_sent
 
 
-async def _get_composite_level(redis) -> tuple[str, str]:
+async def _get_composite_level(cache) -> tuple[str, str]:
     """전체 알림 루프에서 공용으로 쓸 시장 신호 등급을 1회 조회한다.
 
     조회 자체가 실패하면 (composite_level="GREEN", data_freshness="STALE")로 폴백한다 —
@@ -221,7 +221,7 @@ async def _get_composite_level(redis) -> tuple[str, str]:
     from app.services.market_signal_service import get_market_signal
 
     try:
-        market_signal = await get_market_signal(redis)
+        market_signal = await get_market_signal(cache)
         return market_signal.get("composite_level", "GREEN"), market_signal.get("data_freshness", "LIVE")
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_alert_check", error=str(exc))
@@ -249,7 +249,7 @@ def _should_skip_by_schedule(alert: RebalancingAlert, trigger_condition: str, is
     return False
 
 
-async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, redis: Any = None):
+async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db: AsyncSession, cache: Any = None):
     """알림 대상 포트폴리오의 현재 배분을 조회·분석한다. 실패 시 None(호출부에서 skip)."""
     from app.services.portfolio_service import build_portfolio_overview
     from app.services.rebalancing.service import analyze_rebalancing
@@ -257,7 +257,7 @@ async def _analyze_alert_drift(alert: RebalancingAlert, portfolio: Portfolio, db
     effective_account_ids = resolve_effective_account_ids(alert, portfolio)
 
     try:
-        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, redis=redis)
+        overview = await build_portfolio_overview(alert.user_id, db, account_ids=effective_account_ids, cache=cache)
     except Exception as exc:
         logger.error("rebalancing_alert_overview_failed", alert_id=str(alert.id), error=str(exc))
         return None
@@ -276,7 +276,7 @@ async def _evaluate_composite_trigger(
     drifting: list,
     composite_signal_alerts_enabled: bool,
     db: AsyncSession,
-    redis,
+    cache,
 ) -> tuple[bool, str | None]:
     """drift/스케줄만으로 발송이 확정되지 않을 때만 복합 시장신호를 조회해 추가 트리거 여부를 판정한다.
 
@@ -293,7 +293,7 @@ async def _evaluate_composite_trigger(
     extra_trigger = False
     composite_reason: str | None = None
     try:
-        market_level, risk = await fetch_market_and_risk_signal(alert.user_id, db, redis)
+        market_level, risk = await fetch_market_and_risk_signal(alert.user_id, db, cache)
         extra_trigger, composite_reason = check_composite_signal(
             market_level,
             bool(risk.get("data_available")),
@@ -304,7 +304,7 @@ async def _evaluate_composite_trigger(
     except Exception as exc:
         logger.warning("rebalancing_alert_composite_signal_failed", alert_id=str(alert.id), error=str(exc))
 
-    if extra_trigger and await _composite_alert_sent_today(redis, alert.user_id):
+    if extra_trigger and await _composite_alert_sent_today(db, alert.user_id):
         extra_trigger = False
         composite_reason = None
 
@@ -313,11 +313,11 @@ async def _evaluate_composite_trigger(
 
 async def check_rebalancing_alerts(db: AsyncSession) -> None:
     """활성 리밸런싱 알림을 조회하고 스케줄·조건에 따라 이메일 발송."""
-    from app.core.redis_client import get_redis
+    from app.core.cache_store import get_cache_store
 
-    _redis = await get_redis()
+    _cache = await get_cache_store()
     # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
-    composite_level, market_data_freshness = await _get_composite_level(_redis)
+    composite_level, market_data_freshness = await _get_composite_level(_cache)
 
     result = await db.execute(
         select(
@@ -344,7 +344,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
         if _should_skip_by_schedule(alert, trigger_condition, is_schedule_day):
             continue
 
-        analysis = await _analyze_alert_drift(alert, portfolio, db, _redis)
+        analysis = await _analyze_alert_drift(alert, portfolio, db, _cache)
         if analysis is None:
             continue
 
@@ -356,7 +356,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             composite_signal_alerts_enabled if composite_signal_alerts_enabled is not None else True
         )
         extra_trigger, composite_reason = await _evaluate_composite_trigger(
-            alert, trigger_condition, is_schedule_day, drifting, effective_composite_enabled, db, _redis
+            alert, trigger_condition, is_schedule_day, drifting, effective_composite_enabled, db, _cache
         )
 
         selected = _select_items_to_show(trigger_condition, is_schedule_day, drifting, analysis.items, extra_trigger)
@@ -392,7 +392,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
             fcm_token=fcm_token,
             is_composite_triggered=is_composite_triggered,
             composite_reason=composite_reason,
-            redis=_redis,
+            cache=_cache,
             ticker_account_map=analysis.ticker_account_map,
             automation_note=automation_note,
         )

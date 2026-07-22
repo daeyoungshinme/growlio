@@ -10,8 +10,8 @@ import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.redis_client import get_redis
 from app.models.alert import RebalancingAlert
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
@@ -27,20 +27,26 @@ from app.services.rebalancing.plan_service import (
     notify_tax_gate_blocked,
 )
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_AUTO
-from app.utils.market_hours import is_alert_execution_time, is_korean_market_open
+from app.utils.inproc_lock import inproc_lock
+from app.utils.market_hours import is_alert_execution_time, is_korean_market_open, is_us_market_open
 from app.utils.metrics import alert_trigger_count
-from app.utils.redis_lock import redis_lock
 
 logger = structlog.get_logger()
 
 
 async def run_rebalancing_auto_execution() -> None:
-    """장 중 5분 간격 실행 — AUTO 모드 알림의 지정 시각에 리밸런싱 대기 플랜을 생성한다."""
-    if not is_korean_market_open():
+    """5분 간격 실행 — AUTO 모드 알림의 지정 시각에 리밸런싱 대기 플랜을 생성한다.
+
+    국내(KRX)/해외(NYSE) 중 최소 한 시장이 열려 있는 거래일에만 진행하는 저비용 조기 종료 —
+    실제 알림별 시각 매칭은 `is_alert_execution_time()`이, leg 단위 시장 개장 여부는 매수
+    실행(execute_due_buy_legs)·매도 만료(expire_due_sell_legs) 시점에 각각 판단한다. 두 시장이
+    모두 닫힌 주말 등에만 여기서 걸러진다 — 해외 전용 알림이 KRX 휴장일에 막히는 일은 없다.
+    """
+    if not (is_korean_market_open() or is_us_market_open()):
         return
 
-    redis = await get_redis()
-    async with redis_lock(redis, "rebalancing_auto_execution_lock", ttl=TTL_JOB_LOCK_REBALANCING_AUTO) as acquired:
+    cache = await get_cache_store()
+    async with inproc_lock(cache, "rebalancing_auto_execution_lock", ttl=TTL_JOB_LOCK_REBALANCING_AUTO) as acquired:
         if not acquired:
             logger.info("rebalancing_auto_execution_skipped_lock_held")
             return
@@ -50,8 +56,8 @@ async def run_rebalancing_auto_execution() -> None:
 async def _run_auto_execution() -> None:
     from app.services.market_signal_service import get_market_signal_for_auto_gate
 
-    redis = await get_redis()
-    composite_level, data_freshness = await get_market_signal_for_auto_gate(redis)
+    cache = await get_cache_store()
+    composite_level, data_freshness = await get_market_signal_for_auto_gate(cache)
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -91,9 +97,7 @@ async def _run_auto_execution() -> None:
                     market_condition_mode=market_mode,
                     data_freshness=data_freshness,
                 )
-                await notify_market_signal_gate_blocked(
-                    alert, portfolio, blocked_by_signal, email, fcm_token, redis, db
-                )
+                await notify_market_signal_gate_blocked(alert, portfolio, blocked_by_signal, email, fcm_token, db)
                 continue
 
             # 이미 대기 중인 플랜이 있으면(취소/승인 대기) 중복 생성하지 않는다.
@@ -101,19 +105,19 @@ async def _run_auto_execution() -> None:
                 continue
 
             try:
-                generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level, redis=redis)
+                generated = await build_pending_plan_for_alert(alert, portfolio, db, composite_level, cache=cache)
             except Exception as exc:
                 logger.error("rebalancing_auto_plan_generation_failed", alert_id=str(alert.id), error=str(exc))
                 continue
 
             if isinstance(generated, TaxGateBlocked):
-                await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, redis, db)
+                await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)
                 continue
             if generated is None:
                 continue
-            plan_obj, buy_token, sell_token = generated
+            plan_obj, buy_tokens, sell_tokens = generated
             await notify_plan_generated(
-                plan_obj, alert, portfolio, buy_token, sell_token, email, fcm_token, composite_level, db
+                plan_obj, alert, portfolio, buy_tokens, sell_tokens, email, fcm_token, composite_level, db
             )
             triggered_count += 1
 

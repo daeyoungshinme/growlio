@@ -24,9 +24,9 @@ from app.services.credential_service import decrypt
 from app.utils.currency import cache_usd_krw_rate, get_usd_krw_rate
 
 if TYPE_CHECKING:
-    import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.core.cache_store import CacheStore
     from app.models.asset import AssetAccount
 
 logger = structlog.get_logger()
@@ -36,15 +36,15 @@ class KISProvider(BrokerProvider):
     PROVIDER_ID = "KIS_API"
     PROVIDER_NAME = "한국투자증권 KIS API"
 
-    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, cache: CacheStore | None) -> BalanceResult:
         if not account.kis_app_key or not account.kis_app_secret:
             raise ProviderCredentialError(
                 "KIS 자격증명이 설정되지 않았습니다. 계좌 설정에서 App Key와 App Secret을 입력해주세요."
             )
         if not account.kis_account_no:
             raise ProviderCredentialError("KIS 계좌번호가 설정되지 않았습니다.")
-        if redis is None:
-            raise ProviderApiError("Redis 연결이 필요합니다.")
+        if cache is None:
+            raise ProviderApiError("캐시 연결이 필요합니다.")
         account_no: str = account.kis_account_no
         app_key = decrypt(account.kis_app_key)
         app_secret = decrypt(account.kis_app_secret)
@@ -62,7 +62,7 @@ class KISProvider(BrokerProvider):
                 app_key,
                 app_secret,
                 is_mock=is_mock,
-                redis=redis,
+                cache=cache,
                 db=db,
                 user_id=user_id_str,
                 account_id=account_id_str,
@@ -82,7 +82,7 @@ class KISProvider(BrokerProvider):
                 fetch_overseas_cached(
                     lambda: get_overseas_balance(app_key, app_secret, access_token, account_no, is_mock=is_mock),
                     account.id,
-                    redis,
+                    cache,
                     token_expired_exc=KisTokenExpiredError,
                     broker_name="KIS",
                 ),
@@ -108,7 +108,7 @@ class KISProvider(BrokerProvider):
 
         if last_token is None:
             raise RuntimeError("last_token이 설정되지 않음: _get_token이 호출되지 않았습니다.")
-        usd_krw_rate = await get_usd_krw_rate(redis)
+        usd_krw_rate = await get_usd_krw_rate(cache)
         if overseas["positions"]:
             sample = overseas["positions"][0]
             try:
@@ -121,7 +121,7 @@ class KISProvider(BrokerProvider):
                     is_mock=is_mock,
                 )
                 usd_krw_rate = quote["usd_krw_rate"]
-                await cache_usd_krw_rate(redis, usd_krw_rate)
+                await cache_usd_krw_rate(cache, usd_krw_rate)
             except Exception as e:
                 logger.warning("usd_krw_rate_fetch_failed", ticker=sample["ticker"], error=str(e))
 
@@ -131,7 +131,7 @@ class KISProvider(BrokerProvider):
             float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
         )
 
-        overseas_positions = await enrich_overseas_names(overseas["positions"], redis)
+        overseas_positions = await enrich_overseas_names(overseas["positions"], cache)
         all_raw = domestic["positions"] + [
             {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas_positions
         ]

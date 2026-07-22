@@ -145,6 +145,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
+- `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `["settings"]` 쿼리의 `year_end_tax_reminder_enabled` 필드 사용, `PUT /settings/year-end-tax-reminder` 호출. 기본값 `false`(옵트인). `SettingsPage`의 "알림 설정" 섹션에서 월간 리포트 토글 다음에 배치
 - `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `goal_achievement_alerts_enabled` 필드 사용, `PUT /settings/goal-achievement-alerts` 호출. 기본값 `true` (미설정 시 수신)
 - `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `["settings"]` 쿼리의 `monthly_report_enabled` 필드 사용, `PUT /settings/monthly-report-alerts` 호출. 기본값 `true` (미설정 시 수신)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
@@ -405,6 +406,7 @@ cd frontend && npx playwright test
 - 리밸런싱 대기 플랜 취소/승인 후: `invalidateRebalancingPlanData(queryClient)` — 대기 플랜 목록 + 실행 이력 무효화.
 - 복합신호(시장/리스크) 알림 설정 변경 후: `invalidateCompositeSignalData(queryClient)`.
 - 시장신호 매일 요약 알림 설정 변경 후: `invalidateMarketSignalDigestData(queryClient)`.
+- 연말 절세 리마인더 설정 변경 후: `invalidateYearEndTaxReminderData(queryClient)`.
 - 목표 달성 알림 설정 변경 후: `invalidateGoalAchievementAlertsData(queryClient)`.
 - 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.

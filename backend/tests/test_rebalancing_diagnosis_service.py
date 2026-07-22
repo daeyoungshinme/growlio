@@ -212,6 +212,20 @@ class TestBuildTaxPreview:
         assert total_gain == 0.0
         assert items == []
 
+    def test_overseas_sell_net_loss_adds_tax_loss_harvest_note(self):
+        """해외 매도로 순손실이 실현되면 세금 노트에 절세(손익통산) 안내를 추가한다."""
+        item = _make_item(ticker="AAPL", market="NASDAQ", diff_krw=-1_000_000.0, shares_to_trade=-10.0)
+        overview = _make_overview(
+            [_make_position(ticker="AAPL", market="NASDAQ", qty=10.0, avg_price=100_000.0, current_price=80_000.0)]
+        )
+        analysis = _make_analysis([item])
+
+        total_gain, overseas_tax, fee, notes, items = _build_tax_preview(analysis, overview)
+
+        assert total_gain == pytest.approx(-200_000.0)  # (80k-100k)*10
+        assert overseas_tax == 0.0
+        assert any("손실이 실현됩니다" in n and "절세 효과" in n for n in notes)
+
     def test_buy_items_not_included(self):
         item = _make_item(diff_krw=500_000.0, weight_diff_pct=3.0)  # 매수(diff_krw > 0)
         analysis = _make_analysis([item])
@@ -338,7 +352,7 @@ class TestCheckCompositeSignal:
 
 class TestFetchMarketAndRiskSignal:
     @pytest.mark.asyncio
-    async def test_success_returns_level_and_risk_dict(self, mock_db, mock_redis):
+    async def test_success_returns_level_and_risk_dict(self, mock_db, mock_cache):
         with (
             patch(
                 "app.services.rebalancing.diagnosis_service.get_market_signal",
@@ -349,13 +363,13 @@ class TestFetchMarketAndRiskSignal:
                 new=AsyncMock(return_value={"data_available": True, "diversification_score": 50}),
             ),
         ):
-            market_level, risk = await fetch_market_and_risk_signal(uuid.uuid4(), mock_db, mock_redis)
+            market_level, risk = await fetch_market_and_risk_signal(uuid.uuid4(), mock_db, mock_cache)
 
         assert market_level == "RED"
         assert risk["diversification_score"] == 50
 
     @pytest.mark.asyncio
-    async def test_both_failures_return_safe_defaults(self, mock_db, mock_redis):
+    async def test_both_failures_return_safe_defaults(self, mock_db, mock_cache):
         with (
             patch(
                 "app.services.rebalancing.diagnosis_service.get_market_signal",
@@ -366,7 +380,7 @@ class TestFetchMarketAndRiskSignal:
                 new=AsyncMock(side_effect=RuntimeError("down")),
             ),
         ):
-            market_level, risk = await fetch_market_and_risk_signal(uuid.uuid4(), mock_db, mock_redis)
+            market_level, risk = await fetch_market_and_risk_signal(uuid.uuid4(), mock_db, mock_cache)
 
         assert market_level is None
         assert risk == {}
@@ -374,7 +388,7 @@ class TestFetchMarketAndRiskSignal:
 
 class TestBuildDiagnosisContext:
     @pytest.mark.asyncio
-    async def test_market_yellow_and_risk_normal_shows_market_note(self, mock_db, mock_redis):
+    async def test_market_yellow_and_risk_normal_shows_market_note(self, mock_db, mock_cache):
         """복합신호 조건 미충족 시(YELLOW는 단독 트리거 안 됨) 기존처럼 market_note가 노출된다."""
         analysis = _make_analysis([])
         overview = _make_overview([])
@@ -397,7 +411,7 @@ class TestBuildDiagnosisContext:
                 ),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.market_level == "YELLOW"
         assert ctx.market_note is not None
@@ -408,7 +422,7 @@ class TestBuildDiagnosisContext:
         assert ctx.composite_signal_reason is None
 
     @pytest.mark.asyncio
-    async def test_composite_triggered_suppresses_market_and_risk_notes(self, mock_db, mock_redis):
+    async def test_composite_triggered_suppresses_market_and_risk_notes(self, mock_db, mock_cache):
         """복합신호(check_composite_signal)가 충족되면 진단탭 상단 배너와 중복되지 않도록
         market_note/risk_note를 생략하고 composite_signal_triggered/reason만 채운다."""
         analysis = _make_analysis([])
@@ -432,7 +446,7 @@ class TestBuildDiagnosisContext:
                 ),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.market_note is None
         assert ctx.risk_note is None
@@ -441,7 +455,7 @@ class TestBuildDiagnosisContext:
         assert "분산도" in ctx.composite_signal_reason
 
     @pytest.mark.asyncio
-    async def test_enable_composite_signals_false_keeps_granular_notes(self, mock_db, mock_redis):
+    async def test_enable_composite_signals_false_keeps_granular_notes(self, mock_db, mock_cache):
         """enable_composite_signals=False(유저가 해당 알림을 꺼둠)면 조건을 충족해도
         composite_signal_triggered는 False로 고정되고, 기존 market_note/risk_note는 그대로 노출된다."""
         analysis = _make_analysis([])
@@ -466,7 +480,7 @@ class TestBuildDiagnosisContext:
             ),
         ):
             ctx = await build_diagnosis_context(
-                uuid.uuid4(), mock_db, mock_redis, analysis, overview, enable_composite_signals=False
+                uuid.uuid4(), mock_db, mock_cache, analysis, overview, enable_composite_signals=False
             )
 
         assert ctx.composite_signal_triggered is False
@@ -475,7 +489,7 @@ class TestBuildDiagnosisContext:
         assert ctx.risk_note is not None
 
     @pytest.mark.asyncio
-    async def test_market_signal_failure_does_not_crash(self, mock_db, mock_redis):
+    async def test_market_signal_failure_does_not_crash(self, mock_db, mock_cache):
         analysis = _make_analysis([])
         overview = _make_overview([])
 
@@ -489,13 +503,13 @@ class TestBuildDiagnosisContext:
                 new=AsyncMock(return_value={"data_available": False}),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.market_level is None
         assert ctx.market_note is None
 
     @pytest.mark.asyncio
-    async def test_risk_failure_does_not_crash_and_tax_still_computed(self, mock_db, mock_redis):
+    async def test_risk_failure_does_not_crash_and_tax_still_computed(self, mock_db, mock_cache):
         item = _make_item(ticker="005930", market="KOSPI", diff_krw=-500_000.0, shares_to_trade=-5.0)
         analysis = _make_analysis([item])
         overview = _make_overview(
@@ -512,7 +526,7 @@ class TestBuildDiagnosisContext:
                 new=AsyncMock(side_effect=RuntimeError("yfinance down")),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.risk_available is False
         assert ctx.diversification_score is None
@@ -520,7 +534,7 @@ class TestBuildDiagnosisContext:
         assert ctx.estimated_sell_realized_gain_krw == pytest.approx(50_000.0)
 
     @pytest.mark.asyncio
-    async def test_both_fail_tax_preview_still_computed(self, mock_db, mock_redis):
+    async def test_both_fail_tax_preview_still_computed(self, mock_db, mock_cache):
         item = _make_item(ticker="005930", market="KOSPI", diff_krw=-500_000.0, shares_to_trade=-5.0)
         analysis = _make_analysis([item])
         overview = _make_overview(
@@ -537,14 +551,14 @@ class TestBuildDiagnosisContext:
                 new=AsyncMock(side_effect=RuntimeError("yfinance down")),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.market_level is None
         assert ctx.risk_available is False
         assert ctx.estimated_sell_realized_gain_krw == pytest.approx(50_000.0)
 
     @pytest.mark.asyncio
-    async def test_settings_row_none_leaves_goal_fields_none(self, mock_db, mock_redis):
+    async def test_settings_row_none_leaves_goal_fields_none(self, mock_db, mock_cache):
         """목표를 아예 설정하지 않은 유저(settings_row=None)는 목표 비교 필드가 조용히 생략된다."""
         analysis = _make_analysis([])
         overview = _make_overview([])
@@ -559,13 +573,13 @@ class TestBuildDiagnosisContext:
                 new=AsyncMock(return_value={"data_available": False}),
             ),
         ):
-            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_redis, analysis, overview)
+            ctx = await build_diagnosis_context(uuid.uuid4(), mock_db, mock_cache, analysis, overview)
 
         assert ctx.goal_annual_return_pct is None
         assert ctx.goal_annual_dividend_krw is None
 
     @pytest.mark.asyncio
-    async def test_settings_row_provided_populates_goal_fields(self, mock_db, mock_redis):
+    async def test_settings_row_provided_populates_goal_fields(self, mock_db, mock_cache):
         """settings_row가 전달되면 신규 DB 쿼리 없이 UserSettings의 목표 필드를 그대로 반영한다."""
         analysis = _make_analysis([])
         overview = _make_overview([])
@@ -582,7 +596,7 @@ class TestBuildDiagnosisContext:
             ),
         ):
             ctx = await build_diagnosis_context(
-                uuid.uuid4(), mock_db, mock_redis, analysis, overview, settings_row=settings_row
+                uuid.uuid4(), mock_db, mock_cache, analysis, overview, settings_row=settings_row
             )
 
         assert ctx.goal_annual_return_pct == pytest.approx(8.0)

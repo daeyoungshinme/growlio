@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
 from app.schemas.invest import DCAAnalysisResponse, DepositGuideItem, GoalFeasibilityPreview
@@ -29,8 +29,8 @@ async def get_dca_analysis(
     db: AsyncSession = Depends(get_db),
 ):
     """적립식 투자 복리계산 및 월/년 목표달성율 분석."""
-    redis = await get_redis()
-    result = await dca_service.get_dca_analysis(current_user.id, db, redis)
+    cache = await get_cache_store()
+    result = await dca_service.get_dca_analysis(current_user.id, db, cache)
     return result
 
 
@@ -55,8 +55,8 @@ async def get_goal_feasibility(
     if initial_amount is not None:
         pv = initial_amount
     else:
-        redis = await get_redis()
-        total_assets_krw, _, _, by_type = await build_asset_totals(current_user.id, db, redis)
+        cache = await get_cache_store()
+        total_assets_krw, _, _, by_type = await build_asset_totals(current_user.id, db, cache)
         pv = exclude_real_estate(total_assets_krw, by_type)
 
     n_months = months_until_year_end(target_year)
@@ -101,5 +101,5 @@ async def get_dividend_plan(
     db: AsyncSession = Depends(get_db),
 ):
     """연배당/월배당 목표 달성 현황 및 월별·연도별 배당 분포."""
-    redis = await get_redis()
-    return await dividend_plan_service.get_dividend_plan(current_user.id, db, redis)
+    cache = await get_cache_store()
+    return await dividend_plan_service.get_dividend_plan(current_user.id, db, cache)

@@ -8,9 +8,9 @@ from __future__ import annotations
 import asyncio
 import json
 from functools import partial
+from typing import TYPE_CHECKING
 
 import structlog
-from redis.asyncio import Redis as AioRedis
 
 from app.constants import DOMESTIC_MARKETS
 from app.kis.domestic_quote import get_domestic_dividend_info, get_domestic_etf_dividend_info
@@ -36,6 +36,9 @@ from app.utils.cache_keys import (
     dividend_months_key,
 )
 from app.utils.circuit_breaker import fdr_circuit, naver_circuit
+
+if TYPE_CHECKING:
+    from app.core.cache_store import CacheStore
 
 logger = structlog.get_logger()
 
@@ -242,7 +245,7 @@ async def _fetch_from_network(
 async def fetch_ticker_dividend_info(
     ticker: str,
     market: str,
-    redis: AioRedis,
+    cache: CacheStore,
     sem: asyncio.Semaphore,
     kis_creds: dict | None,
     dart_key: str,
@@ -261,7 +264,7 @@ async def fetch_ticker_dividend_info(
     dps = 0.0
     ex_dividend_date = None
 
-    # 배당월: override > 정적 스케줄 > Redis 캐시 > 네트워크
+    # 배당월: override > 정적 스케줄 > 캐시 > 네트워크
     override_months = overrides.get((ticker, market))
     if override_months is not None:
         months: list[int] = override_months
@@ -275,22 +278,22 @@ async def fetch_ticker_dividend_info(
     info_cache_key = dividend_info_key(ticker, market)
 
     if need_months_fetch:
-        cached_months = await redis.get(months_cache_key)
+        cached_months = await cache.get(months_cache_key)
         if cached_months:
             try:
                 months = json.loads(cached_months)
                 need_months_fetch = False
             except (json.JSONDecodeError, TypeError):
-                await redis.delete(months_cache_key)
+                await cache.delete(months_cache_key)
 
-    cached_info = await redis.get(info_cache_key)
+    cached_info = await cache.get(info_cache_key)
     if cached_info:
         try:
             cached = json.loads(cached_info)
             dps = cached["dps"] if dps == 0.0 else dps
             yield_decimal = cached["yield_decimal"] if yield_decimal == 0.0 else yield_decimal
         except (json.JSONDecodeError, TypeError, KeyError):
-            await redis.delete(info_cache_key)
+            await cache.delete(info_cache_key)
 
     if dps > 0 and yield_decimal > 0 and not need_months_fetch:
         return yield_decimal, dps, months, ex_dividend_date
@@ -312,10 +315,10 @@ async def fetch_ticker_dividend_info(
         )
 
     if need_months_fetch:
-        await redis.setex(months_cache_key, TTL_DIVIDEND_MONTHS, json.dumps(months))
+        await cache.setex(months_cache_key, TTL_DIVIDEND_MONTHS, json.dumps(months))
 
     if dps > 0 or yield_decimal > 0:
-        await redis.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
+        await cache.setex(info_cache_key, TTL_DIVIDEND_INFO, json.dumps({"dps": dps, "yield_decimal": yield_decimal}))
     else:
         logger.warning("dividend_all_sources_failed", ticker=ticker, market=market)
 

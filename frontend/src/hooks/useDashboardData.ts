@@ -12,7 +12,7 @@ export function useDashboardData() {
   const { data, isLoading, error, dataUpdatedAt } = useQuery({
     queryKey: QUERY_KEYS.dashboard,
     queryFn: fetchDashboard,
-    staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 Redis TTL(5분)과 동기화
+    staleTime: STALE_TIME.EXCHANGE_RATE, // 5분 — 백엔드 캐시 TTL(5분)과 동기화
     refetchInterval: REFETCH_INTERVAL.DASHBOARD,
     refetchOnWindowFocus: false,
   });

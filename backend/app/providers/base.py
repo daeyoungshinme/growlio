@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any
 from app.core.config import settings
 
 if TYPE_CHECKING:
-    import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.core.cache_store import CacheStore
     from app.models.asset import AssetAccount
 
 
@@ -116,6 +116,6 @@ class BrokerProvider(ABC):
         self,
         account: AssetAccount,
         db: AsyncSession,
-        redis: aioredis.Redis | None,
+        cache: CacheStore | None,
     ) -> BalanceResult:
         """잔고·보유종목을 조회해 BalanceResult를 반환한다."""

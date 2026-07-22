@@ -61,6 +61,8 @@ class UserSettings(Base):
     composite_signal_alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     # 등급 전환과 무관하게 매일 08:30 KST에 현재 시장 신호를 요약 발송 — 옵트인(기본 OFF)
     market_signal_daily_digest_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 11~12월 매주 월요일 09:00 KST에 손실수확·공제한도 요약 발송 — 옵트인(기본 OFF)
+    year_end_tax_reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # 자산/입금/배당 목표 달성 시 알림(GOAL_ASSET/GOAL_DEPOSIT/GOAL_DIVIDEND) — 기존 항상 켜짐 동작 유지 위해 기본 True
     goal_achievement_alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     fcm_token: Mapped[str | None] = mapped_column(String(512))

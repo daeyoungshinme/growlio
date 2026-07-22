@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
 from app.api.v1._account_deps import get_owned_account
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import RebalancingExecution
@@ -47,7 +47,7 @@ async def execute_portfolio_rebalancing(
     body: ExecutionRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """선택된 주문 항목을 KIS API를 통해 실제로 매수/매도 실행한다."""
     await get_owned_or_404(db, Portfolio, portfolio_id, current_user.id, "포트폴리오를 찾을 수 없습니다")
@@ -59,7 +59,7 @@ async def execute_portfolio_rebalancing(
         account_id=body.account_id,
         orders=body.orders,
         db=db,
-        redis=redis,
+        cache=cache,
         portfolio_id=portfolio_id,
         triggered_by="MANUAL",
         strategy=getattr(body, "strategy", "FULL") or "FULL",
@@ -76,7 +76,7 @@ async def quick_execute_rebalancing(
     account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """저장된(또는 화면 미저장) 자동화 알림 설정 기준으로 지금 바로 대기 플랜을 생성한다.
 
@@ -138,7 +138,7 @@ async def quick_execute_rebalancing(
         )
 
     try:
-        market_signal = await get_market_signal(redis)
+        market_signal = await get_market_signal(cache)
         composite_level: str = market_signal.get("composite_level", "GREEN")
         data_freshness: str = market_signal.get("data_freshness", "LIVE")
     except Exception as exc:
@@ -163,7 +163,7 @@ async def quick_execute_rebalancing(
         strategy_override=body.strategy if body else None,
         order_type_override=body.order_type if body else None,
         account_id_override=body.account_id if body else None,
-        redis=redis,
+        cache=cache,
     )
     if isinstance(generated, TaxGateBlocked):
         return QuickExecuteResult(
@@ -177,7 +177,7 @@ async def quick_execute_rebalancing(
             status="NO_DRIFT",
             message="포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
         )
-    plan, buy_token, sell_token = generated
+    plan, buy_tokens, sell_tokens = generated
 
     settings_row = await db.execute(
         select(User.email, UserSettings.notification_email, UserSettings.fcm_token)
@@ -192,8 +192,8 @@ async def quick_execute_rebalancing(
         plan,
         alert_row,
         portfolio,
-        buy_token,
-        sell_token,
+        buy_tokens,
+        sell_tokens,
         email,
         fcm_token,
         composite_level,

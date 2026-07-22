@@ -54,7 +54,7 @@ export function useTaxLimitsSummary(overview: PortfolioOverview | undefined): Ta
   const warningText = taxData?.comprehensive_tax_warning
     ? "금융소득 종합과세 대상 가능"
     : taxData?.domestic_large_holder_warning
-      ? "국내주식 대주주요건 주의"
+      ? `국내주식 대주주요건 주의 (${fmtKrw(taxData.domestic_large_holder_excess_krw)} 초과)`
       : null;
 
   return { parts, warningText };

@@ -96,6 +96,7 @@ class TestGetSettings:
             fcm_token=None,
             composite_signal_alerts_enabled=True,
             market_signal_daily_digest_enabled=False,
+            year_end_tax_reminder_enabled=False,
             goal_achievement_alerts_enabled=True,
             monthly_report_enabled=True,
             goal_candidate_tickers=None,

@@ -16,7 +16,7 @@ from app.kis.auth import _fetch_and_store_token, promote_user_token_to_account
 
 class TestFetchAndStoreTokenMissingAccessToken:
     @pytest.mark.asyncio
-    async def test_raises_provider_token_error_when_access_token_missing(self, override_settings, mock_redis, mock_db):
+    async def test_raises_provider_token_error_when_access_token_missing(self, override_settings, mock_cache, mock_db):
         """KIS가 200 OK와 함께 에러 바디(access_token 없음)를 반환하면 KeyError 대신
         명확한 ProviderTokenError를 발생시켜야 한다."""
         response = httpx.Response(
@@ -35,7 +35,7 @@ class TestFetchAndStoreTokenMissingAccessToken:
                 "app-key",
                 "app-secret",
                 is_mock=True,
-                redis=mock_redis,
+                cache=mock_cache,
                 db=mock_db,
                 user_id=str(uuid.uuid4()),
                 account_id=None,
@@ -44,7 +44,7 @@ class TestFetchAndStoreTokenMissingAccessToken:
 
 class TestPromoteUserTokenToAccount:
     @pytest.mark.asyncio
-    async def test_promotes_valid_user_level_token(self, override_settings, mock_redis, mock_db):
+    async def test_promotes_valid_user_level_token(self, override_settings, mock_cache, mock_db):
         user_id = str(uuid.uuid4())
         account_id = str(uuid.uuid4())
         token_row = SimpleNamespace(
@@ -55,22 +55,22 @@ class TestPromoteUserTokenToAccount:
         mock_db.execute = AsyncMock()
         mock_db.commit = AsyncMock()
 
-        result = await promote_user_token_to_account(user_id, account_id, True, mock_redis, mock_db)
+        result = await promote_user_token_to_account(user_id, account_id, True, mock_cache, mock_db)
 
         assert result is True
         mock_db.execute.assert_awaited_once()
-        mock_redis.setex.assert_awaited_once()
-        args, _ = mock_redis.setex.await_args
+        mock_cache.setex.assert_awaited_once()
+        args, _ = mock_cache.setex.await_args
         assert account_id in args[0]
         assert args[2] == "verified-token"
 
     @pytest.mark.asyncio
-    async def test_returns_false_when_no_user_level_token(self, override_settings, mock_redis, mock_db):
+    async def test_returns_false_when_no_user_level_token(self, override_settings, mock_cache, mock_db):
         mock_db.scalar = AsyncMock(return_value=None)
         mock_db.execute = AsyncMock()
 
-        result = await promote_user_token_to_account(str(uuid.uuid4()), str(uuid.uuid4()), True, mock_redis, mock_db)
+        result = await promote_user_token_to_account(str(uuid.uuid4()), str(uuid.uuid4()), True, mock_cache, mock_db)
 
         assert result is False
         mock_db.execute.assert_not_awaited()
-        mock_redis.setex.assert_not_awaited()
+        mock_cache.setex.assert_not_awaited()

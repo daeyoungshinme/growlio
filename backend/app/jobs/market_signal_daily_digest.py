@@ -6,4 +6,4 @@ from app.services.alerts.market_signal_alert_service import send_market_signal_d
 
 async def run_market_signal_daily_digest() -> None:
     """옵트인한 유저에게 현재 시장 위험 신호(GREEN/YELLOW/RED)를 매일 08:30 KST에 요약 발송."""
-    await run_alert_job(send_market_signal_daily_digest, "market_signal_daily_digest_job", needs_redis=True)
+    await run_alert_job(send_market_signal_daily_digest, "market_signal_daily_digest_job", needs_cache=True)

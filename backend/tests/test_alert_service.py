@@ -269,7 +269,7 @@ async def test_check_and_trigger_alerts_email_failure_continues(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_check_stock_price_alerts_no_alerts(mock_db, mock_redis):
+async def test_check_stock_price_alerts_no_alerts(mock_db, mock_cache):
     """활성 주가 알림이 없으면 조기 반환한다."""
     execute_result = MagicMock()
     execute_result.all.return_value = []
@@ -279,13 +279,13 @@ async def test_check_stock_price_alerts_no_alerts(mock_db, mock_redis):
     with patch("app.services.price_service.fetch_prices_batch", AsyncMock(return_value={})):
         from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
-        await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_db.commit.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_redis):
+async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_cache):
     """주가가 목표가 이하이면 이메일을 발송하고 알림을 비활성화한다."""
     user_id = uuid.uuid4()
     current_price = 79_000.0
@@ -317,7 +317,7 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_redis):
     ):
         from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
-        await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_email.assert_called_once()
     assert alert.trigger_count == 1
@@ -326,7 +326,7 @@ async def test_check_stock_price_alerts_triggers_on_below(mock_db, mock_redis):
 
 
 @pytest.mark.asyncio
-async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_redis):
+async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_cache):
     """가격 조회 실패(ticker 미포함) 시 해당 알림을 건너뛴다."""
     user_id = uuid.uuid4()
 
@@ -357,7 +357,7 @@ async def test_check_stock_price_alerts_no_price_skips(mock_db, mock_redis):
     ):
         from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
-        await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_email.assert_not_called()
     mock_db.commit.assert_not_called()
@@ -386,7 +386,7 @@ async def test_save_alert_history_adds_to_session(mock_db):
 
 
 @pytest.mark.asyncio
-async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_redis):
+async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_cache):
     """다회 발동 주가 알림은 쿨다운 1시간 이내 재발동하지 않는다."""
     user_id = uuid.uuid4()
     current_price = 79_000.0
@@ -415,13 +415,13 @@ async def test_stock_price_alert_multi_trigger_cooldown(mock_db, mock_redis):
     ):
         from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
-        await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_email.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
+async def test_stock_price_alert_email_failure_handled(mock_db, mock_cache):
     """이메일 발송 실패 시 예외를 잡고 계속한다."""
     user_id = uuid.uuid4()
     current_price = 79_000.0
@@ -450,6 +450,6 @@ async def test_stock_price_alert_email_failure_handled(mock_db, mock_redis):
     ):
         from app.services.alerts.alert_service import check_and_trigger_stock_price_alerts
 
-        await check_and_trigger_stock_price_alerts(mock_db, mock_redis)
+        await check_and_trigger_stock_price_alerts(mock_db, mock_cache)
 
     mock_db.commit.assert_not_called()

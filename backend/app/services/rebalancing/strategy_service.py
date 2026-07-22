@@ -15,7 +15,7 @@ from app.services.portfolio_optimizer import get_efficient_frontier
 from app.services.position_aggregator import query_latest_position_map
 from app.utils.cache_keys import (
     TTL_REBALANCING_STRATEGY,
-    RedisType,
+    CacheStoreType,
     get_cached_json,
     rebalancing_strategy_key,
     set_cached_json,
@@ -166,7 +166,7 @@ async def get_rebalancing_strategy(
     user_id: uuid.UUID,
     portfolio_id: str,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> dict:
     """팩터·프론티어 분석을 종합한 리밸런싱 전략 반환."""
     from app.models.portfolio import Portfolio
@@ -188,16 +188,16 @@ async def get_rebalancing_strategy(
     acct_suffix = "_".join(sorted(str(a) for a in portfolio_acct_ids)) if portfolio_acct_ids else "all"
     cache_key = rebalancing_strategy_key(user_id, portfolio_id, acct_suffix)
 
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
     # 1+2. 팩터·프론티어 병렬 조회 — 세 호출이 서로 독립적이므로 asyncio.gather로 동시 실행.
-    # 캐시 히트(TTL=1h) 시 DB 접근 없이 Redis에서 즉시 반환되어 AsyncSession 경합 없음.
+    # 캐시 히트(TTL=1h) 시 DB 접근 없이 캐시에서 즉시 반환되어 AsyncSession 경합 없음.
     current_factors_data, target_factors_data, frontier_data = await asyncio.gather(
-        get_factor_analysis(user_id, db, redis, account_ids=portfolio_acct_ids),
-        get_factor_analysis_for_portfolio(portfolio_id, db, redis),
-        get_efficient_frontier(user_id, db, redis, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids),
+        get_factor_analysis(user_id, db, cache, account_ids=portfolio_acct_ids),
+        get_factor_analysis_for_portfolio(portfolio_id, db, cache),
+        get_efficient_frontier(user_id, db, cache, compare_portfolio_id=portfolio_id, account_ids=portfolio_acct_ids),
     )
 
     current_pf = current_factors_data.get("portfolio_factors", {})
@@ -268,5 +268,5 @@ async def get_rebalancing_strategy(
         "summary": summary,
     }
 
-    await set_cached_json(redis, cache_key, result_data, TTL_REBALANCING_STRATEGY)
+    await set_cached_json(cache, cache_key, result_data, TTL_REBALANCING_STRATEGY)
     return result_data

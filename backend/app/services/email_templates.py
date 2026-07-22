@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
+from typing import Any
 
 
 def _kv_table(rows: list[tuple[str, str]]) -> str:
@@ -329,31 +331,64 @@ def rebalancing_execution_template(
     return subject, html
 
 
+_PLAN_MARKET_LABEL = {"KR": "국내", "US": "미국"}
+_KST_OFFSET_SECONDS = 9 * 3600
+
+
+def _render_plan_buy_section(section: dict, account_note: str, btn_style: str) -> str:
+    market_label = _PLAN_MARKET_LABEL.get(section["market"], section["market"])
+    buy_time_str = datetime.fromtimestamp(section["deadline_at"].timestamp() + _KST_OFFSET_SECONDS).strftime("%H:%M")
+    return (
+        f"<div style='margin-top:20px;padding:16px;background:#eff6ff;border-radius:8px;'>"
+        f"<h3 style='margin:0;color:#1d4ed8;font-size:15px;'>매수 주문 ({market_label}){account_note}</h3>"
+        f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
+        f"<strong>{buy_time_str} KST</strong>에 아래 수량대로 자동 실행됩니다. "
+        f"그 전까지 취소할 수 있습니다.</p>"
+        f"{_plan_items_table(section['items'])}"
+        f"<a href='{section['link']}' style='{btn_style}background:#ffffff;color:#1d4ed8;"
+        f"border:1px solid #1d4ed8;'>매수 취소하기</a>"
+        f"</div>"
+    )
+
+
+def _render_plan_sell_section(section: dict, account_note: str, btn_style: str) -> str:
+    market_label = _PLAN_MARKET_LABEL.get(section["market"], section["market"])
+    sell_time_str = datetime.fromtimestamp(section["deadline_at"].timestamp() + _KST_OFFSET_SECONDS).strftime(
+        "%Y-%m-%d %H:%M"
+    )
+    return (
+        f"<div style='margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px;'>"
+        f"<h3 style='margin:0;color:#dc2626;font-size:15px;'>매도 주문 ({market_label}){account_note} — 승인 필요</h3>"
+        f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
+        f"매도는 실현손익·세금에 영향을 주므로 승인이 필요합니다. "
+        f"<strong>{sell_time_str} KST(정규장 마감)</strong>까지 응답이 없으면 자동으로 취소됩니다.</p>"
+        f"{_plan_items_table(section['items'])}"
+        f"<a href='{section['link']}' style='{btn_style}background:#dc2626;color:#ffffff;'>"
+        f"매도 확인하러 가기</a>"
+        f"</div>"
+    )
+
+
 def rebalancing_plan_pending_template(
     portfolio_name: str,
     account_name: str | None,
-    buy_items: list,
-    buy_deadline_at: datetime | None,
-    buy_cancel_link: str | None,
-    sell_items: list,
-    sell_deadline_at: datetime | None,
-    sell_action_link: str | None,
+    buy_sections: list[dict],
+    sell_sections: list[dict],
 ) -> tuple[str, str]:
     """AUTO 모드 플랜 생성 직후 발송하는 실행 전 계획 안내 이메일.
 
-    매수: 대기시간 후 자동 실행(취소 가능). 매도: 이메일 승인 필요(당일 장마감 미응답 시 자동 취소).
-    매수/매도 leg는 서로 독립적으로 존재할 수 있다(매도 전용 플랜도 유효) — 각 섹션은 해당 leg가
-    실제로 있을 때만 렌더링한다.
+    매수: 대기시간 후 자동 실행(취소 가능). 매도: 이메일 승인 필요(정규장 마감 미응답 시 자동 취소).
+    국내(KR)/해외(US) 주문이 섞여 있으면 leg가 시장별로 나뉘어 있으므로 side당 섹션이 최대 2개
+    (KR/US) 있을 수 있다 — 각 section dict는 {"market", "items", "deadline_at", "link"} 형태.
     """
-    has_buy = bool(buy_items) and buy_deadline_at is not None and buy_cancel_link is not None
-    has_sell = bool(sell_items)
+    has_buy = bool(buy_sections)
+    has_sell = bool(sell_sections)
 
     subject_action = (
         "/".join(label for label, present in (("매수", has_buy), ("매도", has_sell)) if present) or "리밸런싱"
     )
     subject = f"[Growlio] 리밸런싱 자동화 — {portfolio_name} {subject_action} 대기"
 
-    _KST_OFFSET = 9 * 3600
     account_note = f" (실행 계좌: {account_name})" if account_name else ""
 
     btn_style = (
@@ -361,41 +396,14 @@ def rebalancing_plan_pending_template(
         "font-size:14px;text-decoration:none;margin-top:12px;"
     )
 
-    buy_section = ""
-    if has_buy and buy_deadline_at is not None and buy_cancel_link is not None:
-        buy_time_str = datetime.fromtimestamp(buy_deadline_at.timestamp() + _KST_OFFSET).strftime("%H:%M")
-        buy_section = (
-            f"<div style='margin-top:20px;padding:16px;background:#eff6ff;border-radius:8px;'>"
-            f"<h3 style='margin:0;color:#1d4ed8;font-size:15px;'>매수 주문{account_note}</h3>"
-            f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
-            f"<strong>{buy_time_str} KST</strong>에 아래 수량대로 자동 실행됩니다. "
-            f"그 전까지 취소할 수 있습니다.</p>"
-            f"{_plan_items_table(buy_items)}"
-            f"<a href='{buy_cancel_link}' style='{btn_style}background:#ffffff;color:#1d4ed8;"
-            f"border:1px solid #1d4ed8;'>매수 취소하기</a>"
-            f"</div>"
-        )
-
-    sell_section = ""
-    if has_sell and sell_action_link and sell_deadline_at is not None:
-        sell_time_str = datetime.fromtimestamp(sell_deadline_at.timestamp() + _KST_OFFSET).strftime("%Y-%m-%d %H:%M")
-        sell_section = (
-            f"<div style='margin-top:16px;padding:16px;background:#fef2f2;border-radius:8px;'>"
-            f"<h3 style='margin:0;color:#dc2626;font-size:15px;'>매도 주문{account_note} — 승인 필요</h3>"
-            f"<p style='color:#374151;font-size:13px;margin:8px 0 0;'>"
-            f"매도는 실현손익·세금에 영향을 주므로 승인이 필요합니다. "
-            f"<strong>{sell_time_str} KST(당일 장마감)</strong>까지 응답이 없으면 자동으로 취소됩니다.</p>"
-            f"{_plan_items_table(sell_items)}"
-            f"<a href='{sell_action_link}' style='{btn_style}background:#dc2626;color:#ffffff;'>"
-            f"매도 확인하러 가기</a>"
-            f"</div>"
-        )
+    buy_section_html = "".join(_render_plan_buy_section(s, account_note, btn_style) for s in buy_sections)
+    sell_section_html = "".join(_render_plan_sell_section(s, account_note, btn_style) for s in sell_sections)
 
     body = (
         f"<p style='color:#374151;'>포트폴리오 <strong>{portfolio_name}</strong>의 리밸런싱 자동화 조건이 "
         f"충족되어 아래 계획이 생성되었습니다.</p>"
-        f"{buy_section}"
-        f"{sell_section}"
+        f"{buy_section_html}"
+        f"{sell_section_html}"
     )
     html = _email_div(
         "리밸런싱 자동화 계획 생성",
@@ -730,6 +738,64 @@ def market_signal_change_template(old_level: str, new_level: str, reason: str | 
         "이 알림은 시장 위험 신호 등급이 바뀔 때마다(1시간 간격 점검) 발송됩니다.<br>"
         "Growlio 앱 리밸런싱 &gt; 진단 탭에서 상세 지표를 확인하세요.<br>"
         "알림 설정은 설정 &gt; 알림 설정 &gt; 시장 신호 알림에서 변경하세요.",
+    )
+    return subject, html
+
+
+def year_end_tax_reminder_template(content: Mapping[str, Any]) -> tuple[str, str]:
+    """11~12월 매주 월요일 발송되는 연말 절세 리마인더 이메일.
+
+    content는 tax_reminder_service.build_reminder_content()의 반환값(TaxReminderContent).
+    """
+    subject = "[Growlio] 연말 절세 리마인더 — 지금 활용할 수 있는 절세 방법"
+    sections = ""
+
+    harvesting_top = content.get("harvesting_top") or []
+    if harvesting_top:
+        items_html = "".join(
+            f"<li style='margin-bottom:4px;'>{item['ticker']} — 손실 {abs(item['unrealized_loss_krw']):,.0f}원 "
+            f"매도 시 절세 약 {item['tax_saved_krw']:,.0f}원</li>"
+            for item in harvesting_top
+        )
+        sections += (
+            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>해외주식 손실수확 후보</h3>"
+            f"<ul style='padding-left:20px;margin:0;font-size:13px;color:#374151;'>{items_html}</ul>"
+            f"<p style='font-size:13px;color:#64748b;margin-top:4px;'>합계 절세 가능 약 "
+            f"{content.get('harvesting_total_tax_saved_krw', 0):,.0f}원 (250만원 공제 활용 기준, 참고용 추정치)</p>"
+        )
+
+    pension_remaining = content.get("pension_remaining_krw", 0)
+    if pension_remaining > 0:
+        sections += (
+            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>연금저축/IRP 세액공제 잔여한도</h3>"
+            f"<p style='font-size:13px;color:#374151;margin:0;'>올해 아직 {pension_remaining:,.0f}원의 "
+            "세액공제 여력이 남아 있습니다. 연말 전 추가 납입을 고려해보세요.</p>"
+        )
+
+    isa_near_maturity = content.get("isa_near_maturity") or []
+    isa_over_limit_count = content.get("isa_over_limit_count", 0)
+    if isa_near_maturity or isa_over_limit_count:
+        isa_lines = "".join(
+            f"<li style='margin-bottom:4px;'>{acc['account_name']} — 의무가입 만기까지 D-{acc['days_remaining']}</li>"
+            for acc in isa_near_maturity
+        )
+        over_limit_line = (
+            f"<li style='margin-bottom:4px;'>비과세 한도 초과 계좌 {isa_over_limit_count}건</li>"
+            if isa_over_limit_count
+            else ""
+        )
+        sections += (
+            "<h3 style='margin:16px 0 4px;font-size:15px;color:#1e293b;'>ISA 계좌 확인</h3>"
+            f"<ul style='padding-left:20px;margin:0;font-size:13px;color:#374151;'>{isa_lines}{over_limit_line}</ul>"
+        )
+
+    html = _email_div(
+        "연말 절세 리마인더",
+        "#7c3aed",
+        sections,
+        "이 알림은 11~12월 매주 월요일 09:00 KST에 발송됩니다.<br>"
+        "Growlio 앱 자산 &gt; 투자현황 &gt; 세금 탭에서 상세 시뮬레이션을 확인하세요.<br>"
+        "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
     )
     return subject, html
 

@@ -25,7 +25,7 @@ from app.services.returns_calculator import calc_xirr as _calc_xirr
 from app.services.trend_calculator import get_monthly_trend
 from app.utils.cache_keys import (
     TTL_DASHBOARD_SUMMARY,
-    RedisType,
+    CacheStoreType,
     dashboard_summary_key,
     get_cached_json,
     set_cached_json,
@@ -122,9 +122,9 @@ async def _get_scalar_init_data(user_id: uuid.UUID, db: AsyncSession) -> tuple[d
     )
 
 
-async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
+async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
     """전체 자산 집계 + 목표 달성률 + 수익률 계산."""
-    cached = await get_cached_json(redis, dashboard_summary_key(user_id))
+    cached = await get_cached_json(cache, dashboard_summary_key(user_id))
     if cached is not None:
         return cached
 
@@ -142,12 +142,12 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
     ) = await asyncio.gather(
         _get_scalar_init_data(user_id, db),
         db.scalar(select(UserSettings).where(UserSettings.user_id == user_id)),
-        _get_monthly_trend(user_id, db, redis),
-        get_dividend_summary(user_id, db, redis),
+        _get_monthly_trend(user_id, db, cache),
+        get_dividend_summary(user_id, db, cache),
     )
 
     # 2단계: 내부에서 4개 쿼리를 실행하므로 1단계와 분리해 session 충돌 방지
-    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, redis)
+    total_assets_krw, total_invested, stock_value, by_type = await _build_asset_totals(user_id, db, cache)
 
     # 3단계: total_assets_krw에 의존
     xirr_pct, xirr_is_estimated = await _calc_xirr(user_id, total_assets_krw, db)
@@ -223,5 +223,5 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, redis: Red
         "annual_dividend_goal": annual_dividend_goal,
         "dividend_goal_achievement_pct": dividend_goal_achievement_pct,
     }
-    await set_cached_json(redis, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
+    await set_cached_json(cache, dashboard_summary_key(user_id), result, TTL_DASHBOARD_SUMMARY)
     return result

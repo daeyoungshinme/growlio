@@ -60,7 +60,9 @@ export interface TaxSummary {
   domestic_stock_value_krw: number;
   domestic_unrealized_gain_krw: number;
   domestic_large_holder_warning: boolean;
+  domestic_large_holder_excess_krw: number;
   comprehensive_tax_warning: boolean;
+  comprehensive_tax_remaining_krw: number;
   total_estimated_tax_krw: number;
   total_fees_krw: number;
   harvesting_recommendations: HarvestingRecommendation[];

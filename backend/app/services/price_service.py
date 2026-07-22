@@ -12,13 +12,11 @@ Yahoo Finance가 Render 등 클라우드 호스팅 IP를 차단해 401을 반환
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import uuid
 from functools import partial
 
 import structlog
-from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,7 +34,7 @@ from app.services.yahoo_price import (
 from app.utils.cache_keys import (
     TTL_PRICE_CURRENT,
     TTL_PRICE_RETURN,
-    RedisType,
+    CacheStoreType,
     current_price_key,
     price_return_key,
 )
@@ -65,17 +63,16 @@ async def fetch_current_price(
     ticker: str,
     market: str,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> float | None:
     """단일 종목 현재가 조회.
-    Redis 15분 캐시 → (국내: Naver/pykrx →) Yahoo Finance → KIS 순으로 시도한다.
+    캐시(15분) → (국내: Naver/pykrx →) Yahoo Finance → KIS 순으로 시도한다.
     """
     cache_key = current_price_key(ticker, market)
-    if redis:
-        with contextlib.suppress(RedisError):
-            cached = await redis.get(cache_key)
-            if cached:
-                return float(cached)
+    if cache:
+        cached = await cache.get(cache_key)
+        if cached:
+            return float(cached)
 
     loop = asyncio.get_running_loop()
 
@@ -95,65 +92,64 @@ async def fetch_current_price(
         account = await _get_any_kis_account(user_id, db)
         if account:
             try:
-                price = await _price_via_kis(account, ticker, market, db, redis)
+                price = await _price_via_kis(account, ticker, market, db, cache)
             except Exception as e:
                 logger.warning("kis_price_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
 
-    if price and redis:
-        with contextlib.suppress(RedisError):
-            await redis.set(cache_key, str(price), ex=TTL_PRICE_CURRENT)
+    if price and cache:
+        await cache.set(cache_key, str(price), ex=TTL_PRICE_CURRENT)
 
     return price
 
 
-async def _read_cached_prices(redis: RedisType, tickers: list[tuple[str, str]]) -> dict[str, float]:
-    """배치 대상 티커의 Redis 현재가 캐시를 일괄 조회."""
+async def _read_cached_prices(cache: CacheStoreType, tickers: list[tuple[str, str]]) -> dict[str, float]:
+    """배치 대상 티커의 현재가 캐시를 일괄 조회."""
     price_map: dict[str, float] = {}
-    if not redis:
+    if not cache:
         return price_map
-    with contextlib.suppress(RedisError):
-        cached_values = await redis.mget([current_price_key(t, m) for t, m in tickers])
-        for (ticker, _), cached in zip(tickers, cached_values, strict=False):
-            if cached:
-                try:
-                    price_map[ticker] = float(cached)
-                except (ValueError, TypeError):
-                    logger.warning("price_cache_malformed", ticker=ticker, cached=cached)
+    cached_values = await cache.mget([current_price_key(t, m) for t, m in tickers])
+    for (ticker, _), cached in zip(tickers, cached_values, strict=False):
+        if cached:
+            try:
+                price_map[ticker] = float(cached)
+            except (ValueError, TypeError):
+                logger.warning("price_cache_malformed", ticker=ticker, cached=cached)
     return price_map
 
 
-async def _write_cached_prices(redis: RedisType, tickers: list[tuple[str, str]], price_map: dict[str, float]) -> None:
-    """새로 조회된 가격을 Redis 현재가 캐시에 저장."""
-    if not redis:
+async def _write_cached_prices(
+    cache: CacheStoreType, tickers: list[tuple[str, str]], price_map: dict[str, float]
+) -> None:
+    """새로 조회된 가격을 현재가 캐시에 저장."""
+    if not cache:
         return
     newly_fetched = [(t, m) for t, m in tickers if price_map.get(t)]
     if not newly_fetched:
         return
-    with contextlib.suppress(RedisError):
-        await asyncio.gather(
-            *(
-                redis.set(current_price_key(ticker, market), str(price_map[ticker]), ex=TTL_PRICE_CURRENT)
-                for ticker, market in newly_fetched
-            )
+    await asyncio.gather(
+        *(
+            cache.set(current_price_key(ticker, market), str(price_map[ticker]), ex=TTL_PRICE_CURRENT)
+            for ticker, market in newly_fetched
         )
+    )
 
 
 async def fetch_prices_batch(
     user_id: uuid.UUID,
     tickers: list[tuple[str, str]],
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> dict[str, float]:
     """여러 종목 현재가를 한 번에 조회. {ticker: price}
 
     국내 종목은 Naver/pykrx로 먼저 채우고, 남은 종목만 Yahoo Finance 배치 조회 →
-    그래도 실패한 종목은 KIS로 보완한다. Redis 15분 캐시를 우선 조회하고, 새로 조회한 가격은 캐시에 반영한다.
+    그래도 실패한 종목은 KIS로 보완한다. 캐시(15분)를 우선 조회하고, 새로 조회한 가격은 캐시에 반영한다.
     """
     if not tickers:
         return {}
 
     loop = asyncio.get_running_loop()
-    price_map: dict[str, float] = await _read_cached_prices(redis, tickers)
+    price_map: dict[str, float] = await _read_cached_prices(cache, tickers)
     remaining = [(t, m) for t, m in tickers if t not in price_map]
 
     domestic = [(t, m) for t, m in remaining if m.upper() in DOMESTIC_MARKETS]
@@ -179,20 +175,20 @@ async def fetch_prices_batch(
     if missing:
         account = await _get_any_kis_account(user_id, db)
         if account:
-            fallback_tasks = [_fetch_fallback(account, ticker, market, db, redis) for ticker, market in missing]
+            fallback_tasks = [_fetch_fallback(account, ticker, market, db, cache) for ticker, market in missing]
             results = await asyncio.gather(*fallback_tasks, return_exceptions=True)
             for (ticker, _), result in zip(missing, results, strict=False):
                 if isinstance(result, (int, float)) and result > 0:
                     price_map[ticker] = float(result)
 
-    await _write_cached_prices(redis, remaining, price_map)
+    await _write_cached_prices(cache, remaining, price_map)
 
     return price_map
 
 
 async def get_historical_returns(
     tickers: list[tuple[str, str]],
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     years: int = 10,
 ) -> dict[tuple[str, str], dict]:
     """각 종목의 최근 N년 누적/연환산 수익률을 반환한다.
@@ -209,9 +205,8 @@ async def get_historical_returns(
     missing: list[tuple[str, str]] = []
 
     cached_values: list[str | None] = [None] * len(tickers)
-    if redis:
-        with contextlib.suppress(RedisError):
-            cached_values = await redis.mget([price_return_key(years, t, m) for t, m in tickers])
+    if cache:
+        cached_values = await cache.mget([price_return_key(years, t, m) for t, m in tickers])
 
     for (ticker, market), cached in zip(tickers, cached_values, strict=False):
         if cached:
@@ -242,14 +237,13 @@ async def get_historical_returns(
 
     return_map.update(newly_fetched)
 
-    if newly_fetched and redis:
-        with contextlib.suppress(RedisError):
-            await asyncio.gather(
-                *(
-                    redis.setex(price_return_key(years, t, m), TTL_PRICE_RETURN, json.dumps(result))
-                    for (t, m), result in newly_fetched.items()
-                )
+    if newly_fetched and cache:
+        await asyncio.gather(
+            *(
+                cache.setex(price_return_key(years, t, m), TTL_PRICE_RETURN, json.dumps(result))
+                for (t, m), result in newly_fetched.items()
             )
+        )
 
     return return_map
 
@@ -267,10 +261,10 @@ async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAcc
 
 
 async def _fetch_fallback(
-    account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType
+    account: AssetAccount, ticker: str, market: str, db: AsyncSession, cache: CacheStoreType
 ) -> float | None:
     try:
-        price = await _price_via_kis(account, ticker, market, db, redis)
+        price = await _price_via_kis(account, ticker, market, db, cache)
         if price:
             return price
     except Exception as e:
@@ -279,7 +273,7 @@ async def _fetch_fallback(
 
 
 async def _price_via_kis(
-    account: AssetAccount, ticker: str, market: str, db: AsyncSession, redis: RedisType
+    account: AssetAccount, ticker: str, market: str, db: AsyncSession, cache: CacheStoreType
 ) -> float | None:
     """KIS API로 현재가 조회 — 다른 소스가 실패했을 때만 쓰는 최후 폴백.
     반복 실패 시 빠른 실패를 위해 `kis_circuit`으로 보호한다."""
@@ -299,7 +293,7 @@ async def _price_via_kis(
             app_key,
             app_secret,
             is_mock=is_mock,
-            redis=redis,
+            cache=cache,
             db=db,
             user_id=str(account.user_id),
             account_id=str(account.id),

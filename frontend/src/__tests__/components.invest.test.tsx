@@ -418,9 +418,24 @@ describe("TaxRecommendationList", () => {
 
   it("renders recommendations list", () => {
     const recommendations = [{ pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 }];
-    renderWithProviders(<TaxRecommendationList recommendations={recommendations} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxRecommendationList recommendations={recommendations} />
+      </MemoryRouter>,
+    );
     expect(screen.getByText(/절세 추천/)).toBeDefined();
     expect(screen.getByText("AAPL")).toBeDefined();
+  });
+
+  it("renders a deep link to the account's securities tab", () => {
+    const recommendations = [{ pos: mockPos, label: "전량 매도 권장", taxSaved: 55000 }];
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxRecommendationList recommendations={recommendations} />
+      </MemoryRouter>,
+    );
+    const link = screen.getByText(/테스트계좌에서 매도/);
+    expect(link.closest("a")).toHaveAttribute("href", "/assets?tab=계좌관리&atab=증권계좌");
   });
 });
 
@@ -526,7 +541,11 @@ describe("TaxPlannerSection", () => {
       unrealized_pnl_krw: 2000000,
       unrealized_pnl_pct: 13.3,
     };
-    renderWithProviders(<TaxPlannerSection positions={[pos]} />);
+    renderWithProviders(
+      <MemoryRouter>
+        <TaxPlannerSection positions={[pos]} />
+      </MemoryRouter>,
+    );
     expect(screen.getByText(/해외 양도세 절세 플래너/)).toBeDefined();
     expect(screen.getAllByText(/250만원 공제/).length).toBeGreaterThan(0);
   });

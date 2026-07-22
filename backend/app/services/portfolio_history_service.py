@@ -174,7 +174,7 @@ async def get_allocation_history(
     user_id: uuid.UUID,
     db: AsyncSession,
     months: int = 12,
-    redis=None,
+    cache=None,
     account_id: uuid.UUID | None = None,
 ) -> list[dict]:
     """월별 자산 유형별 배분 이력 조회.
@@ -186,7 +186,7 @@ async def get_allocation_history(
     account_id 지정 시 해당 계좌만 집계(미지정 시 전체 계좌 통합).
     """
     cache_key = alloc_history_key(user_id, months, str(account_id) if account_id else "all")
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -198,5 +198,5 @@ async def get_allocation_history(
 
     output = _build_allocation_output(monthly)
 
-    await set_cached_json(redis, cache_key, output, TTL_ALLOC_HISTORY)
+    await set_cached_json(cache, cache_key, output, TTL_ALLOC_HISTORY)
     return output

@@ -2,16 +2,22 @@ import type { DiagnosisContext } from "../api/rebalancing";
 import type { MarketRiskLevel } from "../api/marketSignals";
 import { fmtKrw } from "./format";
 
-const TAX_IMPACT_NOTE_THRESHOLD_KRW = 10_000;
+const FEE_NOTE_THRESHOLD_KRW = 10_000;
+/** 손실실현(절세) 노트를 다른 tax_notes 항목과 구분하기 위한 마커 — diagnosis_service.py의 문구와 동기화 유지 */
+const TAX_LOSS_REALIZED_MARKER = "절세 효과가 있습니다";
 
 export type DiagnosisNoteIcon = "market" | "risk" | "tax";
 
 export interface DiagnosisNote {
   icon: DiagnosisNoteIcon;
   text: string;
+  /** 손실실현으로 절세 기회가 생긴 경우 — 세금 탭 딥링크 CTA를 함께 노출할지 여부 */
+  isTaxLossOpportunity?: boolean;
 }
 
-/** DiagnosisContext를 화면에 표시할 조건부 인사이트 문구 리스트로 변환한다. */
+/** DiagnosisContext를 화면에 표시할 조건부 인사이트 문구 리스트로 변환한다.
+ * 세금 관련 문구는 백엔드(diagnosis_service.py의 _build_tax_preview)가 계산한 tax_notes를
+ * 그대로 사용한다 — 실현손익 부호(이익/손실)에 따라 다른 문구가 필요해 프론트에서 재계산하지 않는다. */
 export function buildDiagnosisNotes(ctx: DiagnosisContext): DiagnosisNote[] {
   const notes: DiagnosisNote[] = [];
 
@@ -22,11 +28,18 @@ export function buildDiagnosisNotes(ctx: DiagnosisContext): DiagnosisNote[] {
     notes.push({ icon: "risk", text: ctx.risk_note });
   }
 
-  const taxImpact = ctx.estimated_overseas_tax_krw + ctx.estimated_fee_krw;
-  if (taxImpact > TAX_IMPACT_NOTE_THRESHOLD_KRW) {
+  for (const text of ctx.tax_notes) {
     notes.push({
       icon: "tax",
-      text: `이번 리밸런싱 매도 시 예상 세금·수수료 영향 약 ${fmtKrw(taxImpact)} (참고용 추정치)`,
+      text,
+      isTaxLossOpportunity: text.includes(TAX_LOSS_REALIZED_MARKER),
+    });
+  }
+
+  if (ctx.estimated_fee_krw > FEE_NOTE_THRESHOLD_KRW) {
+    notes.push({
+      icon: "tax",
+      text: `이번 리밸런싱 매도 시 예상 매매 수수료 약 ${fmtKrw(ctx.estimated_fee_krw)} (참고용 추정치)`,
     });
   }
 

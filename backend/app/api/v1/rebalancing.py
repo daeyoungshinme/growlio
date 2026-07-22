@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.portfolio import Portfolio
 from app.models.user import User
@@ -69,7 +69,7 @@ async def analyze_portfolio(
     deposit_krw_override: float | None = Query(default=None, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """현재 자산과 목표 포트폴리오를 비교해 리밸런싱 제안을 반환한다."""
     portfolio = await db.scalar(
@@ -92,13 +92,13 @@ async def analyze_portfolio(
     cache_key = rebalancing_analysis_key(
         current_user.id, portfolio_id, portfolio_overview_acct_suffix(effective_ids), deposit_krw_override
     )
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return RebalancingAnalysis.model_validate(cached)
 
     overview, base_dividend_items = await asyncio.gather(
-        build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis),
-        get_ticker_dividend_summary(current_user.id, db),
+        build_portfolio_overview(current_user.id, db, account_ids=effective_ids, cache=cache),
+        get_ticker_dividend_summary(current_user.id, db, account_ids=effective_ids),
     )
     base_dividend_map = {(item["ticker"], item["market"]): item for item in base_dividend_items if item.get("ticker")}
 
@@ -114,9 +114,9 @@ async def analyze_portfolio(
     ]
 
     dividend_map, returns_map, overview = await asyncio.gather(
-        collect_dividend_map(current_user.id, db, redis, portfolio, base_dividend_map),
-        get_historical_returns(list(set(target_tickers) | set(current_tickers)), redis=redis),
-        enrich_overview_with_prices(portfolio, overview, current_user.id, db, redis),
+        collect_dividend_map(current_user.id, db, cache, portfolio, base_dividend_map),
+        get_historical_returns(list(set(target_tickers) | set(current_tickers)), cache=cache),
+        enrich_overview_with_prices(portfolio, overview, current_user.id, db, cache),
     )
 
     if deposit_krw_override is not None:
@@ -141,7 +141,7 @@ async def analyze_portfolio(
         analysis.diagnosis_context = await build_diagnosis_context(
             current_user.id,
             db,
-            redis,
+            cache,
             analysis,
             overview,
             enable_composite_signals=enable_composite_signals,
@@ -151,7 +151,7 @@ async def analyze_portfolio(
         logger.warning("diagnosis_context_build_failed", portfolio_id=str(portfolio_id), error=str(e))
         analysis.diagnosis_context = None
 
-    await set_cached_json(redis, cache_key, analysis.model_dump(mode="json"), TTL_REBALANCING_ANALYSIS)
+    await set_cached_json(cache, cache_key, analysis.model_dump(mode="json"), TTL_REBALANCING_ANALYSIS)
     return analysis
 
 
@@ -161,10 +161,10 @@ async def get_overall_goal_recommendation_endpoint(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """전체 계좌(전체 투자현황) 기준으로 목표 역산 추천을 반환한다 (자동 적용 아님)."""
-    overview = await build_portfolio_overview(current_user.id, db, redis=redis)
+    overview = await build_portfolio_overview(current_user.id, db, cache=cache)
     settings_row = await get_settings_row(db, current_user.id)
 
     # 부동산은 목표 역산 추천 MVO 엔진의 후보에 포함되지 않으므로(성장 미모델링) 필요
@@ -177,7 +177,7 @@ async def get_overall_goal_recommendation_endpoint(
     base_krw = float(overview.get("total_assets_krw", 0)) - real_estate_krw
     pos_map = await query_latest_position_map(current_user.id, db, include_name=True)
     existing_items = existing_items_from_positions(pos_map)
-    return await get_goal_recommendation(redis, base_krw, existing_items, settings_row, db)
+    return await get_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
 
 
 @router.get("/goal-recommendation/by-horizon", response_model=HorizonRecommendationResponse)
@@ -186,7 +186,7 @@ async def get_horizon_goal_recommendation_endpoint(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """계좌에 태그된 투자기간(단기/중기/장기)별로 리스크 성향이 다른 추천을 반환한다 (자동 적용 아님).
 
@@ -194,7 +194,7 @@ async def get_horizon_goal_recommendation_endpoint(
     별개의 기능이며, 두 엔드포인트 모두 그대로 유지된다.
     """
     settings_row = await get_or_create_settings(db, current_user.id)
-    return await get_horizon_recommendations(redis, db, current_user.id, settings_row)
+    return await get_horizon_recommendations(cache, db, current_user.id, settings_row)
 
 
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)
@@ -204,7 +204,7 @@ async def get_broker_account_balance(
     account_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """KIS 또는 키움 계좌의 실시간 보유 종목 잔고를 조회한다 (비활성 계좌 포함)."""
     account = await get_account_including_inactive(db, account_id, current_user.id)
@@ -222,7 +222,7 @@ async def get_broker_account_balance(
         )
 
     try:
-        return await fetch_broker_balance(account, db, redis)
+        return await fetch_broker_balance(account, db, cache)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -233,7 +233,7 @@ async def get_all_broker_balances(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """연동된 모든 활성 KIS/키움 계좌의 실시간 잔고를 병렬로 조회한다."""
     acc_result = await db.execute(active_broker_accounts_stmt(current_user.id))
@@ -242,7 +242,7 @@ async def get_all_broker_balances(
     if not accounts:
         return []
 
-    tasks = [fetch_broker_balance(acc, db, redis) for acc in accounts]
+    tasks = [fetch_broker_balance(acc, db, cache) for acc in accounts]
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
     return [
@@ -266,7 +266,7 @@ async def get_drift_summary(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """모든 포트폴리오의 비중 이탈 현황을 빠르게 반환한다 (배당·수익률 외부 API 미사용)."""
     portfolios = await get_linked_portfolios(db, current_user.id)
@@ -282,7 +282,7 @@ async def get_drift_summary(
         settings_row = await get_settings_row(db, current_user.id)
         enable_composite_signals = settings_row.composite_signal_alerts_enabled if settings_row else True
         if enable_composite_signals:
-            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
+            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, cache)
             has_composite_signal, composite_reason = check_composite_signal(
                 market_level,
                 bool(risk.get("data_available")),
@@ -304,7 +304,7 @@ async def get_drift_summary(
         try:
             portfolio_account_ids = getattr(portfolio, "account_ids", None)
             effective_ids = [uuid.UUID(aid) for aid in portfolio_account_ids] if portfolio_account_ids else None
-            overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, redis=redis)
+            overview = await build_portfolio_overview(current_user.id, db, account_ids=effective_ids, cache=cache)
             threshold = alert_by_portfolio.get(str(portfolio.id), 5.0)
             summary = compute_portfolio_drift_summary(portfolio, overview, threshold)
             summary.has_composite_signal = has_composite_signal
@@ -328,7 +328,7 @@ async def get_composite_signal_status(
     request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """진단탭 상단 배너 전용 — 포트폴리오 컨텍스트 없이 유저 단위 복합신호(시장/리스크) 상태만 반환."""
     settings_row = await get_settings_row(db, current_user.id)
@@ -338,7 +338,7 @@ async def get_composite_signal_status(
     reason: str | None = None
     if enabled:
         try:
-            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, redis)
+            market_level, risk = await fetch_market_and_risk_signal(current_user.id, db, cache)
             triggered, reason = check_composite_signal(
                 market_level,
                 bool(risk.get("data_available")),

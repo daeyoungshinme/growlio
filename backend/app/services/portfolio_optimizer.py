@@ -1,7 +1,7 @@
 """포트폴리오 최적화 서비스 — Mean-Variance Optimization으로 효율적 프론티어 계산.
 
 scipy.optimize.minimize(SLSQP)를 사용하며, 1년 일별 수익률 데이터를 기반으로 한다.
-Redis 1시간 캐시를 사용한다.
+1시간 캐시를 사용한다.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from sqlalchemy.orm import selectinload
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
-from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, RedisType, efficient_frontier_key
+from app.utils.cache_keys import TTL_PORTFOLIO_OPTIMIZER, CacheStoreType, efficient_frontier_key
 
 logger = structlog.get_logger()
 _MIN_POSITIONS = 2  # 최적화에 필요한 최소 종목 수
@@ -170,7 +170,7 @@ def _compute_portfolio_position(
 async def get_efficient_frontier(  # noqa: C901
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     compare_portfolio_id: str | None = None,
     account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
@@ -178,9 +178,9 @@ async def get_efficient_frontier(  # noqa: C901
     acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
     cache_key = efficient_frontier_key(user_id, compare_portfolio_id, acct_suffix)
 
-    if redis:
+    if cache:
         try:
-            cached = await redis.get(cache_key)
+            cached = await cache.get(cache_key)
             if cached:
                 return json.loads(cached)
         except Exception as e:
@@ -245,8 +245,8 @@ async def get_efficient_frontier(  # noqa: C901
         )
     result_data["target"] = target_pos
 
-    if redis:
+    if cache:
         with contextlib.suppress(Exception):
-            await redis.setex(cache_key, TTL_PORTFOLIO_OPTIMIZER, json.dumps(result_data))
+            await cache.setex(cache_key, TTL_PORTFOLIO_OPTIMIZER, json.dumps(result_data))
 
     return result_data

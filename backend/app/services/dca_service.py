@@ -15,7 +15,7 @@ from app.models.asset import AssetAccount, AssetSnapshot
 from app.models.user import UserSettings
 from app.services.composition_calculator import build_asset_totals, exclude_real_estate
 from app.services.goal_return_solver import solve_required_annual_return_pct, solve_required_monthly_deposit
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import CacheStoreType
 
 _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50년)
 
@@ -23,7 +23,7 @@ _DCA_MAX_MONTHS = 600  # 목표 달성까지 탐색하는 최대 개월 수 (50�
 _ACCELERATION_YEARS_PRESETS: tuple[int, ...] = (1, 2, 3)
 
 
-async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisType = None) -> dict[str, Any]:
+async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType = None) -> dict[str, Any]:
     """DCA 복리 이론 곡선과 실제 자산을 비교한 분석 결과 반환."""
     settings_row = await db.scalar(select(UserSettings).where(UserSettings.user_id == user_id))
 
@@ -93,7 +93,7 @@ async def get_dca_analysis(user_id: uuid.UUID, db: AsyncSession, redis: RedisTyp
     # 두 화면의 진행율이 항상 일치하도록 함 — 월별 스냅샷 CTE와는 별도 계산.
     # 부동산은 목표 역산 추천/DCA 복리 곡선 어느 쪽도 성장을 모델링하지 않으므로 제외
     # (부동산 추가만으로 진행율이 왜곡되는 것을 방지 — investable_assets_krw).
-    total_assets_krw, _, _, by_type = await build_asset_totals(user_id, db, redis)
+    total_assets_krw, _, _, by_type = await build_asset_totals(user_id, db, cache)
     investable_assets_krw = exclude_real_estate(total_assets_krw, by_type)
 
     goal_timeline = _calc_goal_timeline(

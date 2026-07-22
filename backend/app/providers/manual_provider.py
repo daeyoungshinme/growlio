@@ -15,9 +15,9 @@ from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 
 if TYPE_CHECKING:
-    import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.core.cache_store import CacheStore
     from app.models.asset import AssetAccount
 
 
@@ -25,7 +25,7 @@ class ManualProvider(BrokerProvider):
     PROVIDER_ID = "MANUAL"
     PROVIDER_NAME = "수동 입력"
 
-    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, cache: CacheStore | None) -> BalanceResult:
         from app.kis.constants import OVERSEAS_MARKETS
 
         # 현재 포지션을 positions 테이블에서 로드
@@ -37,16 +37,16 @@ class ManualProvider(BrokerProvider):
         )
         db_positions = pos_result.scalars().all()
 
-        if db_positions and redis is not None:
+        if db_positions and cache is not None:
             from app.services.price_service import fetch_prices_batch
 
             tickers = [(p.ticker, p.market) for p in db_positions]
-            price_map = await fetch_prices_batch(account.user_id, tickers, db, redis)
+            price_map = await fetch_prices_batch(account.user_id, tickers, db, cache)
 
             has_overseas = any(p.market in OVERSEAS_MARKETS for p in db_positions)
             usd_rate: float | None = None
             if has_overseas:
-                usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
+                usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
 
             for p in db_positions:
                 raw_price = price_map.get(p.ticker)
@@ -67,7 +67,7 @@ class ManualProvider(BrokerProvider):
         pnl = value - invested if positions else 0.0
 
         if positions:
-            usd_rate_val = await fetch_usd_krw(redis)
+            usd_rate_val = await fetch_usd_krw(cache)
             deposit = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate_val
             amount_krw = (value if value else invested) + deposit
             account.manual_amount = amount_krw
@@ -76,7 +76,7 @@ class ManualProvider(BrokerProvider):
                 raise BadRequestError("부동산 시세(manual_amount)가 설정되지 않았습니다")
             amount_krw = _calc_net_asset_amount(account.manual_amount, account.asset_type, account.real_estate_details)
         elif account.deposit_krw is not None or account.deposit_usd is not None:
-            usd_rate2 = await fetch_usd_krw(redis)
+            usd_rate2 = await fetch_usd_krw(cache)
             amount_krw = float(account.deposit_krw or 0) + float(account.deposit_usd or 0) * usd_rate2
         else:
             amount_krw = float(account.manual_amount or 0)

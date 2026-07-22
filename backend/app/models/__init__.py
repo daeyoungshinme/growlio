@@ -4,6 +4,7 @@ from app.models.alert import (
     RebalancingAlert,
     StockPriceAlert,
 )
+from app.models.app_state import AppState
 from app.models.asset import (
     AssetAccount,
     AssetSnapshot,
@@ -22,6 +23,7 @@ from app.models.user import User, UserSettings
 __all__ = [
     "User",
     "UserSettings",
+    "AppState",
     "AssetAccount",
     "AssetSnapshot",
     "Position",

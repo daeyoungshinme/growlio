@@ -104,7 +104,7 @@ class TestGetKisUserCredentials:
 
         with (
             patch("app.kis.auth.get_access_token", AsyncMock(return_value="fake-token")),
-            patch("app.core.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=AsyncMock())),
         ):
             result = await get_kis_user_credentials(uuid.uuid4(), db)
 
@@ -133,7 +133,7 @@ class TestGetKisUserCredentials:
 
         with (
             patch("app.kis.auth.get_access_token", AsyncMock(side_effect=Exception("token error"))),
-            patch("app.core.redis_client.get_redis", AsyncMock(return_value=AsyncMock())),
+            patch("app.core.cache_store.get_cache_store", AsyncMock(return_value=AsyncMock())),
         ):
             result = await get_kis_user_credentials(uuid.uuid4(), db)
 

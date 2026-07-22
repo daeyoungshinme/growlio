@@ -110,8 +110,8 @@ class TestCollectPositions:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_account_id_adds_extra_equality_filter(self, mock_db, override_settings):
-        """account_id 지정 시 JOIN 조건과 별개로 asset_accounts.id 필터가 추가로 붙어야 한다."""
+    async def test_account_ids_adds_extra_in_filter(self, mock_db, override_settings):
+        """account_ids 지정 시 JOIN 조건과 별개로 asset_accounts.id IN 필터가 추가로 붙어야 한다."""
         from app.services.dividend.orchestrator import _collect_positions
 
         captured = {}
@@ -125,14 +125,96 @@ class TestCollectPositions:
         mock_db.execute = mock_execute
 
         await _collect_positions(uuid.uuid4(), mock_db)
-        without_filter_count = str(captured["query"]).count("asset_accounts.id = ")
+        without_filter_count = str(captured["query"]).count("asset_accounts.id IN")
 
-        await _collect_positions(uuid.uuid4(), mock_db, account_id=uuid.uuid4())
-        with_filter_count = str(captured["query"]).count("asset_accounts.id = ")
+        await _collect_positions(uuid.uuid4(), mock_db, account_ids=[uuid.uuid4()])
+        with_filter_count = str(captured["query"]).count("asset_accounts.id IN")
 
         # JOIN 조건(asset_accounts.id == asset_snapshots.account_id)은 항상 존재하므로,
-        # account_id 지정 시 WHERE 절에 동등 비교가 하나 더 추가되어야 한다.
+        # account_ids 지정 시 WHERE 절에 IN 비교가 하나 더 추가되어야 한다.
         assert with_filter_count == without_filter_count + 1
+
+    @pytest.mark.asyncio
+    async def test_multiple_account_ids_filters_by_all_of_them(self, mock_db, override_settings):
+        """account_ids에 여러 계좌 ID를 넘겨도 IN 필터 하나로 전부 반영되어야 한다."""
+        from app.services.dividend.orchestrator import _collect_positions
+
+        captured = {}
+
+        async def mock_execute(query):
+            captured["query"] = query
+            result = MagicMock()
+            result.all.return_value = []
+            return result
+
+        mock_db.execute = mock_execute
+
+        ids = [uuid.uuid4(), uuid.uuid4()]
+        await _collect_positions(uuid.uuid4(), mock_db, account_ids=ids)
+
+        assert str(captured["query"]).count("asset_accounts.id IN") == 1
+
+
+class TestFetchReceivedDividendsByTicker:
+    @pytest.mark.asyncio
+    async def test_no_account_ids_omits_account_filter(self, mock_db, override_settings):
+        from app.services.dividend.orchestrator import _fetch_received_dividends_by_ticker
+
+        captured = {}
+
+        async def mock_execute(query, params=None):
+            captured["query"] = query
+            captured["params"] = params
+            result = MagicMock()
+            result.__iter__ = MagicMock(return_value=iter([]))
+            return result
+
+        mock_db.execute = mock_execute
+
+        await _fetch_received_dividends_by_ticker(mock_db, uuid.uuid4(), 2026)
+
+        assert "account_id" not in str(captured["query"])
+        assert "account_ids" not in captured["params"]
+
+    @pytest.mark.asyncio
+    async def test_single_account_id_adds_in_filter(self, mock_db, override_settings):
+        from app.services.dividend.orchestrator import _fetch_received_dividends_by_ticker
+
+        captured = {}
+
+        async def mock_execute(query, params=None):
+            captured["query"] = query
+            captured["params"] = params
+            result = MagicMock()
+            result.__iter__ = MagicMock(return_value=iter([]))
+            return result
+
+        mock_db.execute = mock_execute
+
+        acct_id = uuid.uuid4()
+        await _fetch_received_dividends_by_ticker(mock_db, uuid.uuid4(), 2026, account_ids=[acct_id])
+
+        assert "account_id IN" in str(captured["query"])
+        assert captured["params"]["account_ids"] == [str(acct_id)]
+
+    @pytest.mark.asyncio
+    async def test_multiple_account_ids_all_included(self, mock_db, override_settings):
+        from app.services.dividend.orchestrator import _fetch_received_dividends_by_ticker
+
+        captured = {}
+
+        async def mock_execute(query, params=None):
+            captured["params"] = params
+            result = MagicMock()
+            result.__iter__ = MagicMock(return_value=iter([]))
+            return result
+
+        mock_db.execute = mock_execute
+
+        ids = [uuid.uuid4(), uuid.uuid4()]
+        await _fetch_received_dividends_by_ticker(mock_db, uuid.uuid4(), 2026, account_ids=ids)
+
+        assert captured["params"]["account_ids"] == [str(a) for a in ids]
 
 
 class TestLoadUserOverrides:
@@ -215,13 +297,13 @@ class TestBuildTickerOutputEntry:
 
 class TestGetTickerDividendSummary:
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_returns_cached(self, mock_db, override_settings):
+    async def test_cache_cache_hit_returns_cached(self, mock_db, override_settings):
         from app.services.dividend.orchestrator import get_ticker_dividend_summary
 
         cached = [{"ticker": "AAPL", "estimated_annual_krw": 100_000.0}]
 
         with patch(
-            "app.services.dividend.orchestrator.get_redis",
+            "app.services.dividend.orchestrator.get_cache_store",
             new=AsyncMock(
                 return_value=AsyncMock(
                     get=AsyncMock(return_value=json.dumps(cached).encode()),
@@ -258,12 +340,12 @@ class TestGetTickerDividendSummary:
 
         mock_db.execute = mock_execute
 
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
-        mock_redis.setex = AsyncMock()
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
+        mock_cache.setex = AsyncMock()
 
         with (
-            patch("app.services.dividend.orchestrator.get_redis", new=AsyncMock(return_value=mock_redis)),
+            patch("app.services.dividend.orchestrator.get_cache_store", new=AsyncMock(return_value=mock_cache)),
             patch("app.services.dividend.orchestrator._collect_positions", new=AsyncMock(return_value={})),
             patch("app.services.dividend.orchestrator.load_user_dividend_overrides", new=AsyncMock(return_value={})),
             patch("app.services.dividend.orchestrator.fetch_dart_api_key", new=AsyncMock(return_value="key")),

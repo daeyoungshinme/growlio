@@ -52,7 +52,7 @@ class TestRunMonthlyReport:
 
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
@@ -76,7 +76,7 @@ class TestRunMonthlyReport:
 
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.monthly_report import run_monthly_report
@@ -102,7 +102,7 @@ class TestRunMonthlyReport:
 
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
@@ -132,7 +132,7 @@ class TestRunMonthlyReport:
 
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", new_callable=AsyncMock) as mock_email,
         ):
@@ -170,7 +170,7 @@ class TestRunMonthlyReport:
 
         with (
             patch("app.jobs.monthly_report.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.monthly_report.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.monthly_report.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.monthly_report.get_dashboard_summary", new_callable=AsyncMock, return_value=_MOCK_SUMMARY),
             patch("app.jobs.monthly_report.send_monthly_report_email", side_effect=failing_email),
         ):

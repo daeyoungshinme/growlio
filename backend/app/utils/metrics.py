@@ -32,16 +32,16 @@ http_request_duration = Histogram(
     buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, float("inf")),
 )
 
-# Redis 캐시 히트/미스
+# 캐시 히트/미스
 cache_hit_count = Counter(
     "cache_hit_total",
-    "Redis 캐시 히트 수",
+    "캐시 히트 수",
     labelnames=["cache_name"],
 )
 
 cache_miss_count = Counter(
     "cache_miss_total",
-    "Redis 캐시 미스 수",
+    "캐시 미스 수",
     labelnames=["cache_name"],
 )
 

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.backtest import BacktestPortfolio
 from app.models.user import User
@@ -121,17 +121,17 @@ async def run_backtest_endpoint(
             detail="최소 1개의 포트폴리오 또는 벤치마크를 선택해주세요",
         )
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     payload = json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
     param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()
     cache_key = backtest_key(current_user.id, param_hash)
 
-    cached = await redis.get(cache_key)
+    cached = await cache.get(cache_key)
     if cached:
         return BacktestResult.model_validate_json(cached)
 
     result = await run_backtest(current_user.id, body, db)
-    await redis.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
+    await cache.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
     return result
 
 
@@ -150,15 +150,15 @@ async def run_correlation_endpoint(
             detail="최소 1개의 포트폴리오를 선택해주세요.",
         )
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     payload = json.dumps(body.model_dump(), sort_keys=True, default=str).encode()
     param_hash = hashlib.md5(payload, usedforsecurity=False).hexdigest()
     cache_key = correlation_key(current_user.id, param_hash)
 
-    cached = await redis.get(cache_key)
+    cached = await cache.get(cache_key)
     if cached:
         return CorrelationResult.model_validate_json(cached)
 
     result = await compute_correlation(current_user.id, body, db)
-    await redis.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
+    await cache.setex(cache_key, TTL_BACKTEST, result.model_dump_json())
     return result

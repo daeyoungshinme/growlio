@@ -89,7 +89,7 @@ async def refresh_live_prices(
     items: list,
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: Any = None,
+    cache: Any = None,
 ) -> None:
     """드리프트 항목의 `current_price_krw`를 실시간 시세로 갱신한다 (in-place).
 
@@ -110,7 +110,7 @@ async def refresh_live_prices(
         return
 
     try:
-        price_map = await fetch_prices_batch(user_id, tickers, db, redis)
+        price_map = await fetch_prices_batch(user_id, tickers, db, cache)
     except Exception as exc:
         logger.warning("rebalancing_live_price_refresh_failed", error=str(exc))
         return
@@ -206,6 +206,20 @@ def is_tax_impact_blocking_auto_mode(
     if max_tax_impact_krw is None:
         return False
     return estimated_tax_krw > max_tax_impact_krw
+
+
+def market_group(market: str) -> Literal["KR", "US"]:
+    """주문의 시장을 국내(KR)/해외(US)로 분류한다 — AUTO leg를 시장별로 분리하는 데 쓰인다."""
+    from app.kis.order import is_overseas_market
+
+    return "US" if is_overseas_market(market) else "KR"
+
+
+def split_orders_by_market(orders: list[Any]) -> tuple[list[Any], list[Any]]:
+    """주문 목록을 (국내 주문, 해외 주문)으로 분리한다."""
+    kr_orders = [o for o in orders if market_group(o.market) == "KR"]
+    us_orders = [o for o in orders if market_group(o.market) == "US"]
+    return kr_orders, us_orders
 
 
 def _flatten_account_tax_types(ticker_account_map: dict[str, list]) -> dict[str, str]:

@@ -65,7 +65,20 @@ def test_validate_auto_execution_time_out_of_range_raises():
     from app.schemas.rebalancing import RebalancingAlertCreate
 
     with pytest.raises(ValidationError, match="auto_execution_time"):
-        RebalancingAlertCreate(**_make_base(), auto_execution_time="08:00")
+        RebalancingAlertCreate(**_make_base(), auto_execution_time="24:00")
+
+    with pytest.raises(ValidationError, match="auto_execution_time"):
+        RebalancingAlertCreate(**_make_base(), auto_execution_time="12:60")
+
+
+def test_validate_auto_execution_time_accepts_full_day_range():
+    """해외(NYSE) 시간대 지원 이후 KRX 정규장(09:00~15:00) 밖 시각도 허용된다 — 시장 개장 여부는
+    종목별 소속 시장(KR/US)에 맞춰 leg 단위로 판단하므로 스키마는 형식만 검증한다."""
+    from app.schemas.rebalancing import RebalancingAlertCreate
+
+    for value in ("00:00", "23:59", "22:30", "20:00"):
+        model = RebalancingAlertCreate(**_make_base(), auto_execution_time=value)
+        assert model.auto_execution_time == value
 
 
 # ── AlertCreate (exchange_rate_alerts) 검증 ──────────────────

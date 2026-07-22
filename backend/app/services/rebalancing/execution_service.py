@@ -177,7 +177,7 @@ async def execute_rebalancing(
     account_id: uuid.UUID | None,
     orders: list[ExecutionOrderItem],
     db: AsyncSession,
-    redis,
+    cache,
     portfolio_id: uuid.UUID | None = None,
     triggered_by: str = "MANUAL",
     strategy: str = "FULL",
@@ -197,7 +197,7 @@ async def execute_rebalancing(
     results: list[ExecutionResult] = []
     for acc_id_str, group_orders in groups.items():
         try:
-            results.append(await _execute_account_group(acc_id_str, group_orders, user_id, db, redis, strategy))
+            results.append(await _execute_account_group(acc_id_str, group_orders, user_id, db, cache, strategy))
         except Exception as e:
             results.append(_build_failed_group_result(user_id, acc_id_str, group_orders, e))
 
@@ -218,9 +218,9 @@ async def execute_rebalancing(
     )
 
     # 실행 후 전략·진단 캐시 무효화 (포트폴리오 구성이 변경되었으므로)
-    if portfolio_id and redis:
-        await invalidate_rebalancing_strategy_cache(redis, user_id, portfolio_id)
-        await invalidate_rebalancing_analysis_cache(redis, user_id, portfolio_id)
+    if portfolio_id and cache:
+        await invalidate_rebalancing_strategy_cache(cache, user_id, portfolio_id)
+        await invalidate_rebalancing_analysis_cache(cache, user_id, portfolio_id)
 
     rebalancing_execution_count.labels(status="success" if total_fail == 0 else "partial").inc()
     return results, execution_id
@@ -232,7 +232,7 @@ async def _execute_kiwoom_account_orders(
     user_id: uuid.UUID,
     acc_uuid: uuid.UUID,
     db: AsyncSession,
-    redis,
+    cache,
     is_mock: bool,
 ) -> list[OrderResult]:
     """키움 계좌: 매도(보유수량 clamp) → 매수 순으로 주문을 실행한다."""
@@ -245,7 +245,7 @@ async def _execute_kiwoom_account_orders(
         app_key,
         app_secret,
         is_mock=is_mock,
-        redis=redis,
+        cache=cache,
         db=db,
         user_id=str(user_id),
         account_id=str(acc_uuid),
@@ -278,7 +278,7 @@ async def _execute_kis_account_orders(
     user_id: uuid.UUID,
     acc_uuid: uuid.UUID,
     db: AsyncSession,
-    redis,
+    cache,
     is_mock: bool,
     strategy: str,
 ) -> list[OrderResult]:
@@ -293,7 +293,7 @@ async def _execute_kis_account_orders(
         app_key,
         app_secret,
         is_mock=is_mock,
-        redis=redis,
+        cache=cache,
         db=db,
         user_id=str(user_id),
         account_id=str(acc_uuid),
@@ -339,7 +339,7 @@ async def _execute_account_group(
     group_orders: list[ExecutionOrderItem],
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis,
+    cache,
     strategy: str,
 ) -> ExecutionResult:
     """단일 계좌 그룹의 주문을 실행하고 ExecutionResult를 반환한다."""
@@ -349,11 +349,11 @@ async def _execute_account_group(
 
     if account.asset_type == "STOCK_KIWOOM":
         account_results = await _execute_kiwoom_account_orders(
-            account, group_orders, user_id, acc_uuid, db, redis, is_mock
+            account, group_orders, user_id, acc_uuid, db, cache, is_mock
         )
     else:
         account_results = await _execute_kis_account_orders(
-            account, group_orders, user_id, acc_uuid, db, redis, is_mock, strategy
+            account, group_orders, user_id, acc_uuid, db, cache, is_mock, strategy
         )
 
     success_count = sum(1 for r in account_results if r.status == "SUCCESS")

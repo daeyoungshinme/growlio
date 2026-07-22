@@ -16,15 +16,15 @@ def _make_mock_db():
 
 @pytest.mark.asyncio
 async def test_run_exchange_rate_alert_check_calls_service():
-    """run_exchange_rate_alert_check가 check_and_trigger_alerts를 redis와 함께 호출한다.
+    """run_exchange_rate_alert_check가 check_and_trigger_alerts를 cache와 함께 호출한다.
 
-    needs_redis=True여야 usd_krw_rate 캐시가 갱신됨 — 회귀 방지용 assertion.
+    needs_cache=True여야 usd_krw_rate 캐시가 갱신됨 — 회귀 방지용 assertion.
     """
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.exchange_rate_alert.check_and_trigger_alerts", new=AsyncMock()) as mock_check,
     ):
@@ -32,17 +32,17 @@ async def test_run_exchange_rate_alert_check_calls_service():
 
         await run_exchange_rate_alert_check()
 
-    mock_check.assert_called_once_with(mock_db, mock_redis)
+    mock_check.assert_called_once_with(mock_db, mock_cache)
 
 
 @pytest.mark.asyncio
 async def test_run_exchange_rate_alert_check_handles_exception():
     """check_and_trigger_alerts 예외 발생 시 Job이 크래시하지 않는다."""
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
             "app.jobs.exchange_rate_alert.check_and_trigger_alerts",
@@ -91,10 +91,10 @@ async def test_run_rebalancing_alert_check_handles_exception():
 async def test_run_stock_price_alert_check_calls_service():
     """run_stock_price_alert_check가 check_and_trigger_stock_price_alerts를 호출한다."""
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.stock_price_alert.check_and_trigger_stock_price_alerts", new=AsyncMock()) as mock_check,
     ):
@@ -102,17 +102,17 @@ async def test_run_stock_price_alert_check_calls_service():
 
         await run_stock_price_alert_check()
 
-    mock_check.assert_called_once_with(mock_db, mock_redis)
+    mock_check.assert_called_once_with(mock_db, mock_cache)
 
 
 @pytest.mark.asyncio
 async def test_run_market_signal_daily_digest_calls_service():
-    """run_market_signal_daily_digest가 send_market_signal_daily_digest를 redis와 함께 호출한다."""
+    """run_market_signal_daily_digest가 send_market_signal_daily_digest를 cache와 함께 호출한다."""
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch("app.jobs.market_signal_daily_digest.send_market_signal_daily_digest", new=AsyncMock()) as mock_send,
     ):
@@ -120,17 +120,17 @@ async def test_run_market_signal_daily_digest_calls_service():
 
         await run_market_signal_daily_digest()
 
-    mock_send.assert_called_once_with(mock_db, mock_redis)
+    mock_send.assert_called_once_with(mock_db, mock_cache)
 
 
 @pytest.mark.asyncio
 async def test_run_market_signal_daily_digest_handles_exception():
     """send_market_signal_daily_digest 예외 발생 시 Job이 크래시하지 않는다."""
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
         patch(
             "app.jobs.market_signal_daily_digest.send_market_signal_daily_digest",

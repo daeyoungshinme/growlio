@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
 from app.services._snapshot_queries import latest_snapshot_subquery
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
 from app.utils.pnl import calc_net_asset_amount as _calc_net_asset_amount
 from app.utils.pnl import eval_value as _eval_value
@@ -87,12 +87,12 @@ async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSess
 async def build_asset_totals(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> tuple[float, float, float, dict[str, float]]:
     """최신 스냅샷 기준 총자산·투자금·주식평가액·유형별 금액을 집계한다.
     Returns: (total_assets_krw, total_invested, stock_value, by_type)
     """
-    usd_rate = await fetch_usd_krw(redis)
+    usd_rate = await fetch_usd_krw(cache)
     rows, snapped_ids = await get_latest_snapshot_rows(user_id, db)  # Q1
 
     snap_ids = [snap.id for snap, acc in rows if acc.asset_type in _STOCK_TYPES]

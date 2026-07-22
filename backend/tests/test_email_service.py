@@ -736,6 +736,7 @@ async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkey
     sell_item = SimpleNamespace(
         ticker="005930", name="삼성전자", market="KOSPI", quantity=5, order_type="MARKET", limit_price=None
     )
+    sell_leg = SimpleNamespace(market="KR", items=[sell_item], deadline_at=datetime.now(UTC), token="sell-token")
 
     captured = {}
 
@@ -751,12 +752,8 @@ async def test_send_rebalancing_plan_pending_email_sell_only_no_buy_token(monkey
             to_email="user@example.com",
             portfolio_name="성장 포트폴리오",
             account_name="증권계좌",
-            buy_items=[],
-            buy_deadline_at=None,
-            buy_cancel_token=None,
-            sell_items=[sell_item],
-            sell_deadline_at=datetime.now(UTC),
-            sell_action_token="sell-token",
+            buy_legs=[],
+            sell_legs=[sell_leg],
         )
 
     assert result is True

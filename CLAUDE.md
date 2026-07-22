@@ -11,7 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Prerequisites
 
-Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
+Docker가 실행 중이어야 함 (PostgreSQL 5432). Python 3.11+, Node 22+, [uv](https://docs.astral.sh/uv/) 필수.
 
 > Android 빌드 시 추가 필요: JDK 17+, Android Studio (SDK 포함).
 
@@ -21,7 +21,7 @@ Docker가 실행 중이어야 함 (PostgreSQL 5432, Redis 6379). Python 3.11+, N
 
 ```bash
 # 1. 인프라 시작
-docker compose up -d db redis
+docker compose up -d db
 
 # 2. 의존성 설치
 make install-backend   # backend uv venv + pip install (최초 1회)
@@ -45,7 +45,7 @@ bash dev.sh         # (또는 make dev)
 ## Makefile 단축 명령
 
 ```bash
-make up               # docker compose up -d db redis
+make up               # docker compose up -d db
 make down             # docker compose down
 make migrate          # cd backend && alembic upgrade head
 make migrate-down     # cd backend && alembic downgrade -1 (1단계 롤백)

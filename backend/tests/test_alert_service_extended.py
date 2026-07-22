@@ -205,7 +205,7 @@ class TestCheckStockPriceAlerts:
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        redis = AsyncMock()
-        await check_and_trigger_stock_price_alerts(mock_db, redis)
+        cache = AsyncMock()
+        await check_and_trigger_stock_price_alerts(mock_db, cache)
 
         mock_db.commit.assert_not_called()

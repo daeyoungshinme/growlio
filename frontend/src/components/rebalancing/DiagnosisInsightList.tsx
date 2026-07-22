@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { ChevronDown, Receipt, ShieldAlert, TrendingUp } from "lucide-react";
 import type { DiagnosisContext } from "@/api/rebalancing";
 import { buildDiagnosisNotes, type DiagnosisNoteIcon } from "@/utils/diagnosisInsights";
@@ -32,7 +33,17 @@ export default function DiagnosisInsightList({ context }: Props) {
           className="flex items-start gap-1.5 text-xs text-gray-700 dark:text-gray-300"
         >
           {NOTE_ICONS[note.icon]}
-          <span className="flex-1">{note.text}</span>
+          <span className="flex-1">
+            {note.text}
+            {note.isTaxLossOpportunity && (
+              <Link
+                to="/assets?tab=투자현황&portfolioTab=세금"
+                className="ml-1.5 inline-block text-blue-600 dark:text-blue-400 hover:underline font-medium"
+              >
+                세금 탭에서 확인 →
+              </Link>
+            )}
+          </span>
         </div>
       ))}
 

@@ -6,7 +6,7 @@ import structlog
 from fastapi import APIRouter, Depends, Request
 
 from app.api.deps import get_current_user
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.user import User
 from app.services.market_signal_service import get_market_signal
@@ -35,5 +35,5 @@ async def get_market_signal_endpoint(
     - fear_greed_contrarian_buy: F&G 25 이하 시 역발상 매수 기회 플래그
     - data_freshness: LIVE | CACHED | PARTIAL | STALE
     """
-    redis = await get_redis()
-    return await get_market_signal(redis)
+    cache = await get_cache_store()
+    return await get_market_signal(cache)

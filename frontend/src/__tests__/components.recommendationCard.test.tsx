@@ -120,6 +120,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     fcm_token_stored: false,
     composite_signal_alerts_enabled: true,
     market_signal_daily_digest_enabled: false,
+    year_end_tax_reminder_enabled: false,
     goal_achievement_alerts_enabled: true,
     monthly_report_enabled: true,
     goal_candidate_tickers: [],

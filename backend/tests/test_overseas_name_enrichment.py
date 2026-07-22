@@ -16,49 +16,49 @@ def _position(ticker: str, name: str) -> dict:
 
 class TestEnrichOverseasNames:
     @pytest.mark.asyncio
-    async def test_cache_hit_skips_lookup(self, mock_redis):
-        mock_redis.get = AsyncMock(return_value=b"Invesco QQQ Trust, Series 1")
+    async def test_cache_hit_skips_lookup(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value="Invesco QQQ Trust, Series 1")
 
         with patch("app.providers._overseas_name_enrichment.resolve_english_name", new=AsyncMock()) as resolve_mock:
-            result = await enrich_overseas_names([_position("QQQ", "QQQ 인베스코 ETF")], mock_redis)
+            result = await enrich_overseas_names([_position("QQQ", "QQQ 인베스코 ETF")], mock_cache)
 
         resolve_mock.assert_not_called()
         assert result[0]["name"] == "Invesco QQQ Trust, Series 1"
 
     @pytest.mark.asyncio
-    async def test_cache_miss_looks_up_and_caches(self, mock_redis):
-        mock_redis.get = AsyncMock(return_value=None)
+    async def test_cache_miss_looks_up_and_caches(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value=None)
 
         with patch(
             "app.providers._overseas_name_enrichment.resolve_english_name",
             new=AsyncMock(return_value="Invesco QQQ Trust, Series 1"),
         ):
-            result = await enrich_overseas_names([_position("QQQ", "QQQ 인베스코 ETF")], mock_redis)
+            result = await enrich_overseas_names([_position("QQQ", "QQQ 인베스코 ETF")], mock_cache)
 
         assert result[0]["name"] == "Invesco QQQ Trust, Series 1"
-        mock_redis.setex.assert_any_call(
+        mock_cache.setex.assert_any_call(
             overseas_stock_name_key("QQQ"), TTL_OVERSEAS_STOCK_NAME, "Invesco QQQ Trust, Series 1"
         )
 
     @pytest.mark.asyncio
-    async def test_lookup_failure_falls_back_to_original_name_without_caching(self, mock_redis):
-        mock_redis.get = AsyncMock(return_value=None)
+    async def test_lookup_failure_falls_back_to_original_name_without_caching(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value=None)
 
         with patch("app.providers._overseas_name_enrichment.resolve_english_name", new=AsyncMock(return_value=None)):
-            result = await enrich_overseas_names([_position("XYZ", "브로커원본이름")], mock_redis)
+            result = await enrich_overseas_names([_position("XYZ", "브로커원본이름")], mock_cache)
 
         assert result[0]["name"] == "브로커원본이름"
-        mock_redis.setex.assert_not_called()
+        mock_cache.setex.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_duplicate_tickers_looked_up_once(self, mock_redis):
-        mock_redis.get = AsyncMock(return_value=None)
+    async def test_duplicate_tickers_looked_up_once(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value=None)
 
         with patch(
             "app.providers._overseas_name_enrichment.resolve_english_name",
             new=AsyncMock(return_value="Apple Inc."),
         ) as resolve_mock:
-            result = await enrich_overseas_names([_position("AAPL", "애플1"), _position("AAPL", "애플2")], mock_redis)
+            result = await enrich_overseas_names([_position("AAPL", "애플1"), _position("AAPL", "애플2")], mock_cache)
 
         resolve_mock.assert_called_once_with("AAPL")
         assert [p["name"] for p in result] == ["Apple Inc.", "Apple Inc."]

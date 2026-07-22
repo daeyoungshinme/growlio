@@ -19,9 +19,9 @@ from app.services.credential_service import decrypt
 from app.utils.currency import get_usd_krw_rate
 
 if TYPE_CHECKING:
-    import redis.asyncio as aioredis
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.core.cache_store import CacheStore
     from app.models.asset import AssetAccount
 
 logger = structlog.get_logger()
@@ -33,7 +33,7 @@ class KiwoomProvider(BrokerProvider):
     PROVIDER_ID = "KIWOOM_API"
     PROVIDER_NAME = "키움증권 OpenAPI+"
 
-    async def sync(self, account: AssetAccount, db: AsyncSession, redis: aioredis.Redis | None) -> BalanceResult:
+    async def sync(self, account: AssetAccount, db: AsyncSession, cache: CacheStore | None) -> BalanceResult:
         from app.kiwoom.auth import get_access_token as kiwoom_get_access_token
         from app.kiwoom.balance import get_domestic_balance as kiwoom_get_domestic_balance
         from app.kiwoom.balance import get_overseas_balance as kiwoom_get_overseas_balance
@@ -43,8 +43,8 @@ class KiwoomProvider(BrokerProvider):
             raise ProviderCredentialError("키움 API 자격증명이 설정되지 않았습니다")
         if not account.kiwoom_account_no:
             raise ProviderCredentialError("키움 계좌번호가 설정되지 않았습니다")
-        if redis is None:
-            raise ProviderApiError("Redis 연결이 필요합니다.")
+        if cache is None:
+            raise ProviderApiError("캐시 연결이 필요합니다.")
 
         account_no: str = account.kiwoom_account_no
         app_key = decrypt(account.kiwoom_app_key)
@@ -57,7 +57,7 @@ class KiwoomProvider(BrokerProvider):
                 app_key,
                 app_secret,
                 is_mock=is_mock,
-                redis=redis,
+                cache=cache,
                 db=db,
                 user_id=str(account.user_id),
                 account_id=str(account.id),
@@ -70,7 +70,7 @@ class KiwoomProvider(BrokerProvider):
                 fetch_overseas_cached(
                     lambda: kiwoom_get_overseas_balance(token, account_no, is_mock=is_mock),
                     account.id,
-                    redis,
+                    cache,
                     token_expired_exc=KiwoomTokenExpiredError,
                     broker_name="키움",
                 ),
@@ -101,7 +101,7 @@ class KiwoomProvider(BrokerProvider):
                 raise ProviderApiError(f"{msg} — 앱키/시크릿 및 모의/실계좌 모드를 확인하세요.") from e
             raise ProviderApiError(msg, http_status=502) from e
 
-        usd_krw_rate = await get_usd_krw_rate(redis)
+        usd_krw_rate = await get_usd_krw_rate(cache)
 
         overseas_value_krw = overseas["total_value_usd"] * usd_krw_rate
         overseas_deposit_krw = overseas["deposit_usd"] * usd_krw_rate
@@ -109,7 +109,7 @@ class KiwoomProvider(BrokerProvider):
             float(p.get("avg_price", 0)) * int(p.get("qty", 0)) * usd_krw_rate for p in overseas["positions"]
         )
 
-        overseas_positions = await enrich_overseas_names(overseas["positions"], redis)
+        overseas_positions = await enrich_overseas_names(overseas["positions"], cache)
         all_raw = domestic["positions"] + [
             {**p, "value_krw": p["value_usd"] * usd_krw_rate} for p in overseas_positions
         ]

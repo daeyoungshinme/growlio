@@ -16,7 +16,7 @@ from app.services._snapshot_queries import latest_snapshot_subquery
 from app.services.composition_calculator import fetch_position_maps
 from app.utils.cache_keys import (
     TTL_PORTFOLIO_OVERVIEW,
-    RedisType,
+    CacheStoreType,
     get_cached_json,
     portfolio_overview_acct_suffix,
     portfolio_overview_key,
@@ -236,7 +236,7 @@ async def build_portfolio_overview(
     user_id: uuid.UUID,
     db: AsyncSession,
     account_ids: list[uuid.UUID] | None = None,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     lite: bool = False,
 ) -> dict[str, Any]:
     """포트폴리오 전체 현황 집계 (라우터 및 분석 엔드포인트에서 공용).
@@ -246,7 +246,7 @@ async def build_portfolio_overview(
     """
     cache_key_fn = portfolio_overview_lite_key if lite else portfolio_overview_key
     acct_suffix = portfolio_overview_acct_suffix(account_ids)
-    cached = await get_cached_json(redis, cache_key_fn(user_id, acct_suffix))
+    cached = await get_cached_json(cache, cache_key_fn(user_id, acct_suffix))
     if cached is not None:
         return cached
 
@@ -342,7 +342,7 @@ async def build_portfolio_overview(
         "accounts": account_rows,
     }
 
-    await set_cached_json(redis, cache_key_fn(user_id, acct_suffix), overview, TTL_PORTFOLIO_OVERVIEW)
+    await set_cached_json(cache, cache_key_fn(user_id, acct_suffix), overview, TTL_PORTFOLIO_OVERVIEW)
     return overview
 
 

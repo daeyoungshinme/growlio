@@ -27,11 +27,11 @@ _DIVIDEND_FETCH_CONCURRENCY = 8  # yfinance 가격 조회와 별개 I/O이므로
 async def collect_dividend_map(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis,
+    cache,
     portfolio: Portfolio,
     base_dividend_map: dict,
 ) -> dict:
-    """목표 포트폴리오 중 미보유 종목의 배당수익률을 Redis 캐시(TTL_DIVIDEND_INFO=24h) 경유로 보완한다.
+    """목표 포트폴리오 중 미보유 종목의 배당수익률을 캐시(TTL_DIVIDEND_INFO=24h) 경유로 보완한다.
 
     보유 종목 배당 집계(get_ticker_dividend_summary)가 쓰는 것과 동일한 (ticker, market) 단위
     캐시·멀티소스 폴백 체인(fetch_ticker_dividend_info)을 재사용한다.
@@ -52,7 +52,7 @@ async def collect_dividend_map(
             return
         try:
             yield_decimal, _dps, _months, _ex_dividend_date = await fetch_ticker_dividend_info(
-                ticker, market, redis, sem, kis_creds, dart_key, overrides
+                ticker, market, cache, sem, kis_creds, dart_key, overrides
             )
             if yield_decimal > 0:
                 dividend_map[key] = {
@@ -73,7 +73,7 @@ async def enrich_overview_with_prices(
     overview: dict,
     user_id: uuid.UUID,
     db,
-    redis,
+    cache,
 ) -> dict:
     """목표 포트폴리오 중 미보유 종목의 현재가를 조회해 overview에 보완한다."""
     existing_price_keys: set[tuple[str, str]] = {
@@ -89,7 +89,7 @@ async def enrich_overview_with_prices(
     if not unpriced:
         return overview
 
-    fetched_prices = await fetch_prices_batch(user_id, unpriced, db, redis)
+    fetched_prices = await fetch_prices_batch(user_id, unpriced, db, cache)
     extra_positions = [
         {
             "ticker": ticker,

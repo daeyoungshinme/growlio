@@ -17,7 +17,7 @@ from app.services.tax_service import (
     _get_rates,
     get_overseas_positions_detail,
 )
-from app.utils.cache_keys import TTL_INSIGHTS, RedisType, get_cached_json, insights_key, set_cached_json
+from app.utils.cache_keys import TTL_INSIGHTS, CacheStoreType, get_cached_json, insights_key, set_cached_json
 
 logger = structlog.get_logger()
 
@@ -58,24 +58,24 @@ class Insight:
 async def generate_insights(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     force_refresh: bool = False,
 ) -> list[dict]:
-    """모든 체커를 병렬 실행하고 인사이트 목록을 반환한다 (Redis 1h 캐시)."""
+    """모든 체커를 병렬 실행하고 인사이트 목록을 반환한다 (1h 캐시)."""
     if not force_refresh:
-        cached = await get_cached_json(redis, insights_key(user_id))
+        cached = await get_cached_json(cache, insights_key(user_id))
         if cached is not None:
             return cached
 
     try:
-        dashboard = await get_dashboard_summary(user_id, db, redis)
+        dashboard = await get_dashboard_summary(user_id, db, cache)
     except Exception as e:
         logger.warning("insight_dashboard_summary_failed", user_id=str(user_id), error=str(e))
         dashboard = {}
 
     results = await asyncio.gather(
         _check_concentration(dashboard),
-        _check_rebalancing_opportunity(user_id, db, redis),
+        _check_rebalancing_opportunity(user_id, db, cache),
         _check_tax_loss_harvest(user_id, db),
         return_exceptions=True,
     )
@@ -93,7 +93,7 @@ async def generate_insights(
 
     data = [asdict(i) for i in insights]
 
-    await set_cached_json(redis, insights_key(user_id), data, TTL_INSIGHTS)
+    await set_cached_json(cache, insights_key(user_id), data, TTL_INSIGHTS)
     return data
 
 
@@ -148,7 +148,7 @@ async def _check_concentration(dashboard: dict) -> list[Insight]:
 async def _check_rebalancing_opportunity(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> list[Insight]:
     """저장된 포트폴리오 중 드리프트 > 5%인 항목이 있을 때 알림."""
     from app.models.portfolio import Portfolio
@@ -177,7 +177,7 @@ async def _check_rebalancing_opportunity(
         account_ids = [uuid.UUID(aid) for aid in raw_ids] if raw_ids else None
 
         try:
-            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, redis=redis)
+            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
         except Exception as e:  # 포트폴리오 단위 실패 무시, 나머지 계속
             logger.warning("portfolio_overview_failed", portfolio_id=str(pf.id), error=str(e))
             continue

@@ -142,7 +142,7 @@ class TestCreateTransaction:
         try:
             with (
                 patch(
-                    "app.api.v1.transactions.get_redis",
+                    "app.api.v1.transactions.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
@@ -258,7 +258,7 @@ class TestUpdateTransaction:
         try:
             with (
                 patch(
-                    "app.api.v1.transactions.get_redis",
+                    "app.api.v1.transactions.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
@@ -285,7 +285,7 @@ class TestUpdateTransaction:
         try:
             with (
                 patch(
-                    "app.api.v1.transactions.get_redis",
+                    "app.api.v1.transactions.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()
@@ -351,7 +351,7 @@ class TestDeleteTransaction:
         try:
             with (
                 patch(
-                    "app.api.v1.transactions.get_redis",
+                    "app.api.v1.transactions.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(
                         delete=AsyncMock(), scan=AsyncMock(return_value=(0, [])), unlink=AsyncMock()

@@ -244,26 +244,26 @@ class TestBuildPortfolioOverviewWithAccounts:
         assert acc_row["amount_krw"] == pytest.approx(300_000_000)
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, override_settings):
-        """Redis 캐시 히트 시 DB를 조회하지 않는다."""
+    async def test_cache_cache_hit_skips_db(self, override_settings):
+        """Cache 캐시 히트 시 DB를 조회하지 않는다."""
         cached = {"total_assets_krw": 5_000_000, "accounts": [], "all_positions": []}
 
         db = AsyncMock()
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await build_portfolio_overview(uuid.uuid4(), db, redis=redis)
+        result = await build_portfolio_overview(uuid.uuid4(), db, cache=cache)
 
         assert result["total_assets_krw"] == 5_000_000
         db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_cache_miss_queries_and_stores(self, override_settings):
-        """Redis 미스 시 DB 쿼리 후 캐시에 저장한다."""
+    async def test_cache_cache_miss_queries_and_stores(self, override_settings):
+        """Cache 미스 시 DB 쿼리 후 캐시에 저장한다."""
         db = AsyncMock()
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         acc_id = uuid.uuid4()
         # Need a real account so the function doesn't return early (setex only called after full build)
@@ -276,9 +276,9 @@ class TestBuildPortfolioOverviewWithAccounts:
             ]
         )
 
-        await build_portfolio_overview(uuid.uuid4(), db, redis=redis)
+        await build_portfolio_overview(uuid.uuid4(), db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_snapshot_no_manual_gives_zero(self, override_settings):

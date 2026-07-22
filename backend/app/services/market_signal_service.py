@@ -6,10 +6,9 @@ from __future__ import annotations
 
 import contextlib
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
-import redis.asyncio as aioredis
 import structlog
 
 from app.utils.cache_keys import (
@@ -22,7 +21,13 @@ from app.utils.cache_keys import (
     set_cached_json,
 )
 from app.utils.circuit_breaker import CircuitOpenError, fear_greed_circuit, fred_circuit
-from app.utils.redis_lock import single_flight_fetch
+from app.utils.durable_state import get_durable, set_durable
+from app.utils.inproc_lock import single_flight_fetch
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    from app.core.cache_store import CacheStore
 
 logger = structlog.get_logger()
 
@@ -266,7 +271,7 @@ async def fetch_rate_cut_expectation_signal() -> dict[str, Any] | None:
     }
 
 
-async def fetch_exchange_rate_signal(redis: aioredis.Redis | None = None) -> dict[str, Any] | None:
+async def fetch_exchange_rate_signal(cache: CacheStore | None = None) -> dict[str, Any] | None:
     """실시간 원/달러 환율의 FRED DEXKOUS 20일 이동평균 대비 이격도로 원화 약세 방향성을 판단한다.
 
     실시간 "예측치"가 아닌 참고 지표 — 원/달러 급등(20일선 상향 이탈)은 원화 약세 심화·
@@ -300,7 +305,7 @@ async def fetch_exchange_rate_signal(redis: aioredis.Redis | None = None) -> dic
 
     from app.utils.currency import get_usd_krw_rate
 
-    live_rate = await get_usd_krw_rate(redis)
+    live_rate = await get_usd_krw_rate(cache)
     deviation_pct = (live_rate - ma20) / ma20 * 100
 
     if deviation_pct <= 1:
@@ -548,18 +553,18 @@ def compute_composite_signal(
 # ---------------------------------------------------------------------------
 
 
-async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, Any]:
-    """복합 시장 위험 신호를 반환한다. Redis 캐시(정상 시 1시간, 일부/전체 실패 시 1분)."""
+async def get_market_signal(cache: CacheStore | None = None) -> dict[str, Any]:
+    """복합 시장 위험 신호를 반환한다. 캐시(정상 시 1시간, 일부/전체 실패 시 1분)."""
     cache_key = market_signal_latest_key()
 
     async def _read_cache() -> dict[str, Any] | None:
-        data = await get_cached_json(redis, cache_key)
+        data = await get_cached_json(cache, cache_key)
         if isinstance(data, dict) and data.get("data_freshness") != "STALE":
             data["data_freshness"] = "CACHED"
         return data
 
     cached = await _read_cache()
-    if redis is not None and cached is not None:
+    if cache is not None and cached is not None:
         return cached
 
     async def _fetch_and_cache() -> dict[str, Any]:
@@ -572,7 +577,7 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             rate_cut_expectation,
             exchange_rate,
             oil_price,
-        ) = await _fetch_all_signals(redis)
+        ) = await _fetch_all_signals(cache)
         result = compute_composite_signal(
             vix,
             yield_curve,
@@ -584,16 +589,16 @@ async def get_market_signal(redis: aioredis.Redis | None = None) -> dict[str, An
             oil_price,
         )
         ttl = TTL_MARKET_SIGNAL if result["data_freshness"] == "LIVE" else TTL_MARKET_SIGNAL_DEGRADED
-        await set_cached_json(redis, cache_key, result, ttl)
+        await set_cached_json(cache, cache_key, result, ttl)
         return result
 
-    if redis is None:
+    if cache is None:
         return await _fetch_and_cache()
 
-    return await single_flight_fetch(redis, cache_key, _read_cache, _fetch_and_cache)
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
-async def get_market_signal_for_auto_gate(redis: aioredis.Redis | None) -> tuple[str, str]:
+async def get_market_signal_for_auto_gate(cache: CacheStore | None) -> tuple[str, str]:
     """AUTO 실행 게이트 판정용 (composite_level, data_freshness) — 조회 자체가 실패하면 안전하게 STALE로 폴백.
 
     "판단 불가"를 "GREEN(안전)"으로 오인해 게이트를 통과시키는 사고를 막기 위해, 조회 실패 시
@@ -601,27 +606,29 @@ async def get_market_signal_for_auto_gate(redis: aioredis.Redis | None) -> tuple
     이를 무조건 차단으로 취급한다.
     """
     try:
-        signal = await get_market_signal(redis)
+        signal = await get_market_signal(cache)
         return signal.get("composite_level", "GREEN"), signal.get("data_freshness", "LIVE")
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_for_auto_gate", error=str(exc))
         return "GREEN", "STALE"
 
 
-async def get_last_composite_level(redis: aioredis.Redis | None) -> str | None:
-    """등급 변화 감지 job이 마지막으로 관측한 composite_level을 조회한다. 없으면 None."""
-    if redis is None:
-        return None
-    return await get_cached_json(redis, market_signal_last_level_key())
+async def get_last_composite_level(db: AsyncSession) -> str | None:
+    """등급 변화 감지 job이 마지막으로 관측한 composite_level을 조회한다. 없으면 None.
+
+    재시작에도 유지돼야 하는 상태라(콜드스타트 직후 오탐/누락 방지) Postgres 기반
+    durable_state를 사용한다 — in-memory 캐시(Tier 1)와는 별개.
+    """
+    return await get_durable(db, market_signal_last_level_key())
 
 
-async def set_last_composite_level(redis: aioredis.Redis | None, level: str) -> None:
+async def set_last_composite_level(db: AsyncSession, level: str) -> None:
     """현재 composite_level을 다음 비교를 위해 저장한다."""
-    await set_cached_json(redis, market_signal_last_level_key(), level, TTL_MARKET_SIGNAL_LAST_LEVEL)
+    await set_durable(db, market_signal_last_level_key(), level, ttl=TTL_MARKET_SIGNAL_LAST_LEVEL)
 
 
 async def _fetch_all_signals(
-    redis: aioredis.Redis | None = None,
+    cache: CacheStore | None = None,
 ) -> tuple[
     dict[str, Any] | None,
     dict[str, Any] | None,
@@ -642,7 +649,7 @@ async def _fetch_all_signals(
         fetch_high_yield_spread_signal(),
         fetch_dollar_index_signal(),
         fetch_rate_cut_expectation_signal(),
-        fetch_exchange_rate_signal(redis),
+        fetch_exchange_rate_signal(cache),
         fetch_oil_price_signal(),
         return_exceptions=True,
     )

@@ -9,8 +9,8 @@ from datetime import UTC, date, datetime
 import structlog
 from sqlalchemy import select
 
+from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.redis_client import get_redis
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
@@ -40,7 +40,7 @@ async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
 
 async def run_goal_achievement_check() -> None:
     """매일 18:45 KST — 총 자산·연간 입금·연간 배당 목표 달성 시 이메일 알림."""
-    redis = await get_redis()
+    cache = await get_cache_store()
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -57,15 +57,15 @@ async def run_goal_achievement_check() -> None:
         users = result.all()
 
     sem = asyncio.Semaphore(_GOAL_CHECK_CONCURRENCY)
-    await asyncio.gather(*(_check_user_goals(user, settings_row, redis, sem) for user, settings_row in users))
+    await asyncio.gather(*(_check_user_goals(user, settings_row, cache, sem) for user, settings_row in users))
 
 
-async def _check_user_goals(user: User, settings_row: UserSettings, redis, sem: asyncio.Semaphore) -> None:
+async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: asyncio.Semaphore) -> None:
     async with sem:
         to_email = settings_row.notification_email or user.email
         try:
             async with AsyncSessionLocal() as db:
-                summary = await get_dashboard_summary(user.id, db, redis)
+                summary = await get_dashboard_summary(user.id, db, cache)
 
                 total_assets = float(summary.get("total_assets_krw") or 0)
                 goal_pct: float | None = summary.get("goal_achievement_pct")

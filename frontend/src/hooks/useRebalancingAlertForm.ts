@@ -155,6 +155,17 @@ export function useRebalancingAlertFormState({
 
   const upsertMut = useMutation({
     mutationFn: () => {
+      if (mode === "AUTO" && !accountId) {
+        throw new Error("자동 실행 모드에는 실행 계좌를 선택해야 합니다");
+      }
+      if (
+        mode === "AUTO" &&
+        taxImpactGateMode === "ENABLED" &&
+        !(maxTaxImpactKrw && maxTaxImpactKrw > 0)
+      ) {
+        throw new Error("세금영향 게이트를 켰다면 추정 양도세 상한을 입력해야 합니다");
+      }
+
       const body = {
         threshold_pct: threshold,
         schedule_type: scheduleType,

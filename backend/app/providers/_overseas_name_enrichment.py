@@ -15,19 +15,19 @@ from app.services.stock_search_service import resolve_english_name
 from app.utils.cache_keys import TTL_OVERSEAS_STOCK_NAME, overseas_stock_name_key
 
 if TYPE_CHECKING:
-    import redis.asyncio as aioredis
+    from app.core.cache_store import CacheStore
 
 
-async def enrich_overseas_names(positions: list[dict], redis: aioredis.Redis) -> list[dict]:
+async def enrich_overseas_names(positions: list[dict], cache: CacheStore) -> list[dict]:
     """해외 포지션 리스트의 name을 영문 캐노니컬 이름으로 교체한 새 리스트를 반환한다."""
     tickers = {p["ticker"] for p in positions}
     name_map: dict[str, str] = {}
     uncached: list[str] = []
 
     for ticker in tickers:
-        cached = await redis.get(overseas_stock_name_key(ticker))
+        cached = await cache.get(overseas_stock_name_key(ticker))
         if cached:
-            name_map[ticker] = cached.decode() if isinstance(cached, bytes) else cached
+            name_map[ticker] = cached
         else:
             uncached.append(ticker)
 
@@ -36,6 +36,6 @@ async def enrich_overseas_names(positions: list[dict], redis: aioredis.Redis) ->
         for ticker, name in zip(uncached, resolved, strict=True):
             if name:
                 name_map[ticker] = name
-                await redis.setex(overseas_stock_name_key(ticker), TTL_OVERSEAS_STOCK_NAME, name)
+                await cache.setex(overseas_stock_name_key(ticker), TTL_OVERSEAS_STOCK_NAME, name)
 
     return [{**p, "name": name_map.get(p["ticker"], p["name"])} for p in positions]

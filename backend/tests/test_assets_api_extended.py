@@ -10,13 +10,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 
 
-def _make_redis_mock() -> AsyncMock:
+def _make_cache_mock() -> AsyncMock:
     """SCAN+UNLINK 기반 캐시 무효화(invalidate_portfolio_overview_cache 등)를 사용하는
-    코드 경로가 빈 결과를 받도록 scan을 기본 구성한 redis mock."""
-    redis = AsyncMock()
-    redis.scan = AsyncMock(return_value=(0, []))
-    redis.unlink = AsyncMock()
-    return redis
+    코드 경로가 빈 결과를 받도록 scan을 기본 구성한 cache mock."""
+    cache = AsyncMock()
+    cache.scan = AsyncMock(return_value=(0, []))
+    cache.unlink = AsyncMock()
+    return cache
 
 
 def _make_user():
@@ -210,7 +210,7 @@ class TestUpdateAccountCashTransaction:
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
-            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=_make_redis_mock())),
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
@@ -241,7 +241,7 @@ class TestUpdateAccountCashTransaction:
         latest_snap = SimpleNamespace(amount_krw=5_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
-            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=_make_redis_mock())),
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
@@ -271,7 +271,7 @@ class TestUpdateAccountCashTransaction:
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
-            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=_make_redis_mock())),
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
@@ -298,7 +298,7 @@ class TestUpdateAccountCashTransaction:
         app = _setup_app(user, db)
 
         with (
-            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=_make_redis_mock())),
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",
@@ -328,7 +328,7 @@ class TestUpdateAccountCashTransaction:
         latest_snap = SimpleNamespace(amount_krw=1_000_000.0, invested_amount=None, unrealized_pnl=None)
 
         with (
-            patch("app.api.v1.assets.get_redis", AsyncMock(return_value=_make_redis_mock())),
+            patch("app.api.v1.assets.get_cache_store", AsyncMock(return_value=_make_cache_mock())),
             patch("app.api.v1.assets.fetch_usd_krw", AsyncMock(return_value=1_300.0)),
             patch(
                 "app.api.v1.assets.get_latest_snapshot_with_positions",

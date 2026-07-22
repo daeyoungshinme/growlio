@@ -178,9 +178,11 @@ async def get_tax_summary(
     overseas_tax_estimated = overseas_gain_taxable * rates["overseas_gain"]
 
     domestic_large_holder_warning = domestic_stock_krw >= _DOMESTIC_LARGE_HOLDER_THRESHOLD
+    domestic_large_holder_excess_krw = max(0.0, domestic_stock_krw - _DOMESTIC_LARGE_HOLDER_THRESHOLD)
 
     total_financial_income = dividend_income + max(0.0, overseas_unrealized)
     comprehensive_tax_warning = total_financial_income >= _COMPREHENSIVE_TAX_THRESHOLD
+    comprehensive_tax_remaining_krw = max(0.0, _COMPREHENSIVE_TAX_THRESHOLD - total_financial_income)
 
     positions = await get_overseas_positions_detail(user_id, db, account_id)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
@@ -196,7 +198,9 @@ async def get_tax_summary(
         "domestic_stock_value_krw": round(domestic_stock_krw, 0),
         "domestic_unrealized_gain_krw": round(domestic_unrealized, 0),
         "domestic_large_holder_warning": domestic_large_holder_warning,
+        "domestic_large_holder_excess_krw": round(domestic_large_holder_excess_krw, 0),
         "comprehensive_tax_warning": comprehensive_tax_warning,
+        "comprehensive_tax_remaining_krw": round(comprehensive_tax_remaining_krw, 0),
         "total_estimated_tax_krw": round(dividend_tax + overseas_tax_estimated, 0),
         "total_fees_krw": round(total_fees, 0),
         "tax_deferred_value_krw": round(tax_deferred_value_krw, 0),

@@ -40,6 +40,16 @@ def is_us_market_open(now: datetime | None = None) -> bool:
     return _NYSE_OPEN <= t.time() <= _NYSE_CLOSE
 
 
+def us_market_close_datetime(now: datetime | None = None) -> datetime:
+    """오늘(ET 기준) NYSE 정규장 마감 시각(16:00 ET)을 timezone-aware datetime으로 반환한다.
+
+    ET 기준 "오늘"이므로 KST로 보면 자정을 넘어갈 수 있다(DST에 따라 익일 05:00~06:00 KST) —
+    리밸런싱 해외 leg 매도 승인 만료 시각(당일 장마감) 계산에 사용한다.
+    """
+    t = (now or datetime.now(_EST)).astimezone(_EST)
+    return t.replace(hour=_NYSE_CLOSE.hour, minute=_NYSE_CLOSE.minute, second=0, microsecond=0)
+
+
 def is_alert_execution_time(alert_time_str: str | None, now: datetime | None = None) -> bool:
     """alert의 auto_execution_time(HH:MM)이 현재 KST 시각과 일치하는지 확인 (±4분 허용).
 

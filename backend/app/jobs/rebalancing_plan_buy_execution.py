@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import structlog
 
+from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.core.redis_client import get_redis
 from app.services.rebalancing.plan_service import execute_due_buy_legs
 from app.utils.cache_keys import TTL_JOB_LOCK_REBALANCING_PLAN_BUY
-from app.utils.market_hours import is_korean_market_open
-from app.utils.redis_lock import redis_lock
+from app.utils.inproc_lock import inproc_lock
 
 logger = structlog.get_logger()
 
@@ -18,18 +17,16 @@ async def run_rebalancing_plan_buy_execution() -> None:
     """1분 간격 실행 — deadline_at이 지난 PENDING 매수 leg를 실행한다.
 
     buy_wait_minutes가 최소 1분까지 허용되므로, 5분 간격 잡이면 약속한 대기시간보다
-    최대 5분 더 늦어질 수 있어 1분 간격으로 촘촘히 확인한다.
+    최대 5분 더 늦어질 수 있어 1분 간격으로 촘촘히 확인한다. 시장(KR/US) 개장 여부는
+    leg별로 `execute_due_buy_legs()` 내부에서 판단한다 — 여기서 일괄 차단하지 않는다.
     """
-    if not is_korean_market_open():
-        return
-
-    redis = await get_redis()
-    async with redis_lock(
-        redis, "rebalancing_plan_buy_execution_lock", ttl=TTL_JOB_LOCK_REBALANCING_PLAN_BUY
+    cache = await get_cache_store()
+    async with inproc_lock(
+        cache, "rebalancing_plan_buy_execution_lock", ttl=TTL_JOB_LOCK_REBALANCING_PLAN_BUY
     ) as acquired:
         if not acquired:
             return
         async with AsyncSessionLocal() as db:
-            count = await execute_due_buy_legs(db, redis)
+            count = await execute_due_buy_legs(db, cache)
             if count:
                 logger.info("rebalancing_plan_buy_execution_done", count=count)

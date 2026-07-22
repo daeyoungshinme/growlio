@@ -91,7 +91,7 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=calendar_events),
             ),
         ):
-            result = await fetch_inflation_summary(redis=None)
+            result = await fetch_inflation_summary(cache=None)
 
         assert len(result) == 2  # CPI_US + CORE_CPI_US
         cpi = result[0]
@@ -113,7 +113,7 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=[]),
             ),
         ):
-            result = await fetch_inflation_summary(redis=None)
+            result = await fetch_inflation_summary(cache=None)
 
         for item in result:
             assert item["yoy_change_pct"] is None
@@ -131,6 +131,6 @@ class TestFetchInflationSummary:
                 new=AsyncMock(return_value=[]),
             ),
         ):
-            result = await fetch_inflation_summary(redis=None)
+            result = await fetch_inflation_summary(cache=None)
 
         assert result == []

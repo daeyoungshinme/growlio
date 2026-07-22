@@ -113,6 +113,11 @@ export function invalidateMarketSignalDigestData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
+/** 연말 절세 리마인더 수신 여부 설정 변경 후 */
+export function invalidateYearEndTaxReminderData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+}
+
 /** 목표 달성 알림(자산/입금/배당) 수신 여부 설정 변경 후 */
 export function invalidateGoalAchievementAlertsData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });

@@ -1,7 +1,7 @@
 """팩터 분석 서비스 — Fama-French 3팩터 기반 Value/Size/Momentum/Growth 노출도 계산.
 
 yfinance .info에서 P/E, P/B, 시가총액을 가져와 종목별·포트폴리오 가중 팩터 점수를 반환한다.
-Redis 1시간 캐시를 사용한다.
+1시간 캐시를 사용한다.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from app.services.position_aggregator import query_latest_position_map
 from app.services.yahoo_price import to_yf_symbol as _to_yf_symbol
 from app.utils.cache_keys import (
     TTL_FACTOR_ANALYSIS,
-    RedisType,
+    CacheStoreType,
     factor_analysis_key,
     factor_analysis_portfolio_key,
     get_cached_json,
@@ -168,14 +168,14 @@ def _portfolio_factors(holdings: list[dict]) -> dict:
 async def get_factor_analysis_for_portfolio(
     portfolio_id: str,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
 ) -> dict:
     """저장된 포트폴리오(Portfolio.items)의 팩터 노출도 분석 반환."""
     from app.models.portfolio import Portfolio
 
     cache_key = factor_analysis_portfolio_key(portfolio_id)
 
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -207,21 +207,21 @@ async def get_factor_analysis_for_portfolio(
         "note": "yfinance 기반 팩터 점수 (0-100, 높을수록 해당 팩터 노출도 높음)",
     }
 
-    await set_cached_json(redis, cache_key, result_data, TTL_FACTOR_ANALYSIS)
+    await set_cached_json(cache, cache_key, result_data, TTL_FACTOR_ANALYSIS)
     return result_data
 
 
 async def get_factor_analysis(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType = None,
+    cache: CacheStoreType = None,
     account_ids: list[uuid.UUID] | None = None,
 ) -> dict:
     """포트폴리오 팩터 노출도 분석 반환."""
     acct_suffix = "_".join(sorted(str(a) for a in account_ids)) if account_ids else "all"
     cache_key = factor_analysis_key(user_id, acct_suffix)
 
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -249,7 +249,7 @@ async def get_factor_analysis(
         "note": "yfinance 기반 팩터 점수 (0-100, 높을수록 해당 팩터 노출도 높음)",
     }
 
-    await set_cached_json(redis, cache_key, result_data, TTL_FACTOR_ANALYSIS)
+    await set_cached_json(cache, cache_key, result_data, TTL_FACTOR_ANALYSIS)
     return result_data
 
 

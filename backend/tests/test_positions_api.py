@@ -98,15 +98,15 @@ class TestSavePositions:
             amount_krw=0.0,
         )
 
-        with patch("app.api.v1.positions.get_redis") as mock_get_redis:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_get_redis.return_value = mock_redis
-            with patch("app.utils.redis_lock.redis_lock") as mock_lock:
+        with patch("app.api.v1.positions.get_cache_store") as mock_get_cache:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.get = AsyncMock(return_value=None)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_get_cache.return_value = mock_cache
+            with patch("app.utils.inproc_lock.inproc_lock") as mock_lock:
                 mock_cm = MagicMock()
                 mock_cm.__aenter__ = AsyncMock(return_value=True)
                 mock_cm.__aexit__ = AsyncMock(return_value=None)
@@ -184,7 +184,7 @@ class TestGetPositions:
 class TestSavePositionsExtended:
     """save_positions 추가 커버 — _build, USD rate, lock conflict (lines 97, 108-109, 121, 125, 139)."""
 
-    def _make_redis_lock_ctx(self, acquired=True):
+    def _make_cache_lock_ctx(self, acquired=True):
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=acquired)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
@@ -200,16 +200,16 @@ class TestSavePositionsExtended:
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id, user_id=user.id)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.get = AsyncMock(return_value=None)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with (
-                patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
+                patch("app.utils.inproc_lock.inproc_lock", return_value=self._make_cache_lock_ctx(True)),
                 patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 TestClient(app, raise_server_exceptions=False) as client,
             ):
@@ -241,16 +241,16 @@ class TestSavePositionsExtended:
 
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id, user_id=user.id)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.get = AsyncMock(return_value=None)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with (
-                patch("app.utils.redis_lock.redis_lock", return_value=self._make_redis_lock_ctx(True)),
+                patch("app.utils.inproc_lock.inproc_lock", return_value=self._make_cache_lock_ctx(True)),
                 patch("app.api.v1.positions._upsert_snapshot", AsyncMock(return_value=mock_snap)),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
                 TestClient(app, raise_server_exceptions=False) as client,
@@ -270,20 +270,20 @@ class TestSavePositionsExtended:
         assert resp.status_code == 200
 
     def test_save_positions_lock_conflict_returns_409(self, override_settings):
-        """Redis 락 획득 실패 시 409 (line 97)."""
+        """Cache 락 획득 실패 시 409 (line 97)."""
         user = _make_user()
         db = _make_mock_db()
         account = _make_account(user.id)
         db.scalar = AsyncMock(return_value=account)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=None)  # Lock NOT acquired
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=None)  # Lock NOT acquired
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.put(
                     f"/api/v1/assets/{account.id}/positions",
@@ -295,7 +295,7 @@ class TestSavePositionsExtended:
 class TestSyncPositionPrices:
     """sync_position_prices 엔드포인트 커버 (lines 155-215)."""
 
-    def _make_redis_lock_ctx(self, acquired=True):
+    def _make_cache_lock_ctx(self, acquired=True):
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=acquired)
         mock_cm.__aexit__ = AsyncMock(return_value=None)
@@ -309,13 +309,13 @@ class TestSyncPositionPrices:
         db.scalar = AsyncMock(return_value=account)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 400
@@ -328,13 +328,13 @@ class TestSyncPositionPrices:
         db.scalar = AsyncMock(return_value=account)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=None)  # Lock NOT acquired
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=None)  # Lock NOT acquired
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with TestClient(app, raise_server_exceptions=False) as client:
                 resp = client.post(f"/api/v1/assets/{account.id}/positions/sync-prices")
         assert resp.status_code == 409
@@ -371,13 +371,13 @@ class TestSyncPositionPrices:
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"005930": 76000.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=None)),
@@ -422,13 +422,13 @@ class TestSyncPositionPrices:
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with (
                 patch("app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={"AAPL": 210.0})),
                 patch("app.api.v1.positions.fetch_usd_krw", AsyncMock(return_value=1350.0)),
@@ -472,13 +472,13 @@ class TestSyncPositionPrices:
         mock_snap = SimpleNamespace(id=uuid.uuid4(), account_id=account.id)
         app = _setup_app(user, db)
 
-        with patch("app.api.v1.positions.get_redis") as mock_gr:
-            mock_redis = AsyncMock()
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.delete = AsyncMock()
-            mock_redis.scan = AsyncMock(return_value=(0, []))
-            mock_redis.unlink = AsyncMock()
-            mock_gr.return_value = mock_redis
+        with patch("app.api.v1.positions.get_cache_store") as mock_gr:
+            mock_cache = AsyncMock()
+            mock_cache.set = AsyncMock(return_value=True)
+            mock_cache.delete = AsyncMock()
+            mock_cache.scan = AsyncMock(return_value=(0, []))
+            mock_cache.unlink = AsyncMock()
+            mock_gr.return_value = mock_cache
             with (
                 patch(
                     "app.api.v1.positions.fetch_prices_batch", AsyncMock(return_value={})

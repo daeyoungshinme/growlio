@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_or_404
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.alert import RebalancingAlert
 from app.models.asset import AssetAccount
@@ -208,7 +208,7 @@ async def trigger_rebalancing_alert_test(
     portfolio_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """리밸런싱 자동화 알림 테스트 발송 (AGGREGATE 스코프 전용).
 
@@ -227,7 +227,7 @@ async def trigger_rebalancing_alert_test(
         portfolio_id=portfolio_id,
         user_id=current_user.id,
         db=db,
-        redis=redis,
+        cache=cache,
     )
 
     email_sent = result["email_sent"]
@@ -357,7 +357,7 @@ async def trigger_account_rebalancing_alert_test(
     account_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis=Depends(get_redis),
+    cache=Depends(get_cache_store),
 ):
     """특정 계좌 전용 리밸런싱 자동화 알림 테스트 발송."""
     from app.services.rebalancing.alert_test import send_test_rebalancing_alert
@@ -371,7 +371,7 @@ async def trigger_account_rebalancing_alert_test(
         user_id=current_user.id,
         db=db,
         account_id=account_id,
-        redis=redis,
+        cache=cache,
     )
 
     email_sent = result["email_sent"]

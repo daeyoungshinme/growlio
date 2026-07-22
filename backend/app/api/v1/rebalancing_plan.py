@@ -104,13 +104,13 @@ async def approve_plan_leg(
     db: AsyncSession = Depends(get_db),
 ):
     """대기중인 매수/매도 계획을 앱에서 즉시 실행한다. 매수는 대기시간을 건너뛰고 바로 체결한다."""
-    from app.core.redis_client import get_redis
+    from app.core.cache_store import get_cache_store
 
     leg = await _get_owned_leg(plan_id, leg_id, current_user.id, db)
-    redis = await get_redis()
+    cache = await get_cache_store()
     label = "매수" if leg.side == "BUY" else "매도"
     approve_fn = approve_buy_leg if leg.side == "BUY" else approve_sell_leg
-    execution_id = await approve_fn(leg, db, redis, decided_by="USER_APP")
+    execution_id = await approve_fn(leg, db, cache, decided_by="USER_APP")
     if execution_id is None:
         return PlanActionResponse(status="FAILED", message=f"{label} 주문 실행에 실패했습니다")
     return PlanActionResponse(status="EXECUTED", message=f"{label} 주문이 실행되었습니다")

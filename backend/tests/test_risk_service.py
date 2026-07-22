@@ -131,16 +131,16 @@ class TestGetPortfolioRiskMetrics:
         assert result["var_95_pct"] == 0.0
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+    async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
         import json
 
         from app.services.risk_service import get_portfolio_risk_metrics
 
         cached = {"var_95_pct": 1.5, "data_available": True, "position_count": 5}
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_portfolio_risk_metrics(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_portfolio_risk_metrics(uuid.uuid4(), mock_db, cache=cache)
 
         assert result["var_95_pct"] == 1.5
         mock_db.execute.assert_not_called()

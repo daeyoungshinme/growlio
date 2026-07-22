@@ -55,7 +55,7 @@ def _overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0):
 
 class TestKiwoomProviderSync:
     @pytest.mark.asyncio
-    async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_redis):
+    async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_cache):
         account = make_account(
             data_source="KIWOOM_API",
             kiwoom_app_key=b"enc_key",
@@ -71,7 +71,7 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         assert result.total_value_krw == 1_100_000.0  # domestic total 1,000,000 + deposit 100,000
         assert result.deposit_krw == 100_000.0
@@ -79,7 +79,7 @@ class TestKiwoomProviderSync:
         assert result.positions[0].ticker == "005930"
 
     @pytest.mark.asyncio
-    async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_redis):
+    async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_cache):
         """첫 조회에서 토큰 만료 → 강제 갱신 후 재시도해 성공해야 한다."""
         from app.kiwoom.client import KiwoomTokenExpiredError
 
@@ -113,22 +113,22 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock(return_value=_empty_overseas())),
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         assert result.total_value_krw == 1_100_000.0  # domestic total 1,000,000 + deposit 100,000
         assert token_calls == [False, True]
         assert domestic_calls["count"] == 2
 
     @pytest.mark.asyncio
-    async def test_sync_missing_credentials_raises(self, override_settings, make_account, mock_redis):
+    async def test_sync_missing_credentials_raises(self, override_settings, make_account, mock_cache):
         account = make_account(data_source="KIWOOM_API", kiwoom_app_key=None, kiwoom_app_secret=None)
         provider = KiwoomProvider()
 
         with pytest.raises(ProviderCredentialError):
-            await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
     @pytest.mark.asyncio
-    async def test_sync_with_domestic_and_overseas_positions(self, override_settings, make_account, mock_redis):
+    async def test_sync_with_domestic_and_overseas_positions(self, override_settings, make_account, mock_cache):
         """국내+해외 포지션이 모두 있을 때 합산 결과와 deposit_foreign이 올바르게 채워져야 한다."""
         account = make_account(
             data_source="KIWOOM_API",
@@ -149,7 +149,7 @@ class TestKiwoomProviderSync:
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
             patch("app.providers._overseas_name_enrichment.resolve_english_name", new=AsyncMock(return_value=None)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         # domestic(1,000,000 + 100,000) + overseas(1,000*1300=1,300,000 + 100*1300=130,000)
         assert result.total_value_krw == 1_100_000.0 + 1_300_000.0 + 130_000.0
@@ -164,7 +164,7 @@ class TestKiwoomProviderSync:
 
     @pytest.mark.asyncio
     async def test_sync_overseas_fetch_failure_falls_back_to_domestic_only(
-        self, override_settings, make_account, mock_redis
+        self, override_settings, make_account, mock_cache
     ):
         """해외 API가 예외를 던져도 전체 sync는 실패하지 않고 국내 결과만으로 반환된다(fail-soft)."""
         account = make_account(
@@ -185,15 +185,15 @@ class TestKiwoomProviderSync:
             ),
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         assert result.total_value_krw == 1_100_000.0
         assert len(result.positions) == 1
         assert result.positions[0].ticker == "005930"
 
     @pytest.mark.asyncio
-    async def test_sync_skips_overseas_when_cache_marks_no_overseas(self, override_settings, make_account, mock_redis):
-        """Redis has_overseas 캐시가 '해외 없음'을 가리키면 해외 API를 호출하지 않아야 한다."""
+    async def test_sync_skips_overseas_when_cache_marks_no_overseas(self, override_settings, make_account, mock_cache):
+        """Cache has_overseas 캐시가 '해외 없음'을 가리키면 해외 API를 호출하지 않아야 한다."""
         account = make_account(
             data_source="KIWOOM_API",
             kiwoom_app_key=b"enc_key",
@@ -201,7 +201,7 @@ class TestKiwoomProviderSync:
             kiwoom_account_no="1234567890",
         )
         provider = KiwoomProvider()
-        mock_redis.get = AsyncMock(return_value=b"0")
+        mock_cache.get = AsyncMock(return_value="0")
 
         with (
             patch("app.providers.kiwoom_provider.decrypt", side_effect=["key", "secret"]),
@@ -210,14 +210,14 @@ class TestKiwoomProviderSync:
             patch("app.kiwoom.balance.get_overseas_balance", new=AsyncMock()) as overseas_fn,
             patch("app.providers.kiwoom_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         overseas_fn.assert_not_called()
         assert result.total_value_krw == 1_100_000.0
 
     @pytest.mark.asyncio
     async def test_sync_overseas_position_name_replaced_with_english_canonical(
-        self, override_settings, make_account, mock_redis
+        self, override_settings, make_account, mock_cache
     ):
         """해외 포지션의 브로커 원본(한글) 종목명이 영문 캐노니컬 이름으로 교체되어야 한다."""
         account = make_account(
@@ -241,10 +241,10 @@ class TestKiwoomProviderSync:
                 new=AsyncMock(return_value="Apple Inc."),
             ),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         aapl = next(p for p in result.positions if p.ticker == "AAPL")
         assert aapl.name == "Apple Inc."
         from app.utils.cache_keys import TTL_OVERSEAS_STOCK_NAME, overseas_stock_name_key
 
-        mock_redis.setex.assert_any_call(overseas_stock_name_key("AAPL"), TTL_OVERSEAS_STOCK_NAME, "Apple Inc.")
+        mock_cache.setex.assert_any_call(overseas_stock_name_key("AAPL"), TTL_OVERSEAS_STOCK_NAME, "Apple Inc.")

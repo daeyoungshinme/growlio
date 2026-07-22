@@ -153,32 +153,32 @@ class TestCalcXirr:
 
 
 class TestGetMonthlyTrend:
-    """_get_monthly_trend: Redis 캐시 히트/미스 동작."""
+    """_get_monthly_trend: Cache 캐시 히트/미스 동작."""
 
     @pytest.mark.asyncio
-    async def test_cache_hit_skips_db(self, mock_db, mock_redis):
-        """Redis 캐시 히트 시 DB 쿼리 없이 반환."""
+    async def test_cache_hit_skips_db(self, mock_db, mock_cache):
+        """Cache 캐시 히트 시 DB 쿼리 없이 반환."""
         import json
 
         from app.services.asset_aggregator import _get_monthly_trend
 
         user_id = uuid.uuid4()
         cached_data = [{"month": "2025-01-01", "total_krw": 10_000_000.0}]
-        mock_redis.get = AsyncMock(return_value=json.dumps(cached_data).encode())
+        mock_cache.get = AsyncMock(return_value=json.dumps(cached_data).encode())
 
-        result = await _get_monthly_trend(user_id, mock_db, mock_redis)
+        result = await _get_monthly_trend(user_id, mock_db, mock_cache)
 
         assert result == cached_data
         mock_db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_cache_miss_queries_db(self, mock_db, mock_redis):
-        """Redis 캐시 미스 시 DB 쿼리 후 캐시 저장."""
+    async def test_cache_miss_queries_db(self, mock_db, mock_cache):
+        """Cache 캐시 미스 시 DB 쿼리 후 캐시 저장."""
         from app.services.asset_aggregator import _get_monthly_trend
 
         user_id = uuid.uuid4()
-        mock_redis.get = AsyncMock(return_value=None)
-        mock_redis.setex = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
+        mock_cache.setex = AsyncMock()
 
         # DB 결과 mock
         row = SimpleNamespace(month=date(2025, 1, 1), total_krw=10_000_000.0)
@@ -186,16 +186,16 @@ class TestGetMonthlyTrend:
         db_result.__iter__ = MagicMock(return_value=iter([row]))
         mock_db.execute = AsyncMock(return_value=db_result)
 
-        result = await _get_monthly_trend(user_id, mock_db, mock_redis)
+        result = await _get_monthly_trend(user_id, mock_db, mock_cache)
 
         mock_db.execute.assert_called_once()
-        mock_redis.setex.assert_called_once()
+        mock_cache.setex.assert_called_once()
         assert len(result) == 1
         assert result[0]["total_krw"] == 10_000_000.0
 
     @pytest.mark.asyncio
-    async def test_no_redis_queries_db_directly(self, mock_db):
-        """redis=None이면 캐시 없이 DB 직접 조회."""
+    async def test_no_cache_queries_db_directly(self, mock_db):
+        """cache=None이면 캐시 없이 DB 직접 조회."""
         from app.services.asset_aggregator import _get_monthly_trend
 
         user_id = uuid.uuid4()
@@ -205,7 +205,7 @@ class TestGetMonthlyTrend:
         db_result.__iter__ = MagicMock(return_value=iter([row]))
         mock_db.execute = AsyncMock(return_value=db_result)
 
-        result = await _get_monthly_trend(user_id, mock_db, redis=None)
+        result = await _get_monthly_trend(user_id, mock_db, cache=None)
 
         mock_db.execute.assert_called_once()
         assert result[0]["month"] == "2025-06-01"

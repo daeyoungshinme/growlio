@@ -74,7 +74,7 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     계좌별 자격증명이 없거나 토큰 발급 실패 시 None 반환.
     반환값: {"app_key", "app_secret", "access_token", "is_mock"}
     """
-    from app.core.redis_client import get_redis
+    from app.core.cache_store import get_cache_store
     from app.kis.auth import get_access_token
     from app.models.asset import AssetAccount
 
@@ -96,12 +96,12 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     is_mock = account.is_mock_mode
 
     try:
-        redis = await get_redis()
+        cache = await get_cache_store()
         access_token = await get_access_token(
             app_key,
             app_secret,
             is_mock=is_mock,
-            redis=redis,
+            cache=cache,
             db=db,
             user_id=str(user_id),
             account_id=str(account.id),

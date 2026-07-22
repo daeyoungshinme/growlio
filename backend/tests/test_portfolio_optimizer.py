@@ -44,31 +44,31 @@ class TestGetEfficientFrontier:
         assert "note" in result
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+    async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
         cached = {
             "frontier": [{"risk": 10.0, "return": 8.0}],
             "current": {"risk": 12.0, "return": 9.0},
             "assets": [],
             "note": "cached",
         }
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_efficient_frontier(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_efficient_frontier(uuid.uuid4(), mock_db, cache=cache)
 
         assert result["frontier"][0]["risk"] == 10.0
         mock_db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_error_falls_back_to_db(self, mock_db, override_settings):
-        redis = AsyncMock()
-        redis.get = AsyncMock(side_effect=Exception("redis error"))
+    async def test_cache_error_falls_back_to_db(self, mock_db, override_settings):
+        cache = AsyncMock()
+        cache.get = AsyncMock(side_effect=Exception("cache error"))
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        result = await get_efficient_frontier(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_efficient_frontier(uuid.uuid4(), mock_db, cache=cache)
         assert result["frontier"] == []
 
     @pytest.mark.asyncio
@@ -105,22 +105,22 @@ class TestGetEfficientFrontier:
         assert result["current"] == {"risk": 12.0, "return": 7.0}
 
     @pytest.mark.asyncio
-    async def test_redis_no_cache_write_when_no_positions(self, mock_db, override_settings):
-        """포지션 없을 때 조기 반환되므로 Redis cache 쓰기 없음."""
+    async def test_cache_no_cache_write_when_no_positions(self, mock_db, override_settings):
+        """포지션 없을 때 조기 반환되므로 Cache cache 쓰기 없음."""
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
-        await get_efficient_frontier(uuid.uuid4(), mock_db, redis=redis)
-        redis.setex.assert_not_called()
+        await get_efficient_frontier(uuid.uuid4(), mock_db, cache=cache)
+        cache.setex.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_cache_write_on_success(self, mock_db, override_settings):
-        """2종목 이상 포지션 있을 때 결과를 Redis에 캐시 저장한다."""
+    async def test_cache_cache_write_on_success(self, mock_db, override_settings):
+        """2종목 이상 포지션 있을 때 결과를 Cache에 캐시 저장한다."""
         snap = SimpleNamespace(id=uuid.uuid4())
         acc = SimpleNamespace(id=uuid.uuid4(), is_active=True)
         pos1 = SimpleNamespace(ticker="005930", market="KOSPI", value_krw=500_000.0, snapshot_id=snap.id)
@@ -132,17 +132,17 @@ class TestGetEfficientFrontier:
         pos_result.scalars.return_value.all.return_value = [pos1, pos2]
         mock_db.execute = AsyncMock(side_effect=[snap_result, pos_result])
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         frontier_result = {"frontier": [{"risk": 10.0, "return": 5.0}], "current": None, "assets": [], "note": "ok"}
         returns_map: dict = {"005930.KS": [0.01] * 252, "AAPL": [0.008] * 252}
         with patch("asyncio.get_running_loop") as mock_loop:
             mock_loop.return_value.run_in_executor = AsyncMock(side_effect=[returns_map, frontier_result])
-            await get_efficient_frontier(uuid.uuid4(), mock_db, redis=redis)
+            await get_efficient_frontier(uuid.uuid4(), mock_db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
 
 # ── _compute_frontier 순수 로직 (numpy/scipy 직접 호출) ──

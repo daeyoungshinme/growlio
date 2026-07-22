@@ -111,7 +111,7 @@ class TestManualProvider:
 
         provider = ManualProvider()
         with pytest.raises(BadRequestError, match="수동 금액이 설정되지 않았습니다"):
-            await provider.sync(account, mock_db, redis=None)
+            await provider.sync(account, mock_db, cache=None)
 
     @pytest.mark.asyncio
     async def test_uses_manual_amount_when_no_positions(self, mock_db, make_account):
@@ -122,7 +122,7 @@ class TestManualProvider:
         # mock_db.execute returns [] by default (no positions)
 
         provider = ManualProvider()
-        balance = await provider.sync(account, mock_db, redis=None)
+        balance = await provider.sync(account, mock_db, cache=None)
 
         assert balance.total_value_krw == 10_000_000.0
 
@@ -141,7 +141,7 @@ class TestManualProvider:
         account = make_account(asset_type="STOCK_OTHER")
 
         provider = ManualProvider()
-        balance = await provider.sync(account, mock_db, redis=None)
+        balance = await provider.sync(account, mock_db, cache=None)
 
         assert balance.total_value_krw == 800_000.0  # 80000 * 10
         assert balance.invested_krw == 700_000.0  # 70000 * 10
@@ -220,10 +220,10 @@ class TestKISProvider:
             ),
             patch("app.providers.kis_provider.cache_usd_krw_rate", new_callable=AsyncMock),
         ):
-            redis = AsyncMock()
-            redis.get = AsyncMock(return_value=None)
+            cache = AsyncMock()
+            cache.get = AsyncMock(return_value=None)
             provider = KISProvider()
-            balance = await provider.sync(account, mock_db, redis)
+            balance = await provider.sync(account, mock_db, cache)
 
         # 국내 + 해외 포지션 2개
         assert len(balance.positions) == 2

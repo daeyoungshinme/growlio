@@ -49,7 +49,7 @@ class TestQuickExecuteGates:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "ALREADY_PENDING"
@@ -85,7 +85,7 @@ class TestQuickExecuteGates:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "MARKET_BLOCKED"
@@ -125,7 +125,7 @@ class TestQuickExecuteGates:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "MARKET_BLOCKED"
@@ -160,7 +160,7 @@ class TestQuickExecuteGates:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "NO_DRIFT"
@@ -199,7 +199,7 @@ class TestQuickExecuteGates:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "TAX_BLOCKED"
@@ -245,7 +245,7 @@ class TestQuickExecutePlanGenerated:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "PLAN_GENERATED"
@@ -294,7 +294,7 @@ class TestQuickExecutePlanGenerated:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert result.status == "PLAN_GENERATED"
@@ -338,7 +338,7 @@ class TestQuickExecutePlanGenerated:
                 body=QuickExecuteOverride(strategy="TWO_PHASE"),
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         _, kwargs = mock_build_plan.call_args
@@ -379,7 +379,7 @@ class TestQuickExecutePlanGenerated:
                 body=QuickExecuteOverride(account_id=other_account_id),
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         assert exc_info.value.status_code == 404
@@ -415,7 +415,7 @@ class TestQuickExecutePortfolioQuery:
                 portfolio_id=portfolio_id,
                 current_user=user,
                 db=mock_db,
-                redis=None,
+                cache=None,
             )
 
         stmt = captured_stmt["portfolio"]

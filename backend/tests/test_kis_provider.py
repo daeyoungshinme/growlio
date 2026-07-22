@@ -56,7 +56,7 @@ def _overseas_balance(total_value_usd=1_000.0, deposit_usd=100.0):
 
 class TestKISProviderSync:
     @pytest.mark.asyncio
-    async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_redis):
+    async def test_sync_happy_path_no_token_expiry(self, override_settings, make_account, mock_cache):
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
         provider = KISProvider()
 
@@ -73,7 +73,7 @@ class TestKISProviderSync:
             ),
             patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         assert result.total_value_krw == 1_100_000.0  # domestic total 1,000,000 + deposit 100,000
         assert result.deposit_krw == 100_000.0
@@ -81,7 +81,7 @@ class TestKISProviderSync:
         assert result.positions[0].ticker == "005930"
 
     @pytest.mark.asyncio
-    async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_redis):
+    async def test_sync_retries_after_token_expired(self, override_settings, make_account, mock_cache):
         """첫 조회에서 토큰 만료 → 강제 갱신 후 재시도해 성공해야 한다."""
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
         provider = KISProvider()
@@ -114,23 +114,23 @@ class TestKISProviderSync:
             ),
             patch("app.providers.kis_provider.get_usd_krw_rate", new=AsyncMock(return_value=1300.0)),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         assert result.total_value_krw == 1_100_000.0  # domestic total 1,000,000 + deposit 100,000
         assert token_calls == [False, True]
         assert domestic_calls["count"] == 2
 
     @pytest.mark.asyncio
-    async def test_sync_missing_credentials_raises(self, override_settings, make_account, mock_redis):
+    async def test_sync_missing_credentials_raises(self, override_settings, make_account, mock_cache):
         account = make_account(data_source="KIS_API", kis_app_key=None, kis_app_secret=None)
         provider = KISProvider()
 
         with pytest.raises(ProviderCredentialError):
-            await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
     @pytest.mark.asyncio
     async def test_sync_overseas_position_name_replaced_with_english_canonical(
-        self, override_settings, make_account, mock_redis
+        self, override_settings, make_account, mock_cache
     ):
         """해외 포지션의 브로커 원본(한글) 종목명이 영문 캐노니컬 이름으로 교체되어야 한다."""
         account = make_account(data_source="KIS_API", kis_app_key=b"enc_key", kis_app_secret=b"enc_secret")
@@ -157,7 +157,7 @@ class TestKISProviderSync:
                 new=AsyncMock(return_value="Apple Inc."),
             ),
         ):
-            result = await provider.sync(account, db=AsyncMock(), redis=mock_redis)
+            result = await provider.sync(account, db=AsyncMock(), cache=mock_cache)
 
         aapl = next(p for p in result.positions if p.ticker == "AAPL")
         assert aapl.name == "Apple Inc."

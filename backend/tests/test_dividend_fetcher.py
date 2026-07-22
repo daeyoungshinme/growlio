@@ -10,15 +10,15 @@ import pytest
 
 
 @pytest.fixture
-def mock_redis():
-    redis = AsyncMock()
-    redis.get = AsyncMock(return_value=None)
-    redis.setex = AsyncMock()
-    redis.delete = AsyncMock()
-    return redis
+def mock_cache():
+    cache = AsyncMock()
+    cache.get = AsyncMock(return_value=None)
+    cache.setex = AsyncMock()
+    cache.delete = AsyncMock()
+    return cache
 
 
-async def _call_fetcher(ticker, market, redis, kis_creds=None, overrides=None, dart_key="test"):
+async def _call_fetcher(ticker, market, cache, kis_creds=None, overrides=None, dart_key="test"):
     """fetch_ticker_dividend_info 호출 헬퍼."""
     from app.services.dividend.fetcher import fetch_ticker_dividend_info
 
@@ -26,7 +26,7 @@ async def _call_fetcher(ticker, market, redis, kis_creds=None, overrides=None, d
     return await fetch_ticker_dividend_info(
         ticker=ticker,
         market=market,
-        redis=redis,
+        cache=cache,
         sem=sem,
         kis_creds=kis_creds,
         dart_key=dart_key,
@@ -36,10 +36,10 @@ async def _call_fetcher(ticker, market, redis, kis_creds=None, overrides=None, d
 
 class TestFetchTickerDividendInfo:
     @pytest.mark.asyncio
-    async def test_cache_hit_skips_network(self, mock_redis, override_settings):
-        """Redis 캐시에 dps + yield 있으면 네트워크 소스 생략 후 반환."""
+    async def test_cache_hit_skips_network(self, mock_cache, override_settings):
+        """Cache 캐시에 dps + yield 있으면 네트워크 소스 생략 후 반환."""
         # months cache hit
-        mock_redis.get = AsyncMock(
+        mock_cache.get = AsyncMock(
             side_effect=[
                 json.dumps([3, 6, 9, 12]).encode(),  # months cache
                 json.dumps({"dps": 500.0, "yield_decimal": 0.025}).encode(),  # info cache
@@ -47,16 +47,16 @@ class TestFetchTickerDividendInfo:
         )
 
         with patch("app.services.dividend.fetcher.sync_yahoo_dividend_info") as mock_yahoo:
-            result = await _call_fetcher("AAPL", "NASDAQ", mock_redis)
+            result = await _call_fetcher("AAPL", "NASDAQ", mock_cache)
 
         mock_yahoo.assert_not_called()
         assert result[0] == pytest.approx(0.025)  # yield_decimal
         assert result[1] == pytest.approx(500.0)  # dps
 
     @pytest.mark.asyncio
-    async def test_override_months_used_directly(self, mock_redis, override_settings):
+    async def test_override_months_used_directly(self, mock_cache, override_settings):
         """overrides에 배당월이 있으면 캐시/네트워크 조회 없이 사용."""
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         overrides = {("AAPL", "NASDAQ"): [3, 6, 9, 12]}
 
@@ -71,15 +71,15 @@ class TestFetchTickerDividendInfo:
             loop_mock.run_in_executor = AsyncMock(side_effect=lambda _, fn, *args: fn(*args) if callable(fn) else None)
 
             with patch("asyncio.get_running_loop", return_value=loop_mock):
-                result = await _call_fetcher("AAPL", "NASDAQ", mock_redis, overrides=overrides)
+                result = await _call_fetcher("AAPL", "NASDAQ", mock_cache, overrides=overrides)
 
         mock_months.assert_not_called()
         assert result[2] == [3, 6, 9, 12]
 
     @pytest.mark.asyncio
-    async def test_foreign_ticker_yahoo_used(self, mock_redis, override_settings):
+    async def test_foreign_ticker_yahoo_used(self, mock_cache, override_settings):
         """해외 종목은 Yahoo Finance 사용 (Naver 미사용)."""
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         yahoo_result = {"dividend_yield": 0.015, "dps": 1.0, "ex_dividend_date": None}
 
@@ -98,13 +98,13 @@ class TestFetchTickerDividendInfo:
             patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
-            result = await _call_fetcher("AAPL", "NASDAQ", mock_redis)
+            result = await _call_fetcher("AAPL", "NASDAQ", mock_cache)
 
         mock_naver.assert_not_called()
         assert result[0] == pytest.approx(0.015)
 
     @pytest.mark.asyncio
-    async def test_known_schedule_used_directly(self, mock_redis, override_settings):
+    async def test_known_schedule_used_directly(self, mock_cache, override_settings):
         """KNOWN_DIVIDEND_SCHEDULES에 있는 종목은 배당월 직접 사용."""
         from app.services.dividend.constants import KNOWN_DIVIDEND_SCHEDULES
 
@@ -115,7 +115,7 @@ class TestFetchTickerDividendInfo:
         known_ticker, known_market = next(iter(KNOWN_DIVIDEND_SCHEDULES.keys()))
         expected_months = KNOWN_DIVIDEND_SCHEDULES[(known_ticker, known_market.upper())]
 
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache.get = AsyncMock(return_value=None)
 
         yahoo_result = {"dividend_yield": 0.02, "dps": 100.0, "ex_dividend_date": None}
 
@@ -133,15 +133,15 @@ class TestFetchTickerDividendInfo:
             patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
-            result = await _call_fetcher(known_ticker, known_market, mock_redis)
+            result = await _call_fetcher(known_ticker, known_market, mock_cache)
 
         # months from KNOWN_DIVIDEND_SCHEDULES should be used
         assert result[2] == expected_months
 
     @pytest.mark.asyncio
-    async def test_months_cached_in_redis(self, mock_redis, override_settings):
-        """배당월 조회 후 Redis에 캐시 저장."""
-        mock_redis.get = AsyncMock(return_value=None)
+    async def test_months_cached_in_cache(self, mock_cache, override_settings):
+        """배당월 조회 후 Cache에 캐시 저장."""
+        mock_cache.get = AsyncMock(return_value=None)
 
         yahoo_result = {"dividend_yield": 0.02, "dps": 1.5, "ex_dividend_date": None}
 
@@ -159,6 +159,6 @@ class TestFetchTickerDividendInfo:
             patch("app.services.dividend.fetcher.sync_fetch_dividend_months", return_value=[3, 9]),
             patch("asyncio.get_running_loop", return_value=loop_mock),
         ):
-            await _call_fetcher("AAPL", "NASDAQ", mock_redis)
+            await _call_fetcher("AAPL", "NASDAQ", mock_cache)
 
-        mock_redis.setex.assert_called()
+        mock_cache.setex.assert_called()

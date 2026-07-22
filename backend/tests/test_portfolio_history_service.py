@@ -12,14 +12,14 @@ import pytest
 
 class TestGetAllocationHistory:
     @pytest.mark.asyncio
-    async def test_redis_cache_hit_skips_db(self, mock_db, override_settings):
+    async def test_cache_cache_hit_skips_db(self, mock_db, override_settings):
         from app.services.portfolio_history_service import get_allocation_history
 
         cached = [{"month": "2024-01-01", "total_krw": 10_000_000, "allocations": []}]
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_allocation_history(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_allocation_history(uuid.uuid4(), mock_db, cache=cache)
 
         assert result == cached
         mock_db.execute.assert_not_called()
@@ -96,7 +96,7 @@ class TestGetAllocationHistory:
         assert "STOCK_KIS" not in alloc_types
 
     @pytest.mark.asyncio
-    async def test_result_stored_in_redis(self, mock_db, override_settings):
+    async def test_result_stored_in_cache(self, mock_db, override_settings):
         from app.services.portfolio_history_service import get_allocation_history
 
         row1 = SimpleNamespace(month="2024-01-01", asset_type="BANK_ACCOUNT", amount_krw=1_000_000.0)
@@ -115,13 +115,13 @@ class TestGetAllocationHistory:
 
         mock_db.execute = mock_execute
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
-        await get_allocation_history(uuid.uuid4(), mock_db, redis=redis, months=3)
+        await get_allocation_history(uuid.uuid4(), mock_db, cache=cache, months=3)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_account_id_passed_as_query_param(self, mock_db, override_settings):
@@ -165,9 +165,9 @@ class TestGetAllocationHistory:
     async def test_account_id_uses_separate_cache_key(self, mock_db, override_settings):
         from app.services.portfolio_history_service import get_allocation_history
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
@@ -175,10 +175,10 @@ class TestGetAllocationHistory:
 
         user_id = uuid.uuid4()
         account_id = uuid.uuid4()
-        await get_allocation_history(user_id, mock_db, redis=redis, months=3, account_id=account_id)
-        await get_allocation_history(user_id, mock_db, redis=redis, months=3)
+        await get_allocation_history(user_id, mock_db, cache=cache, months=3, account_id=account_id)
+        await get_allocation_history(user_id, mock_db, cache=cache, months=3)
 
-        keys_used = [call.args[0] for call in redis.get.call_args_list]
+        keys_used = [call.args[0] for call in cache.get.call_args_list]
         assert len(set(keys_used)) == 2
 
     @pytest.mark.asyncio

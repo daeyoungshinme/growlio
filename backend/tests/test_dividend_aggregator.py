@@ -11,7 +11,7 @@ import pytest
 
 class TestGetDividendSummary:
     @pytest.mark.asyncio
-    async def test_redis_cache_hit(self, mock_db, override_settings):
+    async def test_cache_cache_hit(self, mock_db, override_settings):
         import json
 
         from app.services.dividend.aggregator import get_dividend_summary
@@ -22,10 +22,10 @@ class TestGetDividendSummary:
             "monthly_ticker_breakdown": [],
             "estimated_annual": 600_000.0,
         }
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_dividend_summary(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_dividend_summary(uuid.uuid4(), mock_db, cache=cache)
 
         assert result["annual_received"] == 500_000.0
         mock_db.execute.assert_not_called()
@@ -51,21 +51,21 @@ class TestGetDividendSummary:
         assert len(result["monthly_ticker_breakdown"]) == 1
 
     @pytest.mark.asyncio
-    async def test_redis_miss_stores_result(self, mock_db, override_settings):
+    async def test_cache_miss_stores_result(self, mock_db, override_settings):
         from app.services.dividend.aggregator import get_dividend_summary
 
         exec_result = MagicMock()
         exec_result.all.return_value = []
         mock_db.execute = AsyncMock(return_value=exec_result)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         with patch("app.services.dividend.aggregator.get_ticker_dividend_summary", new=AsyncMock(return_value=[])):
-            await get_dividend_summary(uuid.uuid4(), mock_db, redis=redis)
+            await get_dividend_summary(uuid.uuid4(), mock_db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_no_rows_returns_zeros(self, mock_db, override_settings):

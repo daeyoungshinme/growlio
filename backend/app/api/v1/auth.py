@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_token_payload
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.user import User, UserSettings
@@ -127,10 +127,10 @@ async def delete_account(
             status_code=status.HTTP_502_BAD_GATEWAY, detail="탈퇴 처리 중 오류가 발생했습니다. 다시 시도해주세요"
         ) from e
 
-    redis = await get_redis()
+    cache = await get_cache_store()
     for account_id in account_ids:
-        await invalidate_user_caches(redis, f"kis_token:account:{account_id}", f"kiwoom_token:account:{account_id}")
-    await invalidate_all_user_caches(redis, user_id)
+        await invalidate_user_caches(cache, f"kis_token:account:{account_id}", f"kiwoom_token:account:{account_id}")
+    await invalidate_all_user_caches(cache, user_id)
 
     from app.services.email_service import send_account_deletion_email
 

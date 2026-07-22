@@ -37,4 +37,4 @@ OVERSEAS_MARKETS = frozenset(OVERSEAS_MARKET_CODES.keys())  # {"NYSE", "NASDAQ",
 DOMESTIC_MARKET_DIV = "J"  # 주식
 DOMESTIC_MARKET_DIV_ETF = "E"  # ETF/ETN
 
-REDIS_TOKEN_KEY = "kis_token:{user_id}:{mode}"  # nosec B105 — Redis 키 템플릿; mode: real | mock
+TOKEN_CACHE_KEY = "kis_token:{user_id}:{mode}"  # nosec B105 — 캐시 키 템플릿; mode: real | mock

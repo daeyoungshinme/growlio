@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db, get_owned_or_404
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.limiter import limiter
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio, PortfolioAccount, PortfolioItem
@@ -69,9 +69,9 @@ async def list_portfolios(
     db: AsyncSession = Depends(get_db),
 ):
     """저장된 포트폴리오 목록."""
-    redis = await get_redis()
+    cache = await get_cache_store()
     cache_key = portfolio_list_key(current_user.id)
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -85,7 +85,7 @@ async def list_portfolios(
     portfolios = rows.scalars().all()
     result = [PortfolioResponse.model_validate(p).model_dump(mode="json") for p in portfolios]
 
-    await set_cached_json(redis, cache_key, result, TTL_PORTFOLIO_LIST)
+    await set_cached_json(cache, cache_key, result, TTL_PORTFOLIO_LIST)
     return result
 
 
@@ -135,8 +135,8 @@ async def create_portfolio(
 
     await db.commit()
 
-    redis = await get_redis()
-    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+    cache = await get_cache_store()
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
 
     result = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio.id)))
     return result.scalar_one()
@@ -222,9 +222,9 @@ async def update_portfolio(
 
     await db.commit()
 
-    redis = await get_redis()
-    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
-    await invalidate_rebalancing_analysis_cache(redis, current_user.id, portfolio_id)
+    cache = await get_cache_store()
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
     result2 = await db.execute(_with_relations(select(Portfolio).where(Portfolio.id == portfolio_id)))
     return result2.scalar_one()
@@ -244,9 +244,9 @@ async def delete_portfolio(
     await db.delete(portfolio)
     await db.commit()
 
-    redis = await get_redis()
-    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
-    await invalidate_rebalancing_analysis_cache(redis, current_user.id, portfolio_id)
+    cache = await get_cache_store()
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))
+    await invalidate_rebalancing_analysis_cache(cache, current_user.id, portfolio_id)
 
 
 @router.patch("/reorder", status_code=status.HTTP_204_NO_CONTENT)
@@ -274,5 +274,5 @@ async def reorder_portfolios(
     )
     await db.commit()
 
-    redis = await get_redis()
-    await invalidate_user_caches(redis, portfolio_list_key(current_user.id))
+    cache = await get_cache_store()
+    await invalidate_user_caches(cache, portfolio_list_key(current_user.id))

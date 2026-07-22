@@ -121,7 +121,9 @@ class TestGetTaxSummary:
             "domestic_stock_value_krw",
             "domestic_unrealized_gain_krw",
             "domestic_large_holder_warning",
+            "domestic_large_holder_excess_krw",
             "comprehensive_tax_warning",
+            "comprehensive_tax_remaining_krw",
             "total_estimated_tax_krw",
             "total_fees_krw",
             "tax_deferred_value_krw",
@@ -217,6 +219,26 @@ class TestGetTaxSummary:
             result = await get_tax_summary(user_id, 2025, mock_db)
 
         assert result["domestic_large_holder_warning"] is True
+        assert result["domestic_large_holder_excess_krw"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_domestic_large_holder_excess_krw_reflects_amount_over_threshold(self, mock_db, override_settings):
+        """국내주식 보유액이 10억원을 초과한 만큼을 domestic_large_holder_excess_krw로 반환한다."""
+        user_id = uuid.uuid4()
+
+        with (
+            patch("app.services.tax_service._calc_dividend_income", new_callable=AsyncMock, return_value=0.0),
+            patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
+            patch(
+                "app.services.tax_service._calc_stock_unrealized",
+                new_callable=AsyncMock,
+                return_value=(0.0, 1_300_000_000.0, 0.0, 0.0),
+            ),
+            patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
+        ):
+            result = await get_tax_summary(user_id, 2025, mock_db)
+
+        assert result["domestic_large_holder_excess_krw"] == 300_000_000.0
 
     @pytest.mark.asyncio
     async def test_comprehensive_tax_warning_when_over_20m(self, mock_db, override_settings):
@@ -240,6 +262,32 @@ class TestGetTaxSummary:
             result = await get_tax_summary(user_id, 2025, mock_db)
 
         assert result["comprehensive_tax_warning"] is True
+        assert result["comprehensive_tax_remaining_krw"] == 0.0
+
+    @pytest.mark.asyncio
+    async def test_comprehensive_tax_remaining_krw_when_under_threshold(self, mock_db, override_settings):
+        """금융소득이 2000만원 미만이면 남은 여유 금액을 반환한다."""
+        user_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.services.tax_service._calc_dividend_income",
+                new_callable=AsyncMock,
+                return_value=5_000_000.0,
+            ),
+            patch("app.services.tax_service._calc_total_fees", new_callable=AsyncMock, return_value=0.0),
+            patch(
+                "app.services.tax_service._calc_stock_unrealized",
+                new_callable=AsyncMock,
+                return_value=(3_000_000.0, 0.0, 0.0, 0.0),
+            ),
+            patch("app.services.tax_service.get_overseas_positions_detail", new_callable=AsyncMock, return_value=[]),
+        ):
+            result = await get_tax_summary(user_id, 2025, mock_db)
+
+        # total_financial_income = 5_000_000 + 3_000_000 = 8_000_000
+        assert result["comprehensive_tax_warning"] is False
+        assert result["comprehensive_tax_remaining_krw"] == 12_000_000.0
 
     @pytest.mark.asyncio
     async def test_total_fees_included(self, mock_db, override_settings):

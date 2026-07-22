@@ -53,6 +53,8 @@ class RebalancingPlanLeg(Base):
     """플랜의 매수/매도 절반 — 각자 독립된 대기/승인/실행 상태를 가진다."""
 
     __tablename__ = "rebalancing_plan_legs"
+    # 아래 `token` 속성처럼 Mapped[]를 쓰지 않는 transient(비영속) 속성을 허용한다.
+    __allow_unmapped__ = True
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     plan_id: Mapped[uuid.UUID] = mapped_column(
@@ -60,6 +62,9 @@ class RebalancingPlanLeg(Base):
     )
     # BUY | SELL
     side: Mapped[str] = mapped_column(String(10), nullable=False)
+    # KR | US — leg에 속한 주문의 시장(leg는 항상 단일 시장으로 균질). 매수 실행/매도 만료 job이
+    # item을 로드하지 않고도 어느 시장 개장 시각을 기준으로 게이팅할지 판단하는 데 쓰인다.
+    market: Mapped[str] = mapped_column(String(10), nullable=False, server_default="KR")
     # PENDING | EXECUTED | CANCELED | REJECTED | EXPIRED | FAILED
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="PENDING")
     # BUY: 자동 실행 예정 시각. SELL: 승인 만료(당일 장마감) 시각.
@@ -75,6 +80,11 @@ class RebalancingPlanLeg(Base):
     )
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # DB 컬럼이 아닌 transient 속성 — 이메일 발송용 원문 토큰을 leg 생성 직후 잠깐 실어 나르는
+    # 용도(notify_plan_generated -> email_service). action_token_hash만 영속화되므로 원문은
+    # 세션 커밋 대상이 아니다.
+    token: str | None = None
 
     plan: Mapped["RebalancingPlan"] = relationship(back_populates="legs")
     items: Mapped[list["RebalancingPlanItem"]] = relationship(

@@ -35,6 +35,7 @@ export interface SettingsData {
   fcm_token_stored: boolean;
   composite_signal_alerts_enabled: boolean;
   market_signal_daily_digest_enabled: boolean;
+  year_end_tax_reminder_enabled: boolean;
   goal_achievement_alerts_enabled: boolean;
   monthly_report_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
@@ -55,6 +56,9 @@ export const updateCompositeSignalAlerts = (enabled: boolean) =>
 
 export const updateMarketSignalDigest = (enabled: boolean) =>
   apiPut("/settings/market-signal-digest", { enabled });
+
+export const updateYearEndTaxReminder = (enabled: boolean) =>
+  apiPut("/settings/year-end-tax-reminder", { enabled });
 
 export const updateGoalAchievementAlerts = (enabled: boolean) =>
   apiPut("/settings/goal-achievement-alerts", { enabled });

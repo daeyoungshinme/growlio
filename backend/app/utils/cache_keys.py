@@ -1,17 +1,18 @@
-"""Redis 캐시 키 빌더 및 TTL 상수 — 키 형식을 한 곳에서 관리한다."""
+"""캐시 키 빌더 및 TTL 상수 — 키 형식을 한 곳에서 관리한다."""
 
 from __future__ import annotations
 
 import uuid
-from typing import Any, TypeAlias
+from typing import TYPE_CHECKING, Any, TypeAlias
 
-from redis.asyncio import Redis as AioRedis
+if TYPE_CHECKING:
+    from app.core.cache_store import CacheStore
 
-RedisType: TypeAlias = AioRedis | None
+CacheStoreType: TypeAlias = "CacheStore | None"
 
 
 def _env_prefix() -> str:
-    """app_env를 키 네임스페이스 prefix로 반환한다 (dev/staging/prod Redis 공유 시 충돌 방지)."""
+    """app_env를 키 네임스페이스 prefix로 반환한다 (dev/staging/prod 캐시 공유 시 충돌 방지)."""
     from app.core.config import settings  # lazy — 순환 임포트 방지
 
     return f"{settings.app_env}:"
@@ -279,144 +280,128 @@ def market_signal_gate_alert_sent_key(alert_id: uuid.UUID, day: str) -> str:
     return f"{_env_prefix()}rebalancing:market_gate_sent:{alert_id}:{day}"
 
 
-async def get_cached_json(redis: RedisType, key: str) -> Any:
-    """Redis에서 JSON을 조회한다. 캐시 미스나 오류 시 None 반환."""
-    if redis is None:
+async def get_cached_json(cache: CacheStoreType, key: str) -> Any:
+    """캐시에서 JSON을 조회한다. 캐시 미스나 파싱 오류 시 None 반환."""
+    if cache is None:
         return None
     import contextlib
     import json
 
-    from redis.exceptions import RedisError
-
-    with contextlib.suppress(RedisError, json.JSONDecodeError, TypeError):
-        cached = await redis.get(key)
+    with contextlib.suppress(json.JSONDecodeError, TypeError):
+        cached = await cache.get(key)
         if cached:
             return json.loads(cached)
     return None
 
 
-async def set_cached_json(redis: RedisType, key: str, value: object, ttl: int) -> None:
-    """Redis에 JSON으로 직렬화해 저장한다. 오류 시 무시."""
-    if redis is None:
+async def set_cached_json(cache: CacheStoreType, key: str, value: object, ttl: int) -> None:
+    """캐시에 JSON으로 직렬화해 저장한다."""
+    if cache is None:
         return
-    import contextlib
     import json
 
-    from redis.exceptions import RedisError
-
-    with contextlib.suppress(RedisError):
-        await redis.setex(key, ttl, json.dumps(value, ensure_ascii=False, allow_nan=False))
+    await cache.setex(key, ttl, json.dumps(value, ensure_ascii=False, allow_nan=False))
 
 
-async def invalidate_user_caches(redis: RedisType, *keys: str) -> None:
-    """주어진 캐시 키들을 RedisError 무시하며 일괄 삭제한다."""
-    if redis is None:
+async def invalidate_user_caches(cache: CacheStoreType, *keys: str) -> None:
+    """주어진 캐시 키들을 일괄 삭제한다."""
+    if cache is None:
         return
-    import contextlib
-
-    from redis.exceptions import RedisError
-
-    with contextlib.suppress(RedisError):
-        await redis.delete(*keys)
+    await cache.delete(*keys)
 
 
-async def invalidate_exchange_rate_alert_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+async def invalidate_exchange_rate_alert_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """환율 알림 목록 캐시를 삭제한다."""
-    await invalidate_user_caches(redis, exchange_rate_alerts_key(user_id))
+    await invalidate_user_caches(cache, exchange_rate_alerts_key(user_id))
 
 
-async def _scan_unlink(redis: RedisType, pattern: str) -> None:
+async def _scan_unlink(cache: CacheStoreType, pattern: str) -> None:
     """주어진 패턴에 매칭되는 키를 SCAN+UNLINK로 일괄 삭제한다.
 
-    고정된 키 목록 대신 실제 존재하는 키만 삭제해 불필요한 DEL 명령을 줄인다.
+    고정된 키 목록 대신 실제 존재하는 키만 삭제해 불필요한 삭제 호출을 줄인다.
     """
-    if redis is None:
+    if cache is None:
         return
-    import contextlib
-
-    from redis.exceptions import RedisError
-
-    with contextlib.suppress(RedisError):
-        cursor = 0
-        keys_to_delete: list[bytes | str] = []
-        while True:
-            cursor, batch = await redis.scan(cursor, match=pattern, count=100)
-            keys_to_delete.extend(batch)
-            if cursor == 0:
-                break
-        if keys_to_delete:
-            await redis.unlink(*keys_to_delete)
+    cursor = 0
+    keys_to_delete: list[str] = []
+    while True:
+        cursor, batch = await cache.scan(cursor, match=pattern, count=100)
+        keys_to_delete.extend(batch)
+        if cursor == 0:
+            break
+    if keys_to_delete:
+        await cache.unlink(*keys_to_delete)
 
 
-async def invalidate_all_user_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+async def invalidate_all_user_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """회원 탈퇴 시 해당 유저의 모든 캐시 키를 SCAN+UNLINK로 일괄 삭제한다."""
-    await _scan_unlink(redis, f"{_env_prefix()}*{user_id}*")
+    await _scan_unlink(cache, f"{_env_prefix()}*{user_id}*")
 
 
-async def _invalidate_alloc_history(redis: RedisType, user_id: uuid.UUID) -> None:
+async def _invalidate_alloc_history(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """alloc_history 캐시를 SCAN+UNLINK 패턴으로 일괄 삭제한다."""
-    await _scan_unlink(redis, f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}alloc_history_{_ALLOC_HISTORY_VERSION}:{user_id}:*")
 
 
-async def invalidate_dividend_caches(redis: RedisType, user_id: uuid.UUID, year: int) -> None:
+async def invalidate_dividend_caches(cache: CacheStoreType, user_id: uuid.UUID, year: int) -> None:
     """dividend_summary/dividend_ticker_summary/dividends_positions 캐시를 계좌 조합(acct_suffix)
     전체에 대해 SCAN+UNLINK로 삭제한다 — `_invalidate_alloc_history`와 동일한 이유(무효화 시점엔
     어떤 account_id 조합이 캐시됐는지 알 수 없음)."""
-    await _scan_unlink(redis, f"{_env_prefix()}dividend_summary:{user_id}:*")
-    await _scan_unlink(redis, f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}:*")
-    await _scan_unlink(redis, f"{_env_prefix()}dividends:positions:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}dividend_summary:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}dividend:by-ticker:{user_id}:{year}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}dividends:positions:{user_id}:*")
 
 
-async def invalidate_goal_recommendation_caches(redis: RedisType, user_id: uuid.UUID) -> None:
+async def invalidate_goal_recommendation_caches(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """목표 역산 추천(전체/기간별) 캐시를 삭제한다 — 목표 설정, 후보 ETF, 계좌 포지션 변경 시 호출."""
     await invalidate_user_caches(
-        redis,
+        cache,
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
     )
 
 
-async def invalidate_portfolio_overview_cache(redis: RedisType, user_id: uuid.UUID) -> None:
+async def invalidate_portfolio_overview_cache(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """`portfolio_overview`/`portfolio_overview_lite` 캐시를 계좌 조합(acct_suffix) 전체에 대해 삭제한다.
 
     account_ids 조합별로 키가 분기되어(무효화 시점엔 어떤 조합이 캐시됐는지 알 수 없음) SCAN+UNLINK
     와일드카드 패턴을 사용한다 — `invalidate_rebalancing_strategy_cache`와 동일한 패턴.
     """
-    await _scan_unlink(redis, f"{_env_prefix()}portfolio_overview:{user_id}:*")
-    await _scan_unlink(redis, f"{_env_prefix()}portfolio_overview_lite:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}portfolio_overview:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}portfolio_overview_lite:{user_id}:*")
 
 
 async def invalidate_rebalancing_strategy_cache(
-    redis: RedisType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
+    cache: CacheStoreType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
 ) -> None:
     """리밸런싱 전략 캐시(계좌 그룹별 acct_suffix 포함)를 SCAN+UNLINK로 일괄 삭제한다.
 
     쓰기 시점엔 acct_suffix(계좌 그룹 조합)를 알지만 무효화 시점엔 알 수 없으므로,
     와일드카드 패턴으로 해당 user+portfolio의 모든 acct_suffix 변형 키를 삭제한다.
     """
-    await _scan_unlink(redis, f"{_env_prefix()}rebalancing_strategy:{user_id}:{portfolio_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}rebalancing_strategy:{user_id}:{portfolio_id}:*")
 
 
 async def invalidate_rebalancing_analysis_cache(
-    redis: RedisType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
+    cache: CacheStoreType, user_id: uuid.UUID, portfolio_id: uuid.UUID | str
 ) -> None:
     """리밸런싱 진단(analyze) 캐시를 SCAN+UNLINK로 일괄 삭제한다 (계좌 조합·예수금 override 변형 전체).
 
     포트폴리오 수정, 리밸런싱 주문 실행 등 특정 포트폴리오가 특정된 이벤트에서 호출한다.
     """
-    await _scan_unlink(redis, f"{_env_prefix()}rebalancing_analysis:{user_id}:{portfolio_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:{portfolio_id}:*")
 
 
-async def invalidate_rebalancing_analysis_cache_all(redis: RedisType, user_id: uuid.UUID) -> None:
+async def invalidate_rebalancing_analysis_cache_all(cache: CacheStoreType, user_id: uuid.UUID) -> None:
     """유저의 모든 포트폴리오에 대한 리밸런싱 진단(analyze) 캐시를 삭제한다.
 
     계좌 sync·CRUD처럼 어떤 포트폴리오가 영향받는지 특정할 수 없는 이벤트에서 호출한다.
     """
-    await _scan_unlink(redis, f"{_env_prefix()}rebalancing_analysis:{user_id}:*")
+    await _scan_unlink(cache, f"{_env_prefix()}rebalancing_analysis:{user_id}:*")
 
 
 async def invalidate_asset_account_caches(
-    redis: RedisType,
+    cache: CacheStoreType,
     user_id: uuid.UUID,
     account_id: uuid.UUID | None = None,
     year: int | None = None,
@@ -436,26 +421,26 @@ async def invalidate_asset_account_caches(
     ]
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
-    await invalidate_user_caches(redis, *keys)
-    await invalidate_dividend_caches(redis, user_id, _year)
-    await invalidate_portfolio_overview_cache(redis, user_id)
-    await invalidate_rebalancing_analysis_cache_all(redis, user_id)
+    await invalidate_user_caches(cache, *keys)
+    await invalidate_dividend_caches(cache, user_id, _year)
+    await invalidate_portfolio_overview_cache(cache, user_id)
+    await invalidate_rebalancing_analysis_cache_all(cache, user_id)
 
 
-async def invalidate_account_caches(redis: RedisType, user_id: uuid.UUID, year: int | None = None) -> None:
+async def invalidate_account_caches(cache: CacheStoreType, user_id: uuid.UUID, year: int | None = None) -> None:
     """계좌 싱크 완료 후 관련 캐시 일괄 무효화."""
     from datetime import date as _date
 
     _year = year if year is not None else _date.today().year
-    await _invalidate_alloc_history(redis, user_id)
-    await invalidate_dividend_caches(redis, user_id, _year)
-    await _scan_unlink(redis, f"{_env_prefix()}tax:overseas:{user_id}:*")
+    await _invalidate_alloc_history(cache, user_id)
+    await invalidate_dividend_caches(cache, user_id, _year)
+    await _scan_unlink(cache, f"{_env_prefix()}tax:overseas:{user_id}:*")
     await invalidate_user_caches(
-        redis,
+        cache,
         monthly_trend_key(user_id),
         dashboard_summary_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
     )
-    await invalidate_portfolio_overview_cache(redis, user_id)
-    await invalidate_rebalancing_analysis_cache_all(redis, user_id)
+    await invalidate_portfolio_overview_cache(cache, user_id)
+    await invalidate_rebalancing_analysis_cache_all(cache, user_id)

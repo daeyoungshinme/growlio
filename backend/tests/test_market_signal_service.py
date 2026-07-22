@@ -575,7 +575,7 @@ class TestGetMarketSignalCachingTtl:
         return tuple(None for _ in range(8))
 
     @pytest.mark.asyncio
-    async def test_live_uses_full_ttl(self, mock_redis):
+    async def test_live_uses_full_ttl(self, mock_cache):
         from app.utils.cache_keys import TTL_MARKET_SIGNAL
 
         live_signals = (
@@ -592,28 +592,28 @@ class TestGetMarketSignalCachingTtl:
             "app.services.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=live_signals),
         ):
-            result = await get_market_signal(mock_redis)
+            result = await get_market_signal(mock_cache)
 
         assert result["data_freshness"] == "LIVE"
-        mock_redis.setex.assert_called_once()
-        assert mock_redis.setex.call_args[0][1] == TTL_MARKET_SIGNAL
+        mock_cache.setex.assert_called_once()
+        assert mock_cache.setex.call_args[0][1] == TTL_MARKET_SIGNAL
 
     @pytest.mark.asyncio
-    async def test_stale_uses_degraded_ttl(self, mock_redis):
+    async def test_stale_uses_degraded_ttl(self, mock_cache):
         from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED
 
         with patch(
             "app.services.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=self._all_none_signals()),
         ):
-            result = await get_market_signal(mock_redis)
+            result = await get_market_signal(mock_cache)
 
         assert result["data_freshness"] == "STALE"
-        mock_redis.setex.assert_called_once()
-        assert mock_redis.setex.call_args[0][1] == TTL_MARKET_SIGNAL_DEGRADED
+        mock_cache.setex.assert_called_once()
+        assert mock_cache.setex.call_args[0][1] == TTL_MARKET_SIGNAL_DEGRADED
 
     @pytest.mark.asyncio
-    async def test_partial_uses_degraded_ttl(self, mock_redis):
+    async def test_partial_uses_degraded_ttl(self, mock_cache):
         from app.utils.cache_keys import TTL_MARKET_SIGNAL_DEGRADED
 
         # 최소 신뢰 기준(3개)은 충족하되 일부(5개)는 빠진 상태 — PARTIAL로 분류돼야 함.
@@ -623,8 +623,8 @@ class TestGetMarketSignalCachingTtl:
             "app.services.market_signal_service._fetch_all_signals",
             AsyncMock(return_value=partial_signals),
         ):
-            result = await get_market_signal(mock_redis)
+            result = await get_market_signal(mock_cache)
 
         assert result["data_freshness"] == "PARTIAL"
-        mock_redis.setex.assert_called_once()
-        assert mock_redis.setex.call_args[0][1] == TTL_MARKET_SIGNAL_DEGRADED
+        mock_cache.setex.assert_called_once()
+        assert mock_cache.setex.call_args[0][1] == TTL_MARKET_SIGNAL_DEGRADED

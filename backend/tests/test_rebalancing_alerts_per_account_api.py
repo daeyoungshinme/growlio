@@ -370,5 +370,5 @@ class TestTriggerAccountRebalancingAlertTest:
             user_id=user.id,
             db=db,
             account_id=account_id,
-            redis=ANY,
+            cache=ANY,
         )

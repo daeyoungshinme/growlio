@@ -25,7 +25,7 @@ from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
-    RedisType,
+    CacheStoreType,
     invalidate_account_caches,
     invalidate_asset_account_caches,
 )
@@ -66,13 +66,13 @@ def get_provider(account: AssetAccount) -> BrokerProvider:
     reraise=True,
 )
 async def _retry_provider_sync(
-    provider: BrokerProvider, account: AssetAccount, db: AsyncSession, redis: RedisType
+    provider: BrokerProvider, account: AssetAccount, db: AsyncSession, cache: CacheStoreType
 ) -> BalanceResult:
     """ProviderNetworkError에 한해 지수 백오프(2s→4s→8s, 최대 30s) 재시도."""
-    return await provider.sync(account, db, redis)
+    return await provider.sync(account, db, cache)
 
 
-async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType) -> AssetSnapshot:
+async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStoreType) -> AssetSnapshot:
     """모든 데이터 소스를 통합 처리하는 계좌 동기화 진입점.
 
     SyncError 계층 예외 및 CircuitOpenError를 그대로 전파한다.
@@ -85,9 +85,9 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
     circuit = _CIRCUITS.get(account.data_source)
 
     if circuit:
-        balance = await circuit.call(_retry_provider_sync, provider, account, db, redis)
+        balance = await circuit.call(_retry_provider_sync, provider, account, db, cache)
     else:
-        balance = await _retry_provider_sync(provider, account, db, redis)
+        balance = await _retry_provider_sync(provider, account, db, cache)
 
     if balance.deposit_krw is not None:
         account.deposit_krw = balance.deposit_krw
@@ -140,7 +140,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
     await db.commit()
 
     # sync 완료 후 관련 캐시 즉시 무효화 — sync 직후에도 최신 데이터 표시
-    await invalidate_account_caches(redis, account.user_id)
+    await invalidate_account_caches(cache, account.user_id)
 
     broker_sync_duration.labels(data_source=account.data_source, status="success").observe(
         _time.monotonic() - _sync_start
@@ -155,15 +155,15 @@ async def sync_account(account: AssetAccount, db: AsyncSession, redis: RedisType
 
 
 async def sync_account_now(
-    account: AssetAccount, user_id: uuid.UUID, db: AsyncSession, redis: RedisType
+    account: AssetAccount, user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
 ) -> dict[str, str | float]:
     """계좌 동기화 실행 + 관련 캐시 무효화 + API 응답 dict 반환 (assets.py `/sync` 엔드포인트 전용).
 
     SyncError/CircuitOpenError는 main.py 전역 핸들러가 처리한다.
     """
-    snapshot = await sync_account(account, db, redis)
+    snapshot = await sync_account(account, db, cache)
 
-    await invalidate_asset_account_caches(redis, user_id, account.id)
+    await invalidate_asset_account_caches(cache, user_id, account.id)
     return {
         "detail": "동기화 완료",
         "snapshot_date": str(snapshot.snapshot_date),

@@ -29,6 +29,7 @@ import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlertsToggle";
 import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsToggle";
+import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
@@ -202,6 +203,11 @@ export default function SettingsPage() {
     toggle: toggleMonthlyReport,
     isPending: monthlyReportPending,
   } = useMonthlyReportAlertsToggle();
+  const {
+    enabled: yearEndTaxReminderEnabled,
+    toggle: toggleYearEndTaxReminder,
+    isPending: yearEndTaxReminderPending,
+  } = useYearEndTaxReminderToggle();
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -373,6 +379,19 @@ export default function SettingsPage() {
               disabled={monthlyReportPending}
               onChange={toggleMonthlyReport}
               ariaLabel="월간 리포트"
+            />
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
+            </p>
+            <ToggleSwitch
+              checked={yearEndTaxReminderEnabled}
+              disabled={yearEndTaxReminderPending}
+              onChange={toggleYearEndTaxReminder}
+              ariaLabel="연말 절세 리마인더"
             />
           </div>
 

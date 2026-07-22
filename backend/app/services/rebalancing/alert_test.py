@@ -28,7 +28,7 @@ async def send_test_rebalancing_alert(
     user_id: uuid.UUID,
     db: AsyncSession,
     account_id: uuid.UUID | None = None,
-    redis: Any = None,
+    cache: Any = None,
 ) -> dict[str, bool]:
     """리밸런싱 자동화 알림을 즉시 테스트 발송한다.
 
@@ -73,7 +73,7 @@ async def send_test_rebalancing_alert(
     drifting: list = []
     ticker_account_map: dict[str, list] = {}
     try:
-        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids, redis=redis)
+        overview = await build_portfolio_overview(user_id, db, account_ids=effective_account_ids, cache=cache)
         analysis = analyze_rebalancing(portfolio, overview, include_implicit_cash=True)
         drifting = filter_drifting_items(analysis.items, threshold)
         items_to_show = analysis.items

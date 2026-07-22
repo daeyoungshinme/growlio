@@ -402,6 +402,58 @@ describe("useRebalancingAlertFormState", () => {
     );
   });
 
+  it("AUTO 모드 + 실행 계좌 미선택 시 저장을 차단하고 토스트로 안내한다", async () => {
+    const { toast } = await import("@/utils/toast");
+
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.setMode("AUTO");
+      // accountId를 설정하지 않음 — 다중 계좌 포트폴리오에서 드롭다운을 비워둔 상태와 동일
+    });
+
+    await act(async () => {
+      try {
+        await result.current.upsertMut.mutateAsync();
+      } catch {
+        // mutation throws on error — 아래 assertion에서 확인
+      }
+    });
+
+    expect(upsertRebalancingAlert).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("실행 계좌를 선택"));
+  });
+
+  it("AUTO 모드 + 세금영향 게이트 ENABLED인데 상한액 미입력 시 저장을 차단한다", async () => {
+    const { toast } = await import("@/utils/toast");
+
+    const { result } = renderHook(
+      () => useRebalancingAlertFormState({ alert: null, portfolioId: "port-1", onClose }),
+      { wrapper: createWrapper() },
+    );
+
+    act(() => {
+      result.current.setMode("AUTO");
+      result.current.setAccountId("acc-1");
+      result.current.setTaxImpactGateMode("ENABLED");
+      // maxTaxImpactKrw를 입력하지 않음(null 유지)
+    });
+
+    await act(async () => {
+      try {
+        await result.current.upsertMut.mutateAsync();
+      } catch {
+        // mutation throws on error — 아래 assertion에서 확인
+      }
+    });
+
+    expect(upsertRebalancingAlert).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(expect.stringContaining("추정 양도세 상한"));
+  });
+
   it("deleteMut 성공 시 onClose와 toast를 호출한다", async () => {
     vi.mocked(deleteRebalancingAlert).mockResolvedValue(undefined as never);
     const { toast } = await import("@/utils/toast");

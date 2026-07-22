@@ -223,14 +223,14 @@ class TestIndexRegion:
         mock_fetch.assert_not_called()
 
     def test_krx_ticker_uses_fetched_result_and_caches(self, override_settings):
-        """`_mock_redis_singleton`(conftest.py autouse)이 실제 `get_redis()`가 반환하는
-        싱글턴이므로, `app.core.redis_client.redis_client`를 직접 재설정해 캐시 동작을 검증한다."""
-        import app.core.redis_client as _rc
+        """`get_cache_store()`가 반환하는 프로세스 싱글턴을 직접 재설정해 캐시 동작을 검증한다."""
+        import app.core.cache_store as _rc
         from app.main import app
 
-        _rc.redis_client.get = AsyncMock(return_value=None)
-        _rc.redis_client.setex = AsyncMock()
-        mock_setex = _rc.redis_client.setex  # 앱 lifespan 종료 시 redis_client가 None으로 리셋되므로 미리 참조 보관
+        _rc.cache_store = AsyncMock()
+        _rc.cache_store.get = AsyncMock(return_value=None)
+        _rc.cache_store.setex = AsyncMock()
+        mock_setex = _rc.cache_store.setex  # 앱 lifespan 종료 시 cache_client가 None으로 리셋되므로 미리 참조 보관
         with (
             patch(
                 "app.services.dividend.sync_sources.sync_naver_etf_index_region",
@@ -246,11 +246,12 @@ class TestIndexRegion:
 
     def test_krx_ticker_falls_back_when_not_etf(self, override_settings):
         """ETF가 아니면(None 반환) resolve_index_region 폴백(기본값 DOMESTIC)을 사용한다."""
-        import app.core.redis_client as _rc
+        import app.core.cache_store as _rc
         from app.main import app
 
-        _rc.redis_client.get = AsyncMock(return_value=None)
-        _rc.redis_client.setex = AsyncMock()
+        _rc.cache_store = AsyncMock()
+        _rc.cache_store.get = AsyncMock(return_value=None)
+        _rc.cache_store.setex = AsyncMock()
         with (
             patch("app.services.dividend.sync_sources.sync_naver_etf_index_region", return_value=None),
             TestClient(app, raise_server_exceptions=False) as client,
@@ -260,10 +261,11 @@ class TestIndexRegion:
         assert resp.json() == {"index_region": "DOMESTIC"}
 
     def test_cache_hit_skips_fetch(self, override_settings):
-        import app.core.redis_client as _rc
+        import app.core.cache_store as _rc
         from app.main import app
 
-        _rc.redis_client.get = AsyncMock(return_value=b'{"index_region": "OVERSEAS"}')
+        _rc.cache_store = AsyncMock()
+        _rc.cache_store.get = AsyncMock(return_value='{"index_region": "OVERSEAS"}')
         with (
             patch("app.services.dividend.sync_sources.sync_naver_etf_index_region") as mock_fetch,
             TestClient(app, raise_server_exceptions=False) as client,
@@ -276,13 +278,13 @@ class TestIndexRegion:
 
 class TestExchangeRate:
     def test_returns_200_with_cached_rate(self, override_settings):
-        """Redis 캐시에서 환율 반환."""
+        """Cache 캐시에서 환율 반환."""
         from app.main import app
 
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=b"1350.0")
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=b"1350.0")
         with (
-            patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
+            patch("app.api.v1.stocks.get_cache_store", new_callable=AsyncMock, return_value=mock_cache),
             TestClient(app, raise_server_exceptions=False) as client,
         ):
             resp = client.get("/api/v1/stocks/exchange-rate")
@@ -293,12 +295,12 @@ class TestExchangeRate:
         """캐시 미스 시 yfinance 폴백."""
         from app.main import app
 
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
-        mock_redis.set = AsyncMock()
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
+        mock_cache.set = AsyncMock()
         with (
             TestClient(app, raise_server_exceptions=False) as client,
-            patch("app.api.v1.stocks.get_redis", new_callable=AsyncMock, return_value=mock_redis),
+            patch("app.api.v1.stocks.get_cache_store", new_callable=AsyncMock, return_value=mock_cache),
             patch("app.services.yahoo_price._sync_usdkrw", return_value=0.0),
             patch("app.utils.currency.get_usd_krw_rate", new_callable=AsyncMock, return_value=1350.0),
         ):

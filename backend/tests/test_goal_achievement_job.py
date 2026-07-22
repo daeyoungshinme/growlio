@@ -59,7 +59,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock) as mock_email,
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
@@ -86,7 +86,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch(
                 "app.jobs.goal_achievement.get_dashboard_summary",
                 new_callable=AsyncMock,
@@ -132,7 +132,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch(
                 "app.jobs.goal_achievement.get_dashboard_summary",
                 new_callable=AsyncMock,
@@ -183,7 +183,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch(
                 "app.jobs.goal_achievement.get_dashboard_summary",
                 new_callable=AsyncMock,
@@ -233,7 +233,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch(
                 "app.jobs.goal_achievement.get_dashboard_summary",
                 new_callable=AsyncMock,
@@ -273,7 +273,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
         ):
             from app.jobs.goal_achievement import run_goal_achievement_check
 
@@ -308,7 +308,7 @@ class TestRunGoalAchievementCheck:
 
         with (
             patch("app.jobs.goal_achievement.AsyncSessionLocal", return_value=mock_session),
-            patch("app.jobs.goal_achievement.get_redis", new_callable=AsyncMock, return_value=AsyncMock()),
+            patch("app.jobs.goal_achievement.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.goal_achievement.get_dashboard_summary", side_effect=fail_first),
             patch("app.jobs.goal_achievement.send_goal_achievement_email", new_callable=AsyncMock),
         ):

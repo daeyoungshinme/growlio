@@ -6,7 +6,6 @@ import asyncio
 import uuid
 from functools import partial
 
-import redis.asyncio as aioredis
 import structlog
 from fastapi import APIRouter, Depends, Query, Request
 from pydantic import BaseModel, Field
@@ -15,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.api.v1._account_deps import get_owned_account
 from app.constants import DOMESTIC_MARKETS
+from app.core.cache_store import CacheStore, get_cache_store
 from app.core.database import get_db
-from app.core.redis_client import get_redis
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.user import User
@@ -62,7 +61,7 @@ async def get_index_region(
     request: Request,
     ticker: str = Query(..., min_length=1, max_length=20),
     market: str = Query(...),
-    redis: aioredis.Redis = Depends(get_redis),
+    cache: CacheStore = Depends(get_cache_store),
 ):
     """종목이 추종하는 지수의 지역(DOMESTIC/OVERSEAS)을 조회한다.
 
@@ -75,7 +74,7 @@ async def get_index_region(
         return {"index_region": "OVERSEAS"}
 
     cache_key = etf_index_region_key(ticker)
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -86,25 +85,25 @@ async def get_index_region(
     index_region = fetched if fetched is not None else resolve_index_region(ticker, market, None)
 
     result = {"index_region": index_region}
-    await set_cached_json(redis, cache_key, result, TTL_ETF_INDEX_REGION)
+    await set_cached_json(cache, cache_key, result, TTL_ETF_INDEX_REGION)
     return result
 
 
 @router.get("/exchange-rate")
 @limiter.limit("10/minute")
-async def get_exchange_rate(request: Request, redis: aioredis.Redis = Depends(get_redis)):
-    """현재 USD/KRW 환율 조회 (Redis 캐시 → yfinance, ~15분 지연)."""
+async def get_exchange_rate(request: Request, cache: CacheStore = Depends(get_cache_store)):
+    """현재 USD/KRW 환율 조회 (캐시 → yfinance, ~15분 지연)."""
     from app.services.yahoo_price import _sync_usdkrw
 
-    cached = await redis.get(_USD_KRW_KEY)
+    cached = await cache.get(_USD_KRW_KEY)
     if cached:
         return {"usd_krw": float(cached)}
     loop = asyncio.get_running_loop()
     rate = await loop.run_in_executor(None, _sync_usdkrw)
     if rate > 0:
-        await cache_usd_krw_rate(redis, rate)
+        await cache_usd_krw_rate(cache, rate)
     else:
-        rate = await get_usd_krw_rate(redis)
+        rate = await get_usd_krw_rate(cache)
     return {"usd_krw": rate}
 
 
@@ -114,7 +113,7 @@ async def _kis_price_fallback(
     market: str,
     current_user: User,
     db: AsyncSession,
-    redis: aioredis.Redis,
+    cache: CacheStore,
 ) -> float | None:
     """다른 소스가 전부 실패했을 때만 쓰는 최후 폴백 — 소유 계좌 검증 후 KIS API로 조회.
     계좌 미검증/KIS 호출 실패는 가격 조회 전체를 깨지 않도록 조용히 무시한다."""
@@ -122,7 +121,7 @@ async def _kis_price_fallback(
         return None
     try:
         account = await get_owned_account(account_id, current_user.id, db)
-        return await _price_via_kis(account, ticker, market, db, redis)
+        return await _price_via_kis(account, ticker, market, db, cache)
     except Exception as e:
         logger.warning("kis_price_endpoint_failed", ticker=ticker, error=str(e), exc_type=type(e).__name__)
         return None
@@ -137,17 +136,17 @@ async def get_stock_price(
     account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    cache: CacheStore = Depends(get_cache_store),
 ):
     """단일 종목 현재가 조회.
     Yahoo Finance를 먼저 시도하고, 국내 종목이면서 Yahoo가 실패한 경우에만 Naver/pykrx로 폴백한다.
     그래도 없고 `account_id`(KIS 연동 보유 계좌)가 주어진 경우 최후로 KIS API를 시도한다.
-    해외 종목은 USD → KRW 변환 후 반환. Redis 캐시 TTL 900s.
+    해외 종목은 USD → KRW 변환 후 반환. 캐시 TTL 900s.
     """
     from app.services.yahoo_price import _sync_usdkrw, _sync_yahoo_price
 
     cache_key = current_price_display_key(ticker, market)
-    cached = await get_cached_json(redis, cache_key)
+    cached = await get_cached_json(cache, cache_key)
     if cached is not None:
         return cached
 
@@ -159,7 +158,7 @@ async def get_stock_price(
         price = await domestic_price_fallback(ticker, loop)
     if not price:
         tried_stages.append("kis" if account_id is not None else "kis_skipped_no_account")
-        price = await _kis_price_fallback(account_id, ticker, market, current_user, db, redis)
+        price = await _kis_price_fallback(account_id, ticker, market, current_user, db, cache)
     if not price:
         logger.warning("price_lookup_exhausted", ticker=ticker, market=market, tried_stages=tried_stages)
         return {"price_krw": None, "price_usd": None, "usd_rate": None}
@@ -167,7 +166,7 @@ async def get_stock_price(
     if market in OVERSEAS_MARKETS:
         usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
         if not usd_rate:
-            usd_rate = await get_usd_krw_rate(redis)
+            usd_rate = await get_usd_krw_rate(cache)
         result = {
             "price_krw": round(price * usd_rate) if usd_rate else None,
             "price_usd": round(price, 2),
@@ -177,7 +176,7 @@ async def get_stock_price(
         result = {"price_krw": price, "price_usd": None, "usd_rate": None}
 
     if result["price_krw"] is not None:
-        await set_cached_json(redis, cache_key, result, TTL_PRICE_CURRENT)
+        await set_cached_json(cache, cache_key, result, TTL_PRICE_CURRENT)
     return result
 
 
@@ -197,7 +196,7 @@ async def _resolve_batch_prices(
     loop: asyncio.AbstractEventLoop,
     current_user: User,
     db: AsyncSession,
-    redis: aioredis.Redis,
+    cache: CacheStore,
 ) -> dict[str, float]:
     """Yahoo 배치 조회로 먼저 채우고, 그중 국내 마켓이면서 여전히 없는 티커만 Naver/pykrx로 폴백한다.
     그래도 없고 `account_id`가 주어진 티커만 최후로 KIS API를 시도한다."""
@@ -217,7 +216,7 @@ async def _resolve_batch_prices(
     kis_missing = [(t, m) for t, m in to_fetch if t not in price_map and t in account_ids]
     if kis_missing:
         kis_results = await asyncio.gather(
-            *(_kis_price_fallback(account_ids[t], t, m, current_user, db, redis) for t, m in kis_missing),
+            *(_kis_price_fallback(account_ids[t], t, m, current_user, db, cache) for t, m in kis_missing),
             return_exceptions=True,
         )
         for (ticker, _), kis_price in zip(kis_missing, kis_results, strict=False):
@@ -243,7 +242,7 @@ async def get_stock_prices_batch(
     body: _BatchRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),
+    cache: CacheStore = Depends(get_cache_store),
 ):
     """복수 종목 현재가 일괄 조회.
     Response: {ticker: {price_krw, price_usd, usd_rate}}
@@ -257,7 +256,7 @@ async def get_stock_prices_batch(
     account_ids: dict[str, uuid.UUID] = {}
     for item in body.items:
         cache_key = current_price_display_key(item.ticker, item.market)
-        cached = await get_cached_json(redis, cache_key)
+        cached = await get_cached_json(cache, cache_key)
         if cached is not None:
             result[item.ticker] = cached
         else:
@@ -269,7 +268,7 @@ async def get_stock_prices_batch(
         return result
 
     loop = asyncio.get_running_loop()
-    price_map = await _resolve_batch_prices(to_fetch, account_ids, loop, current_user, db, redis)
+    price_map = await _resolve_batch_prices(to_fetch, account_ids, loop, current_user, db, cache)
 
     # 해외 종목이 있으면 환율 1회 조회
     overseas_tickers = {t for t, m in to_fetch if m in OVERSEAS_MARKETS}
@@ -279,9 +278,9 @@ async def get_stock_prices_batch(
 
         usd_rate = await loop.run_in_executor(None, _sync_usdkrw)
         if not usd_rate:
-            usd_rate = await get_usd_krw_rate(redis)
+            usd_rate = await get_usd_krw_rate(cache)
         if usd_rate:
-            await cache_usd_krw_rate(redis, usd_rate)
+            await cache_usd_krw_rate(cache, usd_rate)
 
     for ticker, market in to_fetch:
         price = price_map.get(ticker)
@@ -300,6 +299,6 @@ async def get_stock_prices_batch(
 
         result[ticker] = entry
         if entry["price_krw"] is not None:
-            await set_cached_json(redis, current_price_display_key(ticker, market), entry, TTL_PRICE_CURRENT)
+            await set_cached_json(cache, current_price_display_key(ticker, market), entry, TTL_PRICE_CURRENT)
 
     return result

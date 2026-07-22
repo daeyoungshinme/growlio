@@ -1458,8 +1458,8 @@ class TestGetGoalRecommendation:
                 {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ"},
             ],
         )
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
 
         with (
             patch(
@@ -1479,10 +1479,10 @@ class TestGetGoalRecommendation:
                 return_value={},  # Yahoo 서킷브레이커 오픈 상황 시뮬레이션 — 일별수익률 조회 실패
             ),
         ):
-            result = await get_goal_recommendation(mock_redis, 10_000_000.0, [], settings_row, AsyncMock())
+            result = await get_goal_recommendation(mock_cache, 10_000_000.0, [], settings_row, AsyncMock())
 
         assert result.recommended_items == []
-        mock_redis.setex.assert_not_called()
+        mock_cache.setex.assert_not_called()
 
     async def test_caches_result_with_recommended_items(self):
         """정상적으로 추천이 생성되면 결과를 캐싱한다."""
@@ -1498,8 +1498,8 @@ class TestGetGoalRecommendation:
                 {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ"},
             ],
         )
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
         cagr_map = {("SPY", "NYSE"): {"cagr_pct": 10.0}, ("QQQ", "NASDAQ"): {"cagr_pct": 15.0}}
         returns_map = {"SPY": [0.0005] * 252, "QQQ": [0.0006] * 252}
 
@@ -1521,10 +1521,10 @@ class TestGetGoalRecommendation:
                 return_value=returns_map,
             ),
         ):
-            result = await get_goal_recommendation(mock_redis, 10_000_000.0, [], settings_row, AsyncMock())
+            result = await get_goal_recommendation(mock_cache, 10_000_000.0, [], settings_row, AsyncMock())
 
         assert result.recommended_items
-        mock_redis.setex.assert_awaited_once()
+        mock_cache.setex.assert_awaited_once()
 
 
 def _execute_result(rows: list[tuple]) -> MagicMock:
@@ -2554,8 +2554,8 @@ class TestGetHorizonRecommendations:
         account_id = uuid.uuid4()
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
 
         with (
             patch(
@@ -2575,11 +2575,11 @@ class TestGetHorizonRecommendations:
                 return_value={},  # Yahoo 서킷브레이커 오픈 상황 시뮬레이션 — 일별수익률 조회 실패
             ),
         ):
-            result = await get_horizon_recommendations(mock_redis, mock_db, uuid.uuid4(), settings_row)
+            result = await get_horizon_recommendations(mock_cache, mock_db, uuid.uuid4(), settings_row)
 
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items == []
-        mock_redis.setex.assert_not_called()
+        mock_cache.setex.assert_not_called()
 
     async def test_caches_when_all_combos_have_recommended_items(self):
         """모든 조합이 정상적으로 추천을 생성하면 응답 전체를 캐싱한다."""
@@ -2594,8 +2594,8 @@ class TestGetHorizonRecommendations:
         account_id = uuid.uuid4()
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
-        mock_redis = AsyncMock()
-        mock_redis.get = AsyncMock(return_value=None)
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
         random.seed(13)
         returns_map = {sym: [random.gauss(0.0005, 0.01) for _ in range(252)] for sym in ["SPY", "QQQ"]}
 
@@ -2617,8 +2617,8 @@ class TestGetHorizonRecommendations:
                 return_value=returns_map,
             ),
         ):
-            result = await get_horizon_recommendations(mock_redis, mock_db, uuid.uuid4(), settings_row)
+            result = await get_horizon_recommendations(mock_cache, mock_db, uuid.uuid4(), settings_row)
 
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items
-        mock_redis.setex.assert_awaited_once()
+        mock_cache.setex.assert_awaited_once()

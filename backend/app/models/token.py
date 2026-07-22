@@ -9,7 +9,7 @@ from app.core.database import Base
 
 
 class KisToken(Base):
-    """KIS OAuth2 액세스 토큰 (DB 영속화 — Redis 만료 시 fallback)
+    """KIS OAuth2 액세스 토큰 (DB 영속화 — 캐시 미스 시 fallback)
 
     account_id가 있으면 계좌별 토큰, 없으면 유저 레벨 토큰.
     unique 제약은 migration에서 partial index로 처리:
@@ -50,7 +50,7 @@ class KisToken(Base):
 
 
 class KiwoomToken(Base):
-    """키움 OpenAPI+ OAuth2 액세스 토큰 (DB 영속화 — Redis 만료 시 fallback)
+    """키움 OpenAPI+ OAuth2 액세스 토큰 (DB 영속화 — 캐시 미스 시 fallback)
 
     키움은 전역 자격증명 없음 — account_id는 항상 NOT NULL.
     unique 제약: uq_kiwoom_token_account (account_id)

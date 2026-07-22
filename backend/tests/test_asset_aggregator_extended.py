@@ -343,22 +343,22 @@ class TestGetMonthlyTrend:
         assert trend == []
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit(self, mock_db, override_settings):
+    async def test_cache_cache_hit(self, mock_db, override_settings):
         import json
 
         from app.services.asset_aggregator import _get_monthly_trend
 
         cached = [{"month": "2024-01-01", "total_krw": 10_000_000.0}]
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        trend = await _get_monthly_trend(uuid.uuid4(), mock_db, redis=redis)
+        trend = await _get_monthly_trend(uuid.uuid4(), mock_db, cache=cache)
 
         assert trend[0]["total_krw"] == 10_000_000.0
         mock_db.execute.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_redis_miss_queries_db_and_caches(self, mock_db, override_settings):
+    async def test_cache_miss_queries_db_and_caches(self, mock_db, override_settings):
         from app.services.asset_aggregator import _get_monthly_trend
 
         row = SimpleNamespace(month=date(2024, 1, 1), total_krw=5_000_000.0)
@@ -366,15 +366,15 @@ class TestGetMonthlyTrend:
         result.__iter__ = MagicMock(return_value=iter([row]))
         mock_db.execute = AsyncMock(return_value=result)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
-        trend = await _get_monthly_trend(uuid.uuid4(), mock_db, redis=redis)
+        trend = await _get_monthly_trend(uuid.uuid4(), mock_db, cache=cache)
 
         assert len(trend) == 1
         assert trend[0]["total_krw"] == 5_000_000.0
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
 
 # ── get_dashboard_summary (all sub-functions mocked) ─────────
@@ -425,16 +425,16 @@ class TestGetDashboardSummary:
             assert key in result, f"Missing: {key}"
 
     @pytest.mark.asyncio
-    async def test_redis_cache_hit(self, mock_db, override_settings):
+    async def test_cache_cache_hit(self, mock_db, override_settings):
         import json
 
         from app.services.asset_aggregator import get_dashboard_summary
 
         cached = {"total_assets_krw": 99_000_000}
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=json.dumps(cached).encode())
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=json.dumps(cached).encode())
 
-        result = await get_dashboard_summary(uuid.uuid4(), mock_db, redis=redis)
+        result = await get_dashboard_summary(uuid.uuid4(), mock_db, cache=cache)
 
         assert result["total_assets_krw"] == 99_000_000
         mock_db.execute.assert_not_called()
@@ -638,14 +638,14 @@ class TestGetDashboardSummary:
         assert result["return_goal_gap_pct"] is None
 
     @pytest.mark.asyncio
-    async def test_redis_miss_stores_result(self, mock_db, override_settings):
+    async def test_cache_miss_stores_result(self, mock_db, override_settings):
         from app.services.asset_aggregator import get_dashboard_summary
 
         mock_db.scalar = AsyncMock(return_value=None)
 
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=None)
-        redis.setex = AsyncMock()
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=None)
+        cache.setex = AsyncMock()
 
         with (
             patch(
@@ -666,9 +666,9 @@ class TestGetDashboardSummary:
             ),
             patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
         ):
-            await get_dashboard_summary(uuid.uuid4(), mock_db, redis=redis)
+            await get_dashboard_summary(uuid.uuid4(), mock_db, cache=cache)
 
-        redis.setex.assert_called_once()
+        cache.setex.assert_called_once()
 
 
 # ── _build_asset_totals ─────────────────────────────────────────

@@ -15,6 +15,9 @@ interface TaxOptimizationCardProps {
   accountId?: string | null;
 }
 
+/** 종합과세 기준까지 이 금액 이하로 남으면 "곧 근접" 경고를 보여준다 */
+const COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW = 5_000_000;
+
 export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear);
@@ -77,12 +80,13 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                 <div className="flex items-start gap-2 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
                   <AlertTriangle size={14} className="text-orange-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-orange-700 dark:text-orange-400">
-                    국내 주식 보유액이 10억원 이상입니다. 대주주 요건 해당 시 양도소득세(22%)가
-                    부과될 수 있습니다.
+                    국내 주식 보유액이 10억원을 {fmtKrw(taxData.domestic_large_holder_excess_krw)}{" "}
+                    초과했습니다. 대주주 요건 해당 시 양도소득세(22%)가 부과될 수 있습니다 — 초과분
+                    이상을 매도하면 기준 아래로 내려갑니다.
                   </p>
                 </div>
               )}
-              {taxData.comprehensive_tax_warning && (
+              {taxData.comprehensive_tax_warning ? (
                 <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                   <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
                   <p className="text-xs text-red-700 dark:text-red-400">
@@ -90,6 +94,17 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                     있습니다.
                   </p>
                 </div>
+              ) : (
+                taxData.comprehensive_tax_remaining_krw > 0 &&
+                taxData.comprehensive_tax_remaining_krw <= COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW && (
+                  <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                    <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      금융소득(배당+해외차익)이 종합과세 기준(2,000만원)까지{" "}
+                      {fmtKrw(taxData.comprehensive_tax_remaining_krw)} 남았습니다.
+                    </p>
+                  </div>
+                )
               )}
             </div>
           )}

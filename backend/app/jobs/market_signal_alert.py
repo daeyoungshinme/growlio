@@ -6,4 +6,4 @@ from app.services.alerts.market_signal_alert_service import check_market_signal_
 
 async def run_market_signal_alert_check() -> None:
     """시장 위험 신호(GREEN/YELLOW/RED) 등급이 이전 관측값과 달라졌으면 구독 유저에게 즉시 알림 발송."""
-    await run_alert_job(check_market_signal_level_change, "market_signal_alert_job", needs_redis=True)
+    await run_alert_job(check_market_signal_level_change, "market_signal_alert_job", needs_cache=True)

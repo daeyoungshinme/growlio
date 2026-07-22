@@ -114,7 +114,7 @@ async def decide_sell_by_token(
     db: AsyncSession = Depends(get_db),
 ):
     """이메일 링크로 매도 계획을 승인/거부한다. 승인 시 즉시 주문이 실행된다."""
-    from app.core.redis_client import get_redis
+    from app.core.cache_store import get_cache_store
 
     leg = await get_plan_leg_by_token(token, "SELL", db)
     if leg is None:
@@ -124,8 +124,8 @@ async def decide_sell_by_token(
         await reject_sell_leg(leg, db, decided_by="USER_EMAIL")
         return PlanActionResponse(status="REJECTED", message="매도 계획이 거부되었습니다")
 
-    redis = await get_redis()
-    execution_id = await approve_sell_leg(leg, db, redis, decided_by="USER_EMAIL")
+    cache = await get_cache_store()
+    execution_id = await approve_sell_leg(leg, db, cache, decided_by="USER_EMAIL")
     if execution_id is None:
         return PlanActionResponse(status="FAILED", message="주문 실행에 실패했습니다")
     return PlanActionResponse(status="EXECUTED", message="매도 주문이 실행되었습니다")

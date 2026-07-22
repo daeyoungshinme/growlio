@@ -22,24 +22,14 @@ def _make_mock_db():
 
 
 class TestRunRebalancingPlanBuyExecution:
-    @pytest.mark.asyncio
-    async def test_market_closed_skips_execution(self):
-        with (
-            patch("app.jobs.rebalancing_plan_buy_execution.is_korean_market_open", return_value=False),
-            patch("app.jobs.rebalancing_plan_buy_execution.get_redis") as mock_get_redis,
-        ):
-            from app.jobs.rebalancing_plan_buy_execution import run_rebalancing_plan_buy_execution
-
-            await run_rebalancing_plan_buy_execution()
-
-        mock_get_redis.assert_not_called()
+    """시장(KR/US) 개장 여부는 이 job이 아니라 `execute_due_buy_legs()` 내부에서 leg별로
+    판단한다(NYSE 시간대 AUTO 지원 이후) — 이 job은 lock 획득 여부만 게이팅한다."""
 
     @pytest.mark.asyncio
     async def test_lock_not_acquired_skips_execution(self):
         with (
-            patch("app.jobs.rebalancing_plan_buy_execution.is_korean_market_open", return_value=True),
-            patch("app.jobs.rebalancing_plan_buy_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch("app.jobs.rebalancing_plan_buy_execution.redis_lock", return_value=_make_lock_cm(False)),
+            patch("app.jobs.rebalancing_plan_buy_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_plan_buy_execution.inproc_lock", return_value=_make_lock_cm(False)),
             patch("app.jobs.rebalancing_plan_buy_execution.execute_due_buy_legs", new=AsyncMock()) as mock_exec,
         ):
             from app.jobs.rebalancing_plan_buy_execution import run_rebalancing_plan_buy_execution
@@ -49,12 +39,11 @@ class TestRunRebalancingPlanBuyExecution:
         mock_exec.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_executes_due_buy_legs_when_market_open_and_lock_acquired(self):
+    async def test_executes_due_buy_legs_when_lock_acquired(self):
         mock_db = _make_mock_db()
         with (
-            patch("app.jobs.rebalancing_plan_buy_execution.is_korean_market_open", return_value=True),
-            patch("app.jobs.rebalancing_plan_buy_execution.get_redis", new=AsyncMock(return_value=MagicMock())),
-            patch("app.jobs.rebalancing_plan_buy_execution.redis_lock", return_value=_make_lock_cm(True)),
+            patch("app.jobs.rebalancing_plan_buy_execution.get_cache_store", new=AsyncMock(return_value=MagicMock())),
+            patch("app.jobs.rebalancing_plan_buy_execution.inproc_lock", return_value=_make_lock_cm(True)),
             patch("app.jobs.rebalancing_plan_buy_execution.AsyncSessionLocal", return_value=mock_db),
             patch(
                 "app.jobs.rebalancing_plan_buy_execution.execute_due_buy_legs", new=AsyncMock(return_value=2)

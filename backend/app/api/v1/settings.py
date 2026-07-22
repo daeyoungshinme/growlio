@@ -9,8 +9,8 @@ from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
+from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.core.redis_client import get_redis
 from app.enums import AssetClass, GoalRiskTolerance, IndexRegion
 from app.limiter import limiter
 from app.models.user import User
@@ -127,6 +127,10 @@ class MarketSignalDigestUpdate(BaseModel):
     enabled: bool
 
 
+class YearEndTaxReminderUpdate(BaseModel):
+    enabled: bool
+
+
 class GoalAchievementAlertsUpdate(BaseModel):
     enabled: bool
 
@@ -149,6 +153,7 @@ class SettingsResponse(BaseModel):
     fcm_token_stored: bool = False
     composite_signal_alerts_enabled: bool = True
     market_signal_daily_digest_enabled: bool = False
+    year_end_tax_reminder_enabled: bool = False
     goal_achievement_alerts_enabled: bool = True
     monthly_report_enabled: bool = True
     goal_candidate_tickers: list[GoalCandidateTicker] = []
@@ -197,6 +202,7 @@ async def get_settings(
         fcm_token_stored=bool(row.fcm_token),
         composite_signal_alerts_enabled=row.composite_signal_alerts_enabled,
         market_signal_daily_digest_enabled=row.market_signal_daily_digest_enabled,
+        year_end_tax_reminder_enabled=row.year_end_tax_reminder_enabled,
         goal_achievement_alerts_enabled=row.goal_achievement_alerts_enabled,
         monthly_report_enabled=row.monthly_report_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
@@ -270,9 +276,9 @@ async def update_goal(
     if req.annual_dividend_goal is not None:
         row.annual_dividend_goal = req.annual_dividend_goal
     await db.commit()
-    redis = await get_redis()
-    await invalidate_user_caches(redis, dashboard_summary_key(current_user.id))
-    await invalidate_goal_recommendation_caches(redis, current_user.id)
+    cache = await get_cache_store()
+    await invalidate_user_caches(cache, dashboard_summary_key(current_user.id))
+    await invalidate_goal_recommendation_caches(cache, current_user.id)
     return {"detail": "목표가 저장되었습니다"}
 
 
@@ -288,8 +294,8 @@ async def update_goal_candidate_tickers(
     row = await get_or_create_settings(db, current_user.id)
     row.goal_candidate_tickers = [t.model_dump() for t in req.tickers]
     await db.commit()
-    redis = await get_redis()
-    await invalidate_goal_recommendation_caches(redis, current_user.id)
+    cache = await get_cache_store()
+    await invalidate_goal_recommendation_caches(cache, current_user.id)
     return {"detail": "후보 ETF 목록이 저장되었습니다"}
 
 
@@ -308,8 +314,8 @@ async def update_goal_recommendation_options(
     row.goal_cagr_lookback_years = req.cagr_lookback_years
     row.goal_short_term_equity_floor_pct = req.short_term_equity_floor_pct
     await db.commit()
-    redis = await get_redis()
-    await invalidate_goal_recommendation_caches(redis, current_user.id)
+    cache = await get_cache_store()
+    await invalidate_goal_recommendation_caches(cache, current_user.id)
     return {"detail": "목표 역산 추천 설정이 저장되었습니다"}
 
 
@@ -356,6 +362,21 @@ async def update_market_signal_digest(
     row.market_signal_daily_digest_enabled = req.enabled
     await db.commit()
     return {"detail": "시장신호 매일 요약 설정이 저장되었습니다"}
+
+
+@router.put("/year-end-tax-reminder")
+@limiter.limit("10/minute")
+async def update_year_end_tax_reminder(
+    request: Request,
+    req: YearEndTaxReminderUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """11~12월 매주 월요일 발송되는 연말 절세 리마인더 수신 여부."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.year_end_tax_reminder_enabled = req.enabled
+    await db.commit()
+    return {"detail": "연말 절세 리마인더 설정이 저장되었습니다"}
 
 
 @router.put("/goal-achievement-alerts")

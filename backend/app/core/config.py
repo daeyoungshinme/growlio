@@ -13,7 +13,6 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_secret_key: str
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/growlio"
-    redis_url: str = "redis://localhost:6379/0"
 
     kis_cred_encryption_key: str  # 32-byte hex (64자), AES-256 암호화 키
 
@@ -27,7 +26,7 @@ class Settings(BaseSettings):
 
     # 외부 API 동시 호출 제한 및 캐시 설정
     api_semaphore_limit: int = 5
-    redis_cache_ttl_seconds: int = 3600
+    cache_ttl_seconds: int = 3600
     usd_krw_fallback_rate: float = 1300.0
     kis_rate_per_second: float = 0.9  # KIS 1s 제한 대비 11% 버퍼
     kiwoom_semaphore_limit: int = 5

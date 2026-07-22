@@ -24,4 +24,4 @@ KIWOOM_OVERSEAS_MARKET_CODES = {
     "AMEX": "AMEX",  # TODO: 실제 코드값 확인
 }
 
-REDIS_KIWOOM_TOKEN_KEY = "kiwoom_token:account:{account_id}"  # nosec B105 — Redis 키 템플릿
+KIWOOM_TOKEN_CACHE_KEY = "kiwoom_token:account:{account_id}"  # nosec B105 — 캐시 키 템플릿

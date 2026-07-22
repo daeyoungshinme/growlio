@@ -15,33 +15,33 @@ def _make_mock_db():
 
 
 @pytest.mark.asyncio
-async def test_run_alert_job_without_redis_calls_service_with_db_only():
+async def test_run_alert_job_without_cache_calls_service_with_db_only():
     mock_db = _make_mock_db()
     mock_func = AsyncMock()
 
     with patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db):
         from app.jobs._job_helpers import run_alert_job
 
-        await run_alert_job(mock_func, "test_job", needs_redis=False)
+        await run_alert_job(mock_func, "test_job", needs_cache=False)
 
     mock_func.assert_called_once_with(mock_db)
 
 
 @pytest.mark.asyncio
-async def test_run_alert_job_with_redis_calls_service_with_db_and_redis():
+async def test_run_alert_job_with_cache_calls_service_with_db_and_cache():
     mock_db = _make_mock_db()
-    mock_redis = MagicMock()
+    mock_cache = MagicMock()
     mock_func = AsyncMock()
 
     with (
-        patch("app.jobs._job_helpers.get_redis", new=AsyncMock(return_value=mock_redis)),
+        patch("app.jobs._job_helpers.get_cache_store", new=AsyncMock(return_value=mock_cache)),
         patch("app.jobs._job_helpers.AsyncSessionLocal", return_value=mock_db),
     ):
         from app.jobs._job_helpers import run_alert_job
 
-        await run_alert_job(mock_func, "test_job", needs_redis=True)
+        await run_alert_job(mock_func, "test_job", needs_cache=True)
 
-    mock_func.assert_called_once_with(mock_db, mock_redis)
+    mock_func.assert_called_once_with(mock_db, mock_cache)
 
 
 @pytest.mark.asyncio

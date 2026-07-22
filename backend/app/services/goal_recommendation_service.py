@@ -83,7 +83,7 @@ from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
-    RedisType,
+    CacheStoreType,
     get_cached_json,
     goal_recommendation_horizon_key,
     goal_recommendation_key,
@@ -137,7 +137,7 @@ def _cash_equivalent_daily_returns() -> list[float]:
     return [_CASH_EQUIVALENT_CAGR_PCT / 100 / _CASH_EQUIVALENT_RETURN_DAYS] * _CASH_EQUIVALENT_RETURN_DAYS
 
 
-async def _fetch_market_signal_level(redis: RedisType) -> str | None:
+async def _fetch_market_signal_level(cache: CacheStoreType) -> str | None:
     """추천 비중 계산에 반영할 시장 위험 신호 등급을 안전하게 조회한다.
 
     조회 실패 또는 `data_freshness="STALE"`(신뢰 불가)이면 감쇠 없이(None) 기존 동작을 유지한다
@@ -145,7 +145,7 @@ async def _fetch_market_signal_level(redis: RedisType) -> str | None:
     달리 실패 시 보수적으로 차단할 필요가 없다.
     """
     try:
-        signal = await get_market_signal(redis)
+        signal = await get_market_signal(cache)
     except Exception as e:
         logger.warning("goal_recommendation_market_signal_failed", error=str(e))
         return None
@@ -208,7 +208,7 @@ async def _fetch_dividend_yields(candidates: list[tuple[str, str]]) -> dict[tupl
 
 
 async def get_goal_recommendation(
-    redis: RedisType,
+    cache: CacheStoreType,
     base_krw: float,
     existing_items: list[tuple[str, str, str]],
     settings_row: UserSettings | None,
@@ -227,21 +227,21 @@ async def get_goal_recommendation(
     """
     user_id = getattr(settings_row, "user_id", None)
     if user_id is not None:
-        cached = await get_cached_json(redis, goal_recommendation_key(user_id))
+        cached = await get_cached_json(cache, goal_recommendation_key(user_id))
         if cached is not None:
             return GoalRecommendation(**cached)
 
-    result = await _compute_goal_recommendation(redis, base_krw, existing_items, settings_row, db)
+    result = await _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
 
     if user_id is not None and result.recommended_items:
         await set_cached_json(
-            redis, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+            cache, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
         )
     return result
 
 
 async def _compute_goal_recommendation(
-    redis: RedisType,
+    cache: CacheStoreType,
     base_krw: float,
     existing_items: list[tuple[str, str, str]],
     settings_row: UserSettings | None,
@@ -317,9 +317,9 @@ async def _compute_goal_recommendation(
     tickers_only = [(t, m) for t, _, m in candidates]
 
     cagr_map, dividend_map, market_signal_level = await asyncio.gather(
-        get_historical_returns(tickers_only, redis=redis, years=cagr_lookback_years),
+        get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
         _fetch_dividend_yields(tickers_only),
-        _fetch_market_signal_level(redis),
+        _fetch_market_signal_level(cache),
     )
 
     filtered = [
@@ -384,7 +384,7 @@ async def _compute_goal_recommendation(
 
 
 async def _build_horizon_result(
-    redis: RedisType,
+    cache: CacheStoreType,
     horizon: str,
     tax_type: str,
     account_ids: list[uuid.UUID],
@@ -447,7 +447,7 @@ async def _build_horizon_result(
     tickers_only = [(t, m) for t, _, m, _ in candidates]
 
     cagr_map = (
-        await get_historical_returns(tickers_only, redis=redis, years=cagr_lookback_years) if tickers_only else {}
+        await get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years) if tickers_only else {}
     )
     filtered = [
         (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], asset_class == "EQUITY")
@@ -575,7 +575,7 @@ async def _build_horizon_result(
 
 
 async def get_horizon_recommendations(
-    redis: RedisType,
+    cache: CacheStoreType,
     db: AsyncSession,
     user_id: uuid.UUID,
     settings_row: UserSettings,
@@ -590,21 +590,21 @@ async def get_horizon_recommendations(
     키로 묶여 있어, 그대로 캐싱하면 일시적으로 실패한 조합 하나 때문에 나머지 정상 조합까지
     TTL 동안 통째로 그 실패 상태를 계속 반환하게 된다.
     """
-    cached = await get_cached_json(redis, goal_recommendation_horizon_key(user_id))
+    cached = await get_cached_json(cache, goal_recommendation_horizon_key(user_id))
     if cached is not None:
         return HorizonRecommendationResponse(**cached)
 
-    result = await _compute_horizon_recommendations(redis, db, user_id, settings_row)
+    result = await _compute_horizon_recommendations(cache, db, user_id, settings_row)
 
     if all(rec.recommended_items for rec in result.recommendations):
         await set_cached_json(
-            redis, goal_recommendation_horizon_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+            cache, goal_recommendation_horizon_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
         )
     return result
 
 
 async def _compute_horizon_recommendations(
-    redis: RedisType,
+    cache: CacheStoreType,
     db: AsyncSession,
     user_id: uuid.UUID,
     settings_row: UserSettings,
@@ -654,7 +654,7 @@ async def _compute_horizon_recommendations(
             if not account_ids:
                 continue
 
-            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, redis=redis)
+            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
             base_krw = float(overview.get("total_assets_krw", 0))
 
             eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon.value]
@@ -685,14 +685,14 @@ async def _compute_horizon_recommendations(
         await _persist_added_candidates(db, user_id, all_added)
 
     # 15개 조합이 동일한 시장 신호 스냅샷을 공유하도록 조합별 반복 조회 대신 한 번만 조회한다.
-    market_signal_level = await _fetch_market_signal_level(redis)
+    market_signal_level = await _fetch_market_signal_level(cache)
 
     # 2단계: DB에 의존하지 않는 외부 I/O(Yahoo/pykrx 수익률 조회 + SLSQP 최적화)는 조합 수(최대 15개)만큼
     # 동시 실행한다 — `_build_horizon_result`는 `db`를 사용하지 않으므로 AsyncSession 동시성 제약이 없다.
     results = await asyncio.gather(
         *(
             _build_horizon_result(
-                redis,
+                cache,
                 horizon_value,
                 tax_type_value,
                 account_ids,

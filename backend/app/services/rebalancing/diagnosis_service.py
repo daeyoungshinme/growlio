@@ -20,7 +20,7 @@ from app.schemas.rebalancing import DiagnosisContext, RebalancingAnalysis, TaxIm
 from app.services.market_signal_service import get_market_signal
 from app.services.risk_service import get_portfolio_risk_metrics
 from app.services.tax_service import _OVERSEAS_MARKETS, _TAX_DEFERRED_TYPES, estimate_overseas_transfer_tax
-from app.utils.cache_keys import RedisType
+from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
 
@@ -186,6 +186,11 @@ def _build_tax_preview(
                 f"해외 매도 실현손익 추정 {round(overseas_gain_sum):,.0f}원, "
                 f"예상 양도세 약 {overseas_tax:,.0f}원 (참고용, 연간 다른 손익과 합산 시 달라질 수 있습니다)"
             )
+    elif overseas_gain_sum < 0:
+        tax_notes.append(
+            f"해외 매도로 약 {abs(round(overseas_gain_sum)):,.0f}원의 손실이 실현됩니다 — "
+            "같은 해 다른 매도 이익과 상계하면 절세 효과가 있습니다."
+        )
 
     excluded_count = sum(1 for t in tax_items if t.excluded_reason)
     if excluded_count:
@@ -252,15 +257,15 @@ def _risk_note(risk: dict) -> str | None:
 
 
 async def fetch_market_and_risk_signal(
-    user_id: uuid.UUID, db: AsyncSession, redis: RedisType
+    user_id: uuid.UUID, db: AsyncSession, cache: CacheStoreType
 ) -> tuple[str | None, dict]:
     """market_level과 risk 지표(dict)를 안전하게 조회한다. 실패한 항목은 None/빈 dict로 폴백.
 
     drift-summary 배지, 알림 복합 트리거 등 tax 미리보기가 필요 없는 가벼운 호출부가 공용으로 쓴다.
     """
     market_signal_result, risk_result = await asyncio.gather(
-        get_market_signal(redis),
-        get_portfolio_risk_metrics(user_id, db, redis, portfolio_id=None),
+        get_market_signal(cache),
+        get_portfolio_risk_metrics(user_id, db, cache, portfolio_id=None),
         return_exceptions=True,
     )
 
@@ -282,7 +287,7 @@ async def fetch_market_and_risk_signal(
 async def build_diagnosis_context(
     user_id: uuid.UUID,
     db: AsyncSession,
-    redis: RedisType,
+    cache: CacheStoreType,
     analysis: RebalancingAnalysis,
     overview: dict,
     enable_composite_signals: bool = True,
@@ -298,7 +303,7 @@ async def build_diagnosis_context(
     check_composite_signal 조건이 충족되면 진단탭 상단 배너(CompositeSignalBanner)가 이미
     같은 내용을 보여주므로 market_note/risk_note는 생략해 중복 문구를 피한다.
     """
-    market_level, risk = await fetch_market_and_risk_signal(user_id, db, redis)
+    market_level, risk = await fetch_market_and_risk_signal(user_id, db, cache)
 
     risk_available = bool(risk.get("data_available"))
     annualized_volatility_pct: float | None = None

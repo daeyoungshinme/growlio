@@ -80,7 +80,7 @@ class TestRebalancingAnalyze:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
@@ -91,6 +91,99 @@ class TestRebalancingAnalyze:
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code in (404, 422)
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_dividend_summary_scoped_to_same_accounts_as_overview(self, override_settings):
+        """포트폴리오가 계좌 일부에만 연결된 경우, 배당 조회(get_ticker_dividend_summary)도
+        overview(build_portfolio_overview)와 동일한 계좌 범위로 스코프되어야 한다.
+
+        회귀 대상 버그: 예전에는 get_ticker_dividend_summary가 계좌 필터 없이(전체 계좌 기준) 호출되어,
+        포트폴리오에 연결되지 않은 계좌에도 동일 종목(특히 해외 주식)을 보유한 경우 배당 총액과
+        평가금액의 계좌 범위가 어긋나 "리밸런싱 후 배당" 금액이 왜곡됐다.
+        """
+        user = _make_user()
+        db = _make_mock_db()
+
+        scoped_account_id = uuid.uuid4()
+        portfolio_id = uuid.uuid4()
+        portfolio = SimpleNamespace(
+            id=portfolio_id,
+            name="해외주식 포트폴리오",
+            base_type="STOCK_ONLY",
+            account_ids=[str(scoped_account_id)],
+            items=[{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100.0}],
+        )
+        db.scalar = AsyncMock(return_value=portfolio)
+
+        overview = {
+            "total_assets_krw": 1_000_000.0,
+            "total_stock_krw": 1_000_000.0,
+            "all_positions": [
+                {
+                    "ticker": "AAPL",
+                    "market": "NASDAQ",
+                    "name": "Apple",
+                    "value_krw": 1_000_000.0,
+                    "current_price": 200_000.0,
+                    "qty": 5.0,
+                }
+            ],
+        }
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_cache_store",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(get=AsyncMock(return_value=None)),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.build_portfolio_overview",
+                    new_callable=AsyncMock,
+                    return_value=overview,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_ticker_dividend_summary",
+                    new_callable=AsyncMock,
+                    return_value=[],
+                ) as mock_dividend_summary,
+                patch(
+                    "app.api.v1.rebalancing.collect_dividend_map",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_historical_returns",
+                    new_callable=AsyncMock,
+                    return_value={},
+                ),
+                patch(
+                    "app.api.v1.rebalancing.enrich_overview_with_prices",
+                    new_callable=AsyncMock,
+                    return_value=overview,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_settings_row",
+                    new_callable=AsyncMock,
+                    return_value=None,
+                ),
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/rebalancing/portfolios/{portfolio_id}/analyze",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+
+            # build_portfolio_overview에 전달된 것과 동일한 account_ids로 배당 조회도 스코프돼야 한다.
+            call_kwargs = mock_dividend_summary.call_args.kwargs
+            assert call_kwargs.get("account_ids") == [scoped_account_id]
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
@@ -152,7 +245,7 @@ class TestGoalRecommendationEndpoint:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(),
                 ),
@@ -276,7 +369,7 @@ class TestCompositeSignalStatus:
                     new_callable=AsyncMock,
                 ) as mock_fetch,
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(),
                 ),
@@ -313,7 +406,7 @@ class TestCompositeSignalStatus:
                     return_value=("RED", {"data_available": False}),
                 ),
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(),
                 ),
@@ -355,7 +448,7 @@ class TestBrokerBalance:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
@@ -397,7 +490,7 @@ class TestBrokerBalance:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
@@ -441,7 +534,7 @@ class TestBrokerBalance:
         try:
             with (
                 patch(
-                    "app.api.v1.rebalancing.get_redis",
+                    "app.api.v1.rebalancing.get_cache_store",
                     new_callable=AsyncMock,
                     return_value=AsyncMock(get=AsyncMock(return_value=None)),
                 ),
@@ -536,14 +629,14 @@ class TestCollectDividendMap:
                 return_value=(0.015, 3.5, [3, 6, 9, 12], "2026-03-15"),
             ) as mock_fetch,
         ):
-            redis = AsyncMock()
-            result = await collect_dividend_map(uuid.uuid4(), MagicMock(), redis, portfolio, {})
+            cache = AsyncMock()
+            result = await collect_dividend_map(uuid.uuid4(), MagicMock(), cache, portfolio, {})
 
         mock_fetch.assert_called_once()
         call_args = mock_fetch.call_args.args
         assert call_args[0] == "SPY"
         assert call_args[1] == "NYSE"
-        assert call_args[2] is redis
+        assert call_args[2] is cache
         assert call_args[4] == kis_creds
         assert call_args[5] == dart_key
         assert call_args[6] == overrides

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
 from app.api.v1._account_deps import get_owned_account
-from app.core.redis_client import get_redis
+from app.core.cache_store import get_cache_store
 from app.kis.constants import OVERSEAS_MARKETS
 from app.limiter import limiter
 from app.models.asset import Position
@@ -22,8 +22,8 @@ from app.services.price_service import fetch_prices_batch
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import invalidate_asset_account_caches, sync_lock_key
 from app.utils.currency import fetch_usd_krw
+from app.utils.inproc_lock import inproc_lock
 from app.utils.pnl import calc_position_pnl
-from app.utils.redis_lock import redis_lock
 
 router = APIRouter(tags=["positions"])
 
@@ -86,10 +86,10 @@ async def save_positions(
 ):
     """수동 종목 저장 — 매입금액 합계를 manual_amount로 업데이트."""
     account = await get_owned_account(account_id, current_user.id, db)
-    redis = await get_redis()
+    cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)
-    async with redis_lock(redis, lock_key, ttl=30) as acquired:
+    async with inproc_lock(cache, lock_key, ttl=30) as acquired:
         if not acquired:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -129,7 +129,7 @@ async def save_positions(
 
         usd_rate = 1.0
         if account.deposit_usd:
-            usd_rate = await fetch_usd_krw(redis)
+            usd_rate = await fetch_usd_krw(cache)
 
         snap = await _upsert_snapshot(
             db,
@@ -148,7 +148,7 @@ async def save_positions(
             db.add(_build(p, snap.id))
 
         await db.commit()
-        await invalidate_asset_account_caches(redis, account.user_id, account.id)
+        await invalidate_asset_account_caches(cache, account.user_id, account.id)
         raw = [p.model_dump() for p in positions]
         return _enrich_positions(raw)
 
@@ -163,10 +163,10 @@ async def sync_position_prices(
 ):
     """현재가를 조회해 positions를 갱신하고 스냅샷을 저장한다."""
     account = await get_owned_account(account_id, current_user.id, db)
-    redis = await get_redis()
+    cache = await get_cache_store()
 
     lock_key = sync_lock_key(account_id)
-    async with redis_lock(redis, lock_key, ttl=60) as acquired:
+    async with inproc_lock(cache, lock_key, ttl=60) as acquired:
         if not acquired:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -178,12 +178,12 @@ async def sync_position_prices(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="저장된 종목이 없습니다")
 
         tickers = [(p.ticker, p.market) for p in pos_objs]
-        price_map = await fetch_prices_batch(current_user.id, tickers, db, redis)
+        price_map = await fetch_prices_batch(current_user.id, tickers, db, cache)
 
         has_overseas = any(p.market in OVERSEAS_MARKETS for p in pos_objs)
         usd_rate: float | None = None
         if has_overseas or account.deposit_usd:
-            usd_rate = await fetch_usd_krw(redis, force_refresh=True) or None
+            usd_rate = await fetch_usd_krw(cache, force_refresh=True) or None
 
         updated_dicts = []
         for p in pos_objs:
@@ -220,6 +220,6 @@ async def sync_position_prices(
         )
         await sync_snapshot_positions(db, snapshot_id=snap.id, account_id=account.id, positions=list(pos_objs))
         await db.commit()
-        await invalidate_asset_account_caches(redis, account.user_id, account.id)
+        await invalidate_asset_account_caches(cache, account.user_id, account.id)
 
         return _enrich_positions(updated_dicts)

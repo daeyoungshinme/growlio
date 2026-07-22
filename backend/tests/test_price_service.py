@@ -34,7 +34,7 @@ class TestFetchCurrentPrice:
     """Yahoo 실패 → KIS → LS 순서로 fallback 되는지 검증."""
 
     @pytest.mark.asyncio
-    async def test_returns_yahoo_price_when_available(self, mock_db, mock_redis, override_settings):
+    async def test_returns_yahoo_price_when_available(self, mock_db, mock_cache, override_settings):
         """Yahoo Finance 가격 조회 성공 시 바로 반환."""
         import uuid
         from unittest.mock import AsyncMock, patch
@@ -55,12 +55,12 @@ class TestFetchCurrentPrice:
             # (실제 내부 구현상 DB 조회 후 KIS/LS 체인이므로 mock 필요)
             mock_db.scalar.return_value = None  # UserSettings 없음 → KIS/LS skip
 
-            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_redis)
+            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_cache)
             # Yahoo가 성공했으므로 75000 반환
             assert price == 75000.0
 
     @pytest.mark.asyncio
-    async def test_returns_none_when_all_providers_fail(self, mock_db, mock_redis, override_settings):
+    async def test_returns_none_when_all_providers_fail(self, mock_db, mock_cache, override_settings):
         """모든 provider 실패 시 None 반환 (예외 없음)."""
         import uuid
         from unittest.mock import AsyncMock, patch
@@ -73,7 +73,7 @@ class TestFetchCurrentPrice:
 
             from app.services.price_service import fetch_current_price
 
-            price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_redis)
+            price = await fetch_current_price(user_id, "UNKNOWN", "NYSE", mock_db, mock_cache)
             assert price is None
 
 
@@ -84,17 +84,17 @@ class TestFetchPricesBatch:
     """fetch_prices_batch: 여러 종목 일괄 조회."""
 
     @pytest.mark.asyncio
-    async def test_empty_tickers_returns_empty(self, mock_db, mock_redis, override_settings):
+    async def test_empty_tickers_returns_empty(self, mock_db, mock_cache, override_settings):
         """빈 목록 입력 시 빈 딕셔너리 반환."""
         import uuid
 
         from app.services.price_service import fetch_prices_batch
 
-        result = await fetch_prices_batch(uuid.uuid4(), [], mock_db, mock_redis)
+        result = await fetch_prices_batch(uuid.uuid4(), [], mock_db, mock_cache)
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_yahoo_circuit_open_returns_empty(self, mock_db, mock_redis, override_settings):
+    async def test_yahoo_circuit_open_returns_empty(self, mock_db, mock_cache, override_settings):
         """Yahoo 서킷 OPEN 상태이면 price_map이 빈 dict로 시작."""
         import uuid
         from unittest.mock import AsyncMock, patch
@@ -107,12 +107,12 @@ class TestFetchPricesBatch:
 
             from app.services.price_service import fetch_prices_batch
 
-            result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis)
+            result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_cache)
 
         assert isinstance(result, dict)
 
     @pytest.mark.asyncio
-    async def test_yahoo_returns_prices(self, mock_db, mock_redis, override_settings):
+    async def test_yahoo_returns_prices(self, mock_db, mock_cache, override_settings):
         """Yahoo 배치 조회 성공 시 price_map 반환."""
         import uuid
         from unittest.mock import AsyncMock, patch
@@ -132,12 +132,12 @@ class TestFetchPricesBatch:
             with patch("asyncio.get_running_loop", return_value=loop_mock):
                 from app.services.price_service import fetch_prices_batch
 
-                result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_redis)
+                result = await fetch_prices_batch(user_id, [("AAPL", "NASDAQ")], mock_db, mock_cache)
 
         assert result.get("AAPL") == 180.0
 
     @pytest.mark.asyncio
-    async def test_domestic_ticker_filled_by_naver_skips_yahoo_call(self, mock_db, mock_redis, override_settings):
+    async def test_domestic_ticker_filled_by_naver_skips_yahoo_call(self, mock_db, mock_cache, override_settings):
         """국내 종목이 Naver로 채워지면 해당 티커는 Yahoo 배치 대상에서 제외된다."""
         import uuid
         from unittest.mock import AsyncMock, patch
@@ -151,7 +151,7 @@ class TestFetchPricesBatch:
         ):
             from app.services.price_service import fetch_prices_batch
 
-            result = await fetch_prices_batch(user_id, [("005930", "KOSPI")], mock_db, mock_redis)
+            result = await fetch_prices_batch(user_id, [("005930", "KOSPI")], mock_db, mock_cache)
 
         assert result.get("005930") == 286000.0
         mock_yahoo_batch.assert_not_called()
@@ -164,19 +164,19 @@ class TestReadCachedPricesMalformedEntry:
     회귀 방지."""
 
     @pytest.mark.asyncio
-    async def test_skips_malformed_entry_and_returns_valid_ones(self, mock_redis, override_settings):
+    async def test_skips_malformed_entry_and_returns_valid_ones(self, mock_cache, override_settings):
         from unittest.mock import AsyncMock
 
         from app.services.price_service import _read_cached_prices
 
-        mock_redis.mget = AsyncMock(
+        mock_cache.mget = AsyncMock(
             return_value=[
                 '{"price_krw": 15525.0, "price_usd": null, "usd_rate": null}',
                 "75000.0",
             ]
         )
 
-        result = await _read_cached_prices(mock_redis, [("402970", "KOSPI"), ("005930", "KOSPI")])
+        result = await _read_cached_prices(mock_cache, [("402970", "KOSPI"), ("005930", "KOSPI")])
 
         assert result == {"005930": 75000.0}
 
@@ -197,13 +197,13 @@ class TestGetHistoricalReturns:
         import json
         from unittest.mock import AsyncMock
 
-        redis = AsyncMock()
+        cache = AsyncMock()
         cached_data = {"cumulative_pct": 120.0, "annual_pct": 8.5}
-        redis.mget = AsyncMock(return_value=[json.dumps(cached_data).encode()])
+        cache.mget = AsyncMock(return_value=[json.dumps(cached_data).encode()])
 
         from app.services.price_service import get_historical_returns
 
-        result = await get_historical_returns([("AAPL", "NASDAQ")], redis=redis)
+        result = await get_historical_returns([("AAPL", "NASDAQ")], cache=cache)
 
         assert ("AAPL", "NASDAQ") in result
         assert result[("AAPL", "NASDAQ")]["cumulative_pct"] == 120.0
@@ -313,12 +313,12 @@ class TestFetchCurrentPriceCacheHit:
         from unittest.mock import AsyncMock
 
         user_id = uuid.uuid4()
-        redis = AsyncMock()
-        redis.get = AsyncMock(return_value=b"75000.0")
+        cache = AsyncMock()
+        cache.get = AsyncMock(return_value=b"75000.0")
 
         from app.services.price_service import fetch_current_price
 
-        price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, redis)
+        price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, cache)
 
         assert price == 75000.0
 
@@ -381,7 +381,7 @@ class TestFetchCurrentPriceDomesticPriority:
     """국내 종목은 Naver/pykrx가 성공하면 Yahoo를 호출하지 않아야 한다."""
 
     @pytest.mark.asyncio
-    async def test_domestic_naver_success_skips_yahoo(self, mock_db, mock_redis, override_settings):
+    async def test_domestic_naver_success_skips_yahoo(self, mock_db, mock_cache, override_settings):
         import uuid
         from unittest.mock import patch
 
@@ -394,13 +394,13 @@ class TestFetchCurrentPriceDomesticPriority:
         ):
             from app.services.price_service import fetch_current_price
 
-            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_redis)
+            price = await fetch_current_price(user_id, "005930", "KOSPI", mock_db, mock_cache)
 
         assert price == 286000.0
         mock_yahoo.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_overseas_ticker_skips_domestic_fallback(self, mock_db, mock_redis, override_settings):
+    async def test_overseas_ticker_skips_domestic_fallback(self, mock_db, mock_cache, override_settings):
         """해외 종목은 국내 폴백(Naver/pykrx)을 거치지 않고 바로 Yahoo로 간다."""
         import uuid
         from unittest.mock import patch
@@ -414,7 +414,7 @@ class TestFetchCurrentPriceDomesticPriority:
         ):
             from app.services.price_service import fetch_current_price
 
-            price = await fetch_current_price(user_id, "AAPL", "NASDAQ", mock_db, mock_redis)
+            price = await fetch_current_price(user_id, "AAPL", "NASDAQ", mock_db, mock_cache)
 
         assert price == 180.0
         mock_domestic.assert_not_called()

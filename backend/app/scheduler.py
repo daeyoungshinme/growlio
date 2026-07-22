@@ -57,7 +57,7 @@ def init_scheduler() -> None:
 
     scheduler.add_job(
         run_rebalancing_auto_execution,
-        CronTrigger(minute="*/5", hour="9-15", timezone="Asia/Seoul"),
+        CronTrigger(minute="*/5", timezone="Asia/Seoul"),
         id="rebalancing_auto_execution_intraday",
         replace_existing=True,
     )
@@ -73,7 +73,7 @@ def init_scheduler() -> None:
 
     scheduler.add_job(
         run_rebalancing_plan_sell_expiry,
-        CronTrigger(hour=15, minute=31, timezone="Asia/Seoul"),
+        IntervalTrigger(minutes=15),
         id="rebalancing_plan_sell_expiry_daily",
         replace_existing=True,
     )
@@ -115,6 +115,14 @@ def init_scheduler() -> None:
         run_market_signal_daily_digest,
         CronTrigger(hour=8, minute=30, timezone="Asia/Seoul"),
         id="market_signal_daily_digest",
+        replace_existing=True,
+    )
+    from app.jobs.year_end_tax_reminder import run_year_end_tax_reminder
+
+    scheduler.add_job(
+        run_year_end_tax_reminder,
+        CronTrigger(month="11-12", day_of_week="mon", hour=9, minute=0, timezone="Asia/Seoul"),
+        id="year_end_tax_reminder",
         replace_existing=True,
     )
     scheduler.start()
