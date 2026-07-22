@@ -251,6 +251,7 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6 max-w-xl">
+      <h1 className="sr-only">설정</h1>
       {/* DART OpenAPI */}
       <SectionCard
         title="DART OpenAPI (금융감독원)"

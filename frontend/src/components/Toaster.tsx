@@ -31,6 +31,8 @@ export default function Toaster() {
       {toasts.map((t) => (
         <div
           key={t.id}
+          role={t.type === "error" ? "alert" : "status"}
+          aria-live={t.type === "error" ? "assertive" : "polite"}
           className={`${COLORS[t.type]} text-white text-sm px-4 py-2.5 rounded-xl shadow-lg animate-fade-in`}
         >
           {t.message}

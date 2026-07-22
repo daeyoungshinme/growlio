@@ -1,7 +1,8 @@
 import { lazy, Suspense, useCallback, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Circle, RefreshCw, Wallet } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
+import { fetchPortfolios } from "@/api/portfolios";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
@@ -11,6 +12,7 @@ import SetupTargetPortfolioBanner from "@/components/dashboard/SetupTargetPortfo
 import SkeletonCard from "@/components/common/SkeletonCard";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { QUERY_KEYS } from "@/constants/queryKeys";
+import { STALE_TIME } from "@/constants/queryConfig";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 
@@ -122,6 +124,18 @@ export default function DashboardPage() {
     marketSignal,
   } = useDashboardData();
 
+  // SetupTargetPortfolioBanner와 동일 queryKey를 재사용 — 캐시 공유로 추가 네트워크 요청 없음.
+  const { data: portfolios } = useQuery({
+    queryKey: QUERY_KEYS.portfolios,
+    queryFn: fetchPortfolios,
+    staleTime: STALE_TIME.MEDIUM,
+  });
+  const isBrandNewUser =
+    !data?.goal_amount &&
+    !data?.annual_deposit_goal &&
+    !data?.annual_dividend_goal &&
+    portfolios?.length === 0;
+
   if (!isLoading && !data)
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -139,6 +153,7 @@ export default function DashboardPage() {
 
   return (
     <>
+      <h1 className="sr-only">홈</h1>
       {/* 데스크탑 동기화 버튼 */}
       <div className="hidden lg:flex items-center justify-end mb-4">
         <button
@@ -194,12 +209,15 @@ export default function DashboardPage() {
           </Suspense>
         </ErrorBoundary>
 
-        {/* 자산 추이 — 과거지향 정보라 최하단 유지 */}
-        <ErrorBoundary variant="section">
-          <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
-            <AllocationHistoryChart />
-          </Suspense>
-        </ErrorBoundary>
+        {/* 자산 추이 — 과거지향 정보라 최하단 유지. 목표·포트폴리오 모두 없는 완전 신규 유저는 추이 데이터가
+            없어 의미가 없으므로 생략(목표/포트폴리오를 하나라도 설정하면 다음 방문부터 노출됨) */}
+        {!isBrandNewUser && (
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard rows={3} height="h-4" />}>
+              <AllocationHistoryChart />
+            </Suspense>
+          </ErrorBoundary>
+        )}
       </div>
     </>
   );

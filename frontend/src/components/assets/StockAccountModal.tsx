@@ -84,6 +84,7 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
 
   const [depositSectionOpen, toggleDepositSection] = useCollapsible(true);
   const [credentialSectionOpen, toggleCredentialSection] = useCollapsible(true);
+  const [taxSectionOpen, toggleTaxSection] = useCollapsible(isEdit);
 
   const handleVerify = async () => {
     if (!form.kis_app_key || !form.kis_app_secret) return;
@@ -274,101 +275,110 @@ export default function StockAccountModal({ initialAccount, onClose, onSubmit, i
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label
-                  htmlFor="stock-tax-type"
-                  className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  세제 유형
-                </label>
-                <select
-                  id="stock-tax-type"
-                  className={`mt-1 w-full ${INPUT_SM}`}
-                  value={form.tax_type ?? "GENERAL"}
-                  onChange={(e) =>
-                    set("tax_type", e.target.value as AssetAccountCreate["tax_type"])
-                  }
-                >
-                  {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label
-                  htmlFor="stock-horizon"
-                  className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  투자 기간
-                  <Tooltip content="세제 유형과 함께 리밸런싱 탭의 기간별 목표 역산 추천이 어느 포트폴리오에 적용될지 매칭하는 데 사용됩니다.">
-                    <Info size={12} className="text-gray-400 cursor-help" />
-                  </Tooltip>
-                </label>
-                <select
-                  id="stock-horizon"
-                  className={`mt-1 w-full ${INPUT_SM}`}
-                  value={form.investment_horizon ?? ""}
-                  onChange={(e) =>
-                    set(
-                      "investment_horizon",
-                      (e.target.value || undefined) as AssetAccountCreate["investment_horizon"],
-                    )
-                  }
-                >
-                  <option value="">미지정</option>
-                  {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <CollapsibleSection
+              label="세제·투자기간 설정(선택)"
+              isOpen={taxSectionOpen}
+              onToggle={toggleTaxSection}
+              collapsedHint="목표 역산 추천 매칭에 사용됩니다. 나중에 계좌 수정에서도 설정할 수 있어요."
+            >
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label
+                      htmlFor="stock-tax-type"
+                      className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      세제 유형
+                    </label>
+                    <select
+                      id="stock-tax-type"
+                      className={`mt-1 w-full ${INPUT_SM}`}
+                      value={form.tax_type ?? "GENERAL"}
+                      onChange={(e) =>
+                        set("tax_type", e.target.value as AssetAccountCreate["tax_type"])
+                      }
+                    >
+                      {Object.entries(ACCOUNT_TAX_TYPE_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="stock-horizon"
+                      className="flex items-center gap-1 text-sm font-medium text-gray-700 dark:text-gray-300"
+                    >
+                      투자 기간
+                      <Tooltip content="세제 유형과 함께 리밸런싱 탭의 기간별 목표 역산 추천이 어느 포트폴리오에 적용될지 매칭하는 데 사용됩니다.">
+                        <Info size={12} className="text-gray-400 cursor-help" />
+                      </Tooltip>
+                    </label>
+                    <select
+                      id="stock-horizon"
+                      className={`mt-1 w-full ${INPUT_SM}`}
+                      value={form.investment_horizon ?? ""}
+                      onChange={(e) =>
+                        set(
+                          "investment_horizon",
+                          (e.target.value || undefined) as AssetAccountCreate["investment_horizon"],
+                        )
+                      }
+                    >
+                      <option value="">미지정</option>
+                      {Object.entries(INVESTMENT_HORIZON_LABELS).map(([v, l]) => (
+                        <option key={v} value={v}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
-            {form.tax_type === "ISA" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label
-                    htmlFor="stock-isa-open-date"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    ISA 가입일
-                  </label>
-                  <input
-                    id="stock-isa-open-date"
-                    type="date"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.isa_open_date ?? ""}
-                    onChange={(e) => set("isa_open_date", e.target.value || undefined)}
-                  />
-                </div>
-                <div>
-                  <label
-                    htmlFor="stock-isa-type"
-                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    ISA 유형
-                  </label>
-                  <select
-                    id="stock-isa-type"
-                    className={`mt-1 w-full ${INPUT_SM}`}
-                    value={form.isa_type ?? "GENERAL"}
-                    onChange={(e) =>
-                      set("isa_type", e.target.value as AssetAccountCreate["isa_type"])
-                    }
-                  >
-                    {Object.entries(ISA_TYPE_LABELS).map(([v, l]) => (
-                      <option key={v} value={v}>
-                        {l}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {form.tax_type === "ISA" && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label
+                        htmlFor="stock-isa-open-date"
+                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        ISA 가입일
+                      </label>
+                      <input
+                        id="stock-isa-open-date"
+                        type="date"
+                        className={`mt-1 w-full ${INPUT_SM}`}
+                        value={form.isa_open_date ?? ""}
+                        onChange={(e) => set("isa_open_date", e.target.value || undefined)}
+                      />
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="stock-isa-type"
+                        className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                      >
+                        ISA 유형
+                      </label>
+                      <select
+                        id="stock-isa-type"
+                        className={`mt-1 w-full ${INPUT_SM}`}
+                        value={form.isa_type ?? "GENERAL"}
+                        onChange={(e) =>
+                          set("isa_type", e.target.value as AssetAccountCreate["isa_type"])
+                        }
+                      >
+                        {Object.entries(ISA_TYPE_LABELS).map(([v, l]) => (
+                          <option key={v} value={v}>
+                            {l}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
+            </CollapsibleSection>
 
             {/* 예수금 */}
             {(form.data_source === "MANUAL" || (isEdit && form.data_source !== "MANUAL")) && (

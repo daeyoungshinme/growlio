@@ -15,10 +15,13 @@ import {
   BASE_TYPE_TOTAL_ASSETS,
   CASH_EQUIVALENT_TICKER,
 } from "@/constants/assets";
+import CollapsibleSection from "@/components/common/CollapsibleSection";
 import { INPUT_SM } from "@/constants/inputStyles";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import type { PortfolioOverview } from "@/types";
+import { useCollapsible } from "@/hooks/useCollapsible";
+import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { usePortfolioItemsEditor } from "@/hooks/usePortfolioItemsEditor";
 import { inferHorizonTaxTypeFromAccounts } from "@/utils/portfolio";
 const PortfolioWeightChart = lazy(() => import("./PortfolioWeightChart"));
@@ -70,6 +73,12 @@ export default function UnifiedPortfolioEditor({
   const [taxType, setTaxType] = useState<AccountTaxType | "">(
     initial?.tax_type ?? inferredTags?.taxType ?? "",
   );
+  // 수정 모드거나 추천 비중 카드 등에서 계좌를 미리 선택해 넘긴 경우(계좌 태그 매칭이 이미 의미 있는 상황)엔
+  // 기본으로 펼쳐두고, 완전히 새로 만드는 포트폴리오는 접어서 초심자 화면을 단순하게 유지한다.
+  const [tagSectionOpen, toggleTagSection] = useCollapsible(
+    !!(initial || initialAccountIds?.length),
+  );
+  const { dialogRef, overlayRef } = useModalBehavior(onClose);
   const {
     items,
     totalWeight,
@@ -125,11 +134,23 @@ export default function UnifiedPortfolioEditor({
 
   return (
     <ErrorBoundary variant="section">
-      <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0">
-        <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col">
+      <div
+        ref={overlayRef}
+        className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-[60] sm:p-4 pb-16 lg:pb-0"
+      >
+        <div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="portfolio-editor-title"
+          className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-2xl max-h-[85dvh] sm:max-h-[90vh] flex flex-col"
+        >
           {/* 헤더 */}
           <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-100 dark:border-gray-700 shrink-0">
-            <h2 className="font-semibold text-gray-800 dark:text-gray-50">
+            <h2
+              id="portfolio-editor-title"
+              className="font-semibold text-gray-800 dark:text-gray-50"
+            >
               {initial ? "포트폴리오 수정" : "새 포트폴리오 만들기"}
             </h2>
             <button
@@ -187,10 +208,12 @@ export default function UnifiedPortfolioEditor({
             </div>
 
             {/* 목표 역산 추천 매칭용 기간/세제유형 태그 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                투자 기간 · 세제 유형 (목표 역산 추천 매칭용)
-              </label>
+            <CollapsibleSection
+              label="투자 기간 · 세제 유형 설정(선택, 목표 역산 추천 매칭용)"
+              isOpen={tagSectionOpen}
+              onToggle={toggleTagSection}
+              collapsedHint="지정하면 리밸런싱 탭의 기간별 목표 역산 추천이 이 포트폴리오에 자동 매칭됩니다."
+            >
               <div className="grid grid-cols-2 gap-3">
                 <select
                   className={INPUT_SM}
@@ -221,7 +244,7 @@ export default function UnifiedPortfolioEditor({
                 지정하면 리밸런싱 탭의 기간별 목표 역산 추천이 이 포트폴리오에 자동 매칭됩니다.
                 미지정 시 기준으로 지정된 계좌들의 태그가 전부 동일할 때만 자동 추론합니다.
               </p>
-            </div>
+            </CollapsibleSection>
 
             {/* 종목 목록 */}
             <div>

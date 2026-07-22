@@ -18,7 +18,9 @@ interface TaxOptimizationCardProps {
 export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
   const [taxYear, setTaxYear] = useState(currentYear);
-  const [plannerOpen, setPlannerOpen] = useState(false);
+  // 사용자가 명시적으로 토글하기 전까지는 null — 그동안은 손실수확 후보(해외 미실현 손실) 존재 여부로
+  // 기본 펼침 여부를 정한다(자산탭→세금탭→펼치기 3클릭에 숨어있던 절세 정보 발견성 개선).
+  const [plannerOpenOverride, setPlannerOpenOverride] = useState<boolean | null>(null);
   const [geumtOpen, setGeumtOpen] = useState(false);
 
   const { data: taxData, isLoading: taxLoading } = useQuery({
@@ -26,6 +28,9 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
     queryFn: () => fetchTaxSummary(taxYear, accountId),
     staleTime: STALE_TIME.LONG,
   });
+
+  const hasLossHarvestCandidates = (taxData?.overseas_unrealized_gain_krw ?? 0) < 0;
+  const plannerOpen = plannerOpenOverride ?? hasLossHarvestCandidates;
 
   const { data: positionsData, isLoading: posLoading } = useQuery({
     queryKey: QUERY_KEYS.overseasPositionsTax(accountId),
@@ -124,10 +129,17 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
           <p className="text-xs text-gray-400 dark:text-gray-500">{taxData.note}</p>
 
           <button
-            onClick={() => setPlannerOpen((v) => !v)}
+            onClick={() => setPlannerOpenOverride(!plannerOpen)}
             className="w-full flex items-center justify-between py-2 text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 border-t border-gray-100 dark:border-gray-700 pt-3 transition-colors"
           >
-            <span>절세 플래너 — 해외 종목 매도 시뮬레이션</span>
+            <span className="flex items-center gap-1.5">
+              절세 플래너 — 해외 종목 매도 시뮬레이션
+              {hasLossHarvestCandidates && (
+                <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                  손실수확 가능
+                </span>
+              )}
+            </span>
             {plannerOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
 

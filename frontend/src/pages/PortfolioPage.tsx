@@ -175,7 +175,12 @@ export default function PortfolioPage() {
     return (
       <div className="space-y-6">
         <div className="card">
-          <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0">
+          <div
+            role="status"
+            aria-label="로딩 중"
+            aria-busy="true"
+            className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700 sm:flex sm:divide-x sm:divide-gray-100 sm:dark:divide-gray-700 sm:bg-transparent sm:gap-0"
+          >
             {[0, 1, 2, 3].map((i) => (
               <SkeletonStatBox key={i} />
             ))}

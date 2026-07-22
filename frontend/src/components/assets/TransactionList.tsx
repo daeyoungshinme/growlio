@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { Pencil, Trash2 } from "lucide-react";
 import { Transaction, TransactionCreate } from "@/api/transactions";
 import { fmtKrw } from "@/utils/format";
@@ -22,6 +24,21 @@ export function TransactionList({
   onDelete,
 }: TransactionListProps) {
   const filtered = (txList ?? []).filter((t) => t.transaction_type === activeType);
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const rowVirtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => tableContainerRef.current,
+    estimateSize: () => 48,
+    overscan: 10,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0].start : 0;
+  const paddingBottom =
+    virtualItems.length > 0
+      ? rowVirtualizer.getTotalSize() - virtualItems[virtualItems.length - 1].end
+      : 0;
 
   if (isLoading) {
     return (
@@ -85,11 +102,15 @@ export function TransactionList({
         ))}
       </div>
 
-      {/* 데스크탑 테이블 */}
-      <div className="hidden sm:block overflow-x-auto">
+      {/* 데스크탑 테이블 — 가상화 (패딩-행 방식으로 native 레이아웃 유지, TransactionHistoryTab.tsx와 동일 패턴) */}
+      <div
+        ref={tableContainerRef}
+        className="hidden sm:block overflow-auto"
+        style={{ maxHeight: "480px" }}
+      >
         <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+          <thead className="sticky top-0 z-10 bg-gray-50 dark:bg-gray-800">
+            <tr className="border-b border-gray-100 dark:border-gray-700">
               <th className="text-left px-3 py-2.5 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase">
                 날짜
               </th>
@@ -106,51 +127,64 @@ export function TransactionList({
             </tr>
           </thead>
           <tbody>
-            {filtered.map((tx) => (
-              <tr
-                key={tx.id}
-                className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
-              >
-                <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
-                  {tx.transaction_date}
-                </td>
-                <td
-                  className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}
-                >
-                  <span>{TX_LABELS[tx.transaction_type]}</span>
-                  {tx.ticker && (
-                    <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">
-                      {tx.ticker}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">
-                  {fmtKrw(tx.amount)}
-                </td>
-                <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs">
-                  <div className="max-w-[100px] truncate">{tx.notes || "—"}</div>
-                </td>
-                <td className="px-3 py-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <button
-                      onClick={() => onEdit(tx)}
-                      aria-label="수정"
-                      className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                    <button
-                      onClick={() => onDelete(tx.id)}
-                      disabled={isDeleting}
-                      aria-label="삭제"
-                      className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </td>
+            {paddingTop > 0 && (
+              <tr>
+                <td colSpan={5} style={{ height: paddingTop }} />
               </tr>
-            ))}
+            )}
+            {virtualItems.map((virtualRow) => {
+              const tx = filtered[virtualRow.index];
+              return (
+                <tr
+                  key={tx.id}
+                  className="border-b border-gray-50 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap text-xs">
+                    {tx.transaction_date}
+                  </td>
+                  <td
+                    className={`px-3 py-3 font-medium whitespace-nowrap ${TX_COLORS[tx.transaction_type]}`}
+                  >
+                    <span>{TX_LABELS[tx.transaction_type]}</span>
+                    {tx.ticker && (
+                      <span className="block text-xs text-gray-400 dark:text-gray-500 font-normal mt-0.5">
+                        {tx.ticker}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-right font-semibold text-gray-900 dark:text-gray-50 whitespace-nowrap">
+                    {fmtKrw(tx.amount)}
+                  </td>
+                  <td className="px-3 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                    <div className="max-w-[100px] truncate">{tx.notes || "—"}</div>
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={() => onEdit(tx)}
+                        aria-label="수정"
+                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 transition-colors`}
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        onClick={() => onDelete(tx.id)}
+                        disabled={isDeleting}
+                        aria-label="삭제"
+                        className={`${TOUCH_TARGET_MIN} p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors`}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {paddingBottom > 0 && (
+              <tr>
+                <td colSpan={5} style={{ height: paddingBottom }} />
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

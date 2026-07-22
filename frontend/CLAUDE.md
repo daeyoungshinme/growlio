@@ -368,6 +368,10 @@ cd frontend && npx playwright test
 - 단, 배지/탭/필터 칩/보조 링크/카드 내부 아이콘 버튼처럼 여러 개가 조밀하게 나열되는 요소는 44px 강제 시 시각적으로 뭉툭해져 오히려 가독성이 떨어질 수 있다 — 이 경우 `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px, WCAG AA 24px 이상 충족)를 사용해도 된다.
 - 단, `StockAccountCard.tsx`/`BankAccountCard.tsx`/`PortfolioItemRow.tsx`의 삭제 버튼처럼 이미 앱 전역에 44px로 정착된 아이콘 버튼 패턴은 개별 화면에서 임의로 축소하지 말 것 — 화면 간 일관성이 깨짐.
 
+**헤딩 구조 규칙 (접근성)**
+- 각 페이지(`src/pages/*.tsx`)의 최상위 return에는 `<h1 className="sr-only">{페이지명}</h1>`을 두어 스크린리더 사용자가 진입 시 현재 위치를 알 수 있게 한다(시각적으로는 숨김 — `BottomNav`/탭 UI가 이미 시각적 내비게이션을 담당).
+- 카드/섹션 제목은 `<span>`/`<p>` 대신 `<h2>`/`<h3>`을 사용 — 스크린리더의 헤딩 내비게이션(다음 섹션으로 건너뛰기)이 동작하려면 실제 헤딩 태그가 필요하다. 기존 카드 전체를 일괄 교정하지는 않았으므로, 새로 만들거나 수정하는 컴포넌트부터 점진적으로 이 규칙을 적용할 것.
+
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.
   ```ts

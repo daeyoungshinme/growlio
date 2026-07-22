@@ -6,7 +6,7 @@ export default function SkeletonCard({
   height?: string;
 }) {
   return (
-    <div className="card space-y-3">
+    <div className="card space-y-3" role="status" aria-label="로딩 중" aria-busy="true">
       {Array.from({ length: rows }).map((_, i) => (
         <div
           key={i}

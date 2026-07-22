@@ -25,6 +25,8 @@ export default function FormInput({
   const baseClass = inputSize === "md" ? INPUT_MD : INPUT_SM;
   const labelClass = inputSize === "md" ? LABEL_MD : LABEL_SM;
   const errorClass = "border-red-400 dark:border-red-500 focus:ring-red-400";
+  const errorId = error ? `${inputId}-error` : undefined;
+  const hintId = hint && !error ? `${inputId}-hint` : undefined;
 
   return (
     <div>
@@ -36,13 +38,23 @@ export default function FormInput({
         id={inputId}
         className={`w-full ${baseClass} ${error ? errorClass : ""} ${className ?? ""}`}
         required={required}
+        aria-invalid={!!error}
+        aria-describedby={errorId ?? hintId}
         {...inputProps}
       />
       {preview && (
         <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mt-1">{preview}</p>
       )}
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
-      {hint && !error && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{hint}</p>}
+      {error && (
+        <p id={errorId} className="text-xs text-red-500 mt-1">
+          {error}
+        </p>
+      )}
+      {hint && !error && (
+        <p id={hintId} className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {hint}
+        </p>
+      )}
     </div>
   );
 }

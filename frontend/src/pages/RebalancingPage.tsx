@@ -165,6 +165,7 @@ export default function RebalancingPage() {
 
   return (
     <div className="flex flex-col min-h-full gap-4">
+      <h1 className="sr-only">리밸런싱</h1>
       <div className="px-1">
         <Tabs
           tabs={REBALANCING_PAGE_TABS}

@@ -17,7 +17,7 @@ export function yieldBadgeClass(y: number): string {
   if (y >= 7) return "bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 font-bold";
   if (y >= 4) return "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400";
   if (y >= 2) return "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400";
-  return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400";
+  return "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300";
 }
 
 export function dividendFreqInfo(
@@ -28,7 +28,7 @@ export function dividendFreqInfo(
   if (n === 0)
     return {
       label: "미설정",
-      cls: "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500",
+      cls: "bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-300",
     };
   if (n === 12)
     return {
@@ -57,7 +57,7 @@ export function dividendFreqInfo(
     };
   return {
     label: `${n}회/년`,
-    cls: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
+    cls: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-300",
   };
 }
 

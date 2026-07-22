@@ -31,6 +31,7 @@ export default function AssetsPage() {
 
   return (
     <div>
+      <h1 className="sr-only">자산</h1>
       <Tabs
         tabs={ASSETS_TOP_TABS}
         activeTab={activeTab}

@@ -122,6 +122,7 @@ export default function InvestPlanPage() {
 
   return (
     <div className="space-y-6">
+      <h1 className="sr-only">계획</h1>
       {/* 탭 전환 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-full sm:w-fit">
