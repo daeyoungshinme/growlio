@@ -60,7 +60,8 @@ make test-frontend    # cd frontend && npm run test
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
-make format           # ruff --fix (backend) + prettier --write (frontend)
+make format           # ruff format + ruff --fix (backend) + prettier --write (frontend)
+make format-backend   # ruff format + ruff --fix (backend만)
 make db-reset         # docker compose down -v + up + migrate (**데이터 전체 삭제** — 개발 환경 전용)
 make build-android-debug    # npm build + cap sync + gradlew assembleDebug
 make build-android-release  # npm build + cap sync + gradlew assembleRelease

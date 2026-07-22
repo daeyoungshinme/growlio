@@ -217,7 +217,7 @@ services/
   ├── _portfolio_queries.py   # 연결된 포트폴리오 목록·활성 알림 threshold 조회 헬퍼 (rebalancing.py 라우터에서 분리)
   ├── yahoo_price.py          # [현재가 조회 그룹] Yahoo Finance 가격 조회 유틸 (티커 변환, 개별/배치 조회, 수익률 계산)
   ├── backtest_metrics.py           # 백테스트 성과 지표 계산 (backtest_service.py 서브모듈)
-  ├── composition_calculator.py     # 자산 구성 비중 계산
+  ├── composition_calculator.py     # 자산 구성 비중 계산. `exclude_real_estate(total_assets_krw, by_type)` — 목표 진행율·필요수익률 등 "투자자산" 기준 계산 전용 헬퍼(부동산 순자산 제외, 대시보드 총자산 표시에는 미적용). MVO 후보·DCA 복리 곡선 둘 다 부동산 가치 상승을 모델링하지 않아 부동산 포함 총자산을 그대로 쓰면 진행율이 왜곡됨 — asset_aggregator.py/dca_service.py/invest.py의 목표 관련 계산이 호출
   ├── trend_calculator.py           # 월별 자산 추이 계산
   ├── returns_calculator.py         # 수익률 계산 (XIRR 등)
   ├── economic_indicator_service.py # 미국 CPI/Core CPI 조회·캐싱 + FRED 발표 캘린더 조회(fetch_inflation_summary 전용, 구 economic_calendar_service.py 병합됨)
