@@ -334,9 +334,6 @@ async def get_composite_signal_status(
     settings_row = await get_settings_row(db, current_user.id)
     enabled = settings_row.composite_signal_alerts_enabled if settings_row else True
 
-    alert_by_portfolio = await get_active_alert_thresholds(db, current_user.id)
-    has_active_alert = bool(alert_by_portfolio)
-
     triggered = False
     reason: str | None = None
     if enabled:
@@ -352,4 +349,4 @@ async def get_composite_signal_status(
         except Exception as e:
             logger.warning("composite_signal_status_failed", error=str(e))
 
-    return CompositeSignalStatus(enabled=enabled, triggered=triggered, reason=reason, has_active_alert=has_active_alert)
+    return CompositeSignalStatus(enabled=enabled, triggered=triggered, reason=reason)

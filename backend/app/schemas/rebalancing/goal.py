@@ -60,4 +60,3 @@ class CompositeSignalStatus(BaseModel):
     enabled: bool  # UserSettings.composite_signal_alerts_enabled
     triggered: bool  # enabled=True이고 조건(시장 RED 또는 리스크 이상) 충족 시 True
     reason: str | None = None
-    has_active_alert: bool  # 활성 리밸런싱 알림이 1개라도 있는지 (없으면 enabled=True여도 실제 발송 안 됨)

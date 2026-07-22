@@ -12,7 +12,6 @@ vi.mock("@/api/rebalancing", () => ({
     enabled: true,
     triggered: false,
     reason: null,
-    has_active_alert: true,
   }),
 }));
 

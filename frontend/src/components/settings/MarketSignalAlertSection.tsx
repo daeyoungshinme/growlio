@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-import { AlertTriangle } from "lucide-react";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import { useMarketSignalDigestToggle } from "@/hooks/useMarketSignalDigestToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
@@ -52,18 +50,6 @@ export function MarketSignalAlertSection() {
                 ? "현재는 이탈이 없어도 알림이 발송될 조건이 아닙니다"
                 : "알림이 꺼져 있어 신호를 평가하지 않습니다"}
           </p>
-
-          {status.enabled && !status.has_active_alert && (
-            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/40">
-              <AlertTriangle size={14} className="text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                현재 활성화된 리밸런싱 알림이 없어 이 알림을 받을 수 없습니다.{" "}
-                <Link to="/rebalancing?rtab=포트폴리오" className="underline font-medium">
-                  리밸런싱 탭에서 설정하기
-                </Link>
-              </p>
-            </div>
-          )}
         </>
       )}
 

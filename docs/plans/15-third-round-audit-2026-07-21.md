@@ -44,7 +44,7 @@
 | 8 | A5 — 계좌 등록 모달 필드 단계 분리/고급설정 접힘 | 중간 | 중간 |
 | 9 | A7 — 포트폴리오 편집기 투자기간/세제유형 고급설정 접힘 | 낮음 | 낮음 |
 | 10 | A6 — 신규 사용자 대시보드 카드 단계적 노출 | 낮음 | 중간 |
-| 11 | B4 — 시장신호 알림 구독 선결조건 완화 | 낮음 | 중간 |
+| 11 | B4 — 시장신호 알림 구독 선결조건 완화 — **완료(2026-07-22)** | 낮음 | 중간 |
 | 12 | B5 — 세금탭 손실수확 추천 노출 단계 단축 | 낮음 | 낮음 |
 
 1~4번은 전부 딥링크/CTA 추가 수준(신규 컴포넌트 불필요)이라 한 세션에서 같이 처리 가능. 5~6번은 설정 페이지 기존 토글 옆에 1개 추가하는 수준. 7번부터는 게이트 로직을 만지므로 동시 세션이 진행 중인 세금 게이트 수정이 먼저 커밋된 뒤 착수 권장.
@@ -67,3 +67,13 @@
 - DB 마이그레이션·프론트엔드 변경 없음(기존 `market_condition_mode` 컬럼만 읽고, 알림 이력은 자유 텍스트라 그대로 렌더링됨).
 
 검증: 신규/수정 테스트 포함 백엔드 전체 `uv run pytest` 1782 tests 통과(커버리지 86.66%), `ruff check .`/`mypy app/` 클린. 기존 시장신호 게이트 차단 테스트(`test_rebalancing_auto_execution.py`의 CAUTIOUS/STRICT/STALE/예외 4건)에 `notify_market_signal_gate_blocked` 호출 검증 추가, `test_rebalancing_alert_service.py`에 AUTO→NOTIFY 강등 시 이메일/이력에 사유가 실리는지 검증하는 신규 테스트 1건 추가.
+
+## 구현 결과 (2026-07-22, B4/11번 완료)
+
+`market_signal_alert_service.py:40-53`의 `_get_composite_subscribers()`가 `RebalancingAlert`와 INNER JOIN하던 조건을 제거 — `composite_signal_alerts_enabled`가 True(기본값 포함)인 활성 유저 전체를 대상으로 변경. 수동 리밸런싱만 쓰거나 알림을 하나도 설정하지 않은 유저도 이 토글 하나로 시장신호 등급전환 알림을 받는다.
+
+- `market_signal_alert_service.py` 모듈/함수 docstring을 실제 동작에 맞게 갱신, `RebalancingAlert` import 제거.
+- 부수 효과로 `GET /rebalancing/composite-signal`(설정 페이지 `MarketSignalAlertSection`이 사용)의 `has_active_alert` 필드가 유일한 소비처(경고 배너)와 함께 의미를 잃어 **필드 자체를 제거**: `schemas/rebalancing/goal.py`의 `CompositeSignalStatus`, `api/v1/rebalancing.py`의 `get_composite_signal_status`(불필요해진 `get_active_alert_thresholds` 조회도 제거), 프론트 `api/rebalancing.ts` 타입, `MarketSignalAlertSection.tsx`의 "현재 활성화된 리밸런싱 알림이 없어 이 알림을 받을 수 없습니다" 경고 배너(이제 사실이 아님) + 미사용 `Link`/`AlertTriangle` import 제거.
+- 테스트: `test_market_signal_alert_service.py`에 `_get_composite_subscribers` 전용 테스트 2건 추가(컴파일된 SQL에 `rebalancing_alerts` 미포함 확인, 활성 알림 0개 유저 포함 확인). `test_rebalancing_api.py`의 `has_active_alert` 전용 테스트 2건 삭제. 프론트 `components.settings2.test.tsx`/`components.rebalancing2.test.tsx`의 관련 배너 테스트·fixture 정리.
+
+검증: 백엔드 `uv run pytest`/`ruff check .`/`mypy app/`, 프론트 `npm run typecheck`/`npm run lint`/`npm run test` 전부 통과(하단 검증 로그 참고). `docs/plans/15` 기준 잔여 항목은 이제 없음.

@@ -28,6 +28,40 @@ class TestLastLevelRoundTrip:
         assert result == "YELLOW"
 
 
+class TestGetCompositeSubscribers:
+    @pytest.mark.asyncio
+    async def test_query_does_not_join_rebalancing_alert(self, mock_db):
+        """활성 RebalancingAlert 보유 여부와 무관하게 구독 대상을 조회해야 한다(계획15 B4/11).
+
+        수동 리밸런싱만 쓰거나 알림을 하나도 설정하지 않은 유저도 이 토글만으로
+        구독되어야 하므로, 생성되는 쿼리 자체가 rebalancing_alerts 테이블을 참조하면 안 된다.
+        """
+        from app.services.alerts.market_signal_alert_service import _get_composite_subscribers
+
+        await _get_composite_subscribers(mock_db)
+
+        mock_db.execute.assert_called_once()
+        statement = mock_db.execute.call_args[0][0]
+        compiled_sql = str(statement.compile(compile_kwargs={"literal_binds": True})).lower()
+        assert "rebalancing_alerts" not in compiled_sql
+
+    @pytest.mark.asyncio
+    async def test_includes_user_without_any_rebalancing_alert(self, mock_db):
+        """리밸런싱 알림이 0개인 유저도 composite_signal_alerts_enabled만 True면 대상에 포함된다."""
+        from app.services.alerts.market_signal_alert_service import _get_composite_subscribers
+
+        user = SimpleNamespace(id=uuid.uuid4(), email="no-alerts@example.com", is_active=True)
+        user_settings = SimpleNamespace(composite_signal_alerts_enabled=True)
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(user, user_settings)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        subscribers = await _get_composite_subscribers(mock_db)
+
+        assert subscribers == [(user, user_settings)]
+
+
 class TestCheckMarketSignalLevelChange:
     @pytest.mark.asyncio
     async def test_first_run_stores_without_notifying(self, mock_db, mock_redis):

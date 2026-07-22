@@ -2,13 +2,12 @@
 
 포트폴리오별 드리프트 알림(rebalancing/alert_check.py)과 달리, 시장 신호 자체의
 등급 전환만을 감지해 특정 포트폴리오 알림 설정 여부와 무관하게 발송한다. 대상 유저는
-UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)이고 활성 RebalancingAlert를
-하나라도 가진 유저로 한정한다 — 신규 구독 모델을 만들지 않고 기존
-"드리프트 없어도 복합신호로 알림받기" 의사표시(이제는 유저 단위 단일 설정)를 재사용한다.
+UserSettings.composite_signal_alerts_enabled가 True(기본값 포함)인 활성 유저 전체 —
+수동 리밸런싱만 쓰거나 알림을 하나도 설정하지 않은 유저도 이 토글만으로 구독된다.
 
 이와 별개로 `send_market_signal_daily_digest`는 등급 전환 여부와 무관하게 매일 08:30 KST에
 현재 시장 신호를 요약 발송하는 옵트인(기본 OFF) 기능 — 구독 조건도 별도
-(UserSettings.market_signal_daily_digest_enabled, 활성 RebalancingAlert 불필요).
+(UserSettings.market_signal_daily_digest_enabled).
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import AsyncSessionLocal
-from app.models.alert import AlertHistory, RebalancingAlert
+from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import save_alert_history
 from app.services.market_signal_service import (
@@ -38,13 +37,11 @@ _DIGEST_CONCURRENCY = 5
 
 
 async def _get_composite_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings | None]]:
-    """composite_signal_alerts_enabled가 True(기본값 포함)이고 활성 RebalancingAlert를 가진 유저 목록(중복 제거)."""
+    """composite_signal_alerts_enabled가 True(기본값 포함)인 활성 유저 목록(활성 리밸런싱 알림 보유 여부와 무관)."""
     result = await db.execute(
         select(User, UserSettings)
-        .join(RebalancingAlert, RebalancingAlert.user_id == User.id)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .where(
-            RebalancingAlert.is_active == True,  # noqa: E712
             User.is_active == True,  # noqa: E712
             or_(UserSettings.user_id.is_(None), UserSettings.composite_signal_alerts_enabled == True),  # noqa: E712
         )
@@ -193,9 +190,9 @@ async def _send_digest_to_user(
 async def send_market_signal_daily_digest(db: AsyncSession, redis: RedisType) -> None:
     """매일 08:30 KST — 옵트인한 유저에게 등급 전환 여부와 무관하게 현재 시장 위험 신호를 요약 발송한다.
 
-    등급전환 알림(check_market_signal_level_change)과 달리 활성 RebalancingAlert 보유 여부를
-    조건에 넣지 않는다 — 리밸런싱 알림 설정과 무관하게 "그냥 매일 시장 상황만 보고 싶다"는
-    니즈를 독립적으로 충족하기 위함.
+    등급전환 알림(check_market_signal_level_change)과는 별도의 옵트인 토글
+    (market_signal_daily_digest_enabled, 기본 OFF)로 구독 여부를 판단한다 —
+    "그냥 매일 시장 상황만 보고 싶다"는 니즈를 독립적으로 충족하기 위함.
     """
     try:
         signal = await get_market_signal(redis)

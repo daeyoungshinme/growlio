@@ -56,7 +56,6 @@ vi.mock("@/api/rebalancing", () => ({
     enabled: true,
     triggered: false,
     reason: null,
-    has_active_alert: true,
   }),
 }));
 
@@ -105,7 +104,6 @@ import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAler
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
-import { fetchCompositeSignalStatus } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
 import { fetchRebalancingAlerts, type RebalancingAlert } from "@/api/alerts";
 import { fetchPortfolios, type Portfolio } from "@/api/portfolios";
@@ -255,26 +253,6 @@ describe("MarketSignalAlertSection", () => {
   it("points users to the 발송 이력 tab", async () => {
     renderSection();
     expect(await screen.findByText(/발송 이력 탭에서 확인/)).toBeDefined();
-  });
-
-  it("does not warn when the user already has an active rebalancing alert", async () => {
-    renderSection();
-    await screen.findByLabelText("시장/리스크 신호 알림 받기");
-    expect(screen.queryByText(/활성화된 리밸런싱 알림이 없어/)).toBeNull();
-  });
-
-  it("warns and links to rebalancing setup when there is no active alert", async () => {
-    vi.mocked(fetchCompositeSignalStatus).mockResolvedValueOnce({
-      enabled: true,
-      triggered: false,
-      reason: null,
-      has_active_alert: false,
-    });
-    renderSection();
-    const warning = await screen.findByText(/활성화된 리밸런싱 알림이 없어/);
-    expect(warning).toBeDefined();
-    const link = screen.getByText("리밸런싱 탭에서 설정하기");
-    expect(link.getAttribute("href")).toBe("/rebalancing?rtab=포트폴리오");
   });
 
   it("shows a separate daily digest toggle, defaulting to off", async () => {
