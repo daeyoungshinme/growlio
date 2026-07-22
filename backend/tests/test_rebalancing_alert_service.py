@@ -1469,6 +1469,39 @@ class TestRefreshLivePrices:
 
         assert item.shares_to_trade == -5.0
 
+    @pytest.mark.asyncio
+    async def test_overseas_ticker_price_converted_to_krw(self, mock_db):
+        """QLD 397,071주 버그 회귀 방지 — 해외 종목의 실시간 가격은 원시 USD가 아니라
+        환율이 곱해진 KRW로 current_price_krw/shares_to_trade에 반영돼야 한다."""
+        from app.services.rebalancing.order_builder import refresh_live_prices
+
+        item = _make_drift_item(
+            ticker="QLD",
+            market="NASDAQ",
+            shares_to_trade=None,
+            current_price_krw=None,
+            target_value_krw=10_000_000.0,
+            current_qty=0.0,
+        )
+
+        with (
+            patch(
+                "app.services.price_service.fetch_prices_batch",
+                new=AsyncMock(return_value={"QLD": 95.0}),
+            ),
+            patch(
+                "app.services.price_service.get_usd_krw_rate",
+                new=AsyncMock(return_value=1385.0),
+            ),
+        ):
+            await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
+
+        expected_price_krw = 95.0 * 1385.0
+        assert item.current_price_krw == pytest.approx(expected_price_krw)
+        # 버그가 있었다면 shares_to_trade가 환율(~1,385)배 부풀려져 수만 주 단위가 됐을 것.
+        assert item.shares_to_trade == pytest.approx(10_000_000 // expected_price_krw)
+        assert item.shares_to_trade < 1_000
+
 
 # ── resolve_effective_account_ids ─────────────────────────────
 

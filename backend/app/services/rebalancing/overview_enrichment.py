@@ -16,7 +16,7 @@ from app.models.portfolio import Portfolio
 from app.services.credential_service import get_kis_user_credentials
 from app.services.dividend._dividend_queries import fetch_dart_api_key, load_user_dividend_overrides
 from app.services.dividend.fetcher import fetch_ticker_dividend_info
-from app.services.price_service import fetch_prices_batch
+from app.services.price_service import fetch_prices_batch_krw
 from app.services.rebalancing.service import _item_attr
 
 logger = structlog.get_logger()
@@ -89,7 +89,7 @@ async def enrich_overview_with_prices(
     if not unpriced:
         return overview
 
-    fetched_prices = await fetch_prices_batch(user_id, unpriced, db, cache)
+    fetched_prices = await fetch_prices_batch_krw(user_id, unpriced, db, cache)
     extra_positions = [
         {
             "ticker": ticker,

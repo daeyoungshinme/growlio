@@ -181,6 +181,89 @@ class TestReadCachedPricesMalformedEntry:
         assert result == {"005930": 75000.0}
 
 
+# ── fetch_prices_batch_krw: 해외 종목 원시 USD 가격 → KRW 환산 ─────
+
+
+class TestFetchPricesBatchKrw:
+    """fetch_prices_batch_krw: fetch_prices_batch()의 원시 가격(해외는 USD)을 KRW로 환산.
+
+    QLD 397,071주 버그(리밸런싱 매수 수량이 환율 배수만큼 부풀려짐) 회귀 방지 —
+    overview_enrichment.py/order_builder.py가 이 헬퍼로 KRW 환산 후 값을 써야 한다.
+    """
+
+    @pytest.mark.asyncio
+    async def test_overseas_ticker_multiplied_by_usd_rate(self, mock_db, mock_cache, override_settings):
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        user_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.services.price_service.fetch_prices_batch",
+                new=AsyncMock(return_value={"QLD": 95.0}),
+            ),
+            patch(
+                "app.services.price_service.get_usd_krw_rate",
+                new=AsyncMock(return_value=1385.0),
+            ),
+        ):
+            from app.services.price_service import fetch_prices_batch_krw
+
+            result = await fetch_prices_batch_krw(user_id, [("QLD", "NASDAQ")], mock_db, mock_cache)
+
+        assert result == {"QLD": pytest.approx(95.0 * 1385.0)}
+
+    @pytest.mark.asyncio
+    async def test_domestic_only_skips_rate_lookup(self, mock_db, mock_cache, override_settings):
+        """국내 종목만 있으면 환율 조회 자체를 생략하고 원시 가격을 그대로 반환한다."""
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        user_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.services.price_service.fetch_prices_batch",
+                new=AsyncMock(return_value={"005930": 75000.0}),
+            ),
+            patch("app.services.price_service.get_usd_krw_rate") as mock_rate,
+        ):
+            from app.services.price_service import fetch_prices_batch_krw
+
+            result = await fetch_prices_batch_krw(user_id, [("005930", "KOSPI")], mock_db, mock_cache)
+
+        assert result == {"005930": 75000.0}
+        mock_rate.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_mixed_domestic_and_overseas_only_converts_overseas(self, mock_db, mock_cache, override_settings):
+        """국내+해외 혼합 시 국내 종목 가격은 그대로, 해외 종목만 환율이 곱해진다."""
+        import uuid
+        from unittest.mock import AsyncMock, patch
+
+        user_id = uuid.uuid4()
+
+        with (
+            patch(
+                "app.services.price_service.fetch_prices_batch",
+                new=AsyncMock(return_value={"005930": 75000.0, "QLD": 95.0}),
+            ),
+            patch(
+                "app.services.price_service.get_usd_krw_rate",
+                new=AsyncMock(return_value=1385.0),
+            ),
+        ):
+            from app.services.price_service import fetch_prices_batch_krw
+
+            result = await fetch_prices_batch_krw(
+                user_id, [("005930", "KOSPI"), ("QLD", "NASDAQ")], mock_db, mock_cache
+            )
+
+        assert result["005930"] == 75000.0
+        assert result["QLD"] == pytest.approx(95.0 * 1385.0)
+
+
 # ── get_historical_returns ────────────────────────────────────
 
 

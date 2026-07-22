@@ -103,14 +103,14 @@ async def refresh_live_prices(
     `shares_to_trade`도 함께 재계산한다. 그러지 않으면 `build_rebalancing_orders()`가 이 항목을
     "거래수량 없음"으로 영구히 스킵해 실제로는 존재하는 드리프트가 조용히 누락된다.
     """
-    from app.services.price_service import fetch_prices_batch
+    from app.services.price_service import fetch_prices_batch_krw
 
     tickers = [(item.ticker, item.market) for item in items if item.ticker not in _NON_TRADABLE_TICKERS]
     if not tickers:
         return
 
     try:
-        price_map = await fetch_prices_batch(user_id, tickers, db, cache)
+        price_map = await fetch_prices_batch_krw(user_id, tickers, db, cache)
     except Exception as exc:
         logger.warning("rebalancing_live_price_refresh_failed", error=str(exc))
         return
