@@ -69,7 +69,7 @@ export default function EditableNameField({
 
   return (
     <div className={`flex items-center gap-1.5 ${className ?? ""}`}>
-      <span className={textClassName}>{name}</span>
+      <h3 className={textClassName}>{name}</h3>
       <button
         onClick={() => {
           setValue(name);

@@ -31,9 +31,9 @@ export default function StockAccountSummaryCard({ perAccountStats, overview, usd
 
   return (
     <div className="card">
-      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">
+      <h3 className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">
         증권계좌 전체 요약
-      </p>
+      </h3>
       <div className="grid grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-3">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">평가금액</p>

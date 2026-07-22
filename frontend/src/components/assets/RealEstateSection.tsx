@@ -478,7 +478,9 @@ export function RealEstateSummaryCard({ accounts }: SummaryProps) {
 
   return (
     <div className="card">
-      <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">부동산 전체 요약</p>
+      <h3 className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-3">
+        부동산 전체 요약
+      </h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
         <div>
           <p className="text-xs text-gray-400 dark:text-gray-500">시세 합계</p>
@@ -534,9 +536,9 @@ export function RealEstateAccountCard({ account, onDelete, onEdit, isDeleting }:
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-50 truncate">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50 truncate">
               {account.name}
-            </span>
+            </h3>
             {re?.property_type && (
               <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900 text-amber-700 dark:text-amber-300 text-xs rounded-full shrink-0">
                 {re.property_type}

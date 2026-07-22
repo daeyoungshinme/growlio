@@ -89,7 +89,7 @@ export default memo(function HeroSummaryCard({
         {/* 좌: 제목/금액 + 지표 */}
         <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</p>
+            <h2 className="text-xs text-gray-400 dark:text-gray-500 font-medium">전체 자산</h2>
             <div className="flex items-center gap-1">
               {onSync && (
                 <button
