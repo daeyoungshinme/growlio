@@ -41,11 +41,15 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
 
   return (
     <div className="card space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Receipt size={15} className="text-blue-500" />
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">세금 추정</h3>
-          <span className="text-xs text-gray-400 dark:text-gray-500">배당세·해외 양도세</span>
+      <div className="flex flex-wrap items-center justify-between gap-y-2">
+        <div className="flex items-center gap-2 shrink-0">
+          <Receipt size={15} className="text-blue-500 shrink-0" />
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 whitespace-nowrap">
+            세금 추정
+          </h3>
+          <span className="hidden sm:inline text-xs text-gray-400 dark:text-gray-500">
+            배당세·해외 양도세
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-gray-500 dark:text-gray-400 font-medium">기준 연도</label>

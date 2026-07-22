@@ -101,8 +101,16 @@ export function useGoalSettings() {
   }, [location.state, isLoading, data, openEdit]);
 
   useEffect(() => {
-    if (!isLoading && !autoOpenTriggeredRef.current && data && !data.is_configured) {
+    const alreadyShown = localStorage.getItem("growlio:goal-wizard-auto-shown") === "true";
+    if (
+      !isLoading &&
+      !autoOpenTriggeredRef.current &&
+      data &&
+      !data.is_configured &&
+      !alreadyShown
+    ) {
       autoOpenTriggeredRef.current = true;
+      localStorage.setItem("growlio:goal-wizard-auto-shown", "true");
       void openWizard();
     }
   }, [isLoading, data, openWizard]);

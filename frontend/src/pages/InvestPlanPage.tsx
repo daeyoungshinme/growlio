@@ -148,9 +148,9 @@ export default function InvestPlanPage() {
           <>
             {/* 현재 설정 요약 */}
             <div className="card">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <div className="flex flex-wrap items-start justify-between gap-y-2 mb-3">
+                <div className="shrink-0">
+                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">
                     적립 계획 설정
                   </h2>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">

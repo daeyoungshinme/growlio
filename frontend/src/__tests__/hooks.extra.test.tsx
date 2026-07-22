@@ -433,6 +433,70 @@ describe("useGoalSettings", () => {
     expect(result.current.editing).toBe(true);
     expect(result.current.wizardMode).toBe(false);
   });
+
+  it("auto-opens the wizard once when the goal is unconfigured", async () => {
+    localStorage.removeItem("growlio:goal-wizard-auto-shown");
+    const { fetchDCAAnalysis } = await import("@/api/invest");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
+      is_configured: false,
+      settings: {
+        monthly_deposit_amount: null,
+        goal_annual_return_pct: null,
+        goal_amount: null,
+        goal_start_date: null,
+        goal_initial_amount: null,
+      },
+      projection_months: [],
+      yearly_achievements: [],
+      goal_timeline: {
+        months_to_goal: null,
+        expected_goal_date: null,
+        actual_expected_goal_date: null,
+        current_progress_pct: null,
+        on_track: null,
+        lead_lag_months: null,
+        acceleration_scenarios: [],
+      },
+    });
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings(), { wrapper });
+    await vi.waitFor(() => expect(result.current.editing).toBe(true));
+    expect(result.current.wizardMode).toBe(true);
+    expect(localStorage.getItem("growlio:goal-wizard-auto-shown")).toBe("true");
+  });
+
+  it("does not auto-open the wizard again once already shown once (avoids re-nagging on every tab revisit)", async () => {
+    localStorage.setItem("growlio:goal-wizard-auto-shown", "true");
+    const { fetchDCAAnalysis } = await import("@/api/invest");
+    vi.mocked(fetchDCAAnalysis).mockResolvedValueOnce({
+      is_configured: false,
+      settings: {
+        monthly_deposit_amount: null,
+        goal_annual_return_pct: null,
+        goal_amount: null,
+        goal_start_date: null,
+        goal_initial_amount: null,
+      },
+      projection_months: [],
+      yearly_achievements: [],
+      goal_timeline: {
+        months_to_goal: null,
+        expected_goal_date: null,
+        actual_expected_goal_date: null,
+        current_progress_pct: null,
+        on_track: null,
+        lead_lag_months: null,
+        acceleration_scenarios: [],
+      },
+    });
+    const { useGoalSettings } = await import("@/hooks/useGoalSettings");
+    const wrapper = createWrapper();
+    const { result } = renderHook(() => useGoalSettings(), { wrapper });
+    await vi.waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.editing).toBe(false);
+    localStorage.removeItem("growlio:goal-wizard-auto-shown");
+  });
 });
 
 // ============================================
