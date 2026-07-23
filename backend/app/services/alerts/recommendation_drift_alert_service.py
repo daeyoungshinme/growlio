@@ -30,6 +30,7 @@ from app.models.alert import AlertHistory
 from app.models.asset import AssetAccount
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
+from app.services._account_queries import active_accounts_stmt
 from app.services._portfolio_queries import get_linked_portfolios
 from app.services.alerts.alert_service import save_alert_history
 from app.services.goal_candidate_service import existing_items_from_positions
@@ -96,11 +97,7 @@ async def _find_drifted_portfolios(
         return []
 
     stock_accounts_result = await db.execute(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.asset_type.in_(_STOCK_ASSET_TYPES),
-        )
+        active_accounts_stmt(user_id).where(AssetAccount.asset_type.in_(_STOCK_ASSET_TYPES))
     )
     stock_accounts = list(stock_accounts_result.scalars().all())
 

@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.asset import AssetAccount, AssetSnapshot, Transaction
+from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 
 ISA_MATURITY_YEARS = 3
@@ -45,13 +46,7 @@ class IsaStatusSummary(TypedDict):
 
 async def get_isa_status_summary(user_id: uuid.UUID, db: AsyncSession) -> dict[str, Any]:
     """사용자의 ISA 계좌별 의무가입(3년) 진행 상황과 비과세 한도 대비 세금 추정치를 반환한다."""
-    accounts_result = await db.execute(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
-            AssetAccount.tax_type == "ISA",
-            AssetAccount.is_active == True,  # noqa: E712
-        )
-    )
+    accounts_result = await db.execute(active_accounts_stmt(user_id).where(AssetAccount.tax_type == "ISA"))
     accounts = accounts_result.scalars().all()
     if not accounts:
         return {"accounts": [], "note": _ISA_STATUS_NOTE}

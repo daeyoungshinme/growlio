@@ -84,27 +84,28 @@ async def place_overseas_order(
     order_type: str = "MARKET",
     limit_price: float | None = None,
 ) -> dict[str, Any]:
-    """미국주식 매수·매도 주문.
+    """미국주식 매수·매도 주문 (ust20000/ust20001, /api/us/ordr).
 
-    api-id/경로/파라미터명은 openapi.kiwoom.com/guide/apiguide "미국주식 > 주문" 명세
-    확인 후 확정 필요. 아래는 국내(kt10000/kt10001) 패턴을 참고한 잠정 플레이스홀더 —
-    실제 응답이 다를 경우 아래 파싱 부분만 수정할 것.
+    api-id/경로/파라미터명은 오픈소스 .NET 클라이언트(dongbin300/KiwoomRestApi.Net,
+    Clients/UsStocks/KiwoomRestApiClientUsStockOrder.cs)로 교차검증 — 거래소 코드(stex_tp:
+    ND/NY/NA)는 balance.py의 실측 확정값과 일치. 국내주문과 달리 필드명이 stex_tp(dmst_stex_tp
+    아님)이고 trde_tp가 2자리 코드(00=지정가/03=시장가, 국내는 0/3 1자리)임에 주의.
     """
     api_id = API_ID_OVERSEAS_BUY if side == "BUY" else API_ID_OVERSEAS_SELL
     headers = _auth_headers(access_token, api_id)
 
-    exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper(), "NASD")
+    exchange_cd = KIWOOM_OVERSEAS_MARKET_CODES.get(market.upper(), "ND")
 
     if order_type == "LIMIT" and limit_price is not None:
-        trde_tp = "0"  # 보통(지정가)
+        trde_tp = "00"  # 지정가
         ord_uv = f"{limit_price:.2f}"
     else:
-        trde_tp = "3"  # 시장가
+        trde_tp = "03"  # 시장가
         ord_uv = "0"
 
     body: dict[str, Any] = {
         "acnt_no": account_no,
-        "dmst_stex_tp": exchange_cd,  # TODO: 실제 거래소 파라미터명 확인
+        "stex_tp": exchange_cd,  # 거래소구분: NA(AMEX)/ND(NASDAQ)/NY(NYSE)
         "stk_cd": ticker,  # 종목코드
         "ord_qty": str(quantity),  # 주문수량
         "ord_uv": ord_uv,
@@ -113,7 +114,7 @@ async def place_overseas_order(
 
     data = await kiwoom_request(
         "POST",
-        "/api/dostk/ordr",  # TODO: 미국주식 전용 주문 경로로 교체 (문서 확인)
+        "/api/us/ordr",
         is_mock=is_mock,
         headers=headers,
         json=body,

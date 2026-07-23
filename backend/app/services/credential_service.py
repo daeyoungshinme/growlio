@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 import structlog
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -77,12 +76,11 @@ async def get_kis_user_credentials(user_id: uuid.UUID, db: AsyncSession) -> dict
     from app.core.cache_store import get_cache_store
     from app.kis.auth import get_access_token
     from app.models.asset import AssetAccount
+    from app.services._account_queries import active_accounts_stmt
 
     account = await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
+        active_accounts_stmt(user_id).where(
             AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
             AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )

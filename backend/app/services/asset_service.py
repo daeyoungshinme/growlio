@@ -23,6 +23,7 @@ from app.providers.base import BalanceResult, BrokerProvider
 from app.providers.kis_provider import KISProvider
 from app.providers.kiwoom_provider import KiwoomProvider
 from app.providers.manual_provider import ManualProvider
+from app.services._account_queries import active_accounts_stmt
 from app.services.snapshot_service import _upsert_snapshot, sync_snapshot_positions
 from app.utils.cache_keys import (
     CacheStoreType,
@@ -183,8 +184,7 @@ async def list_accounts(
     limit: int = 200,
 ) -> Sequence[AssetAccount]:
     result = await db.execute(
-        select(AssetAccount)
-        .where(AssetAccount.user_id == user_id, AssetAccount.is_active == True)  # noqa: E712
+        active_accounts_stmt(user_id)
         .order_by(AssetAccount.sort_order, AssetAccount.created_at)
         .offset(skip)
         .limit(limit)

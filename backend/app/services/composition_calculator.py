@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.enums import AssetType
 from app.models.asset import AssetAccount, AssetSnapshot, Position
+from app.services._account_queries import active_accounts_stmt
 from app.services._snapshot_queries import latest_snapshot_subquery
 from app.utils.cache_keys import CacheStoreType
 from app.utils.currency import fetch_usd_krw
@@ -36,18 +37,16 @@ async def get_latest_snapshot_rows(user_id: uuid.UUID, db: AsyncSession) -> tupl
 
 async def get_no_snap_accounts(user_id: uuid.UUID, db: AsyncSession, snapped_ids: set) -> list:
     """스냅샷 없이 manual_amount/deposit만 있는 활성 계좌를 반환한다."""
-    conditions = [
-        AssetAccount.user_id == user_id,
-        AssetAccount.is_active == True,  # noqa: E712
+    stmt = active_accounts_stmt(user_id).where(
         or_(
             and_(AssetAccount.manual_amount.isnot(None), AssetAccount.manual_amount > 0),
             AssetAccount.deposit_krw > 0,
             AssetAccount.deposit_usd > 0,
-        ),
-    ]
+        )
+    )
     if snapped_ids:
-        conditions.append(AssetAccount.id.not_in(snapped_ids))
-    result = await db.execute(select(AssetAccount).where(*conditions))
+        stmt = stmt.where(AssetAccount.id.not_in(snapped_ids))
+    result = await db.execute(stmt)
     return list(result.scalars().all())
 
 

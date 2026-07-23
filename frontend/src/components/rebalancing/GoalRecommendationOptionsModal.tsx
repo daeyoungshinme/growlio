@@ -37,9 +37,11 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   });
 
   const [riskTolerance, setRiskTolerance] = useState<GoalRiskTolerance | null>(null);
-  const [maxWeightPct, setMaxWeightPct] = useState<number | null>(null);
+  const [maxWeightPctInput, setMaxWeightPctInput] = useState<string | null>(null);
   const [cagrLookbackYears, setCagrLookbackYears] = useState<number | null>(null);
-  const [shortTermEquityFloorPct, setShortTermEquityFloorPct] = useState<number | null>(null);
+  const [shortTermEquityFloorPctInput, setShortTermEquityFloorPctInput] = useState<string | null>(
+    null,
+  );
 
   const savedRiskTolerance = settingsData?.goal_risk_tolerance ?? "CONSERVATIVE";
   const savedMaxWeightPct = settingsData?.goal_max_weight_pct ?? 40.0;
@@ -47,9 +49,24 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const savedShortTermEquityFloorPct = settingsData?.goal_short_term_equity_floor_pct ?? 80.0;
 
   const currentRiskTolerance = riskTolerance ?? savedRiskTolerance;
-  const currentMaxWeightPct = maxWeightPct ?? savedMaxWeightPct;
   const currentCagrLookbackYears = cagrLookbackYears ?? savedCagrLookbackYears;
-  const currentShortTermEquityFloorPct = shortTermEquityFloorPct ?? savedShortTermEquityFloorPct;
+
+  const currentMaxWeightPctStr = maxWeightPctInput ?? String(savedMaxWeightPct);
+  const currentMaxWeightPct =
+    maxWeightPctInput === null ? savedMaxWeightPct : Number(maxWeightPctInput);
+  const currentShortTermEquityFloorPctStr =
+    shortTermEquityFloorPctInput ?? String(savedShortTermEquityFloorPct);
+  const currentShortTermEquityFloorPct =
+    shortTermEquityFloorPctInput === null
+      ? savedShortTermEquityFloorPct
+      : Number(shortTermEquityFloorPctInput);
+
+  const maxWeightValid =
+    Number.isFinite(currentMaxWeightPct) && currentMaxWeightPct >= 10 && currentMaxWeightPct <= 100;
+  const shortTermFloorValid =
+    Number.isFinite(currentShortTermEquityFloorPct) &&
+    currentShortTermEquityFloorPct >= 0 &&
+    currentShortTermEquityFloorPct <= 100;
 
   const isDirty =
     currentRiskTolerance !== savedRiskTolerance ||
@@ -105,8 +122,8 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               min={10}
               max={100}
               step={5}
-              value={currentMaxWeightPct}
-              onChange={(e) => setMaxWeightPct(Number(e.target.value))}
+              value={currentMaxWeightPctStr}
+              onChange={(e) => setMaxWeightPctInput(e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">% (10~100)</span>
@@ -148,8 +165,8 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
               min={0}
               max={100}
               step={5}
-              value={currentShortTermEquityFloorPct}
-              onChange={(e) => setShortTermEquityFloorPct(Number(e.target.value))}
+              value={currentShortTermEquityFloorPctStr}
+              onChange={(e) => setShortTermEquityFloorPctInput(e.target.value)}
               className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <span className="text-xs text-gray-500 dark:text-gray-400">% (0~100)</span>
@@ -171,7 +188,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           {isDirty && (
             <button
               type="button"
-              disabled={saveMutation.isPending}
+              disabled={saveMutation.isPending || !maxWeightValid || !shortTermFloorValid}
               onClick={() =>
                 saveMutation.mutate({
                   risk_tolerance: currentRiskTolerance,

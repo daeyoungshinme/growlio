@@ -17,11 +17,11 @@ import uuid
 from functools import partial
 
 import structlog
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants import DOMESTIC_MARKETS
 from app.models.asset import AssetAccount
+from app.services._account_queries import active_accounts_stmt
 from app.services.credential_service import decrypt_kis_credentials
 from app.services.price_sync_sources import sync_naver_price, sync_pykrx_price
 from app.services.yahoo_price import (
@@ -278,10 +278,8 @@ async def get_historical_returns(
 async def _get_any_kis_account(user_id: uuid.UUID, db: AsyncSession) -> AssetAccount | None:
     """유저의 활성 KIS 계좌 중 자격증명이 있는 첫 번째 계좌를 반환."""
     return await db.scalar(
-        select(AssetAccount).where(
-            AssetAccount.user_id == user_id,
+        active_accounts_stmt(user_id).where(
             AssetAccount.data_source == "KIS_API",
-            AssetAccount.is_active == True,  # noqa: E712
             AssetAccount.kis_app_key != None,  # noqa: E711
         )
     )
