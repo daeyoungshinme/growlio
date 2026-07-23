@@ -79,8 +79,10 @@ async def _fetch_current_positions(stock_acc_ids: list, db: AsyncSession) -> dic
 
 async def fetch_position_maps(snap_ids: list, stock_acc_ids: list, db: AsyncSession) -> tuple[dict, dict]:
     """스냅샷별·계좌별 포지션을 각각 dict로 batch 조회한다."""
-    snap_positions = await _fetch_snapshot_positions(snap_ids, db)
-    current_positions = await _fetch_current_positions(stock_acc_ids, db)
+    snap_positions, current_positions = await asyncio.gather(
+        _fetch_snapshot_positions(snap_ids, db),
+        _fetch_current_positions(stock_acc_ids, db),
+    )
     return snap_positions, current_positions
 
 

@@ -133,5 +133,13 @@ def init_scheduler() -> None:
         id="recommendation_drift_alert",
         replace_existing=True,
     )
+    from app.jobs.cache_sweep import run_cache_sweep
+
+    scheduler.add_job(
+        run_cache_sweep,
+        IntervalTrigger(minutes=15),
+        id="cache_sweep",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

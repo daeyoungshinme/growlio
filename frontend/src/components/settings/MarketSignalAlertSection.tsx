@@ -3,7 +3,9 @@ import { useMarketSignalDigestToggle } from "@/hooks/useMarketSignalDigestToggle
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import { SectionCard } from "./shared";
 
-export function MarketSignalAlertSection() {
+/** `embedded`이면 자체 `SectionCard` 제목("시장 신호 알림")을 생략 — 부모(`SettingsPage`의 "시장 모니터링"
+ * `CollapsibleCard`)가 이미 동일 위계의 제목을 렌더링하므로 중복 방지. */
+export function MarketSignalAlertSection({ embedded = false }: { embedded?: boolean } = {}) {
   const { status, toggle, isPending } = useCompositeSignalToggle();
   const {
     enabled: digestEnabled,
@@ -11,8 +13,8 @@ export function MarketSignalAlertSection() {
     isPending: digestPending,
   } = useMarketSignalDigestToggle();
 
-  return (
-    <SectionCard title="시장 신호 알림">
+  const content = (
+    <>
       <p className="text-xs text-gray-500 dark:text-gray-400">
         포트폴리오 목표 비중 이탈이 없어도, 시장 상황이나 리스크가 심상치 않으면 이메일·푸시로
         알려드립니다.
@@ -73,6 +75,9 @@ export function MarketSignalAlertSection() {
       <p className="text-xs text-gray-400 dark:text-gray-500">
         최근 발송 이력은 발송 이력 탭에서 확인할 수 있습니다.
       </p>
-    </SectionCard>
+    </>
   );
+
+  if (embedded) return content;
+  return <SectionCard title="시장 신호 알림">{content}</SectionCard>;
 }

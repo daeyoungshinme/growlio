@@ -83,7 +83,11 @@ from app.services.goal_portfolio_optimizer import (
 from app.services.goal_return_solver import months_until_year_end, solve_required_annual_return_pct
 from app.services.market_data_fetcher import fetch_yf_daily_returns
 from app.services.market_signal_service import get_market_signal
-from app.services.portfolio_service import build_portfolio_overview
+from app.services.portfolio_service import (
+    build_portfolio_overview,
+    compute_total_assets_krw,
+    prefetch_accounts_snapshot_positions,
+)
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
@@ -646,8 +650,10 @@ async def get_horizon_recommendations(
 ) -> HorizonRecommendationResponse:
     """`_compute_horizon_recommendations()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
 
-    최대 15개(투자기간×세제유형) 조합에 대해 순차 DB 조회 후 조합별 SLSQP 최적화를 수행하는
-    무거운 계산이라 캐싱 효과가 크다. 무효화 조건은 `get_goal_recommendation`과 동일.
+    최대 15개(투자기간×세제유형) 조합에 대해 후보 필터링(순차, 조합 간 상태 의존) 후 조합별
+    SLSQP 최적화를 수행하는 무거운 계산이라 캐싱 효과가 크다. 계좌/스냅샷/포지션 DB 조회는
+    조합마다 반복하지 않고 루프 진입 전 한 번만 수행한다(`prefetch_accounts_snapshot_positions`).
+    무효화 조건은 `get_goal_recommendation`과 동일.
 
     조합 중 하나라도 `recommended_items`가 비어 있으면(예: 해외전용 조합만 Yahoo 서킷브레이커에
     걸려 시세 데이터를 못 가져온 경우) 응답 전체를 캐싱하지 않는다 — 15개 조합이 하나의 캐시
@@ -719,9 +725,16 @@ async def _compute_horizon_recommendations(
         key = (horizon_value, tax_type_value or AccountTaxType.GENERAL.value)
         accounts_by_pair.setdefault(key, []).append(account_id)
 
-    # 1단계: DB(AsyncSession, 동시 접근 불가) 의존 부분 — 계좌당 자산총액·후보 필터링을 조합별로
-    # 순차 계산한다. `candidate_dicts`는 `_apply_index_region_preference`가 앞선 조합에서 추가한
-    # 큐레이션 후보를 뒤따르는 조합의 capacity_remaining/필터링에 반영해야 하므로 병렬화할 수 없다.
+    # 1단계: 후보 필터링(`candidate_dicts` 누적)은 조합 간 상태 의존(`_apply_index_region_preference`가
+    # 앞선 조합에서 추가한 큐레이션 후보를 뒤따르는 조합의 capacity_remaining에 반영)이 있어 순차 계산이
+    # 불가피하다. 다만 그 계산에 필요한 계좌/스냅샷/포지션 데이터는 조합마다 재조회(`build_portfolio_overview`
+    # 재호출, 최대 15회 × 쿼리 3~4개)하지 않고 루프 진입 전에 관련 계좌 전체를 한 번만 조회해 재사용한다
+    # (`prefetch_accounts_snapshot_positions` + `compute_total_assets_krw`).
+    all_account_ids = [acc_id for ids in accounts_by_pair.values() for acc_id in ids]
+    accounts_by_id, snap_by_acc, snap_pos_map, cur_pos_map = await prefetch_accounts_snapshot_positions(
+        all_account_ids, db
+    )
+
     combos: list[tuple[str, str, list[uuid.UUID], float, list[dict[str, str]], str | None]] = []
     all_added: list[dict[str, str]] = []
     for horizon in InvestmentHorizon:
@@ -730,8 +743,8 @@ async def _compute_horizon_recommendations(
             if not account_ids:
                 continue
 
-            overview = await build_portfolio_overview(user_id, db, account_ids=account_ids, cache=cache)
-            base_krw = float(overview.get("total_assets_krw", 0))
+            combo_accounts = [accounts_by_id[acc_id] for acc_id in account_ids if acc_id in accounts_by_id]
+            base_krw = compute_total_assets_krw(combo_accounts, snap_by_acc, snap_pos_map, cur_pos_map)
 
             eligible_classes = _HORIZON_ELIGIBLE_ASSET_CLASSES[horizon.value]
             if tax_type.value == AccountTaxType.IRP.value:

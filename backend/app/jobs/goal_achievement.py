@@ -8,14 +8,16 @@ from datetime import UTC, date, datetime
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
+from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_goal_achievement_email
 from app.services.push_service import send_push_to_user
+from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
 
@@ -38,26 +40,27 @@ async def _already_notified_this_month(db, user_id, alert_type: str) -> bool:
     return result.scalar() is not None
 
 
-async def run_goal_achievement_check() -> None:
-    """매일 18:45 KST — 총 자산·연간 입금·연간 배당 목표 달성 시 이메일 알림."""
-    cache = await get_cache_store()
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(User, UserSettings)
-            .join(UserSettings, User.id == UserSettings.user_id)
-            .where(
-                User.is_active == True,  # noqa: E712
-                UserSettings.goal_achievement_alerts_enabled == True,  # noqa: E712
-                UserSettings.goal_amount.isnot(None)
-                | UserSettings.annual_deposit_goal.isnot(None)
-                | UserSettings.annual_dividend_goal.isnot(None),
-            )
+async def _run_goal_achievement_check(db: AsyncSession, cache: CacheStoreType) -> None:
+    result = await db.execute(
+        select(User, UserSettings)
+        .join(UserSettings, User.id == UserSettings.user_id)
+        .where(
+            User.is_active == True,  # noqa: E712
+            UserSettings.goal_achievement_alerts_enabled == True,  # noqa: E712
+            UserSettings.goal_amount.isnot(None)
+            | UserSettings.annual_deposit_goal.isnot(None)
+            | UserSettings.annual_dividend_goal.isnot(None),
         )
-        users = result.all()
+    )
+    users = result.all()
 
     sem = asyncio.Semaphore(_GOAL_CHECK_CONCURRENCY)
     await asyncio.gather(*(_check_user_goals(user, settings_row, cache, sem) for user, settings_row in users))
+
+
+async def run_goal_achievement_check() -> None:
+    """매일 18:45 KST — 총 자산·연간 입금·연간 배당 목표 달성 시 이메일 알림."""
+    await run_alert_job(_run_goal_achievement_check, "goal_achievement_check_job", needs_cache=True)
 
 
 async def _check_user_goals(user: User, settings_row: UserSettings, cache, sem: asyncio.Semaphore) -> None:

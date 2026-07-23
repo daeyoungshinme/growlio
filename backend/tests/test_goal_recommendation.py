@@ -1605,8 +1605,12 @@ class TestGetHorizonRecommendations:
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
-                AsyncMock(return_value={"total_assets_krw": 5_000_000.0}),
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
             ),
             patch(
                 "app.services.goal_recommendation_service.get_historical_returns",
@@ -2497,8 +2501,8 @@ class TestGetHorizonRecommendations:
 
     async def test_multiple_combos_preserve_order_after_parallelized_io(self):
         """`_build_horizon_result` 호출을 asyncio.gather로 동시 실행하도록 바꾼 뒤에도, DB 의존
-        단계(overview 조회)는 여전히 (InvestmentHorizon, AccountTaxType) enum 순서대로 순차 실행되고
-        최종 결과 순서도 그 순서를 유지해야 한다."""
+        단계(계좌당 base_krw 계산)는 여전히 (InvestmentHorizon, AccountTaxType) enum 순서대로
+        순차 실행되고 최종 결과 순서도 그 순서를 유지해야 한다."""
         settings_row = SimpleNamespace(
             goal_candidate_tickers=[
                 {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
@@ -2530,14 +2534,22 @@ class TestGetHorizonRecommendations:
             "153130.KS": [random.gauss(0.0001, 0.0005) for _ in range(252)],
             "114260.KS": [random.gauss(0.00015, 0.001) for _ in range(252)],
         }
-        overview_mock = AsyncMock(return_value={"total_assets_krw": 5_000_000.0})
+        accounts_by_id = {short_account_id: object(), mid_account_id: object()}
+        compute_total_assets_mock = MagicMock(return_value=5_000_000.0)
 
         with (
             patch(
                 "app.services.goal_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
-            patch("app.services.goal_recommendation_service.build_portfolio_overview", overview_mock),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=(accounts_by_id, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                compute_total_assets_mock,
+            ),
             patch(
                 "app.services.goal_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
@@ -2553,8 +2565,8 @@ class TestGetHorizonRecommendations:
             ("SHORT_TERM", "GENERAL"),
             ("MID_TERM", "GENERAL"),
         ]
-        overview_account_ids = [call.kwargs["account_ids"] for call in overview_mock.call_args_list]
-        assert overview_account_ids == [[short_account_id], [mid_account_id]]
+        combo_accounts_seen = [call.args[0] for call in compute_total_assets_mock.call_args_list]
+        assert combo_accounts_seen == [[accounts_by_id[short_account_id]], [accounts_by_id[mid_account_id]]]
 
     async def test_does_not_cache_when_any_combo_has_no_recommended_items(self):
         """조합 중 하나라도 recommended_items가 비어 있으면(예: Yahoo 서킷브레이커로 해외전용

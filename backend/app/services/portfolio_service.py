@@ -346,6 +346,51 @@ async def build_portfolio_overview(
     return overview
 
 
+async def prefetch_accounts_snapshot_positions(
+    account_ids: list[uuid.UUID], db: AsyncSession
+) -> tuple[
+    dict[uuid.UUID, AssetAccount],
+    dict[str, AssetSnapshot],
+    dict[uuid.UUID, list[Position]],
+    dict[uuid.UUID, list[Position]],
+]:
+    """계좌 ID 목록에 대해 계좌·최신 스냅샷·포지션을 한 번에 조회한다.
+
+    `goal_recommendation_service.py`의 투자기간×세제유형 조합별 추천처럼, 같은 유저의 여러
+    계좌 부분집합에 대해 총자산을 반복 계산해야 할 때 `compute_total_assets_krw()`와 함께
+    사용해 조합마다 `build_portfolio_overview()`를 재호출(계좌/스냅샷/포지션 재조회)하지 않도록 한다.
+    """
+    acc_result = await db.execute(select(AssetAccount).where(AssetAccount.id.in_(account_ids)))
+    accounts = list(acc_result.scalars().all())
+    accounts_by_id = {a.id: a for a in accounts}
+
+    snap_by_acc = await _fetch_latest_snapshots(account_ids, db)
+    snap_ids = [s.id for s in snap_by_acc.values()]
+    stock_acc_ids = [a.id for a in accounts if a.asset_type in STOCK_TYPES]
+    snap_pos_map, cur_pos_map = await fetch_position_maps(snap_ids, stock_acc_ids, db)
+
+    return accounts_by_id, snap_by_acc, snap_pos_map, cur_pos_map
+
+
+def compute_total_assets_krw(
+    accounts: list[AssetAccount],
+    snap_by_acc: dict[str, AssetSnapshot],
+    snap_pos_map: dict[uuid.UUID, list[Position]],
+    cur_pos_map: dict[uuid.UUID, list[Position]],
+) -> float:
+    """이미 조회된 계좌/스냅샷/포지션 데이터로 총자산(KRW)만 계산한다 — `build_portfolio_overview()`의
+    `total_assets_krw` 계산 로직과 반드시 동일해야 한다(계좌 상세·비중 등은 계산하지 않는 축약형).
+    """
+    total_assets_krw = 0.0
+    for acc in accounts:
+        snap = snap_by_acc.get(str(acc.id))
+        pos_list_db: list[Position] = (snap_pos_map.get(snap.id, []) if snap else []) or cur_pos_map.get(acc.id, [])
+        amount_krw, _invested, _pnl, _raw = _calc_account_amounts(acc, snap, pos_list_db)
+        if acc.include_in_total:
+            total_assets_krw += amount_krw
+    return total_assets_krw
+
+
 def _empty_overview() -> dict[str, Any]:
     return {
         "total_assets_krw": 0,

@@ -202,7 +202,7 @@ services/
   │   └── _dividend_queries.py # 배당 관련 DB 쿼리 헬퍼
   ├── price_sync_sources.py   # [현재가 조회 그룹] Yahoo 클라우드 IP 차단 대비 국내종목 Naver/pykrx 폴백 가격 조회
   ├── email_service.py        # 이메일 발송
-  ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리)
+  ├── portfolio_service.py    # 포트폴리오 overview 집계 (portfolio.py 라우터에서 분리). `prefetch_accounts_snapshot_positions()`/`compute_total_assets_krw()`는 `build_portfolio_overview()`의 총자산 계산 축약형 — 같은 유저의 여러 계좌 부분집합에 대해 총자산만 반복 계산해야 할 때(`goal_recommendation_service.py`의 투자기간별 추천) 계좌/스냅샷/포지션을 한 번만 조회해 재사용하는 용도
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # [현재가 조회 그룹] 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── stock_search_service.py # 종목명·티커 검색 — 네이버 금융(한글)/Yahoo Finance(영문·티커) 연동 (stocks.py 라우터에서 분리)
@@ -251,7 +251,7 @@ schemas/                      # Pydantic 요청/응답 스키마
 core/                         # 설정·DB·in-memory 캐시 store (구 app/config.py·app/database.py)
   ├── config.py                # Settings(pydantic-settings) — env var 로딩
   ├── database.py              # SQLAlchemy async engine/session, Base
-  └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 store 싱글톤, get_cache_store/close_cache_store (단일 프로세스 배포 전제 — 구 Redis 클라이언트 대체)
+  └── cache_store.py           # 프로세스 내 in-memory TTL 캐시 store 싱글톤, get_cache_store/close_cache_store (단일 프로세스 배포 전제 — 구 Redis 클라이언트 대체). `sweep_expired()`를 `jobs/cache_sweep.py`가 15분마다 호출해 만료 키를 능동 청소(lazy expiration만으로는 재방문 없는 유저의 키가 계속 남아 `scan()` 비용 증가). **주의**: 워커/인스턴스를 2개 이상으로 늘리면 캐시가 프로세스 로컬이라 적중률이 급락하고 무효화도 다른 워커에 전파되지 않음 — 확장 시 Redis 등 공유 캐시 재도입 필요(현재 `render.yaml`은 단일 워커/단일 인스턴스 전제)
 kis/                          # KIS OpenAPI 클라이언트 (auth, balance, client, constants, domestic_quote, order, overseas_quote)
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일한 `AsyncRateLimiter`로 초당 `kiwoom_rate_per_second`(기본 4.0, 관측 유량 5/s 대비 20% 버퍼) 건 제한 — `providers/http_client.py`의 rate-limit 응답 감지도 키움 `return_code=5`(EGW00201과 동일 의미)에 대응
 providers/                    # 금융 데이터 provider
@@ -291,6 +291,7 @@ jobs/                         # APScheduler 정기 작업
   ├── rebalancing_plan_sell_expiry.py  # 매일 15:31 KST — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신
+  ├── cache_sweep.py          # 15분 간격 — in-memory 캐시(`cache_store.py`)의 만료 키를 능동 청소(lazy expiration 보완)
   └── _job_helpers.py         # job 공통 헬퍼 유틸리티
 ```
 

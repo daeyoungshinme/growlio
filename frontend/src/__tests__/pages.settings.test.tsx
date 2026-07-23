@@ -128,6 +128,9 @@ function renderSettings() {
 describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // useCollapsible이 localStorage로 접힘 상태를 영속화하므로, 알림 그룹 카드를 여닫는 테스트 간
+    // 상태가 새지 않도록 매 테스트 시작 시 초기화한다.
+    localStorage.clear();
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/settings") return Promise.resolve({ data: mockSettings });
       if (url === "/assets") return Promise.resolve({ data: [] });
@@ -229,6 +232,10 @@ describe("SettingsPage", () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
     await waitFor(() => {
+      expect(screen.getByText("목표·추천 변화 감지")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /목표·추천 변화 감지/ }));
+    await waitFor(() => {
       expect(screen.getByText("목표 달성 알림")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "목표 달성 알림" }));
@@ -241,6 +248,10 @@ describe("SettingsPage", () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
     await waitFor(() => {
+      expect(screen.getByText("정기 리포트·리마인더")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·리마인더/ }));
+    await waitFor(() => {
       expect(screen.getByText("월간 리포트")).toBeInTheDocument();
     });
     fireEvent.click(screen.getByRole("checkbox", { name: "월간 리포트" }));
@@ -252,6 +263,7 @@ describe("SettingsPage", () => {
   it("추천 비중 변화 알림 토글을 클릭하면 설정을 저장한다", async () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
+    fireEvent.click(screen.getByRole("button", { name: /목표·추천 변화 감지/ }));
     // mockSettings 로드 전 기본값(false)에서 클릭하는 경합을 피하기 위해 로드 완료(checked) 대기
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" })).toBeChecked();
@@ -264,12 +276,12 @@ describe("SettingsPage", () => {
     });
   });
 
-  it("시장 신호 알림 탭을 클릭하면 MarketSignalAlertSection을 표시한다", async () => {
+  it("시장 모니터링 카드를 펼치면 MarketSignalAlertSection을 표시한다", async () => {
     renderSettings();
     await waitFor(() => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: "시장 신호 알림" }));
+    fireEvent.click(screen.getByRole("button", { name: /시장 모니터링/ }));
     await waitFor(() => {
       expect(screen.getByTestId("market-signal-alert-section")).toBeInTheDocument();
     });

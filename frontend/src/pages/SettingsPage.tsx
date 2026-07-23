@@ -12,6 +12,9 @@ import {
   Sparkles,
   ChevronRight,
   KeyRound,
+  Mail,
+  TrendingUp,
+  Activity,
 } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
@@ -27,11 +30,13 @@ import { useBiometric } from "@/hooks/useBiometric";
 import { retryPushRegistration, disablePushNotifications } from "@/hooks/usePushNotifications";
 import { usePushNotificationStore } from "@/stores/pushNotificationStore";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlertsToggle";
 import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsToggle";
 import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
 import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDriftAlertToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
+import CollapsibleCard from "@/components/common/CollapsibleCard";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
 import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSection";
@@ -162,7 +167,7 @@ function AlertHistorySection() {
 const inputClass = `mt-1 w-full ${INPUT_MD}`;
 const labelClass = LABEL_MD;
 
-const ALERT_TABS = ["환율 알림", "주가 알림", "시장 신호 알림", "발송 이력"] as const;
+const ALERT_TABS = ["환율 알림", "주가 알림", "발송 이력"] as const;
 type AlertTab = (typeof ALERT_TABS)[number];
 
 export default function SettingsPage() {
@@ -215,6 +220,30 @@ export default function SettingsPage() {
     toggle: toggleRecommendationDriftAlert,
     isPending: recommendationDriftAlertPending,
   } = useRecommendationDriftAlertToggle();
+
+  const [isReportAlertsOpen, toggleReportAlertsOpen] = useCollapsible(
+    false,
+    "growlio:settings:report-alerts-open",
+  );
+  const [isGoalAlertsOpen, toggleGoalAlertsOpen] = useCollapsible(
+    false,
+    "growlio:settings:goal-alerts-open",
+  );
+  const [isMarketAlertsOpen, toggleMarketAlertsOpen, setMarketAlertsOpen] = useCollapsible(
+    false,
+    "growlio:settings:market-alerts-open",
+  );
+  useEffect(() => {
+    if (initialAlertTab === "시장 신호 알림") setMarketAlertsOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialAlertTab]);
+
+  const reportAlertsEnabledCount = [monthlyReportEnabled, yearEndTaxReminderEnabled].filter(
+    Boolean,
+  ).length;
+  const goalAlertsEnabledCount = [goalAlertsEnabled, recommendationDriftAlertEnabled].filter(
+    Boolean,
+  ).length;
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -363,58 +392,84 @@ export default function SettingsPage() {
             onSettingsChange={invalidateSettings}
           />
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
-            </p>
-            <ToggleSwitch
-              checked={goalAlertsEnabled}
-              disabled={goalAlertsPending}
-              onChange={toggleGoalAlerts}
-              ariaLabel="목표 달성 알림"
-            />
-          </div>
+          <CollapsibleCard
+            icon={Mail}
+            title="정기 리포트·리마인더"
+            isOpen={isReportAlertsOpen}
+            onToggle={toggleReportAlertsOpen}
+            collapsedHint={`2개 중 ${reportAlertsEnabledCount}개 켜짐`}
+          >
+            <div>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
+              </p>
+              <ToggleSwitch
+                checked={monthlyReportEnabled}
+                disabled={monthlyReportPending}
+                onChange={toggleMonthlyReport}
+                ariaLabel="월간 리포트"
+              />
+            </div>
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              매월 1일 전월 포트폴리오 요약을 이메일로 보내드립니다.
-            </p>
-            <ToggleSwitch
-              checked={monthlyReportEnabled}
-              disabled={monthlyReportPending}
-              onChange={toggleMonthlyReport}
-              ariaLabel="월간 리포트"
-            />
-          </div>
+            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
+              </p>
+              <ToggleSwitch
+                checked={yearEndTaxReminderEnabled}
+                disabled={yearEndTaxReminderPending}
+                onChange={toggleYearEndTaxReminder}
+                ariaLabel="연말 절세 리마인더"
+              />
+            </div>
+          </CollapsibleCard>
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">연말 절세 리마인더</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              11~12월 매주 월요일, 활용 가능한 절세 방법(손실수확·공제한도)을 요약해 보내드립니다.
-            </p>
-            <ToggleSwitch
-              checked={yearEndTaxReminderEnabled}
-              disabled={yearEndTaxReminderPending}
-              onChange={toggleYearEndTaxReminder}
-              ariaLabel="연말 절세 리마인더"
-            />
-          </div>
+          <CollapsibleCard
+            icon={TrendingUp}
+            title="목표·추천 변화 감지"
+            isOpen={isGoalAlertsOpen}
+            onToggle={toggleGoalAlertsOpen}
+            collapsedHint={`2개 중 ${goalAlertsEnabledCount}개 켜짐`}
+          >
+            <div>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
+              </p>
+              <ToggleSwitch
+                checked={goalAlertsEnabled}
+                disabled={goalAlertsPending}
+                onChange={toggleGoalAlerts}
+                ariaLabel="목표 달성 알림"
+              />
+            </div>
 
-          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
-            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-              매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
-              달라지면 이메일/푸시로 알려드립니다.
-            </p>
-            <ToggleSwitch
-              checked={recommendationDriftAlertEnabled}
-              disabled={recommendationDriftAlertPending}
-              onChange={toggleRecommendationDriftAlert}
-              ariaLabel="추천 비중 변화 알림"
-            />
-          </div>
+            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+                달라지면 이메일/푸시로 알려드립니다.
+              </p>
+              <ToggleSwitch
+                checked={recommendationDriftAlertEnabled}
+                disabled={recommendationDriftAlertPending}
+                onChange={toggleRecommendationDriftAlert}
+                ariaLabel="추천 비중 변화 알림"
+              />
+            </div>
+          </CollapsibleCard>
+
+          <CollapsibleCard
+            icon={Activity}
+            title="시장 모니터링"
+            isOpen={isMarketAlertsOpen}
+            onToggle={toggleMarketAlertsOpen}
+            collapsedHint="시장 위험 신호 등급 전환 알림 + 매일 아침 요약"
+          >
+            <MarketSignalAlertSection embedded />
+          </CollapsibleCard>
 
           {/* 알림 탭 */}
           <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
@@ -436,7 +491,6 @@ export default function SettingsPage() {
           <div ref={alertTabContentRef}>
             {alertTab === "환율 알림" && <ExchangeRateAlertSection />}
             {alertTab === "주가 알림" && <StockPriceAlertSection />}
-            {alertTab === "시장 신호 알림" && <MarketSignalAlertSection />}
             {alertTab === "발송 이력" && <AlertHistorySection />}
           </div>
         </SectionCard>

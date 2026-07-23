@@ -73,11 +73,12 @@ make build-android-release         # APK Release 빌드
 - `/find-account` — 계정 찾기 (FindAccountPage)
 - `/forgot-password` — 비밀번호 찾기 (ForgotPasswordPage)
 - `/reset-password` — 비밀번호 재설정 (ResetPasswordPage)
+- `/auth/callback` — 회원가입 확인 이메일 링크 전용 랜딩 페이지 (AuthCallbackPage, 인증 불필요). Supabase가 이메일 인증 후 리다이렉트하는 목적지 — 세션 확립 대기 → 성공/실패 안내 → `/dashboard`로 이동
 - `/rebalancing/plan-confirm?token=` — 리밸런싱 자동화 매수 취소/매도 승인 (RebalancingPlanConfirmPage, 이메일 링크 전용, 인증 불필요)
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — DART API 키, 알림 설정(목표 달성/공통 수신 이메일/환율/주가/시장 신호/발송 이력), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
+- `/settings` — DART API 키, 알림 설정(공통 수신 이메일 + 카테고리별 `CollapsibleCard` 3개: "정기 리포트·리마인더"/"목표·추천 변화 감지"/"시장 모니터링" + 환율/주가/발송이력 탭), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
@@ -143,12 +144,13 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
+- `useSettingsToggle.ts` — `["settings"]`의 boolean 필드 하나를 조회 후 PUT으로 토글하는 반복 패턴(조회+뮤테이션+무효화+에러토스트)을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 4개 훅(`useGoalAchievementAlertsToggle`/`useMonthlyReportAlertsToggle`/`useYearEndTaxReminderToggle`/`useRecommendationDriftAlertToggle`)이 필드명만 다르게 얹어 씀 — 전용 상태 조회 엔드포인트가 있는 `useCompositeSignalToggle`/`useMarketSignalDigestToggle`(설정 필드는 후자만 해당)은 구조가 달라 이 팩토리를 쓰지 않음
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
-- `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `["settings"]` 쿼리의 `year_end_tax_reminder_enabled` 필드 사용, `PUT /settings/year-end-tax-reminder` 호출. 기본값 `false`(옵트인). `SettingsPage`의 "알림 설정" 섹션에서 월간 리포트 토글 다음에 배치
-- `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `goal_achievement_alerts_enabled` 필드 사용, `PUT /settings/goal-achievement-alerts` 호출. 기본값 `true` (미설정 시 수신)
-- `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `["settings"]` 쿼리의 `monthly_report_enabled` 필드 사용, `PUT /settings/monthly-report-alerts` 호출. 기본값 `true` (미설정 시 수신)
-- `useRecommendationDriftAlertToggle.ts` — 매주 월요일 09:15 KST "추천 비중이 달라졌어요" 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `recommendation_drift_alert_enabled` 필드 사용, `PUT /settings/recommendation-drift-alert` 호출. 기본값 `false`(옵트인)
+- `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `useSettingsToggle` 사용, `year_end_tax_reminder_enabled` 필드 · `PUT /settings/year-end-tax-reminder`. 기본값 `false`(옵트인). `SettingsPage`의 "알림 설정" › "정기 리포트·리마인더" 그룹에 배치
+- `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `goal_achievement_alerts_enabled` 필드 · `PUT /settings/goal-achievement-alerts`. 기본값 `true` (미설정 시 수신)
+- `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `useSettingsToggle` 사용, `monthly_report_enabled` 필드 · `PUT /settings/monthly-report-alerts`. 기본값 `true` (미설정 시 수신)
+- `useRecommendationDriftAlertToggle.ts` — 매주 월요일 09:15 KST "추천 비중이 달라졌어요" 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `recommendation_drift_alert_enabled` 필드 · `PUT /settings/recommendation-drift-alert`. 기본값 `false`(옵트인)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석

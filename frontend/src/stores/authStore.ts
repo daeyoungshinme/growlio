@@ -122,7 +122,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         email,
         password,
         options: {
-          emailRedirectTo: import.meta.env.VITE_REDIRECT_URL,
+          emailRedirectTo: `${import.meta.env.VITE_REDIRECT_URL}/auth/callback`,
         },
       });
       if (error || !data.user) throw new Error(error?.message ?? "Registration failed");
@@ -143,9 +143,18 @@ export const useAuthStore = create<AuthState>((set, get) => {
     },
 
     checkAuth: async (onSessionFound) => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      let session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"];
+      try {
+        const {
+          data: { session: fetchedSession },
+        } = await supabase.auth.getSession();
+        session = fetchedSession;
+      } catch {
+        // 세션 조회 자체가 실패하면 isAuthChecking이 영구히 true로 남아
+        // PrivateRoute가 스피너에서 벗어나지 못하는 것을 방지
+        setLoggedOut();
+        return;
+      }
       if (session?.user) {
         onSessionFound?.();
 
@@ -242,7 +251,7 @@ export const useAuthStore = create<AuthState>((set, get) => {
         type: "signup",
         email,
         options: {
-          emailRedirectTo: import.meta.env.VITE_REDIRECT_URL,
+          emailRedirectTo: `${import.meta.env.VITE_REDIRECT_URL}/auth/callback`,
         },
       });
       if (error) throw error;

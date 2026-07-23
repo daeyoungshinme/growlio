@@ -163,6 +163,23 @@ describe("authStore — register", () => {
     await store.register("u@example.com", "password123");
     expect(api.post).toHaveBeenCalledWith("/auth/sync-profile", { display_name: null });
   });
+
+  it("emailRedirectTo가 /auth/callback 경로로 전송된다", async () => {
+    vi.mocked(supabase.auth.signUp).mockResolvedValue({
+      data: { user: { id: "user-6", email: "u2@example.com" }, session: null },
+      error: null,
+    } as never);
+
+    const store = await getStore();
+    await expect(store.register("u2@example.com", "password123")).rejects.toThrow();
+    expect(supabase.auth.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          emailRedirectTo: expect.stringMatching(/\/auth\/callback$/),
+        }),
+      }),
+    );
+  });
 });
 
 describe("authStore — logout", () => {
@@ -286,6 +303,17 @@ describe("authStore — checkAuth", () => {
 
     const state = (await import("@/stores/authStore")).useAuthStore.getState();
     expect(state.isAuthenticated).toBe(false);
+  });
+
+  it("getSession() 자체가 실패하면 isAuthenticated=false, isAuthChecking=false로 정리된다", async () => {
+    vi.mocked(supabase.auth.getSession).mockRejectedValue(new Error("network error"));
+
+    const store = await getStore();
+    await store.checkAuth();
+
+    const state = (await import("@/stores/authStore")).useAuthStore.getState();
+    expect(state.isAuthenticated).toBe(false);
+    expect(state.isAuthChecking).toBe(false);
   });
 
   it("needs_password_reset=true이면 needsPasswordReset이 true가 된다", async () => {

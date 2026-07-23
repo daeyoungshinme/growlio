@@ -77,6 +77,17 @@ class CacheStore:
             ]
             return 0, matched
 
+    async def sweep_expired(self) -> int:
+        """만료된 키를 능동적으로 청소한다 (lazy expiration만으로는 재방문하지 않는 유저의 캐시가
+        TTL이 지나도 계속 메모리에 남아 `scan()` 풀스캔 비용을 키우므로, 주기적으로 호출한다 —
+        `jobs/cache_sweep.py` 참고). 삭제된 키 개수를 반환한다.
+        """
+        async with self._lock:
+            expired_keys = [key for key, (_, expires_at) in self._data.items() if self._is_expired(expires_at)]
+            for key in expired_keys:
+                del self._data[key]
+            return len(expired_keys)
+
     async def ping(self) -> bool:
         return True
 

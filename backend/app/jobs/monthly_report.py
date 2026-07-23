@@ -7,13 +7,15 @@ from datetime import date
 
 import structlog
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
+from app.jobs._job_helpers import run_alert_job
 from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.asset_aggregator import get_dashboard_summary
 from app.services.email_service import send_monthly_report_email
+from app.utils.cache_keys import CacheStoreType
 
 logger = structlog.get_logger()
 
@@ -26,21 +28,23 @@ def _prev_month_label(today: date) -> str:
     return f"{today.year}년 {today.month - 1}월"
 
 
-async def run_monthly_report() -> None:
-    """매월 1일 — 활성 유저에게 전월 포트폴리오 요약 리포트 이메일 발송."""
-    cache = await get_cache_store()
+async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
     report_month = _prev_month_label(date.today())
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)  # noqa: E712
-        )
-        users = result.all()
+    result = await db.execute(
+        select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)  # noqa: E712
+    )
+    users = result.all()
 
     sem = asyncio.Semaphore(_MONTHLY_REPORT_CONCURRENCY)
     await asyncio.gather(
         *(_send_report_for_user(user, settings_row, cache, report_month, sem) for user, settings_row in users)
     )
+
+
+async def run_monthly_report() -> None:
+    """매월 1일 — 활성 유저에게 전월 포트폴리오 요약 리포트 이메일 발송."""
+    await run_alert_job(_run_monthly_report, "monthly_report_job", needs_cache=True)
 
 
 async def _send_report_for_user(
