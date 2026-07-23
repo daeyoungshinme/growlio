@@ -96,6 +96,94 @@ class TestSyncYahooDividendInfo:
         assert result["dividend_yield"] == pytest.approx(0.03)
 
 
+class TestSyncYahooDividendInfoOutlierExclusion:
+    """레버리지/파생상품 ETF(QLD 등)의 연말 자본이득분배로 인한 배당수익률 과대평가 보정."""
+
+    @staticmethod
+    def _dividends_series(amounts_and_days_ago: list[tuple[float, int]]):
+        import pandas as pd
+
+        today = pd.Timestamp.today().normalize()
+        idx = pd.DatetimeIndex([today - pd.Timedelta(days=d) for _, d in amounts_and_days_ago])
+        values = [amt for amt, _ in amounts_and_days_ago]
+        return pd.Series(values, index=idx)
+
+    def test_excludes_capital_gain_distribution_qld_like(self, override_settings):
+        """소액 분기배당 4건 + 대형 연말 자본이득분배 1건 → 자본이득분배 제외 후 재계산."""
+        mock_info = {
+            "trailingAnnualDividendYield": 0.08,  # 자본이득분배 포함해 과대평가된 원본값
+            "dividendYield": 0.0,
+            "trailingAnnualDividendRate": 6.2,
+            "currentPrice": 80.0,
+            "regularMarketPrice": None,
+        }
+        mock_ticker = MagicMock()
+        mock_ticker.info = mock_info
+        mock_ticker.dividends = self._dividends_series([(0.05, 300), (0.05, 210), (0.05, 120), (0.05, 30), (6.0, 15)])
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.dividend.sync_sources import sync_yahoo_dividend_info
+
+            result = sync_yahoo_dividend_info("QLD")
+
+        assert result["dps"] == pytest.approx(0.20, abs=0.01)
+        assert result["dividend_yield"] == pytest.approx(0.20 / 80.0, rel=0.05)
+        assert result["dividend_yield"] < 0.08
+
+    def test_no_outlier_keeps_original_for_even_distributions(self, override_settings):
+        """고른 분기배당(이상치 없음)은 원래 info 기반 값 그대로 유지(오탐 없음)."""
+        mock_info = {
+            "trailingAnnualDividendYield": 0.035,
+            "dividendYield": 0.0,
+            "trailingAnnualDividendRate": 2.8,
+            "currentPrice": 80.0,
+            "regularMarketPrice": None,
+        }
+        mock_ticker = MagicMock()
+        mock_ticker.info = mock_info
+        mock_ticker.dividends = self._dividends_series([(0.7, 300), (0.7, 210), (0.7, 120), (0.7, 30)])
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.dividend.sync_sources import sync_yahoo_dividend_info
+
+            result = sync_yahoo_dividend_info("SCHD")
+
+        assert result["dps"] == pytest.approx(2.8)
+        assert result["dividend_yield"] == pytest.approx(0.035)
+
+    def test_single_distribution_skips_outlier_check(self, override_settings):
+        """분배 1건뿐이면 이상치 판단 불가 → 기존 info 기반 값 그대로."""
+        mock_info = {
+            "trailingAnnualDividendYield": 0.05,
+            "dividendYield": 0.0,
+            "trailingAnnualDividendRate": 4.0,
+            "currentPrice": 80.0,
+            "regularMarketPrice": None,
+        }
+        mock_ticker = MagicMock()
+        mock_ticker.info = mock_info
+        mock_ticker.dividends = self._dividends_series([(4.0, 15)])
+
+        with patch("yfinance.Ticker", return_value=mock_ticker):
+            from app.services.dividend.sync_sources import sync_yahoo_dividend_info
+
+            result = sync_yahoo_dividend_info("XYZ")
+
+        assert result["dps"] == pytest.approx(4.0)
+        assert result["dividend_yield"] == pytest.approx(0.05)
+
+    def test_dividends_access_failure_falls_back_to_info(self, override_settings):
+        """ticker.dividends 조회 자체가 실패해도 기존 info 기반 로직으로 폴백."""
+        from app.services.dividend.sync_sources import _exclude_capital_gain_outlier
+
+        class _BadTicker:
+            @property
+            def dividends(self):
+                raise RuntimeError("network error")
+
+        assert _exclude_capital_gain_outlier(_BadTicker()) is None
+
+
 # ── sync_pykrx_etf_dividend_info ─────────────────────────────
 
 

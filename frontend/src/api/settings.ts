@@ -38,6 +38,7 @@ export interface SettingsData {
   year_end_tax_reminder_enabled: boolean;
   goal_achievement_alerts_enabled: boolean;
   monthly_report_enabled: boolean;
+  recommendation_drift_alert_enabled: boolean;
   goal_candidate_tickers: GoalCandidateTicker[];
   goal_risk_tolerance: GoalRiskTolerance;
   goal_max_weight_pct: number;
@@ -65,6 +66,9 @@ export const updateGoalAchievementAlerts = (enabled: boolean) =>
 
 export const updateMonthlyReportAlerts = (enabled: boolean) =>
   apiPut("/settings/monthly-report-alerts", { enabled });
+
+export const updateRecommendationDriftAlert = (enabled: boolean) =>
+  apiPut("/settings/recommendation-drift-alert", { enabled });
 
 export const updateGoalCandidateTickers = (tickers: GoalCandidateTicker[]) =>
   apiPut("/settings/goal-candidate-tickers", { tickers });

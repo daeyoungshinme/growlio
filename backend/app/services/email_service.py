@@ -34,6 +34,7 @@ from app.services.email_templates import (
     rebalancing_execution_template,
     rebalancing_plan_execution_failed_template,
     rebalancing_plan_pending_template,
+    recommendation_drift_alert_template,
     stock_price_alert_template,
     tax_impact_gate_blocked_template,
     test_email_template,
@@ -449,4 +450,20 @@ async def send_market_signal_daily_digest_alert(to_email: str, level: str, reaso
         return True
     except Exception as e:
         logger.error("market_signal_daily_digest_email_failed", to=to_email, error=str(e))
+        return False
+
+
+async def send_recommendation_drift_alert_email(to_email: str, portfolio_names: list[str]) -> bool:
+    """추천 비중 변화 알림 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    app_link = f"{settings.frontend_url}/rebalancing?rtab={quote('포트폴리오')}"
+    subject, html = recommendation_drift_alert_template(portfolio_names, app_link)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("recommendation_drift_alert_email_sent", to=to_email, portfolio_count=len(portfolio_names))
+        return True
+    except Exception as e:
+        logger.error("recommendation_drift_alert_email_failed", to=to_email, error=str(e))
         return False

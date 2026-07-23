@@ -125,5 +125,13 @@ def init_scheduler() -> None:
         id="year_end_tax_reminder",
         replace_existing=True,
     )
+    from app.jobs.recommendation_drift_alert import run_recommendation_drift_alert
+
+    scheduler.add_job(
+        run_recommendation_drift_alert,
+        CronTrigger(day_of_week="mon", hour=9, minute=15, timezone="Asia/Seoul"),
+        id="recommendation_drift_alert",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("scheduler_started", jobs=len(scheduler.get_jobs()))

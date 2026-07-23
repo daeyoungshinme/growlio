@@ -21,6 +21,7 @@ from app.schemas.rebalancing import (
     HorizonRecommendationResponse,
     KisBalanceResponse,
     PortfolioDriftSummary,
+    PortfolioExpectedMetrics,
     RebalancingAnalysis,
 )
 from app.schemas.service_dtypes import DividendMapEntry, ReturnsMapEntry
@@ -29,6 +30,7 @@ from app.services._portfolio_queries import get_active_alert_thresholds, get_lin
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.goal_recommendation_service import (
+    compute_portfolio_expected_metrics,
     existing_items_from_positions,
     get_goal_recommendation,
     get_horizon_recommendations,
@@ -195,6 +197,43 @@ async def get_horizon_goal_recommendation_endpoint(
     """
     settings_row = await get_or_create_settings(db, current_user.id)
     return await get_horizon_recommendations(cache, db, current_user.id, settings_row)
+
+
+@router.get("/portfolios/{portfolio_id}/expected-metrics", response_model=PortfolioExpectedMetrics)
+@limiter.limit("10/minute")
+async def get_portfolio_expected_metrics_endpoint(
+    request: Request,
+    portfolio_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    cache=Depends(get_cache_store),
+):
+    """포트폴리오의 현재 목표 비중에 대한 기대수익률/배당수익률/변동성 — "추천 비중 적용 전
+    비교 미리보기"에서 추천 비중의 같은 지표와 나란히 보여주기 위한 온디맨드 조회(캐싱 없음,
+    확인 모달을 열 때만 호출)."""
+    portfolio = await db.scalar(
+        select(Portfolio)
+        .options(selectinload(Portfolio.items))
+        .where(Portfolio.id == portfolio_id, Portfolio.user_id == current_user.id)
+    )
+    if not portfolio:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="포트폴리오를 찾을 수 없습니다")
+
+    items = [
+        (
+            str(_item_attr(i, "ticker")),
+            str(_item_attr(i, "market")),
+            str(_item_attr(i, "name")),
+            float(_item_attr(i, "weight")),
+        )
+        for i in portfolio.items
+        if str(_item_attr(i, "ticker")) not in ("CASH",) and str(_item_attr(i, "market")) != "KR_PROPERTY"
+    ]
+
+    settings_row = await get_settings_row(db, current_user.id)
+    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or 10)
+
+    return await compute_portfolio_expected_metrics(cache, items, cagr_lookback_years=cagr_lookback_years)
 
 
 @router.get("/broker-balance/{account_id}", response_model=KisBalanceResponse)

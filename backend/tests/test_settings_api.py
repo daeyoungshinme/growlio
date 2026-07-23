@@ -99,6 +99,7 @@ class TestGetSettings:
             year_end_tax_reminder_enabled=False,
             goal_achievement_alerts_enabled=True,
             monthly_report_enabled=True,
+            recommendation_drift_alert_enabled=False,
             goal_candidate_tickers=None,
             goal_risk_tolerance=None,
             goal_max_weight_pct=None,

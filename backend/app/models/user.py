@@ -65,6 +65,9 @@ class UserSettings(Base):
     year_end_tax_reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # 자산/입금/배당 목표 달성 시 알림(GOAL_ASSET/GOAL_DEPOSIT/GOAL_DIVIDEND) — 기존 항상 켜짐 동작 유지 위해 기본 True
     goal_achievement_alerts_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+    # 달라지면 이메일/푸시 발송 — 옵트인(기본 OFF)
+    recommendation_drift_alert_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     fcm_token: Mapped[str | None] = mapped_column(String(512))
 
     user: Mapped["User"] = relationship(back_populates="settings")

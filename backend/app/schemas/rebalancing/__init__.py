@@ -38,6 +38,7 @@ from app.schemas.rebalancing.goal import (
     GoalRecommendationItem,
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
+    PortfolioExpectedMetrics,
 )
 from app.schemas.rebalancing.plan import (
     PlanActionResponse,
@@ -67,6 +68,7 @@ __all__ = [
     "PlanActionResponse",
     "PlanTokenPreview",
     "PortfolioDriftSummary",
+    "PortfolioExpectedMetrics",
     "QuickExecuteOverride",
     "QuickExecuteResult",
     "RebalancingAlertCreate",

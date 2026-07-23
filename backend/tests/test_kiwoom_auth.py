@@ -15,8 +15,9 @@ from app.kiwoom.auth import _fetch_and_store_token
 class TestFetchAndStoreTokenExpiresDt:
     @pytest.mark.asyncio
     async def test_parses_actual_kiwoom_expires_dt_format(self, override_settings, mock_cache, mock_db):
-        """키움 API는 expires_dt를 'YYYYMMDDHHMMSS'(구분자 없음)로 응답한다 —
-        'YYYY-MM-DD HH:MM:SS' 포맷을 가정하면 ValueError로 동기화 전체가 실패한다."""
+        """키움 API는 expires_dt를 'YYYYMMDDHHMMSS'(구분자 없음, KST 벽시계 값)로 응답한다 —
+        'YYYY-MM-DD HH:MM:SS' 포맷을 가정하면 ValueError로 동기화 전체가 실패하고,
+        KST→UTC 변환 없이 그대로 UTC로 태깅하면 만료시각이 실제보다 9시간 늦게 저장된다."""
         response = httpx.Response(
             200,
             json={"return_code": 0, "token": "kiwoom-token", "expires_dt": "20260721231120"},
@@ -40,4 +41,5 @@ class TestFetchAndStoreTokenExpiresDt:
         mock_db.execute.assert_awaited_once()
         insert_stmt = mock_db.execute.await_args.args[0]
         expires_at = insert_stmt.compile().params["expires_at"]
-        assert expires_at == datetime(2026, 7, 21, 23, 11, 20, tzinfo=UTC)
+        # KST 23:11:20 == UTC 14:11:20 (같은 날, 9시간 차)
+        assert expires_at == datetime(2026, 7, 21, 14, 11, 20, tzinfo=UTC)

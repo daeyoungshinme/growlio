@@ -42,3 +42,56 @@ export function computeRecommendationDrift(
 export function hasSignificantDrift(drift: RecommendationDrift): boolean {
   return drift.maxDeltaPct >= RECOMMENDATION_DRIFT_THRESHOLD_PCT || drift.newCandidateCount > 0;
 }
+
+export interface WeightDiffRow {
+  key: string;
+  name: string;
+  ticker: string;
+  market: string;
+  /** null이면 현재 포트폴리오에는 없는 신규 후보. */
+  currentWeight: number | null;
+  /** null이면 추천에서 빠진(비중 0) 기존 종목. */
+  recommendedWeight: number | null;
+}
+
+/** 추천 비중과 현재 포트폴리오 목표 비중을 합쳐 "적용 전 비교 미리보기" 테이블 행을 만든다 —
+ * `computeRecommendationDrift`가 요약 수치(최대 차이·신규 후보 개수)만 내는 것과 달리, 종목별
+ * 전체 비교(현재 vs 추천 vs 차이)를 보여주기 위함. 추천 비중 기준 내림차순 정렬. */
+export function buildWeightDiffRows(
+  recommended: GoalRecommendationItem[],
+  current: PortfolioItem[],
+): WeightDiffRow[] {
+  const rows = new Map<string, WeightDiffRow>();
+
+  for (const item of current) {
+    rows.set(itemKey(item), {
+      key: itemKey(item),
+      name: item.name,
+      ticker: item.ticker,
+      market: item.market,
+      currentWeight: item.weight,
+      recommendedWeight: null,
+    });
+  }
+
+  for (const item of recommended) {
+    const key = itemKey(item);
+    const existing = rows.get(key);
+    if (existing) {
+      existing.recommendedWeight = item.weight;
+    } else {
+      rows.set(key, {
+        key,
+        name: item.name,
+        ticker: item.ticker,
+        market: item.market,
+        currentWeight: null,
+        recommendedWeight: item.weight,
+      });
+    }
+  }
+
+  return Array.from(rows.values()).sort(
+    (a, b) => (b.recommendedWeight ?? 0) - (a.recommendedWeight ?? 0),
+  );
+}

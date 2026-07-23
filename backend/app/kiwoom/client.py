@@ -32,12 +32,19 @@ def _check_kiwoom_token_expired(data: dict[str, Any], status_code: int) -> bool:
     return status_code == 401
 
 
+def _is_token_invalid_error(return_code: str, msg: str) -> bool:
+    """키움은 토큰 무효를 HTTP 401이 아닌 200 + return_code=3 + 메시지 내 8005 서브코드로 응답한다."""
+    return return_code == "3" and "8005" in msg
+
+
 def _check_kiwoom_api_error(data: dict[str, Any], path: str, *, quiet: bool = False) -> None:
     return_code = data.get("return_code")
     if return_code is not None and str(return_code) != "0":
         msg = data.get("return_msg", "알 수 없는 오류")
         log = logger.debug if quiet else logger.warning
         log("kiwoom_api_error", return_code=return_code, msg=msg, path=path)
+        if _is_token_invalid_error(str(return_code), msg):
+            raise KiwoomTokenExpiredError(msg)
         raise KiwoomApiError(str(return_code), msg)
 
 

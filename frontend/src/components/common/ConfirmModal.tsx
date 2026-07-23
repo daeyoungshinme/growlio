@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import { triggerHaptic } from "@/hooks/useHaptic";
 import { TOUCH_TARGET_MIN } from "@/constants/uiSizes";
 
@@ -10,6 +10,8 @@ interface Props {
   onConfirm: () => void;
   onCancel: () => void;
   danger?: boolean;
+  /** 메시지 아래, 버튼 위에 추가로 렌더할 내용(비교 테이블 등) — 생략 시 기존과 동일. */
+  children?: ReactNode;
 }
 
 export default function ConfirmModal({
@@ -19,6 +21,7 @@ export default function ConfirmModal({
   onConfirm,
   onCancel,
   danger = true,
+  children,
 }: Props) {
   const msgId = useId();
 
@@ -38,9 +41,12 @@ export default function ConfirmModal({
           {danger && (
             <AlertTriangle size={20} className="text-red-500 mt-0.5 shrink-0" aria-hidden="true" />
           )}
-          <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
-            {message}
-          </p>
+          <div className="min-w-0 flex-1">
+            <p id={msgId} className="text-sm text-gray-700 dark:text-gray-200 leading-relaxed">
+              {message}
+            </p>
+            {children}
+          </div>
         </div>
         <div className="flex gap-4 justify-end">
           <button

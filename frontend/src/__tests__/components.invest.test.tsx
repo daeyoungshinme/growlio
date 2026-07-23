@@ -121,6 +121,7 @@ describe("GoalTimelineCard", () => {
     recommended_items: [],
     expected_return_pct: null,
     expected_dividend_yield_pct: null,
+    expected_volatility_pct: null,
     note: null,
     cagr_lookback_years: 10,
     risk_tolerance: "CONSERVATIVE",

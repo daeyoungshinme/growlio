@@ -139,6 +139,10 @@ class MonthlyReportAlertsUpdate(BaseModel):
     enabled: bool
 
 
+class RecommendationDriftAlertUpdate(BaseModel):
+    enabled: bool
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -156,6 +160,7 @@ class SettingsResponse(BaseModel):
     year_end_tax_reminder_enabled: bool = False
     goal_achievement_alerts_enabled: bool = True
     monthly_report_enabled: bool = True
+    recommendation_drift_alert_enabled: bool = False
     goal_candidate_tickers: list[GoalCandidateTicker] = []
     goal_risk_tolerance: GoalRiskTolerance = GoalRiskTolerance.CONSERVATIVE
     goal_max_weight_pct: float = 40.0
@@ -205,6 +210,7 @@ async def get_settings(
         year_end_tax_reminder_enabled=row.year_end_tax_reminder_enabled,
         goal_achievement_alerts_enabled=row.goal_achievement_alerts_enabled,
         monthly_report_enabled=row.monthly_report_enabled,
+        recommendation_drift_alert_enabled=row.recommendation_drift_alert_enabled,
         goal_candidate_tickers=[GoalCandidateTicker(**t) for t in (row.goal_candidate_tickers or [])],
         goal_risk_tolerance=(
             GoalRiskTolerance(row.goal_risk_tolerance) if row.goal_risk_tolerance else GoalRiskTolerance.CONSERVATIVE
@@ -407,6 +413,22 @@ async def update_monthly_report_alerts(
     row.monthly_report_enabled = req.enabled
     await db.commit()
     return {"detail": "월간 리포트 설정이 저장되었습니다"}
+
+
+@router.put("/recommendation-drift-alert")
+@limiter.limit("10/minute")
+async def update_recommendation_drift_alert(
+    request: Request,
+    req: RecommendationDriftAlertUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+    달라지면 이메일/푸시로 알리는 기능의 수신 여부."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.recommendation_drift_alert_enabled = req.enabled
+    await db.commit()
+    return {"detail": "추천 비중 변화 알림 설정이 저장되었습니다"}
 
 
 @router.put("/push-token")

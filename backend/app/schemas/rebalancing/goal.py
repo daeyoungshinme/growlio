@@ -20,6 +20,7 @@ class GoalRecommendation(BaseModel):
     recommended_items: list[GoalRecommendationItem] = []
     expected_return_pct: float | None = None  # 추천 비중의 가중평균 CAGR(%) — cagr_lookback_years 기간 기준
     expected_dividend_yield_pct: float | None = None  # 추천 비중의 가중평균 배당수익률(%)
+    expected_volatility_pct: float | None = None  # 추천 비중의 연율화 변동성(%, 공분산 기반)
     note: str | None = None  # 미설정/이미 달성/달성 불가/리스크 성향 클램프 등 상태 설명
     cagr_lookback_years: int = 10  # 기대수익률(CAGR) 산출 기간(년) — 진단화면 10년 고정 지표와 다를 수 있음
     risk_tolerance: str = "CONSERVATIVE"  # 적용된 리스크 성향 (CONSERVATIVE/BALANCED/AGGRESSIVE)
@@ -40,6 +41,8 @@ class HorizonGoalRecommendation(BaseModel):
     account_count: int
     recommended_items: list[GoalRecommendationItem] = []
     expected_return_pct: float | None = None
+    expected_dividend_yield_pct: float | None = None  # 추천 비중의 가중평균 배당수익률(%)
+    expected_volatility_pct: float | None = None  # 추천 비중의 연율화 변동성(%, 공분산 기반)
     risk_tolerance: str  # 기간별로 고정 적용됨 (단기=CONSERVATIVE/중기=BALANCED/장기=AGGRESSIVE)
     max_weight_pct: float
     # recommended_items에 현금성 자산(CMA·파킹통장) 합성 항목이 포함돼 있는지(SHORT_TERM 전용).
@@ -52,6 +55,16 @@ class HorizonGoalRecommendation(BaseModel):
 class HorizonRecommendationResponse(BaseModel):
     generated_at: str  # ISO timestamp
     recommendations: list[HorizonGoalRecommendation] = []
+
+
+class PortfolioExpectedMetrics(BaseModel):
+    """포트폴리오의 현재 목표 비중(`Portfolio.items`)에 대한 기대수익률/배당수익률/변동성 —
+    "적용 전 비교 미리보기"에서 추천 비중의 같은 지표와 나란히 보여주기 위한 값. 시세 데이터가
+    없는 종목은 계산에서 제외되므로, 전 종목이 미확인이면 전부 None."""
+
+    expected_return_pct: float | None = None
+    expected_dividend_yield_pct: float | None = None
+    expected_volatility_pct: float | None = None
 
 
 class CompositeSignalStatus(BaseModel):

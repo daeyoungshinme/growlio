@@ -127,7 +127,7 @@ API Request
         ├── invest.py         # DCA 분석 + 목표 설정 마법사용 필요수익률·적립액 프리뷰(GET /invest/goal-feasibility, 저장 없음)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk(?portfolio_id=), /rebalancing-strategy. /overview·/allocation-history는 ?account_id= 옵션 지원(미지정 시 전체 계좌 통합, PortfolioPage 투자현황 탭 계좌 필터 전용)
-        ├── rebalancing.py    # 리밸런싱 추천 + 투자기간별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-horizon)
+        ├── rebalancing.py    # 리밸런싱 추천 + 투자기간별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-horizon) + 포트폴리오 적용 전 비교 미리보기(GET /rebalancing/portfolios/{id}/expected-metrics)
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── rebalancing_plan.py       # 리밸런싱 대기 플랜 조회/취소/승인 (인증 필요, 앱 내 사용)
         ├── rebalancing_plan_public.py  # 리밸런싱 대기 플랜 토큰 기반 액션 (인증 없음, 이메일 링크 전용 — `Depends(get_current_user)` 사용 금지)
@@ -160,7 +160,8 @@ services/
   │   ├── stock_price_service.py   # 주가 알림 조건 체크 서비스 (구 stock_price_alert_service.py)
   │   ├── market_signal_alert_service.py # 시장 위험 신호 등급 변화(GREEN/YELLOW/RED 전환) 감지 및 즉시 알림 + 매일 08:30 KST 요약 다이제스트(`send_market_signal_daily_digest`, 옵트인). `check_composite_signal`(리스크+시장신호 복합 판정)을 제공해 rebalancing/alert_check.py·rebalancing/diagnosis_service.py와 공유. 등급전환 알림 발송 성공 시 rebalancing/alert_check.py의 `_mark_composite_alert_sent_today` dedup 키를 공유 갱신 — 같은 날 두 서비스가 같은 신호로 중복 발송하지 않도록 함
   │   ├── calculator.py       # 알림 조건 판단 로직 (구 alert_calculator.py, alert_service.py에서 분리)
-  │   └── tax_reminder_service.py # 연말(11~12월) 절세 리마인더 콘텐츠 조합(`build_reminder_content` — 손실수확 후보·연금공제 잔여한도·ISA 만기, tax_service/pension_contribution_service/isa_service 재사용) + 유저별 발송(`send_year_end_tax_reminder`, 알릴 내용 없으면 스킵)
+  │   ├── tax_reminder_service.py # 연말(11~12월) 절세 리마인더 콘텐츠 조합(`build_reminder_content` — 손실수확 후보·연금공제 잔여한도·ISA 만기, tax_service/pension_contribution_service/isa_service 재사용) + 유저별 발송(`send_year_end_tax_reminder`, 알릴 내용 없으면 스킵)
+  │   └── recommendation_drift_alert_service.py # 매주 월요일 09:15 KST — 목표 역산 추천 비중(전체 자산 기준 + 투자기간별)이 타겟 포트폴리오의 현재 목표 비중과 유의미하게(3%p 이상 또는 신규 후보 존재) 달라지면 이메일/푸시 발송(옵트인, 기본 OFF). `compute_recommendation_drift()`(goal_recommendation_service.py)가 프론트 `recommendationDrift.ts`와 동일한 로직 — 임계값도 항상 함께 맞출 것. 타겟 포트폴리오 판별은 계좌 태그 추론 폴백 없이 단순화(전체: 연결 계좌 전부가 target_portfolio_id로 지정, 기간별: Portfolio.investment_horizon/tax_type 명시값만)
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
@@ -183,8 +184,8 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
-  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)가 있으면 필요 배당수익률도 제약으로 함께 전달(전체 자산 기준만, 큐레이션 후보로 달성 불가하면 fail-soft로 무시). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
-  ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈
+  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)가 있으면 필요 배당수익률도 제약으로 함께 전달(전체 자산 기준과 동일한 %를 투자기간별 경로 모든 조합에도 동일 적용, 큐레이션 후보로 달성 불가하면 fail-soft로 무시). `compute_portfolio_expected_metrics()`는 포트폴리오의 현재 목표 비중에 대해 추천과 동일한 지표(기대수익률/배당수익률/변동성)를 계산(적용 전 비교 미리보기 전용). `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 동일한 드리프트 계산의 백엔드 포팅(주간 알림 job 전용). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈. `compute_weighted_expected_metrics()`는 이미 정해진(최적화 대상 아닌) 비중에 대해 가중평균 기대수익률/배당수익률/변동성만 계산하는 버전
   ├── goal_candidate_service.py  # 목표 역산 추천 후보 종목 관리/영속화(세제유형별 필터링, 동시요청 lost-update 방지 락) — goal_recommendation_service.py 서브모듈
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률(`solve_required_annual_return_pct`)·월 적립액(`solve_required_monthly_deposit`) 역산 순수 계산 함수 — goal_recommendation_service.py 서브모듈이자 invest.py의 `GET /invest/goal-feasibility`(목표 설정 마법사 전용, 저장 없는 미리보기)가 직접 호출
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
@@ -284,6 +285,7 @@ jobs/                         # APScheduler 정기 작업
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
   ├── year_end_tax_reminder.py       # 11~12월 매주 월요일 09:00 KST — 손실수확 후보·연금공제 잔여한도·ISA 만기 현황 요약 발송(옵트인, 기본 OFF). 알릴 내용이 없으면 스킵
+  ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고)
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
   ├── rebalancing_plan_sell_expiry.py  # 매일 15:31 KST — 당일 미응답 매도 승인 요청 만료 처리

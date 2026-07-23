@@ -2,6 +2,7 @@
 
 import json
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -15,6 +16,8 @@ from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
 
 logger = structlog.get_logger()
+
+_KST = ZoneInfo("Asia/Seoul")  # 키움 expires_dt는 KST 벽시계 값 (구분자 없는 YYYYMMDDHHMMSS)
 
 
 async def get_access_token(
@@ -100,10 +103,10 @@ async def _fetch_and_store_token(
 
     access_token: str = data["token"]  # 키움은 token (표준 access_token 아님)
 
-    # 키움 응답: expires_dt = "YYYYMMDDHHMMSS" 형식 문자열 (구분자 없음)
+    # 키움 응답: expires_dt = "YYYYMMDDHHMMSS" 형식 문자열 (구분자 없음, KST 벽시계 값)
     expires_dt_str: str | None = data.get("expires_dt")
     if expires_dt_str:
-        expires_at = datetime.strptime(expires_dt_str, "%Y%m%d%H%M%S").replace(tzinfo=UTC)
+        expires_at = datetime.strptime(expires_dt_str, "%Y%m%d%H%M%S").replace(tzinfo=_KST).astimezone(UTC)
     else:
         expires_at = datetime.now(UTC) + timedelta(seconds=86400)
 

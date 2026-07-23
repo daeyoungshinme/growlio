@@ -54,6 +54,8 @@ export const QUERY_KEYS = {
   compositeSignalStatus: ["composite-signal-status"] as const,
   goalRecommendationOverall: ["goal-recommendation", "overall"] as const,
   goalRecommendationByHorizon: ["goal-recommendation", "by-horizon"] as const,
+  portfolioExpectedMetrics: (portfolioId: string) =>
+    ["portfolio-expected-metrics", portfolioId] as const,
   goalFeasibility: (
     goalAmount: number,
     targetYear: number,

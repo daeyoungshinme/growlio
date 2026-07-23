@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders as renderWithProvidersBase } from "@/test/renderWithProviders";
 import type {
@@ -14,6 +14,7 @@ import type { AssetAccount } from "@/api/assets";
 
 const fetchOverallGoalRecommendation = vi.fn();
 const fetchHorizonGoalRecommendations = vi.fn();
+const fetchPortfolioExpectedMetrics = vi.fn();
 const fetchSettings = vi.fn();
 const updateGoalCandidateTickers = vi.fn();
 const updateGoalRecommendationOptions = vi.fn();
@@ -26,6 +27,7 @@ const toastMock = vi.fn();
 vi.mock("@/api/rebalancing", () => ({
   fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
   fetchHorizonGoalRecommendations: (...args: unknown[]) => fetchHorizonGoalRecommendations(...args),
+  fetchPortfolioExpectedMetrics: (...args: unknown[]) => fetchPortfolioExpectedMetrics(...args),
   CASH_EQUIVALENT_TICKER: "CASH_EQUIVALENT",
 }));
 
@@ -123,6 +125,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     year_end_tax_reminder_enabled: false,
     goal_achievement_alerts_enabled: true,
     monthly_report_enabled: true,
+    recommendation_drift_alert_enabled: false,
     goal_candidate_tickers: [],
     goal_risk_tolerance: "CONSERVATIVE",
     goal_max_weight_pct: 40.0,
@@ -147,6 +150,7 @@ function makeOverallRecommendation(
     ],
     expected_return_pct: 9.1,
     expected_dividend_yield_pct: 2.1,
+    expected_volatility_pct: 12.3,
     note: null,
     cagr_lookback_years: 10,
     risk_tolerance: "CONSERVATIVE",
@@ -169,6 +173,8 @@ function makeHorizonRec(
       { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 40 },
     ],
     expected_return_pct: 2.5,
+    expected_dividend_yield_pct: null,
+    expected_volatility_pct: null,
     risk_tolerance: "CONSERVATIVE",
     max_weight_pct: 40,
     includes_cash_equivalent: false,
@@ -189,6 +195,12 @@ describe("RecommendationCard", () => {
     fetchOverallGoalRecommendation.mockReset();
     fetchHorizonGoalRecommendations.mockReset();
     fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([]));
+    fetchPortfolioExpectedMetrics.mockReset();
+    fetchPortfolioExpectedMetrics.mockResolvedValue({
+      expected_return_pct: 7.0,
+      expected_dividend_yield_pct: 1.0,
+      expected_volatility_pct: 15.0,
+    });
     fetchSettings.mockReset();
     fetchSettings.mockResolvedValue(makeSettingsData());
     updateGoalCandidateTickers.mockReset();
@@ -244,6 +256,7 @@ describe("RecommendationCard", () => {
       expect(screen.getByText("60.0%")).toBeDefined();
       expect(screen.getByText("40.0%")).toBeDefined();
       expect(screen.getByText(/최근 10년 CAGR 기준/)).toBeDefined();
+      expect(screen.getByText(/예상 변동성은 연 12\.3%입니다/)).toBeDefined();
     });
 
     it("shows a hint instead of an apply control when no portfolio is set as a goal target", async () => {
@@ -338,6 +351,45 @@ describe("RecommendationCard", () => {
         ],
       });
       await waitFor(() => expect(onApplied).toHaveBeenCalledWith("target-1"));
+    });
+
+    it("shows a before/after comparison preview in the apply confirmation", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({
+          recommended_items: [
+            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 80 },
+          ],
+          expected_return_pct: 9.1,
+          expected_dividend_yield_pct: 2.1,
+          expected_volatility_pct: 14.5,
+        }),
+      );
+      const portfolio = makePortfolio({
+        id: "target-1",
+        name: "은퇴 포트폴리오",
+        items: [{ ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 50 }],
+      });
+      fetchPortfolios.mockResolvedValue([portfolio]);
+      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: "target-1" })]);
+      fetchPortfolioExpectedMetrics.mockResolvedValue({
+        expected_return_pct: 6.0,
+        expected_dividend_yield_pct: 1.5,
+        expected_volatility_pct: 10.0,
+      });
+
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("은퇴 포트폴리오에 적용"));
+
+      const dialog = within(await screen.findByRole("dialog"));
+      // 현재 비중(50%)과 추천 비중(80%)이 비교 테이블에 함께 노출됨
+      expect(dialog.getByText("50.0%")).toBeDefined();
+      expect(dialog.getByText("80.0%")).toBeDefined();
+
+      // 현재(6.0%) → 추천(9.1%) 기대수익률 비교 요약이 로드된 후 노출됨
+      await waitFor(() => expect(fetchPortfolioExpectedMetrics).toHaveBeenCalledWith("target-1"));
+      expect(await dialog.findByText("6.0%")).toBeDefined();
+      expect(dialog.getByText("9.1%")).toBeDefined();
     });
 
     it("requires selecting a target portfolio when multiple portfolios are goal targets", async () => {
@@ -603,6 +655,21 @@ describe("RecommendationCard", () => {
       expect(await screen.findByText(/KODEX 단기채권/)).toBeDefined();
       expect(screen.getByText("60.0%")).toBeDefined();
       expect(screen.getByText("40.0%")).toBeDefined();
+    });
+
+    it("shows expected dividend yield and volatility for the selected horizon", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({ expected_dividend_yield_pct: 3.2, expected_volatility_pct: 5.5 }),
+        ]),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("단기"));
+
+      expect(await screen.findByText(/배당수익률 약 3\.2%/)).toBeDefined();
+      expect(screen.getByText(/예상 변동성 연 5\.5%/)).toBeDefined();
     });
 
     it("switches displayed recommendation when another horizon pill is clicked", async () => {

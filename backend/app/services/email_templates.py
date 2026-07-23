@@ -800,6 +800,29 @@ def year_end_tax_reminder_template(content: Mapping[str, Any]) -> tuple[str, str
     return subject, html
 
 
+def recommendation_drift_alert_template(portfolio_names: list[str], app_link: str) -> tuple[str, str]:
+    """매주 월요일 09:15 KST 발송되는 추천 비중 변화 알림 이메일 — 목표 역산 추천 비중이 타겟
+    포트폴리오의 현재 목표 비중과 유의미하게(3%p 이상 또는 신규 후보 존재) 달라진 경우에만 발송."""
+    subject = "[Growlio] 추천 비중이 달라졌어요"
+    names_html = "".join(f"<li style='margin-bottom:4px;'>{name}</li>" for name in portfolio_names)
+    body = (
+        "<p style='font-size:13px;color:#374151;'>시장 상황이 바뀌어 아래 포트폴리오의 추천 비중이 "
+        "현재 목표 비중과 달라졌습니다.</p>"
+        f"<ul style='padding-left:20px;margin:8px 0;font-size:13px;color:#374151;'>{names_html}</ul>"
+        f"<p style='margin-top:16px;'><a href='{app_link}' "
+        "style='color:#0d9488;font-weight:bold;text-decoration:none;'>추천 비중 확인하러 가기 →</a></p>"
+    )
+    html = _email_div(
+        "추천 비중이 달라졌어요",
+        "#0d9488",
+        body,
+        "이 알림은 매주 월요일 09:15 KST에 발송됩니다.<br>"
+        "추천은 참고용 제안이며 자동으로 반영되지 않습니다 — 확인 후 직접 적용해야 합니다.<br>"
+        "알림 설정은 설정 &gt; 알림 설정에서 변경하세요.",
+    )
+    return subject, html
+
+
 def market_signal_daily_digest_template(level: str, reason: str | None) -> tuple[str, str]:
     """매일 08:30 KST 발송되는 시장 위험 신호 요약 이메일 — 등급 전환 여부와 무관하게 발송."""
     label = _SIGNAL_LEVEL_LABEL.get(level, level)

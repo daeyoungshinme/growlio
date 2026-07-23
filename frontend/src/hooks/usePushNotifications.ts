@@ -65,6 +65,8 @@ export function resolvePushDeepLink(
       return `/invest-plan?tab=${encodeURIComponent("적립 계획")}`;
     case "GOAL_DIVIDEND":
       return `/invest-plan?tab=${encodeURIComponent("배당 계획")}`;
+    case "RECOMMENDATION_DRIFT":
+      return "/rebalancing?rtab=포트폴리오";
     default:
       return null;
   }

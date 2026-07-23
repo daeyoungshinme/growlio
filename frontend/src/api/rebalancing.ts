@@ -287,6 +287,7 @@ export interface GoalRecommendation {
   recommended_items: GoalRecommendationItem[];
   expected_return_pct: number | null;
   expected_dividend_yield_pct: number | null;
+  expected_volatility_pct: number | null;
   note: string | null;
   cagr_lookback_years: number;
   risk_tolerance: GoalRiskTolerance;
@@ -309,6 +310,8 @@ export interface HorizonGoalRecommendation {
   account_count: number;
   recommended_items: GoalRecommendationItem[];
   expected_return_pct: number | null;
+  expected_dividend_yield_pct: number | null;
+  expected_volatility_pct: number | null;
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
   includes_cash_equivalent: boolean;
@@ -323,3 +326,16 @@ export interface HorizonRecommendationResponse {
 
 export const fetchHorizonGoalRecommendations = (): Promise<HorizonRecommendationResponse> =>
   apiGet<HorizonRecommendationResponse>(`/rebalancing/goal-recommendation/by-horizon`);
+
+// ── 적용 전 비교 미리보기 — 포트폴리오의 현재 목표 비중에 대한 기대수익률/배당수익률/변동성 ──────
+
+export interface PortfolioExpectedMetrics {
+  expected_return_pct: number | null;
+  expected_dividend_yield_pct: number | null;
+  expected_volatility_pct: number | null;
+}
+
+export const fetchPortfolioExpectedMetrics = (
+  portfolioId: string,
+): Promise<PortfolioExpectedMetrics> =>
+  apiGet<PortfolioExpectedMetrics>(`/rebalancing/portfolios/${portfolioId}/expected-metrics`);

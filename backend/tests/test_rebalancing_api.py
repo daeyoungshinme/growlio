@@ -641,3 +641,86 @@ class TestCollectDividendMap:
         assert call_args[5] == dart_key
         assert call_args[6] == overrides
         assert result[("SPY", "NYSE")]["dividend_yield"] == 1.5
+
+
+class TestPortfolioExpectedMetricsEndpoint:
+    """GET /rebalancing/portfolios/{portfolio_id}/expected-metrics — 적용 전 비교 미리보기용."""
+
+    def test_returns_404_when_portfolio_not_found(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        db.scalar = AsyncMock(return_value=None)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.get(
+                    f"/api/v1/rebalancing/portfolios/{uuid.uuid4()}/expected-metrics",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 404
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_excludes_cash_and_real_estate_items_and_returns_metrics(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+        portfolio = SimpleNamespace(
+            id=uuid.uuid4(),
+            items=[
+                SimpleNamespace(ticker="SPY", market="NYSE", name="SPDR S&P 500", weight=70.0),
+                SimpleNamespace(ticker="CASH", market="KRW", name="현금", weight=20.0),
+                SimpleNamespace(ticker="MY_HOUSE", market="KR_PROPERTY", name="자가", weight=10.0),
+            ],
+        )
+        db.scalar = AsyncMock(return_value=portfolio)
+        settings_row = SimpleNamespace(goal_cagr_lookback_years=5)
+
+        metrics_result = SimpleNamespace(
+            expected_return_pct=8.0, expected_dividend_yield_pct=1.5, expected_volatility_pct=12.0
+        )
+
+        app = _setup_app(user, db)
+        try:
+            with (
+                patch(
+                    "app.api.v1.rebalancing.get_cache_store",
+                    new_callable=AsyncMock,
+                    return_value=AsyncMock(),
+                ),
+                patch(
+                    "app.api.v1.rebalancing.get_settings_row",
+                    new_callable=AsyncMock,
+                    return_value=settings_row,
+                ),
+                patch(
+                    "app.api.v1.rebalancing.compute_portfolio_expected_metrics",
+                    new_callable=AsyncMock,
+                    return_value=metrics_result,
+                ) as mock_compute,
+                TestClient(app, raise_server_exceptions=False) as client,
+            ):
+                resp = client.get(
+                    f"/api/v1/rebalancing/portfolios/{portfolio.id}/expected-metrics",
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["expected_return_pct"] == 8.0
+            assert data["expected_dividend_yield_pct"] == 1.5
+            assert data["expected_volatility_pct"] == 12.0
+
+            call_args = mock_compute.call_args
+            items_arg = call_args.args[1]
+            assert items_arg == [("SPY", "NYSE", "SPDR S&P 500", 70.0)]
+            assert call_args.kwargs["cagr_lookback_years"] == 5
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)

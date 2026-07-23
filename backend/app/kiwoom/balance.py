@@ -74,15 +74,24 @@ def _strip_ticker_prefix(stk_cd: str) -> str:
 
 
 async def _get_deposit_krw(access_token: str, *, is_mock: bool) -> float:
-    """예수금상세현황요청 (kt00001) — 국내 현금 예수금(entr)."""
+    """예수금상세현황요청 (kt00001) — 국내 현금 예수금(entr).
+
+    kt00018(평가잔고)과 동일하게 dmst_stex_tp를 함께 보낸다 — 이전에는 qry_tp만 보내
+    kt00001 응답이 비정상(entr 누락)으로 와서 리밸런싱 실행 화면에 예수금이 0원으로
+    표시되는 버그가 있었다.
+    """
     headers = _auth_headers(access_token, API_ID_DOMESTIC_DEPOSIT)
     data = await kiwoom_request(
         "POST",
         "/api/dostk/acnt",
         is_mock=is_mock,
         headers=headers,
-        json={"qry_tp": "3"},  # 3: 추정조회
+        json={"qry_tp": "3", "dmst_stex_tp": "KRX"},  # 3: 추정조회
     )
+    if data.get("entr") is None:
+        logger.warning("kiwoom_deposit_field_missing", response_keys=list(data.keys()))
+    else:
+        logger.debug("kiwoom_deposit_raw_response", entr=data.get("entr"))
     return _parse_num(data.get("entr"))
 
 

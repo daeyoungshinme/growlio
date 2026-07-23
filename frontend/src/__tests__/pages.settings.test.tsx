@@ -104,6 +104,7 @@ const mockSettings = {
   composite_signal_alerts_enabled: false,
   goal_achievement_alerts_enabled: true,
   monthly_report_enabled: true,
+  recommendation_drift_alert_enabled: true,
   goal_candidate_tickers: [],
   goal_risk_tolerance: "BALANCED",
   goal_max_weight_pct: 30,
@@ -245,6 +246,21 @@ describe("SettingsPage", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "월간 리포트" }));
     await waitFor(() => {
       expect(api.put).toHaveBeenCalledWith("/settings/monthly-report-alerts", { enabled: false });
+    });
+  });
+
+  it("추천 비중 변화 알림 토글을 클릭하면 설정을 저장한다", async () => {
+    vi.mocked(api.put).mockResolvedValue({ data: {} });
+    renderSettings();
+    // mockSettings 로드 전 기본값(false)에서 클릭하는 경합을 피하기 위해 로드 완료(checked) 대기
+    await waitFor(() => {
+      expect(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" })).toBeChecked();
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" }));
+    await waitFor(() => {
+      expect(api.put).toHaveBeenCalledWith("/settings/recommendation-drift-alert", {
+        enabled: false,
+      });
     });
   });
 

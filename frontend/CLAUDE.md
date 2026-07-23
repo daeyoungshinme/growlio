@@ -148,6 +148,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `["settings"]` 쿼리의 `year_end_tax_reminder_enabled` 필드 사용, `PUT /settings/year-end-tax-reminder` 호출. 기본값 `false`(옵트인). `SettingsPage`의 "알림 설정" 섹션에서 월간 리포트 토글 다음에 배치
 - `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `goal_achievement_alerts_enabled` 필드 사용, `PUT /settings/goal-achievement-alerts` 호출. 기본값 `true` (미설정 시 수신)
 - `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `["settings"]` 쿼리의 `monthly_report_enabled` 필드 사용, `PUT /settings/monthly-report-alerts` 호출. 기본값 `true` (미설정 시 수신)
+- `useRecommendationDriftAlertToggle.ts` — 매주 월요일 09:15 KST "추천 비중이 달라졌어요" 알림(이메일·푸시) on/off. `["settings"]` 쿼리의 `recommendation_drift_alert_enabled` 필드 사용, `PUT /settings/recommendation-drift-alert` 호출. 기본값 `false`(옵트인)
 - `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
 - `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
 - `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
@@ -271,6 +272,7 @@ cd frontend && npx playwright test
 | 복합신호 (시장/리스크) 상태 | `["composite-signal-status"]` |
 | 목표 역산 추천 (전체 자산) | `["goal-recommendation", "overall"]` |
 | 목표 역산 추천 (투자기간별) | `["goal-recommendation", "by-horizon"]` |
+| 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표) | `["portfolio-expected-metrics", portfolioId]` |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰 | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]` |
 | CPI/Core CPI 인플레이션 요약 | `["inflation-summary"]` |
 
@@ -329,6 +331,7 @@ cd frontend && npx playwright test
 **추천 비중 변화 감지 유틸리티 (`src/utils/recommendationDrift.ts`)**
 - `computeRecommendationDrift(recommended, current)` — 추천 비중과 목표 포트폴리오의 현재 비중을 ticker+market 기준 비교해 `{ maxDeltaPct, newCandidateCount }` 반환.
 - `hasSignificantDrift(drift)` — `RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3%p) 이상 차이 나거나 신규 후보가 있으면 true. `RecommendationCard.tsx`가 "추천이 달라졌어요" 배지 노출 여부 판단에 사용.
+- `buildWeightDiffRows(recommended, current)` — 두 목록을 합쳐 종목별 (현재 비중, 추천 비중) 전체 비교 행을 만든다(추천 비중 내림차순 정렬) — "적용" 확인 모달의 비교 미리보기(`RecommendationComparisonPreview`, `RecommendationCard.tsx`)에서 사용.
 
 **진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
 - `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.
@@ -409,6 +412,7 @@ cd frontend && npx playwright test
 - 연말 절세 리마인더 설정 변경 후: `invalidateYearEndTaxReminderData(queryClient)`.
 - 목표 달성 알림 설정 변경 후: `invalidateGoalAchievementAlertsData(queryClient)`.
 - 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
+- 추천 비중 변화 알림 설정 변경 후: `invalidateRecommendationDriftAlertData(queryClient)`.
 - 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 

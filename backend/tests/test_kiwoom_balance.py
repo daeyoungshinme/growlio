@@ -220,6 +220,7 @@ class TestGetDomesticBalance:
                 assert "acnt_no" not in json
                 return _evaluation_response()
             assert headers["api-id"] == "kt00001"
+            assert json == {"qry_tp": "3", "dmst_stex_tp": "KRX"}
             return _deposit_response()
 
         with patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request):
@@ -238,3 +239,23 @@ class TestGetDomesticBalance:
         assert result["invested_krw"] == 900000.0
         assert result["pnl_krw"] == 50000.0
         assert result["deposit_krw"] == 100000.0
+
+    @pytest.mark.asyncio
+    async def test_missing_entr_field_logs_warning_and_returns_zero(self):
+        """kt00001 응답에 entr 필드가 없으면(비정상 응답) 조용히 0을 반환하지 말고
+        경고 로그를 남겨야 한다 — 리밸런싱 실행 화면 예수금 0원 버그의 재발 감지용."""
+
+        async def _fake_request(method, path, *, is_mock, headers, json=None, **kwargs):
+            if headers["api-id"] == "kt00018":
+                return _evaluation_response()
+            assert headers["api-id"] == "kt00001"
+            return {"return_code": 0}  # entr 필드 없는 비정상 응답
+
+        with (
+            patch("app.kiwoom.balance.kiwoom_request", side_effect=_fake_request),
+            patch("app.kiwoom.balance.logger") as mock_logger,
+        ):
+            result = await get_domestic_balance("token", "1234567890", is_mock=True)
+
+        assert result["deposit_krw"] == 0.0
+        mock_logger.warning.assert_called_once_with("kiwoom_deposit_field_missing", response_keys=["return_code"])

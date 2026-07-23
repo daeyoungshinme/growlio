@@ -15,6 +15,7 @@ import {
   CASH_EQUIVALENT_TICKER,
   fetchHorizonGoalRecommendations,
   fetchOverallGoalRecommendation,
+  fetchPortfolioExpectedMetrics,
   type GoalRecommendationItem,
 } from "@/api/rebalancing";
 import { fetchSettings } from "@/api/settings";
@@ -40,6 +41,7 @@ import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateMan
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
 import {
+  buildWeightDiffRows,
   computeRecommendationDrift,
   hasSignificantDrift,
   type RecommendationDrift,
@@ -74,6 +76,105 @@ function driftBadgeLabel(drift: RecommendationDrift): string {
   if (drift.maxDeltaPct > 0) parts.push(`최대 ${drift.maxDeltaPct}%p 차이`);
   if (drift.newCandidateCount > 0) parts.push(`신규 후보 ${drift.newCandidateCount}개`);
   return `시장 상황이 바뀌어 추천 비중이 달라졌어요 · ${parts.join(" · ")}`;
+}
+
+function MetricCompareCell({
+  label,
+  current,
+  recommended,
+  loading,
+}: {
+  label: string;
+  current: number | null | undefined;
+  recommended: number | null;
+  loading: boolean;
+}) {
+  return (
+    <div>
+      <p className="text-gray-400 dark:text-gray-500">{label}</p>
+      <p className="text-gray-700 dark:text-gray-300">
+        <span>{loading ? "…" : current != null ? `${current.toFixed(1)}%` : "—"}</span>
+        {" → "}
+        <span className="text-teal-600 dark:text-teal-400 font-medium">
+          {recommended != null ? `${recommended.toFixed(1)}%` : "—"}
+        </span>
+      </p>
+    </div>
+  );
+}
+
+/** "적용" 확인창에 표시되는 비교 미리보기 — 종목별 현재 vs 추천 비중 테이블 + 기대수익률/변동성/
+ * 배당수익률 요약. 현재 포트폴리오 쪽 지표는 확인창이 열릴 때만 온디맨드로 조회한다(캐싱 없음). */
+function RecommendationComparisonPreview({
+  recommendedItems,
+  currentItems,
+  recommendedMetrics,
+  targetPortfolioId,
+}: {
+  recommendedItems: GoalRecommendationItem[];
+  currentItems: PortfolioItem[];
+  recommendedMetrics: {
+    expected_return_pct: number | null;
+    expected_dividend_yield_pct: number | null;
+    expected_volatility_pct: number | null;
+  };
+  targetPortfolioId: string;
+}) {
+  const { data: currentMetrics, isLoading } = useQuery({
+    queryKey: QUERY_KEYS.portfolioExpectedMetrics(targetPortfolioId),
+    queryFn: () => fetchPortfolioExpectedMetrics(targetPortfolioId),
+  });
+
+  const rows = buildWeightDiffRows(recommendedItems, currentItems);
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+      <div className="max-h-40 overflow-y-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-gray-400 dark:text-gray-500">
+              <th className="text-left font-normal pb-1">종목</th>
+              <th className="text-right font-normal pb-1">현재</th>
+              <th className="text-right font-normal pb-1">추천</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="text-gray-700 dark:text-gray-300">
+                <td className="py-0.5 pr-2 truncate max-w-[140px]">{row.name}</td>
+                <td className="text-right py-0.5 text-gray-400 dark:text-gray-500">
+                  {row.currentWeight != null ? `${row.currentWeight.toFixed(1)}%` : "—"}
+                </td>
+                <td className="text-right py-0.5 font-medium text-teal-600 dark:text-teal-400">
+                  {row.recommendedWeight != null ? `${row.recommendedWeight.toFixed(1)}%` : "0%"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="pt-2 border-t border-gray-100 dark:border-gray-800 grid grid-cols-3 gap-2 text-xs">
+        <MetricCompareCell
+          label="기대수익률"
+          current={currentMetrics?.expected_return_pct}
+          recommended={recommendedMetrics.expected_return_pct}
+          loading={isLoading}
+        />
+        <MetricCompareCell
+          label="변동성"
+          current={currentMetrics?.expected_volatility_pct}
+          recommended={recommendedMetrics.expected_volatility_pct}
+          loading={isLoading}
+        />
+        <MetricCompareCell
+          label="배당수익률"
+          current={currentMetrics?.expected_dividend_yield_pct}
+          recommended={recommendedMetrics.expected_dividend_yield_pct}
+          loading={isLoading}
+        />
+      </div>
+    </div>
+  );
 }
 
 /** 마지막으로 적용한 목표 비중과 지금 다시 계산한 추천 비중을 비교해 유의미하게 달라졌을 때만
@@ -334,6 +435,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     {overallData.expected_dividend_yield_pct != null &&
                       ` (배당수익률 약 ${overallData.expected_dividend_yield_pct.toFixed(1)}%)`}
                     를 기대할 수 있습니다.
+                    {overallData.expected_volatility_pct != null &&
+                      ` 예상 변동성은 연 ${overallData.expected_volatility_pct.toFixed(1)}%입니다.`}
                   </p>
 
                   {overallDrift && hasSignificantDrift(overallDrift) && (
@@ -447,6 +550,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               {activeHorizonRec.recommended_items.length > 0 &&
                 activeHorizonRec.expected_return_pct != null &&
                 ` · 기대수익률 ${activeHorizonRec.expected_return_pct.toFixed(1)}%`}
+              {activeHorizonRec.recommended_items.length > 0 &&
+                activeHorizonRec.expected_dividend_yield_pct != null &&
+                ` · 배당수익률 약 ${activeHorizonRec.expected_dividend_yield_pct.toFixed(1)}%`}
+              {activeHorizonRec.recommended_items.length > 0 &&
+                activeHorizonRec.expected_volatility_pct != null &&
+                ` · 예상 변동성 연 ${activeHorizonRec.expected_volatility_pct.toFixed(1)}%`}
             </p>
 
             {horizonDrift && hasSignificantDrift(horizonDrift) && (
@@ -587,7 +696,18 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
           danger={false}
           onConfirm={() => applyOverallMutation.mutate(overallConfirmTarget.id)}
           onCancel={() => setConfirmOpen(false)}
-        />
+        >
+          <RecommendationComparisonPreview
+            recommendedItems={overallData.recommended_items}
+            currentItems={overallConfirmTarget.items}
+            recommendedMetrics={{
+              expected_return_pct: overallData.expected_return_pct,
+              expected_dividend_yield_pct: overallData.expected_dividend_yield_pct,
+              expected_volatility_pct: overallData.expected_volatility_pct,
+            }}
+            targetPortfolioId={overallConfirmTarget.id}
+          />
+        </ConfirmModal>
       )}
 
       {confirmOpen && effectiveTab !== "전체" && horizonTargetPortfolio && (
@@ -601,7 +721,20 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
           danger={false}
           onConfirm={() => applyHorizonMutation.mutate()}
           onCancel={() => setConfirmOpen(false)}
-        />
+        >
+          {activeHorizonRec && (
+            <RecommendationComparisonPreview
+              recommendedItems={activeHorizonRec.recommended_items}
+              currentItems={horizonTargetPortfolio.items}
+              recommendedMetrics={{
+                expected_return_pct: activeHorizonRec.expected_return_pct,
+                expected_dividend_yield_pct: activeHorizonRec.expected_dividend_yield_pct,
+                expected_volatility_pct: activeHorizonRec.expected_volatility_pct,
+              }}
+              targetPortfolioId={horizonTargetPortfolio.id}
+            />
+          )}
+        </ConfirmModal>
       )}
     </>
   );

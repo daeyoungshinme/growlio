@@ -30,6 +30,7 @@ import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useGoalAchievementAlertsToggle } from "@/hooks/useGoalAchievementAlertsToggle";
 import { useMonthlyReportAlertsToggle } from "@/hooks/useMonthlyReportAlertsToggle";
 import { useYearEndTaxReminderToggle } from "@/hooks/useYearEndTaxReminderToggle";
+import { useRecommendationDriftAlertToggle } from "@/hooks/useRecommendationDriftAlertToggle";
 import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 import RebalancingAlertSummaryCard from "@/components/settings/RebalancingAlertSummaryCard";
 import { ExchangeRateAlertSection } from "@/components/settings/ExchangeRateAlertSection";
@@ -88,6 +89,7 @@ const ALERT_TYPE_LABELS: Record<string, string> = {
   GOAL_DEPOSIT: "입금 목표 달성 알림",
   GOAL_DIVIDEND: "배당 목표 달성 알림",
   MONTHLY_REPORT: "월간 리포트",
+  RECOMMENDATION_DRIFT: "추천 비중 변화 알림",
 };
 
 const ALERT_HISTORY_PAGE_SIZE = 50;
@@ -208,6 +210,11 @@ export default function SettingsPage() {
     toggle: toggleYearEndTaxReminder,
     isPending: yearEndTaxReminderPending,
   } = useYearEndTaxReminderToggle();
+  const {
+    enabled: recommendationDriftAlertEnabled,
+    toggle: toggleRecommendationDriftAlert,
+    isPending: recommendationDriftAlertPending,
+  } = useRecommendationDriftAlertToggle();
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -392,6 +399,20 @@ export default function SettingsPage() {
               disabled={yearEndTaxReminderPending}
               onChange={toggleYearEndTaxReminder}
               ariaLabel="연말 절세 리마인더"
+            />
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-800 pt-3">
+            <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              매주 월요일, 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
+              달라지면 이메일/푸시로 알려드립니다.
+            </p>
+            <ToggleSwitch
+              checked={recommendationDriftAlertEnabled}
+              disabled={recommendationDriftAlertPending}
+              onChange={toggleRecommendationDriftAlert}
+              ariaLabel="추천 비중 변화 알림"
             />
           </div>
 

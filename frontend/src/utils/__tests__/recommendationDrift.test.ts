@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  buildWeightDiffRows,
   computeRecommendationDrift,
   hasSignificantDrift,
   RECOMMENDATION_DRIFT_THRESHOLD_PCT,
@@ -102,5 +103,50 @@ describe("hasSignificantDrift", () => {
 
   it("is true whenever there is at least one new candidate, regardless of delta", () => {
     expect(hasSignificantDrift({ maxDeltaPct: 0, newCandidateCount: 1 })).toBe(true);
+  });
+});
+
+describe("buildWeightDiffRows", () => {
+  it("merges a matched ticker into a single row with both weights", () => {
+    const rows = buildWeightDiffRows(
+      [recItem({ ticker: "AAPL", weight: 60 })],
+      [portItem({ ticker: "AAPL", weight: 40 })],
+    );
+    expect(rows).toEqual([
+      {
+        key: "AAPL-NASDAQ",
+        name: "Apple Inc.",
+        ticker: "AAPL",
+        market: "NASDAQ",
+        currentWeight: 40,
+        recommendedWeight: 60,
+      },
+    ]);
+  });
+
+  it("marks a recommended-only ticker with currentWeight null", () => {
+    const rows = buildWeightDiffRows(
+      [recItem({ ticker: "GOOG", name: "Alphabet", weight: 30 })],
+      [portItem({ ticker: "AAPL", weight: 100 })],
+    );
+    const goog = rows.find((r) => r.ticker === "GOOG");
+    expect(goog).toMatchObject({ currentWeight: null, recommendedWeight: 30 });
+    const aapl = rows.find((r) => r.ticker === "AAPL");
+    expect(aapl).toMatchObject({ currentWeight: 100, recommendedWeight: null });
+  });
+
+  it("sorts rows by recommended weight descending", () => {
+    const rows = buildWeightDiffRows(
+      [
+        recItem({ ticker: "AAPL", weight: 20 }),
+        recItem({ ticker: "MSFT", name: "Microsoft", weight: 80 }),
+      ],
+      [],
+    );
+    expect(rows.map((r) => r.ticker)).toEqual(["MSFT", "AAPL"]);
+  });
+
+  it("returns an empty array when both lists are empty", () => {
+    expect(buildWeightDiffRows([], [])).toEqual([]);
   });
 });

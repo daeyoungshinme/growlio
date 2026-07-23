@@ -128,6 +128,11 @@ export function invalidateMonthlyReportAlertsData(qc: QueryClient) {
   return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
 }
 
+/** 추천 비중 변화 알림 수신 여부 설정 변경 후 */
+export function invalidateRecommendationDriftAlertData(qc: QueryClient) {
+  return qc.invalidateQueries({ queryKey: QUERY_KEYS.settings });
+}
+
 /** 목표 역산 추천 후보 ETF/추천 엔진 설정(리스크성향·최대비중·CAGR기간) 변경 후 —
  * 포트폴리오별/전체 추천 전부(접두사 매칭) + settings 무효화 */
 export function invalidateGoalRecommendationData(qc: QueryClient) {

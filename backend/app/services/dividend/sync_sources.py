@@ -6,7 +6,8 @@
 
 from __future__ import annotations
 
-from datetime import date
+import statistics
+from datetime import date, timedelta
 
 import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
@@ -26,6 +27,35 @@ def _zero_div_with_months() -> dict:
 
 def _yield_from_dps(dps: float, price: float) -> float:
     return round(dps / price, 6) if (dps > 0 and price > 0) else 0.0
+
+
+_CAPITAL_GAIN_OUTLIER_MULTIPLE = 2.5  # 최댓값이 나머지 median의 이 배수 이상이면 자본이득분배로 간주
+
+
+def _exclude_capital_gain_outlier(ticker: object) -> float | None:
+    """trailing 12개월 분배 이력에서 자본이득분배로 추정되는 이상치 1건을 제외한 합계를 반환.
+
+    레버리지/파생상품 ETF(QLD 등)는 소액 정기배당과 별개로 연 1회 자본이득분배를 지급하는데,
+    yfinance는 이를 구분하지 않고 trailingAnnualDividendRate에 합산해 배당수익률을 부풀린다.
+    분배 건수가 2건 미만이거나 뚜렷한 이상치가 없으면 None(보정 불필요)을 반환한다.
+    """
+    try:
+        divs = ticker.dividends  # type: ignore[attr-defined]
+        if divs is None or len(divs) == 0:
+            return None
+        cutoff = date.today() - timedelta(days=365)
+        recent = [float(v) for ts, v in divs.items() if hasattr(ts, "date") and ts.date() >= cutoff and float(v) > 0]
+        if len(recent) < 2:
+            return None
+        med = statistics.median(recent)
+        largest = max(recent)
+        if med <= 0 or largest < med * _CAPITAL_GAIN_OUTLIER_MULTIPLE:
+            return None
+        remaining = recent.copy()
+        remaining.remove(largest)
+        return round(sum(remaining), 4)
+    except Exception:
+        return None
 
 
 _NAVER_RETRY = dict(
@@ -60,6 +90,17 @@ def sync_yahoo_dividend_info(yahoo_symbol: str) -> dict:
 
         trailing_dps = float(info.get("trailingAnnualDividendRate") or 0)
         last_price = float(info.get("currentPrice") or info.get("regularMarketPrice") or 0)
+
+        recurring_dps = _exclude_capital_gain_outlier(ticker)
+        if recurring_dps is not None and last_price > 0:
+            logger.info(
+                "yahoo_dividend_outlier_excluded",
+                symbol=yahoo_symbol,
+                original_dps=trailing_dps,
+                recurring_dps=recurring_dps,
+            )
+            trailing_dps = recurring_dps
+            yld = round(recurring_dps / last_price, 6)
 
         # DPS가 주가 대비 50% 초과이면 단위 오류로 판단
         if trailing_dps > 0 and last_price > 0 and trailing_dps / last_price > 0.5:

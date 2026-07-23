@@ -27,13 +27,16 @@
 3. 목표 포트폴리오가 지정되어 있지 않은 경우(대상 자체가 없음)는 배지 자체를 숨김 — 지금도 "적용" 버튼이 대상 없으면 숨겨지는 것과 동일한 조건 재사용.
 4. 테스트: `frontend/src/utils/__tests__/recommendationDrift.test.ts`(신규), `components.recommendationCard.test.tsx`에 배지 노출 케이스 추가.
 
-## 설계 — Phase B (선택, 별도 세션에서 진행 권장 — 스코프 분리)
+## Phase B — 완료 (2026-07-23, "추천 비중 고도화" 세션)
 
-Phase A는 사용자가 화면을 열어야만 보인다. "주기적으로 알려준다"까지 가려면 백엔드 잡이 필요하다:
+Phase A는 사용자가 화면을 열어야만 보였다. 주간 알림 job으로 확장 완료:
 
-- 신규 잡(`backend/app/jobs/` 아래, 기존 `goal_achievement.py`(매일 18:45 KST) 패턴 참고) — 목표 포트폴리오가 지정된 계좌들에 대해 주기적으로(예: 매주 1회) 추천을 재계산하고, Phase A와 동일한 drift 계산을 서버에서 수행해 임계값 초과 시 이메일/푸시 발송.
-- 발송 dedup 필요(같은 주에 중복 발송 방지) — `already_fired_today`류 헬퍼 대신 "이번 주 발송 여부"를 추적하는 새로운 키 필요.
-- **이 Phase는 스코프가 크고 별도 알림 채널(이메일 템플릿, 스케줄러 등록)이 필요하므로, Phase A를 먼저 완료하고 사용자 반응을 본 뒤 별도 계획으로 착수할 것을 권장** — 이 파일에서는 설계 방향만 남겨둔다.
+- `backend/app/services/goal_recommendation_service.py::compute_recommendation_drift()` — Phase A의 `computeRecommendationDrift()`를 백엔드에 그대로 포팅한 순수 함수(임계값 3%p는 `_RECOMMENDATION_DRIFT_THRESHOLD_PCT`로 동일 유지).
+- `backend/app/services/alerts/recommendation_drift_alert_service.py`(신규) — `_find_drifted_portfolios()`가 전체 자산 기준(연결 계좌 전부가 `target_portfolio_id`로 지정된 "full" 타겟 포트폴리오)과 투자기간별(포트폴리오에 `investment_horizon`+`tax_type`이 명시적으로 지정된 경우만, 계좌 태그 추론 폴백은 생략) 양쪽 경로에 대해 drift를 계산. `tax_reminder_service.py`와 동일하게 유저별 `AsyncSessionLocal` + `AlertHistory` 기반 dedup(주 1회 실행이라 "오늘 발송 여부"가 곧 주간 dedup) 패턴.
+- `UserSettings.recommendation_drift_alert_enabled`(기본 OFF, 마이그레이션 `b1c2d3e4f5a6`) + `PUT /settings/recommendation-drift-alert` + 프론트 `useRecommendationDriftAlertToggle.ts` + `SettingsPage.tsx` "알림 설정" 섹션에 토글 추가.
+- `backend/app/jobs/recommendation_drift_alert.py` + `app/scheduler.py`에 매주 월요일 09:15 KST 등록.
+- 이메일 템플릿 `recommendation_drift_alert_template()`(`email_templates.py`) + `send_recommendation_drift_alert_email()`(`email_service.py`), 푸시 딥링크 `RECOMMENDATION_DRIFT` → `/rebalancing?rtab=포트폴리오`(`usePushNotifications.ts`).
+- 검증: 백엔드 1885 tests 86.80%, 프론트 1376 tests, typecheck/lint/build 전부 클린.
 
 ## 주의사항
 

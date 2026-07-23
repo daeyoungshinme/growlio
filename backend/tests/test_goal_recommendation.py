@@ -9,10 +9,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.goal_portfolio_optimizer import compute_weighted_expected_metrics
 from app.services.goal_recommendation_service import (
     _apply_index_region_preference,
     _optimize_goal_portfolio,
     _persist_added_candidates,
+    compute_portfolio_expected_metrics,
+    compute_recommendation_drift,
     existing_items_from_positions,
     get_goal_recommendation,
     get_horizon_recommendations,
@@ -41,6 +44,20 @@ def _mock_market_signal():
     with patch(
         "app.services.goal_recommendation_service.get_market_signal",
         AsyncMock(return_value={"composite_level": "GREEN", "data_freshness": "LIVE"}),
+    ):
+        yield
+
+
+@pytest.fixture(autouse=True)
+def _mock_dividend_yields():
+    """`_fetch_dividend_yields`를 빈 dict로 고정해 실제 외부 API(Naver/Yahoo) 호출을 막는다.
+
+    배당 목표(A1)를 검증하는 `TestGetGoalRecommendation`의 일부 테스트와 기간별 배당 반영(Part 3)을
+    검증하는 테스트는 이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
+    """
+    with patch(
+        "app.services.goal_recommendation_service._fetch_dividend_yields",
+        AsyncMock(return_value={}),
     ):
         yield
 
@@ -109,7 +126,7 @@ class TestMonthsUntilYearEnd:
 
 class TestOptimizeGoalPortfolio:
     def test_insufficient_candidates_returns_note(self):
-        items, expected, note = _optimize_goal_portfolio(
+        items, expected, _, note = _optimize_goal_portfolio(
             symbols=["A"],
             tickers=[("A", "A Inc", "NASDAQ")],
             cagr_pct=[10.0],
@@ -121,7 +138,7 @@ class TestOptimizeGoalPortfolio:
         assert note is not None
 
     def test_unreachable_required_return_returns_note(self):
-        items, expected, note = _optimize_goal_portfolio(
+        items, expected, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=[("A", "A Inc", "NASDAQ"), ("B", "B Inc", "NASDAQ")],
             cagr_pct=[5.0, 6.0],
@@ -137,7 +154,7 @@ class TestOptimizeGoalPortfolio:
         r_a = [random.gauss(0.0006, 0.008) for _ in range(252)]
         r_b = [random.gauss(0.0003, 0.004) for _ in range(252)]
 
-        items, expected, note = _optimize_goal_portfolio(
+        items, expected, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=[("A", "고성장 ETF", "NASDAQ"), ("B", "저변동 ETF", "NASDAQ")],
             cagr_pct=[15.0, 4.0],
@@ -161,7 +178,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [(t, t, "NASDAQ") for t in ("A", "B", "C", "D")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["A", "B", "C", "D"],
             tickers=tickers,
             cagr_pct=[3.0, 3.0, 3.0, 3.0],
@@ -184,7 +201,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("GROWTH", "성장주 ETF", "NASDAQ"), ("DIVIDEND", "고배당 ETF", "NASDAQ")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["GROWTH", "DIVIDEND"],
             tickers=tickers,
             cagr_pct=[8.0, 6.0],
@@ -210,7 +227,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
 
-        items, expected, note = _optimize_goal_portfolio(
+        items, expected, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=[8.0, 6.0],
@@ -235,7 +252,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=[8.0, 6.0],
@@ -261,7 +278,7 @@ class TestOptimizeGoalPortfolio:
         tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ"), ("C", "C", "NASDAQ")]
         cagr_pct = [3.0, 6.0, 15.0]
 
-        conservative_items, conservative_expected, conservative_note = _optimize_goal_portfolio(
+        conservative_items, conservative_expected, _, conservative_note = _optimize_goal_portfolio(
             symbols=["A", "B", "C"],
             tickers=tickers,
             cagr_pct=cagr_pct,
@@ -269,7 +286,7 @@ class TestOptimizeGoalPortfolio:
             required_return_pct=5.0,
             risk_tolerance="CONSERVATIVE",
         )
-        balanced_items, balanced_expected, balanced_note = _optimize_goal_portfolio(
+        balanced_items, balanced_expected, _, balanced_note = _optimize_goal_portfolio(
             symbols=["A", "B", "C"],
             tickers=tickers,
             cagr_pct=cagr_pct,
@@ -277,7 +294,7 @@ class TestOptimizeGoalPortfolio:
             required_return_pct=5.0,
             risk_tolerance="BALANCED",
         )
-        aggressive_items, aggressive_expected, aggressive_note = _optimize_goal_portfolio(
+        aggressive_items, aggressive_expected, _, aggressive_note = _optimize_goal_portfolio(
             symbols=["A", "B", "C"],
             tickers=tickers,
             cagr_pct=cagr_pct,
@@ -309,7 +326,7 @@ class TestOptimizeGoalPortfolio:
         cagr_pct = [3.0, 6.0, 15.0]
 
         def _run(market_signal_level: str | None) -> tuple[float, str | None]:
-            _, expected, note = _optimize_goal_portfolio(
+            _, expected, _, note = _optimize_goal_portfolio(
                 symbols=["A", "B", "C"],
                 tickers=tickers,
                 cagr_pct=cagr_pct,
@@ -341,7 +358,7 @@ class TestOptimizeGoalPortfolio:
         tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
         cagr_pct = [3.0, 6.0]
 
-        no_signal_items, no_signal_expected, no_signal_note = _optimize_goal_portfolio(
+        no_signal_items, no_signal_expected, _, no_signal_note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=cagr_pct,
@@ -349,7 +366,7 @@ class TestOptimizeGoalPortfolio:
             required_return_pct=2.0,
             risk_tolerance="CONSERVATIVE",
         )
-        red_items, red_expected, red_note = _optimize_goal_portfolio(
+        red_items, red_expected, _, red_note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=cagr_pct,
@@ -373,7 +390,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("A", "A", "NASDAQ"), ("B", "B", "NASDAQ")]
 
-        items, expected, note = _optimize_goal_portfolio(
+        items, expected, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=[7.0, 7.0],
@@ -396,7 +413,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("SAFE", "안전자산", "KOSPI"), ("STOCK", "주식", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["SAFE", "STOCK"],
             tickers=tickers,
             cagr_pct=[3.0, 8.0],
@@ -419,7 +436,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("A", "A", "KOSPI"), ("B", "B", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=[3.0, 8.0],
@@ -448,7 +465,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("STOCK1", "주식1", "KOSPI"), ("STOCK2", "주식2", "KOSPI"), ("SAFE", "안전자산", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["STOCK1", "STOCK2", "SAFE"],
             tickers=tickers,
             cagr_pct=[8.0, 8.0, 3.0],
@@ -471,7 +488,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("A", "A", "KOSPI"), ("B", "B", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["A", "B"],
             tickers=tickers,
             cagr_pct=[3.0, 8.0],
@@ -495,7 +512,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("SAFE1", "안전자산1", "KOSPI"), ("SAFE2", "안전자산2", "KOSPI"), ("STOCK", "주식", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["SAFE1", "SAFE2", "STOCK"],
             tickers=tickers,
             cagr_pct=[3.0, 3.0, 8.0],
@@ -521,7 +538,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("STOCK1", "주식1", "KOSPI"), ("STOCK2", "주식2", "KOSPI"), ("SAFE", "안전자산", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["STOCK1", "STOCK2", "SAFE"],
             tickers=tickers,
             cagr_pct=[8.0, 8.0, 3.0],
@@ -550,7 +567,7 @@ class TestOptimizeGoalPortfolio:
         }
         tickers = [("SAFE1", "안전자산1", "KOSPI"), ("SAFE2", "안전자산2", "KOSPI"), ("STOCK", "주식", "KOSPI")]
 
-        items, _, note = _optimize_goal_portfolio(
+        items, _, _, note = _optimize_goal_portfolio(
             symbols=["SAFE1", "SAFE2", "STOCK"],
             tickers=tickers,
             cagr_pct=[3.0, 3.0, 8.0],
@@ -2622,3 +2639,121 @@ class TestGetHorizonRecommendations:
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items
         mock_cache.setex.assert_awaited_once()
+
+
+class TestComputeWeightedExpectedMetrics:
+    """`compute_weighted_expected_metrics()` — 이미 정해진 비중에 대한 기대수익률/배당수익률/변동성 계산."""
+
+    def test_empty_symbols_returns_all_none(self):
+        result = compute_weighted_expected_metrics([], [], {}, {}, {})
+        assert result == (None, None, None)
+
+    def test_no_matching_returns_data_returns_all_none(self):
+        result = compute_weighted_expected_metrics(["SPY"], [100.0], {"SPY": 10.0}, {"SPY": 2.0}, {})
+        assert result == (None, None, None)
+
+    def test_single_symbol_weighted_average_equals_its_own_values(self):
+        random.seed(1)
+        returns_map = {"SPY": [random.gauss(0.0005, 0.01) for _ in range(252)]}
+        expected_return, expected_dividend, expected_volatility = compute_weighted_expected_metrics(
+            ["SPY"], [100.0], {"SPY": 10.0}, {"SPY": 2.0}, returns_map
+        )
+        assert expected_return == 10.0
+        assert expected_dividend == 2.0
+        assert expected_volatility is not None
+        assert expected_volatility > 0
+
+    def test_two_symbols_weighted_average(self):
+        random.seed(2)
+        returns_map = {
+            "SPY": [random.gauss(0.0005, 0.01) for _ in range(252)],
+            "QQQ": [random.gauss(0.0007, 0.015) for _ in range(252)],
+        }
+        expected_return, expected_dividend, _ = compute_weighted_expected_metrics(
+            ["SPY", "QQQ"],
+            [50.0, 50.0],
+            {"SPY": 10.0, "QQQ": 20.0},
+            {"SPY": 2.0, "QQQ": 0.5},
+            returns_map,
+        )
+        assert expected_return == 15.0  # (10+20)/2
+        assert expected_dividend == 1.25  # (2.0+0.5)/2
+
+    def test_missing_return_data_excluded_and_renormalized(self):
+        """시세 데이터 없는 종목은 제외되고 나머지 비중으로 재정규화된다."""
+        random.seed(3)
+        returns_map = {"SPY": [random.gauss(0.0005, 0.01) for _ in range(252)]}
+        expected_return, _, _ = compute_weighted_expected_metrics(
+            ["SPY", "MISSING"],
+            [50.0, 50.0],
+            {"SPY": 10.0, "MISSING": 999.0},
+            {"SPY": 2.0, "MISSING": 999.0},
+            returns_map,
+        )
+        assert expected_return == 10.0  # MISSING 제외 후 SPY 100%로 재정규화
+
+
+class TestComputePortfolioExpectedMetrics:
+    """`compute_portfolio_expected_metrics()` — 포트폴리오의 현재 목표 비중에 대한 지표 계산(적용 전 비교 미리보기)."""
+
+    @pytest.mark.asyncio
+    async def test_empty_items_returns_empty_metrics(self):
+        result = await compute_portfolio_expected_metrics(None, [])
+        assert result.expected_return_pct is None
+        assert result.expected_dividend_yield_pct is None
+        assert result.expected_volatility_pct is None
+
+    @pytest.mark.asyncio
+    async def test_computes_metrics_from_items(self):
+        random.seed(4)
+        returns_map = {"SPY": [random.gauss(0.0005, 0.01) for _ in range(252)]}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value={("SPY", "NYSE"): 2.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await compute_portfolio_expected_metrics(None, [("SPY", "NYSE", "SPDR S&P 500", 100.0)])
+
+        assert result.expected_return_pct == 10.0
+        assert result.expected_dividend_yield_pct == 2.0
+        assert result.expected_volatility_pct is not None
+
+
+class TestComputeRecommendationDrift:
+    """`compute_recommendation_drift()` — 프론트 `recommendationDrift.ts`와 동일한 로직의 백엔드 포팅."""
+
+    def test_no_drift_when_weights_match(self):
+        recommended = [("SPY", "NYSE", 100.0)]
+        current = [("SPY", "NYSE", 100.0)]
+        assert compute_recommendation_drift(recommended, current) == (0.0, 0)
+
+    def test_max_delta_pct_reflects_largest_difference(self):
+        recommended = [("SPY", "NYSE", 80.0), ("QQQ", "NASDAQ", 20.0)]
+        current = [("SPY", "NYSE", 50.0), ("QQQ", "NASDAQ", 50.0)]
+        max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended, current)
+        assert max_delta_pct == 30.0
+        assert new_candidate_count == 0
+
+    def test_new_candidate_not_in_current_counted(self):
+        recommended = [("SPY", "NYSE", 50.0), ("SCHD", "NYSE", 50.0)]
+        current = [("SPY", "NYSE", 50.0)]
+        max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended, current)
+        assert max_delta_pct == 0.0
+        assert new_candidate_count == 1
+
+    def test_ticker_matches_only_on_same_market(self):
+        """같은 티커라도 market이 다르면 다른 종목으로 취급 — 신규 후보로 카운트된다."""
+        recommended = [("069500", "KOSPI", 100.0)]
+        current = [("069500", "KOSDAQ", 100.0)]
+        max_delta_pct, new_candidate_count = compute_recommendation_drift(recommended, current)
+        assert new_candidate_count == 1

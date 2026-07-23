@@ -87,8 +87,10 @@ def _optimize_goal_portfolio(
     market_signal_level: str | None = None,
     dividend_yields: list[float] | None = None,
     required_dividend_yield_pct: float | None = None,
-) -> tuple[list[dict], float | None, str | None]:
-    """분산 최소화 + 목표수익률 제약(SLSQP). (recommended_items, expected_return_pct, note) 반환. 동기 함수.
+) -> tuple[list[dict], float | None, float | None, str | None]:
+    """분산 최소화 + 목표수익률 제약(SLSQP). 동기 함수.
+
+    반환: (recommended_items, expected_return_pct, expected_volatility_pct, note).
 
     `required_return_pct`는 실행가능성 하드체크(달성 불가 판정)에 쓰이는 필요수익률이다.
 
@@ -130,14 +132,14 @@ def _optimize_goal_portfolio(
         if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
     ]
     if len(valid) < _MIN_CANDIDATES:
-        return [], None, f"추천에 충분한 시세 데이터가 있는 종목이 {_MIN_CANDIDATES}개 미만입니다"
+        return [], None, None, f"추천에 충분한 시세 데이터가 있는 종목이 {_MIN_CANDIDATES}개 미만입니다"
 
     syms, tks, cagrs_list, equity_flags, dividend_list = zip(*valid, strict=False)
     cagrs = np.array(cagrs_list, dtype=float)
     n = len(syms)
 
     if float(cagrs.max()) < required_return_pct:
-        return [], None, f"큐레이션 종목만으로는 목표 수익률(연 {required_return_pct:.1f}%)을 달성하기 어렵습니다"
+        return [], None, None, f"큐레이션 종목만으로는 목표 수익률(연 {required_return_pct:.1f}%)을 달성하기 어렵습니다"
 
     min_len = min(len(returns_map[s]) for s in syms)
     rets = np.array([returns_map[s][:min_len] for s in syms])
@@ -249,10 +251,11 @@ def _optimize_goal_portfolio(
         options={"ftol": 1e-9, "maxiter": 500},
     )
     if not res.success:
-        return [], None, "제약 조건을 만족하는 포트폴리오를 찾지 못했습니다"
+        return [], None, None, "제약 조건을 만족하는 포트폴리오를 찾지 못했습니다"
 
     weights = res.x
     expected_return = round(float(weights @ cagrs), 2)
+    expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
 
     items = [
         {"ticker": tk[0], "name": tk[1], "market": tk[2], "weight": round(float(w) * 100, 1)}
@@ -263,4 +266,50 @@ def _optimize_goal_portfolio(
     if items and abs(total - 100) > 0.01:
         items[0]["weight"] = round(items[0]["weight"] + (100 - total), 1)
 
-    return items, expected_return, note
+    return items, expected_return, expected_volatility, note
+
+
+def compute_weighted_expected_metrics(
+    symbols: list[str],
+    weights_pct: list[float],  # 0~100, symbols와 동일 순서로 대응
+    cagr_by_symbol: dict[str, float],
+    dividend_by_symbol: dict[str, float],
+    returns_map: dict[str, list[float]],
+) -> tuple[float | None, float | None, float | None]:
+    """임의의 "이미 정해진" 비중(최적화 대상이 아님)에 대해 가중평균 기대수익률·배당수익률·변동성을
+    계산한다 — `_optimize_goal_portfolio`가 SLSQP 최적화 이후 계산하는 것과 동일한 수식을 최적화
+    과정 없이 바로 적용한 버전. "적용 전 비교 미리보기"에서 포트폴리오의 현재 목표 비중에 대해
+    추천 비중과 같은 지표를 나란히 보여주기 위해 쓰인다.
+
+    시세 데이터가 없는 종목(`returns_map`에 없거나 데이터 부족)은 계산에서 제외하고 나머지
+    비중으로 재정규화한다. 유효 종목이 하나도 없으면 (None, None, None)을 반환한다.
+    """
+    import numpy as np
+
+    valid = [
+        (sym, w)
+        for sym, w in zip(symbols, weights_pct, strict=False)
+        if sym in returns_map and len(returns_map[sym]) >= _MIN_RETURN_DAYS and w > 0
+    ]
+    if not valid:
+        return None, None, None
+
+    syms, ws = zip(*valid, strict=False)
+    raw_weights = np.array(ws, dtype=float)
+    weight_sum = float(raw_weights.sum())
+    if weight_sum <= 0:
+        return None, None, None
+    weights = raw_weights / weight_sum
+
+    cagrs = np.array([cagr_by_symbol.get(s, 0.0) for s in syms], dtype=float)
+    dividends = np.array([dividend_by_symbol.get(s, 0.0) for s in syms], dtype=float)
+
+    expected_return = round(float(weights @ cagrs), 2)
+    expected_dividend = round(float(weights @ dividends), 2)
+
+    min_len = min(len(returns_map[s]) for s in syms)
+    rets = np.array([returns_map[s][:min_len] for s in syms])
+    cov_annual = np.cov(rets) * 252 if len(syms) > 1 else np.array([[float(np.var(rets[0])) * 252]])
+    expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
+
+    return expected_return, expected_dividend, expected_volatility
