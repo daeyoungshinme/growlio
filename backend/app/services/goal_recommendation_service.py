@@ -26,11 +26,29 @@ CONSERVATIVE는 오늘까지의 동작과 동일하게 부등식 제약(필요�
 배당 목표는 전체 자산 기준과 동일한 필요배당수익률(%)을 모든 (기간,세제유형) 조합에 동일 적용해
 함께 반영한다(`_compute_horizon_recommendations` 참고).
 
+전체 자산 기준 경로(`get_goal_recommendation`)는 자산목표(`goal_amount`+`retirement_target_year`)가
+없어도 배당목표만 있으면 동작한다 — 이 경우 `required_return_pct`는 화면에 노출하지 않고(None),
+옵티마이저에는 `by-horizon`/`by-age`와 동일한 `_NON_BINDING_RETURN_FLOOR`를 전달해 배당수익률
+하한 제약만으로 최소분산 포트폴리오를 계산한다("배당 계획" 탭 전용 진입점).
+
+`_suggest_for_dividend_goal()`은 "등록 후보로 달성 불가능할 때"뿐 아니라, 이미 달성한 경우에도
+등록후보 밖에 유의미하게(`_DIVIDEND_IMPROVEMENT_THRESHOLD_PCT` 이상) 더 높은 배당수익률 후보가
+있으면 "더 나은 옵션" 제안을 함께 반환한다(`dividend_goal_status`: unreachable/improvable/optimal).
+이 판정은 최적화 실행 후 실제 산출된 `expected_dividend_yield_pct`를 기준으로 하므로, 세 호출부
+모두 최적화 완료 후(또는 조기 반환 시 `expected_dividend_yield_pct=None`으로) 호출한다.
+
 자동 반영되지 않음 — 프론트엔드에서 사용자가 확인 후 수동으로 포트폴리오 편집기에 적용한다.
 
 MVO 최적화 엔진은 `goal_portfolio_optimizer.py`, 후보 종목 관리/영속화는 `goal_candidate_service.py`
 로 분리되어 있다 — 이 파일에는 API 진입점(전체 자산 기준 `get_goal_recommendation`, 투자기간별
-`get_horizon_recommendations`)과 그 사이에서 공유되는 소규모 헬퍼만 남아 있다.
+`get_horizon_recommendations`, 연령대별 `get_age_based_recommendation`)과 그 사이에서 공유되는
+소규모 헬퍼만 남아 있다.
+
+`get_age_based_recommendation`(연령대별)은 `UserSettings.age_group`(사용자가 직접 선택한
+20대/30대/40대/50대/60대 이상 연령대)에 따라, 목표금액 역산 없이 연령대에 맞는 리스크 성향 +
+주식비중 상/하한만으로 추천 비중을 계산한다 — 목표 역산을 하지 않는다는 점에서
+`get_horizon_recommendations`와 성격이 같다(`_NON_BINDING_RETURN_FLOOR`로 required_return_pct
+제약을 사실상 무효화).
 """
 
 from __future__ import annotations
@@ -38,6 +56,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 import structlog
@@ -50,7 +69,7 @@ from app.constants import (
     CASH_EQUIVALENT_TICKER,
     DOMESTIC_MARKETS,
 )
-from app.enums import AccountTaxType, InvestmentHorizon
+from app.enums import AccountTaxType, AgeGroup, InvestmentHorizon
 from app.models.asset import AssetAccount
 from app.models.user import UserSettings
 from app.schemas.rebalancing import (
@@ -59,6 +78,7 @@ from app.schemas.rebalancing import (
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
     PortfolioExpectedMetrics,
+    SuggestedGoalCandidate,
 )
 from app.services.dividend.constants import is_korean_etf
 from app.services.dividend.sync_sources import (
@@ -71,12 +91,15 @@ from app.services.goal_candidate_service import (
     _active_account_tax_types,
     _apply_index_region_preference,
     _get_or_seed_candidates,
+    _matches_index_region_preference,
     _persist_added_candidates,
+    detect_duplicate_tracking_index_note,
     existing_items_from_positions,
 )
 from app.services.goal_portfolio_optimizer import (
     _MAX_WEIGHT,
     _MIN_CANDIDATES,
+    _dividend_floor_constraint,
     _optimize_goal_portfolio,
     compute_weighted_expected_metrics,
 )
@@ -90,12 +113,13 @@ from app.services.portfolio_service import (
 )
 from app.services.position_aggregator import query_latest_position_map
 from app.services.price_service import get_historical_returns
-from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
+from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS, RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
     get_cached_json,
+    goal_recommendation_age_key,
     goal_recommendation_horizon_key,
     goal_recommendation_key,
     set_cached_json,
@@ -141,6 +165,36 @@ _DEFAULT_IRP_SAFE_ASSET_FLOOR_PCT = 30.0
 고정 규칙이라 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`와 달리 UserSettings 오버라이드 필드를
 두지 않는다. 단기(SHORT_TERM) 조합에서는 이 규칙이 `_DEFAULT_SHORT_TERM_EQUITY_FLOOR_PCT`(주식
 최소 80%)와 정면 충돌하므로 IRP가 우선하고 단기 주식 하한 규칙은 적용하지 않는다."""
+
+_AGE_GROUP_PROFILE: dict[str, tuple[str, str, float | None, float | None, float]] = {
+    # age_group → (구간 라벨, risk_tolerance, equity_floor, equity_ceiling, 기본 배당수익률 하한%)
+    AgeGroup.TWENTIES.value: ("20대", "AGGRESSIVE", 0.8, None, 0.0),
+    AgeGroup.THIRTIES.value: ("30대", "AGGRESSIVE", 0.7, None, 0.0),
+    AgeGroup.FORTIES.value: ("40대", "BALANCED", 0.55, None, 1.5),
+    AgeGroup.FIFTIES.value: ("50대", "BALANCED", None, 0.6, 2.5),
+    AgeGroup.SIXTIES_PLUS.value: ("60대 이상", "CONSERVATIVE", None, 0.35, 3.5),
+}
+"""연령대(`UserSettings.age_group`, 사용자가 직접 선택) → (risk_tolerance, 주식비중 상/하한,
+기본 배당수익률 하한%) 매핑 — "나이가 많을수록 안전자산 비중을 늘리고 배당(현금흐름) 안정성에
+초점을 둔다"는 생애주기 투자 통념을 이 엔진의 축(risk_tolerance/equity_floor·ceiling/배당수익률
+하한)에 얹은 것. 구간마다 `equity_floor`/`equity_ceiling` 중 하나만 설정한다 —
+`_optimize_goal_portfolio`는 호출측이 둘을 동시에 넘기지 않는다고 전제한다
+(goal_portfolio_optimizer.py의 해당 docstring 참고, bounds 계산이 `elif`로 분기돼 있어 동시 사용
+시 제약 간 불일치가 생길 수 있음).
+
+기본 배당수익률 하한은 `UserSettings.annual_dividend_goal`(명시적 배당목표)이 설정돼 있지
+않을 때만 적용되는 폴백 값이다(`_compute_age_based_recommendation` 참고) — 명시적 목표가
+있으면 그 값이 항상 우선한다. 20~30대는 0(배당 제약 없음, 성장 중심 기존 동작 유지), 40대부터
+점진적으로 상향한다. 다른 age_group 값과 마찬가지로 튜닝 가능한 휴리스틱 기본값이며 특정
+종목 투자를 권유하는 것은 아니다.
+
+BALANCED/AGGRESSIVE(20~40대)는 프론티어 보간을 위한 등식 제약(목표 수익률 고정)이 추가로 걸리는데,
+등록된 주식(EQUITY) 후보 수가 너무 적으면(예: 1~2개) equity_floor 하한과 이 등식 제약이 동시에
+정확히 한 점만 허용해 옵티마이저가 해를 못 찾을 수 있다(SLSQP 실패 → "제약 조건을 만족하는
+포트폴리오를 찾지 못했습니다" note로 fail-soft 반환). 큐레이션 유니버스는 항상 다수의 EQUITY
+후보를 포함하므로 실사용에서는 드문 경우지만, 후보 ETF를 극소수만 등록한 사용자는 겪을 수 있다 —
+이미 IRP+LONG_TERM(AGGRESSIVE) 조합에서도 존재하는 동일한 구조적 한계이며 이 엔진의 알려진
+트레이드오프다."""
 
 
 def _cash_equivalent_daily_returns() -> list[float]:
@@ -191,6 +245,12 @@ _RECOMMENDATION_DRIFT_THRESHOLD_PCT = 3.0
 """`frontend/src/utils/recommendationDrift.ts`의 RECOMMENDATION_DRIFT_THRESHOLD_PCT와 동일하게
 유지 — 프론트(화면을 열었을 때 배지)와 백엔드(주간 알림 job)가 같은 기준으로 "유의미한 변화"를
 판단하게 하기 위함. 한쪽만 바꾸면 배지와 알림의 민감도가 어긋나므로 항상 함께 바꿀 것."""
+
+_DIVIDEND_IMPROVEMENT_THRESHOLD_PCT = 0.5
+"""이미 배당 목표를 달성했어도, 미등록 후보를 추가했을 때 그리디 최대 달성 가능 배당수익률이
+이 값(%p) 이상 개선되면 `_suggest_for_dividend_goal()`이 "더 나은 옵션이 있습니다"로 제안한다.
+노이즈성 제안(0.1%p 차이로 계속 새 종목을 권유)을 막기 위한 최소 유의미 기준 —
+`_RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3.0%p, 비중 변화 감지용)와는 판단 축이 달라 값도 다르게 잡는다."""
 
 
 def compute_recommendation_drift(
@@ -245,6 +305,129 @@ async def _fetch_dividend_yields(candidates: list[tuple[str, str]]) -> dict[tupl
     return result
 
 
+def _attach_dividend_yield(
+    items: list[dict[str, object]], dividend_map: dict[tuple[str, str], float]
+) -> list[GoalRecommendationItem]:
+    """옵티마이저 결과(`items`)에 `_fetch_dividend_yields()`가 이미 조회해둔 종목별 배당수익률을
+    붙인다 — 배당 목표 제약(`_optimize_goal_portfolio`)은 포트폴리오 전체 가중평균에만 걸리므로,
+    저배당 종목(예: 성장형 지수 ETF)도 분산 목적으로 결과에 포함될 수 있다. 화면에서 이를 구분할
+    수 있도록 종목별 수치를 노출한다(조회 실패/데이터 없음이면 None)."""
+    return [
+        GoalRecommendationItem(**i, dividend_yield_pct=dividend_map.get((str(i["ticker"]), str(i["market"]))))
+        for i in items
+    ]
+
+
+async def _suggest_for_dividend_goal(
+    candidate_dicts: list[dict[str, str]],
+    required_dividend_yield_pct: float | None,
+    expected_dividend_yield_pct: float | None,
+    max_weight: float,
+    capacity_remaining: int,
+    market_filter: Callable[[dict[str, str]], bool] | None = None,
+) -> tuple[list[dict[str, object]], str | None, str | None]:
+    """등록된 후보만으로 배당 목표(`required_dividend_yield_pct`) 달성이 어렵거나, 이미 달성했더라도
+    등록후보 밖에 유의미하게 더 높은 배당수익률 후보가 있으면 큐레이션 유니버스(`RECOMMENDATION_UNIVERSE`)
+    에서 필요한 만큼만 "제안"한다 — 등록 목록(`UserSettings.goal_candidate_tickers`)에는 반영하지
+    않고, 반환된 제안 목록은 응답의 `suggested_candidates` 필드로만 노출된다. 사용자가 추천 카드의
+    "후보에 추가" 버튼으로 승인해야만 `PUT /settings/goal-candidate-tickers`를 통해 실제로 저장되고,
+    그래야 다음 추천 계산부터 비중 산출에 포함된다 — 사용자 동의 없이 후보 목록이 바뀌는 것을
+    막기 위한 설계.
+
+    `_get_or_seed_candidates`는 최초 1회만 시딩하고 이후에는 저장된 목록을 그대로 쓴다(자동
+    병합 없음, "후보 ETF 관리"에서 사용자가 편집한 목록을 존중하기 위한 의도된 설계) — 그래서
+    큐레이션 유니버스에 새 고배당 ETF를 추가해도 이미 후보를 등록한 기존 사용자에게는 영원히
+    노출되지 않는다. 이 함수는 "배당 목표 달성/개선에 실제로 필요한 경우"에만 한정해 제안함으로써
+    사용자가 등록하지 않은 임의 종목을 무분별하게 제안하지 않으면서 이 gap을 메운다.
+
+    `expected_dividend_yield_pct`는 이번 계산에서 최적화 이후 실제로 산출된 가중평균 배당수익률이다
+    (아직 최적화 전이거나 실패했으면 호출측이 None을 넘긴다 — 이 경우 무조건 미달성으로 취급한다).
+    `expected_dividend_yield_pct < required_dividend_yield_pct`(미달성)면 목표치를 달성하는 후보를
+    찾고, 이미 달성했으면(`expected >= required`) `expected + _DIVIDEND_IMPROVEMENT_THRESHOLD_PCT`를
+    새 탐색 목표로 삼아 "더 나은 옵션"을 찾는다 — 둘 다 동일한 그리디 탐색 루프를 목표치만 바꿔 재사용한다.
+
+    반환값 3번째 요소 `dividend_goal_status`: `"unreachable"`(등록 후보로 목표 달성 불가) /
+    `"improvable"`(이미 달성했지만 더 나은 후보가 있음) / `"optimal"`(달성했고 더 나은 후보 없음) /
+    `None`(배당 목표 자체가 없음).
+
+    달성가능성 판정은 종목당 `max_weight` 상한만 고려하는 근사치(`_dividend_floor_constraint`를
+    `equity_floor`/`equity_ceiling` 없이 호출)다 — 최종 게이트는 `_optimize_goal_portfolio`의
+    그룹예산까지 반영한 정확한 검증이 담당하므로, 여기서는 "제안이 더 필요한가"를 판단하는
+    트리거로만 쓰기에 충분하다(과소·과대 추정돼도 최종 결과의 정확성에는 영향 없음).
+
+    `candidate_dicts`는 이번 계산(전체 등록 목록의 부분집합일 수 있음, 예: 기간별 추천의
+    세제유형별 필터링 결과)에 쓰이는 후보 집합이고, `capacity_remaining`은 항상 호출측이
+    **전체** 등록 목록 기준(`MAX_GOAL_CANDIDATE_TICKERS - 전체 등록 후보 수`)으로 계산해
+    넘겨야 한다 — `_apply_index_region_preference`와 동일한 컨벤션.
+    """
+    if not required_dividend_yield_pct:
+        return [], None, None
+
+    if expected_dividend_yield_pct is None:
+        unreachable = True
+        search_target = required_dividend_yield_pct
+    else:
+        unreachable = expected_dividend_yield_pct < required_dividend_yield_pct
+        search_target = (
+            required_dividend_yield_pct
+            if unreachable
+            else expected_dividend_yield_pct + _DIVIDEND_IMPROVEMENT_THRESHOLD_PCT
+        )
+    status: str = "unreachable" if unreachable else "optimal"
+
+    def _achievable(dicts: list[dict[str, str]], dividend_map: dict[tuple[str, str], float]) -> bool:
+        if not dicts:
+            return False
+        divs = tuple(dividend_map.get((c["ticker"], c["market"]), 0.0) for c in dicts)
+        bounds = [(0.0, max_weight)] * len(dicts)
+        constraint, _ = _dividend_floor_constraint(bounds, divs, search_target)
+        return constraint is not None
+
+    tickers_only = [(c["ticker"], c["market"]) for c in candidate_dicts]
+    dividend_map = await _fetch_dividend_yields(tickers_only)
+    if not unreachable and _achievable(candidate_dicts, dividend_map):
+        # 이미 달성 + 등록 후보만으로 개선 목표(search_target)까지도 달성 가능 — 제안 불필요
+        return [], None, status
+
+    seen = {(c["ticker"], c["market"]) for c in candidate_dicts}
+    pool = [
+        c
+        for c in RECOMMENDATION_UNIVERSE
+        if (c["ticker"], c["market"]) not in seen and (market_filter is None or market_filter(c))
+    ]
+    if not pool or capacity_remaining <= 0:
+        return [], None, status
+
+    pool_dividend_map = await _fetch_dividend_yields([(c["ticker"], c["market"]) for c in pool])
+    pool_sorted = sorted(pool, key=lambda c: pool_dividend_map.get((c["ticker"], c["market"]), 0.0), reverse=True)
+    combined_dividend_map = {**dividend_map, **pool_dividend_map}
+
+    trial = list(candidate_dicts)
+    suggested: list[dict[str, object]] = []
+    for c in pool_sorted:
+        if len(suggested) >= capacity_remaining:
+            break
+        yield_pct = pool_dividend_map.get((c["ticker"], c["market"]), 0.0)
+        if yield_pct <= 0:
+            break  # 남은 후보는 배당수익률 데이터가 없거나 0 — 더 제안해도 목표 달성에 도움 안 됨
+        trial.append(c)
+        suggested.append({**c, "dividend_yield_pct": round(yield_pct, 2)})
+        if _achievable(trial, combined_dividend_map):
+            break
+
+    if not suggested:
+        return [], None, status
+
+    status = "unreachable" if unreachable else "improvable"
+    note = (
+        f"등록된 후보로는 배당 목표(연 {required_dividend_yield_pct:.1f}%)를 달성하기 어렵습니다 — "
+        "아래 고배당 후보를 추가하면 도움이 됩니다"
+        if unreachable
+        else "이미 배당 목표를 달성했지만, 아래 후보를 추가하면 배당수익률을 더 높일 수 있습니다"
+    )
+    return suggested, note, status
+
+
 async def get_goal_recommendation(
     cache: CacheStoreType,
     base_krw: float,
@@ -278,6 +461,68 @@ async def get_goal_recommendation(
     return result
 
 
+def _resolve_asset_goal_return_pct(
+    settings_row: UserSettings,
+    pv: float,
+    required_dividend_yield_pct: float | None,
+) -> tuple[float | None, GoalRecommendation | None]:
+    """자산목표(`goal_amount`+`retirement_target_year`)를 필요 연평균 수익률로 역산한다.
+
+    반환값: (`required_return_pct`, 조기 반환할 결과가 있으면 그 `GoalRecommendation`, 없으면 None).
+    `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다. 호출측이 `has_asset_goal`
+    (goal_amount·retirement_target_year 둘 다 설정됨)을 이미 확인했다고 전제한다.
+    """
+    assert settings_row.goal_amount is not None
+    assert settings_row.retirement_target_year is not None
+    pmt = float(settings_row.monthly_deposit_amount or 0)
+    if not pmt and settings_row.annual_deposit_goal:
+        pmt = float(settings_row.annual_deposit_goal) / 12
+    goal_amount = float(settings_row.goal_amount)
+    target_year = int(settings_row.retirement_target_year)
+    n_months = months_until_year_end(target_year)
+
+    if n_months <= 0:
+        return None, _no_recommendation("목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요")
+    if pv >= goal_amount:
+        return None, _no_recommendation(
+            "이미 목표 금액을 달성했습니다", required_dividend_yield_pct=required_dividend_yield_pct
+        )
+
+    required_return_pct = solve_required_annual_return_pct(pv, pmt, n_months, goal_amount)
+    if required_return_pct is None:
+        return None, _no_recommendation(
+            "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다",
+            required_dividend_yield_pct=required_dividend_yield_pct,
+        )
+    return required_return_pct, None
+
+
+async def _apply_tax_type_preference_for_overall(
+    db: AsyncSession,
+    candidate_dicts: list[dict[str, str]],
+    user_id: uuid.UUID | None,
+) -> tuple[list[dict[str, str]], str | None, str | None]:
+    """활성 계좌가 전부 단일 세제유형일 때만 추종지수 지역 선호 필터를 적용한다(전체 자산 기준 경로 전용).
+
+    반환값: (필터링된 후보, fallback 안내 note, 단일 세제유형 값(있으면, `overall_market_filter`용)).
+    `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다.
+    """
+    if user_id is None:
+        return candidate_dicts, None, None
+    tax_type_rows = await _active_account_tax_types(db, user_id)
+    distinct_tax_types = {t or AccountTaxType.GENERAL.value for t in tax_type_rows}
+    if len(distinct_tax_types) != 1:
+        return candidate_dicts, None, None
+    single_tax_type = next(iter(distinct_tax_types))
+    capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+    computed_candidates, preference_fallback_note, added = _apply_index_region_preference(
+        candidate_dicts, single_tax_type, capacity_remaining
+    )
+    if added:
+        await _persist_added_candidates(db, user_id, added)
+    return computed_candidates, preference_fallback_note, single_tax_type
+
+
 async def _compute_goal_recommendation(
     cache: CacheStoreType,
     base_krw: float,
@@ -285,38 +530,34 @@ async def _compute_goal_recommendation(
     settings_row: UserSettings | None,
     db: AsyncSession,
 ) -> GoalRecommendation:
-    """기준 자산총액과 유저 목표를 받아 목표 역산 추천을 계산한다."""
-    if not settings_row or not settings_row.goal_amount or not settings_row.retirement_target_year:
-        return _not_configured("목표금액·목표연도를 설정하면 추천을 받을 수 있습니다")
+    """기준 자산총액과 유저 목표(자산목표 또는 배당목표)를 받아 목표 역산 추천을 계산한다.
 
-    pmt = float(settings_row.monthly_deposit_amount or 0)
-    if not pmt and settings_row.annual_deposit_goal:
-        pmt = float(settings_row.annual_deposit_goal) / 12
-    goal_amount = float(settings_row.goal_amount)
-    target_year = int(settings_row.retirement_target_year)
+    자산목표(`goal_amount`+`retirement_target_year`)가 없어도 배당목표(`annual_dividend_goal`)만
+    있으면 동작한다 — 이 경우 `required_return_pct`는 None(화면 미노출)이고, 옵티마이저에는
+    `_NON_BINDING_RETURN_FLOOR`를 전달해 배당수익률 하한 제약만으로 최소분산 포트폴리오를 계산한다.
+    """
+    has_asset_goal = bool(settings_row and settings_row.goal_amount and settings_row.retirement_target_year)
+    has_dividend_goal = bool(settings_row and settings_row.annual_dividend_goal)
+    if not settings_row or not (has_asset_goal or has_dividend_goal):
+        return _not_configured("목표금액·목표연도 또는 배당목표를 설정하면 추천을 받을 수 있습니다")
 
     pv = base_krw
-    n_months = months_until_year_end(target_year)
-
     required_dividend_yield_pct = (
         round(float(settings_row.annual_dividend_goal) / pv * 100, 2)
         if settings_row.annual_dividend_goal and pv > 0
         else None
     )
 
-    if n_months <= 0:
-        return _no_recommendation("목표 연도가 이미 지났습니다 — 목표연도를 다시 설정해주세요")
-    if pv >= goal_amount:
-        return _no_recommendation(
-            "이미 목표 금액을 달성했습니다", required_dividend_yield_pct=required_dividend_yield_pct
+    required_return_pct: float | None = None
+    required_return_pct_for_optimizer = _NON_BINDING_RETURN_FLOOR
+    if has_asset_goal:
+        required_return_pct, early_result = _resolve_asset_goal_return_pct(
+            settings_row, pv, required_dividend_yield_pct
         )
-
-    required_return_pct = solve_required_annual_return_pct(pv, pmt, n_months, goal_amount)
-    if required_return_pct is None:
-        return _no_recommendation(
-            "현재 조건(적립액·기간)으로는 달성이 매우 어려운 목표입니다",
-            required_dividend_yield_pct=required_dividend_yield_pct,
-        )
+        if early_result is not None:
+            return early_result
+        assert required_return_pct is not None
+        required_return_pct_for_optimizer = required_return_pct
 
     candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
 
@@ -327,19 +568,16 @@ async def _compute_goal_recommendation(
             required_dividend_yield_pct,
         )
 
-    preference_fallback_note: str | None = None
-    computed_candidates = candidate_dicts
     user_id = getattr(settings_row, "user_id", None)
-    if user_id is not None:
-        tax_type_rows = await _active_account_tax_types(db, user_id)
-        distinct_tax_types = {t or AccountTaxType.GENERAL.value for t in tax_type_rows}
-        if len(distinct_tax_types) == 1:
-            capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
-            computed_candidates, preference_fallback_note, added = _apply_index_region_preference(
-                candidate_dicts, next(iter(distinct_tax_types)), capacity_remaining
-            )
-            if added:
-                await _persist_added_candidates(db, user_id, added)
+    computed_candidates, preference_fallback_note, single_tax_type = await _apply_tax_type_preference_for_overall(
+        db, candidate_dicts, user_id
+    )
+    duplicate_index_note = detect_duplicate_tracking_index_note(computed_candidates, existing_items)
+    preference_fallback_note = (
+        f"{preference_fallback_note} {duplicate_index_note}"
+        if preference_fallback_note and duplicate_index_note
+        else preference_fallback_note or duplicate_index_note
+    )
 
     def _combine_note(msg: str | None) -> str | None:
         if preference_fallback_note and msg:
@@ -350,6 +588,27 @@ async def _compute_goal_recommendation(
     max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
     max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
     cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+
+    overall_market_filter = (
+        (lambda c, tax_type_value=single_tax_type: _matches_index_region_preference(c, tax_type_value))
+        if single_tax_type is not None
+        else None
+    )
+    dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+
+    async def _suggest_dividend_candidates(
+        expected_dividend_yield_pct: float | None,
+    ) -> tuple[list[dict[str, object]], str | None, str | None]:
+        if user_id is None:
+            return [], None, None
+        return await _suggest_for_dividend_goal(
+            computed_candidates,
+            required_dividend_yield_pct,
+            expected_dividend_yield_pct,
+            max_weight,
+            capacity_remaining=dividend_capacity_remaining,
+            market_filter=overall_market_filter,
+        )
 
     candidates = [(c["ticker"], c["name"], c["market"]) for c in computed_candidates]
     tickers_only = [(t, m) for t, _, m in candidates]
@@ -366,12 +625,17 @@ async def _compute_goal_recommendation(
         if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
     ]
     if len(filtered) < _MIN_CANDIDATES:
+        suggested_candidates, dividend_note, dividend_goal_status = await _suggest_dividend_candidates(None)
         result = _no_recommendation(
             "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
             required_return_pct,
             required_dividend_yield_pct,
         )
         result.note = _combine_note(result.note)
+        if dividend_note:
+            result.note = f"{result.note} {dividend_note}" if result.note else dividend_note
+        result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested_candidates]
+        result.dividend_goal_status = dividend_goal_status
         return result
 
     f_symbols = [f[0] for f in filtered]
@@ -390,7 +654,7 @@ async def _compute_goal_recommendation(
             f_tickers,
             f_cagrs,
             returns_map,
-            required_return_pct,
+            required_return_pct_for_optimizer,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
             market_signal_level=market_signal_level,
@@ -405,20 +669,29 @@ async def _compute_goal_recommendation(
             sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2
         )
 
+    suggested_candidates, dividend_note, dividend_goal_status = await _suggest_dividend_candidates(
+        expected_dividend_yield_pct
+    )
+    note = _combine_note(opt_note)
+    if dividend_note:
+        note = f"{note} {dividend_note}" if note else dividend_note
+
     return GoalRecommendation(
         generated_at=datetime.now(UTC).isoformat(),
         is_configured=True,
         required_return_pct=required_return_pct,
         required_dividend_yield_pct=required_dividend_yield_pct,
-        recommended_items=[GoalRecommendationItem(**i) for i in items],
+        recommended_items=_attach_dividend_yield(items, dividend_map),
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
-        note=_combine_note(opt_note),
+        note=note,
         cagr_lookback_years=cagr_lookback_years,
         risk_tolerance=risk_tolerance,
         max_weight_pct=round(max_weight * 100, 2),
         market_signal_level=market_signal_level,
+        suggested_candidates=[SuggestedGoalCandidate(**s) for s in suggested_candidates],
+        dividend_goal_status=dividend_goal_status,
     )
 
 
@@ -546,7 +819,11 @@ async def _build_horizon_result(
             tax_type=tax_type,
             base_krw=base_krw,
             account_count=len(account_ids),
-            recommended_items=[GoalRecommendationItem(ticker=tk, name=name, market=mk, weight=100.0)],
+            recommended_items=[
+                GoalRecommendationItem(
+                    ticker=tk, name=name, market=mk, weight=100.0, dividend_yield_pct=dividend if dividend > 0 else None
+                )
+            ],
             expected_return_pct=cagr,
             expected_dividend_yield_pct=dividend if dividend > 0 else None,
             risk_tolerance=risk_tolerance,
@@ -630,7 +907,7 @@ async def _build_horizon_result(
         tax_type=tax_type,
         base_krw=base_krw,
         account_count=len(account_ids),
-        recommended_items=[GoalRecommendationItem(**i) for i in items],
+        recommended_items=_attach_dividend_yield(items, dividend_map),
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
@@ -697,7 +974,8 @@ async def _compute_horizon_recommendations(
     ) / 100
 
     all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
-    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items_from_positions(all_pos_map))
+    existing_items = existing_items_from_positions(all_pos_map)
+    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
 
     # 배당목표(annual_dividend_goal)가 있으면 전체 자산 기준(오버롤 경로)과 동일한 필요배당수익률(%)을
     # 계산해 모든 (기간,세제유형) 조합에 동일하게 적용한다 — 조합별 자산총액으로 비례배분해도 결과가
@@ -735,7 +1013,17 @@ async def _compute_horizon_recommendations(
         all_account_ids, db
     )
 
-    combos: list[tuple[str, str, list[uuid.UUID], float, list[dict[str, str]], str | None]] = []
+    combos: list[
+        tuple[
+            str,
+            str,
+            list[uuid.UUID],
+            float,
+            list[dict[str, str]],
+            str | None,
+            Callable[[dict[str, str]], bool],
+        ]
+    ] = []
     all_added: list[dict[str, str]] = []
     for horizon in InvestmentHorizon:
         for tax_type in AccountTaxType:
@@ -765,9 +1053,35 @@ async def _compute_horizon_recommendations(
             if added:
                 candidate_dicts.extend(added)
                 all_added.extend(added)
+            duplicate_index_note = detect_duplicate_tracking_index_note(eligible_candidates, existing_items)
+            preference_fallback_note = (
+                f"{preference_fallback_note} {duplicate_index_note}"
+                if preference_fallback_note and duplicate_index_note
+                else preference_fallback_note or duplicate_index_note
+            )
+
+            def _market_filter(
+                c: dict[str, str],
+                market_group: str = market_group,
+                eligible_classes: set[str] = eligible_classes,
+                tax_type_value: str = tax_type.value,
+            ) -> bool:
+                return (
+                    c.get("asset_class", "EQUITY") in eligible_classes
+                    and (c["market"].upper() in DOMESTIC_MARKETS) == (market_group == "DOMESTIC")
+                    and _matches_index_region_preference(c, tax_type_value)
+                )
 
             combos.append(
-                (horizon.value, tax_type.value, account_ids, base_krw, eligible_candidates, preference_fallback_note)
+                (
+                    horizon.value,
+                    tax_type.value,
+                    account_ids,
+                    base_krw,
+                    eligible_candidates,
+                    preference_fallback_note,
+                    _market_filter,
+                )
             )
 
     if all_added:
@@ -802,13 +1116,255 @@ async def _compute_horizon_recommendations(
                 base_krw,
                 eligible_candidates,
                 preference_fallback_note,
+                _market_filter,
             ) in combos
         )
     )
 
+    # 배당 제안 판정은 각 조합의 최적화 결과(`result.expected_dividend_yield_pct`)가 나온 뒤에야
+    # 가능하므로 gather 이후에 수행한다 — 이미 달성한 조합에도 "더 나은 옵션" 제안이 필요할 수 있다
+    # (`_suggest_for_dividend_goal` 참고). capacity는 전체 등록 후보 수(최종, 조합 간 공유) 기준.
+    dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+    for result, combo in zip(results, combos, strict=True):
+        eligible_candidates = combo[4]
+        market_filter = combo[6]
+        suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+            eligible_candidates,
+            required_dividend_yield_pct,
+            result.expected_dividend_yield_pct,
+            max_weight,
+            capacity_remaining=dividend_capacity_remaining,
+            market_filter=market_filter,
+        )
+        result.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]
+        result.dividend_goal_status = dividend_goal_status
+        if dividend_note:
+            result.note = f"{result.note} {dividend_note}" if result.note else dividend_note
+
     return HorizonRecommendationResponse(
         generated_at=datetime.now(UTC).isoformat(),
         recommendations=list(results),
+    )
+
+
+async def get_age_based_recommendation(
+    cache: CacheStoreType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+) -> GoalRecommendation:
+    """`_compute_age_based_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+
+    무효화 조건은 `get_goal_recommendation`/`get_horizon_recommendations`와 동일 —
+    `invalidate_goal_recommendation_caches()`가 `age_group` 변경(설정 저장) 시에도 함께 호출된다.
+    """
+    cached = await get_cached_json(cache, goal_recommendation_age_key(user_id))
+    if cached is not None:
+        return GoalRecommendation(**cached)
+
+    result = await _compute_age_based_recommendation(cache, db, user_id, settings_row)
+
+    if result.recommended_items:
+        await set_cached_json(
+            cache, goal_recommendation_age_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+        )
+    return result
+
+
+async def _compute_age_based_recommendation(
+    cache: CacheStoreType,
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    settings_row: UserSettings,
+) -> GoalRecommendation:
+    """사용자가 직접 선택한 연령대(`UserSettings.age_group`) 기반 추천 — 목표금액 역산 없이
+    연령대(`_AGE_GROUP_PROFILE`)에서 유도한 risk_tolerance + 주식비중 상/하한으로 비중을
+    계산한다. 후보 필터링·현금성 자산 fallback 로직은 `_build_horizon_result`의 SHORT_TERM
+    분기와 동일한 이유로 동일하게 동작한다(실보유 안전자산 후보가 하나도 없는데 `equity_floor`
+    구간이면 합성 현금성 자산으로 채움).
+
+    배당수익률 제약(`required_dividend_yield_pct`)도 함께 반영한다 — `UserSettings.annual_dividend_goal`이
+    설정돼 있으면 그 값을(전체 자산 기준 경로와 동일한 방식으로) 우선 사용하고, 없으면
+    `_AGE_GROUP_PROFILE`의 연령대 기본 배당수익률 하한을 폴백으로 적용한다(20~30대는 0이라
+    사실상 미적용). 옵티마이저가 fail-soft로 처리하므로 큐레이션 후보로 달성 불가능하면
+    조용히 무시되고 note로만 안내된다.
+    """
+    if not settings_row.age_group or settings_row.age_group not in _AGE_GROUP_PROFILE:
+        return _not_configured("연령대를 설정하면 연령대별 추천을 받을 수 있습니다")
+
+    age_bracket, risk_tolerance, equity_floor, equity_ceiling, default_dividend_floor_pct = _AGE_GROUP_PROFILE[
+        settings_row.age_group
+    ]
+
+    # 명시적 배당목표(annual_dividend_goal)가 있으면 그 값을 우선 반영하고, 없을 때만 연령대
+    # 기본 배당수익률 하한(_AGE_GROUP_PROFILE)을 폴백으로 적용한다 — 전체 자산 기준 경로
+    # (_compute_horizon_recommendations)와 동일한 annual_dividend_goal → 필요배당수익률 변환 패턴.
+    required_dividend_yield_pct: float | None = None
+    age_default_dividend_note: str | None = None
+    annual_dividend_goal = getattr(settings_row, "annual_dividend_goal", None)
+    if annual_dividend_goal:
+        overall_overview = await build_portfolio_overview(user_id, db, account_ids=None, cache=cache)
+        total_assets_krw = float(overall_overview.get("total_assets_krw", 0))
+        if total_assets_krw > 0:
+            required_dividend_yield_pct = round(float(annual_dividend_goal) / total_assets_krw * 100, 2)
+    if required_dividend_yield_pct is None and default_dividend_floor_pct > 0:
+        required_dividend_yield_pct = default_dividend_floor_pct
+        age_default_dividend_note = (
+            f"{age_bracket} 연령대 기본 배당목표(연 {default_dividend_floor_pct:.1f}%↑)를 반영했습니다"
+        )
+
+    max_weight_pct_raw = getattr(settings_row, "goal_max_weight_pct", None)
+    max_weight = float(max_weight_pct_raw) / 100 if max_weight_pct_raw else _MAX_WEIGHT
+    cagr_lookback_years = int(getattr(settings_row, "goal_cagr_lookback_years", None) or _DEFAULT_CAGR_LOOKBACK_YEARS)
+
+    all_pos_map = await query_latest_position_map(user_id, db, include_name=True)
+    existing_items = existing_items_from_positions(all_pos_map)
+    candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
+    dividend_capacity_remaining = MAX_GOAL_CANDIDATE_TICKERS - len(candidate_dicts)
+    duplicate_index_note = detect_duplicate_tracking_index_note(candidate_dicts, existing_items)
+
+    def _combine_age_note(msg: str | None) -> str | None:
+        if duplicate_index_note and msg:
+            return f"{duplicate_index_note} {msg}"
+        return duplicate_index_note or msg
+
+    async def _with_bracket(res: GoalRecommendation, expected_dividend_yield_pct: float | None) -> GoalRecommendation:
+        """배당 제안 판정은 최적화 결과(`expected_dividend_yield_pct`)가 필요하므로 각 반환 지점에서
+        호출한다 — 조기 반환 지점은 `None`(미최적화)을 넘긴다."""
+        res.age_bracket = age_bracket
+        suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+            candidate_dicts,
+            required_dividend_yield_pct,
+            expected_dividend_yield_pct,
+            max_weight,
+            capacity_remaining=dividend_capacity_remaining,
+        )
+        res.suggested_candidates = [SuggestedGoalCandidate(**s) for s in suggested]
+        res.dividend_goal_status = dividend_goal_status
+        if dividend_note:
+            res.note = f"{res.note} {dividend_note}" if res.note else dividend_note
+        return res
+
+    if not candidate_dicts:
+        return await _with_bracket(
+            _no_recommendation(
+                "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
+                required_dividend_yield_pct=required_dividend_yield_pct,
+            ),
+            None,
+        )
+
+    market_signal_level = await _fetch_market_signal_level(cache)
+
+    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in candidate_dicts]
+    tickers_only = [(t, m) for t, _, m, _ in candidates]
+
+    cagr_map, dividend_map = await asyncio.gather(
+        get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
+        _fetch_dividend_yields(tickers_only),
+    )
+    filtered = [
+        (
+            to_yf_symbol(t, m),
+            (t, name, m),
+            cagr_map[(t, m)]["cagr_pct"],
+            asset_class == "EQUITY",
+            dividend_map.get((t, m), 0.0),
+        )
+        for t, name, m, asset_class in candidates
+        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
+    ]
+
+    has_real_safe_asset = any(not is_eq for _, _, _, is_eq, _ in filtered)
+    include_cash_equivalent = equity_floor is not None and not has_real_safe_asset
+    if include_cash_equivalent:
+        filtered.append(
+            (
+                _CASH_EQUIVALENT_TICKER,
+                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
+                _CASH_EQUIVALENT_CAGR_PCT,
+                False,
+                0.0,
+            )
+        )
+
+    if len(filtered) < _MIN_CANDIDATES:
+        no_data_result = _no_recommendation(
+            "추천에 필요한 수익률 데이터를 가져오지 못했습니다",
+            required_dividend_yield_pct=required_dividend_yield_pct,
+        )
+        no_data_result.note = _combine_age_note(no_data_result.note)
+        return await _with_bracket(no_data_result, None)
+
+    f_symbols = [f[0] for f in filtered]
+    f_tickers = [f[1] for f in filtered]
+    f_cagrs = [f[2] for f in filtered]
+    f_is_equity = [f[3] for f in filtered]
+    f_dividends = [f[4] for f in filtered]
+
+    loop = asyncio.get_running_loop()
+    real_symbols = [s for s in f_symbols if s != _CASH_EQUIVALENT_TICKER]
+    if real_symbols:
+        async with _yfinance_sem:
+            returns_map = await loop.run_in_executor(None, fetch_yf_daily_returns, real_symbols)
+    else:
+        returns_map = {}
+    if include_cash_equivalent:
+        returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
+
+    items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
+        None,
+        functools.partial(
+            _optimize_goal_portfolio,
+            f_symbols,
+            f_tickers,
+            f_cagrs,
+            returns_map,
+            _NON_BINDING_RETURN_FLOOR,
+            max_weight=max_weight,
+            risk_tolerance=risk_tolerance,
+            is_equity=f_is_equity,
+            equity_floor=equity_floor,
+            equity_ceiling=equity_ceiling,
+            market_signal_level=market_signal_level,
+            dividend_yields=f_dividends,
+            required_dividend_yield_pct=required_dividend_yield_pct,
+        ),
+    )
+
+    includes_cash_equivalent = any(i["ticker"] == _CASH_EQUIVALENT_TICKER for i in items)
+    expected_dividend_yield_pct = None
+    if items:
+        expected_dividend_yield_pct = round(
+            sum(i["weight"] * dividend_map.get((i["ticker"], i["market"]), 0.0) for i in items) / 100, 2
+        )
+
+    # age_default_dividend_note(명시적 목표가 아닌 연령대 기본값을 적용한 경우에만 존재)는
+    # opt_note(옵티마이저의 배당 목표 달성 불가 fail-soft 안내)보다 앞에 붙인다.
+    note = (
+        f"{age_default_dividend_note} {opt_note}"
+        if age_default_dividend_note and opt_note
+        else (age_default_dividend_note or opt_note)
+    )
+    note = _combine_age_note(note)
+
+    return await _with_bracket(
+        GoalRecommendation(
+            generated_at=datetime.now(UTC).isoformat(),
+            is_configured=True,
+            required_dividend_yield_pct=required_dividend_yield_pct,
+            recommended_items=_attach_dividend_yield(items, dividend_map),
+            expected_return_pct=expected_return_pct,
+            expected_dividend_yield_pct=expected_dividend_yield_pct,
+            expected_volatility_pct=expected_volatility_pct,
+            note=note,
+            cagr_lookback_years=cagr_lookback_years,
+            risk_tolerance=risk_tolerance,
+            max_weight_pct=round(max_weight * 100, 2),
+            market_signal_level=market_signal_level,
+            includes_cash_equivalent=includes_cash_equivalent,
+        ),
+        expected_dividend_yield_pct,
     )
 
 

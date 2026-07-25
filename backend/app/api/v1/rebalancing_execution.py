@@ -86,7 +86,7 @@ async def quick_execute_rebalancing(
     `alert_scope == PER_ACCOUNT`인 포트폴리오는 쿼리파라미터 `account_id`로 어느 계좌 전용
     알림 행을 실행할지 반드시 지정해야 한다.
     """
-    from app.services.market_signal_service import get_market_signal
+    from app.services.market_signal_service import get_confirmed_composite_level
 
     portfolio = await db.scalar(
         select(Portfolio)
@@ -138,9 +138,7 @@ async def quick_execute_rebalancing(
         )
 
     try:
-        market_signal = await get_market_signal(cache)
-        composite_level: str = market_signal.get("composite_level", "GREEN")
-        data_freshness: str = market_signal.get("data_freshness", "LIVE")
+        composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_quick_execute", error=str(exc))
         composite_level = "GREEN"

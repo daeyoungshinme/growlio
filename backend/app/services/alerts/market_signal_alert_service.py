@@ -24,9 +24,9 @@ from app.models.alert import AlertHistory
 from app.models.user import User, UserSettings
 from app.services.alerts.alert_service import save_alert_history
 from app.services.market_signal_service import (
+    get_confirmed_composite_level,
     get_last_composite_level,
     get_market_signal,
-    set_last_composite_level,
 )
 from app.services.rebalancing.diagnosis_service import _MARKET_NOTES
 from app.utils.cache_keys import CacheStoreType
@@ -51,26 +51,26 @@ async def _get_composite_subscribers(db: AsyncSession) -> list[tuple[User, UserS
 
 
 async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreType) -> None:
-    """시장 위험 신호등 등급이 이전 관측값과 달라졌으면 구독 유저 전체에게 즉시 알림한다.
+    """confirmed(hysteresis 적용) 등급이 이전 confirmed 값과 달라졌으면 구독 유저 전체에게 즉시 알림한다.
 
-    최초 실행(이전 관측값 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
+    raw 레벨이 아닌 confirmed 레벨(연속 CONFIRM_STREAK_REQUIRED회 관측 후에만 반영)을 기준으로
+    비교해, 경계값 근처에서 등급이 잦게 오갈 때 발생하는 알림 flapping을 억제한다. 최초 실행
+    (이전 관측값 없음)은 저장만 하고 발송하지 않는다 — 배포 직후 스팸 방지.
     """
     from app.services.email_service import send_market_signal_change_alert
     from app.services.push_service import send_push_to_user
     from app.services.rebalancing.alert_check import _mark_composite_alert_sent_today
 
+    old_level = await get_last_composite_level(db)
+
     try:
-        signal = await get_market_signal(cache)
-        new_level: str = signal.get("composite_level", "GREEN")
+        new_level, _ = await get_confirmed_composite_level(cache, db)
     except Exception as exc:
         logger.warning("market_signal_level_check_fetch_failed", error=str(exc))
         return
 
-    old_level = await get_last_composite_level(db)
-
     if old_level is None:
-        await set_last_composite_level(db, new_level)
-        return
+        return  # get_confirmed_composite_level가 최초 부트스트랩 저장을 이미 처리함
 
     if old_level == new_level:
         return
@@ -115,8 +115,6 @@ async def check_market_signal_level_change(db: AsyncSession, cache: CacheStoreTy
             new_level=new_level,
             count=sent_count,
         )
-
-    await set_last_composite_level(db, new_level)
 
 
 async def _get_daily_digest_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:

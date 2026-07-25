@@ -39,6 +39,7 @@ from app.schemas.rebalancing.goal import (
     HorizonGoalRecommendation,
     HorizonRecommendationResponse,
     PortfolioExpectedMetrics,
+    SuggestedGoalCandidate,
 )
 from app.schemas.rebalancing.plan import (
     PlanActionResponse,
@@ -80,6 +81,7 @@ __all__ = [
     "RebalancingPlanItemOut",
     "RebalancingPlanLegSummary",
     "SellDecisionRequest",
+    "SuggestedGoalCandidate",
     "TaxImpactItem",
     "TestAlertResponse",
     "TickerAccountInfo",

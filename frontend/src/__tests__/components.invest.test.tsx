@@ -127,6 +127,7 @@ describe("GoalTimelineCard", () => {
     risk_tolerance: "CONSERVATIVE",
     max_weight_pct: 40,
     market_signal_level: null,
+    suggested_candidates: [],
   };
 
   function renderCard(timeline: GoalTimeline, goalAmount: number | null) {
@@ -223,7 +224,15 @@ describe("GoalTimelineCard", () => {
       is_configured: true,
       required_return_pct: 7.2,
       expected_return_pct: 8.5,
-      recommended_items: [{ ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 100 }],
+      recommended_items: [
+        {
+          ticker: "069500",
+          name: "KODEX 200",
+          market: "KOSPI",
+          weight: 100,
+          dividend_yield_pct: null,
+        },
+      ],
     });
     renderCard(mockTimeline, 100000000);
     expect(await screen.findByText("목표 달성 필요 수익률")).toBeDefined();

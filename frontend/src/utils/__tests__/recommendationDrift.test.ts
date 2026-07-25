@@ -13,6 +13,7 @@ const recItem = (overrides: Partial<GoalRecommendationItem> = {}): GoalRecommend
   name: "Apple Inc.",
   market: "NASDAQ",
   weight: 50,
+  dividend_yield_pct: null,
   ...overrides,
 });
 

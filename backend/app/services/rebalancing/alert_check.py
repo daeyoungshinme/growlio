@@ -211,18 +211,17 @@ async def _process_rebalancing_alert(
     return any_sent
 
 
-async def _get_composite_level(cache) -> tuple[str, str]:
-    """전체 알림 루프에서 공용으로 쓸 시장 신호 등급을 1회 조회한다.
+async def _get_composite_level(cache, db: AsyncSession) -> tuple[str, str]:
+    """전체 알림 루프에서 공용으로 쓸 시장 신호 등급(confirmed, hysteresis 적용)을 1회 조회한다.
 
     조회 자체가 실패하면 (composite_level="GREEN", data_freshness="STALE")로 폴백한다 —
     composite_level만 보면 "안전"으로 오인되므로, data_freshness="STALE"을 함께 반환해
     `is_market_signal_blocking_auto_mode`가 AUTO를 보수적으로 차단할 수 있게 한다.
     """
-    from app.services.market_signal_service import get_market_signal
+    from app.services.market_signal_service import get_confirmed_composite_level
 
     try:
-        market_signal = await get_market_signal(cache)
-        return market_signal.get("composite_level", "GREEN"), market_signal.get("data_freshness", "LIVE")
+        return await get_confirmed_composite_level(cache, db)
     except Exception as exc:
         logger.warning("market_signal_fetch_failed_in_alert_check", error=str(exc))
         return "GREEN", "STALE"
@@ -317,7 +316,7 @@ async def check_rebalancing_alerts(db: AsyncSession) -> None:
 
     _cache = await get_cache_store()
     # 시장 신호를 루프 전 한 번만 조회 (전체 알림 공용)
-    composite_level, market_data_freshness = await _get_composite_level(_cache)
+    composite_level, market_data_freshness = await _get_composite_level(_cache, db)
 
     result = await db.execute(
         select(

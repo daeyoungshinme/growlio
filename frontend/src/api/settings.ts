@@ -14,11 +14,14 @@ export interface GoalCandidateTicker {
 
 export type GoalRiskTolerance = "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE";
 
+export type AgeGroup = "TWENTIES" | "THIRTIES" | "FORTIES" | "FIFTIES" | "SIXTIES_PLUS";
+
 export interface GoalRecommendationOptions {
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
   cagr_lookback_years: number;
   short_term_equity_floor_pct: number;
+  age_group: AgeGroup | null;
 }
 
 export interface SettingsData {
@@ -44,6 +47,7 @@ export interface SettingsData {
   goal_max_weight_pct: number;
   goal_cagr_lookback_years: number;
   goal_short_term_equity_floor_pct: number;
+  age_group: AgeGroup | null;
   auto_rebalancing_max_order_value_krw: number;
 }
 

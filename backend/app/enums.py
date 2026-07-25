@@ -43,6 +43,16 @@ class GoalRiskTolerance(StrEnum):
     AGGRESSIVE = "AGGRESSIVE"
 
 
+class AgeGroup(StrEnum):
+    """연령대별 목표 역산 추천 전용 — 사용자가 정확한 생년월일 대신 10년 단위 연령대를 직접 선택한다."""
+
+    TWENTIES = "TWENTIES"
+    THIRTIES = "THIRTIES"
+    FORTIES = "FORTIES"
+    FIFTIES = "FIFTIES"
+    SIXTIES_PLUS = "SIXTIES_PLUS"
+
+
 class AccountTaxType(StrEnum):
     GENERAL = "GENERAL"
     ISA = "ISA"

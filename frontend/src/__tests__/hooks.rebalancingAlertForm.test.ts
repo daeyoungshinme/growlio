@@ -37,9 +37,7 @@ vi.mock("@/api/marketSignals", () => ({
   fetchMarketSignal: vi.fn().mockResolvedValue({
     composite_level: "GREEN",
     composite_score: 75,
-    fear_greed_contrarian_buy: false,
-    fear_greed_extreme_greed: false,
-    signals: { vix: null, yield_curve: null, fear_greed: null },
+    signals: { vix: null, us_rate_curve: null },
     computed_at: "2024-01-01T00:00:00Z",
     data_freshness: "LIVE",
   }),

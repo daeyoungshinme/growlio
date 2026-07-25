@@ -19,6 +19,7 @@ from app.utils.cache_keys import (
     get_cached_json,
     set_cached_json,
 )
+from app.utils.circuit_breaker import CircuitOpenError, fred_circuit
 
 logger = structlog.get_logger()
 
@@ -47,11 +48,21 @@ INDICATORS: dict[str, dict[str, str]] = {
         "frequency": "monthly",
         "description": "식품·에너지 제외 소비자물가지수",
     },
+    "PCE_US": {
+        "name": "미국 PCE",
+        "name_en": "US PCE",
+        "source": "fred",
+        "series": "PCEPI",
+        "unit": "지수",
+        "frequency": "monthly",
+        "description": "개인소비지출 물가지수 — market_signal_service.py의 인플레이션 복합신호(CPI와 병합)에도 사용됨",
+    },
 }
 
 _IMPACT: dict[str, str] = {
     "CPI_US": "High",
     "CORE_CPI_US": "High",
+    "PCE_US": "High",
 }
 
 FRED_BASE = "https://api.stlouisfed.org/fred"
@@ -82,9 +93,12 @@ async def _fred_get_observations(series_id: str, limit: int = 36) -> list[dict[s
             resp.raise_for_status()
             data = resp.json()
             return data.get("observations", [])
+    except httpx.HTTPStatusError as e:
+        logger.error("fred_fetch_failed", series=series_id, status_code=e.response.status_code, error=str(e))
+        raise
     except Exception as e:
         logger.error("fred_fetch_failed", series=series_id, error=str(e))
-        return []
+        raise
 
 
 async def _fred_get_release_dates(series_id: str, upcoming: bool = False) -> list[str]:
@@ -231,7 +245,7 @@ async def get_calendar_events(cache) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-_INFLATION_CODES = ("CPI_US", "CORE_CPI_US")
+_INFLATION_CODES = ("CPI_US", "CORE_CPI_US", "PCE_US")
 
 
 async def fetch_inflation_summary(cache=None) -> list[dict[str, Any]]:
@@ -288,7 +302,14 @@ async def fetch_indicator_history(code: str, months: int = 24, cache=None) -> li
     if (hit := await get_cached_json(cache, cache_key)) is not None:
         return hit
 
-    raw = await _fred_get_observations(meta["series"], limit=months + 3)
+    if not fred_circuit.is_available():
+        logger.warning("fred_circuit_open", code=code)
+        return []
+    try:
+        raw = await fred_circuit.call(_fred_get_observations, meta["series"], limit=months + 3)
+    except (CircuitOpenError, Exception) as exc:
+        logger.warning("indicator_history_fetch_failed", code=code, error=str(exc))
+        return []
     points = _parse_fred_obs(raw)
 
     # 최근 months개만 반환

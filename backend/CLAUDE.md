@@ -111,7 +111,7 @@ cd backend && uv run mypy app/
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`)
+- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
 
@@ -127,7 +127,7 @@ API Request
         ├── invest.py         # DCA 분석 + 목표 설정 마법사용 필요수익률·적립액 프리뷰(GET /invest/goal-feasibility, 저장 없음)
         ├── portfolios.py     # 저장된 포트폴리오 CRUD (백테스트·리밸런싱 공용)
         ├── portfolio_analysis.py  # 포트폴리오 분석 API (prefix: /portfolio) — /overview, /allocation-history, /risk(?portfolio_id=), /rebalancing-strategy. /overview·/allocation-history는 ?account_id= 옵션 지원(미지정 시 전체 계좌 통합, PortfolioPage 투자현황 탭 계좌 필터 전용)
-        ├── rebalancing.py    # 리밸런싱 추천 + 투자기간별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-horizon) + 포트폴리오 적용 전 비교 미리보기(GET /rebalancing/portfolios/{id}/expected-metrics)
+        ├── rebalancing.py    # 리밸런싱 추천 + 투자기간별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-horizon) + 연령대별 목표 역산 추천(GET /rebalancing/goal-recommendation/by-age) + 포트폴리오 적용 전 비교 미리보기(GET /rebalancing/portfolios/{id}/expected-metrics)
         ├── rebalancing_execution.py  # 리밸런싱 실행 API — 주문 실행·이력 조회
         ├── rebalancing_plan.py       # 리밸런싱 대기 플랜 조회/취소/승인 (인증 필요, 앱 내 사용)
         ├── rebalancing_plan_public.py  # 리밸런싱 대기 플랜 토큰 기반 액션 (인증 없음, 이메일 링크 전용 — `Depends(get_current_user)` 사용 금지)
@@ -138,7 +138,7 @@ API Request
         ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
         ├── economic_indicators.py  # 미국 CPI/Core CPI 인플레이션 요약(GET /economic-indicators/inflation-summary) — 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 이 엔드포인트만 존재 (지표 목록/구독/캘린더/알림 job은 프론트 미연동이라 제거됨)
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
-        ├── market_signals.py       # VIX·장단기 금리차·Fear&Greed 복합 신호 (/market-signals)
+        ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
         ├── positions.py            # 포지션 CRUD + 현재가 sync (assets.py 하위, /assets/{id}/positions)
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
@@ -165,7 +165,7 @@ services/
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
-  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py. `clamp_orders_to_max_value()`는 1건당 거래대금이 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만원)를 넘지 않도록 축소하는 안전장치 — `plan_service.generate_pending_plan_for_alert()`(AUTO/quick-execute 공용 대기 플랜 생성 경로)가 호출. `is_market_signal_blocking_auto_mode()`/`is_tax_impact_blocking_auto_mode()`는 각각 시장신호·세금영향 게이트 판정 순수 함수(대칭 설계) — plan_service.py가 계획 생성 시점과 매수 실행 직전(시장신호만 재확인) 두 시점에 호출
+  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py. `clamp_orders_to_max_value()`는 1건당 거래대금이 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만원)를 넘지 않도록 축소하는 안전장치 — `plan_service.generate_pending_plan_for_alert()`(AUTO/quick-execute 공용 대기 플랜 생성 경로)가 호출. `is_market_signal_blocking_auto_mode()`/`is_tax_impact_blocking_auto_mode()`는 각각 시장신호·세금영향 게이트 판정 순수 함수(대칭 설계) — plan_service.py가 계획 생성 시점과 매수 실행 직전(시장신호만 재확인) 두 시점에 호출. 시장신호 게이트 4곳(이 함수의 호출부)은 raw가 아닌 `market_signal_service.get_confirmed_composite_level()`(hysteresis 적용, 연속 2회 관측 후에만 레벨 반영)을 사용 — 배너 표시 등 raw 소비처와 분리(docs/plans/21-market-signal-methodology.md)
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). AUTO 모드 알림이 시장신호 게이트로 이번만 NOTIFY로 강등되면 그 사유를 `automation_note`로 이메일 본문·발송 이력에 노출
   │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
@@ -184,8 +184,8 @@ services/
   ├── credential_service.py   # AES-256 자격증명 암호화/복호화
   ├── dart_service.py         # DART OpenAPI 연동 — dividend/fetcher.py 폴백 체인의 배당 데이터 소스 (fetch_dart_dividend)
   ├── dca_service.py          # DCA(정기투자) 분석 + 목표 타임라인
-  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 2종(전체 자산 기준/투자기간별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)가 있으면 필요 배당수익률도 제약으로 함께 전달(전체 자산 기준과 동일한 %를 투자기간별 경로 모든 조합에도 동일 적용, 큐레이션 후보로 달성 불가하면 fail-soft로 무시). `compute_portfolio_expected_metrics()`는 포트폴리오의 현재 목표 비중에 대해 추천과 동일한 지표(기대수익률/배당수익률/변동성)를 계산(적용 전 비교 미리보기 전용). `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 동일한 드리프트 계산의 백엔드 포팅(주간 알림 job 전용). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
-  ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈. `compute_weighted_expected_metrics()`는 이미 정해진(최적화 대상 아닌) 비중에 대해 가중평균 기대수익률/배당수익률/변동성만 계산하는 버전
+  ├── goal_recommendation_service.py  # 목표 역산 포트폴리오 추천 API 진입점 3종(전체 자산 기준/투자기간별/연령대별) — 목표금액/월적립액/목표연도 → 필요 수익률 역산 → MVO 최적화 호출로 최소분산 포트폴리오 추천. 배당 목표(`annual_dividend_goal`)가 있으면 필요 배당수익률도 제약으로 함께 전달(전체 자산 기준과 동일한 %를 투자기간별 경로 모든 조합에도 동일 적용, 큐레이션 후보로 달성 불가하면 fail-soft로 무시). `get_age_based_recommendation()`(연령대별)은 목표 역산 없이 사용자가 직접 선택한 `UserSettings.age_group`(20대/30대/40대/50대/60대 이상)을 `_AGE_GROUP_PROFILE`로 조회해 risk_tolerance + 주식비중 상/하한 + 연령대 기본 배당수익률 하한(20~30대 0%, 40대 1.5%, 50대 2.5%, 60대 이상 3.5%)으로 추천을 계산 — 투자기간별과 마찬가지로 `_NON_BINDING_RETURN_FLOOR`로 필요수익률 제약을 무효화. `annual_dividend_goal`이 명시적으로 설정돼 있으면 연령대 기본값 대신 그 목표에서 계산된 배당수익률이 우선 적용된다(fail-soft는 다른 경로와 동일). `_suggest_for_dividend_goal()`은 등록된 후보만으로 배당 목표 달성이 어려우면 큐레이션 유니버스(`recommendation_universe.py`)에서 배당수익률이 높은 미등록 후보를 응답의 `suggested_candidates` 필드로 제안한다(전체 자산 기준/투자기간별/연령대별 3경로 모두 호출) — DB에 쓰지 않으며 이번 추천 계산(`recommended_items`)에도 반영하지 않는다. 사용자가 추천 카드의 "후보에 추가" 버튼으로 승인해야만 `PUT /settings/goal-candidate-tickers`(기존 전체교체 엔드포인트)를 통해 저장되고, 그래야 다음 추천부터 비중 계산에 포함된다 — `_get_or_seed_candidates()`가 최초 1회만 시딩하고 이후 자동 병합이 없어(의도된 설계) 큐레이션 유니버스에 새 ETF를 추가해도 기존 후보 등록 사용자에게는 노출되지 않는 gap을, 사용자 동의 없이 후보 목록을 바꾸지 않으면서 메운다. `compute_portfolio_expected_metrics()`는 포트폴리오의 현재 목표 비중에 대해 추천과 동일한 지표(기대수익률/배당수익률/변동성)를 계산(적용 전 비교 미리보기 전용). `compute_recommendation_drift()`는 프론트 `recommendationDrift.ts`와 동일한 드리프트 계산의 백엔드 포팅(주간 알림 job 전용). 자동 반영 안 됨 — 사용자가 확인 후 수동 적용
+  ├── goal_portfolio_optimizer.py  # 목표 역산 추천 전용 MVO 최적화 엔진(SLSQP, DB 의존 없는 순수 계산) — goal_recommendation_service.py 서브모듈. 배당 목표 달성가능성 사전검증(`_dividend_floor_constraint`)은 `equity_floor`/`equity_ceiling`이 걸려 있으면 그 그룹 예산도 함께 반영한다 — 종목당 상한만 보면 equity_floor가 저배당 주식 종목에 비중을 강제 배분시켜 실제로는 불가능한데도 "달성 가능"으로 오판, SLSQP 전체가 실패(빈 추천)하는 버그가 있었다(단기·IRP 추천에서 재현). `compute_weighted_expected_metrics()`는 이미 정해진(최적화 대상 아닌) 비중에 대해 가중평균 기대수익률/배당수익률/변동성만 계산하는 버전
   ├── goal_candidate_service.py  # 목표 역산 추천 후보 종목 관리/영속화(세제유형별 필터링, 동시요청 lost-update 방지 락) — goal_recommendation_service.py 서브모듈
   ├── goal_return_solver.py   # 목표 역산에 필요한 연평균 수익률(`solve_required_annual_return_pct`)·월 적립액(`solve_required_monthly_deposit`) 역산 순수 계산 함수 — goal_recommendation_service.py 서브모듈이자 invest.py의 `GET /invest/goal-feasibility`(목표 설정 마법사 전용, 저장 없는 미리보기)가 직접 호출
   ├── recommendation_universe.py  # 목표 역산 추천의 큐레이션 ETF 후보 유니버스 + 자산군(AssetClass)/추종지수 지역(IndexRegion) 필터링
@@ -226,7 +226,7 @@ services/
   ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
-  ├── market_signal_service.py      # 복합 시장 위험 신호 평가
+  ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가 6종, 상한 20점). `get_confirmed_composite_level()`이 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측 후 반영) 제공 — raw(`get_market_signal`)는 배너 등 표시용으로 별개 유지
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
@@ -267,7 +267,7 @@ providers/                    # 금융 데이터 provider
   └── _error_mapping.py       # KIS/키움 공용 HTTP 에러 매핑 (5xx/4xx 분기, ConnectError/TimeoutException) — 브로커별 에러 메시지 키(msg1 vs return_msg)만 파라미터로 받음
 utils/
   ├── cache_keys.py           # 캐시 키 빌더 + TTL 상수 (`dividend_ticker_summary_key` 등) — Tier1(휘발성) 캐시 전용, get_cached_json/set_cached_json/invalidate_* 포함
-  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FearGreedAPI 3회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
+  ├── circuit_breaker.py      # 인메모리 서킷 브레이커 (CircuitOpenError). KIS/Kiwoom 5회→60s, Yahoo/DART/Naver/FDR 5회→120s, FRED 4회→300s. 재시작 시 상태 초기화됨.
   ├── currency.py             # USD/KRW 캐싱 (`get_usd_krw_rate`, `cache_usd_krw_rate`)
   ├── durable_state.py        # Postgres(`AppState` 테이블) 기반 key-value durable state — get_durable/set_durable/delete_durable. 재시작에도 유지돼야 하는 상태(시장신호 등급 마지막 값, 알림 dedup 플래그) 전용, cache_keys.py의 휘발성 캐시와는 별개
   ├── inproc_lock.py          # 프로세스 내 락 — 동일 계좌 동시 sync 방지, 콜드 캐시 single-flight 중복 조회 방지 (구 redis_lock.py, 단일 프로세스 배포 전제로 대체)

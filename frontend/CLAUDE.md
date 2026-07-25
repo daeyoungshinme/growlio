@@ -274,6 +274,7 @@ cd frontend && npx playwright test
 | 복합신호 (시장/리스크) 상태 | `["composite-signal-status"]` |
 | 목표 역산 추천 (전체 자산) | `["goal-recommendation", "overall"]` |
 | 목표 역산 추천 (투자기간별) | `["goal-recommendation", "by-horizon"]` |
+| 목표 역산 추천 (연령대별) | `["goal-recommendation", "by-age"]` |
 | 포트폴리오 적용 전 비교 미리보기(현재 목표 비중 기대지표) | `["portfolio-expected-metrics", portfolioId]` |
 | 목표 설정 마법사 필요수익률·적립액 가이드 프리뷰 | `["goal-feasibility", goalAmount, targetYear, monthlyDepositAmount, initialAmount]` |
 | CPI/Core CPI 인플레이션 요약 | `["inflation-summary"]` |

@@ -9,14 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.goal_candidate_service import _seed_candidate_tickers, detect_duplicate_tracking_index_note
 from app.services.goal_portfolio_optimizer import compute_weighted_expected_metrics
 from app.services.goal_recommendation_service import (
+    _AGE_GROUP_PROFILE,
     _apply_index_region_preference,
+    _matches_index_region_preference,
     _optimize_goal_portfolio,
     _persist_added_candidates,
+    _suggest_for_dividend_goal,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,
     existing_items_from_positions,
+    get_age_based_recommendation,
     get_goal_recommendation,
     get_horizon_recommendations,
 )
@@ -29,7 +34,9 @@ from app.services.recommendation_universe import (
     MAX_GOAL_CANDIDATE_TICKERS,
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
+    guess_tracking_index,
     resolve_index_region,
+    resolve_tracking_index,
 )
 
 
@@ -622,6 +629,40 @@ class TestGuessAssetClass:
         assert guess_asset_class("TIGER CD금리투자KIS(합성)") == "CASH"
 
 
+class TestMatchesIndexRegionPreference:
+    """`_apply_index_region_preference`(등록 후보 필터링)와 `_suggest_for_dividend_goal`
+    (배당목표 미달성 시 제안)이 공유하는 지역선호 판별 헬퍼 — 한쪽만 지역선호를 지키고 다른
+    쪽은 무시하는 비일관성(실제 프로덕션에서 재현된 버그: GENERAL 계좌에 배당목표 미달성 시
+    해외지수 추종 ETF가 "후보에 추가" 제안으로 새어 들어감)을 막기 위한 공용 규칙."""
+
+    def test_general_rejects_overseas_tracking_equity_even_if_krx_listed(self):
+        c = {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"}
+        assert _matches_index_region_preference(c, "GENERAL") is False
+
+    def test_general_accepts_domestic_tracking_equity(self):
+        c = {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"}
+        assert _matches_index_region_preference(c, "GENERAL") is True
+
+    def test_isa_accepts_overseas_tracking_equity(self):
+        c = {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"}
+        assert _matches_index_region_preference(c, "ISA") is True
+
+    def test_overseas_dedicated_rejects_krx_listed_even_if_overseas_tracking(self):
+        c = {
+            "ticker": "360750",
+            "name": "TIGER 미국S&P500",
+            "market": "KOSPI",
+            "asset_class": "EQUITY",
+            "index_region": "OVERSEAS",
+        }
+        assert _matches_index_region_preference(c, "OVERSEAS_DEDICATED") is False
+
+    def test_non_equity_always_matches_regardless_of_region(self):
+        c = {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "CASH"}
+        assert _matches_index_region_preference(c, "GENERAL") is True
+        assert _matches_index_region_preference(c, "ISA") is True
+
+
 class TestApplyIndexRegionPreference:
     def test_general_prefers_domestic_and_excludes_overseas_tracking(self):
         candidates = [
@@ -664,36 +705,59 @@ class TestApplyIndexRegionPreference:
         filtered, note, added = _apply_index_region_preference(candidates, "ISA", capacity_remaining=20)
         tickers = {c["ticker"] for c in filtered}
         assert "069500" not in tickers  # 국내지수 추종 개별 EQUITY 후보는 제외됨
-        assert tickers >= {"133690", "360750", "458730"}  # 큐레이션 해외지수 추종 ETF로 보강됨
+        assert tickers >= {"133690", "360750", "458730", "446720"}  # 큐레이션 해외지수 추종 ETF로 보강됨
         assert "153130" in tickers  # CASH 후보는 영향받지 않고 그대로 유지
         assert note is not None
         assert "자동 등록" in note
-        assert {c["ticker"] for c in added} == {"133690", "360750", "458730"}
+        assert {c["ticker"] for c in added} == {"133690", "360750", "458730", "446720"}
 
     def test_fallback_gives_up_augmenting_when_not_enough_capacity(self):
-        """보강 후보 수가 capacity_remaining을 넘으면(등록 한도 초과) 보강을 포기하고 전체 후보로 대체한다."""
+        """보강 후보 수가 capacity_remaining을 넘으면(등록 한도 초과) 보강을 포기하되, 선호
+        지역에 맞지 않는 EQUITY(069500, 국내지수)는 여전히 제외해야 한다 — 원본을 그대로
+        반환하면 ISA 계좌에 국내지수 추종 종목이 새어 들어가는 버그가 된다."""
         candidates = [
             {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
         ]
         # 큐레이션 해외지수 추종 EQUITY는 3개(133690/360750/458730)인데 잔여 슬롯은 2개뿐 — 전부 아니면 전무
         filtered, note, added = _apply_index_region_preference(candidates, "ISA", capacity_remaining=2)
-        assert filtered == candidates
+        assert filtered == []  # non_equity가 없으므로 069500은 제외되고 빈 리스트만 남는다
         assert added == []
         assert note is not None
         assert "해외지수" in note
         assert "자동 등록" not in note
 
     def test_fallback_to_full_candidates_when_curated_universe_has_no_match(self):
-        """큐레이션 유니버스에서도 선호 지역 후보를 찾지 못하면(안전장치) 원본 후보 그대로 반환한다."""
+        """큐레이션 유니버스에서도 선호 지역 후보를 찾지 못해 보강이 불가능해도, 선호 지역에
+        맞지 않는 EQUITY(069500)는 여전히 제외해야 한다 — 안전장치가 필터링 자체를 무력화하면
+        안 된다(원본을 그대로 반환하던 이전 동작이 실제 프로덕션 버그였다)."""
         candidates = [
             {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
         ]
         with patch("app.services.goal_candidate_service.RECOMMENDATION_UNIVERSE", []):
             filtered, note, added = _apply_index_region_preference(candidates, "ISA", capacity_remaining=20)
-        assert filtered == candidates
+        assert filtered == []
         assert added == []
         assert note is not None
         assert "해외지수" in note
+        assert "자동 등록" not in note
+
+    def test_general_excludes_overseas_tracking_etf_when_capacity_exhausted_regression(self):
+        """실제 프로덕션 버그 재현: GENERAL(국내지수 선호) 계좌에 국내지수 추종 EQUITY가 하나도
+        없고(TIGER 미국S&P500만 등록) 등록 후보가 이미 한도에 도달해(capacity_remaining=0)
+        큐레이션 보강도 불가능하면, 이전에는 안전장치가 원본을 그대로 반환해 해외지수 추종
+        ETF(360750)가 국내전용 계좌 추천에 새어 들어갔다 — 이제는 non_equity만 남고 제외돼야
+        한다."""
+        candidates = [
+            {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+            {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
+        ]
+        filtered, note, added = _apply_index_region_preference(candidates, "GENERAL", capacity_remaining=0)
+        tickers = {c["ticker"] for c in filtered}
+        assert "360750" not in tickers  # 해외지수 추종 EQUITY는 더 이상 새지 않는다
+        assert tickers == {"153130"}  # CASH 후보는 영향받지 않고 그대로 유지
+        assert added == []
+        assert note is not None
+        assert "국내지수" in note
         assert "자동 등록" not in note
 
     def test_overseas_dedicated_passes_through_genuinely_overseas_listed_candidates(self):
@@ -758,6 +822,119 @@ class TestExistingItemsHelpers:
         assert result == [("QQQ", "QQQ", "NASDAQ")]
 
 
+class TestResolveTrackingIndex:
+    """동일 지수 중복 추천 버그(ACE 미국S&P500 보유 중인데 TIGER 미국S&P500도 추천됨) 수정을
+    위한 추종지수 판별 헬퍼."""
+
+    def test_guess_tracking_index_matches_sp500_name_variants(self):
+        assert guess_tracking_index("ACE 미국S&P500") == "US_SP500"
+        assert guess_tracking_index("KODEX 미국S&P500TR") == "US_SP500"
+
+    def test_guess_tracking_index_returns_none_for_unrecognized_name(self):
+        """매칭되는 패턴이 없으면 None — dedup 효과가 없을 뿐 추천 자체를 막지 않는다(fail-soft)."""
+        assert guess_tracking_index("삼성전자") is None
+
+    def test_guess_tracking_index_prefers_dow_dividend_over_generic_high_dividend(self):
+        """이름에 "배당"과 "다우존스"가 함께 들어가는 경우 더 구체적인 다우존스 배당 지수로
+        분류돼야 한다(고배당 패턴에 앞서 검사)."""
+        assert guess_tracking_index("TIGER 미국배당다우존스") == "US_DIV_DOWJONES100"
+
+    def test_resolve_tracking_index_prefers_explicit_tag(self):
+        assert resolve_tracking_index("999999", "KOSPI", "아무이름", "CUSTOM_LABEL") == "CUSTOM_LABEL"
+
+    def test_resolve_tracking_index_looks_up_curated_universe_by_ticker_and_market(self):
+        assert resolve_tracking_index("360750", "KOSPI", "TIGER 미국S&P500", None) == "US_SP500"
+
+    def test_resolve_tracking_index_falls_back_to_name_heuristic_outside_universe(self):
+        """큐레이션 유니버스 밖의 보유 종목(예: ACE 360200)은 이름 휴리스틱으로 추정된다."""
+        assert resolve_tracking_index("360200", "KOSPI", "ACE 미국S&P500", None) == "US_SP500"
+
+
+class TestSeedCandidateTickersDedup:
+    """`_seed_candidate_tickers`의 큐레이션 보강 단계가 보유 종목과 동일 지수를 추종하는
+    ETF를 중복으로 추가하지 않는지 검증 — 버그 재현(ACE 보유 + TIGER 자동추천) → 수정 확인."""
+
+    def test_curated_etf_tracking_same_index_as_held_position_is_not_seeded(self):
+        existing_items = [("360200", "ACE 미국S&P500", "KOSPI")]
+        seed = _seed_candidate_tickers(existing_items)
+        tickers = {c["ticker"] for c in seed}
+        assert "360200" in tickers
+        assert "360750" not in tickers  # TIGER 미국S&P500 — ACE와 동일 지수라 제외됨
+        assert "VOO" not in tickers  # Vanguard S&P500 — 마찬가지로 동일 지수라 제외됨
+        assert "SPY" not in tickers  # SPDR S&P500 — 마찬가지
+        # 무관한 지수를 추종하는 큐레이션 ETF는 정상적으로 함께 시딩된다
+        assert "069500" in tickers  # KODEX 200 (KOSPI200)
+        assert "QQQ" in tickers  # 나스닥100
+
+    def test_no_held_positions_seeds_curated_universe_unfiltered(self):
+        """보유 종목이 없으면(회귀 없음) 큐레이션 유니버스가 그대로(중복 포함) 시딩된다 —
+        SPY/VOO/360750처럼 계좌 유형에 따라 의도적으로 병존하는 조합은 여기서 걸러지지 않는다."""
+        seed = _seed_candidate_tickers([])
+        tickers = {c["ticker"] for c in seed}
+        assert {"SPY", "VOO", "360750"} <= tickers
+
+    def test_dow_dividend_monthly_and_quarterly_pair_both_seeded_when_not_held(self):
+        """458730(분기배당)/446720(월배당)은 동일 지수를 추종하지만 배당주기가 달라 의도적으로
+        함께 큐레이션돼 있다 — 보유 종목과 무관하면 dedup 대상이 아니므로 둘 다 시딩돼야 한다."""
+        seed = _seed_candidate_tickers([("069500", "KODEX 200", "KOSPI")])
+        tickers = {c["ticker"] for c in seed}
+        assert {"458730", "446720"} <= tickers
+
+    def test_holding_quarterly_variant_still_blocks_curated_same_index_dividend_etf(self):
+        """458730(분기배당)을 이미 보유 중이면, held_indexes는 배당주기를 구분하지 않으므로
+        큐레이션 보강 단계의 458730/446720 둘 다 이미 (ticker, market) 완전일치로 걸러지거나
+        seen 처리되는지와 무관하게, 동일 지수의 SCHD도 중복으로 추가되지 않아야 한다."""
+        seed = _seed_candidate_tickers([("458730", "TIGER 미국배당다우존스", "KOSPI")])
+        tickers = {c["ticker"] for c in seed}
+        assert "SCHD" not in tickers
+
+
+class TestDetectDuplicateTrackingIndexNote:
+    """이미 저장된 후보 목록에 보유 종목과 동일 지수를 추종하는 다른 티커가 남아있을 때
+    정리를 권유하는 안내문(`detect_duplicate_tracking_index_note`) 검증 — 후보 목록 자체는
+    건드리지 않는다(자동 수정 없음)."""
+
+    def test_returns_note_when_registered_candidate_duplicates_held_position_index(self):
+        existing_items = [("360200", "ACE 미국S&P500", "KOSPI")]
+        candidates = [
+            {"ticker": "360200", "name": "ACE 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+            {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+        ]
+        note = detect_duplicate_tracking_index_note(candidates, existing_items)
+        assert note is not None
+        assert "360750" in note
+        assert "360200" in note
+
+    def test_no_note_when_no_held_positions(self):
+        """등록 후보끼리(큐레이션 유니버스가 계좌 유형별로 의도적으로 병존시키는 조합 포함)는
+        비교 대상이 아니다 — 실제 보유 종목이 없으면 항상 None."""
+        candidates = [
+            {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+        ]
+        assert detect_duplicate_tracking_index_note(candidates, []) is None
+
+    def test_no_note_when_registered_candidate_is_the_held_ticker_itself(self):
+        existing_items = [("360200", "ACE 미국S&P500", "KOSPI")]
+        candidates = [{"ticker": "360200", "name": "ACE 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"}]
+        assert detect_duplicate_tracking_index_note(candidates, existing_items) is None
+
+    def test_no_note_for_dividend_frequency_differentiated_companion(self):
+        """458730(분기배당)을 보유 중이어도, 배당주기가 다른 446720(월배당)은 실질적으로
+        다른 선택지이므로 중복 안내 대상이 아니다."""
+        existing_items = [("458730", "TIGER 미국배당다우존스", "KOSPI")]
+        candidates = [
+            {
+                "ticker": "446720",
+                "name": "SOL 미국배당다우존스",
+                "market": "KOSPI",
+                "asset_class": "EQUITY",
+                "distribution_frequency": "MONTHLY",
+            },
+        ]
+        assert detect_duplicate_tracking_index_note(candidates, existing_items) is None
+
+
 @pytest.mark.asyncio
 class TestPersistAddedCandidates:
     async def test_merges_against_freshly_locked_row_not_stale_caller_snapshot(self):
@@ -813,10 +990,166 @@ class TestPersistAddedCandidates:
         mock_db.commit.assert_not_awaited()
 
 
+class TestSuggestForDividendGoal:
+    """등록된 후보만으로 배당 목표를 달성할 수 없을 때 큐레이션 유니버스에서 고배당 후보를
+    제안만 하는 `_suggest_for_dividend_goal()` — 저장은 사용자가 추천 카드의 "후보에 추가"
+    버튼으로 승인해야만 이뤄지므로, 이 함수는 DB에 쓰지 않고 제안 목록만 반환한다."""
+
+    _DIVIDEND_YIELDS = {
+        ("SCHD", "NYSE"): 3.5,
+        ("VYM", "NYSE"): 2.9,
+        ("JEPI", "NYSE"): 8.1,
+        ("JEPQ", "NASDAQ"): 9.95,
+        ("446720", "KOSPI"): 2.88,
+        ("SPY", "NYSE"): 1.3,
+    }
+
+    def _dividend_side_effect(self, tickers):
+        return {tm: self._DIVIDEND_YIELDS[tm] for tm in tickers if tm in self._DIVIDEND_YIELDS}
+
+    def _mock_fetch_dividend_yields(self):
+        return AsyncMock(side_effect=self._dividend_side_effect)
+
+    async def test_noop_when_no_dividend_goal(self):
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        suggested, note, status = await _suggest_for_dividend_goal(candidates, None, None, 0.4, 10)
+
+        assert suggested == []
+        assert note is None
+        assert status is None
+
+    async def test_noop_when_already_achievable_and_no_meaningfully_better_candidate(self):
+        candidates = [
+            {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+        ]
+        # max_weight=0.4 -> 등록 후보만으로 최대 0.4*3.5 + 0.4*1.3 = 1.92%까지 달성 가능.
+        # 이미 달성(expected=1.2 >= required=1.0)했고, 개선 목표(1.2+0.5=1.7%)도 등록 후보만으로
+        # 이미 달성 가능한 범위(<=1.92%)라 미등록 후보를 제안할 필요가 없다.
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(candidates, 1.0, 1.2, 0.4, capacity_remaining=10)
+
+        assert suggested == []
+        assert note is None
+        assert status == "optimal"
+
+    async def test_suggests_when_achievable_but_meaningfully_higher_yield_exists(self):
+        """이미 배당 목표(연 1.0%)를 달성했어도(expected=1.3%), 등록 후보만으로는 개선 목표
+        (1.3+0.5=1.8%)에 못 미쳐 큐레이션 유니버스에서 더 높은 배당 후보(JEPQ)를 제안한다."""
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(candidates, 1.0, 1.3, 0.4, capacity_remaining=10)
+
+        tickers = [c["ticker"] for c in suggested]
+        assert tickers[0] == "JEPQ"
+        assert status == "improvable"
+        assert note is not None
+        assert "이미 배당 목표를 달성했지만" in note
+
+    async def test_suggests_highest_yield_unregistered_candidates_when_unachievable(self):
+        """등록 후보(SPY, 배당 1.3%)만으로는 목표(연 5%)를 달성할 수 없어 큐레이션 유니버스의
+        고배당 후보를 수익률 내림차순(JEPQ 9.95% > JEPI 8.1%)으로 제안한다 — 등록 목록에는
+        반영하지 않는다."""
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(candidates, 5.0, 1.3, 0.4, capacity_remaining=10)
+
+        tickers = [c["ticker"] for c in suggested]
+        assert "SPY" not in tickers  # 이미 등록된 후보는 제안 목록에 포함되지 않음
+        assert tickers[0] == "JEPQ"  # 가장 배당수익률이 높은 후보부터 제안
+        assert suggested[0]["dividend_yield_pct"] == 9.95
+        assert status == "unreachable"
+        assert note is not None
+        assert "아래 고배당 후보를 추가하면 도움이 됩니다" in note
+        assert "자동 등록" not in note
+
+    async def test_status_unreachable_when_expected_is_none(self):
+        """옵티마이저가 아직 실행되지 않았거나 실패해 `expected_dividend_yield_pct=None`이면
+        무조건 미달성(unreachable)으로 취급한다(조기 반환 지점에서 호출되는 경우)."""
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(
+                candidates, 5.0, None, 0.4, capacity_remaining=10
+            )
+
+        assert status == "unreachable"
+        assert len(suggested) > 0
+
+    async def test_respects_capacity_remaining(self):
+        """등록 가능 잔여 슬롯이 0이면 달성 불가능해도 제안하지 않는다."""
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(candidates, 5.0, 1.3, 0.4, capacity_remaining=0)
+
+        assert suggested == []
+        assert note is None
+        assert status == "unreachable"
+
+    async def test_market_filter_excludes_overseas_listed_candidates(self):
+        """일반(GENERAL) 계좌처럼 국내상장 후보만 허용하는 시장 필터를 넘기면, 미국 상장인
+        JEPI/JEPQ는 후보 풀에서 제외되고 국내상장 446720만 제안 대상이 된다."""
+        candidates = [{"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"}]
+
+        def _domestic_only(c: dict[str, str]) -> bool:
+            return c["market"].upper() in {"KOSPI", "KOSDAQ"}
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(
+                candidates, 2.5, 0.0, 0.4, capacity_remaining=10, market_filter=_domestic_only
+            )
+
+        tickers = {c["ticker"] for c in suggested}
+        assert "JEPI" not in tickers
+        assert "JEPQ" not in tickers
+        assert "446720" in tickers
+        assert status == "unreachable"
+        assert note is not None
+
+    async def test_gives_up_gracefully_when_universe_cannot_achieve_target(self):
+        """유니버스 전체를 더해도 목표를 달성할 수 없으면(비현실적으로 높은 목표), 도움이 되는
+        후보는 모두 제안하되 조용히 종료한다 — 최종 fail-soft 판정은 옵티마이저 몫이다."""
+        candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(
+                candidates, 100.0, 1.3, 0.4, capacity_remaining=10
+            )
+
+        assert len(suggested) > 0
+        assert note is not None
+        assert status == "unreachable"
+
+
 @pytest.mark.asyncio
 class TestGetGoalRecommendation:
     async def test_not_configured_without_goal_amount(self):
-        settings_row = SimpleNamespace(goal_amount=None, retirement_target_year=None)
+        settings_row = SimpleNamespace(goal_amount=None, retirement_target_year=None, annual_dividend_goal=None)
 
         result = await get_goal_recommendation(None, 0.0, [], settings_row, AsyncMock())
 
@@ -965,6 +1298,67 @@ class TestGetGoalRecommendation:
         # 배당수익률이 0인 나머지 8개 후보만으로는 목표를 채울 수 없으므로 고배당 후보 비중이 0일 수는 없다.
         assert high_yield_weight > 0.0
         assert result.note is None or "배당 목표" not in result.note
+        # 배당 제약은 포트폴리오 전체 가중평균에만 걸리므로, 저배당(dividend_map에 없는) 종목도
+        # 분산 목적으로 함께 포함될 수 있다 — 화면에서 이를 구분할 수 있도록 종목별 배당수익률이
+        # dividend_map과 정확히 일치해야 한다(없으면 None).
+        for item in result.recommended_items:
+            assert item.dividend_yield_pct == dividend_map.get((item.ticker, item.market))
+        assert any(i.dividend_yield_pct is None for i in result.recommended_items)
+
+    async def test_dividend_goal_only_without_asset_goal_returns_configured_recommendation(self):
+        """자산목표(goal_amount·retirement_target_year)를 설정하지 않아도 배당목표
+        (annual_dividend_goal)만 있으면 "배당 계획" 탭 전용 진입점으로 동작해야 한다.
+        required_return_pct는 화면에 노출하지 않고(None), 옵티마이저에는 비구속적 하한만
+        전달돼 배당수익률 제약만으로 최소분산 포트폴리오가 계산된다."""
+        settings_row = SimpleNamespace(
+            goal_amount=None,
+            retirement_target_year=None,
+            monthly_deposit_amount=None,
+            annual_deposit_goal=None,
+            annual_dividend_goal=300_000.0,  # base_krw 10,000,000 대비 required_dividend_yield_pct = 3.0%
+            goal_candidate_tickers=None,
+            goal_max_weight_pct=100.0,
+        )
+        cagr_map = {
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+            ("QQQ", "NASDAQ"): {"cagr_pct": 15.0},
+            ("VOO", "NYSE"): {"cagr_pct": 9.0},
+            ("VTI", "NYSE"): {"cagr_pct": 9.5},
+            ("SCHD", "NYSE"): {"cagr_pct": 8.0},
+            ("VYM", "NYSE"): {"cagr_pct": 7.0},
+            ("069500", "KOSPI"): {"cagr_pct": 6.0},
+            ("360750", "KOSPI"): {"cagr_pct": 9.0},
+            ("133690", "KOSPI"): {"cagr_pct": 14.0},
+            ("458730", "KOSPI"): {"cagr_pct": 5.0},
+        }
+        random.seed(7)
+        returns_map = {
+            sym: [random.gauss(0.0005, 0.01) for _ in range(252)]
+            for sym in ["SPY", "QQQ", "VOO", "VTI", "SCHD", "VYM", "069500.KS", "360750.KS", "133690.KS", "458730.KS"]
+        }
+        dividend_map = {("SCHD", "NYSE"): 3.5, ("VYM", "NYSE"): 2.9}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            mock_db = AsyncMock()
+            result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
+
+        assert result.is_configured is True
+        assert result.required_return_pct is None
+        assert result.required_dividend_yield_pct == pytest.approx(3.0)
+        assert result.recommended_items
 
     async def test_market_signal_level_propagates_to_result(self):
         """시장 위험 신호(RED)가 결과의 market_signal_level에 그대로 반영되어야 한다."""
@@ -1402,9 +1796,14 @@ class TestGetGoalRecommendation:
             result = await get_goal_recommendation(None, 10_000_000.0, [], settings_row, mock_db)
 
         queried_tickers = get_historical_returns_mock.call_args.args[0]
-        assert set(queried_tickers) == {("133690", "KOSPI"), ("360750", "KOSPI"), ("458730", "KOSPI")}
+        assert set(queried_tickers) == {
+            ("133690", "KOSPI"),
+            ("360750", "KOSPI"),
+            ("458730", "KOSPI"),
+            ("446720", "KOSPI"),
+        }
         assert result.recommended_items
-        assert {item.ticker for item in result.recommended_items} <= {"133690", "360750", "458730"}
+        assert {item.ticker for item in result.recommended_items} <= {"133690", "360750", "458730", "446720"}
         assert "005930" not in {item.ticker for item in result.recommended_items}
         assert result.note is not None
         assert "해외지수" in result.note
@@ -1636,6 +2035,71 @@ class TestGetHorizonRecommendations:
         assert ("SPY", "NYSE") not in queried_tickers
         assert ("CASH_EQUIVALENT", "CASH") not in queried_tickers
 
+    async def test_short_term_general_excludes_overseas_tracking_etf_when_candidate_slots_full(self):
+        """실제 프로덕션 버그 재현: 등록 후보가 MAX_GOAL_CANDIDATE_TICKERS(20개)에 도달해
+        `_apply_index_region_preference`의 큐레이션 보강이 불가능해지면, 이전에는 안전장치가
+        선호 지역 필터링 자체를 포기해 GENERAL(국내지수 선호) 계좌에도 해외지수 추종
+        EQUITY(TIGER 미국S&P500, 360750)가 그대로 추천됐다 — 수정 후에는 여전히 제외돼야 한다."""
+        candidate_tickers = [
+            {"ticker": "360750", "name": "TIGER 미국S&P500", "market": "KOSPI", "asset_class": "EQUITY"},
+            {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
+            {"ticker": "357870", "name": "TIGER CD금리투자KIS(합성)", "market": "KOSPI", "asset_class": "CASH"},
+        ] + [
+            {"ticker": f"PAD{i:03d}", "name": f"패딩종목{i}", "market": "KOSPI", "asset_class": "CASH"}
+            for i in range(17)
+        ]
+        assert len(candidate_tickers) == MAX_GOAL_CANDIDATE_TICKERS  # capacity_remaining=0을 만들기 위한 전제
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=candidate_tickers,
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("SHORT_TERM", "GENERAL", account_id)]))
+
+        cagr_map = {
+            ("153130", "KOSPI"): {"cagr_pct": 2.0},
+            ("357870", "KOSPI"): {"cagr_pct": 2.5},
+        }
+        random.seed(11)
+        returns_map = {
+            "153130.KS": [random.gauss(0.0001, 0.0005) for _ in range(252)],
+            "357870.KS": [random.gauss(0.00012, 0.0006) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 1
+        rec = result.recommendations[0]
+        recommended_tickers = {item.ticker for item in rec.recommended_items}
+        assert "360750" not in recommended_tickers  # 해외지수 추종 EQUITY는 더 이상 새지 않는다
+        assert recommended_tickers <= {"153130", "357870", "CASH_EQUIVALENT"}
+        assert rec.note is not None
+        assert "국내지수" in rec.note
+
     async def test_short_term_includes_cash_equivalent_alongside_registered_candidates(self):
         """단기 추천은 등록된 BOND/CASH 후보가 있어도 현금성 자산(CMA·파킹통장) 합성 후보를
         함께 옵티마이저에 넣어 실제로 섞인 비중을 계산한다."""
@@ -1690,6 +2154,374 @@ class TestGetHorizonRecommendations:
         assert rec.recommended_items
         assert "CASH_EQUIVALENT" in {item.ticker for item in rec.recommended_items}
         assert rec.includes_cash_equivalent is True
+
+    async def test_short_term_with_equity_floor_and_dividend_goal_does_not_crash(self):
+        """실제 계정에서 재현된 회귀 시나리오: 단기(equity_floor=80%) + 배당목표(연 2.4%,
+        equity_floor를 반영하면 실제로는 달성 불가능한 수준) 조합에서 예전에는 배당
+        달성가능성 사전검증이 equity_floor 그룹 예산을 무시해 "달성 가능"으로 오판, SLSQP
+        전체가 실패(빈 추천)했다. 수정 후에는 배당 제약만 fail-soft로 드롭하고 정상 추천을
+        반환해야 한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "069500", "name": "KODEX 200", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "153130", "name": "KODEX 단기채권", "market": "KOSPI", "asset_class": "CASH"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+                {"ticker": "357870", "name": "TIGER CD금리투자KIS(합성)", "market": "KOSPI", "asset_class": "CASH"},
+            ],
+            goal_max_weight_pct=60.0,
+            goal_cagr_lookback_years=None,
+            annual_dividend_goal=240_000.0,  # total_assets_krw 10,000,000 대비 required_dividend_yield_pct = 2.4%
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("SHORT_TERM", "GENERAL", account_id)]))
+
+        cagr_map = {
+            ("069500", "KOSPI"): {"cagr_pct": 8.0},
+            ("153130", "KOSPI"): {"cagr_pct": 3.0},
+            ("114260", "KOSPI"): {"cagr_pct": 3.0},
+            ("357870", "KOSPI"): {"cagr_pct": 3.0},
+        }
+        dividend_map = {
+            ("069500", "KOSPI"): 1.8,
+            ("153130", "KOSPI"): 3.3,
+            ("114260", "KOSPI"): 3.0,
+            ("357870", "KOSPI"): 3.4,
+        }
+        random.seed(42)
+        returns_map = {
+            sym: [random.gauss(0.0003, 0.008) for _ in range(252)]
+            for sym in ["069500.KS", "153130.KS", "114260.KS", "357870.KS"]
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 1
+        rec = result.recommendations[0]
+        # 수정 전에는 이 시나리오에서 빈 추천 + "제약 조건을 만족하는 포트폴리오를 찾지
+        # 못했습니다" 노트가 반환됐다.
+        assert rec.recommended_items
+        equity_weight = sum(i.weight for i in rec.recommended_items if i.ticker == "069500")
+        assert equity_weight >= 79.5  # equity_floor(80%)는 여전히 만족
+
+    async def test_long_term_overseas_dedicated_with_dividend_goal_does_not_crash(self):
+        """실제 계정에서 재현된 회귀 시나리오: 장기(LONG_TERM, risk_tolerance=AGGRESSIVE 고정) +
+        해외전용 계좌에 배당목표(연 1.8%)가 걸리면, AGGRESSIVE의 "가중평균 CAGR=target" 등식
+        제약과 배당 제약이 동시에는 충족 불가능해 예전에는 SLSQP가 전체 실패(빈 추천 + "제약
+        조건을 만족하는 포트폴리오를 찾지 못했습니다")했다. 수정 후에는 배당 제약만 fail-soft로
+        드롭하고 정상 추천을 반환해야 한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "QQQM", "name": "Invesco NASDAQ 100 ETF", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "QLD", "name": "ProShares Ultra QQQ", "market": "NASDAQ", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=40.0,
+            goal_cagr_lookback_years=None,
+            annual_dividend_goal=180_000.0,  # total_assets_krw 10,000,000 대비 required_dividend_yield_pct = 1.8%
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
+
+        cagr_map = {
+            ("QQQ", "NASDAQ"): {"cagr_pct": 18.0},
+            ("QQQM", "NASDAQ"): {"cagr_pct": 18.0},
+            ("VOO", "NYSE"): {"cagr_pct": 13.0},
+            ("SCHD", "NYSE"): {"cagr_pct": 11.0},
+            ("QLD", "NASDAQ"): {"cagr_pct": 32.0},
+        }
+        dividend_map = {
+            ("QQQ", "NASDAQ"): 0.6,
+            ("QQQM", "NASDAQ"): 0.6,
+            ("VOO", "NYSE"): 1.3,
+            ("SCHD", "NYSE"): 3.5,
+            ("QLD", "NASDAQ"): 0.5,
+        }
+        random.seed(5)
+        returns_map = {
+            "QQQ": [random.gauss(0.0009, 0.013) for _ in range(252)],
+            "QQQM": [random.gauss(0.0009, 0.013) for _ in range(252)],
+            "VOO": [random.gauss(0.0006, 0.010) for _ in range(252)],
+            "SCHD": [random.gauss(0.0005, 0.009) for _ in range(252)],
+            "QLD": [random.gauss(0.0018, 0.026) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 1
+        rec = result.recommendations[0]
+        # 수정 전에는 이 시나리오에서 빈 추천 + "제약 조건을 만족하는 포트폴리오를 찾지
+        # 못했습니다" 노트가 반환됐다.
+        assert rec.recommended_items
+        assert rec.risk_tolerance == "AGGRESSIVE"
+        assert rec.note is not None
+        assert "다른 조건과 함께 만족하는" in rec.note
+
+    async def test_each_combo_gets_its_own_dividend_suggestions_not_persisted_or_merged(self):
+        """LONG_TERM 내 GENERAL(국내전용)·OVERSEAS_DEDICATED(해외전용) 두 조합이 동시에 배당
+        목표를 달성하지 못할 때, 조합별로 서로 다른(시장 필터가 적용된) 제안 목록이 정확히
+        매칭돼 부착되는지 검증한다 — `combos`를 7-튜플로 확장하고 `asyncio.gather` 이후
+        `zip`으로 매핑하는 배선(제안이 엉뚱한 조합에 붙는 회귀를 방지). 또한 제안된 후보는
+        어느 조합의 `recommended_items`에도 나타나지 않고(승인 전 비중 계산 미반영),
+        `goal_candidate_tickers`도 변경되지 않아야 한다."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                # 005930/000660은 개별 종목이라 index_region이 자동으로 DOMESTIC 판정되므로
+                # GENERAL의 지역 선호 필터를 통과한다 — 큐레이션 유니버스에서 진짜 국내지수
+                # 추종 EQUITY는 069500 하나뿐이라, 069500을 등록하지 않고 남겨둬야 제안 풀에서
+                # 실제로 제안 대상이 된다(제안도 `_apply_index_region_preference`와 동일하게
+                # 지역 선호를 지켜야 한다는 회귀 방지).
+                {"ticker": "005930", "name": "삼성전자", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "000660", "name": "SK하이닉스", "market": "KOSPI", "asset_class": "EQUITY"},
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+            annual_dividend_goal=300_000.0,  # total_assets_krw 10,000,000 대비 required_dividend_yield_pct = 3.0%
+        )
+        general_account_id = uuid.uuid4()
+        overseas_account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(
+            return_value=_execute_result(
+                [
+                    ("LONG_TERM", "GENERAL", general_account_id),
+                    ("LONG_TERM", "OVERSEAS_DEDICATED", overseas_account_id),
+                ]
+            )
+        )
+
+        cagr_map = {
+            ("005930", "KOSPI"): {"cagr_pct": 9.0},
+            ("000660", "KOSPI"): {"cagr_pct": 7.0},
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+            ("VOO", "NYSE"): {"cagr_pct": 9.5},
+        }
+        dividend_by_ticker = {
+            # 등록된 후보 (전부 배당수익률이 낮아 3.0% 목표를 등록 후보만으로 달성 불가)
+            ("005930", "KOSPI"): 1.0,
+            ("000660", "KOSPI"): 0.6,
+            ("SPY", "NYSE"): 1.3,
+            ("VOO", "NYSE"): 1.2,
+            # 국내(GENERAL) 큐레이션 풀 — 진짜 국내지수 추종 EQUITY는 069500 하나뿐이고, 그것을
+            # 더해도 최대 1.52%뿐이라 3.0%에 못 미쳐 풀 전체(069500 하나)가 그대로 제안됨.
+            # 360750/133690/458730/446720(해외지수 추종·KRX 상장)은 GENERAL 지역 선호에 안 맞아
+            # 제안 풀에서 제외돼야 한다 — 이게 이 테스트가 검증하는 회귀 방지 포인트.
+            ("069500", "KOSPI"): 2.5,
+            # 해외(OVERSEAS_DEDICATED) 큐레이션 풀 — JEPQ 하나만 추가해도 목표 달성 가능
+            ("JEPQ", "NASDAQ"): 9.95,
+            ("JEPI", "NYSE"): 8.1,
+            ("SCHD", "NYSE"): 3.5,
+            ("VYM", "NYSE"): 2.9,
+            ("VTI", "NYSE"): 1.3,
+            ("QQQ", "NASDAQ"): 0.6,
+        }
+
+        async def _dividend_side_effect(tickers):
+            return {tm: dividend_by_ticker[tm] for tm in tickers if tm in dividend_by_ticker}
+
+        random.seed(7)
+        returns_map = {
+            sym: [random.gauss(0.0004, 0.008) for _ in range(252)] for sym in ["005930.KS", "000660.KS", "SPY", "VOO"]
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({general_account_id: object(), overseas_account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        assert len(result.recommendations) == 2
+        by_tax_type = {r.tax_type: r for r in result.recommendations}
+
+        general_rec = by_tax_type["GENERAL"]
+        general_suggested = {c.ticker for c in general_rec.suggested_candidates}
+        assert general_suggested == {"069500"}  # 진짜 국내지수 추종 EQUITY만 제안됨
+        general_recommended = {i.ticker for i in general_rec.recommended_items}
+        assert general_recommended == {"005930", "000660"}  # 제안된 종목은 비중 계산에 반영 안 됨
+
+        overseas_rec = by_tax_type["OVERSEAS_DEDICATED"]
+        overseas_suggested = {c.ticker for c in overseas_rec.suggested_candidates}
+        assert overseas_suggested == {"JEPQ"}
+        jepq = next(c for c in overseas_rec.suggested_candidates if c.ticker == "JEPQ")
+        assert jepq.dividend_yield_pct == 9.95
+        overseas_recommended = {i.ticker for i in overseas_rec.recommended_items}
+        assert overseas_recommended == {"SPY", "VOO"}
+
+        mock_db.commit.assert_not_awaited()
+        assert len(settings_row.goal_candidate_tickers) == 4
+
+    async def test_combo_already_achieving_dividend_goal_suggests_better_candidate(self):
+        """등록 후보(QQQ/VOO/SCHD)만으로 배당 목표(연 1.74%)를 이미 달성했어도(CONSERVATIVE는
+        배당 하한을 딱 그 값에서 충족하도록 최소분산 해를 찾음), 등록 후보만으로는 개선 목표
+        (1.74+0.5=2.24%)에 못 미쳐 큐레이션 유니버스의 JEPQ(9.95%)가 "더 나은 옵션"으로
+        제안돼야 한다 — 판정 시점을 최적화 이후로 옮긴 리팩터링의 핵심 시나리오."""
+        settings_row = SimpleNamespace(
+            goal_candidate_tickers=[
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=40.0,
+            goal_cagr_lookback_years=None,
+            annual_dividend_goal=174_000.0,  # total_assets_krw 10,000,000 대비 required_dividend_yield_pct = 1.74%
+        )
+        account_id = uuid.uuid4()
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=_execute_result([("LONG_TERM", "OVERSEAS_DEDICATED", account_id)]))
+
+        cagr_map = {
+            ("QQQ", "NASDAQ"): {"cagr_pct": 18.0},
+            ("VOO", "NYSE"): {"cagr_pct": 13.0},
+            ("SCHD", "NYSE"): {"cagr_pct": 11.0},
+        }
+        dividend_map = {
+            ("QQQ", "NASDAQ"): 0.6,
+            ("VOO", "NYSE"): 1.3,
+            ("SCHD", "NYSE"): 3.5,
+            ("JEPQ", "NASDAQ"): 9.95,
+            ("JEPI", "NYSE"): 8.1,
+        }
+        random.seed(5)
+        returns_map = {
+            "QQQ": [random.gauss(0.0009, 0.013) for _ in range(252)],
+            "VOO": [random.gauss(0.0006, 0.010) for _ in range(252)],
+            "SCHD": [random.gauss(0.0005, 0.009) for _ in range(252)],
+        }
+
+        async def _dividend_side_effect(tickers):
+            return {tm: dividend_map[tm] for tm in tickers if tm in dividend_map}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.prefetch_accounts_snapshot_positions",
+                AsyncMock(return_value=({account_id: object()}, {}, {}, {})),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.compute_total_assets_krw",
+                return_value=5_000_000.0,
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
+
+        rec = result.recommendations[0]
+        assert rec.expected_dividend_yield_pct >= 1.74  # 등록 후보만으로 이미 목표 달성
+        assert rec.dividend_goal_status == "improvable"
+        suggested_tickers = {c.ticker for c in rec.suggested_candidates}
+        assert suggested_tickers == {"JEPQ"}
+        assert "이미 배당 목표를 달성했지만" in rec.note
+        # 제안된 후보는 이번 계산의 recommended_items(비중 계산)에는 반영되지 않는다.
+        assert "JEPQ" not in {i.ticker for i in rec.recommended_items}
 
     async def test_insufficient_eligible_candidates_falls_back_to_cash_equivalent(self):
         """단기 추천에 적합한(BOND/CASH) 후보가 없으면 옵티마이저 없이 현금성 자산 100% 배분을 반환한다."""
@@ -2487,8 +3319,13 @@ class TestGetHorizonRecommendations:
         rec = result.recommendations[0]
         assert rec.recommended_items
         queried_tickers = get_historical_returns_mock.call_args.args[0]
-        assert set(queried_tickers) == {("133690", "KOSPI"), ("360750", "KOSPI"), ("458730", "KOSPI")}
-        assert {item.ticker for item in rec.recommended_items} <= {"133690", "360750", "458730"}
+        assert set(queried_tickers) == {
+            ("133690", "KOSPI"),
+            ("360750", "KOSPI"),
+            ("458730", "KOSPI"),
+            ("446720", "KOSPI"),
+        }
+        assert {item.ticker for item in rec.recommended_items} <= {"133690", "360750", "458730", "446720"}
         assert "005930" not in {item.ticker for item in rec.recommended_items}
         assert rec.note is not None
         assert "해외지수" in rec.note
@@ -2651,6 +3488,524 @@ class TestGetHorizonRecommendations:
         assert len(result.recommendations) == 1
         assert result.recommendations[0].recommended_items
         mock_cache.setex.assert_awaited_once()
+
+
+class TestAgeGroupProfile:
+    """연령대(`UserSettings.age_group`) → (구간 라벨, risk_tolerance, equity_floor, equity_ceiling,
+    기본 배당수익률 하한%) 매핑."""
+
+    def test_twenties_gets_aggressive_equity_floor(self):
+        label, risk_tolerance, equity_floor, equity_ceiling, dividend_floor = _AGE_GROUP_PROFILE["TWENTIES"]
+        assert label == "20대"
+        assert risk_tolerance == "AGGRESSIVE"
+        assert equity_floor == 0.8
+        assert equity_ceiling is None
+        assert dividend_floor == 0.0
+
+    def test_thirties_gets_aggressive_equity_floor(self):
+        label, risk_tolerance, equity_floor, equity_ceiling, dividend_floor = _AGE_GROUP_PROFILE["THIRTIES"]
+        assert label == "30대"
+        assert risk_tolerance == "AGGRESSIVE"
+        assert equity_floor == 0.7
+        assert equity_ceiling is None
+        assert dividend_floor == 0.0
+
+    def test_forties_gets_balanced_equity_floor(self):
+        label, risk_tolerance, equity_floor, equity_ceiling, dividend_floor = _AGE_GROUP_PROFILE["FORTIES"]
+        assert label == "40대"
+        assert risk_tolerance == "BALANCED"
+        assert equity_floor == 0.55
+        assert equity_ceiling is None
+        assert dividend_floor == 1.5
+
+    def test_fifties_gets_balanced_equity_ceiling(self):
+        label, risk_tolerance, equity_floor, equity_ceiling, dividend_floor = _AGE_GROUP_PROFILE["FIFTIES"]
+        assert label == "50대"
+        assert risk_tolerance == "BALANCED"
+        assert equity_floor is None
+        assert equity_ceiling == 0.6
+        assert dividend_floor == 2.5
+
+    def test_sixties_plus_gets_conservative_equity_ceiling(self):
+        label, risk_tolerance, equity_floor, equity_ceiling, dividend_floor = _AGE_GROUP_PROFILE["SIXTIES_PLUS"]
+        assert label == "60대 이상"
+        assert risk_tolerance == "CONSERVATIVE"
+        assert equity_floor is None
+        assert equity_ceiling == 0.35
+        assert dividend_floor == 3.5
+
+    def test_dividend_floor_increases_monotonically_with_age(self):
+        """ "나이가 많을수록 배당목표에 초점" 요구사항 — 연령대 순서대로 배당수익률 하한이
+        감소하지 않아야 한다."""
+        order = ["TWENTIES", "THIRTIES", "FORTIES", "FIFTIES", "SIXTIES_PLUS"]
+        floors = [_AGE_GROUP_PROFILE[key][4] for key in order]
+        assert floors == sorted(floors)
+
+
+class TestGetAgeBasedRecommendation:
+    """사용자가 직접 선택한 연령대(`UserSettings.age_group`) 기반 추천 — 목표 역산 없이 연령대의
+    risk_tolerance + 주식비중 상/하한만으로 비중을 계산한다."""
+
+    async def test_age_group_not_configured_returns_not_configured(self):
+        settings_row = SimpleNamespace(age_group=None)
+
+        result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.is_configured is False
+        assert "연령대" in result.note
+        assert result.recommended_items == []
+
+    async def test_no_candidates_registered(self):
+        settings_row = SimpleNamespace(
+            age_group="TWENTIES",
+            goal_candidate_tickers=[],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+
+        with patch(
+            "app.services.goal_recommendation_service.query_latest_position_map",
+            AsyncMock(return_value={}),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.age_bracket == "20대"
+        assert result.recommended_items == []
+        assert "후보 ETF" in result.note
+
+    async def test_twenties_applies_equity_floor_with_cash_equivalent_fallback(self):
+        """20대는 AGGRESSIVE + equity_floor 80% — 등록된 안전자산 후보가 하나도 없으면 합성
+        현금성 자산(CASH_EQUIVALENT)으로 나머지를 채운다."""
+        settings_row = SimpleNamespace(
+            age_group="TWENTIES",
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(11)
+        returns_map = {
+            "SPY": [random.gauss(0.0005, 0.01) for _ in range(252)],
+            "QQQ": [random.gauss(0.0006, 0.012) for _ in range(252)],
+            "VOO": [random.gauss(0.00055, 0.0105) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(
+                    return_value={
+                        ("SPY", "NYSE"): {"cagr_pct": 10.0},
+                        ("QQQ", "NASDAQ"): {"cagr_pct": 12.0},
+                        ("VOO", "NYSE"): {"cagr_pct": 10.5},
+                    }
+                ),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.age_bracket == "20대"
+        assert result.risk_tolerance == "AGGRESSIVE"
+        assert result.includes_cash_equivalent is True
+        tickers = {item.ticker for item in result.recommended_items}
+        assert "CASH_EQUIVALENT" in tickers
+        equity_weight = sum(item.weight for item in result.recommended_items if item.ticker in {"SPY", "QQQ", "VOO"})
+        assert equity_weight >= 75.0
+        # 20대는 배당수익률 하한이 0이라 annual_dividend_goal 미설정 시 배당 제약을 전혀 걸지 않는다
+        assert result.required_dividend_yield_pct is None
+
+    async def test_sixties_plus_applies_equity_ceiling(self):
+        """60대 이상은 CONSERVATIVE + equity_ceiling 35% — 주식 비중이 상한을 크게 넘지 않는다."""
+        settings_row = SimpleNamespace(
+            age_group="SIXTIES_PLUS",
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(13)
+        returns_map = {
+            "SPY": [random.gauss(0.0006, 0.012) for _ in range(252)],
+            "114260.KS": [random.gauss(0.0001, 0.001) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("114260", "KOSPI"): {"cagr_pct": 3.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.age_bracket == "60대 이상"
+        assert result.risk_tolerance == "CONSERVATIVE"
+        assert result.includes_cash_equivalent is False
+        spy_weight = next((item.weight for item in result.recommended_items if item.ticker == "SPY"), 0.0)
+        assert spy_weight <= 35.5
+
+    async def test_caches_result_when_recommendation_produced(self):
+        mock_cache = AsyncMock()
+        mock_cache.get = AsyncMock(return_value=None)
+        settings_row = SimpleNamespace(
+            age_group="FORTIES",
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(17)
+        returns_map = {
+            "SPY": [random.gauss(0.0006, 0.012) for _ in range(252)],
+            "QQQ": [random.gauss(0.0007, 0.014) for _ in range(252)],
+            "114260.KS": [random.gauss(0.0001, 0.001) for _ in range(252)],
+        }
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(
+                    return_value={
+                        ("SPY", "NYSE"): {"cagr_pct": 10.0},
+                        ("QQQ", "NASDAQ"): {"cagr_pct": 12.0},
+                        ("114260", "KOSPI"): {"cagr_pct": 3.0},
+                    }
+                ),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(mock_cache, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.recommended_items
+        mock_cache.setex.assert_awaited_once()
+
+    async def test_age_default_dividend_floor_shifts_weight_to_high_yield_candidate(self):
+        """annual_dividend_goal 미설정 + 40대 → 연령대 기본 배당수익률 하한(1.5%)이
+        required_dividend_yield_pct로 반영되고, note에 안내 문구가 포함되며, 고배당 후보(SCHD)
+        비중이 늘어 목표 배당수익률을 충족한다."""
+        settings_row = SimpleNamespace(
+            age_group="FORTIES",
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=100.0,  # 종목당 상한을 풀어 배당 제약이 실제로 비중을 좌우하게 함
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(19)
+        returns_map = {
+            "SPY": [random.gauss(0.0005, 0.01) for _ in range(252)],
+            "SCHD": [random.gauss(0.0004, 0.009) for _ in range(252)],
+        }
+        dividend_map = {("SPY", "NYSE"): 0.0, ("SCHD", "NYSE"): 3.5}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.age_bracket == "40대"
+        assert result.required_dividend_yield_pct == 1.5
+        assert "40대" in result.note
+        assert "1.5" in result.note
+        assert result.expected_dividend_yield_pct is not None
+        assert result.expected_dividend_yield_pct >= 1.4  # 반올림 오차 허용
+        # SPY(저배당, dividend_map=0.0)도 분산 목적으로 포함될 수 있는데, 종목별 배당수익률이
+        # dividend_map과 일치해야 화면에서 "이건 배당 목적이 아니다"를 구분할 수 있다.
+        for item in result.recommended_items:
+            assert item.dividend_yield_pct == dividend_map.get((item.ticker, item.market))
+
+    async def test_explicit_dividend_goal_overrides_age_default(self):
+        """annual_dividend_goal이 설정돼 있으면 연령대 기본값(40대=1.5%) 대신 명시적 목표에서
+        계산된 값이 우선 반영된다."""
+        settings_row = SimpleNamespace(
+            age_group="FORTIES",
+            annual_dividend_goal=1_000_000.0,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=100.0,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(23)
+        returns_map = {
+            "SPY": [random.gauss(0.0005, 0.01) for _ in range(252)],
+            "SCHD": [random.gauss(0.0004, 0.009) for _ in range(252)],
+        }
+        dividend_map = {("SPY", "NYSE"): 0.0, ("SCHD", "NYSE"): 3.5}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        # 1,000,000 / 10,000,000 * 100 = 10.0% — 40대 기본값(1.5%)보다 훨씬 큼
+        assert result.required_dividend_yield_pct == 10.0
+        # 큐레이션 후보(최대 3.5%)로는 10% 목표를 달성할 수 없어 fail-soft로 무시된다
+        assert "충족하는 조합을 찾지 못해" in result.note
+        # 명시적 목표를 쓴 경우이므로 연령대 기본값 안내 문구는 붙지 않는다
+        assert "연령대 기본" not in result.note
+        assert result.recommended_items
+
+    async def test_unachievable_age_default_dividend_goal_falls_back_gracefully(self):
+        """연령대 기본 배당목표가 큐레이션 후보로 달성 불가능하면 제약을 조용히 무시하고(fail-soft)
+        note로 안내하되, 추천 자체는 정상적으로 반환된다."""
+        settings_row = SimpleNamespace(
+            age_group="SIXTIES_PLUS",
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(29)
+        returns_map = {
+            "SPY": [random.gauss(0.0006, 0.012) for _ in range(252)],
+            "114260.KS": [random.gauss(0.0001, 0.001) for _ in range(252)],
+        }
+        # 두 후보 모두 배당수익률 0% — 60대 이상 기본 하한(3.5%)은 절대 달성 불가능
+        dividend_map = {("SPY", "NYSE"): 0.0, ("114260", "KOSPI"): 0.0}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("114260", "KOSPI"): {"cagr_pct": 3.0}}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(return_value=dividend_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.required_dividend_yield_pct == 3.5
+        assert "60대 이상 연령대 기본 배당목표" in result.note
+        assert "충족하는 조합을 찾지 못해" in result.note
+        assert result.recommended_items
+
+    async def test_age_default_dividend_goal_suggests_curated_high_yield_candidate(self):
+        """등록된 후보(SPY 1.0%, 114260 국고채 0%)만으로는 60대 이상 기본 배당목표(3.5%)를
+        달성할 수 없을 때, 큐레이션 유니버스의 고배당 후보(JEPQ)를 `suggested_candidates`로
+        제안한다 — 사용자가 승인하기 전까지는 비중 계산(`recommended_items`)에 반영되지
+        않고, 등록 목록(`goal_candidate_tickers`)도 그대로 유지된다."""
+        settings_row = SimpleNamespace(
+            age_group="SIXTIES_PLUS",
+            annual_dividend_goal=None,
+            goal_candidate_tickers=[
+                {"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "114260", "name": "KODEX 국고채3년", "market": "KOSPI", "asset_class": "BOND"},
+            ],
+            goal_max_weight_pct=None,
+            goal_cagr_lookback_years=None,
+        )
+        random.seed(31)
+        returns_map = {
+            "SPY": [random.gauss(0.0006, 0.012) for _ in range(252)],
+            "114260.KS": [random.gauss(0.0001, 0.001) for _ in range(252)],
+            "JEPQ": [random.gauss(0.0003, 0.009) for _ in range(252)],
+        }
+        cagr_map = {
+            ("SPY", "NYSE"): {"cagr_pct": 10.0},
+            ("114260", "KOSPI"): {"cagr_pct": 3.0},
+            ("JEPQ", "NASDAQ"): {"cagr_pct": 6.0},
+        }
+        dividend_by_ticker = {
+            ("SPY", "NYSE"): 1.0,
+            ("114260", "KOSPI"): 0.0,
+            ("JEPQ", "NASDAQ"): 9.95,
+            ("JEPI", "NYSE"): 8.1,
+            ("SCHD", "NYSE"): 3.5,
+            ("VYM", "NYSE"): 2.9,
+            ("458730", "KOSPI"): 2.81,
+            ("446720", "KOSPI"): 2.88,
+        }
+
+        async def _dividend_side_effect(tickers):
+            return {tm: dividend_by_ticker[tm] for tm in tickers if tm in dividend_by_ticker}
+
+        user_id = uuid.uuid4()
+        mock_db = AsyncMock()
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, mock_db, user_id, settings_row)
+
+        recommended_tickers = {item.ticker for item in result.recommended_items}
+        assert "JEPQ" not in recommended_tickers  # 승인 전에는 비중 계산에 반영되지 않음
+
+        suggested_tickers = {c.ticker for c in result.suggested_candidates}
+        assert "JEPQ" in suggested_tickers  # 가장 배당수익률이 높은 미등록 후보가 제안됨
+        jepq = next(c for c in result.suggested_candidates if c.ticker == "JEPQ")
+        assert jepq.dividend_yield_pct == 9.95
+
+        assert "60대 이상 연령대 기본 배당목표" in result.note
+        assert "아래 고배당 후보를 추가하면 도움이 됩니다" in result.note
+        assert "자동 등록" not in result.note
+        mock_db.commit.assert_not_awaited()
+        assert result.risk_tolerance == "CONSERVATIVE"
+        # 승인 전이므로 등록 목록(goal_candidate_tickers)은 변경되지 않아야 한다.
+        assert len(settings_row.goal_candidate_tickers) == 2
+
+    async def test_age_based_already_achieving_dividend_goal_suggests_better_candidate(self):
+        """등록 후보(QQQ/VOO/SCHD)만으로 명시적 배당목표(연 1.74%)를 이미 달성했어도, 등록
+        후보만으로는 개선 목표(1.74+0.5=2.24%)에 못 미쳐 큐레이션 유니버스의 JEPQ(9.95%)가
+        "더 나은 옵션"으로 제안돼야 한다 — overall/by-horizon과 동일한 사후 판정 배선을
+        연령대별 경로에서도 검증."""
+        settings_row = SimpleNamespace(
+            age_group="FORTIES",
+            annual_dividend_goal=174_000.0,  # total_assets_krw 10,000,000 대비 1.74%
+            goal_candidate_tickers=[
+                {"ticker": "QQQ", "name": "Invesco QQQ Trust", "market": "NASDAQ", "asset_class": "EQUITY"},
+                {"ticker": "VOO", "name": "Vanguard S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"},
+                {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            ],
+            goal_max_weight_pct=40.0,
+            goal_cagr_lookback_years=None,
+        )
+        cagr_map = {
+            ("QQQ", "NASDAQ"): {"cagr_pct": 18.0},
+            ("VOO", "NYSE"): {"cagr_pct": 13.0},
+            ("SCHD", "NYSE"): {"cagr_pct": 11.0},
+        }
+        dividend_map = {
+            ("QQQ", "NASDAQ"): 0.6,
+            ("VOO", "NYSE"): 1.3,
+            ("SCHD", "NYSE"): 3.5,
+            ("JEPQ", "NASDAQ"): 9.95,
+            ("JEPI", "NYSE"): 8.1,
+        }
+        random.seed(5)
+        returns_map = {
+            "QQQ": [random.gauss(0.0009, 0.013) for _ in range(252)],
+            "VOO": [random.gauss(0.0006, 0.010) for _ in range(252)],
+            "SCHD": [random.gauss(0.0005, 0.009) for _ in range(252)],
+        }
+
+        async def _dividend_side_effect(tickers):
+            return {tm: dividend_map[tm] for tm in tickers if tm in dividend_map}
+
+        with (
+            patch(
+                "app.services.goal_recommendation_service.query_latest_position_map",
+                AsyncMock(return_value={}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.get_historical_returns",
+                AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
+            ),
+            patch(
+                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                return_value=returns_map,
+            ),
+        ):
+            result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
+
+        assert result.expected_dividend_yield_pct >= 1.74  # 등록 후보만으로 이미 목표 달성
+        assert result.dividend_goal_status == "improvable"
+        suggested_tickers = {c.ticker for c in result.suggested_candidates}
+        assert suggested_tickers == {"JEPQ"}
+        assert "이미 배당 목표를 달성했지만" in result.note
+        assert "JEPQ" not in {i.ticker for i in result.recommended_items}
 
 
 class TestComputeWeightedExpectedMetrics:

@@ -23,7 +23,8 @@ async def test_check_rebalancing_alerts_no_alerts_nothing_happens(mock_db, overr
 
     await check_rebalancing_alerts(mock_db)
 
-    mock_db.commit.assert_not_called()
+    # 1회: get_confirmed_composite_level()의 최초 부트스트랩 저장(durable_state) — 알림 순회 전에 항상 호출됨
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -74,7 +75,8 @@ async def test_check_rebalancing_alerts_notify_with_drift(mock_db):
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_called_once()
-    mock_db.commit.assert_called_once()
+    # 2회: (1) get_confirmed_composite_level() 부트스트랩 저장 (2) 알림 발송 후 커밋
+    assert mock_db.commit.call_count == 2
 
 
 @pytest.mark.asyncio
@@ -122,7 +124,8 @@ async def test_check_rebalancing_alerts_no_drift_skips(mock_db):
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_not_called()
-    mock_db.commit.assert_not_called()
+    # 1회: get_confirmed_composite_level()의 최초 부트스트랩 저장(durable_state)
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -210,7 +213,8 @@ async def test_check_rebalancing_alerts_scheduled_report(mock_db):
         await check_rebalancing_alerts(mock_db)
 
     mock_email.assert_called_once()
-    mock_db.commit.assert_called_once()
+    # 2회: (1) get_confirmed_composite_level() 부트스트랩 저장 (2) 알림 발송 후 커밋
+    assert mock_db.commit.call_count == 2
 
 
 # ── _select_items_to_show (extra_trigger) ────────────────────
@@ -321,8 +325,9 @@ class TestCheckRebalancingAlertsCompositeTrigger:
         mock_email.assert_called_once()
         assert mock_email.call_args.kwargs["is_composite_triggered"] is True
         assert "분산도" in mock_email.call_args.kwargs["composite_reason"]
-        # commit 2회: (1) 복합신호 dedup 플래그 저장(set_durable 내부) (2) 알림 루프의 last_triggered_at 저장
-        assert mock_db.commit.call_count == 2
+        # commit 3회: (1) get_confirmed_composite_level() 부트스트랩 저장 (2) 복합신호 dedup 플래그 저장
+        # (set_durable 내부) (3) 알림 루프의 last_triggered_at 저장
+        assert mock_db.commit.call_count == 3
 
     @pytest.mark.asyncio
     async def test_no_drift_no_composite_signal_skips(self, mock_db):
@@ -763,7 +768,8 @@ async def test_check_rebalancing_alerts_both_on_schedule_day_sends_full_report(m
     mock_email.assert_called_once()
     call_kwargs = mock_email.call_args.kwargs
     assert call_kwargs.get("is_scheduled_report") is True
-    mock_db.commit.assert_called_once()
+    # 2회: (1) get_confirmed_composite_level() 부트스트랩 저장 (2) 알림 발송 후 커밋
+    assert mock_db.commit.call_count == 2
 
 
 @pytest.mark.asyncio

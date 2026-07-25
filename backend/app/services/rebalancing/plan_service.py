@@ -774,9 +774,9 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
     if not due_leg_ids:
         return 0
 
-    from app.services.market_signal_service import get_market_signal_for_auto_gate
+    from app.services.market_signal_service import get_confirmed_composite_level
 
-    composite_level, data_freshness = await get_market_signal_for_auto_gate(cache)
+    composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
 
     processed = 0
     for leg_id in due_leg_ids:

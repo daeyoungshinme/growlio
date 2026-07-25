@@ -1,4 +1,4 @@
-"""시장 위험 신호 API — VIX, 장단기 금리차, Fear & Greed Index 복합 조회."""
+"""시장 위험 신호 API — VIX, 미국 금리 커브, 하이일드 스프레드 등 복합 조회."""
 
 from __future__ import annotations
 
@@ -25,14 +25,12 @@ async def get_market_signal_endpoint(
 
     - composite_level: GREEN | YELLOW | RED
     - signals.vix: VIX 최신값 + 위험 레벨
-    - signals.yield_curve: 10Y-2Y 스프레드 + 커브 상태
-    - signals.fear_greed: Fear & Greed Index 0-100
+    - signals.us_rate_curve: 10Y-2Y 스프레드 + 2Y-FEDFUNDS 스프레드를 병합한 "미국 금리 커브" 신호
+      (둘 다 Fed 정책금리 경로 기대를 반영해 이중계상 방지 목적으로 병합, sub_score는 worst-case)
     - signals.high_yield_spread: 하이일드 채권 스프레드 + 신용 경색 레벨
     - signals.dollar_index: 달러 인덱스 20일선 이격도 + 레벨
-    - signals.rate_cut_expectation: 2Y-FEDFUNDS 스프레드 기반 금리인하 기대 레벨
     - signals.exchange_rate: 원/달러 환율(DEXKOUS) 20일선 이격도 + 레벨 (예측치 아님, 참고 지표)
     - signals.oil_price: WTI 현물유가(DCOILWTICO) 20일선 이격도 + 레벨 (급등/급락 모두 위험 신호)
-    - fear_greed_contrarian_buy: F&G 25 이하 시 역발상 매수 기회 플래그
     - data_freshness: LIVE | CACHED | PARTIAL | STALE
     """
     cache = await get_cache_store()

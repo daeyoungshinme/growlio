@@ -24,6 +24,9 @@ def _make_mock_db():
     execute_result.all.return_value = []
     mock_db.execute = AsyncMock(return_value=execute_result)
     mock_db.scalar = AsyncMock(return_value=None)
+    # get_confirmed_composite_level()의 durable_state 조회(db.get) 기본값 — 저장된 confirmed level
+    # 없음(최초 실행)으로 취급, raw level을 그대로 confirmed로 부트스트랩한다.
+    mock_db.get = AsyncMock(return_value=None)
     mock_db.commit = AsyncMock()
     mock_db.refresh = AsyncMock()
     return mock_db

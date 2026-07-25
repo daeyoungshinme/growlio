@@ -253,7 +253,8 @@ class TestQuickExecutePlanGenerated:
         assert result.plan_id == plan.id
         assert result.buy_count == 2
         assert result.sell_count == 1
-        mock_db.commit.assert_awaited_once()
+        # 2회: (1) get_confirmed_composite_level()의 최초 부트스트랩 저장(durable_state) (2) 플랜 생성 커밋
+        assert mock_db.commit.await_count == 2
 
     @pytest.mark.asyncio
     async def test_plan_generated_but_email_not_sent_reports_honest_message(self, mock_db, mock_request):

@@ -54,12 +54,14 @@ async def run_rebalancing_auto_execution() -> None:
 
 
 async def _run_auto_execution() -> None:
-    from app.services.market_signal_service import get_market_signal_for_auto_gate
+    from app.services.market_signal_service import get_confirmed_composite_level
 
     cache = await get_cache_store()
-    composite_level, data_freshness = await get_market_signal_for_auto_gate(cache)
 
     async with AsyncSessionLocal() as db:
+        # confirmed level(hysteresis 적용)은 durable_state 조회가 필요해 db 세션 안에서 구한다.
+        composite_level, data_freshness = await get_confirmed_composite_level(cache, db)
+
         result = await db.execute(
             select(RebalancingAlert, Portfolio, User.email, UserSettings.notification_email, UserSettings.fcm_token)
             .join(Portfolio, Portfolio.id == RebalancingAlert.portfolio_id)

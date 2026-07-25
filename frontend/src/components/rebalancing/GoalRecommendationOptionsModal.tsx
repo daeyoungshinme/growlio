@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchSettings,
   updateGoalRecommendationOptions,
+  type AgeGroup,
   type GoalRiskTolerance,
 } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -20,6 +21,14 @@ const RISK_TOLERANCE_OPTIONS: { value: GoalRiskTolerance; label: string }[] = [
 ];
 
 const CAGR_LOOKBACK_OPTIONS = [3, 5, 10];
+
+const AGE_GROUP_OPTIONS: { value: AgeGroup; label: string }[] = [
+  { value: "TWENTIES", label: "20대" },
+  { value: "THIRTIES", label: "30대" },
+  { value: "FORTIES", label: "40대" },
+  { value: "FIFTIES", label: "50대" },
+  { value: "SIXTIES_PLUS", label: "60대 이상" },
+];
 
 interface Props {
   onClose: () => void;
@@ -42,11 +51,13 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const [shortTermEquityFloorPctInput, setShortTermEquityFloorPctInput] = useState<string | null>(
     null,
   );
+  const [ageGroupInput, setAgeGroupInput] = useState<AgeGroup | "" | null>(null);
 
   const savedRiskTolerance = settingsData?.goal_risk_tolerance ?? "CONSERVATIVE";
   const savedMaxWeightPct = settingsData?.goal_max_weight_pct ?? 40.0;
   const savedCagrLookbackYears = settingsData?.goal_cagr_lookback_years ?? 10;
   const savedShortTermEquityFloorPct = settingsData?.goal_short_term_equity_floor_pct ?? 80.0;
+  const savedAgeGroup = settingsData?.age_group ?? null;
 
   const currentRiskTolerance = riskTolerance ?? savedRiskTolerance;
   const currentCagrLookbackYears = cagrLookbackYears ?? savedCagrLookbackYears;
@@ -60,6 +71,8 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
     shortTermEquityFloorPctInput === null
       ? savedShortTermEquityFloorPct
       : Number(shortTermEquityFloorPctInput);
+  const currentAgeGroup: AgeGroup | null =
+    ageGroupInput === null ? savedAgeGroup : ageGroupInput === "" ? null : ageGroupInput;
 
   const maxWeightValid =
     Number.isFinite(currentMaxWeightPct) && currentMaxWeightPct >= 10 && currentMaxWeightPct <= 100;
@@ -72,7 +85,8 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
     currentRiskTolerance !== savedRiskTolerance ||
     currentMaxWeightPct !== savedMaxWeightPct ||
     currentCagrLookbackYears !== savedCagrLookbackYears ||
-    currentShortTermEquityFloorPct !== savedShortTermEquityFloorPct;
+    currentShortTermEquityFloorPct !== savedShortTermEquityFloorPct ||
+    currentAgeGroup !== savedAgeGroup;
 
   const saveMutation = useMutation({
     mutationFn: updateGoalRecommendationOptions,
@@ -177,6 +191,28 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           </p>
         </div>
 
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            연령대 (연령대별 추천)
+          </label>
+          <select
+            value={currentAgeGroup ?? ""}
+            onChange={(e) => setAgeGroupInput((e.target.value || "") as AgeGroup | "")}
+            className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="">선택 안 함</option>
+            {AGE_GROUP_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-400 mt-1">
+            선택하면 "연령대" 탭에서 해당 연령대에 맞는 리스크 성향과 주식비중으로 추천을 받을 수
+            있습니다.
+          </p>
+        </div>
+
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
@@ -195,6 +231,7 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
                   max_weight_pct: currentMaxWeightPct,
                   cagr_lookback_years: currentCagrLookbackYears,
                   short_term_equity_floor_pct: currentShortTermEquityFloorPct,
+                  age_group: currentAgeGroup,
                 })
               }
               className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"

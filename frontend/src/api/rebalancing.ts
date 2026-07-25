@@ -1,5 +1,5 @@
 import { apiGet, apiPost } from "./client";
-import type { GoalRiskTolerance } from "./settings";
+import type { AssetClass, GoalRiskTolerance } from "./settings";
 import type { AccountTaxType } from "./assets";
 import type { MarketRiskLevel } from "./marketSignals";
 
@@ -277,7 +277,24 @@ export interface GoalRecommendationItem {
   name: string;
   market: string;
   weight: number;
+  /** 실시간 조회된 종목별 배당수익률(%) — 배당 목표 제약은 포트폴리오 전체 가중평균에만 걸리므로,
+   * 저배당 종목도 분산 목적으로 포함될 수 있다. 조회 실패/데이터 없음이면 null. */
+  dividend_yield_pct: number | null;
 }
+
+/** 등록된 후보만으로 배당 목표를 달성할 수 없을 때 제안되는 미등록 고배당 후보 — 아직
+ * 저장되지 않았으며, 사용자가 "후보에 추가" 버튼으로 승인해야만 저장된다. */
+export interface SuggestedGoalCandidate {
+  ticker: string;
+  name: string;
+  market: string;
+  asset_class: AssetClass;
+  dividend_yield_pct: number | null;
+}
+
+/** 배당 목표 대비 판정 상태 — "unreachable"(등록후보로 달성 불가) | "improvable"(달성했지만
+ * 더 나은 후보 존재) | "optimal"(달성했고 더 나은 후보 없음) | null(배당목표 미설정). */
+export type DividendGoalStatus = "unreachable" | "improvable" | "optimal" | null;
 
 export interface GoalRecommendation {
   generated_at: string;
@@ -293,6 +310,10 @@ export interface GoalRecommendation {
   risk_tolerance: GoalRiskTolerance;
   max_weight_pct: number;
   market_signal_level: MarketRiskLevel | null;
+  age_bracket?: string | null;
+  includes_cash_equivalent?: boolean;
+  suggested_candidates: SuggestedGoalCandidate[];
+  dividend_goal_status?: DividendGoalStatus;
 }
 
 export const fetchOverallGoalRecommendation = (): Promise<GoalRecommendation> =>
@@ -317,6 +338,8 @@ export interface HorizonGoalRecommendation {
   includes_cash_equivalent: boolean;
   market_signal_level: MarketRiskLevel | null;
   note: string | null;
+  suggested_candidates: SuggestedGoalCandidate[];
+  dividend_goal_status?: DividendGoalStatus;
 }
 
 export interface HorizonRecommendationResponse {
@@ -326,6 +349,11 @@ export interface HorizonRecommendationResponse {
 
 export const fetchHorizonGoalRecommendations = (): Promise<HorizonRecommendationResponse> =>
   apiGet<HorizonRecommendationResponse>(`/rebalancing/goal-recommendation/by-horizon`);
+
+// ── 연령대별 추천 — 목표 역산이 아닌 나이 구간별 리스크 성향 + 주식비중 상/하한 재배분 ──
+
+export const fetchAgeGoalRecommendation = (): Promise<GoalRecommendation> =>
+  apiGet<GoalRecommendation>(`/rebalancing/goal-recommendation/by-age`);
 
 // ── 적용 전 비교 미리보기 — 포트폴리오의 현재 목표 비중에 대한 기대수익률/배당수익률/변동성 ──────
 

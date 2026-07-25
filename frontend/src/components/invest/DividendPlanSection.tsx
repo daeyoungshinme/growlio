@@ -1,14 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
-import { Settings2, TrendingUp } from "lucide-react";
+import { ArrowRight, Settings2, TrendingUp } from "lucide-react";
 import { fetchDividendPlan } from "@/api/invest";
+import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
+import { fetchSettings } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { fmtKrw, fmtKrwShort } from "@/utils/format";
+import { fmtKrw, fmtKrwShort, fmtPct } from "@/utils/format";
 import { useThemeStore } from "@/stores/themeStore";
 import { chartTooltipStyle } from "@/utils/chart";
+import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
 
 const MONTH_LABELS = [
   "1월",
@@ -38,6 +42,21 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     queryFn: fetchDividendPlan,
     staleTime: STALE_TIME.MEDIUM,
   });
+
+  // GoalTimelineCard(적립 계획 탭)와 동일한 queryKey를 써서 캐시를 공유한다 — 중복 호출 없음.
+  const { data: recommendation } = useQuery({
+    queryKey: QUERY_KEYS.goalRecommendationOverall,
+    queryFn: fetchOverallGoalRecommendation,
+    staleTime: STALE_TIME.LONG,
+  });
+  const { data: settingsData } = useQuery({
+    queryKey: QUERY_KEYS.settings,
+    queryFn: fetchSettings,
+    staleTime: STALE_TIME.LONG,
+  });
+  const addSuggestedMutation = useAddSuggestedCandidates(
+    settingsData?.goal_candidate_tickers ?? [],
+  );
 
   if (isLoading) return <SkeletonCard rows={5} height="h-5" />;
 
@@ -254,6 +273,60 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
           </div>
         )}
       </div>
+
+      {/* 배당 목표 달성 추천 ETF — 적립 계획 탭의 "더 빨리 달성하려면?"과 동일한 사상 */}
+      {annual_dividend_goal && recommendation?.is_configured && (
+        <div className="card">
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+            배당 목표를 더 빨리 달성하려면?
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-3">
+            배당수익률이 높은 ETF를 후보에 추가하면 목표 배당금에 더 가까워질 수 있어요.
+          </p>
+
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950">
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">목표 배당수익률</p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+                {fmtPct(recommendation.required_dividend_yield_pct)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 dark:text-gray-500">기대 배당수익률</p>
+              <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                {fmtPct(recommendation.expected_dividend_yield_pct)}
+              </p>
+            </div>
+          </div>
+
+          {recommendation.note && (
+            <p
+              className={`text-xs font-medium mb-2 ${
+                recommendation.dividend_goal_status === "unreachable"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : recommendation.dividend_goal_status === "improvable"
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              {recommendation.note}
+            </p>
+          )}
+
+          <SuggestedCandidatesBlock
+            candidates={recommendation.suggested_candidates}
+            onAdd={() => addSuggestedMutation.mutate(recommendation.suggested_candidates)}
+            isPending={addSuggestedMutation.isPending}
+          />
+
+          <Link
+            to="/rebalancing?rtab=포트폴리오"
+            className="flex items-center gap-1.5 text-xs font-medium text-violet-600 dark:text-violet-400 hover:underline mt-3"
+          >
+            추천 포트폴리오 자세히 보기 <ArrowRight size={12} />
+          </Link>
+        </div>
+      )}
 
       {/* 월별 배당 분포 */}
       <div className="card">

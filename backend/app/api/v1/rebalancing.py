@@ -32,6 +32,7 @@ from app.services.dividend.orchestrator import get_ticker_dividend_summary
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
     existing_items_from_positions,
+    get_age_based_recommendation,
     get_goal_recommendation,
     get_horizon_recommendations,
 )
@@ -197,6 +198,24 @@ async def get_horizon_goal_recommendation_endpoint(
     """
     settings_row = await get_or_create_settings(db, current_user.id)
     return await get_horizon_recommendations(cache, db, current_user.id, settings_row)
+
+
+@router.get("/goal-recommendation/by-age", response_model=GoalRecommendation)
+@limiter.limit("5/minute")
+async def get_age_based_goal_recommendation_endpoint(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    cache=Depends(get_cache_store),
+):
+    """사용자가 직접 선택한 연령대에 맞는 리스크 성향 + 주식비중으로 추천을 반환한다
+    (자동 적용 아님). `UserSettings.age_group` 미설정 시 `is_configured=False`로 안내 문구만 반환한다.
+
+    목표금액/목표연도 역산은 하지 않는다 — `/goal-recommendation/by-horizon`과 동일하게 나이
+    구간에서 유도한 리스크 성향/주식비중 상하한만으로 결과를 결정한다.
+    """
+    settings_row = await get_or_create_settings(db, current_user.id)
+    return await get_age_based_recommendation(cache, db, current_user.id, settings_row)
 
 
 @router.get("/portfolios/{portfolio_id}/expected-metrics", response_model=PortfolioExpectedMetrics)

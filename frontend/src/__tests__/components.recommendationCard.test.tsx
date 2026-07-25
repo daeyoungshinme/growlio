@@ -14,6 +14,7 @@ import type { AssetAccount } from "@/api/assets";
 
 const fetchOverallGoalRecommendation = vi.fn();
 const fetchHorizonGoalRecommendations = vi.fn();
+const fetchAgeGoalRecommendation = vi.fn();
 const fetchPortfolioExpectedMetrics = vi.fn();
 const fetchSettings = vi.fn();
 const updateGoalCandidateTickers = vi.fn();
@@ -27,6 +28,7 @@ const toastMock = vi.fn();
 vi.mock("@/api/rebalancing", () => ({
   fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
   fetchHorizonGoalRecommendations: (...args: unknown[]) => fetchHorizonGoalRecommendations(...args),
+  fetchAgeGoalRecommendation: (...args: unknown[]) => fetchAgeGoalRecommendation(...args),
   fetchPortfolioExpectedMetrics: (...args: unknown[]) => fetchPortfolioExpectedMetrics(...args),
   CASH_EQUIVALENT_TICKER: "CASH_EQUIVALENT",
 }));
@@ -131,6 +133,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_max_weight_pct: 40.0,
     goal_cagr_lookback_years: 10,
     goal_short_term_equity_floor_pct: 80.0,
+    age_group: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,
     ...overrides,
   };
@@ -145,8 +148,20 @@ function makeOverallRecommendation(
     required_return_pct: 8.5,
     required_dividend_yield_pct: null,
     recommended_items: [
-      { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 60 },
-      { ticker: "SCHD", name: "Schwab US Dividend Equity ETF", market: "NYSE", weight: 40 },
+      {
+        ticker: "SPY",
+        name: "SPDR S&P 500 ETF",
+        market: "NYSE",
+        weight: 60,
+        dividend_yield_pct: null,
+      },
+      {
+        ticker: "SCHD",
+        name: "Schwab US Dividend Equity ETF",
+        market: "NYSE",
+        weight: 40,
+        dividend_yield_pct: null,
+      },
     ],
     expected_return_pct: 9.1,
     expected_dividend_yield_pct: 2.1,
@@ -156,6 +171,44 @@ function makeOverallRecommendation(
     risk_tolerance: "CONSERVATIVE",
     max_weight_pct: 40.0,
     market_signal_level: null,
+    suggested_candidates: [],
+    ...overrides,
+  };
+}
+
+function makeAgeRecommendation(overrides: Partial<GoalRecommendation> = {}): GoalRecommendation {
+  return {
+    generated_at: "2026-07-23T00:00:00Z",
+    is_configured: true,
+    required_return_pct: null,
+    required_dividend_yield_pct: null,
+    recommended_items: [
+      {
+        ticker: "SPY",
+        name: "SPDR S&P 500 ETF",
+        market: "NYSE",
+        weight: 70,
+        dividend_yield_pct: null,
+      },
+      {
+        ticker: "QQQ",
+        name: "Invesco QQQ Trust",
+        market: "NASDAQ",
+        weight: 30,
+        dividend_yield_pct: null,
+      },
+    ],
+    expected_return_pct: 10.2,
+    expected_dividend_yield_pct: 1.5,
+    expected_volatility_pct: 16.0,
+    note: null,
+    cagr_lookback_years: 10,
+    risk_tolerance: "AGGRESSIVE",
+    max_weight_pct: 40.0,
+    market_signal_level: null,
+    age_bracket: "20~30대 초반",
+    includes_cash_equivalent: false,
+    suggested_candidates: [],
     ...overrides,
   };
 }
@@ -169,8 +222,20 @@ function makeHorizonRec(
     base_krw: 5_000_000,
     account_count: 1,
     recommended_items: [
-      { ticker: "153130", name: "KODEX 단기채권", market: "KOSPI", weight: 60 },
-      { ticker: "114260", name: "KODEX 국고채3년", market: "KOSPI", weight: 40 },
+      {
+        ticker: "153130",
+        name: "KODEX 단기채권",
+        market: "KOSPI",
+        weight: 60,
+        dividend_yield_pct: null,
+      },
+      {
+        ticker: "114260",
+        name: "KODEX 국고채3년",
+        market: "KOSPI",
+        weight: 40,
+        dividend_yield_pct: null,
+      },
     ],
     expected_return_pct: 2.5,
     expected_dividend_yield_pct: null,
@@ -180,6 +245,7 @@ function makeHorizonRec(
     includes_cash_equivalent: false,
     market_signal_level: null,
     note: null,
+    suggested_candidates: [],
     ...overrides,
   };
 }
@@ -195,6 +261,10 @@ describe("RecommendationCard", () => {
     fetchOverallGoalRecommendation.mockReset();
     fetchHorizonGoalRecommendations.mockReset();
     fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([]));
+    fetchAgeGoalRecommendation.mockReset();
+    fetchAgeGoalRecommendation.mockResolvedValue(
+      makeAgeRecommendation({ is_configured: false, recommended_items: [] }),
+    );
     fetchPortfolioExpectedMetrics.mockReset();
     fetchPortfolioExpectedMetrics.mockResolvedValue({
       expected_return_pct: 7.0,
@@ -277,12 +347,19 @@ describe("RecommendationCard", () => {
       fetchOverallGoalRecommendation.mockResolvedValue(
         makeOverallRecommendation({
           recommended_items: [
-            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 33.33 },
+            {
+              ticker: "SPY",
+              name: "SPDR S&P 500 ETF",
+              market: "NYSE",
+              weight: 33.33,
+              dividend_yield_pct: null,
+            },
             {
               ticker: "SCHD",
               name: "Schwab US Dividend Equity ETF",
               market: "NYSE",
               weight: 66.67,
+              dividend_yield_pct: null,
             },
           ],
         }),
@@ -310,18 +387,26 @@ describe("RecommendationCard", () => {
       fetchOverallGoalRecommendation.mockResolvedValue(
         makeOverallRecommendation({
           recommended_items: [
-            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 33.33 },
+            {
+              ticker: "SPY",
+              name: "SPDR S&P 500 ETF",
+              market: "NYSE",
+              weight: 33.33,
+              dividend_yield_pct: null,
+            },
             {
               ticker: "SCHD",
               name: "Schwab US Dividend Equity ETF",
               market: "NYSE",
               weight: 33.33,
+              dividend_yield_pct: null,
             },
             {
               ticker: "TLT",
               name: "iShares 20+ Year Treasury Bond ETF",
               market: "NYSE",
               weight: 33.33,
+              dividend_yield_pct: null,
             },
           ],
         }),
@@ -357,7 +442,13 @@ describe("RecommendationCard", () => {
       fetchOverallGoalRecommendation.mockResolvedValue(
         makeOverallRecommendation({
           recommended_items: [
-            { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 80 },
+            {
+              ticker: "SPY",
+              name: "SPDR S&P 500 ETF",
+              market: "NYSE",
+              weight: 80,
+              dividend_yield_pct: null,
+            },
           ],
           expected_return_pct: 9.1,
           expected_dividend_yield_pct: 2.1,
@@ -452,6 +543,143 @@ describe("RecommendationCard", () => {
           "선택한 리스크 성향의 여유 수익률 목표는 종목당 최대 비중 제약 하에서 달성 가능한 최대 기대수익률까지만 반영되었습니다",
         ),
       ).toBeDefined();
+    });
+
+    it("shows suggested high-yield candidates with an add button, and saves the merged list without touching recommended weights when clicked", async () => {
+      fetchSettings.mockResolvedValue(
+        makeSettingsData({
+          goal_candidate_tickers: [{ ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE" }],
+        }),
+      );
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({
+          note: "등록된 후보로는 배당 목표(연 5.0%)를 달성하기 어렵습니다 — 아래 고배당 후보를 추가하면 도움이 됩니다",
+          suggested_candidates: [
+            {
+              ticker: "JEPQ",
+              name: "JPMorgan Nasdaq Equity Premium Income ETF",
+              market: "NASDAQ",
+              asset_class: "EQUITY",
+              dividend_yield_pct: 9.95,
+            },
+          ],
+        }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/Nasdaq Equity Premium/)).toBeDefined();
+      // 승인 전이므로 제안된 종목(JEPQ)은 추천 비중 목록에는 나타나지 않는다(등록된 SPY/SCHD만 표시).
+      expect(screen.queryByText(/\(JEPQ\)/)).toBeNull();
+
+      fireEvent.click(screen.getByText("후보에 추가"));
+
+      await waitFor(() => expect(updateGoalCandidateTickers).toHaveBeenCalled());
+      expect(updateGoalCandidateTickers.mock.calls[0][0]).toEqual([
+        { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE" },
+        {
+          ticker: "JEPQ",
+          name: "JPMorgan Nasdaq Equity Premium Income ETF",
+          market: "NASDAQ",
+          asset_class: "EQUITY",
+        },
+      ]);
+      await waitFor(() =>
+        expect(toastMock).toHaveBeenCalledWith(expect.stringContaining("추가"), "success"),
+      );
+    });
+
+    it("does not show a suggestion block when suggested_candidates is empty", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({ suggested_candidates: [] }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/SPY/)).toBeDefined();
+      expect(screen.queryByText("후보에 추가")).toBeNull();
+    });
+  });
+
+  describe("연령대 탭", () => {
+    it("always shows the 연령대 tab alongside 전체", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText("전체")).toBeDefined();
+      expect(screen.getByText("연령대")).toBeDefined();
+    });
+
+    it("shows the not-configured guidance and a settings shortcut when age_group is unset", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("연령대"));
+
+      expect(
+        await screen.findByText("연령대를 설정하면 연령대별 추천을 받을 수 있습니다"),
+      ).toBeDefined();
+      expect(screen.queryByText(/에 적용/)).toBeNull();
+
+      fireEvent.click(screen.getByText("연령대 설정하기"));
+      expect(await screen.findByText("연령대 (연령대별 추천)")).toBeDefined();
+    });
+
+    it("renders recommended items and the age bracket summary", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchAgeGoalRecommendation.mockResolvedValue(makeAgeRecommendation());
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("연령대"));
+
+      expect(await screen.findByText(/SPY/)).toBeDefined();
+      expect(screen.getByText("70.0%")).toBeDefined();
+      expect(screen.getByText("30.0%")).toBeDefined();
+      expect(screen.getByText(/20~30대 초반/)).toBeDefined();
+      expect(screen.getByText(/예상 변동성 연 16\.0%/)).toBeDefined();
+    });
+
+    it("applies the age-based recommendation to the tagged target portfolio", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchAgeGoalRecommendation.mockResolvedValue(makeAgeRecommendation());
+      fetchPortfolios.mockResolvedValue([makePortfolio({ id: "target-1" })]);
+      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: "target-1" })]);
+      updatePortfolio.mockResolvedValue({});
+      const onApplied = vi.fn();
+      renderWithProviders(<RecommendationCard onApplied={onApplied} />);
+
+      fireEvent.click(await screen.findByText("연령대"));
+      fireEvent.click(await screen.findByText(/에 적용/));
+      fireEvent.click(await screen.findByText("적용"));
+
+      await waitFor(() =>
+        expect(updatePortfolio).toHaveBeenCalledWith(
+          "target-1",
+          expect.objectContaining({
+            items: [
+              { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 70 },
+              { ticker: "QQQ", name: "Invesco QQQ Trust", market: "NASDAQ", weight: 30 },
+            ],
+          }),
+        ),
+      );
+      await waitFor(() => expect(onApplied).toHaveBeenCalledWith("target-1"));
+    });
+
+    it("shows a note instead of items when the recommendation is insufficient", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchAgeGoalRecommendation.mockResolvedValue(
+        makeAgeRecommendation({
+          recommended_items: [],
+          note: "등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요",
+        }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("연령대"));
+
+      expect(
+        await screen.findByText("등록된 후보 종목이 없습니다 — 후보 ETF를 추가해주세요"),
+      ).toBeDefined();
+      expect(screen.queryByText(/에 적용/)).toBeNull();
     });
   });
 
@@ -604,6 +832,7 @@ describe("RecommendationCard", () => {
         max_weight_pct: 40,
         cagr_lookback_years: 10,
         short_term_equity_floor_pct: 80,
+        age_group: null,
       });
     });
 
@@ -681,7 +910,13 @@ describe("RecommendationCard", () => {
             investment_horizon: "LONG_TERM",
             risk_tolerance: "AGGRESSIVE",
             recommended_items: [
-              { ticker: "QQQ", name: "Invesco QQQ Trust", market: "NASDAQ", weight: 100 },
+              {
+                ticker: "QQQ",
+                name: "Invesco QQQ Trust",
+                market: "NASDAQ",
+                weight: 100,
+                dividend_yield_pct: null,
+              },
             ],
           }),
         ]),
@@ -729,6 +964,7 @@ describe("RecommendationCard", () => {
                 name: "현금성 자산 (CMA·파킹통장 등)",
                 market: "CASH",
                 weight: 100,
+                dividend_yield_pct: null,
               },
             ],
             includes_cash_equivalent: true,
@@ -817,6 +1053,7 @@ describe("RecommendationCard", () => {
                 name: "현금성 자산 (CMA·파킹통장 등)",
                 market: "CASH",
                 weight: 100,
+                dividend_yield_pct: null,
               },
             ],
             includes_cash_equivalent: true,
@@ -846,6 +1083,7 @@ describe("RecommendationCard", () => {
                 name: "현금성 자산 (CMA·파킹통장 등)",
                 market: "CASH",
                 weight: 100,
+                dividend_yield_pct: null,
               },
             ],
             includes_cash_equivalent: true,
@@ -898,6 +1136,7 @@ describe("RecommendationCard", () => {
                 name: "현금성 자산 (CMA·파킹통장 등)",
                 market: "CASH",
                 weight: 100,
+                dividend_yield_pct: null,
               },
             ],
             includes_cash_equivalent: true,
@@ -958,6 +1197,7 @@ describe("RecommendationCard", () => {
                 name: "현금성 자산 (CMA·파킹통장 등)",
                 market: "CASH",
                 weight: 100,
+                dividend_yield_pct: null,
               },
             ],
             includes_cash_equivalent: true,
@@ -1078,14 +1318,26 @@ describe("RecommendationCard", () => {
             investment_horizon: "LONG_TERM",
             tax_type: "ISA",
             recommended_items: [
-              { ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 100 },
+              {
+                ticker: "069500",
+                name: "KODEX 200",
+                market: "KOSPI",
+                weight: 100,
+                dividend_yield_pct: null,
+              },
             ],
           }),
           makeHorizonRec({
             investment_horizon: "LONG_TERM",
             tax_type: "OVERSEAS_DEDICATED",
             recommended_items: [
-              { ticker: "SPY", name: "SPDR S&P 500 ETF", market: "NYSE", weight: 100 },
+              {
+                ticker: "SPY",
+                name: "SPDR S&P 500 ETF",
+                market: "NYSE",
+                weight: 100,
+                dividend_yield_pct: null,
+              },
             ],
           }),
         ]),
@@ -1112,14 +1364,26 @@ describe("RecommendationCard", () => {
             investment_horizon: "LONG_TERM",
             tax_type: "ISA",
             recommended_items: [
-              { ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 100 },
+              {
+                ticker: "069500",
+                name: "KODEX 200",
+                market: "KOSPI",
+                weight: 100,
+                dividend_yield_pct: null,
+              },
             ],
           }),
           makeHorizonRec({
             investment_horizon: "LONG_TERM",
             tax_type: "GENERAL",
             recommended_items: [
-              { ticker: "005930", name: "삼성전자", market: "KOSPI", weight: 100 },
+              {
+                ticker: "005930",
+                name: "삼성전자",
+                market: "KOSPI",
+                weight: 100,
+                dividend_yield_pct: null,
+              },
             ],
           }),
         ]),

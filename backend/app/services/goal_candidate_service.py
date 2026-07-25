@@ -20,6 +20,7 @@ from app.services.recommendation_universe import (
     RECOMMENDATION_UNIVERSE,
     guess_asset_class,
     resolve_index_region,
+    resolve_tracking_index,
 )
 
 _TAX_TYPE_MARKET_GROUP: dict[str, str] = {
@@ -48,6 +49,27 @@ OVERSEAS_DEDICATED도 이 맵에 포함하는 이유는 선호 지역 좁히기�
 이 세제유형 후보로 섞여 들어가지는 않는다."""
 
 
+def _matches_index_region_preference(c: dict[str, str], tax_type_value: str) -> bool:
+    """EQUITY 후보가 세제유형별 선호 추종지수 지역(`_TAX_TYPE_INDEX_REGION_PREFERENCE`)에 맞는지
+    판별한다 — BOND/CASH는 지역 선호의 영향을 받지 않으므로 항상 True.
+
+    `_apply_index_region_preference()`(등록된 후보 목록을 지역 선호로 좁히는 필터)와
+    `_suggest_for_dividend_goal()`(배당 목표 미달성 시 큐레이션 유니버스에서 고배당 후보를
+    제안하는 기능)이 같은 판별 규칙을 쓰도록 공유한다 — 전자만 적용하면 "등록 후보는 지역
+    선호가 지켜지는데 제안되는 후보는 지켜지지 않는" 비일관성이 생긴다.
+    """
+    if c.get("asset_class", "EQUITY") != "EQUITY":
+        return True
+    preferred_region = _TAX_TYPE_INDEX_REGION_PREFERENCE.get(tax_type_value)
+    if not preferred_region:
+        return True
+    # OVERSEAS_DEDICATED는 추종지수가 아니라 상장거래소가 실제 매수 가능 여부를 결정한다 — KRX
+    # 상장·해외지수 추종 ETF는 이 세제유형 계좌에서 매수할 수 없으므로 항상 제외한다.
+    if tax_type_value == "OVERSEAS_DEDICATED" and c["market"].upper() in DOMESTIC_MARKETS:
+        return False
+    return resolve_index_region(c["ticker"], c["market"], c.get("index_region")) == preferred_region
+
+
 def _apply_index_region_preference(
     candidates: list[dict[str, str]], tax_type_value: str, capacity_remaining: int
 ) -> tuple[list[dict[str, str]], str | None, list[dict[str, str]]]:
@@ -63,7 +85,9 @@ def _apply_index_region_preference(
     `capacity_remaining`(등록 가능 잔여 슬롯, `MAX_GOAL_CANDIDATE_TICKERS - 전체 등록 후보 수`)보다
     보강 후보가 많아 전부 등록할 수 없으면(등록 한도 초과) 보강 자체를 포기한다 — 계산에 쓰인
     후보와 실제 등록되는 후보가 항상 일치하도록 하기 위한 전부 아니면 전무 규칙. 큐레이션 보강도
-    실패하거나 포기되면(안전장치) 원본 후보 목록을 그대로 반환하고 `added=[]`.
+    실패하거나 포기되면, 선호 지역에 맞지 않는 EQUITY는 제외하고(BOND/CASH는 그대로 유지)
+    `added=[]`로 반환한다 — 원본을 그대로 반환하면 이 함수의 존재 목적(세제유형별 선호 지역
+    외 EQUITY 배제)이 무력화되므로, 보강이 불가능해도 필터링 자체는 포기하지 않는다.
     """
     preferred_region = _TAX_TYPE_INDEX_REGION_PREFERENCE.get(tax_type_value)
     if not preferred_region:
@@ -71,17 +95,7 @@ def _apply_index_region_preference(
 
     non_equity = [c for c in candidates if c.get("asset_class", "EQUITY") != "EQUITY"]
     equity_candidates = [c for c in candidates if c.get("asset_class", "EQUITY") == "EQUITY"]
-    preferred_equity = [
-        c
-        for c in equity_candidates
-        if resolve_index_region(c["ticker"], c["market"], c.get("index_region")) == preferred_region
-        # OVERSEAS_DEDICATED는 추종지수가 아니라 상장거래소가 실제 매수 가능 여부를 결정한다 — KRX
-        # 상장·해외지수 추종 ETF(예: TIGER 미국나스닥100)가 index_region=OVERSEAS로 태그돼 있어도
-        # 이 세제유형 계좌에서는 매수할 수 없으므로 항상 제외한다. get_horizon_recommendations는
-        # 호출 전에 이미 시장으로 후보를 걸러주지만, get_goal_recommendation(전체 탭)은 그런 사전
-        # 필터링이 없어 이 함수 자체가 강제하지 않으면 새어 들어갈 수 있다.
-        and (tax_type_value != "OVERSEAS_DEDICATED" or c["market"].upper() not in DOMESTIC_MARKETS)
-    ]
+    preferred_equity = [c for c in equity_candidates if _matches_index_region_preference(c, tax_type_value)]
 
     if preferred_equity:
         return preferred_equity + non_equity, None, []
@@ -109,9 +123,50 @@ def _apply_index_region_preference(
         return curated_fallback + non_equity, note, curated_fallback
 
     note = (
-        f"등록된 후보 중 {region_label}가 없어 전체 후보로 대체 추천합니다 — 후보 ETF 관리에서 지역 태그를 확인해주세요"
+        f"등록된 후보 중 {region_label}가 없어 이번 추천에서는 해당 EQUITY 후보 없이 계산했습니다 — "
+        "후보 ETF 관리에서 등록해주세요"
     )
-    return candidates, note, []
+    return non_equity, note, []
+
+
+def detect_duplicate_tracking_index_note(
+    candidates: list[dict[str, str]], existing_items: list[tuple[str, str, str]]
+) -> str | None:
+    """등록된 후보 중 실제 보유 종목과 동일 지수를 추종하는 다른 티커가 남아있으면 안내
+    문구를 반환한다 — 이미 저장된 `UserSettings.goal_candidate_tickers`를 자동으로 수정하지는
+    않는다(`_get_or_seed_candidates`가 최초 1회만 시딩하고 이후 자동 병합하지 않는 기존
+    설계와 동일 — 사용자 동의 없이 후보 목록을 바꾸지 않는다). `_seed_candidate_tickers`가
+    신규 시딩 시에는 이런 중복을 만들지 않지만, 그 로직이 도입되기 전부터 서로 다른 운용사의
+    동일 지수 ETF를 보유종목과 함께 등록해버린 기존 사용자(예: ACE 미국S&P500 보유 + TIGER
+    미국S&P500 후보 등록)에게 정리를 권유하기 위한 용도다.
+
+    비교 대상을 "실제 보유 종목"으로 한정하는 이유 — 등록 후보끼리(예: 세제유형 필터링 전
+    `RECOMMENDATION_UNIVERSE`가 함께 포함하는 SPY/VOO/TIGER 미국S&P500)는 계좌 유형(해외전용
+    증권사 계좌 vs 국내상장 ISA/연금 계좌)에 따라 의도적으로 병존하는 경우가 흔해, 후보끼리
+    비교하면 정상적인 조합까지 "중복"으로 오탐한다. 배당주기가 명시된 종목(`distribution_frequency`,
+    예: 446720 월배당)도 실질적으로 다른 선택지일 수 있어 비교에서 제외한다.
+    """
+    held_index_labels: dict[str, tuple[str, str]] = {}
+    held_keys = {(t, m) for t, _, m in existing_items}
+    for t, name, m in existing_items:
+        idx = resolve_tracking_index(t, m, name, None)
+        if idx is not None:
+            held_index_labels.setdefault(idx, (t, name))
+
+    for c in candidates:
+        if (c["ticker"], c["market"]) in held_keys or c.get("distribution_frequency"):
+            continue
+        idx = resolve_tracking_index(c["ticker"], c["market"], c["name"], c.get("tracking_index"))
+        if idx is None:
+            continue
+        held = held_index_labels.get(idx)
+        if held is not None:
+            held_ticker, held_name = held
+            return (
+                f"{c['name']}({c['ticker']})은 이미 보유 중인 {held_name}({held_ticker})과 동일 지수를 "
+                "추종합니다 — 후보 ETF 관리에서 정리 여부를 확인해보세요"
+            )
+    return None
 
 
 def existing_items_from_positions(pos_map: dict[str, dict]) -> list[tuple[str, str, str]]:
@@ -133,8 +188,20 @@ def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[
     이 값이 없으면 하위 로직(`c.get("asset_class", "EQUITY")`)이 전부 EQUITY로 취급해, 채권혼합
     ETF 같은 안전자산 보유종목이 IRP 안전자산 30% 하한 계산에서 위험자산으로 오분류된다.
     휴리스틱이라 부정확할 수 있으므로 "후보 ETF 관리"에서 사용자가 언제든 수정 가능해야 한다.
+
+    큐레이션 ETF를 채울 때는 `(ticker, market)` 완전 일치뿐 아니라, 보유 종목과 동일 지수를
+    추종하는 ETF(`resolve_tracking_index`)도 건너뛴다 — 예를 들어 `ACE 미국S&P500`을 이미
+    보유 중이면 큐레이션 유니버스의 `TIGER 미국S&P500`(같은 S&P500 지수, 운용사만 다름)을
+    중복으로 추가하지 않는다. 큐레이션 항목끼리는(예: 458730/446720 배당다우존스 분기·월배당
+    쌍) 이 검사에 걸리지 않는다 — `held_indexes`는 보유 종목에서만 채워지기 때문에 큐레이션
+    유니버스 자체의 의도적인 지수 중복(배당주기 차이)은 그대로 유지된다. 다만 `held_indexes`
+    자체는 배당주기를 구분하지 않으므로, 458730(분기배당)을 이미 보유 중이면 자동 시딩 시
+    446720(월배당)도 함께 건너뛴다 — `detect_duplicate_tracking_index_note`와 달리 자동 채움
+    단계는 "배당주기까지 다르면 별개로 취급"하지 않고 보수적으로 하나만 남긴다(과다 추천보다
+    과소 추천이 안전하다는 원칙). 월배당을 원하면 "후보 ETF 관리"에서 수동으로 추가하면 된다.
     """
     seen: set[tuple[str, str]] = set()
+    held_indexes: set[str] = set()
     seed: list[dict[str, str]] = []
     for t, name, m in existing_items:
         if len(seed) >= MAX_GOAL_CANDIDATE_TICKERS:
@@ -142,11 +209,16 @@ def _seed_candidate_tickers(existing_items: list[tuple[str, str, str]]) -> list[
         if (t, m) in seen:
             continue
         seen.add((t, m))
+        tracking_index = resolve_tracking_index(t, m, name, None)
+        if tracking_index:
+            held_indexes.add(tracking_index)
         seed.append({"ticker": t, "name": name, "market": m, "asset_class": guess_asset_class(name)})
     for c in RECOMMENDATION_UNIVERSE:
         if len(seed) >= MAX_GOAL_CANDIDATE_TICKERS:
             break
         if (c["ticker"], c["market"]) in seen:
+            continue
+        if c.get("tracking_index") in held_indexes:
             continue
         seen.add((c["ticker"], c["market"]))
         seed.append(c)

@@ -70,10 +70,14 @@ TTL_OVERSEAS_STOCK_NAME = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이
 # 잘못된 값을 계속 서빙하는 것을 방지). **값 자체(문자열)는 여기서만 바꾸고,
 # 키 빌더 함수의 f-string 포맷은 그대로 유지할 것 — 무단으로 포맷을 바꾸면 캐시 미스가 폭증한다.**
 _ALLOC_HISTORY_VERSION = "v2"
-_MARKET_SIGNAL_VERSION = "v5"
+_MARKET_SIGNAL_VERSION = "v7"
 """v4: exchange_rate.value 산출 소스를 FRED 지연값 → 실시간 캐시(get_usd_krw_rate)로 변경
 (필드 구성은 동일하나 값 자체가 달라지므로, 기존 v3 캐시가 최대 1시간 TTL 동안
-잘못된 값을 계속 서빙하지 않도록 키를 분리)"""
+잘못된 값을 계속 서빙하지 않도록 키를 분리)
+v6: Fear & Greed Index 완전 제거 + 장단기금리차/금리인하기대를 us_rate_curve 단일 신호로 병합,
+composite_score_max 26→20 — 필드 구성 자체가 바뀌므로 구버전 캐시와 섞이지 않도록 키 분리
+v7: 인플레이션(CPI+PCE 병합)·고용(실업률) 신호 추가, composite_score_max 20→27 —
+signals 딕셔너리에 새 키 추가로 필드 구성이 바뀌므로 키 분리"""
 
 # ---------------------------------------------------------------------------
 # 단순 상수 키
@@ -216,6 +220,10 @@ def goal_recommendation_horizon_key(user_id: uuid.UUID) -> str:
     return f"{_env_prefix()}goal_recommendation_horizon:{user_id}"
 
 
+def goal_recommendation_age_key(user_id: uuid.UUID) -> str:
+    return f"{_env_prefix()}goal_recommendation_age:{user_id}"
+
+
 def economic_indicator_history_key(code: str, months: int) -> str:
     return f"{_env_prefix()}economic:history:{code}:{months}"
 
@@ -229,8 +237,19 @@ def market_signal_latest_key() -> str:
 
 
 def market_signal_last_level_key() -> str:
-    """등급 변화 감지 job이 마지막으로 관측한 composite_level을 저장하는 키."""
+    """마지막으로 확정(confirmed)된 composite_level을 저장하는 키.
+
+    등급전환 즉시알림(`check_market_signal_level_change`)과 AUTO 게이트 hysteresis
+    (`market_signal_service.get_confirmed_composite_level`)가 공유 — 연속 확인 없이는
+    이 값이 바뀌지 않아 두 소비처 모두 flapping을 피한다."""
     return f"{_env_prefix()}market:signal:last_level"
+
+
+def market_signal_pending_confirmation_key() -> str:
+    """raw 레벨이 confirmed와 다를 때, 연속 관측 스트릭(candidate/streak/last_observed_at)을 저장하는 키.
+
+    `CONFIRM_STREAK_REQUIRED`회 연속 관측되면 `market_signal_last_level_key()`로 승격되고 이 키는 삭제된다."""
+    return f"{_env_prefix()}market:signal:pending_confirmation"
 
 
 def factor_analysis_key(user_id: uuid.UUID, acct_suffix: str) -> str:
@@ -358,6 +377,7 @@ async def invalidate_goal_recommendation_caches(cache: CacheStoreType, user_id: 
         cache,
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
+        goal_recommendation_age_key(user_id),
     )
 
 
@@ -418,6 +438,7 @@ async def invalidate_asset_account_caches(
         dashboard_summary_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
+        goal_recommendation_age_key(user_id),
     ]
     if account_id is not None:
         keys.append(account_detail_key(user_id, account_id))
@@ -441,6 +462,7 @@ async def invalidate_account_caches(cache: CacheStoreType, user_id: uuid.UUID, y
         dashboard_summary_key(user_id),
         goal_recommendation_key(user_id),
         goal_recommendation_horizon_key(user_id),
+        goal_recommendation_age_key(user_id),
     )
     await invalidate_portfolio_overview_cache(cache, user_id)
     await invalidate_rebalancing_analysis_cache_all(cache, user_id)

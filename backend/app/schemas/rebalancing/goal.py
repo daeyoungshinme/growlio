@@ -8,6 +8,22 @@ class GoalRecommendationItem(BaseModel):
     name: str
     market: str
     weight: float  # 0~100
+    # 실시간 조회된 종목별 배당수익률(%) — 배당 목표 제약은 포트폴리오 전체 가중평균에만 걸리므로,
+    # 저배당 종목도 분산 목적으로 포함될 수 있다는 걸 화면에서 구분할 수 있게 노출한다.
+    # 조회 실패/데이터 없음이면 None.
+    dividend_yield_pct: float | None = None
+
+
+class SuggestedGoalCandidate(BaseModel):
+    """등록된 후보만으로 배당 목표를 달성할 수 없을 때 제안되는 미등록 고배당 후보 — 아직
+    `UserSettings.goal_candidate_tickers`에 저장되지 않았으며, 사용자가 추천 카드의 "후보에
+    추가" 버튼으로 승인해야만 `PUT /settings/goal-candidate-tickers`를 통해 저장된다."""
+
+    ticker: str
+    name: str
+    market: str
+    asset_class: str = "EQUITY"
+    dividend_yield_pct: float | None = None
 
 
 class GoalRecommendation(BaseModel):
@@ -26,6 +42,18 @@ class GoalRecommendation(BaseModel):
     risk_tolerance: str = "CONSERVATIVE"  # 적용된 리스크 성향 (CONSERVATIVE/BALANCED/AGGRESSIVE)
     max_weight_pct: float = 40.0  # 적용된 종목당 최대 비중(%)
     market_signal_level: str | None = None  # GREEN|YELLOW|RED — 추천 비중 계산에 반영된 시장 위험 신호 등급
+    age_bracket: str | None = None  # 연령대별 추천(get_age_based_recommendation) 전용 — 적용된 나이 구간 라벨
+    # recommended_items에 현금성 자산(CMA·파킹통장) 합성 항목이 포함돼 있는지(연령대별 추천 전용,
+    # HorizonGoalRecommendation.includes_cash_equivalent와 동일 의미). True면 실제 매수 가능한
+    # 티커가 아니므로 프론트에서 포트폴리오 "적용" 버튼을 숨겨야 한다.
+    includes_cash_equivalent: bool = False
+    # 등록된 후보만으로는 배당 목표를 달성할 수 없을 때 제안되는 미등록 고배당 후보 —
+    # 사용자가 승인(추천 카드의 "후보에 추가" 버튼)하기 전까지는 비중 계산에 반영되지 않는다.
+    suggested_candidates: list[SuggestedGoalCandidate] = []
+    # 배당 목표 대비 판정 상태 — "unreachable"(등록후보로 달성 불가) | "improvable"(달성했지만
+    # 더 나은 후보 존재) | "optimal"(달성했고 더 나은 후보 없음) | None(배당목표 미설정).
+    # suggested_candidates가 비어 있어도 unreachable/optimal을 구분해 문구를 다르게 보여줄 수 있다.
+    dividend_goal_status: str | None = None
 
 
 class HorizonGoalRecommendation(BaseModel):
@@ -50,6 +78,10 @@ class HorizonGoalRecommendation(BaseModel):
     includes_cash_equivalent: bool = False
     market_signal_level: str | None = None  # GREEN|YELLOW|RED — 추천 비중 계산에 반영된 시장 위험 신호 등급
     note: str | None = None
+    # 등록된 후보만으로는 배당 목표를 달성할 수 없을 때 제안되는 미등록 고배당 후보 —
+    # 사용자가 승인(추천 카드의 "후보에 추가" 버튼)하기 전까지는 비중 계산에 반영되지 않는다.
+    suggested_candidates: list[SuggestedGoalCandidate] = []
+    dividend_goal_status: str | None = None  # GoalRecommendation.dividend_goal_status와 동일 의미
 
 
 class HorizonRecommendationResponse(BaseModel):

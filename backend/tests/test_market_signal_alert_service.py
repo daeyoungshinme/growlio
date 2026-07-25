@@ -65,37 +65,41 @@ class TestGetCompositeSubscribers:
 
 
 class TestCheckMarketSignalLevelChange:
+    """confirmed(hysteresis 적용) 레벨 기준 등급전환 감지 — hysteresis 산정 로직 자체는
+    test_market_signal_service.py::TestConfirmedCompositeLevel에서 별도 검증하므로, 여기서는
+    `get_confirmed_composite_level`을 모킹해 알림 발송 로직만 격리 테스트한다."""
+
     @pytest.mark.asyncio
     async def test_first_run_stores_without_notifying(self, mock_db, mock_cache):
-        """이전 관측값이 없으면(최초 실행) 저장만 하고 알림을 보내지 않는다."""
+        """이전 confirmed 관측값이 없으면(최초 실행) 아무 것도 하지 않는다 — 부트스트랩 저장은
+        get_confirmed_composite_level 내부 책임이라 이 함수는 관여하지 않는다."""
         from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         mock_db.get = AsyncMock(return_value=None)
         with (
             patch(
-                "app.services.alerts.market_signal_alert_service.get_market_signal",
-                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+                "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
+                new=AsyncMock(return_value=("GREEN", "LIVE")),
             ),
             patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
         ):
             await check_market_signal_level_change(mock_db, mock_cache)
 
         mock_email.assert_not_called()
-        # last_level 저장은 durable_state(db) 경유 — set_durable이 내부적으로 커밋한다.
-        mock_db.execute.assert_called_once()
-        mock_db.commit.assert_called_once()
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_no_change_does_nothing(self, mock_db, mock_cache):
-        """이전 관측값과 동일하면 아무 것도 하지 않는다."""
+        """confirmed 레벨이 이전 관측값과 동일하면 아무 것도 하지 않는다."""
         from app.models.app_state import AppState
         from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         mock_db.get = AsyncMock(return_value=AppState(key="last_level", value="GREEN", expires_at=None))
         with (
             patch(
-                "app.services.alerts.market_signal_alert_service.get_market_signal",
-                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+                "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
+                new=AsyncMock(return_value=("GREEN", "LIVE")),
             ),
             patch("app.services.email_service.send_market_signal_change_alert", new=AsyncMock()) as mock_email,
         ):
@@ -107,7 +111,7 @@ class TestCheckMarketSignalLevelChange:
 
     @pytest.mark.asyncio
     async def test_level_change_notifies_subscribers_and_saves_history(self, mock_db, mock_cache):
-        """등급이 바뀌면 composite_signal_alerts_enabled=True인 구독자에게 이메일+푸시 발송, 이력 저장, 커밋."""
+        """confirmed 레벨이 바뀌면 composite_signal_alerts_enabled=True 구독자에게 이메일+푸시 발송, 이력 저장, 커밋."""
         from app.models.app_state import AppState
         from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
@@ -121,8 +125,8 @@ class TestCheckMarketSignalLevelChange:
 
         with (
             patch(
-                "app.services.alerts.market_signal_alert_service.get_market_signal",
-                new=AsyncMock(return_value={"composite_level": "RED"}),
+                "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
+                new=AsyncMock(return_value=("RED", "LIVE")),
             ),
             patch(
                 "app.services.email_service.send_market_signal_change_alert",
@@ -142,15 +146,16 @@ class TestCheckMarketSignalLevelChange:
         assert args[2] == "RED"
 
         mock_push.assert_called_once()
-        # db.execute 3회: (1) 구독자 쿼리 (2) 복합신호 dedup 플래그 저장(durable) (3) last_level 저장(durable)
+        # db.execute 2회: (1) 구독자 쿼리 (2) 복합신호 dedup 플래그 저장(durable) —
+        # last_level 저장은 이제 get_confirmed_composite_level 내부 책임(모킹돼 여기선 발생 안 함).
         # rebalancing_alert_service와 dedup 키를 공유해 같은 날 두 서비스가 중복 발송하지 않도록 함
-        assert mock_db.execute.call_count == 3
-        # commit 3회: dedup 저장(set_durable) + save_alert_history 이력 저장 후 + last_level 저장(set_durable)
-        assert mock_db.commit.call_count == 3
+        assert mock_db.execute.call_count == 2
+        # commit 2회: dedup 저장(set_durable) + save_alert_history 이력 저장 후 outer commit
+        assert mock_db.commit.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_no_subscribers_still_updates_last_level(self, mock_db, mock_cache):
-        """구독자가 없어도 마지막 관측값은 갱신된다."""
+    async def test_no_subscribers_sends_nothing(self, mock_db, mock_cache):
+        """구독자가 없으면 이 함수 자체는 아무 것도 커밋하지 않는다(last_level 갱신은 hysteresis 함수 책임)."""
         from app.models.app_state import AppState
 
         execute_result = MagicMock()
@@ -161,22 +166,22 @@ class TestCheckMarketSignalLevelChange:
         from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
         with patch(
-            "app.services.alerts.market_signal_alert_service.get_market_signal",
-            new=AsyncMock(return_value={"composite_level": "RED"}),
+            "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
+            new=AsyncMock(return_value=("RED", "LIVE")),
         ):
             await check_market_signal_level_change(mock_db, mock_cache)
 
-        # 알림 발송 경로(email/push/save_alert_history)는 타지 않았으므로 그 경로의 commit은 없다.
-        # last_level 저장(set_durable)만 내부적으로 1회 커밋한다.
-        mock_db.commit.assert_called_once()
+        mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_market_signal_fetch_failure_is_swallowed(self, mock_db, mock_cache):
-        """시장 신호 조회 실패 시 예외를 삼키고 조용히 반환한다."""
+    async def test_confirmed_level_fetch_failure_is_swallowed(self, mock_db, mock_cache):
+        """confirmed 레벨 조회 실패 시 예외를 삼키고 조용히 반환한다."""
+        from app.models.app_state import AppState
         from app.services.alerts.market_signal_alert_service import check_market_signal_level_change
 
+        mock_db.get = AsyncMock(return_value=AppState(key="last_level", value="GREEN", expires_at=None))
         with patch(
-            "app.services.alerts.market_signal_alert_service.get_market_signal",
+            "app.services.alerts.market_signal_alert_service.get_confirmed_composite_level",
             new=AsyncMock(side_effect=RuntimeError("boom")),
         ):
             await check_market_signal_level_change(mock_db, mock_cache)

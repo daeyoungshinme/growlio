@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { Bell, ChevronDown, TrendingDown, TrendingUp } from "lucide-react";
+import { Bell, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import type {
   MarketSignalResponse,
   MarketRiskLevel,
   VixLevel,
   YieldCurveState,
-  FearGreedClassification,
   HighYieldSpreadLevel,
   DollarIndexLevel,
   RateCutExpectationLevel,
   ExchangeRateLevel,
   OilPriceLevel,
+  UsRateCurveSignal,
+  InflationLevel,
+  InflationSignal,
+  EmploymentLevel,
 } from "@/api/marketSignals";
 import { useCompositeSignalToggle } from "@/hooks/useCompositeSignalToggle";
 import MarketSignalLevelBadge from "./MarketSignalLevelBadge";
@@ -53,13 +56,6 @@ const VIX_HINT: Record<VixLevel, string> = {
   HIGH: "변동성 급등, 분할 매수 권고",
 };
 
-const YIELD_DOT: Record<YieldCurveState, string> = {
-  POSITIVE: "bg-green-500",
-  FLAT: "bg-yellow-500",
-  INVERTED: "bg-orange-500",
-  DEEPLY_INVERTED: "bg-red-500",
-};
-
 const YIELD_CURVE_LABEL: Record<YieldCurveState, string> = {
   POSITIVE: "정상",
   FLAT: "평탄",
@@ -74,20 +70,32 @@ const YIELD_HINT: Record<YieldCurveState, string> = {
   DEEPLY_INVERTED: "침체 위험 높음, 안전자산 비중 점검",
 };
 
-const FEAR_DOT: Record<FearGreedClassification, string> = {
-  EXTREME_FEAR: "bg-blue-500",
-  FEAR: "bg-sky-400",
-  NEUTRAL: "bg-gray-400",
-  GREED: "bg-orange-400",
-  EXTREME_GREED: "bg-red-500",
+const YIELD_CURVE_RANK: Record<YieldCurveState, number> = {
+  POSITIVE: 0,
+  FLAT: 1,
+  INVERTED: 2,
+  DEEPLY_INVERTED: 3,
 };
 
-const FEAR_HINT: Record<FearGreedClassification, string> = {
-  EXTREME_FEAR: "역발상 매수 기회 검토",
-  FEAR: "저점 매수 관심 가능",
-  NEUTRAL: "중립 유지",
-  GREED: "과열 주의, 신규 비중 축소 고려",
-  EXTREME_GREED: "탐욕 과열, 차익실현 검토",
+const RATE_LABEL: Record<RateCutExpectationLevel, string> = {
+  NEUTRAL: "중립",
+  MILD_CUT_EXPECTED: "완만한 인하기대",
+  CUT_EXPECTED: "인하기대",
+  DEEP_CUT_EXPECTED: "급격한 인하기대",
+};
+
+const RATE_HINT: Record<RateCutExpectationLevel, string> = {
+  NEUTRAL: "정책금리 유지 전망",
+  MILD_CUT_EXPECTED: "인하 기대 소폭 반영",
+  CUT_EXPECTED: "금리 인하 기대 확대",
+  DEEP_CUT_EXPECTED: "경기둔화 우려, 장기채·성장주 비중 점검",
+};
+
+const RATE_CUT_RANK: Record<RateCutExpectationLevel, number> = {
+  NEUTRAL: 0,
+  MILD_CUT_EXPECTED: 1,
+  CUT_EXPECTED: 2,
+  DEEP_CUT_EXPECTED: 3,
 };
 
 const HIGH_YIELD_DOT: Record<HighYieldSpreadLevel, string> = {
@@ -132,27 +140,6 @@ const DOLLAR_HINT: Record<DollarIndexLevel, string> = {
   BREAKOUT: "20일선 상향 돌파, 위험자산 비중 점검",
 };
 
-const RATE_DOT: Record<RateCutExpectationLevel, string> = {
-  NEUTRAL: "bg-green-500",
-  MILD_CUT_EXPECTED: "bg-yellow-500",
-  CUT_EXPECTED: "bg-orange-500",
-  DEEP_CUT_EXPECTED: "bg-red-500",
-};
-
-const RATE_LABEL: Record<RateCutExpectationLevel, string> = {
-  NEUTRAL: "중립",
-  MILD_CUT_EXPECTED: "완만한 인하기대",
-  CUT_EXPECTED: "인하기대",
-  DEEP_CUT_EXPECTED: "급격한 인하기대",
-};
-
-const RATE_HINT: Record<RateCutExpectationLevel, string> = {
-  NEUTRAL: "정책금리 유지 전망",
-  MILD_CUT_EXPECTED: "인하 기대 소폭 반영",
-  CUT_EXPECTED: "금리 인하 기대 확대",
-  DEEP_CUT_EXPECTED: "경기둔화 우려, 장기채·성장주 비중 점검",
-};
-
 const EXCHANGE_DOT: Record<ExchangeRateLevel, string> = {
   NORMAL: "bg-green-500",
   ELEVATED: "bg-yellow-500",
@@ -195,6 +182,71 @@ const OIL_HINT: Record<OilPriceLevel, string> = {
   BREAKOUT: "20일선 대비 급등락, 에너지·인플레이션 민감 자산 점검",
 };
 
+const INFLATION_LABEL: Record<InflationLevel, string> = {
+  NORMAL: "안정",
+  ELEVATED: "완만한 상승",
+  HIGH: "높음",
+  BREAKOUT: "급등",
+};
+
+const INFLATION_HINT: Record<InflationLevel, string> = {
+  NORMAL: "물가 안정, Fed 목표(2%) 근접",
+  ELEVATED: "목표 대비 소폭 상회, 모니터링",
+  HIGH: "목표 상회 지속, 긴축 장기화 우려",
+  BREAKOUT: "목표 큰폭 상회, 금리인상 재개 리스크",
+};
+
+const INFLATION_RANK: Record<InflationLevel, number> = {
+  NORMAL: 0,
+  ELEVATED: 1,
+  HIGH: 2,
+  BREAKOUT: 3,
+};
+
+const EMPLOYMENT_LABEL: Record<EmploymentLevel, string> = {
+  NORMAL: "안정",
+  WATCH: "주시",
+  SAHM_TRIGGERED: "경보발동",
+  HIGH: "위험",
+};
+
+const EMPLOYMENT_HINT: Record<EmploymentLevel, string> = {
+  NORMAL: "고용시장 안정",
+  WATCH: "실업률 저점 대비 소폭 상승",
+  SAHM_TRIGGERED: "Sahm Rule 발동 — 경기침체 신호",
+  HIGH: "실업률 급등, 경기침체 우려 확대",
+};
+
+/** CPI+PCE 병합 신호의 힌트 — 백엔드가 worst-case(max)로 sub_score를 산정하는 것과
+ * 동일한 기준으로, 더 심각한 쪽의 힌트 문구를 선택한다(rateCurveHint와 동일 패턴). */
+function inflationHint(signal: InflationSignal): string {
+  const cpiRank = signal.cpi_level ? INFLATION_RANK[signal.cpi_level] : -1;
+  const pceRank = signal.pce_level ? INFLATION_RANK[signal.pce_level] : -1;
+  if (cpiRank >= pceRank) {
+    return signal.cpi_level ? INFLATION_HINT[signal.cpi_level] : "";
+  }
+  return signal.pce_level ? INFLATION_HINT[signal.pce_level] : "";
+}
+
+/** sub_score(0~3) 기반 공용 심각도 색상 — 미국 금리 커브 병합 신호처럼 단일 level enum이 없는 경우 사용. */
+function subScoreDotColor(subScore: number): string {
+  if (subScore <= 0) return "bg-green-500";
+  if (subScore === 1) return "bg-yellow-500";
+  if (subScore === 2) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+/** 미국 금리 커브(장단기금리차+금리인하기대) 병합 신호의 힌트 — 백엔드가 worst-case(max)로
+ * sub_score를 산정하는 것과 동일한 기준으로, 더 심각한 쪽의 힌트 문구를 선택한다. */
+function rateCurveHint(signal: UsRateCurveSignal): string {
+  const ycRank = signal.yield_curve_state ? YIELD_CURVE_RANK[signal.yield_curve_state] : -1;
+  const rateRank = signal.rate_cut_level ? RATE_CUT_RANK[signal.rate_cut_level] : -1;
+  if (ycRank >= rateRank) {
+    return signal.yield_curve_state ? YIELD_HINT[signal.yield_curve_state] : "";
+  }
+  return signal.rate_cut_level ? RATE_HINT[signal.rate_cut_level] : "";
+}
+
 function scoreColor(level: MarketRiskLevel): string {
   if (level === "GREEN") return "text-green-600 dark:text-green-400";
   if (level === "YELLOW") return "text-yellow-600 dark:text-yellow-400";
@@ -202,15 +254,7 @@ function scoreColor(level: MarketRiskLevel): string {
 }
 
 export default function MarketSignalBanner({ signal }: Props) {
-  const {
-    composite_level,
-    composite_score,
-    composite_score_max,
-    data_freshness,
-    signals,
-    fear_greed_contrarian_buy,
-    fear_greed_extreme_greed,
-  } = signal;
+  const { composite_level, composite_score, composite_score_max, data_freshness, signals } = signal;
   const [isOpen, setIsOpen] = useState(composite_level !== "GREEN");
 
   const { status: compositeStatus } = useCompositeSignalToggle();
@@ -229,7 +273,7 @@ export default function MarketSignalBanner({ signal }: Props) {
           {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}
         </span>
         <span className={`text-xs font-semibold shrink-0 ${scoreColor(composite_level)}`}>
-          위험지수 {composite_score}/{composite_score_max ?? 20}
+          위험지수 {composite_score}/{composite_score_max ?? 27}
         </span>
         <button
           onClick={() => setIsOpen((v) => !v)}
@@ -266,44 +310,28 @@ export default function MarketSignalBanner({ signal }: Props) {
             )}
           </div>
 
-          {/* 장단기 금리차 */}
+          {/* 미국 금리 커브 (장단기금리차+금리인하기대 병합) */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
-              장단기 금리차
+              미국 금리 커브
             </span>
-            {signals.yield_curve ? (
+            {signals.us_rate_curve ? (
               <>
                 <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${YIELD_DOT[signals.yield_curve.state]}`}
+                  className={`w-2 h-2 rounded-full shrink-0 ${subScoreDotColor(signals.us_rate_curve.sub_score)}`}
                 />
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.yield_curve.value.toFixed(2)}% ·{" "}
-                  {YIELD_CURVE_LABEL[signals.yield_curve.state]}
+                  {signals.us_rate_curve.yield_curve_value != null &&
+                    `10Y-2Y ${signals.us_rate_curve.yield_curve_value.toFixed(2)}%`}
+                  {signals.us_rate_curve.yield_curve_state &&
+                    ` · ${YIELD_CURVE_LABEL[signals.us_rate_curve.yield_curve_state]}`}
+                  {signals.us_rate_curve.rate_cut_value != null &&
+                    ` · 2Y-FF ${signals.us_rate_curve.rate_cut_value >= 0 ? "+" : ""}${signals.us_rate_curve.rate_cut_value.toFixed(2)}%p`}
+                  {signals.us_rate_curve.rate_cut_level &&
+                    ` · ${RATE_LABEL[signals.us_rate_curve.rate_cut_level]}`}
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
-                  {YIELD_HINT[signals.yield_curve.state]}
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-gray-400">—</span>
-            )}
-          </div>
-
-          {/* Fear & Greed */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
-              Fear &amp; Greed
-            </span>
-            {signals.fear_greed ? (
-              <>
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${FEAR_DOT[signals.fear_greed.classification]}`}
-                />
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.fear_greed.value} · {signals.fear_greed.label}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
-                  {FEAR_HINT[signals.fear_greed.classification]}
+                  {rateCurveHint(signals.us_rate_curve)}
                 </span>
               </>
             ) : (
@@ -351,29 +379,6 @@ export default function MarketSignalBanner({ signal }: Props) {
                 </span>
                 <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
                   {DOLLAR_HINT[signals.dollar_index.level]}
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-gray-400">—</span>
-            )}
-          </div>
-
-          {/* 금리인하 기대 (2Y-FEDFUNDS 스프레드, FedWatch 대체지표) */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
-              금리인하 기대
-            </span>
-            {signals.rate_cut_expectation ? (
-              <>
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${RATE_DOT[signals.rate_cut_expectation.level]}`}
-                />
-                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                  {signals.rate_cut_expectation.value.toFixed(2)}%p ·{" "}
-                  {RATE_LABEL[signals.rate_cut_expectation.level]}
-                </span>
-                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
-                  {RATE_HINT[signals.rate_cut_expectation.level]}
                 </span>
               </>
             ) : (
@@ -431,23 +436,55 @@ export default function MarketSignalBanner({ signal }: Props) {
             )}
           </div>
 
-          {/* 특수 플래그 */}
-          {fear_greed_contrarian_buy && (
-            <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950/40 dark:border-blue-800/40">
-              <TrendingUp size={13} className="text-blue-500 shrink-0" />
-              <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">
-                역발상 매수 기회 — 극도 공포 구간에서 분할 매수를 고려할 수 있습니다
-              </span>
-            </div>
-          )}
-          {fear_greed_extreme_greed && (
-            <div className="flex items-center gap-2 mt-1 px-3 py-2 rounded-lg bg-orange-50 border border-orange-200 dark:bg-orange-950/40 dark:border-orange-800/40">
-              <TrendingDown size={13} className="text-orange-500 shrink-0" />
-              <span className="text-xs text-orange-700 dark:text-orange-300 font-medium">
-                탐욕 과열 구간 — 신규 비중 확대보다 차익실현 점검을 권장합니다
-              </span>
-            </div>
-          )}
+          {/* 인플레이션 (CPI+PCE 병합, Fed 목표 2% 대비 이격도) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">
+              인플레이션
+            </span>
+            {signals.inflation ? (
+              <>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${subScoreDotColor(signals.inflation.sub_score)}`}
+                />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  {signals.inflation.cpi_yoy_pct != null &&
+                    `CPI ${signals.inflation.cpi_yoy_pct >= 0 ? "+" : ""}${signals.inflation.cpi_yoy_pct.toFixed(1)}%`}
+                  {signals.inflation.cpi_level &&
+                    ` · ${INFLATION_LABEL[signals.inflation.cpi_level]}`}
+                  {signals.inflation.pce_yoy_pct != null &&
+                    ` · PCE ${signals.inflation.pce_yoy_pct >= 0 ? "+" : ""}${signals.inflation.pce_yoy_pct.toFixed(1)}%`}
+                  {signals.inflation.pce_level &&
+                    ` · ${INFLATION_LABEL[signals.inflation.pce_level]}`}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {inflationHint(signals.inflation)}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
+
+          {/* 고용 (실업률 Sahm Rule-lite — 12개월 최저치 대비 상승폭) */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 w-20 shrink-0">고용</span>
+            {signals.employment ? (
+              <>
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 ${subScoreDotColor(signals.employment.sub_score)}`}
+                />
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  실업률 {signals.employment.value.toFixed(1)}% ·{" "}
+                  {EMPLOYMENT_LABEL[signals.employment.level]}
+                </span>
+                <span className="text-xs text-gray-400 dark:text-gray-500 ml-auto text-right">
+                  {EMPLOYMENT_HINT[signals.employment.level]}
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-gray-400">—</span>
+            )}
+          </div>
         </div>
       )}
 

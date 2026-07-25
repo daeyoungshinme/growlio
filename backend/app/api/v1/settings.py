@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_db
 from app.core.cache_store import get_cache_store
 from app.core.config import settings
-from app.enums import AssetClass, GoalRiskTolerance, IndexRegion
+from app.enums import AgeGroup, AssetClass, GoalRiskTolerance, IndexRegion
 from app.limiter import limiter
 from app.models.user import User
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
@@ -88,6 +88,7 @@ class GoalRecommendationOptionsUpdate(BaseModel):
     max_weight_pct: float = 40.0
     cagr_lookback_years: int = 10
     short_term_equity_floor_pct: float = 80.0
+    age_group: AgeGroup | None = None  # 연령대별 추천(goal-recommendation/by-age) 전용 — 미입력 시 None
 
     @field_validator("max_weight_pct")
     @classmethod
@@ -166,6 +167,7 @@ class SettingsResponse(BaseModel):
     goal_max_weight_pct: float = 40.0
     goal_cagr_lookback_years: int = 10
     goal_short_term_equity_floor_pct: float = 80.0
+    age_group: AgeGroup | None = None
     # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
     # 1건당 거래대금 안전장치 상한을 안내하기 위해 노출한다 (app/services/rebalancing/order_builder.py 참고).
     auto_rebalancing_max_order_value_krw: float = 50_000_000.0
@@ -220,6 +222,7 @@ async def get_settings(
         goal_short_term_equity_floor_pct=(
             float(row.goal_short_term_equity_floor_pct) if row.goal_short_term_equity_floor_pct else 80.0
         ),
+        age_group=AgeGroup(row.age_group) if row.age_group else None,
         auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
     )
 
@@ -319,6 +322,7 @@ async def update_goal_recommendation_options(
     row.goal_max_weight_pct = req.max_weight_pct
     row.goal_cagr_lookback_years = req.cagr_lookback_years
     row.goal_short_term_equity_floor_pct = req.short_term_equity_floor_pct
+    row.age_group = req.age_group.value if req.age_group else None
     await db.commit()
     cache = await get_cache_store()
     await invalidate_goal_recommendation_caches(cache, current_user.id)

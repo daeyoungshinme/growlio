@@ -23,8 +23,17 @@ def _dividend_floor_constraint(
     bounds: list[tuple[float, float]],
     dividend_list: tuple[float, ...],
     required_dividend_yield_pct: float,
+    equity_flags: tuple[bool, ...] | None = None,
+    group_budget: dict[bool, float] | None = None,
 ) -> tuple[dict | None, str | None]:
     """종목당 비중 상한(bounds) 하에서 목표 배당수익률 달성 가능 여부를 그리디하게 판정한다.
+
+    `equity_flags`+`group_budget`이 함께 주어지면(`equity_floor`/`equity_ceiling`이 적용된
+    호출) 종목당 상한뿐 아니라 주식/비주식 그룹 예산도 함께 반영한다 —
+    `_optimize_goal_portfolio`의 `max_achievable_return` 계산과 동일한 방식. 이걸 빠뜨리면
+    실제로는 `equity_floor`가 저배당 주식 종목에 비중을 강제로 배분시켜 달성 불가능한데도
+    "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패하는 버그가 생긴다
+    (단기 추천의 `equity_floor=0.8`처럼 그룹 제약이 걸린 조합에서 실제로 재현됨).
 
     달성 가능하면 (SLSQP 부등식 제약 dict, None)을, 불가능하면 (None, 안내 note)를 반환한다
     — `_optimize_goal_portfolio`의 순환 복잡도를 낮추기 위해 분리한 헬퍼(로직 자체는 동일).
@@ -32,12 +41,20 @@ def _dividend_floor_constraint(
     import numpy as np
 
     divs = np.array(dividend_list, dtype=float)
+    use_group_budget = equity_flags is not None and group_budget is not None
+    group_used = {True: 0.0, False: 0.0}
     achievable = 0.0
     remaining = 1.0
     for idx in np.argsort(-divs):
-        take = max(min(bounds[idx][1], remaining), 0.0)
+        cap = bounds[idx][1]
+        if use_group_budget:
+            is_eq = bool(equity_flags[idx])  # type: ignore[index]
+            cap = min(cap, group_budget[is_eq] - group_used[is_eq])  # type: ignore[index]
+        take = max(min(cap, remaining), 0.0)
         achievable += take * float(divs[idx])
         remaining -= take
+        if use_group_budget:
+            group_used[bool(equity_flags[idx])] += take  # type: ignore[index]
         if remaining <= 1e-9:
             break
 
@@ -58,6 +75,8 @@ def _apply_dividend_floor(
     bounds: list[tuple[float, float]],
     dividend_list: tuple[float, ...],
     required_dividend_yield_pct: float | None,
+    equity_flags: tuple[bool, ...] | None = None,
+    group_budget: dict[bool, float] | None = None,
 ) -> tuple[list[dict], str | None]:
     """`_dividend_floor_constraint()` 결과를 constraints/note에 병합한다 — 호출부(`_optimize_goal_portfolio`)의
     순환 복잡도를 낮추기 위해 분기 처리를 이 헬퍼로 옮겼다. required_dividend_yield_pct가 없거나
@@ -65,12 +84,54 @@ def _apply_dividend_floor(
     if required_dividend_yield_pct is None or required_dividend_yield_pct <= 0:
         return constraints, note
 
-    constraint, dividend_note = _dividend_floor_constraint(bounds, dividend_list, required_dividend_yield_pct)
+    constraint, dividend_note = _dividend_floor_constraint(
+        bounds, dividend_list, required_dividend_yield_pct, equity_flags=equity_flags, group_budget=group_budget
+    )
     if constraint is not None:
         constraints = [*constraints, constraint]
     if dividend_note:
         note = f"{note} {dividend_note}" if note else dividend_note
     return constraints, note
+
+
+def _solve_with_dividend_fallback(
+    objective,
+    x0,
+    bounds: list[tuple[float, float]],
+    constraints: list[dict],
+    constraints_without_dividend: list[dict],
+    required_dividend_yield_pct: float | None,
+    note: str | None,
+):
+    """SLSQP를 풀고, 배당 제약이 추가된 상태로 실패하면 배당 제약만 뺀 채로 한 번 더 시도한다
+    (호출부 `_optimize_goal_portfolio`의 순환 복잡도를 낮추기 위해 분리한 헬퍼).
+
+    배당 목표 사전검증(`_dividend_floor_constraint`)은 종목당 상한·주식/비주식 그룹예산만 보고
+    판정하므로, BALANCED/AGGRESSIVE의 "가중평균 CAGR = target" 등식 제약처럼 사전검증이 모르는
+    다른 제약과 배당 제약이 동시에는 충족 불가능한 조합을 예측하지 못할 수 있다 — 배당 하나만
+    보면 달성 가능해도 수익률 목표와 동시에는 불가능한 경우가 실제로 있다(장기=AGGRESSIVE +
+    배당목표 조합에서 재현됨). 이 경우도 배당 목표 미달성은 fail-soft여야 하므로, SLSQP가
+    실패했고 그 원인이 배당 제약 추가일 수 있으면(제약 개수가 늘었으면) 배당 제약만 뺀 채로
+    재시도한다.
+    """
+    from scipy.optimize import minimize
+
+    options = {"ftol": 1e-9, "maxiter": 500}
+    res = minimize(objective, x0=x0, method="SLSQP", bounds=bounds, constraints=constraints, options=options)
+    if res.success or len(constraints) <= len(constraints_without_dividend):
+        return res, note
+
+    retry_res = minimize(
+        objective, x0=x0, method="SLSQP", bounds=bounds, constraints=constraints_without_dividend, options=options
+    )
+    if not retry_res.success:
+        return res, note
+
+    dividend_note = (
+        f"배당 목표(연 {required_dividend_yield_pct:.1f}%)를 다른 조건과 함께 만족하는 "
+        "포트폴리오를 찾지 못해 자산 목표 기준으로만 계산했습니다"
+    )
+    return retry_res, (f"{note} {dividend_note}" if note else dividend_note)
 
 
 def _optimize_goal_portfolio(
@@ -117,9 +178,13 @@ def _optimize_goal_portfolio(
     `dividend_yields`+`required_dividend_yield_pct`가 함께 주어지면 "가중평균 배당수익률 ≥
     required_dividend_yield_pct" 부등식 제약을 추가한다 — 배당 목표(`UserSettings.annual_dividend_goal`)를
     실제 비중 계산에 반영하기 위함(과거에는 표시용으로만 사후 계산되고 최적화 입력으로 쓰이지
-    않았음). 종목당 비중 상한(bounds) 하에서 그리디하게 계산한 달성 가능 최대 배당수익률이
-    목표에 못 미치면 제약을 적용하지 않고(자산 목표 기준으로만 계산) note에 안내를 남긴다 —
-    배당 목표를 못 채운다고 전체 추천 자체를 실패시키지 않는다(fail-soft).
+    않았음). 종목당 비중 상한(bounds) 하에서, `equity_floor`/`equity_ceiling`이 걸려 있으면
+    그 그룹 예산까지 함께 반영해 그리디하게 계산한 달성 가능 최대 배당수익률이 목표에 못
+    미치면 제약을 적용하지 않고(자산 목표 기준으로만 계산) note에 안내를 남긴다 — 배당 목표를
+    못 채운다고 전체 추천 자체를 실패시키지 않는다(fail-soft). 그룹 예산을 무시하고 종목당
+    상한만으로 판정하면, `equity_floor`가 저배당 주식 종목에 비중을 강제로 배분시켜 실제로는
+    불가능한데도 "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가
+    실패(빈 추천)하는 버그가 생긴다(단기/IRP 추천에서 실제 재현됨).
     """
     import numpy as np
     from scipy.optimize import minimize
@@ -237,18 +302,32 @@ def _optimize_goal_portfolio(
                 {"type": "ineq", "fun": lambda w: equity_ceiling - float(w[equity_mask].sum())},
             ]
 
-    # equity_floor/ceiling 그룹 예산은 반영하지 않음 — 배당 목표는 전체 자산 기준 추천에서만 쓰이고
-    # 그 호출 경로는 equity_floor/ceiling을 넘기지 않으므로 무해한 단순화. required_dividend_yield_pct가
-    # 없으면(배당 목표 미설정) 헬퍼 내부에서 즉시 no-op.
-    constraints, note = _apply_dividend_floor(constraints, note, bounds, dividend_list, required_dividend_yield_pct)
+    # equity_floor/ceiling이 걸려 있으면 배당 달성가능성 검증도 동일한 group_budget으로 제한한다
+    # (위 max_achievable_return 계산과 동일한 이유) — 그렇지 않으면 실제로는 equity_floor가
+    # 저배당 주식 종목에 비중을 강제로 배분시켜 달성 불가능한데도 종목당 상한만 보고
+    # "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패한다(단기/IRP 추천에서
+    # 실제 재현됨). required_dividend_yield_pct가 없으면(배당 목표 미설정) 헬퍼 내부에서 즉시 no-op.
+    dividend_group_budget = group_budget if (apply_equity_floor or apply_equity_ceiling) else None
+    dividend_equity_flags = equity_flags if (apply_equity_floor or apply_equity_ceiling) else None
+    constraints_without_dividend = constraints
+    constraints, note = _apply_dividend_floor(
+        constraints,
+        note,
+        bounds,
+        dividend_list,
+        required_dividend_yield_pct,
+        equity_flags=dividend_equity_flags,
+        group_budget=dividend_group_budget,
+    )
 
-    res = minimize(
+    res, note = _solve_with_dividend_fallback(
         lambda w: float(w @ cov_annual @ w),
-        x0=x0,
-        method="SLSQP",
-        bounds=bounds,
-        constraints=constraints,
-        options={"ftol": 1e-9, "maxiter": 500},
+        x0,
+        bounds,
+        constraints,
+        constraints_without_dividend,
+        required_dividend_yield_pct,
+        note,
     )
     if not res.success:
         return [], None, None, "제약 조건을 만족하는 포트폴리오를 찾지 못했습니다"

@@ -13,6 +13,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CASH_EQUIVALENT_TICKER,
+  fetchAgeGoalRecommendation,
   fetchHorizonGoalRecommendations,
   fetchOverallGoalRecommendation,
   fetchPortfolioExpectedMetrics,
@@ -36,10 +37,12 @@ import { fmtKrw } from "@/utils/format";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
 import {
   buildWeightDiffRows,
   computeRecommendationDrift,
@@ -62,10 +65,15 @@ const RISK_TOLERANCE_LABELS: Record<string, string> = {
   AGGRESSIVE: "공격적",
 };
 
-type ActiveTab = "전체" | InvestmentHorizon;
+type ActiveTab = "전체" | "연령대" | InvestmentHorizon;
 
-function normalizeWeights(items: GoalRecommendationItem[]) {
-  const normalized = items.map((i) => ({ ...i, weight: Math.round(i.weight * 10) / 10 }));
+function normalizeWeights(items: GoalRecommendationItem[]): PortfolioItem[] {
+  const normalized = items.map((i) => ({
+    ticker: i.ticker,
+    name: i.name,
+    market: i.market,
+    weight: Math.round(i.weight * 10) / 10,
+  }));
   const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
   if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
   return normalized;
@@ -220,6 +228,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     staleTime: STALE_TIME.LONG,
   });
 
+  const { data: ageData } = useQuery({
+    queryKey: QUERY_KEYS.goalRecommendationByAge,
+    queryFn: fetchAgeGoalRecommendation,
+    staleTime: STALE_TIME.LONG,
+  });
+
   const { data: portfoliosRaw } = useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
@@ -251,7 +265,9 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
   const effectiveTab: ActiveTab =
-    activeTab === "전체" || availableHorizons.includes(activeTab) ? activeTab : "전체";
+    activeTab === "전체" || activeTab === "연령대" || availableHorizons.includes(activeTab)
+      ? activeTab
+      : "전체";
 
   const taxTypesForHorizon = TAX_TYPE_ORDER.filter((t) =>
     horizonRecommendations.some((r) => r.investment_horizon === effectiveTab && r.tax_type === t),
@@ -312,6 +328,22 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  const applyAgeMutation = useMutation({
+    mutationFn: async (portfolioId: string) => {
+      if (!ageData) throw new Error("추천 비중이 없습니다");
+      await updatePortfolio(portfolioId, {
+        items: normalizeWeights(ageData.recommended_items),
+      });
+      return portfolioId;
+    },
+    onSuccess: async (portfolioId) => {
+      setConfirmOpen(false);
+      await invalidatePortfolioData(queryClient);
+      onApplied?.(portfolioId);
+    },
+    onError: (e) => toast(extractErrorMessage(e), "error"),
+  });
+
   const applyHorizonMutation = useMutation({
     mutationFn: async () => {
       if (!activeHorizonRec || !horizonTargetPortfolio) throw new Error("추천 비중이 없습니다");
@@ -337,6 +369,10 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     onError: (e) => toast(extractErrorMessage(e), "error"),
   });
 
+  const addSuggestedMutation = useAddSuggestedCandidates(
+    settingsData?.goal_candidate_tickers ?? [],
+  );
+
   const [managerOpen, setManagerOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
 
@@ -345,11 +381,11 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
   // overall/horizon 중 먼저 도착하는 응답을 기준으로 1회만 재조회해 동기화한다.
   const settingsSyncedRef = useRef(false);
   useEffect(() => {
-    if ((overallData || horizonData) && !settingsSyncedRef.current) {
+    if ((overallData || horizonData || ageData) && !settingsSyncedRef.current) {
       settingsSyncedRef.current = true;
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.settings });
     }
-  }, [overallData, horizonData, queryClient]);
+  }, [overallData, horizonData, ageData, queryClient]);
 
   if (!overallData) return null;
 
@@ -366,6 +402,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     activeHorizonRec && activeHorizonRec.recommended_items.length > 0 && horizonTargetPortfolio
       ? computeRecommendationDrift(activeHorizonRec.recommended_items, horizonTargetPortfolio.items)
       : null;
+  const hasAgeRecommendation =
+    !!ageData && ageData.is_configured && ageData.recommended_items.length > 0;
+  const ageDrift =
+    hasAgeRecommendation && ageData && overallConfirmTarget
+      ? computeRecommendationDrift(ageData.recommended_items, overallConfirmTarget.items)
+      : null;
 
   return (
     <>
@@ -376,7 +418,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
         </div>
 
         <div className="flex gap-1.5">
-          {(["전체", ...availableHorizons] as ActiveTab[]).map((tab) => (
+          {(["전체", "연령대", ...availableHorizons] as ActiveTab[]).map((tab) => (
             <button
               key={tab}
               type="button"
@@ -387,7 +429,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                   : "bg-white dark:bg-gray-800 text-teal-600 dark:text-teal-400 border border-teal-200 dark:border-teal-800/50"
               }`}
             >
-              {tab === "전체" ? "전체" : INVESTMENT_HORIZON_LABELS[tab]}
+              {tab === "전체" || tab === "연령대" ? tab : INVESTMENT_HORIZON_LABELS[tab]}
             </button>
           ))}
         </div>
@@ -452,6 +494,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                         <span className="text-gray-700 dark:text-gray-300">
                           {item.name}{" "}
                           <span className="text-gray-400 dark:text-gray-500">({item.ticker})</span>
+                          {item.dividend_yield_pct != null && (
+                            <span className="text-gray-400 dark:text-gray-500">
+                              {" "}
+                              · 배당 {item.dividend_yield_pct.toFixed(1)}%
+                            </span>
+                          )}
                         </span>
                         <span className="font-medium text-teal-600 dark:text-teal-400">
                           {item.weight.toFixed(1)}%
@@ -469,6 +517,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       {overallData.note}
                     </p>
                   )}
+
+                  <SuggestedCandidatesBlock
+                    candidates={overallData.suggested_candidates}
+                    onAdd={() => addSuggestedMutation.mutate(overallData.suggested_candidates)}
+                    isPending={addSuggestedMutation.isPending}
+                  />
 
                   <p className="text-xs text-teal-500 dark:text-teal-500 pt-1">
                     등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
@@ -539,6 +593,159 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               )}
             </>
           )
+        ) : effectiveTab === "연령대" ? (
+          !ageData ? null : !ageData.is_configured ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {ageData.note ?? "연령대를 설정하면 연령대별 추천을 받을 수 있습니다"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setOptionsOpen(true)}
+                className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline shrink-0"
+              >
+                연령대 설정하기 <ArrowRight size={12} />
+              </button>
+            </div>
+          ) : (
+            <>
+              {hasAgeRecommendation ? (
+                <>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                    {ageData.age_bracket} 기준 리스크 성향{" "}
+                    {RISK_TOLERANCE_LABELS[ageData.risk_tolerance] ?? ageData.risk_tolerance}
+                    {ageData.expected_return_pct != null &&
+                      ` · 기대수익률 ${ageData.expected_return_pct.toFixed(1)}%`}
+                    {ageData.expected_dividend_yield_pct != null &&
+                      ` · 배당수익률 약 ${ageData.expected_dividend_yield_pct.toFixed(1)}%`}
+                    {ageData.expected_volatility_pct != null &&
+                      ` · 예상 변동성 연 ${ageData.expected_volatility_pct.toFixed(1)}%`}
+                  </p>
+
+                  {ageDrift && hasSignificantDrift(ageDrift) && (
+                    <RecommendationDriftBadge drift={ageDrift} />
+                  )}
+
+                  <ul className="space-y-1">
+                    {ageData.recommended_items.map((item) => (
+                      <li
+                        key={`${item.ticker}-${item.market}`}
+                        className="flex items-center justify-between text-xs"
+                      >
+                        <span className="text-gray-700 dark:text-gray-300">
+                          {item.name}
+                          {!isCashEquivalentItem(item) && (
+                            <span className="text-gray-400 dark:text-gray-500">
+                              {" "}
+                              ({item.ticker})
+                            </span>
+                          )}
+                          {item.dividend_yield_pct != null && (
+                            <span className="text-gray-400 dark:text-gray-500">
+                              {" "}
+                              · 배당 {item.dividend_yield_pct.toFixed(1)}%
+                            </span>
+                          )}
+                        </span>
+                        <span className="font-medium text-teal-600 dark:text-teal-400">
+                          {item.weight.toFixed(1)}%
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {ageData.includes_cash_equivalent && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      현금성 자산(CMA·파킹통장 등) 합성 비중이 포함되어 있어요 — 실제 계좌와 연결해
+                      목표 비중에 반영해주세요.
+                    </p>
+                  )}
+
+                  {ageData.note && (
+                    <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 flex items-center gap-1.5 flex-wrap">
+                      {(ageData.market_signal_level === "YELLOW" ||
+                        ageData.market_signal_level === "RED") && (
+                        <MarketSignalLevelBadge level={ageData.market_signal_level} />
+                      )}
+                      {ageData.note}
+                    </p>
+                  )}
+
+                  <SuggestedCandidatesBlock
+                    candidates={ageData.suggested_candidates}
+                    onAdd={() => addSuggestedMutation.mutate(ageData.suggested_candidates)}
+                    isPending={addSuggestedMutation.isPending}
+                  />
+
+                  <p className="text-xs text-teal-500 dark:text-teal-500 pt-1">
+                    등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
+                  </p>
+
+                  <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
+                    {targetPortfolios.length === 0 ? (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수
+                        있어요.
+                      </p>
+                    ) : (
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {targetPortfolios.length > 1 && (
+                          <select
+                            value={selectedOverallTargetId}
+                            onChange={(e) => setSelectedOverallTargetId(e.target.value)}
+                            className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                          >
+                            <option value="">포트폴리오 선택</option>
+                            {targetPortfolios.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        <button
+                          type="button"
+                          disabled={
+                            (targetPortfolios.length > 1 && !selectedOverallTargetId) ||
+                            applyAgeMutation.isPending
+                          }
+                          onClick={() => setConfirmOpen(true)}
+                          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
+                        >
+                          {applyAgeMutation.isPending ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <Anchor size={12} />
+                          )}
+                          {targetPortfolios.length === 1
+                            ? `${targetPortfolios[0].name}에 적용`
+                            : "기준 포트폴리오에 적용"}
+                        </button>
+                      </div>
+                    )}
+                    {onCreatePortfolio && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onCreatePortfolio(
+                            normalizeWeights(ageData.recommended_items),
+                            "연령대별 추천 포트폴리오",
+                          )
+                        }
+                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
+                      >
+                        <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {ageData.note ?? "추천을 계산할 수 없습니다 — 후보 ETF를 등록해주세요"}
+                </p>
+              )}
+            </>
+          )
         ) : activeHorizonRec ? (
           <>
             <p className="text-xs text-gray-600 dark:text-gray-300">
@@ -575,6 +782,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                         {!isCashEquivalentItem(item) && (
                           <span className="text-gray-400 dark:text-gray-500"> ({item.ticker})</span>
                         )}
+                        {item.dividend_yield_pct != null && (
+                          <span className="text-gray-400 dark:text-gray-500">
+                            {" "}
+                            · 배당 {item.dividend_yield_pct.toFixed(1)}%
+                          </span>
+                        )}
                       </span>
                       <span className="font-medium text-teal-600 dark:text-teal-400">
                         {item.weight.toFixed(1)}%
@@ -591,6 +804,11 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     {activeHorizonRec.note}
                   </p>
                 )}
+                <SuggestedCandidatesBlock
+                  candidates={activeHorizonRec.suggested_candidates}
+                  onAdd={() => addSuggestedMutation.mutate(activeHorizonRec.suggested_candidates)}
+                  isPending={addSuggestedMutation.isPending}
+                />
               </>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -710,32 +928,56 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
         </ConfirmModal>
       )}
 
-      {confirmOpen && effectiveTab !== "전체" && horizonTargetPortfolio && (
+      {confirmOpen && effectiveTab === "연령대" && ageData && overallConfirmTarget && (
         <ConfirmModal
-          message={
-            activeHorizonRec?.includes_cash_equivalent && cashEquivalentMatches.length > 0
-              ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
-              : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
-          }
+          message={`${overallConfirmTarget.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`}
           confirmLabel="적용"
           danger={false}
-          onConfirm={() => applyHorizonMutation.mutate()}
+          onConfirm={() => applyAgeMutation.mutate(overallConfirmTarget.id)}
           onCancel={() => setConfirmOpen(false)}
         >
-          {activeHorizonRec && (
-            <RecommendationComparisonPreview
-              recommendedItems={activeHorizonRec.recommended_items}
-              currentItems={horizonTargetPortfolio.items}
-              recommendedMetrics={{
-                expected_return_pct: activeHorizonRec.expected_return_pct,
-                expected_dividend_yield_pct: activeHorizonRec.expected_dividend_yield_pct,
-                expected_volatility_pct: activeHorizonRec.expected_volatility_pct,
-              }}
-              targetPortfolioId={horizonTargetPortfolio.id}
-            />
-          )}
+          <RecommendationComparisonPreview
+            recommendedItems={ageData.recommended_items}
+            currentItems={overallConfirmTarget.items}
+            recommendedMetrics={{
+              expected_return_pct: ageData.expected_return_pct,
+              expected_dividend_yield_pct: ageData.expected_dividend_yield_pct,
+              expected_volatility_pct: ageData.expected_volatility_pct,
+            }}
+            targetPortfolioId={overallConfirmTarget.id}
+          />
         </ConfirmModal>
       )}
+
+      {confirmOpen &&
+        effectiveTab !== "전체" &&
+        effectiveTab !== "연령대" &&
+        horizonTargetPortfolio && (
+          <ConfirmModal
+            message={
+              activeHorizonRec?.includes_cash_equivalent && cashEquivalentMatches.length > 0
+                ? `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 현금성 자산 반영을 위해 ${cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에 자동으로 연결됩니다. 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
+                : `${horizonTargetPortfolio.name}의 목표 비중이 추천 비중으로 즉시 업데이트되고, 리밸런싱 분석이 자동으로 실행됩니다. 계속하시겠습니까?`
+            }
+            confirmLabel="적용"
+            danger={false}
+            onConfirm={() => applyHorizonMutation.mutate()}
+            onCancel={() => setConfirmOpen(false)}
+          >
+            {activeHorizonRec && (
+              <RecommendationComparisonPreview
+                recommendedItems={activeHorizonRec.recommended_items}
+                currentItems={horizonTargetPortfolio.items}
+                recommendedMetrics={{
+                  expected_return_pct: activeHorizonRec.expected_return_pct,
+                  expected_dividend_yield_pct: activeHorizonRec.expected_dividend_yield_pct,
+                  expected_volatility_pct: activeHorizonRec.expected_volatility_pct,
+                }}
+                targetPortfolioId={horizonTargetPortfolio.id}
+              />
+            )}
+          </ConfirmModal>
+        )}
     </>
   );
 }

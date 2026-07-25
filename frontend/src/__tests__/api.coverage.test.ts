@@ -50,9 +50,7 @@ describe("api/marketSignals", () => {
     const mockSignal = {
       composite_level: "GREEN" as const,
       composite_score: 75,
-      fear_greed_contrarian_buy: false,
-      fear_greed_extreme_greed: false,
-      signals: { vix: null, yield_curve: null, fear_greed: null },
+      signals: { vix: null, us_rate_curve: null },
       computed_at: "2024-01-01T00:00:00Z",
       data_freshness: "LIVE" as const,
     };
@@ -66,18 +64,9 @@ describe("api/marketSignals", () => {
     const mockSignal = {
       composite_level: "RED" as const,
       composite_score: 20,
-      fear_greed_contrarian_buy: true,
-      fear_greed_extreme_greed: false,
       signals: {
         vix: { value: 35, level: "HIGH" as const, date: "2024-01-01", sub_score: 10 },
-        yield_curve: null,
-        fear_greed: {
-          value: 15,
-          classification: "EXTREME_FEAR" as const,
-          label: "극도의 공포",
-          label_en: "Extreme Fear",
-          sub_score: 5,
-        },
+        us_rate_curve: null,
       },
       computed_at: "2024-01-01T00:00:00Z",
       data_freshness: "CACHED" as const,
@@ -85,24 +74,22 @@ describe("api/marketSignals", () => {
     vi.mocked(api.get).mockResolvedValue({ data: mockSignal });
     const result = await fetchMarketSignal();
     expect(result.composite_level).toBe("RED");
-    expect(result.fear_greed_contrarian_buy).toBe(true);
   });
 
   it("YELLOW 리스크 레벨을 올바르게 반환한다", async () => {
     const mockSignal = {
       composite_level: "YELLOW" as const,
       composite_score: 50,
-      fear_greed_contrarian_buy: false,
-      fear_greed_extreme_greed: false,
       signals: {
         vix: { value: 22, level: "MEDIUM" as const, date: "2024-01-01", sub_score: 50 },
-        yield_curve: {
-          value: -0.1,
-          state: "FLAT" as const,
+        us_rate_curve: {
+          yield_curve_value: -0.1,
+          yield_curve_state: "FLAT" as const,
+          rate_cut_value: -0.1,
+          rate_cut_level: "MILD_CUT_EXPECTED" as const,
           date: "2024-01-01",
           sub_score: 50,
         },
-        fear_greed: null,
       },
       computed_at: "2024-01-01T00:00:00Z",
       data_freshness: "PARTIAL" as const,

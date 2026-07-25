@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
-from app.services.economic_indicator_service import _parse_fred_obs, fetch_inflation_summary
+from app.services.economic_indicator_service import (
+    _fred_get_observations,
+    _parse_fred_obs,
+    fetch_indicator_history,
+    fetch_inflation_summary,
+)
+from app.utils.circuit_breaker import CircuitBreaker
 
 
 class TestParseFredObs:
@@ -80,6 +87,7 @@ class TestFetchInflationSummary:
         calendar_events = [
             {"event": "미국 CPI", "date": "2025-02-13"},
             {"event": "미국 Core CPI", "date": "2025-02-13"},
+            {"event": "미국 PCE", "date": "2025-02-28"},
         ]
         with (
             patch(
@@ -93,7 +101,7 @@ class TestFetchInflationSummary:
         ):
             result = await fetch_inflation_summary(cache=None)
 
-        assert len(result) == 2  # CPI_US + CORE_CPI_US
+        assert len(result) == 3  # CPI_US + CORE_CPI_US + PCE_US
         cpi = result[0]
         assert cpi["code"] == "CPI_US"
         assert cpi["latest_value"] == pytest.approx(306.0)
@@ -134,3 +142,64 @@ class TestFetchInflationSummary:
             result = await fetch_inflation_summary(cache=None)
 
         assert result == []
+
+
+class TestFredGetObservations:
+    """403 등 HTTP 오류가 삼켜지지 않고 그대로 propagate되는지 검증
+    (fred_circuit이 실패를 감지하려면 예외가 밖으로 나가야 한다)."""
+
+    async def test_http_status_error_propagates(self):
+        mock_response = MagicMock()
+        mock_response.status_code = 403
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "403 Forbidden", request=MagicMock(), response=mock_response
+        )
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_response)
+
+        with (
+            patch("httpx.AsyncClient", return_value=mock_client),
+            patch("app.services.economic_indicator_service.settings.fred_api_key", "test-key"),
+            pytest.raises(httpx.HTTPStatusError),
+        ):
+            await _fred_get_observations("PCEPI")
+
+    async def test_no_api_key_returns_empty_without_raising(self):
+        with patch("app.services.economic_indicator_service.settings.fred_api_key", ""):
+            result = await _fred_get_observations("PCEPI")
+
+        assert result == []
+
+
+class TestFetchIndicatorHistoryCircuitBreaker:
+    """fetch_indicator_history가 나머지 FRED 소비처(market_signal_service.py)와 동일하게
+    fred_circuit으로 보호받는지 검증 — 실제 전역 fred_circuit 상태 오염을 피하려고
+    테스트 전용 CircuitBreaker 인스턴스로 교체해 사용한다."""
+
+    async def test_returns_empty_when_fred_call_fails(self):
+        test_circuit = CircuitBreaker("FREDAPI", fail_max=4, reset_timeout=300)
+        with (
+            patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
+            patch(
+                "app.services.economic_indicator_service._fred_get_observations",
+                new=AsyncMock(side_effect=httpx.HTTPStatusError("403", request=MagicMock(), response=MagicMock())),
+            ),
+        ):
+            result = await fetch_indicator_history("CPI_US", months=13, cache=None)
+
+        assert result == []
+
+    async def test_skips_live_call_when_circuit_open(self):
+        test_circuit = CircuitBreaker("FREDAPI", fail_max=4, reset_timeout=300)
+        mock_fetch = AsyncMock(side_effect=AssertionError("circuit open인데도 라이브 호출을 시도함"))
+        with (
+            patch("app.services.economic_indicator_service.fred_circuit", test_circuit),
+            patch.object(test_circuit, "is_available", return_value=False),
+            patch("app.services.economic_indicator_service._fred_get_observations", new=mock_fetch),
+        ):
+            result = await fetch_indicator_history("CPI_US", months=13, cache=None)
+
+        assert result == []
+        mock_fetch.assert_not_called()
