@@ -1,4 +1,4 @@
-"""rebalancing_execution.py 라우터 — quick_execute_rebalancing() 단위 테스트.
+"""rebalancing_execution.py 라우터 — create_rebalancing_execution_plan() 단위 테스트.
 
 FastAPI 의존성 주입 없이 라우터 함수를 직접 호출해, "지금 테스트 실행"이 AUTO 스케줄러와
 동일한 파이프라인(대기 플랜 생성 → 이메일 발송)을 태우는지 검증한다. 드리프트 분석 자체는
@@ -22,10 +22,10 @@ def _make_plan(plan_id=None, buy_items=None, sell_items=None):
     return SimpleNamespace(id=plan_id or uuid.uuid4(), legs=legs)
 
 
-class TestQuickExecuteGates:
+class TestExecutionPlanGates:
     @pytest.mark.asyncio
     async def test_already_pending_short_circuits_before_plan_generation(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -44,7 +44,7 @@ class TestQuickExecuteGates:
             patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=True)),
             patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -57,7 +57,7 @@ class TestQuickExecuteGates:
 
     @pytest.mark.asyncio
     async def test_market_blocked_when_strict_mode_and_red_signal(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -80,7 +80,7 @@ class TestQuickExecuteGates:
             ),
             patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -97,7 +97,7 @@ class TestQuickExecuteGates:
 
         회귀 테스트 — FRED_API_KEY 미설정 등으로 대부분 신호가 실패해도 과거에는 GREEN으로
         오판되어 원클릭 실행이 그대로 통과했다."""
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -120,7 +120,7 @@ class TestQuickExecuteGates:
             ),
             patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -133,7 +133,7 @@ class TestQuickExecuteGates:
 
     @pytest.mark.asyncio
     async def test_no_drift_when_build_pending_plan_returns_none(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -155,7 +155,7 @@ class TestQuickExecuteGates:
             ),
             patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=AsyncMock(return_value=None)),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -167,7 +167,7 @@ class TestQuickExecuteGates:
 
     @pytest.mark.asyncio
     async def test_tax_blocked_when_build_pending_plan_returns_tax_gate_blocked(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
         from app.services.rebalancing.plan_service import TaxGateBlocked
 
         portfolio_id = uuid.uuid4()
@@ -194,7 +194,7 @@ class TestQuickExecuteGates:
                 new=AsyncMock(return_value=blocked),
             ),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -206,11 +206,57 @@ class TestQuickExecuteGates:
         assert "600,000" in result.message
         assert "500,000" in result.message
 
+    @pytest.mark.asyncio
+    async def test_daily_cap_blocked_when_build_pending_plan_returns_daily_value_cap_blocked(
+        self, mock_db, mock_request
+    ):
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
+        from app.services.rebalancing.plan_service import DailyValueCapBlocked
 
-class TestQuickExecutePlanGenerated:
+        portfolio_id = uuid.uuid4()
+        user = SimpleNamespace(id=uuid.uuid4())
+        portfolio = SimpleNamespace(id=portfolio_id, account_ids=None)
+        alert_row = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=uuid.uuid4(),
+            strategy="FULL",
+            order_type="MARKET",
+            market_condition_mode="DISABLED",
+        )
+        mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
+        blocked = DailyValueCapBlocked(
+            today_total_krw=5_000_000.0, attempted_value_krw=6_000_000.0, cap_krw=10_000_000.0
+        )
+
+        with (
+            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=blocked),
+            ),
+        ):
+            result = await create_rebalancing_execution_plan(
+                request=mock_request,
+                portfolio_id=portfolio_id,
+                current_user=user,
+                db=mock_db,
+                cache=None,
+            )
+
+        assert result.status == "DAILY_CAP_BLOCKED"
+        assert "5,000,000" in result.message
+        assert "6,000,000" in result.message
+        assert "10,000,000" in result.message
+
+
+class TestExecutionPlanGenerated:
     @pytest.mark.asyncio
     async def test_plan_generated_happy_path_sends_email_and_maps_counts(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -240,7 +286,7 @@ class TestQuickExecutePlanGenerated:
             ),
             patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=True)),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -260,7 +306,7 @@ class TestQuickExecutePlanGenerated:
     async def test_plan_generated_but_email_not_sent_reports_honest_message(self, mock_db, mock_request):
         """email_sent=False(발송 실패/이메일 미등록)인 경우, 메시지가 '이메일로 발송되었습니다'라고
         거짓으로 알리면 안 된다 — 실제로 이메일이 안 갔는데도 성공 메시지가 뜨던 버그 재발 방지."""
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -290,7 +336,7 @@ class TestQuickExecutePlanGenerated:
             ),
             patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=False)),
         ):
-            result = await quick_execute_rebalancing(
+            result = await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,
@@ -304,8 +350,8 @@ class TestQuickExecutePlanGenerated:
 
     @pytest.mark.asyncio
     async def test_body_strategy_override_passed_through(self, mock_db, mock_request):
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
-        from app.schemas.rebalancing import QuickExecuteOverride
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
+        from app.schemas.rebalancing import ExecutionPlanOverride
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -333,10 +379,10 @@ class TestQuickExecutePlanGenerated:
             patch("app.api.v1.rebalancing_execution.build_pending_plan_for_alert", new=mock_build_plan),
             patch("app.api.v1.rebalancing_execution.notify_plan_generated", new=AsyncMock(return_value=False)),
         ):
-            await quick_execute_rebalancing(
+            await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
-                body=QuickExecuteOverride(strategy="TWO_PHASE"),
+                body=ExecutionPlanOverride(strategy="TWO_PHASE"),
                 current_user=user,
                 db=mock_db,
                 cache=None,
@@ -351,8 +397,8 @@ class TestQuickExecutePlanGenerated:
     async def test_body_account_id_override_requires_ownership(self, mock_db, mock_request):
         from fastapi import HTTPException
 
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
-        from app.schemas.rebalancing import QuickExecuteOverride
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
+        from app.schemas.rebalancing import ExecutionPlanOverride
 
         saved_account_id = uuid.uuid4()
         other_account_id = uuid.uuid4()
@@ -374,10 +420,10 @@ class TestQuickExecutePlanGenerated:
             patch("app.api.v1.rebalancing_execution.get_owned_account", new=mock_get_owned),
             pytest.raises(HTTPException) as exc_info,
         ):
-            await quick_execute_rebalancing(
+            await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
-                body=QuickExecuteOverride(account_id=other_account_id),
+                body=ExecutionPlanOverride(account_id=other_account_id),
                 current_user=user,
                 db=mock_db,
                 cache=None,
@@ -387,13 +433,13 @@ class TestQuickExecutePlanGenerated:
         mock_get_owned.assert_awaited_once_with(other_account_id, user.id, mock_db)
 
 
-class TestQuickExecutePortfolioQuery:
+class TestExecutionPlanPortfolioQuery:
     @pytest.mark.asyncio
     async def test_portfolio_query_eager_loads_linked_accounts_and_items(self, mock_db, mock_request):
-        """quick_execute_rebalancing()이 portfolio.account_ids / portfolio.items에 접근하기 전에
+        """create_rebalancing_execution_plan()이 portfolio.account_ids / portfolio.items에 접근하기 전에
         selectinload로 미리 로드해야 한다. 누락 시 실제 DB에서 lazy-load가 시도되어
         async 세션에서 sqlalchemy.exc.MissingGreenlet이 발생한다."""
-        from app.api.v1.rebalancing_execution import quick_execute_rebalancing
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
 
         portfolio_id = uuid.uuid4()
         user = SimpleNamespace(id=uuid.uuid4())
@@ -411,7 +457,7 @@ class TestQuickExecutePortfolioQuery:
         from fastapi import HTTPException
 
         with pytest.raises(HTTPException):
-            await quick_execute_rebalancing(
+            await create_rebalancing_execution_plan(
                 request=mock_request,
                 portfolio_id=portfolio_id,
                 current_user=user,

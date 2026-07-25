@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { IsaStatusSummary } from "@/api/tax";
 import type { PortfolioOverview } from "@/types";
@@ -36,19 +36,17 @@ function makeOverview(
 const emptyIsa: IsaStatusSummary = { accounts: [], note: "" };
 
 describe("TaxLimitsSection", () => {
-  afterEach(() => {
-    localStorage.clear();
-  });
-
-  it("ISA/연금 계좌가 하나도 없으면 렌더링하지 않는다", async () => {
+  it("ISA/연금 계좌가 하나도 없으면 안내 문구를 표시한다", async () => {
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([{ tax_type: "GENERAL" }]));
-    const { container } = renderWithProviders(<TaxLimitsSection />);
+    renderWithProviders(<TaxLimitsSection />);
     await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
-    expect(container).toBeEmptyDOMElement();
+    expect(
+      await screen.findByText("ISA·연금저축/IRP 계좌가 없어 한도 현황이 없습니다."),
+    ).toBeInTheDocument();
   });
 
-  it("ISA 계좌가 있으면 카드를 렌더링하고, 토글 클릭 시 IsaMaturityCard가 펼쳐진다 (기본 접힘)", async () => {
+  it("ISA 계좌가 있으면 IsaMaturityCard를 곧바로(접기 없이) 렌더한다", async () => {
     fetchIsaStatus.mockResolvedValue({
       accounts: [
         {
@@ -72,14 +70,10 @@ describe("TaxLimitsSection", () => {
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
 
     renderWithProviders(<TaxLimitsSection />);
-    expect(await screen.findByText("한도·기한 현황")).toBeInTheDocument();
-    expect(screen.queryByText("ISA 만기·세제 현황")).toBeNull();
-
-    fireEvent.click(screen.getByText("한도·기한 현황"));
     expect(await screen.findByText("ISA 만기·세제 현황")).toBeInTheDocument();
   });
 
-  it("연금저축 태그 계좌가 있으면 토글 펼침 후 PensionContributionCard를 임베드 렌더한다", async () => {
+  it("연금저축 태그 계좌가 있으면 PensionContributionCard를 곧바로 렌더한다", async () => {
     fetchIsaStatus.mockResolvedValue(emptyIsa);
     fetchPensionContribution.mockResolvedValue({
       year: 2026,
@@ -97,8 +91,6 @@ describe("TaxLimitsSection", () => {
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([{ tax_type: "PENSION_SAVINGS" }]));
 
     renderWithProviders(<TaxLimitsSection />);
-    await screen.findByText("한도·기한 현황");
-    fireEvent.click(screen.getByText("한도·기한 현황"));
     expect(await screen.findByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument();
   });
 });

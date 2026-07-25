@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle, Info, Zap } from "lucide-react";
 import type { RebalancingAnalysis } from "@/api/rebalancing";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import DiagnosisInsightList from "./DiagnosisInsightList";
@@ -161,7 +161,7 @@ export default function RebalancingDiagnosisCard({
             onClick={onExecute}
             className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
           >
-            ⚡ 지금 실행하기
+            <Zap size={14} /> 지금 실행하기
           </button>
         </div>
       )}

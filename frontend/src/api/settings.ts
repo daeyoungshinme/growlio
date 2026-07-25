@@ -49,6 +49,7 @@ export interface SettingsData {
   goal_short_term_equity_floor_pct: number;
   age_group: AgeGroup | null;
   auto_rebalancing_max_order_value_krw: number;
+  auto_rebalancing_daily_value_cap_krw: number | null;
 }
 
 export const fetchSettings = (): Promise<SettingsData> => apiGet<SettingsData>("/settings");

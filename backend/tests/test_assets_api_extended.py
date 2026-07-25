@@ -131,33 +131,6 @@ class TestGetAccount:
         assert resp.status_code == 404
 
 
-class TestGetSnapshots:
-    def test_get_snapshots_returns_200(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/assets/snapshots/range")
-        assert resp.status_code == 200
-        assert isinstance(resp.json(), list)
-
-    def test_get_snapshots_with_dates(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/assets/snapshots/range?start_date=2024-01-01&end_date=2024-12-31")
-        assert resp.status_code == 200
-
-    def test_get_snapshots_invalid_date_range(self, override_settings):
-        user = _make_user()
-        db = _make_mock_db()
-        app = _setup_app(user, db)
-        with TestClient(app, raise_server_exceptions=False) as client:
-            resp = client.get("/api/v1/assets/snapshots/range?start_date=2024-12-31&end_date=2024-01-01")
-        assert resp.status_code == 400
-
-
 class TestUpdateAccount:
     def test_update_account_name(self, override_settings):
         user = _make_user()

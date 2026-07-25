@@ -144,6 +144,19 @@ class RecommendationDriftAlertUpdate(BaseModel):
     enabled: bool
 
 
+class AutoRebalancingDailyCapUpdate(BaseModel):
+    """AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(KRW). None(또는 생략)이면 무제한(기본값)."""
+
+    daily_value_cap_krw: float | None = None
+
+    @field_validator("daily_value_cap_krw")
+    @classmethod
+    def validate_positive(cls, v: float | None) -> float | None:
+        if v is not None and v <= 0:
+            raise ValueError("하루 합산 거래한도는 0보다 커야 합니다")
+        return v
+
+
 class SettingsResponse(BaseModel):
     has_kis: bool
     has_dart: bool
@@ -171,6 +184,8 @@ class SettingsResponse(BaseModel):
     # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
     # 1건당 거래대금 안전장치 상한을 안내하기 위해 노출한다 (app/services/rebalancing/order_builder.py 참고).
     auto_rebalancing_max_order_value_krw: float = 50_000_000.0
+    # 유저 단위 하루 합산 거래대금 상한 — None이면 무제한(기본값). 위 1건당 상한과 별개(app/models/user.py 참고).
+    auto_rebalancing_daily_value_cap_krw: float | None = None
 
 
 @router.get("", response_model=SettingsResponse)
@@ -224,6 +239,11 @@ async def get_settings(
         ),
         age_group=AgeGroup(row.age_group) if row.age_group else None,
         auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
+        auto_rebalancing_daily_value_cap_krw=(
+            float(row.auto_rebalancing_daily_value_cap_krw)
+            if row.auto_rebalancing_daily_value_cap_krw is not None
+            else None
+        ),
     )
 
 
@@ -433,6 +453,21 @@ async def update_recommendation_drift_alert(
     row.recommendation_drift_alert_enabled = req.enabled
     await db.commit()
     return {"detail": "추천 비중 변화 알림 설정이 저장되었습니다"}
+
+
+@router.put("/auto-rebalancing-daily-cap")
+@limiter.limit("10/minute")
+async def update_auto_rebalancing_daily_cap(
+    request: Request,
+    req: AutoRebalancingDailyCapUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한 설정. None(미지정)이면 무제한(기본값)."""
+    row = await get_or_create_settings(db, current_user.id)
+    row.auto_rebalancing_daily_value_cap_krw = req.daily_value_cap_krw
+    await db.commit()
+    return {"detail": "하루 합산 거래한도 설정이 저장되었습니다"}
 
 
 @router.put("/push-token")

@@ -29,7 +29,7 @@ import {
   executeRebalancing,
   fetchBrokerBalance,
   fetchAllBrokerBalances,
-  quickExecuteRebalancing,
+  createRebalancingExecutionPlan,
   fetchRebalancingHistory,
   fetchRebalancingExecutionDetail,
   fetchDriftSummary,
@@ -83,9 +83,9 @@ describe("api/rebalancing", () => {
     expect(api.get).toHaveBeenCalledWith("/rebalancing/broker-balance-all");
   });
 
-  it("quickExecuteRebalancing calls POST /rebalancing/portfolios/:id/quick-execute", async () => {
+  it("createRebalancingExecutionPlan calls POST /rebalancing/portfolios/:id/quick-execute", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: [] });
-    await quickExecuteRebalancing("port-1");
+    await createRebalancingExecutionPlan("port-1");
     expect(api.post).toHaveBeenCalledWith(
       "/rebalancing/portfolios/port-1/quick-execute",
       undefined,
@@ -93,9 +93,9 @@ describe("api/rebalancing", () => {
     );
   });
 
-  it("quickExecuteRebalancing passes scope account_id as query param when given", async () => {
+  it("createRebalancingExecutionPlan passes scope account_id as query param when given", async () => {
     vi.mocked(api.post).mockResolvedValue({ data: [] });
-    await quickExecuteRebalancing("port-1", undefined, "acc-1");
+    await createRebalancingExecutionPlan("port-1", undefined, "acc-1");
     expect(api.post).toHaveBeenCalledWith(
       "/rebalancing/portfolios/port-1/quick-execute",
       undefined,

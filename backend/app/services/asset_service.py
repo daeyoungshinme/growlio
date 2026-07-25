@@ -192,24 +192,6 @@ async def list_accounts(
     return result.scalars().all()
 
 
-async def list_snapshots_in_range(
-    user_id: uuid.UUID,
-    db: AsyncSession,
-    start_date: date | None = None,
-    end_date: date | None = None,
-    skip: int = 0,
-    limit: int = 365,
-) -> Sequence[AssetSnapshot]:
-    query = select(AssetSnapshot).where(AssetSnapshot.user_id == user_id)
-    if start_date:
-        query = query.where(AssetSnapshot.snapshot_date >= start_date)
-    if end_date:
-        query = query.where(AssetSnapshot.snapshot_date <= end_date)
-    query = query.order_by(AssetSnapshot.snapshot_date.desc()).offset(skip).limit(limit)
-    result = await db.execute(query)
-    return result.scalars().all()
-
-
 async def list_accounts_by_ids(
     account_ids: list[uuid.UUID],
     user_id: uuid.UUID,

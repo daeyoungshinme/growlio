@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Bell, BellOff, Loader2, PlayCircle, Send } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sendTestAccountRebalancingAlert, sendTestRebalancingAlert } from "@/api/alerts";
-import { quickExecuteRebalancing } from "@/api/rebalancing";
+import { createRebalancingExecutionPlan } from "@/api/rebalancing";
 import type { RebalancingAlertFormState } from "@/hooks/useRebalancingAlertForm";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -37,7 +37,7 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
   // 즉시 체결이 아니라 매수는 대기시간 후 자동 실행, 매도는 이메일 승인이 필요하다.
   const quickExecuteMut = useMutation({
     mutationFn: () =>
-      quickExecuteRebalancing(
+      createRebalancingExecutionPlan(
         portfolioId,
         {
           account_id: form.accountId || undefined,
@@ -47,8 +47,11 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
         targetAccountId,
       ),
     onSuccess: (result) => {
-      const toastType = result.status === "MARKET_BLOCKED" ? "error" : "success";
-      toast(result.message, toastType);
+      const isBlocked =
+        result.status === "MARKET_BLOCKED" ||
+        result.status === "TAX_BLOCKED" ||
+        result.status === "DAILY_CAP_BLOCKED";
+      toast(result.message, isBlocked ? "error" : "success");
       if (result.status === "PLAN_GENERATED") {
         void invalidateRebalancingPlanData(queryClient);
       }

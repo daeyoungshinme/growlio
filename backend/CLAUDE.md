@@ -111,7 +111,7 @@ cd backend && uv run mypy app/
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS)
+- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS), AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(`auto_rebalancing_daily_value_cap_krw`, nullable — NULL이면 무제한/기본값, `PUT /settings/auto-rebalancing-daily-cap`으로 설정)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
 
@@ -135,7 +135,6 @@ API Request
         ├── stocks.py         # 종목 검색 + ETF 추종지수 지역 판별(GET /stocks/index-region)
         ├── tax.py            # 세금 추정 요약(GET /tax/summary?year=YYYY&account_id=) + 해외 포지션(GET /tax/overseas-positions?account_id=) + ISA 만기 현황(GET /tax/isa-status) + 연금 납입 현황(GET /tax/pension-contribution) — account_id 미지정 시 전체 계좌 통합
         ├── transactions.py   # 입출금/배당 내역 CRUD
-        ├── ws_prices.py        # WebSocket: /api/v1/ws/prices — 실시간 주가 구독 (연결 관리는 app/ws/connection_manager.py)
         ├── economic_indicators.py  # 미국 CPI/Core CPI 인플레이션 요약(GET /economic-indicators/inflation-summary) — 리밸런싱 화면 InflationSummaryCard로 프론트 연동됨. 이 엔드포인트만 존재 (지표 목록/구독/캘린더/알림 job은 프론트 미연동이라 제거됨)
         ├── insights.py             # 스마트 인사이트 & 포트폴리오 진단 (/insights)
         ├── market_signals.py       # VIX·미국 금리 커브·하이일드 스프레드 등 복합 신호 (/market-signals)
@@ -165,11 +164,11 @@ services/
   ├── rebalancing/            # 리밸런싱 도메인 패키지 (분석·실행·계획·전략·알림)
   │   ├── service.py          # 리밸런싱 추천 (구 rebalancing_service.py)
   │   ├── strategy_service.py # 리밸런싱 전략 로직 (구 rebalancing_strategy_service.py, service.py에서 분리)
-  │   ├── order_builder.py    # AUTO 실행·원클릭 실행·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py. `clamp_orders_to_max_value()`는 1건당 거래대금이 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만원)를 넘지 않도록 축소하는 안전장치 — `plan_service.generate_pending_plan_for_alert()`(AUTO/quick-execute 공용 대기 플랜 생성 경로)가 호출. `is_market_signal_blocking_auto_mode()`/`is_tax_impact_blocking_auto_mode()`는 각각 시장신호·세금영향 게이트 판정 순수 함수(대칭 설계) — plan_service.py가 계획 생성 시점과 매수 실행 직전(시장신호만 재확인) 두 시점에 호출. 시장신호 게이트 4곳(이 함수의 호출부)은 raw가 아닌 `market_signal_service.get_confirmed_composite_level()`(hysteresis 적용, 연속 2회 관측 후에만 레벨 반영)을 사용 — 배너 표시 등 raw 소비처와 분리(docs/plans/21-market-signal-methodology.md)
+  │   ├── order_builder.py    # AUTO 실행·원클릭 실행(`create_rebalancing_execution_plan`)·대기 플랜 생성이 공유하는 주문 생성 로직(build_rebalancing_orders/refresh_live_prices/filter_drifting_items) — 구 rebalancing_order_builder.py. `clamp_orders_to_max_value()`는 1건당 거래대금이 `settings.auto_rebalancing_max_order_value_krw`(기본 5천만원)를 넘지 않도록 축소하는 안전장치 — `plan_service.generate_pending_plan_for_alert()`(AUTO/quick-execute 공용 대기 플랜 생성 경로)가 호출. `is_market_signal_blocking_auto_mode()`/`is_tax_impact_blocking_auto_mode()`/`is_daily_value_cap_blocking_auto_mode()`는 각각 시장신호·세금영향·유저 단위 하루 합산 거래한도 게이트 판정 순수 함수(대칭 설계) — plan_service.py가 계획 생성 시점과 매수 실행 직전(시장신호만 재확인) 두 시점에 호출. 시장신호 게이트 4곳(이 함수의 호출부)은 raw가 아닌 `market_signal_service.get_confirmed_composite_level()`(hysteresis 적용, 연속 2회 관측 후에만 레벨 반영)을 사용 — 배너 표시 등 raw 소비처와 분리(docs/plans/21-market-signal-methodology.md)
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). AUTO 모드 알림이 시장신호 게이트로 이번만 NOTIFY로 강등되면 그 사유를 `automation_note`로 이메일 본문·발송 이력에 노출
   │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
-  │   ├── plan_service.py     # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지 (구 rebalancing_plan_service.py). `build_pending_plan_for_alert()`가 세금영향(`RebalancingAlert.tax_impact_gate_mode`) 또는 시장신호 게이트로 계획 생성을 막으면 각각 `TaxGateBlocked`/`MarketSignalGateBlocked` sentinel을 반환(플랜 미생성) — `notify_tax_gate_blocked()`/`notify_market_signal_gate_blocked()`가 알림당 하루 1회(Postgres 기반 durable_state dedup — 재시작에도 유지) 이메일/푸시/이력으로 보류 사유를 안내. `execute_due_buy_legs()`는 대기시간이 지난 매수 leg 실행 직전 시장신호 게이트를 재확인(계획 생성 시점 이후 상황 악화 대응, 차단되면 조용히 다음 1분 tick에 재시도). leg 실행 자체가 예외로 실패하면(개별 종목 주문 실패와는 별개) `_notify_leg_execution_failed()`가 이메일/푸시로 안내
+  │   ├── plan_service.py     # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지 (구 rebalancing_plan_service.py). `build_pending_plan_for_alert()`가 세금영향(`RebalancingAlert.tax_impact_gate_mode`)·시장신호·유저 단위 하루 합산 거래한도(`UserSettings.auto_rebalancing_daily_value_cap_krw`, nullable=무제한) 게이트로 계획 생성을 막으면 각각 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel을 반환(플랜 미생성) — `notify_tax_gate_blocked()`/`notify_market_signal_gate_blocked()`/`notify_daily_value_cap_blocked()`가 하루 1회(Postgres 기반 durable_state dedup — 재시작에도 유지) 이메일/푸시/이력으로 보류 사유를 안내(앞 둘은 알림 단위, 하루 합산 캡은 게이트 자체가 유저 단위라 dedup도 user_id 기준). 하루 합산 캡 판정은 `sum_today_auto_plan_value_krw()`(오늘 KST 기준 PENDING/EXECUTED leg 합산)와 드리프트 항목의 `diff_krw` 절대값 합(클램프 이전 추정치, 보수적) 비교로 이뤄진다. `execute_due_buy_legs()`는 대기시간이 지난 매수 leg 실행 직전 시장신호 게이트를 재확인(계획 생성 시점 이후 상황 악화 대응, 차단되면 조용히 다음 1분 tick에 재시도). leg 실행 자체가 예외로 실패하면(개별 종목 주문 실패와는 별개) `_notify_leg_execution_failed()`가 이메일/푸시로 안내
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리 (구 rebalancing_execution_service.py)
   │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (execution_service.py에서 분리)
   │   ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (execution_service.py에서 분리)
@@ -226,7 +225,7 @@ services/
   ├── factor_service.py             # 팩터 분석 (모멘텀·가치·품질)
   ├── insight_service.py            # 포트폴리오 진단 & 인사이트 생성
   ├── market_data_fetcher.py        # [팩터·리스크용 배치 수익률 그룹] 시장 데이터 수집 유틸 (VIX, 금리차 등) — 개별 현재가 조회(price_service.py 등)와는 별개 책임
-  ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가 6종, 상한 20점). `get_confirmed_composite_level()`이 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측 후 반영) 제공 — raw(`get_market_signal`)는 배너 등 표시용으로 별개 유지
+  ├── market_signal_service.py      # 복합 시장 위험 신호 평가(VIX·미국 금리 커브·하이일드 스프레드·달러인덱스·환율·유가·인플레이션(CPI+PCE 병합)·고용(실업률) 8종, 상한 27점). `get_confirmed_composite_level()`이 AUTO 게이트·등급전환 알림 전용 hysteresis(연속 2회 관측 후 반영) 제공 — raw(`get_market_signal`)는 배너 등 표시용으로 별개 유지
   ├── portfolio_optimizer.py        # 포트폴리오 최적화 (효율적 프론티어)
   ├── position_aggregator.py        # 복수 계좌 포지션 집계
   ├── push_service.py               # FCM 푸시 알림 발송
@@ -280,7 +279,6 @@ jobs/                         # APScheduler 정기 작업
   ├── exchange_rate_alert.py  # 5분 간격 환율 알림 체크
   ├── goal_achievement.py     # 매일 18:45 KST 투자 목표 달성도 확인
   ├── monthly_report.py       # 매월 1일 09:00 KST 월간 리포트 발송
-  ├── price_publisher.py      # 30초 간격 WebSocket 실시간 가격 브로드캐스트
   ├── rebalancing_alert.py    # 10분 간격(app/scheduler.py:44) — 리밸런싱 드리프트 초과 시 이메일 알림(SCHEDULE/DRIFT/BOTH 조건 체크)
   ├── market_signal_alert.py  # 1시간 간격 — 시장 위험 신호 등급 전환(GREEN/YELLOW/RED) 감지 시 즉시 알림
   ├── market_signal_daily_digest.py  # 매일 08:30 KST — 등급 전환 여부와 무관하게 현재 시장 신호를 요약 발송(옵트인, 기본 OFF)
@@ -288,7 +286,7 @@ jobs/                         # APScheduler 정기 작업
   ├── recommendation_drift_alert.py  # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오와 유의미하게 달라지면 이메일/푸시 발송(옵트인, 기본 OFF)
   ├── rebalancing_auto_execution.py  # 장 중 5분 간격 — AUTO 모드 리밸런싱 대기 플랜 생성(계획 이메일 발송, 실행은 안 함). 시장신호·세금영향 게이트로 차단되면 보류 알림 발송(services/rebalancing/plan_service.py 참고)
   ├── rebalancing_plan_buy_execution.py  # 1분 간격 — 대기시간 지난 매수 leg 자동 실행. 실행 직전 시장신호 게이트를 재확인(대기 중 상황 악화 대응) — 차단되면 조용히 다음 tick 재시도
-  ├── rebalancing_plan_sell_expiry.py  # 매일 15:31 KST — 당일 미응답 매도 승인 요청 만료 처리
+  ├── rebalancing_plan_sell_expiry.py  # 15분 간격(app/scheduler.py) — 당일 미응답 매도 승인 요청 만료 처리
   ├── stock_price_alert.py    # 10분 간격 주가 알림 체크
   ├── token_refresh.py        # 매일 06:00 KST KIS 계좌별 토큰 갱신
   ├── cache_sweep.py          # 15분 간격 — in-memory 캐시(`cache_store.py`)의 만료 키를 능동 청소(lazy expiration 보완)

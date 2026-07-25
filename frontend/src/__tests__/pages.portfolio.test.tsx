@@ -217,7 +217,7 @@ describe("PortfolioPage", () => {
     });
   });
 
-  it("'세금' 탭을 선택하면 TaxLimitsSection과 TaxOptimizationCard가 함께 렌더링된다", async () => {
+  it("'세금' 탭을 선택하면 기본으로 TaxLimitsSection(한도 현황)이 렌더링된다", async () => {
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
       if (url === "/dividends/positions") return Promise.resolve({ data: [] });
@@ -226,6 +226,22 @@ describe("PortfolioPage", () => {
     renderPortfolio("?portfolioTab=세금");
     await waitFor(() => {
       expect(screen.getByTestId("tax-limits-section")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("tax-optimization")).not.toBeInTheDocument();
+  });
+
+  it("'세금' 탭에서 '세금 추정' 서브탭을 클릭하면 TaxOptimizationCard가 렌더링된다", async () => {
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio("?portfolioTab=세금");
+    await waitFor(() => {
+      expect(screen.getByTestId("tax-limits-section")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "세금 추정" }));
+    await waitFor(() => {
       expect(screen.getByTestId("tax-optimization")).toBeInTheDocument();
     });
   });

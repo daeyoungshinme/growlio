@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db
@@ -17,7 +17,6 @@ from app.schemas.asset import (
     AssetAccountCreate,
     AssetAccountResponse,
     AssetAccountUpdate,
-    AssetSnapshotResponse,
     BatchSetTargetPortfolioRequest,
     IsaPnlOverrideUpdate,
     KisCredentialVerifyRequest,
@@ -36,9 +35,6 @@ from app.services.asset_service import (
 )
 from app.services.asset_service import (
     list_accounts_by_ids as _list_accounts_by_ids,
-)
-from app.services.asset_service import (
-    list_snapshots_in_range as _list_snapshots_in_range,
 )
 from app.services.asset_service import (
     sync_account_now as _sync_account_now,
@@ -177,34 +173,6 @@ async def create_account(
         )
         await db.commit()
     return _account_response(account)
-
-
-_MAX_SNAPSHOTS_LIMIT = 365
-
-
-@router.get("/snapshots/range", response_model=list[AssetSnapshotResponse])
-async def get_snapshots(
-    start_date: date | None = None,
-    end_date: date | None = None,
-    limit: int = Query(default=_MAX_SNAPSHOTS_LIMIT, ge=1, le=_MAX_SNAPSHOTS_LIMIT),
-    skip: int = Query(default=0, ge=0),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    if start_date and end_date and start_date > end_date:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="start_date는 end_date보다 이전이어야 합니다",
-        )
-    limit = min(limit, _MAX_SNAPSHOTS_LIMIT)
-    return await _list_snapshots_in_range(
-        current_user.id,
-        db,
-        start_date=start_date,
-        end_date=end_date,
-        skip=skip,
-        limit=limit,
-    )
 
 
 @router.get("/{account_id}", response_model=AssetAccountResponse)

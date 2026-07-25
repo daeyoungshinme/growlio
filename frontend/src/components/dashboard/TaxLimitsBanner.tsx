@@ -10,7 +10,8 @@ interface Props {
 /** ISA 만기·연금 공제한도·세금 추정 현황을 압축해 보여주고, 자산탭 세금 서브탭으로 딥링크한다.
  * `InvestmentSnapshotCard`("주식 투자 현황") 안의 4번째 하위 섹션으로, 형제 섹션인
  * "투자기간별 자산현황"/"배당 현황"과 동일한 시각 언어(아이콘 없는 텍스트 행)로 임베드된다 —
- * 상세는 여전히 /assets?tab=투자현황&portfolioTab=세금의 TaxLimitsSection/TaxOptimizationCard가 전담. */
+ * 상세는 여전히 /assets?tab=투자현황&portfolioTab=세금의 `TaxTabContainer`(한도 현황/세금 추정 2탭)가 전담
+ * — 기본 탭이 "한도 현황"이라 이 배너가 요약하는 내용과 자연스럽게 일치한다. */
 export default function TaxLimitsBanner({ overview }: Props) {
   const { parts, warningText } = useTaxLimitsSummary(overview);
 

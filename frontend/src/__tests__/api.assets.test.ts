@@ -33,7 +33,6 @@ import {
   setAccountTargetPortfolio,
   batchSetTargetPortfolio,
   verifyKisCredentials,
-  fetchSnapshots,
   searchStocks,
   fetchExchangeRate,
   fetchStockPrice,
@@ -126,14 +125,6 @@ describe("api/assets", () => {
       is_mock: false,
     });
     expect(result).toEqual(mockResponse);
-  });
-
-  it("fetchSnapshots calls GET /assets/snapshots/range", async () => {
-    vi.mocked(api.get).mockResolvedValue({ data: [] });
-    await fetchSnapshots("2024-01-01", "2024-12-31");
-    expect(api.get).toHaveBeenCalledWith("/assets/snapshots/range", {
-      params: { start_date: "2024-01-01", end_date: "2024-12-31" },
-    });
   });
 
   it("searchStocks calls GET /stocks/search with query", async () => {

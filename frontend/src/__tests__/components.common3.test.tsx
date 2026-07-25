@@ -17,10 +17,8 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import Toaster from "@/components/Toaster";
 import OfflineBanner from "@/components/common/OfflineBanner";
 import PageLoader from "@/components/common/PageLoader";
-import SkeletonTable from "@/components/common/SkeletonTable";
 import Tabs from "@/components/common/Tabs";
 import TreemapCell from "@/components/common/TreemapCell";
-import StatCard from "@/components/common/StatCard";
 import Tooltip from "@/components/common/Tooltip";
 import SkeletonCard from "@/components/common/SkeletonCard";
 import SkeletonStatBox from "@/components/common/SkeletonStatBox";
@@ -190,19 +188,6 @@ describe("PageLoader", () => {
   });
 });
 
-// ------- SkeletonTable -------
-describe("SkeletonTable", () => {
-  it("renders with default cols and rows", () => {
-    const { container } = renderWithProviders(<SkeletonTable />);
-    expect(container.firstChild).toBeDefined();
-  });
-
-  it("renders with custom cols and rows", () => {
-    const { container } = renderWithProviders(<SkeletonTable cols={3} rows={2} />);
-    expect(container.firstChild).toBeDefined();
-  });
-});
-
 // ------- Tabs -------
 describe("Tabs", () => {
   const tabs = ["탭1", "탭2", "탭3"] as const;
@@ -311,32 +296,6 @@ describe("TreemapCell", () => {
     const textNodes = container.querySelectorAll("text");
     const hasName = Array.from(textNodes).some((t) => t.textContent?.includes("이름이매우길"));
     expect(hasName).toBe(true);
-  });
-});
-
-// ------- StatCard -------
-describe("StatCard", () => {
-  it("renders label and value", () => {
-    renderWithProviders(<StatCard label="총자산" value="1,000만원" />);
-    expect(screen.getByText("총자산")).toBeDefined();
-    expect(screen.getByText("1,000만원")).toBeDefined();
-  });
-
-  it("renders sub text", () => {
-    renderWithProviders(<StatCard label="수익률" value="+5%" sub="전일 대비" />);
-    expect(screen.getByText("전일 대비")).toBeDefined();
-  });
-
-  it("renders in sm size", () => {
-    renderWithProviders(<StatCard label="수익" value="+1%" size="sm" />);
-    expect(screen.getByText("수익")).toBeDefined();
-  });
-
-  it("renders with color variants", () => {
-    const { rerender } = renderWithProviders(<StatCard label="수익" value="+1%" color="red" />);
-    expect(screen.getByText("+1%")).toBeDefined();
-    rerender(<StatCard label="수익" value="+1%" color="green" />);
-    expect(screen.getByText("+1%")).toBeDefined();
   });
 });
 

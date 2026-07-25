@@ -245,20 +245,6 @@ class IsaPnlOverrideUpdate(BaseModel):
     cumulative_pnl_krw: float | None = None
 
 
-class AssetSnapshotResponse(BaseModel):
-    id: UUID
-    account_id: UUID | None
-    snapshot_date: date
-    amount_krw: float
-    currency: str
-    invested_amount: float | None
-    unrealized_pnl: float | None
-    positions: list[Any] | None
-    source: str
-
-    model_config = {"from_attributes": True}
-
-
 class KisCredentialVerifyRequest(BaseModel):
     kis_app_key: str
     kis_app_secret: str

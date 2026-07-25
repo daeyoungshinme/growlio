@@ -187,14 +187,20 @@ export const fetchAllBrokerBalances = (): Promise<KisBalanceResponse[]> =>
 
 // ── 지금 테스트 실행 (대기 플랜 생성 + 이메일 발송, AUTO와 동일 파이프라인) ──────────
 
-export interface QuickExecuteOverride {
+export interface ExecutionPlanOverride {
   account_id?: string | null;
   strategy?: "FULL" | "BUY_ONLY" | "TWO_PHASE";
   order_type?: "MARKET" | "LIMIT";
 }
 
-export interface QuickExecuteResult {
-  status: "PLAN_GENERATED" | "NO_DRIFT" | "ALREADY_PENDING" | "MARKET_BLOCKED";
+export interface ExecutionPlanResult {
+  status:
+    | "PLAN_GENERATED"
+    | "NO_DRIFT"
+    | "ALREADY_PENDING"
+    | "MARKET_BLOCKED"
+    | "TAX_BLOCKED"
+    | "DAILY_CAP_BLOCKED";
   message: string;
   email_sent: boolean;
   plan_id: string | null;
@@ -202,13 +208,14 @@ export interface QuickExecuteResult {
   sell_count: number;
 }
 
-export const quickExecuteRebalancing = (
+/** 즉시 체결이 아니라 AUTO와 동일하게 대기 플랜을 생성한다(매수는 대기 후 자동 실행, 매도는 이메일 승인). */
+export const createRebalancingExecutionPlan = (
   portfolioId: string,
-  override?: QuickExecuteOverride,
+  override?: ExecutionPlanOverride,
   /** PER_ACCOUNT 스코프 포트폴리오는 어느 계좌 전용 알림 행을 실행할지 지정해야 한다. */
   scopeAccountId?: string,
-): Promise<QuickExecuteResult> =>
-  apiPost<QuickExecuteResult>(`/rebalancing/portfolios/${portfolioId}/quick-execute`, override, {
+): Promise<ExecutionPlanResult> =>
+  apiPost<ExecutionPlanResult>(`/rebalancing/portfolios/${portfolioId}/quick-execute`, override, {
     params: scopeAccountId ? { account_id: scopeAccountId } : undefined,
   });
 

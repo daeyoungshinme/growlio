@@ -192,7 +192,10 @@ class TestRunAutoExecution:
             ),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(_make_plan(), [("KR", "buy-token")], [])),
@@ -265,7 +268,10 @@ class TestRunAutoExecution:
             _patch_common(mock_db),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=True)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(side_effect=lambda alert_ids, db: set(alert_ids)),
+            ),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
         ):
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
@@ -273,6 +279,46 @@ class TestRunAutoExecution:
             await _run_auto_execution()
 
         mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_pending_plan_check_is_batched_and_skips_only_pending_alert(self):
+        """N개 알림 중 일부만 pending이면 그 알림만 스킵하고, pending 조회는 alert마다가
+        아니라 루프 전체에 대해 단 한 번만 이뤄진다(N+1 회귀 방지)."""
+        mock_db = _make_mock_db()
+        pending_alert = _make_alert()
+        clear_alert = _make_alert()
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [
+            (pending_alert, portfolio, "u@test.com", None, None),
+            (clear_alert, portfolio, "u@test.com", None, None),
+        ]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        pending_check = AsyncMock(return_value={pending_alert.id})
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch("app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan", new=pending_check),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=(_make_plan(), [("KR", "buy-token")], [])),
+            ) as mock_gen,
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        pending_check.assert_awaited_once()
+        awaited_alert_ids = pending_check.await_args.args[0]
+        assert set(awaited_alert_ids) == {pending_alert.id, clear_alert.id}
+        mock_gen.assert_awaited_once()
+        assert mock_gen.await_args.args[0] is clear_alert
 
     @pytest.mark.asyncio
     async def test_tax_gate_blocked_notifies_instead_of_crashing(self):
@@ -294,7 +340,10 @@ class TestRunAutoExecution:
             _patch_common(mock_db),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=blocked),
@@ -304,6 +353,48 @@ class TestRunAutoExecution:
             from app.jobs.rebalancing_auto_execution import _run_auto_execution
 
             await _run_auto_execution()  # TaxGateBlocked를 (plan, buy, sell)로 언패킹하면 여기서 예외 발생
+
+        mock_gen.assert_called_once()
+        mock_notify.assert_called_once()
+        assert mock_notify.call_args.args[0] is alert
+        assert mock_notify.call_args.args[1] is portfolio
+        assert mock_notify.call_args.args[2] is blocked
+
+    @pytest.mark.asyncio
+    async def test_daily_value_cap_blocked_notifies_instead_of_crashing(self):
+        """build_pending_plan_for_alert()가 DailyValueCapBlocked를 반환하면 3-tuple로 언패킹하지 않고
+        notify_daily_value_cap_blocked()를 호출한 뒤 다음 alert로 넘어가야 한다."""
+        from app.services.rebalancing.plan_service import DailyValueCapBlocked
+
+        mock_db = _make_mock_db()
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        blocked = DailyValueCapBlocked(
+            today_total_krw=5_000_000.0, attempted_value_krw=6_000_000.0, cap_krw=10_000_000.0
+        )
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=blocked),
+            ) as mock_gen,
+            patch("app.jobs.rebalancing_auto_execution.notify_daily_value_cap_blocked", new=AsyncMock()) as mock_notify,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()  # DailyValueCapBlocked를 (plan, buy, sell)로 언패킹하면 여기서 예외 발생
 
         mock_gen.assert_called_once()
         mock_notify.assert_called_once()
@@ -487,7 +578,10 @@ class TestRunAutoExecution:
             _patch_common(mock_db),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(return_value=(_make_plan(), [("KR", "buy-token")], [])),
@@ -529,7 +623,10 @@ class TestRunAutoExecution:
             _patch_common(mock_db),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
             patch("app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert", side_effect=_gen_side_effect),
             patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()) as mock_save,
             patch("app.services.email_service.send_rebalancing_plan_pending_email", new=AsyncMock()),
@@ -725,6 +822,85 @@ class TestBuildPendingPlanForAlert:
 
         mock_tax_preview.assert_not_called()
 
+    @pytest.mark.asyncio
+    async def test_daily_value_cap_blocks_when_total_exceeds_cap(self):
+        """오늘 이미 실행된 금액 + 이번 계획 예상 금액이 유저 단위 하루 상한을 초과하면 차단한다."""
+        from app.services.rebalancing.plan_service import DailyValueCapBlocked, build_pending_plan_for_alert
+
+        alert = _make_alert(threshold_pct=5.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(
+            items=[SimpleNamespace(weight_diff_pct=10.0, diff_krw=-6_000_000.0)], ticker_account_map={}
+        )
+        mock_db = _make_mock_db()
+        # 순서: (1) UserSettings.auto_rebalancing_daily_value_cap_krw 조회, (2) 오늘 합산 조회
+        mock_db.scalar = AsyncMock(side_effect=[10_000_000.0, 5_000_000.0])
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.generate_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
+        ):
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert isinstance(result, DailyValueCapBlocked)
+        assert result.cap_krw == 10_000_000.0
+        assert result.today_total_krw == 5_000_000.0
+        assert result.attempted_value_krw == 6_000_000.0
+        mock_gen.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_daily_value_cap_under_threshold_still_generates_plan(self):
+        alert = _make_alert(threshold_pct=5.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(
+            items=[SimpleNamespace(weight_diff_pct=10.0, diff_krw=-1_000_000.0)], ticker_account_map={}
+        )
+        mock_db = _make_mock_db()
+        mock_db.scalar = AsyncMock(side_effect=[10_000_000.0, 5_000_000.0])
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch(
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ) as mock_gen,
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        assert result == (plan, "buy-token", None)
+        mock_gen.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_daily_value_cap_unset_skips_check_entirely(self):
+        """상한 미설정(None, 기본값)이면 오늘 합산 조회 자체를 하지 않는다 — 불필요한 쿼리 스킵."""
+        alert = _make_alert(threshold_pct=5.0)
+        portfolio = _make_portfolio()
+        analysis = SimpleNamespace(
+            items=[SimpleNamespace(weight_diff_pct=10.0, diff_krw=-1_000_000.0)], ticker_account_map={}
+        )
+        mock_db = _make_mock_db()  # db.scalar 기본값 None(상한 미설정)
+        plan = _make_plan()
+
+        with (
+            patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
+            patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.sum_today_auto_plan_value_krw", new=AsyncMock()) as mock_sum,
+            patch(
+                "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
+                new=AsyncMock(return_value=(plan, "buy-token", None)),
+            ),
+        ):
+            from app.services.rebalancing.plan_service import build_pending_plan_for_alert
+
+            await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
+
+        mock_sum.assert_not_called()
+
 
 class TestAutoExecutionPlanGenerationFailure:
     @pytest.mark.asyncio
@@ -742,7 +918,10 @@ class TestAutoExecutionPlanGenerationFailure:
             _patch_common(mock_db),
             patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
             patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
-            patch("app.jobs.rebalancing_auto_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
             patch(
                 "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
                 new=AsyncMock(side_effect=RuntimeError("DB error")),

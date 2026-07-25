@@ -306,6 +306,20 @@ class TestGeneratePendingPlanForAlert:
 # ── notify_plan_generated ────────────────────────────────────
 
 
+class TestSumTodayAutoPlanValueKrw:
+    @pytest.mark.asyncio
+    async def test_returns_sum_from_query(self, mock_db):
+        mock_db.scalar = AsyncMock(return_value=12_345_000.0)
+        result = await svc.sum_today_auto_plan_value_krw(uuid.uuid4(), mock_db)
+        assert result == 12_345_000.0
+
+    @pytest.mark.asyncio
+    async def test_returns_zero_when_no_rows(self, mock_db):
+        mock_db.scalar = AsyncMock(return_value=None)
+        result = await svc.sum_today_auto_plan_value_krw(uuid.uuid4(), mock_db)
+        assert result == 0.0
+
+
 class TestNotifyPlanGenerated:
     @pytest.mark.asyncio
     async def test_sell_only_plan_still_sends_email(self, mock_db):
@@ -413,6 +427,47 @@ class TestNotifyTaxGateBlocked:
             patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
         ):
             await svc.notify_tax_gate_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
+
+        mock_email.assert_not_awaited()
+
+
+class TestNotifyDailyValueCapBlocked:
+    @pytest.mark.asyncio
+    async def test_sends_email_and_push_and_marks_dedup(self, mock_db):
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+        blocked = svc.DailyValueCapBlocked(
+            today_total_krw=5_000_000.0, attempted_value_krw=6_000_000.0, cap_krw=10_000_000.0
+        )
+
+        mock_email = AsyncMock(return_value=True)
+        with (
+            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.services.push_service.send_push_to_user", new=AsyncMock(return_value=True)),
+            patch("app.services.rebalancing.plan_service.save_alert_history", new=AsyncMock()),
+            patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value=None)),
+            patch("app.utils.durable_state.set_durable", new=AsyncMock()) as mock_set_durable,
+        ):
+            await svc.notify_daily_value_cap_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
+
+        mock_email.assert_awaited_once_with("user@test.com", portfolio.name, 5_000_000.0, 6_000_000.0, 10_000_000.0)
+        mock_set_durable.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_skips_when_already_sent_today(self, mock_db):
+        """유저 단위 dedup — 같은 유저의 여러 PER_ACCOUNT 알림이 같은 날 같은 상한에 걸려도 1회만 발송."""
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+        blocked = svc.DailyValueCapBlocked(
+            today_total_krw=5_000_000.0, attempted_value_krw=6_000_000.0, cap_krw=10_000_000.0
+        )
+
+        mock_email = AsyncMock()
+        with (
+            patch("app.services.email_service.send_daily_value_cap_gate_blocked_email", new=mock_email),
+            patch("app.utils.durable_state.get_durable", new=AsyncMock(return_value="1")),
+        ):
+            await svc.notify_daily_value_cap_blocked(alert, portfolio, blocked, "user@test.com", "fcm-token", mock_db)
 
         mock_email.assert_not_awaited()
 

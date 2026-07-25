@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from app.services.email_templates import (
     exchange_rate_alert_template,
     market_signal_change_template,
-    password_reset_template,
     rebalancing_alert_template,
     rebalancing_plan_pending_template,
     stock_price_alert_template,
@@ -204,22 +203,6 @@ class TestStockPriceAlertTemplate:
             direction="BELOW",
         )
         assert "이하" in subject
-
-
-class TestPasswordResetTemplate:
-    def test_returns_subject_and_html(self):
-        subject, html = password_reset_template("https://example.com/reset?token=abc")
-        assert isinstance(subject, str)
-        assert isinstance(html, str)
-
-    def test_html_contains_reset_link(self):
-        link = "https://example.com/reset?token=xyz123"
-        _, html = password_reset_template(link)
-        assert link in html
-
-    def test_subject_nonempty(self):
-        subject, _ = password_reset_template("https://example.com/reset")
-        assert len(subject) > 0
 
 
 class TestRebalancingPlanPendingTemplate:

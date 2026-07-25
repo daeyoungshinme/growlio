@@ -135,6 +135,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_short_term_equity_floor_pct: 80.0,
     age_group: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,
+    auto_rebalancing_daily_value_cap_krw: null,
     ...overrides,
   };
 }

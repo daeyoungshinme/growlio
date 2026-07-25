@@ -55,10 +55,10 @@ function OnboardingChecklist() {
           <li className="flex items-start gap-3">
             <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-500">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 2단계: 포트폴리오 구성
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-600">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 목표 비중을 설정해 리밸런싱을 관리하세요.
               </p>
             </div>
@@ -73,10 +73,10 @@ function OnboardingChecklist() {
           <li className="flex items-start gap-3">
             <Circle size={20} className="mt-0.5 shrink-0 text-gray-300 dark:text-gray-600" />
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-500 dark:text-gray-500">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
                 3단계: 투자 목표 설정
               </p>
-              <p className="text-xs text-gray-400 dark:text-gray-600">
+              <p className="text-xs text-gray-400 dark:text-gray-500">
                 자산·배당·입금 목표를 입력하세요.
               </p>
             </div>

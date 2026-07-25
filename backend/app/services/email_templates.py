@@ -606,25 +606,6 @@ def test_email_template() -> tuple[str, str]:
     return subject, html
 
 
-def password_reset_template(reset_link: str) -> tuple[str, str]:
-    subject = "[Growlio] 비밀번호 재설정 안내"
-    body = (
-        "<p style='color:#374151;margin-top:16px;'>"
-        "비밀번호 재설정을 요청하셨습니다. 아래 버튼을 클릭하여 새 비밀번호를 설정해주세요.</p>"
-        f"<div style='margin:24px 0;text-align:center;'>"
-        f"<a href='{reset_link}' style='display:inline-block;background:#1d4ed8;color:#ffffff;"
-        f"text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:bold;font-size:15px;'>"
-        f"비밀번호 재설정</a></div>"
-        f"<p style='color:#64748b;font-size:13px;'>이 링크는 1시간 후에 만료됩니다.<br>"
-        f"본인이 요청하지 않은 경우 이 이메일을 무시하시면 됩니다.</p>"
-        f"<p style='color:#9ca3af;font-size:12px;margin-top:16px;'>"
-        f"링크가 클릭되지 않으면 아래 URL을 브라우저에 직접 입력해주세요:<br>"
-        f"<span style='color:#6b7280;'>{reset_link}</span></p>"
-    )
-    html = _email_div("비밀번호 재설정", "#1d4ed8", body)
-    return subject, html
-
-
 def account_deletion_template() -> tuple[str, str]:
     subject = "[Growlio] 회원 탈퇴가 완료되었습니다"
     body = (
@@ -712,6 +693,30 @@ def market_signal_gate_blocked_template(
         "현재 시장 위험 신호가 설정하신 자동화 게이트 조건에 해당해 이번 자동 실행 계획을 만들지 않았습니다. "
         "신호가 완화되면 다음 실행 시각에 다시 확인합니다. 게이트 조건은 리밸런싱 자동화 설정에서 조정할 수 있습니다. "
         "이 알림은 같은 알림에 대해 하루 1회만 발송됩니다.",
+    )
+    return subject, html
+
+
+def daily_value_cap_gate_blocked_template(
+    portfolio_name: str, today_total_krw: float, attempted_value_krw: float, cap_krw: float
+) -> tuple[str, str]:
+    """하루 합산 거래한도 게이트로 이번 자동 실행 계획 생성이 보류됐을 때 발송."""
+    subject = "[Growlio] 리밸런싱 자동화 보류 — 하루 합산 거래한도 초과"
+    table = _kv_table(
+        [
+            ("포트폴리오", portfolio_name),
+            ("오늘 이미 실행된 금액", f"약 {today_total_krw:,.0f} 원"),
+            ("이번 계획 예상 금액", f"약 {attempted_value_krw:,.0f} 원"),
+            ("설정된 하루 상한", f"{cap_krw:,.0f} 원"),
+        ]
+    )
+    html = _email_div(
+        "리밸런싱 자동화 보류 — 하루 합산 거래한도 초과",
+        "#d97706",
+        table,
+        "오늘 자동 실행된 금액에 이번 계획 예상 금액을 더하면 설정하신 하루 합산 상한을 초과해 이번 "
+        "자동 실행 계획을 만들지 않았습니다. 상한은 리밸런싱 자동화 설정에서 조정할 수 있습니다. "
+        "이 알림은 하루 1회만 발송됩니다.",
     )
     return subject, html
 

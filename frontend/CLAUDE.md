@@ -95,7 +95,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 **컨텍스트 (`src/context/`):**
 - `ExchangeRateContext.tsx` — `ExchangeRateProvider`로 앱 전체에 환율 공유. `useExchangeRateContext()`로 소비. `useExchangeRate.ts` 훅과 별개 — 컨텍스트 방식으로 동일 쿼리 중복 방지.
 
-`components/common/` 주요 파일: `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SkeletonTable.tsx`, `StatCard.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
+`components/common/` 주요 파일: `AccountActionsMenu.tsx` (카드 헤더 등에 밀집된 부가 액션을 `⋯` 오버플로우 메뉴로 접는 공용 컴포넌트 — `items: {icon, label, onClick, disabled?, variant?}[]`, 아이콘+라벨 텍스트를 함께 렌더해 모바일 `title` 툴팁 미동작 문제 우회), `AmountUnitButtons.tsx`, `BiometricGuard.tsx`, `Button.tsx`, `CollapsibleCard.tsx` (카드 전체를 감싸는 헤더+접기 토글, `isOpen`/`onToggle` controlled), `CollapsibleSection.tsx` (카드 내부에 삽입하는 경량 접기 토글), `ConfirmModal.tsx`, `EditableNameField.tsx`, `EmptyState.tsx`, `FormInput.tsx` (공통 폼 인풋), `Modal.tsx`, `OfflineBanner.tsx`, `PageLoader.tsx`, `PriceCell.tsx` (가격 표시 셀), `SkeletonCard.tsx`, `SkeletonStatBox.tsx`, `SuggestionDropdown.tsx`, `Tabs.tsx`, `ToggleSwitch.tsx` (`checked`/`onChange`/`disabled?`/`ariaLabel?` props의 스위치 토글), `Tooltip.tsx`, `TopLoadingBar.tsx`, `TreemapCell.tsx`
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
@@ -104,8 +104,9 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/TaxLimitsBanner.tsx`** — `InvestmentSnapshotCard`("주식 투자 현황") 안에 4번째 하위 섹션으로 임베드되는 세금 한도 요약 행. ISA 임박 만기/한도초과·연금공제 달성률을 한 줄로 보여주고 `/assets?tab=투자현황&portfolioTab=세금`으로 딥링크(상세 카드 자체는 여전히 홈에 렌더하지 않음). 계산 로직은 `useTaxLimitsSummary` 훅(`hooks/useTaxLimitsSummary.ts`)에 있으며, 같은 훅을 `InvestmentSnapshotCard`가 헤더 경고 배지·collapsedHint 계산에도 재사용한다(React Query 캐시 공유로 요청 중복 없음).
-- **`components/portfolio-analysis/TaxLimitsSection.tsx`** — 자산탭 세금 서브탭에서 `IsaMaturityCard`/`PensionContributionCard`를 묶는 접이식 카드("한도·기한 현황"). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음).
-- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load).
+- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭의 진입점(`PortfolioPage`가 lazy-load). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`(ISA·연금)과 `TaxOptimizationCard`(세금 추정)를 묶는다 — 기존에 두 카드가 각각 접이식으로 나란히 쌓여 3중 중첩이었던 것을 탭 전환 1단계로 단순화(2026-07-25). 탭 상태는 `?taxTab=` 쿼리파라미터로 영속화(`PortfolioPage`의 기존 `portfolioTab` 관리 패턴과 동일한 `useSearchParams` 방식). Home 배너(`TaxLimitsBanner`)의 `?portfolioTab=세금` 딥링크는 `taxTab` 미지정이라 기본값인 "한도 현황" 탭으로 랜딩한다.
+- **`components/portfolio-analysis/TaxLimitsSection.tsx`** — `TaxTabContainer`의 "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`를 감싸는 순수 프레젠테이션 컴포넌트(자체 접기 카드 없음 — 탭이 이미 그 역할을 함). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음).
+- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load). 전체/연령대/기간별 3개 탭이 공유하는 비중 목록·적용 섹션은 `RecommendationWeightList.tsx`/`RecommendationApplySection.tsx`로 추출됨(2026-07-25, 3중 중복 제거) — 탭별 설명 문구·`useMutation`·탭 전환 상태머신은 이 파일에 그대로 유지.
 - **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 4단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안 — `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
@@ -140,7 +141,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
-- `useRealtimePrice.ts` — WebSocket 실시간 가격 구독 (`/api/v1/ws/prices`). 연결 끊김 시 최대 3회 지수 백오프(1s/3s/10s) 재연결.
 - `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
 - `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
@@ -210,9 +210,6 @@ cd frontend && npx playwright test
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
-
-**WebSocket 패턴**
-- 새 WebSocket 훅은 `useRealtimePrice.ts` 패턴 참고.
 
 > **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
 
@@ -377,7 +374,13 @@ cd frontend && npx playwright test
 
 **헤딩 구조 규칙 (접근성)**
 - 각 페이지(`src/pages/*.tsx`)의 최상위 return에는 `<h1 className="sr-only">{페이지명}</h1>`을 두어 스크린리더 사용자가 진입 시 현재 위치를 알 수 있게 한다(시각적으로는 숨김 — `BottomNav`/탭 UI가 이미 시각적 내비게이션을 담당).
-- 카드/섹션 제목은 `<span>`/`<p>` 대신 `<h2>`/`<h3>`을 사용 — 스크린리더의 헤딩 내비게이션(다음 섹션으로 건너뛰기)이 동작하려면 실제 헤딩 태그가 필요하다. `CollapsibleCard.tsx`/`settings/shared.tsx`(`SectionCard`)/`Modal.tsx` 등 공용 컴포넌트를 거치는 카드 제목은 이미 전부 `h2`이고, 직접 마크업을 그리던 나머지 straggler(`StockAccountSummaryCard`/`RealEstateSection`/`EditableNameField`/`HeroSummaryCard`)도 정리 완료. 단, `StatCard.tsx`의 통계 라벨과 `RebalancingMobileCard.tsx` 같은 반복되는 리스트 행 아이템은 헤딩으로 승격하지 않음(그리드/리스트에 다수 반복 렌더돼 헤딩 목록이 라벨로 도배되면 오히려 스크린리더 내비게이션을 해침) — 의도된 제외이니 새 컴포넌트를 만들 때도 이 기준을 따를 것.
+- 카드/섹션 제목은 `<span>`/`<p>` 대신 `<h2>`/`<h3>`을 사용 — 스크린리더의 헤딩 내비게이션(다음 섹션으로 건너뛰기)이 동작하려면 실제 헤딩 태그가 필요하다. `CollapsibleCard.tsx`/`settings/shared.tsx`(`SectionCard`)/`Modal.tsx` 등 공용 컴포넌트를 거치는 카드 제목은 이미 전부 `h2`이고, 직접 마크업을 그리던 나머지 straggler(`StockAccountSummaryCard`/`RealEstateSection`/`EditableNameField`/`HeroSummaryCard`)도 정리 완료. 단, `RebalancingMobileCard.tsx` 같은 반복되는 리스트 행 아이템은 헤딩으로 승격하지 않음(그리드/리스트에 다수 반복 렌더돼 헤딩 목록이 라벨로 도배되면 오히려 스크린리더 내비게이션을 해침) — 의도된 제외이니 새 컴포넌트를 만들 때도 이 기준을 따를 것.
+
+**콜랩스 기본값 일관성 규칙**
+- 정보 밀도가 낮은 헤드라인 카드(`HeroSummaryCard`, `InvestmentGoalCard` 최상위 등)는 콜랩스 불가로 항상 펼침 유지 — 접었다 폈다 할 만큼 내용이 많지 않음.
+- 보조/상세 카드(`InvestmentSnapshotCard`, `RebalancingStatusCard`, `TaxLimitsSection` 등)는 `useCollapsible`로 접기 가능하게 하되, 최초 방문 시 기본값은 **열림**(`true`)으로 시작 — 사용자가 직접 접으면 그 상태가 `localStorage`로 유지된다.
+- 단, 이미 펼쳐진 부모 카드 내부의 2차 상세 토글(`InflationSummaryCard`, `RebalancingDetailMetrics`, `RebalancingDiagnosisCard` 등 영속화 키 없는 세션 한정 토글)은 이 규칙 대상이 아님 — "최상위 카드"에만 적용되는 규칙이므로 중첩된 하위 토글까지 강제로 펼칠 필요는 없다.
+- 새 카드 추가 시 이 규칙을 따를 것.
 
 **마켓 유틸리티 (`src/constants/markets.ts`)**
 - `isOverseasMarket(market)` — market 문자열이 해외거래소인지 판별. 인라인 문자열 비교 금지.

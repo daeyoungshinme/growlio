@@ -63,10 +63,10 @@ describe("PensionContributionCard", () => {
     await waitFor(() => expect(screen.getByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument());
   });
 
-  it("embedded 모드에서는 카드 헤더/보더 없이 내용만 렌더한다", async () => {
+  it("카드 헤더/보더 없이 내용만 렌더한다 (TaxLimitsSection 임베드 전용)", async () => {
     fetchPensionContribution.mockResolvedValue(makeStatus());
     const { container } = renderWithProviders(
-      <PensionContributionCard overview={makeOverview(["PENSION_SAVINGS"])} embedded />,
+      <PensionContributionCard overview={makeOverview(["PENSION_SAVINGS"])} />,
     );
     await waitFor(() => expect(screen.getByText(/연금저축·IRP 납입 현황/)).toBeInTheDocument());
     expect(container.querySelector(".card")).toBeNull();

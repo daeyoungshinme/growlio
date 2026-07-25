@@ -4,7 +4,6 @@ import { render } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
 import { Wallet } from "lucide-react";
-import StatCard from "@/components/common/StatCard";
 import PriceCell from "@/components/common/PriceCell";
 import BankAccountCard from "@/components/assets/BankAccountCard";
 import AmountUnitButtons from "@/components/common/AmountUnitButtons";
@@ -15,36 +14,6 @@ import { ToggleSwitch } from "@/components/common/ToggleSwitch";
 vi.mock("@/context/ExchangeRateContext", () => ({
   useExchangeRateContext: vi.fn(() => ({ rate: 1350, isLoading: false, error: null })),
 }));
-
-describe("StatCard", () => {
-  it("레이블과 값을 표시한다", () => {
-    renderWithProviders(<StatCard label="총 자산" value="1억 2,345만원" />);
-    expect(screen.getByText("총 자산")).toBeInTheDocument();
-    expect(screen.getByText("1억 2,345만원")).toBeInTheDocument();
-  });
-
-  it("sub 텍스트가 있으면 함께 표시한다", () => {
-    renderWithProviders(<StatCard label="수익률" value="+12.3%" sub="연초 대비" />);
-    expect(screen.getByText("연초 대비")).toBeInTheDocument();
-  });
-
-  it("sub 텍스트가 없으면 표시하지 않는다", () => {
-    renderWithProviders(<StatCard label="수익률" value="+12.3%" />);
-    expect(screen.queryByText(/연초/)).toBeNull();
-  });
-
-  it("color=red이면 적절한 색상 클래스가 적용된다", () => {
-    renderWithProviders(<StatCard label="손실" value="-5.0%" color="red" />);
-    const valueEl = screen.getByText("-5.0%");
-    expect(valueEl.className).toContain("text-red-500");
-  });
-
-  it("size=sm이면 sm 클래스가 적용된다", () => {
-    renderWithProviders(<StatCard label="소형" value="100" size="sm" />);
-    const valueEl = screen.getByText("100");
-    expect(valueEl.className).toContain("text-sm");
-  });
-});
 
 describe("PriceCell", () => {
   it("국내 종목이면 원 단위로 표시한다", () => {

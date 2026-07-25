@@ -11,6 +11,7 @@ import { pnlColor } from "@/utils/colors";
 import { STOCK_TYPE_LABELS } from "@/constants";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import EditableNameField from "@/components/common/EditableNameField";
+import AccountActionsMenu from "@/components/common/AccountActionsMenu";
 
 export interface AccountStats {
   amount_krw: number;
@@ -127,37 +128,33 @@ export default function StockAccountCard({
               {isSyncing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
           )}
-          <button
-            onClick={() =>
-              onManagePositions({
-                id: account.id,
-                name: account.name,
-                dataSource: account.data_source,
-              })
-            }
-            title="종목 관리"
-            aria-label="종목 관리"
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950 rounded-lg transition-colors`}
-          >
-            <BarChart2 size={16} />
-          </button>
-          <button
-            onClick={() => onTransactions({ id: account.id, name: account.name })}
-            title="입출금 내역"
-            aria-label="입출금 내역"
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-950 rounded-lg transition-colors`}
-          >
-            <Receipt size={16} />
-          </button>
-          <button
-            onClick={() => onDelete(account.id)}
-            disabled={isDeleting}
-            title="계좌 삭제"
-            aria-label="계좌 삭제"
-            className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} p-2.5 sm:p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50`}
-          >
-            <Trash2 size={16} />
-          </button>
+          <AccountActionsMenu
+            ariaLabel="계좌 관리 메뉴"
+            items={[
+              {
+                icon: <BarChart2 size={16} />,
+                label: "종목 관리",
+                onClick: () =>
+                  onManagePositions({
+                    id: account.id,
+                    name: account.name,
+                    dataSource: account.data_source,
+                  }),
+              },
+              {
+                icon: <Receipt size={16} />,
+                label: "입출금 내역",
+                onClick: () => onTransactions({ id: account.id, name: account.name }),
+              },
+              {
+                icon: <Trash2 size={16} />,
+                label: "계좌 삭제",
+                onClick: () => onDelete(account.id),
+                disabled: isDeleting,
+                variant: "danger",
+              },
+            ]}
+          />
         </div>
       </div>
       {hasStats && (

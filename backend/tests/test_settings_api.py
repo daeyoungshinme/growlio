@@ -106,6 +106,7 @@ class TestGetSettings:
             goal_cagr_lookback_years=None,
             goal_short_term_equity_floor_pct=None,
             age_group="TWENTIES",
+            auto_rebalancing_daily_value_cap_krw=None,
         )
         db.scalar = AsyncMock(return_value=settings)
 
@@ -125,6 +126,7 @@ class TestGetSettings:
             assert data["age_group"] == "TWENTIES"
             assert data["goal_short_term_equity_floor_pct"] == 80.0
             assert data["auto_rebalancing_max_order_value_krw"] == 50_000_000.0
+            assert data["auto_rebalancing_daily_value_cap_krw"] is None
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db
@@ -296,6 +298,85 @@ class TestUpdateMarketSignalDigest:
         app.dependency_overrides.pop(get_current_user, None)
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.put("/api/v1/settings/market-signal-digest", json={"enabled": True})
+        assert resp.status_code == 401
+
+
+class TestUpdateAutoRebalancingDailyCap:
+    def test_put_daily_cap_returns_200_and_sets_value(self, override_settings):
+        """AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한을 저장한다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(auto_rebalancing_daily_value_cap_krw=None)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/auto-rebalancing-daily-cap",
+                    json={"daily_value_cap_krw": 80_000_000.0},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.auto_rebalancing_daily_value_cap_krw == 80_000_000.0
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_daily_cap_accepts_null_to_clear(self, override_settings):
+        """None(미지정)으로 다시 보내면 무제한(기본값)으로 되돌아간다."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(auto_rebalancing_daily_value_cap_krw=80_000_000.0)
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/auto-rebalancing-daily-cap",
+                    json={"daily_value_cap_krw": None},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.auto_rebalancing_daily_value_cap_krw is None
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_daily_cap_rejects_zero_or_negative(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/auto-rebalancing-daily-cap",
+                    json={"daily_value_cap_krw": 0},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_daily_cap_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.put("/api/v1/settings/auto-rebalancing-daily-cap", json={"daily_value_cap_krw": 100.0})
         assert resp.status_code == 401
 
 

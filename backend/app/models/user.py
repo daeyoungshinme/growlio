@@ -70,6 +70,10 @@ class UserSettings(Base):
     # 매주 월요일 09:15 KST — 목표 역산 추천 비중이 타겟 포트폴리오의 현재 목표 비중과 유의미하게
     # 달라지면 이메일/푸시 발송 — 옵트인(기본 OFF)
     recommendation_drift_alert_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # AUTO 리밸런싱(대기 플랜 생성) 유저 단위 하루 합산 거래대금 상한(KRW) — NULL이면 상한 없음(기존
+    # 동작과 동일, 기본값). 주문 1건당 상한(auto_rebalancing_max_order_value_krw, env 설정)과 별개로,
+    # PER_ACCOUNT 스코프에서 여러 알림이 같은 날 각각 개별 상한까지 트리거될 때 합산 노출을 제한한다.
+    auto_rebalancing_daily_value_cap_krw: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     fcm_token: Mapped[str | None] = mapped_column(String(512))
 
     user: Mapped["User"] = relationship(back_populates="settings")

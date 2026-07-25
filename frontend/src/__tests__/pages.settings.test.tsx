@@ -232,9 +232,9 @@ describe("SettingsPage", () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText("목표·추천 변화 감지")).toBeInTheDocument();
+      expect(screen.getByText("즉시 알림")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /목표·추천 변화 감지/ }));
+    fireEvent.click(screen.getByRole("button", { name: /즉시 알림/ }));
     await waitFor(() => {
       expect(screen.getByText("목표 달성 알림")).toBeInTheDocument();
     });
@@ -248,9 +248,9 @@ describe("SettingsPage", () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
     await waitFor(() => {
-      expect(screen.getByText("정기 리포트·리마인더")).toBeInTheDocument();
+      expect(screen.getByText("정기 리포트·요약")).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·리마인더/ }));
+    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·요약/ }));
     await waitFor(() => {
       expect(screen.getByText("월간 리포트")).toBeInTheDocument();
     });
@@ -263,7 +263,7 @@ describe("SettingsPage", () => {
   it("추천 비중 변화 알림 토글을 클릭하면 설정을 저장한다", async () => {
     vi.mocked(api.put).mockResolvedValue({ data: {} });
     renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: /목표·추천 변화 감지/ }));
+    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·요약/ }));
     // mockSettings 로드 전 기본값(false)에서 클릭하는 경합을 피하기 위해 로드 완료(checked) 대기
     await waitFor(() => {
       expect(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" })).toBeChecked();

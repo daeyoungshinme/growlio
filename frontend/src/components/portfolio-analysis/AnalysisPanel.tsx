@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
+import { BarChart3, Loader2, RefreshCw } from "lucide-react";
 import type { RebalancingAlert } from "@/api/alerts";
 import type { Portfolio } from "@/api/portfolios";
 import type { AssetAccount } from "@/api/assets";
@@ -252,11 +252,9 @@ export function AnalysisPanel({
       {/* Empty state */}
       {!mode && selectedIds.size === 0 && (
         <div className="flex flex-col items-center justify-center h-48 text-center text-gray-400 dark:text-gray-500">
-          <div className="text-3xl mb-3">📊</div>
+          <BarChart3 size={32} className="mb-3" />
           <div className="text-sm font-medium mb-1">포트폴리오를 선택하세요</div>
-          <div className="text-xs">
-            좌측 목록에서 포트폴리오를 클릭하면 분석을 시작할 수 있습니다
-          </div>
+          <div className="text-xs">포트폴리오 목록에서 선택하면 분석을 시작할 수 있습니다</div>
         </div>
       )}
       {!mode && selectedIds.size > 0 && (

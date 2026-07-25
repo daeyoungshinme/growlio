@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarCheck2 } from "lucide-react";
 import { fetchIsaStatus, type IsaAccountStatus } from "@/api/tax";
 import { updateIsaPnlOverride } from "@/api/assets";
 import { QUERY_KEYS } from "@/constants/queryKeys";
@@ -140,8 +139,9 @@ function IsaAccountRow({ status }: { status: IsaAccountStatus }) {
   );
 }
 
-/** ISA 계좌의 의무가입(3년) 진행 상황과 비과세 한도 대비 예상 세금을 보여준다. ISA 계좌가 없으면 표시하지 않는다. */
-export default function IsaMaturityCard({ embedded = false }: { embedded?: boolean }) {
+/** ISA 계좌의 의무가입(3년) 진행 상황과 비과세 한도 대비 예상 세금을 보여준다. ISA 계좌가 없으면 표시하지 않는다.
+ * `TaxLimitsSection`(`TaxTabContainer`의 "한도 현황" 탭)이 렌더하므로 이 컴포넌트는 헤더/보더 없이 본문만 그린다. */
+export default function IsaMaturityCard() {
   const { data } = useQuery({
     queryKey: QUERY_KEYS.isaStatus,
     queryFn: fetchIsaStatus,
@@ -150,37 +150,17 @@ export default function IsaMaturityCard({ embedded = false }: { embedded?: boole
 
   if (!data || data.accounts.length === 0) return null;
 
-  const body = (
-    <>
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1.5">
+        ISA 만기·세제 현황
+      </p>
       <div>
         {data.accounts.map((status) => (
           <IsaAccountRow key={status.account_id} status={status} />
         ))}
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{data.note}</p>
-    </>
-  );
-
-  if (embedded) {
-    return (
-      <div>
-        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1.5">
-          ISA 만기·세제 현황
-        </p>
-        {body}
-      </div>
-    );
-  }
-
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-          <CalendarCheck2 size={16} className="text-blue-500" />
-          ISA 만기·세제 현황
-        </h2>
-      </div>
-      {body}
     </div>
   );
 }

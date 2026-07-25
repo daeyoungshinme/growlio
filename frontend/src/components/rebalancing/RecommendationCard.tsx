@@ -1,18 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Anchor,
-  ArrowRight,
-  FolderPlus,
-  Loader2,
-  Plus,
-  RefreshCw,
-  Settings2,
-  Target,
-} from "lucide-react";
+import { ArrowRight, Plus, RefreshCw, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  CASH_EQUIVALENT_TICKER,
   fetchAgeGoalRecommendation,
   fetchHorizonGoalRecommendations,
   fetchOverallGoalRecommendation,
@@ -42,6 +32,8 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
+import RecommendationApplySection from "@/components/rebalancing/RecommendationApplySection";
+import RecommendationWeightList from "@/components/rebalancing/RecommendationWeightList";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
 import {
   buildWeightDiffRows,
@@ -391,8 +383,6 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
   const hasOverallRecommendation =
     overallData.is_configured && overallData.recommended_items.length > 0;
-  const isCashEquivalentItem = (item: GoalRecommendationItem) =>
-    item.ticker === CASH_EQUIVALENT_TICKER;
 
   const overallDrift =
     hasOverallRecommendation && overallConfirmTarget
@@ -485,28 +475,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     <RecommendationDriftBadge drift={overallDrift} />
                   )}
 
-                  <ul className="space-y-1">
-                    {overallData.recommended_items.map((item) => (
-                      <li
-                        key={`${item.ticker}-${item.market}`}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {item.name}{" "}
-                          <span className="text-gray-400 dark:text-gray-500">({item.ticker})</span>
-                          {item.dividend_yield_pct != null && (
-                            <span className="text-gray-400 dark:text-gray-500">
-                              {" "}
-                              · 배당 {item.dividend_yield_pct.toFixed(1)}%
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-medium text-teal-600 dark:text-teal-400">
-                          {item.weight.toFixed(1)}%
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <RecommendationWeightList items={overallData.recommended_items} />
 
                   {overallData.note && (
                     <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 flex items-center gap-1.5 flex-wrap">
@@ -528,63 +497,23 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
                   </p>
 
-                  <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
-                    {targetPortfolios.length === 0 ? (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수
-                        있어요.
-                      </p>
-                    ) : (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {targetPortfolios.length > 1 && (
-                          <select
-                            value={selectedOverallTargetId}
-                            onChange={(e) => setSelectedOverallTargetId(e.target.value)}
-                            className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          >
-                            <option value="">포트폴리오 선택</option>
-                            {targetPortfolios.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <button
-                          type="button"
-                          disabled={
-                            (targetPortfolios.length > 1 && !selectedOverallTargetId) ||
-                            applyOverallMutation.isPending
-                          }
-                          onClick={() => setConfirmOpen(true)}
-                          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
-                        >
-                          {applyOverallMutation.isPending ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Anchor size={12} />
-                          )}
-                          {targetPortfolios.length === 1
-                            ? `${targetPortfolios[0].name}에 적용`
-                            : "기준 포트폴리오에 적용"}
-                        </button>
-                      </div>
-                    )}
-                    {onCreatePortfolio && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onCreatePortfolio(
-                            normalizeWeights(overallData.recommended_items),
-                            "추천 포트폴리오",
-                          )
-                        }
-                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
-                      >
-                        <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
-                      </button>
-                    )}
-                  </div>
+                  <RecommendationApplySection
+                    targetPortfolios={targetPortfolios}
+                    selectedTargetId={selectedOverallTargetId}
+                    onSelectTarget={setSelectedOverallTargetId}
+                    onApplyClick={() => setConfirmOpen(true)}
+                    applyPending={applyOverallMutation.isPending}
+                    noTargetMessage="포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요."
+                    onCreatePortfolio={
+                      onCreatePortfolio
+                        ? () =>
+                            onCreatePortfolio(
+                              normalizeWeights(overallData.recommended_items),
+                              "추천 포트폴리오",
+                            )
+                        : undefined
+                    }
+                  />
                 </>
               ) : (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -626,33 +555,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     <RecommendationDriftBadge drift={ageDrift} />
                   )}
 
-                  <ul className="space-y-1">
-                    {ageData.recommended_items.map((item) => (
-                      <li
-                        key={`${item.ticker}-${item.market}`}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <span className="text-gray-700 dark:text-gray-300">
-                          {item.name}
-                          {!isCashEquivalentItem(item) && (
-                            <span className="text-gray-400 dark:text-gray-500">
-                              {" "}
-                              ({item.ticker})
-                            </span>
-                          )}
-                          {item.dividend_yield_pct != null && (
-                            <span className="text-gray-400 dark:text-gray-500">
-                              {" "}
-                              · 배당 {item.dividend_yield_pct.toFixed(1)}%
-                            </span>
-                          )}
-                        </span>
-                        <span className="font-medium text-teal-600 dark:text-teal-400">
-                          {item.weight.toFixed(1)}%
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                  <RecommendationWeightList items={ageData.recommended_items} />
 
                   {ageData.includes_cash_equivalent && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -681,63 +584,23 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                     등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
                   </p>
 
-                  <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
-                    {targetPortfolios.length === 0 ? (
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수
-                        있어요.
-                      </p>
-                    ) : (
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {targetPortfolios.length > 1 && (
-                          <select
-                            value={selectedOverallTargetId}
-                            onChange={(e) => setSelectedOverallTargetId(e.target.value)}
-                            className="text-xs border border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg px-2 py-2 sm:py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-500"
-                          >
-                            <option value="">포트폴리오 선택</option>
-                            {targetPortfolios.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                        <button
-                          type="button"
-                          disabled={
-                            (targetPortfolios.length > 1 && !selectedOverallTargetId) ||
-                            applyAgeMutation.isPending
-                          }
-                          onClick={() => setConfirmOpen(true)}
-                          className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
-                        >
-                          {applyAgeMutation.isPending ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Anchor size={12} />
-                          )}
-                          {targetPortfolios.length === 1
-                            ? `${targetPortfolios[0].name}에 적용`
-                            : "기준 포트폴리오에 적용"}
-                        </button>
-                      </div>
-                    )}
-                    {onCreatePortfolio && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          onCreatePortfolio(
-                            normalizeWeights(ageData.recommended_items),
-                            "연령대별 추천 포트폴리오",
-                          )
-                        }
-                        className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
-                      >
-                        <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
-                      </button>
-                    )}
-                  </div>
+                  <RecommendationApplySection
+                    targetPortfolios={targetPortfolios}
+                    selectedTargetId={selectedOverallTargetId}
+                    onSelectTarget={setSelectedOverallTargetId}
+                    onApplyClick={() => setConfirmOpen(true)}
+                    applyPending={applyAgeMutation.isPending}
+                    noTargetMessage="포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요."
+                    onCreatePortfolio={
+                      onCreatePortfolio
+                        ? () =>
+                            onCreatePortfolio(
+                              normalizeWeights(ageData.recommended_items),
+                              "연령대별 추천 포트폴리오",
+                            )
+                        : undefined
+                    }
+                  />
                 </>
               ) : (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -771,30 +634,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
             {activeHorizonRec.recommended_items.length > 0 ? (
               <>
-                <ul className="space-y-1">
-                  {activeHorizonRec.recommended_items.map((item) => (
-                    <li
-                      key={`${item.ticker}-${item.market}`}
-                      className="flex items-center justify-between text-xs"
-                    >
-                      <span className="text-gray-700 dark:text-gray-300">
-                        {item.name}
-                        {!isCashEquivalentItem(item) && (
-                          <span className="text-gray-400 dark:text-gray-500"> ({item.ticker})</span>
-                        )}
-                        {item.dividend_yield_pct != null && (
-                          <span className="text-gray-400 dark:text-gray-500">
-                            {" "}
-                            · 배당 {item.dividend_yield_pct.toFixed(1)}%
-                          </span>
-                        )}
-                      </span>
-                      <span className="font-medium text-teal-600 dark:text-teal-400">
-                        {item.weight.toFixed(1)}%
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <RecommendationWeightList items={activeHorizonRec.recommended_items} />
                 {activeHorizonRec.note && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
                     {(activeHorizonRec.market_signal_level === "YELLOW" ||
@@ -828,58 +668,42 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
 
             {activeHorizonRec.recommended_items.length > 0 &&
               (!activeHorizonRec.includes_cash_equivalent || cashEquivalentMatches.length > 0) && (
-                <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 space-y-2">
-                  {activeHorizonRec.includes_cash_equivalent && (
-                    <p className="text-xs text-teal-600 dark:text-teal-500">
-                      현금성 자산 반영을 위해 {cashEquivalentMatches.map((a) => a.name).join(", ")}{" "}
-                      계좌가 포트폴리오에 자동으로 연결됩니다.
-                    </p>
-                  )}
-                  {horizonTargetPortfolio ? (
-                    <button
-                      type="button"
-                      disabled={applyHorizonMutation.isPending}
-                      onClick={() => setConfirmOpen(true)}
-                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed px-3 py-1.5 rounded-lg transition-colors`}
-                    >
-                      {applyHorizonMutation.isPending ? (
-                        <Loader2 size={12} className="animate-spin" />
-                      ) : (
-                        <Anchor size={12} />
-                      )}
-                      {horizonTargetPortfolio.name}에 적용
-                    </button>
-                  ) : (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준
-                      포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.
-                    </p>
-                  )}
-                  {onCreatePortfolio && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onCreatePortfolio(
-                          normalizeWeights(activeHorizonRec.recommended_items),
-                          `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
-                          [
-                            ...stockAccounts
-                              .filter(
-                                (a) =>
-                                  a.investment_horizon === effectiveTab &&
-                                  a.tax_type === activeTaxType,
-                              )
-                              .map((a) => a.id),
-                            ...cashEquivalentMatches.map((a) => a.id),
-                          ],
-                        )
-                      }
-                      className={`${TOUCH_TARGET_COMPACT_MOBILE_ONLY} gap-1 text-xs font-medium text-teal-700 dark:text-teal-400 border border-teal-300 dark:border-teal-700 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 rounded-lg transition-colors`}
-                    >
-                      <FolderPlus size={12} />이 비중으로 새 포트폴리오 만들기
-                    </button>
-                  )}
-                </div>
+                <RecommendationApplySection
+                  targetPortfolios={horizonTargetPortfolio ? [horizonTargetPortfolio] : []}
+                  selectedTargetId={horizonTargetPortfolio?.id ?? ""}
+                  onSelectTarget={() => {}}
+                  onApplyClick={() => setConfirmOpen(true)}
+                  applyPending={applyHorizonMutation.isPending}
+                  noTargetMessage="포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요."
+                  extraCopyBeforeButtons={
+                    activeHorizonRec.includes_cash_equivalent ? (
+                      <p className="text-xs text-teal-600 dark:text-teal-500">
+                        현금성 자산 반영을 위해{" "}
+                        {cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에
+                        자동으로 연결됩니다.
+                      </p>
+                    ) : undefined
+                  }
+                  onCreatePortfolio={
+                    onCreatePortfolio
+                      ? () =>
+                          onCreatePortfolio(
+                            normalizeWeights(activeHorizonRec.recommended_items),
+                            `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
+                            [
+                              ...stockAccounts
+                                .filter(
+                                  (a) =>
+                                    a.investment_horizon === effectiveTab &&
+                                    a.tax_type === activeTaxType,
+                                )
+                                .map((a) => a.id),
+                              ...cashEquivalentMatches.map((a) => a.id),
+                            ],
+                          )
+                      : undefined
+                  }
+                />
               )}
           </>
         ) : null}

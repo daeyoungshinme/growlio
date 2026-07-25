@@ -18,17 +18,18 @@ from app.models.asset import RebalancingExecution
 from app.models.portfolio import Portfolio
 from app.models.user import User, UserSettings
 from app.schemas.rebalancing import (
+    ExecutionPlanOverride,
+    ExecutionPlanResult,
     ExecutionRequest,
     ExecutionResult,
     OrderResult,
-    QuickExecuteOverride,
-    QuickExecuteResult,
     RebalancingExecutionDetail,
     RebalancingExecutionSummary,
 )
 from app.services.rebalancing.execution_service import execute_rebalancing
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
+    DailyValueCapBlocked,
     TaxGateBlocked,
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
@@ -67,12 +68,16 @@ async def execute_portfolio_rebalancing(
     return results
 
 
-@router.post("/portfolios/{portfolio_id}/quick-execute", response_model=QuickExecuteResult)
+@router.post(
+    "/portfolios/{portfolio_id}/quick-execute",
+    response_model=ExecutionPlanResult,
+    summary="리밸런싱 대기 계획 생성 (즉시 체결 아님)",
+)
 @limiter.limit("2/minute")
-async def quick_execute_rebalancing(
+async def create_rebalancing_execution_plan(
     request: Request,
     portfolio_id: uuid.UUID,
-    body: QuickExecuteOverride | None = None,
+    body: ExecutionPlanOverride | None = None,
     account_id: uuid.UUID | None = Query(default=None),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -132,7 +137,7 @@ async def quick_execute_rebalancing(
         await get_owned_account(body.account_id, current_user.id, db)
 
     if await has_pending_plan_for_alert(alert_row.id, db):
-        return QuickExecuteResult(
+        return ExecutionPlanResult(
             status="ALREADY_PENDING",
             message="이미 대기중인 계획이 있습니다. 리밸런싱 계획 목록에서 확인해주세요.",
         )
@@ -147,7 +152,7 @@ async def quick_execute_rebalancing(
     market_mode = getattr(alert_row, "market_condition_mode", "DISABLED")
     blocked = is_market_signal_blocking_auto_mode(market_mode, composite_level, data_freshness)
     if blocked:
-        return QuickExecuteResult(
+        return ExecutionPlanResult(
             status="MARKET_BLOCKED",
             message=f"현재 시장 위험 신호({composite_level})로 인해 실행이 보류됩니다. "
             "자동화 설정의 시장 상황 조건을 확인해주세요.",
@@ -164,14 +169,21 @@ async def quick_execute_rebalancing(
         cache=cache,
     )
     if isinstance(generated, TaxGateBlocked):
-        return QuickExecuteResult(
+        return ExecutionPlanResult(
             status="TAX_BLOCKED",
             message=f"매도로 인한 추정 양도세(약 {generated.estimated_tax_krw:,.0f}원)가 설정하신 상한"
             f"({generated.max_tax_impact_krw:,.0f}원)을 초과해 실행이 보류됩니다. "
             "자동화 설정의 세금영향 상한을 확인해주세요.",
         )
+    if isinstance(generated, DailyValueCapBlocked):
+        return ExecutionPlanResult(
+            status="DAILY_CAP_BLOCKED",
+            message=f"오늘 자동 실행된 금액(약 {generated.today_total_krw:,.0f}원)에 이번 계획 예상 금액"
+            f"(약 {generated.attempted_value_krw:,.0f}원)을 더하면 설정하신 하루 합산 상한"
+            f"({generated.cap_krw:,.0f}원)을 초과해 실행이 보류됩니다.",
+        )
     if generated is None:
-        return QuickExecuteResult(
+        return ExecutionPlanResult(
             status="NO_DRIFT",
             message="포트폴리오가 이미 균형을 이루고 있거나 실행할 주문이 없습니다.",
         )
@@ -210,7 +222,7 @@ async def quick_execute_rebalancing(
         message = f"계획이 생성되었습니다 (등록된 이메일이 없어 알림은 발송되지 않았습니다) — 매수 {buy_count}건"
     if sell_count:
         message += f", 매도 승인대기 {sell_count}건"
-    return QuickExecuteResult(
+    return ExecutionPlanResult(
         status="PLAN_GENERATED",
         message=message,
         email_sent=email_sent,

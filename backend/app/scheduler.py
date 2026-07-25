@@ -85,14 +85,6 @@ def init_scheduler() -> None:
         id="stock_price_alert_check",
         replace_existing=True,
     )
-    from app.jobs.price_publisher import run_price_broadcast
-
-    scheduler.add_job(
-        run_price_broadcast,
-        IntervalTrigger(seconds=30),
-        id="ws_price_broadcast",
-        replace_existing=True,
-    )
     from app.jobs.monthly_report import run_monthly_report
 
     scheduler.add_job(

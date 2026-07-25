@@ -1329,6 +1329,32 @@ class TestIsTaxImpactBlockingAutoMode:
         assert is_tax_impact_blocking_auto_mode("ENABLED", 500_000.0, 500_000.0) is False
 
 
+class TestIsDailyValueCapBlockingAutoMode:
+    """is_daily_value_cap_blocking_auto_mode() — 유저 단위 하루 합산 거래대금 게이트 순수함수."""
+
+    def test_no_cap_never_blocks(self):
+        """cap_krw가 None(미설정, 기본값)이면 무제한 — 항상 통과시킨다."""
+        from app.services.rebalancing.order_builder import is_daily_value_cap_blocking_auto_mode
+
+        assert is_daily_value_cap_blocking_auto_mode(100_000_000.0, 100_000_000.0, None) is False
+
+    def test_under_cap_passes(self):
+        from app.services.rebalancing.order_builder import is_daily_value_cap_blocking_auto_mode
+
+        assert is_daily_value_cap_blocking_auto_mode(30_000_000.0, 40_000_000.0, 100_000_000.0) is False
+
+    def test_over_cap_blocks(self):
+        from app.services.rebalancing.order_builder import is_daily_value_cap_blocking_auto_mode
+
+        assert is_daily_value_cap_blocking_auto_mode(70_000_000.0, 40_000_000.0, 100_000_000.0) is True
+
+    def test_exactly_at_cap_passes(self):
+        """상한과 정확히 같으면 초과가 아니므로 통과 — 다른 게이트들과 동일한 관례(초과만 차단)."""
+        from app.services.rebalancing.order_builder import is_daily_value_cap_blocking_auto_mode
+
+        assert is_daily_value_cap_blocking_auto_mode(60_000_000.0, 40_000_000.0, 100_000_000.0) is False
+
+
 class TestRefreshLivePrices:
     """refresh_live_prices() — 자동/원클릭 실행이 수동 실행 모달과 동일하게 실시간 시세를 지정가에 반영하는지 검증."""
 

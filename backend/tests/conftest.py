@@ -224,6 +224,7 @@ def make_user_settings(make_user_id):
         retirement_target_year=None,
         monthly_report_enabled=True,
         goal_candidate_tickers=None,
+        auto_rebalancing_daily_value_cap_krw=None,
     )
 
 

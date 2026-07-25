@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { PiggyBank } from "lucide-react";
 import { fetchPensionContribution } from "@/api/tax";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
@@ -14,13 +13,12 @@ function achievementColor(pct: number): string {
 
 interface Props {
   overview: PortfolioOverview | undefined;
-  /** true면 카드 헤더/보더 없이 내용만 렌더 (통합 섹션 내부 임베드용) */
-  embedded?: boolean;
 }
 
 /** 연금저축(600만원)+IRP(합산 900만원) 소득공제 한도 대비 올해 납입 진행률을 보여준다.
- * 연금저축/IRP로 태그된 계좌가 없으면 표시하지 않는다. */
-export default function PensionContributionCard({ overview, embedded = false }: Props) {
+ * 연금저축/IRP로 태그된 계좌가 없으면 표시하지 않는다. `TaxLimitsSection`(`TaxTabContainer`의
+ * "한도 현황" 탭)이 렌더하므로 이 컴포넌트는 헤더/보더 없이 본문만 그린다. */
+export default function PensionContributionCard({ overview }: Props) {
   const accounts = overview?.accounts ?? [];
   const hasPensionAccount = accounts.some(
     (a) => a.tax_type === "PENSION_SAVINGS" || a.tax_type === "IRP",
@@ -55,8 +53,11 @@ export default function PensionContributionCard({ overview, embedded = false }: 
     },
   ];
 
-  const body = (
-    <>
+  return (
+    <div>
+      <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1.5">
+        연금저축·IRP 납입 현황 ({data.year}년)
+      </p>
       <div className="grid grid-cols-2 gap-px bg-gray-100 dark:bg-gray-700">
         {chips.map((chip) => (
           <div key={chip.key} className="min-w-0 bg-white dark:bg-gray-900 p-2">
@@ -77,29 +78,6 @@ export default function PensionContributionCard({ overview, embedded = false }: 
         ))}
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">{data.note}</p>
-    </>
-  );
-
-  if (embedded) {
-    return (
-      <div>
-        <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase mb-1.5">
-          연금저축·IRP 납입 현황 ({data.year}년)
-        </p>
-        {body}
-      </div>
-    );
-  }
-
-  return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-2">
-        <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-          <PiggyBank size={16} className="text-emerald-500" />
-          연금저축·IRP 납입 현황 ({data.year}년)
-        </h2>
-      </div>
-      {body}
     </div>
   );
 }

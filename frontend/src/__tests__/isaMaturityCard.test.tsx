@@ -86,9 +86,9 @@ describe("IsaMaturityCard", () => {
     await waitFor(() => expect(screen.getByText("자동 추정으로 되돌리기")).toBeInTheDocument());
   });
 
-  it("embedded 모드에서는 카드 헤더/보더 없이 내용만 렌더한다", async () => {
+  it("카드 헤더/보더 없이 내용만 렌더한다 (TaxLimitsSection 임베드 전용)", async () => {
     fetchIsaStatus.mockResolvedValue(makeSummary([makeStatus()]));
-    const { container } = renderWithProviders(<IsaMaturityCard embedded />);
+    const { container } = renderWithProviders(<IsaMaturityCard />);
     await waitFor(() => expect(screen.getByText("ISA 만기·세제 현황")).toBeInTheDocument());
     expect(container.querySelector(".card")).toBeNull();
   });

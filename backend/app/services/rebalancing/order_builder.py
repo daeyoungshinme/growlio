@@ -1,6 +1,6 @@
 """리밸런싱 실행 주문 생성 로직.
 
-AUTO 자동실행(`rebalancing_auto_execution` job)·원클릭 실행(`quick_execute_rebalancing`)·
+AUTO 자동실행(`rebalancing_auto_execution` job)·원클릭 실행(`create_rebalancing_execution_plan`)·
 대기 플랜 생성(`rebalancing/plan_service.generate_pending_plan_for_alert`)이 공유하는
 주문 생성 헬퍼. 알림 발송 책임(`rebalancing/alert_check.py`)과 분리하기 위해 별도 모듈로 둔다.
 """
@@ -208,6 +208,19 @@ def is_tax_impact_blocking_auto_mode(
     return estimated_tax_krw > max_tax_impact_krw
 
 
+def is_daily_value_cap_blocking_auto_mode(
+    today_total_krw: float, attempted_value_krw: float, cap_krw: float | None
+) -> bool:
+    """AUTO 모드에서 유저 단위 하루 합산 거래대금이 상한을 초과하는지 판정한다.
+
+    `is_tax_impact_blocking_auto_mode`/`is_market_signal_blocking_auto_mode`와 대칭인 순수 함수.
+    `cap_krw`가 None이면(미설정, 기본값) 무제한 — 항상 통과시킨다.
+    """
+    if cap_krw is None:
+        return False
+    return (today_total_krw + attempted_value_krw) > cap_krw
+
+
 def market_group(market: str) -> Literal["KR", "US"]:
     """주문의 시장을 국내(KR)/해외(US)로 분류한다 — AUTO leg를 시장별로 분리하는 데 쓰인다."""
     from app.kis.order import is_overseas_market
@@ -247,7 +260,7 @@ def build_rebalancing_orders(
 
     매도 주문은 `ticker_account_map`을 사용해 실제 종목을 보유한 브로커 연동 계좌(들)로
     분산 생성하고, 매수 주문은 `buy_account_id` 단일 계좌로 생성한다.
-    AUTO 자동실행(`_execute_auto_rebalancing`)과 원클릭 실행(`quick_execute_rebalancing`)이
+    AUTO 자동실행(`_execute_auto_rebalancing`)과 원클릭 실행(`create_rebalancing_execution_plan`)이
     공유하는 주문 생성 로직 — 두 경로가 서로 다른 동작을 하지 않도록 여기서 단일화한다.
     """
     from app.schemas.rebalancing import ExecutionOrderItem

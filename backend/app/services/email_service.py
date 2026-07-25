@@ -23,13 +23,13 @@ from tenacity import (
 from app.core.config import settings
 from app.services.email_templates import (
     account_deletion_template,
+    daily_value_cap_gate_blocked_template,
     exchange_rate_alert_template,
     goal_achievement_template,
     market_signal_change_template,
     market_signal_daily_digest_template,
     market_signal_gate_blocked_template,
     monthly_report_template,
-    password_reset_template,
     rebalancing_alert_template,
     rebalancing_execution_template,
     rebalancing_plan_execution_failed_template,
@@ -216,6 +216,23 @@ async def send_market_signal_gate_blocked_email(
         return False
 
 
+async def send_daily_value_cap_gate_blocked_email(
+    to_email: str, portfolio_name: str, today_total_krw: float, attempted_value_krw: float, cap_krw: float
+) -> bool:
+    """하루 합산 거래한도 게이트로 AUTO 계획 생성이 보류됐을 때 발송. 발송 성공 시 True, 이메일 미설정 시 False 반환."""
+    if not _email_configured():
+        logger.warning("email_not_configured_skip_email", to=to_email)
+        return False
+    subject, html = daily_value_cap_gate_blocked_template(portfolio_name, today_total_krw, attempted_value_krw, cap_krw)
+    try:
+        await _send_html_email(to_email, subject, html)
+        logger.info("daily_value_cap_gate_blocked_email_sent", to=to_email, portfolio=portfolio_name)
+        return True
+    except Exception as e:
+        logger.error("daily_value_cap_gate_blocked_email_failed", to=to_email, error=str(e))
+        return False
+
+
 async def send_rebalancing_plan_pending_email(
     to_email: str,
     portfolio_name: str,
@@ -370,21 +387,6 @@ async def send_test_email(to_email: str) -> bool:
         return True
     except Exception as e:
         logger.error("test_email_failed", to=to_email, error=str(e))
-        return False
-
-
-async def send_password_reset_email(to_email: str, reset_link: str) -> bool:
-    """비밀번호 재설정 링크 이메일 발송. 발송 성공 시 True, 이메일 미설정/실패 시 False 반환."""
-    if not _email_configured():
-        logger.warning("email_not_configured_skip_password_reset_email", to=to_email, reset_link=reset_link)
-        return False
-    subject, html = password_reset_template(reset_link)
-    try:
-        await _send_html_email(to_email, subject, html)
-        logger.info("password_reset_email_sent", to=to_email)
-        return True
-    except Exception as e:
-        logger.error("password_reset_email_failed", to=to_email, error=str(e))
         return False
 
 

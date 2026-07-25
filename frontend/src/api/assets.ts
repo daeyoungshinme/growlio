@@ -147,9 +147,6 @@ export const verifyKisCredentials = (data: {
   is_mock: boolean;
 }) => apiPost<{ valid: boolean; message: string }>("/assets/verify-kis-credentials", data);
 
-export const fetchSnapshots = (start?: string, end?: string) =>
-  apiGet("/assets/snapshots/range", { params: { start_date: start, end_date: end } });
-
 export interface StockSuggestion {
   ticker: string;
   name: string;

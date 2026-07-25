@@ -38,18 +38,20 @@ class ExecutionRequest(BaseModel):
         return v
 
 
-class QuickExecuteOverride(BaseModel):
-    """원클릭 실행(quick-execute) 시 저장된 알림 설정 대신 사용할 화면 값 override."""
+class ExecutionPlanOverride(BaseModel):
+    """대기 계획 생성(`/quick-execute`) 시 저장된 알림 설정 대신 사용할 화면 값 override."""
 
     account_id: uuid.UUID | None = None
     strategy: Literal["FULL", "BUY_ONLY", "TWO_PHASE"] | None = None
     order_type: Literal["MARKET", "LIMIT"] | None = None
 
 
-class QuickExecuteResult(BaseModel):
+class ExecutionPlanResult(BaseModel):
     """ "지금 테스트 실행" 결과 — AUTO와 동일하게 대기 플랜을 생성하고 이메일로 안내한다 (즉시 체결 아님)."""
 
-    status: Literal["PLAN_GENERATED", "NO_DRIFT", "ALREADY_PENDING", "MARKET_BLOCKED", "TAX_BLOCKED"]
+    status: Literal[
+        "PLAN_GENERATED", "NO_DRIFT", "ALREADY_PENDING", "MARKET_BLOCKED", "TAX_BLOCKED", "DAILY_CAP_BLOCKED"
+    ]
     message: str
     email_sent: bool = False
     plan_id: uuid.UUID | None = None

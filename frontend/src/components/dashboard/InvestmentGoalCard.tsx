@@ -26,6 +26,46 @@ interface GapBadgeOptions {
   behindLabel: string;
 }
 
+/** "전체 진행율" 헤드라인 — 모바일 헤더/데스크탑 3열 그리드 양쪽에서 값·서식이 동일해야 하므로
+ * 텍스트 크기만 파라미터화해 하나로 공유한다 (예전엔 sm:hidden/hidden sm:block 두 벌로 복붙되어 있었음). */
+function ProgressHeadline({
+  size,
+  currentProgressPct,
+  goalAmountDisplay,
+  goalGapAmount,
+  hasData,
+}: {
+  size: "sm" | "lg";
+  currentProgressPct: number | null | undefined;
+  goalAmountDisplay: number | null | undefined;
+  goalGapAmount: number | null;
+  hasData: boolean;
+}) {
+  return (
+    <div>
+      <p
+        className={`text-xs text-gray-400 dark:text-gray-500 mb-0.5 ${size === "lg" ? "font-medium" : ""}`}
+      >
+        전체 진행율
+      </p>
+      <p
+        className={`font-bold text-gray-900 dark:text-gray-50 ${size === "lg" ? "text-lg" : "text-base"}`}
+      >
+        {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
+      </p>
+      {goalAmountDisplay != null && hasData && (
+        <p
+          className={`text-xs mt-0.5 ${size === "lg" ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"}`}
+        >
+          {goalGapAmount != null && goalGapAmount > 0
+            ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
+            : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: GapBadgeOptions) {
   const isAhead = gap > 0;
   const isEven = gap === 0;
@@ -307,19 +347,13 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       <div className="sm:hidden border-t border-gray-100 dark:border-gray-700 pt-1.5 mt-1.5">
         {currentProgressPct != null || timeline ? (
           <>
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mb-0.5">전체 진행율</p>
-              <p className="text-base font-bold text-gray-900 dark:text-gray-50">
-                {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
-              </p>
-              {goalAmountDisplay != null && data != null && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                  {goalGapAmount != null && goalGapAmount > 0
-                    ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
-                    : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
-                </p>
-              )}
-            </div>
+            <ProgressHeadline
+              size="sm"
+              currentProgressPct={currentProgressPct}
+              goalAmountDisplay={goalAmountDisplay}
+              goalGapAmount={goalGapAmount}
+              hasData={data != null}
+            />
             <CollapsibleSection
               isOpen={dcaDetailOpen}
               onToggle={toggleDcaDetail}
@@ -390,21 +424,13 @@ export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) 
       {currentProgressPct != null || timeline ? (
         <div className="hidden sm:block border-t border-gray-100 dark:border-gray-700 pt-2 mt-2 space-y-2">
           <div className="grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-0.5">
-                전체 진행율
-              </p>
-              <p className="text-lg font-bold text-gray-900 dark:text-gray-50">
-                {currentProgressPct != null ? `${currentProgressPct.toFixed(1)}%` : "—"}
-              </p>
-              {goalAmountDisplay != null && data != null && (
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                  {goalGapAmount != null && goalGapAmount > 0
-                    ? `목표까지 ${fmtKrw(goalGapAmount)} 남음`
-                    : `목표 ${fmtKrw(goalAmountDisplay)} 달성`}
-                </p>
-              )}
-            </div>
+            <ProgressHeadline
+              size="lg"
+              currentProgressPct={currentProgressPct}
+              goalAmountDisplay={goalAmountDisplay}
+              goalGapAmount={goalGapAmount}
+              hasData={data != null}
+            />
             <div>
               <p className="text-xs text-gray-400 dark:text-gray-500 font-medium mb-0.5">
                 실제 달성 예상

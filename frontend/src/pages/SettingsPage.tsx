@@ -238,12 +238,12 @@ export default function SettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAlertTab]);
 
-  const reportAlertsEnabledCount = [monthlyReportEnabled, yearEndTaxReminderEnabled].filter(
-    Boolean,
-  ).length;
-  const goalAlertsEnabledCount = [goalAlertsEnabled, recommendationDriftAlertEnabled].filter(
-    Boolean,
-  ).length;
+  const reportAlertsEnabledCount = [
+    monthlyReportEnabled,
+    yearEndTaxReminderEnabled,
+    recommendationDriftAlertEnabled,
+  ].filter(Boolean).length;
+  const instantAlertsEnabledCount = [goalAlertsEnabled].filter(Boolean).length;
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
@@ -394,10 +394,10 @@ export default function SettingsPage() {
 
           <CollapsibleCard
             icon={Mail}
-            title="정기 리포트·리마인더"
+            title="정기 리포트·요약"
             isOpen={isReportAlertsOpen}
             onToggle={toggleReportAlertsOpen}
-            collapsedHint={`2개 중 ${reportAlertsEnabledCount}개 켜짐`}
+            collapsedHint={`3개 중 ${reportAlertsEnabledCount}개 켜짐`}
           >
             <div>
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
@@ -424,27 +424,6 @@ export default function SettingsPage() {
                 ariaLabel="연말 절세 리마인더"
               />
             </div>
-          </CollapsibleCard>
-
-          <CollapsibleCard
-            icon={TrendingUp}
-            title="목표·추천 변화 감지"
-            isOpen={isGoalAlertsOpen}
-            onToggle={toggleGoalAlertsOpen}
-            collapsedHint={`2개 중 ${goalAlertsEnabledCount}개 켜짐`}
-          >
-            <div>
-              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
-              </p>
-              <ToggleSwitch
-                checked={goalAlertsEnabled}
-                disabled={goalAlertsPending}
-                onChange={toggleGoalAlerts}
-                ariaLabel="목표 달성 알림"
-              />
-            </div>
 
             <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mt-3">
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">추천 비중 변화 알림</p>
@@ -457,6 +436,27 @@ export default function SettingsPage() {
                 disabled={recommendationDriftAlertPending}
                 onChange={toggleRecommendationDriftAlert}
                 ariaLabel="추천 비중 변화 알림"
+              />
+            </div>
+          </CollapsibleCard>
+
+          <CollapsibleCard
+            icon={TrendingUp}
+            title="즉시 알림"
+            isOpen={isGoalAlertsOpen}
+            onToggle={toggleGoalAlertsOpen}
+            collapsedHint={`1개 중 ${instantAlertsEnabledCount}개 켜짐`}
+          >
+            <div>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                투자·입금·배당 목표를 달성하면 이메일·푸시로 알려드립니다.
+              </p>
+              <ToggleSwitch
+                checked={goalAlertsEnabled}
+                disabled={goalAlertsPending}
+                onChange={toggleGoalAlerts}
+                ariaLabel="목표 달성 알림"
               />
             </div>
           </CollapsibleCard>

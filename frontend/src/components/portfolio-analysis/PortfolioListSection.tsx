@@ -19,6 +19,7 @@ import {
   GripVertical,
   Loader2,
   Plus,
+  Target,
   Trash2,
 } from "lucide-react";
 import { Portfolio } from "@/api/portfolios";
@@ -376,7 +377,7 @@ export default function PortfolioListSection({
               설정됨
             </span>
           ) : (
-            <span>자동화 설정된 포트폴리오가 없습니다. 🔔 버튼으로 설정하세요.</span>
+            <span>자동화 설정된 포트폴리오가 없습니다. 알림 버튼으로 설정하세요.</span>
           )}
         </div>
       )}
@@ -387,7 +388,7 @@ export default function PortfolioListSection({
         </div>
       ) : portfolios.length === 0 ? (
         <div className="rounded-xl border border-dashed border-gray-200 dark:border-gray-700 p-5 text-center space-y-4">
-          <div className="text-2xl">🎯</div>
+          <Target size={28} className="mx-auto text-gray-400 dark:text-gray-500" />
           <div>
             <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
               첫 포트폴리오를 만들어 보세요

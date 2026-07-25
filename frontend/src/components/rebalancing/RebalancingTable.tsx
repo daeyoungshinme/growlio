@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Zap } from "lucide-react";
 import { ExecutionResult, RebalancingAnalysis } from "@/api/rebalancing";
 import { AssetAccount } from "@/api/assets";
 import { fmtKrw } from "@/utils/format";
@@ -89,10 +90,10 @@ export default function RebalancingTable({
           <button
             onClick={() => setExecutionOpen(true)}
             disabled={kisAccounts.length === 0}
-            className="inline-flex bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
+            className="inline-flex items-center gap-1.5 bg-indigo-600 text-white px-4 py-1.5 text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
             title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
           >
-            ⚡ 리밸런싱 실행
+            <Zap size={14} /> 리밸런싱 실행
           </button>
         </div>
       </div>
@@ -172,10 +173,10 @@ export default function RebalancingTable({
         <button
           onClick={() => setExecutionOpen(true)}
           disabled={kisAccounts.length === 0}
-          className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl text-sm font-semibold shadow-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title={kisAccounts.length === 0 ? "자산관리에서 KIS 증권계좌를 연동하세요" : ""}
         >
-          ⚡ 리밸런싱 실행
+          <Zap size={16} /> 리밸런싱 실행
         </button>
       </div>
 

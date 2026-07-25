@@ -385,41 +385,6 @@ async def test_send_test_email_success(monkeypatch):
         mock_post.assert_called_once()
 
 
-# ── send_password_reset_email ───────────────────────────────
-
-
-@pytest.mark.asyncio
-async def test_send_password_reset_email_not_configured(monkeypatch):
-    """이메일 미설정 시 비밀번호 재설정 이메일을 발송하지 않는다 (경고 로그만)."""
-    monkeypatch.setattr("app.core.config.settings.resend_api_key", "")
-
-    with patch("httpx.AsyncClient.post", new_callable=AsyncMock) as mock_post:
-        from app.services.email_service import send_password_reset_email
-
-        await send_password_reset_email("user@example.com", "https://reset-link/token")
-        mock_post.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_send_password_reset_email_includes_link(monkeypatch):
-    """비밀번호 재설정 이메일 본문에 reset 링크가 포함된다."""
-    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
-    monkeypatch.setattr("app.core.config.settings.email_from", "noreply@test.com")
-
-    captured = {}
-
-    async def fake_post(self, url, headers=None, json=None, **kwargs):
-        captured["html"] = json["html"]
-        return _ok_response(url)
-
-    with patch("httpx.AsyncClient.post", new=fake_post):
-        from app.services.email_service import send_password_reset_email
-
-        await send_password_reset_email("user@example.com", "https://growlio.app/reset-password?token=abc123")
-
-    assert "abc123" in captured["html"]
-
-
 # ── send_rebalancing_alert ──────────────────────────────────
 
 
@@ -701,20 +666,6 @@ async def test_send_test_email_exception_returns_false(monkeypatch):
 
     with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
         result = await em.send_test_email("user@example.com")
-
-    assert result is False
-
-
-@pytest.mark.asyncio
-async def test_send_password_reset_exception_returns_false(monkeypatch):
-    """send_password_reset_email은 예외 발생 시 re-raise 없이 False를 반환한다."""
-    monkeypatch.setattr("app.core.config.settings.resend_api_key", "test-key")
-
-    import app.services.email_service as em
-
-    with patch.object(em, "_send_html_email", new=AsyncMock(side_effect=Exception("api error"))):
-        # 예외가 propagate되지 않아야 함
-        result = await em.send_password_reset_email("user@example.com", "https://growlio.app/reset?token=abc")
 
     assert result is False
 

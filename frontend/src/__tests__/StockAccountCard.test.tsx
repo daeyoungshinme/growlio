@@ -67,14 +67,16 @@ describe("StockAccountCard", () => {
     expect(syncBtn).toBeInTheDocument();
   });
 
-  it("종목 관리 버튼에 aria-label이 있다", () => {
+  it("계좌 관리 메뉴를 열면 종목 관리 항목이 있다", () => {
     renderWithProviders(<StockAccountCard {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "종목 관리" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "계좌 관리 메뉴" }));
+    expect(screen.getByRole("menuitem", { name: "종목 관리" })).toBeInTheDocument();
   });
 
-  it("계좌 삭제 버튼에 aria-label이 있다", () => {
+  it("계좌 관리 메뉴를 열면 계좌 삭제 항목이 있다", () => {
     renderWithProviders(<StockAccountCard {...defaultProps} />);
-    expect(screen.getByRole("button", { name: "계좌 삭제" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "계좌 관리 메뉴" }));
+    expect(screen.getByRole("menuitem", { name: "계좌 삭제" })).toBeInTheDocument();
   });
 
   it("동기화 버튼 클릭 시 onSync를 계좌 id와 함께 호출한다", () => {
@@ -83,9 +85,10 @@ describe("StockAccountCard", () => {
     expect(defaultProps.onSync).toHaveBeenCalledWith("acc-1");
   });
 
-  it("삭제 버튼 클릭 시 onDelete를 계좌 id와 함께 호출한다", () => {
+  it("메뉴에서 계좌 삭제 클릭 시 onDelete를 계좌 id와 함께 호출한다", () => {
     renderWithProviders(<StockAccountCard {...defaultProps} />);
-    fireEvent.click(screen.getByRole("button", { name: "계좌 삭제" }));
+    fireEvent.click(screen.getByRole("button", { name: "계좌 관리 메뉴" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "계좌 삭제" }));
     expect(defaultProps.onDelete).toHaveBeenCalledWith("acc-1");
   });
 

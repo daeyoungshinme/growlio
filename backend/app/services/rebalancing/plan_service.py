@@ -12,12 +12,12 @@ import hashlib
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any, Literal, cast
 
 import structlog
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -31,6 +31,7 @@ from app.services.rebalancing.order_builder import (
     build_rebalancing_orders,
     clamp_orders_to_max_value,
     filter_drifting_items,
+    is_daily_value_cap_blocking_auto_mode,
     is_tax_impact_blocking_auto_mode,
     market_group,
     refresh_live_prices,
@@ -38,6 +39,8 @@ from app.services.rebalancing.order_builder import (
 )
 
 logger = structlog.get_logger()
+
+_KST = timezone(timedelta(hours=9))
 
 
 @dataclass(frozen=True)
@@ -57,6 +60,15 @@ class MarketSignalGateBlocked:
     composite_level: str
     market_condition_mode: str
     data_freshness: str
+
+
+@dataclass(frozen=True)
+class DailyValueCapBlocked:
+    """AUTO 계획 생성이 유저 단위 하루 합산 거래대금 상한으로 차단됐을 때 반환하는 sentinel."""
+
+    today_total_krw: float
+    attempted_value_krw: float
+    cap_krw: float
 
 
 def _generate_token() -> tuple[str, str]:
@@ -135,6 +147,47 @@ async def has_pending_plan_for_alert(alert_id: uuid.UUID, db: AsyncSession) -> b
         .limit(1)
     )
     return result.first() is not None
+
+
+async def sum_today_auto_plan_value_krw(user_id: uuid.UUID, db: AsyncSession) -> float:
+    """오늘(KST) 이 유저의 AUTO 대기 플랜 중 자금이 이동했거나 이동할 leg의 총 거래대금(KRW)을 합산한다.
+
+    PENDING(대기중, 곧 실행될 수 있음)/EXECUTED(이미 실행됨) leg만 포함 — CANCELED/REJECTED/
+    EXPIRED/FAILED는 자금이 이동하지 않(았)으므로 하루 합산 상한 계산에서 제외한다.
+    """
+    today_start_kst = datetime.now(tz=_KST).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start_kst.astimezone(UTC)
+
+    total = await db.scalar(
+        select(func.coalesce(func.sum(RebalancingPlanItem.quantity * RebalancingPlanItem.reference_price), 0))
+        .select_from(RebalancingPlanItem)
+        .join(RebalancingPlanLeg, RebalancingPlanLeg.id == RebalancingPlanItem.leg_id)
+        .join(RebalancingPlan, RebalancingPlan.id == RebalancingPlanLeg.plan_id)
+        .where(
+            RebalancingPlan.user_id == user_id,
+            RebalancingPlan.created_at >= today_start_utc,
+            RebalancingPlanLeg.status.in_(["PENDING", "EXECUTED"]),
+        )
+    )
+    return float(total or 0)
+
+
+async def get_alert_ids_with_pending_plan(alert_ids: list[uuid.UUID], db: AsyncSession) -> set[uuid.UUID]:
+    """여러 알림 중 PENDING 상태 leg가 있는 알림 id 집합을 한 번의 쿼리로 조회한다.
+
+    `has_pending_plan_for_alert()`를 alert마다 개별 호출하면 AUTO 알림 수만큼 DB
+    round-trip이 발생하는 N+1이 되므로(rebalancing_auto_execution.py 루프 전용),
+    루프 시작 전 한 번에 조회해 멤버십 체크로 대체한다.
+    """
+    if not alert_ids:
+        return set()
+    result = await db.execute(
+        select(RebalancingPlan.alert_id)
+        .join(RebalancingPlanLeg, RebalancingPlanLeg.plan_id == RebalancingPlan.id)
+        .where(RebalancingPlan.alert_id.in_(alert_ids), RebalancingPlanLeg.status == "PENDING")
+        .distinct()
+    )
+    return {alert_id for alert_id in result.scalars().all() if alert_id is not None}
 
 
 async def generate_pending_plan_for_alert(
@@ -246,12 +299,15 @@ async def build_pending_plan_for_alert(
     order_type_override: Literal["MARKET", "LIMIT"] | None = None,
     account_id_override: uuid.UUID | None = None,
     cache: Any = None,
-) -> tuple[RebalancingPlan, list[tuple[str, str]], list[tuple[str, str]]] | None | TaxGateBlocked:
+) -> (
+    tuple[RebalancingPlan, list[tuple[str, str]], list[tuple[str, str]]] | None | TaxGateBlocked | DailyValueCapBlocked
+):
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
     AUTO 스케줄러 job과 수동 "지금 테스트 실행" 모두 이 함수로 플랜을 생성해 두 경로가
     동일한 계획 생성 로직(및 이메일 발송 파이프라인)을 공유하도록 한다.
-    반환: (plan, buy_tokens, sell_tokens) | None(드리프트 없음) | TaxGateBlocked(세금영향 게이트 차단).
+    반환: (plan, buy_tokens, sell_tokens) | None(드리프트 없음) | TaxGateBlocked(세금영향 게이트 차단)
+    | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단).
     buy_tokens/sell_tokens는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
     from app.services.portfolio_service import build_portfolio_overview
@@ -284,6 +340,28 @@ async def build_pending_plan_for_alert(
                 max_tax_impact_krw=max_tax_impact_krw,
             )
             return TaxGateBlocked(estimated_tax_krw=estimated_tax_krw, max_tax_impact_krw=float(max_tax_impact_krw))
+
+    from app.models.user import UserSettings
+
+    daily_cap_krw = await db.scalar(
+        select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
+    )
+    if daily_cap_krw is not None:
+        attempted_value_krw = sum(abs(item.diff_krw) for item in drifting)
+        today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
+        if is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
+            logger.info(
+                "rebalancing_plan_blocked_daily_value_cap",
+                alert_id=str(alert.id),
+                today_total_krw=today_total_krw,
+                attempted_value_krw=attempted_value_krw,
+                cap_krw=float(daily_cap_krw),
+            )
+            return DailyValueCapBlocked(
+                today_total_krw=today_total_krw,
+                attempted_value_krw=attempted_value_krw,
+                cap_krw=float(daily_cap_krw),
+            )
 
     plan, buy_tokens, sell_tokens = await generate_pending_plan_for_alert(
         alert,
@@ -480,6 +558,62 @@ async def notify_market_signal_gate_blocked(
     await db.commit()
 
     await set_durable(db, dedup_key, "1", ttl=TTL_MARKET_SIGNAL_GATE_ALERT_SENT)
+
+
+async def notify_daily_value_cap_blocked(
+    alert: RebalancingAlert,
+    portfolio: Portfolio,
+    blocked: DailyValueCapBlocked,
+    email: str | None,
+    fcm_token: str | None,
+    db: AsyncSession,
+) -> None:
+    """하루 합산 거래한도 게이트로 계획 생성이 보류됐음을 알린다 — 유저당 하루 1회만 발송(dedup).
+
+    이 게이트는 알림(alert) 단위가 아닌 유저 단위로 평가되므로, dedup 키도 alert.id가 아닌
+    user_id 기준 — 같은 유저의 여러 PER_ACCOUNT 알림이 같은 날 같은 상한에 걸려도 중복 발송하지 않는다.
+    dedup 플래그는 재시작에도 유지돼야 하므로(콜드스타트 후 오탐 방지) Postgres 기반 durable_state를 사용한다.
+    """
+    from app.services.email_service import send_daily_value_cap_gate_blocked_email
+    from app.services.push_service import send_push_to_user
+    from app.utils.cache_keys import TTL_DAILY_VALUE_CAP_ALERT_SENT, daily_value_cap_gate_alert_sent_key
+    from app.utils.durable_state import get_durable, set_durable
+
+    today = datetime.now(tz=_KST).date().isoformat()
+    dedup_key = daily_value_cap_gate_alert_sent_key(alert.user_id, today)
+    if await get_durable(db, dedup_key):
+        return
+
+    if email:
+        try:
+            await send_daily_value_cap_gate_blocked_email(
+                email, portfolio.name, blocked.today_total_krw, blocked.attempted_value_krw, blocked.cap_krw
+            )
+        except Exception as exc:
+            logger.error("daily_value_cap_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
+
+    push_body = (
+        f"하루 합산 거래한도({blocked.cap_krw:,.0f}원) 초과로 이번 계획을 만들지 않았습니다 "
+        f"(오늘 누적 약 {blocked.today_total_krw:,.0f}원)."
+    )
+    with contextlib.suppress(Exception):
+        await send_push_to_user(
+            user_id=alert.user_id,
+            title=f"리밸런싱 자동화 보류 — {portfolio.name}",
+            body=push_body,
+            fcm_token=fcm_token,
+            data={"type": "REBALANCING_DAILY_CAP_BLOCKED", "portfolio_id": str(portfolio.id)},
+        )
+
+    history_message = (
+        f"리밸런싱 자동화 보류(하루 합산 거래한도 초과): {portfolio.name} — "
+        f"오늘 누적 약 {blocked.today_total_krw:,.0f}원 + 이번 약 {blocked.attempted_value_krw:,.0f}원 "
+        f"> 상한 {blocked.cap_krw:,.0f}원"
+    )
+    await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
+    await db.commit()
+
+    await set_durable(db, dedup_key, "1", ttl=TTL_DAILY_VALUE_CAP_ALERT_SENT)
 
 
 async def get_plan_leg_by_token(

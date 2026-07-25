@@ -18,10 +18,12 @@ from app.models.user import User, UserSettings
 from app.services.alerts.calculator import already_fired_today
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
+    DailyValueCapBlocked,
     MarketSignalGateBlocked,
     TaxGateBlocked,
     build_pending_plan_for_alert,
-    has_pending_plan_for_alert,
+    get_alert_ids_with_pending_plan,
+    notify_daily_value_cap_blocked,
     notify_market_signal_gate_blocked,
     notify_plan_generated,
     notify_tax_gate_blocked,
@@ -74,6 +76,7 @@ async def _run_auto_execution() -> None:
             )
         )
         rows = result.all()
+        pending_alert_ids = await get_alert_ids_with_pending_plan([alert.id for alert, *_ in rows], db)
 
         triggered_count = 0
         for alert, portfolio, user_email, notification_email, fcm_token in rows:
@@ -103,7 +106,7 @@ async def _run_auto_execution() -> None:
                 continue
 
             # 이미 대기 중인 플랜이 있으면(취소/승인 대기) 중복 생성하지 않는다.
-            if await has_pending_plan_for_alert(alert.id, db):
+            if alert.id in pending_alert_ids:
                 continue
 
             try:
@@ -114,6 +117,9 @@ async def _run_auto_execution() -> None:
 
             if isinstance(generated, TaxGateBlocked):
                 await notify_tax_gate_blocked(alert, portfolio, generated, email, fcm_token, db)
+                continue
+            if isinstance(generated, DailyValueCapBlocked):
+                await notify_daily_value_cap_blocked(alert, portfolio, generated, email, fcm_token, db)
                 continue
             if generated is None:
                 continue

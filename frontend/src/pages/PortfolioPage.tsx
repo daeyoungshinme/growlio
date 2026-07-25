@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useRef, useState, lazy, Suspense } from "react";
+import { useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import Tabs from "@/components/common/Tabs";
@@ -12,6 +12,7 @@ import DividendTab from "@/components/portfolio/DividendTab";
 import { fmtKrw, fmtKrwPrice } from "@/utils/format";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useRegisterRefresh } from "@/hooks/useRegisterRefresh";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
@@ -29,10 +30,7 @@ import type { PortfolioOverview } from "@/types";
 import { isPortfolioAccount, isStockAccount } from "@/utils/accounts";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/api/client";
-const TaxOptimizationCard = lazy(
-  () => import("../components/portfolio-analysis/TaxOptimizationCard"),
-);
-const TaxLimitsSection = lazy(() => import("../components/portfolio-analysis/TaxLimitsSection"));
+const TaxTabContainer = lazy(() => import("../components/portfolio-analysis/TaxTabContainer"));
 
 const TreemapChart = lazy(() => import("../components/portfolio/TreemapChart"));
 const DomesticForeignBar = lazy(() => import("../components/portfolio/DomesticForeignBar"));
@@ -92,20 +90,10 @@ export default function PortfolioPage() {
   const syncDone = useSyncStore((s) => s.done);
   const syncTotal = useSyncStore((s) => s.total);
   const startSyncAll = useSyncStore((s) => s.startSyncAll);
-  const [chartsOpen, setChartsOpen] = useState(
-    () => localStorage.getItem(CHARTS_OPEN_KEY) !== "false",
-  );
+  const [chartsOpen, handleChartsToggle] = useCollapsible(true, CHARTS_OPEN_KEY);
 
   const tabContentRef = useRef<HTMLDivElement>(null);
   useSwipeTabs(tabContentRef, TABS, tab, handleTabChange);
-
-  const handleChartsToggle = useCallback(() => {
-    setChartsOpen((v) => {
-      const next = !v;
-      localStorage.setItem(CHARTS_OPEN_KEY, String(next));
-      return next;
-    });
-  }, []);
 
   const { data: accountsList } = useQuery({
     queryKey: QUERY_KEYS.accounts,
@@ -324,18 +312,11 @@ export default function PortfolioPage() {
         )}
 
         {tab === "세금" && (
-          <div className="space-y-6">
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard rows={2} height="h-4" />}>
-                <TaxLimitsSection />
-              </Suspense>
-            </ErrorBoundary>
-            <ErrorBoundary variant="section">
-              <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
-                <TaxOptimizationCard accountId={selectedAccountId} />
-              </Suspense>
-            </ErrorBoundary>
-          </div>
+          <ErrorBoundary variant="section">
+            <Suspense fallback={<SkeletonCard rows={4} height="h-4" />}>
+              <TaxTabContainer accountId={selectedAccountId} />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </div>
     </div>
