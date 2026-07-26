@@ -78,7 +78,8 @@ make build-android-release         # APK Release 빌드
 - `/dashboard` — 전체 자산 집계, 포트폴리오 요약, 연간 입금 달성률, 배당 현황, 월별 추이
 - `/assets` — **자산 관리 허브** 단일 라우트. `AssetsPage`가 내부적으로 "투자현황"(조회 전용 PortfolioContent)/"계좌관리"(CRUD AssetManagementContent) 2개 탭으로 분기 (`ASSETS_TOP_TABS`, `?tab=` 쿼리 파라미터)
 - `/invest-plan` — DCA(정기투자) 분석 + 목표 타임라인 (InvestPlanPage)
-- `/settings` — DART API 키, 알림 설정(공통 수신 이메일 + 카테고리별 `CollapsibleCard` 3개: "정기 리포트·리마인더"/"목표·추천 변화 감지"/"시장 모니터링" + 환율/주가/발송이력 탭), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
+- `/settings` — DART API 키, 계정 정보(비밀번호 변경), 앱 설정(다크모드/생체인증/로그아웃/탈퇴). KIS/키움 계좌 연동(`/assets`)·투자/입금/배당 목표·DCA(`/invest-plan`)·목표 역산 추천 옵션(`/rebalancing`)·알림 설정(`/settings/notifications`)은 실제 편집 UI가 각 페이지에 있고, 설정 탭에는 상태 요약 + 딥링크만 표시됨
+- `/settings/notifications` — 알림 설정 상세(`NotificationSettingsPage`, `/settings`에서 딥링크). 공통 수신 이메일(`NotificationEmailSection`) + 카테고리별 `CollapsibleCard` 3개("정기 리포트·요약"/"즉시 알림"/"시장 모니터링") + 환율/주가/발송이력 탭. `SettingsPage.tsx`(2026-07-26 이전)의 3중 중첩(`SectionCard`›`CollapsibleCard`×3›내부 pill탭)을 완화하기 위해 별도 라우트로 분리됨 — `MarketSignalBanner.tsx`/`RebalancingHistoryTab.tsx`의 `?atab=` 딥링크도 이 경로를 가리킴
 - `/rebalancing` — 리밸런싱 실행 허브. 포트폴리오별 목표 비중 편집, 드리프트 현황, 주문 실행 (RebalancingPage)
 - 미매칭 경로(`*`)는 `/dashboard`로 리다이렉트
 
@@ -103,11 +104,13 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
+- **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건강보험 피부양자 자격상실 위험 상시 노출 카드(진행률 바 + 기준 초과 시 예상 월 보험료). `TaxLimitsSection`이 ISA/연금 계좌 유무와 무관하게 항상 렌더 — 배당소득은 계좌 태그가 아닌 전체 배당 수령액 기준이라 두 카드와 게이트 조건이 다름. `TaxOptimizationCard`("세금 추정" 탭)의 조건부 경고 배너와는 별개(상호 보완 — 이 카드가 상시 노출, 배너는 임계값 근접/초과 시 강조).
 - **`components/dashboard/TaxLimitsBanner.tsx`** — `InvestmentSnapshotCard`("주식 투자 현황") 안에 4번째 하위 섹션으로 임베드되는 세금 한도 요약 행. ISA 임박 만기/한도초과·연금공제 달성률을 한 줄로 보여주고 `/assets?tab=투자현황&portfolioTab=세금`으로 딥링크(상세 카드 자체는 여전히 홈에 렌더하지 않음). 계산 로직은 `useTaxLimitsSummary` 훅(`hooks/useTaxLimitsSummary.ts`)에 있으며, 같은 훅을 `InvestmentSnapshotCard`가 헤더 경고 배지·collapsedHint 계산에도 재사용한다(React Query 캐시 공유로 요청 중복 없음).
 - **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭의 진입점(`PortfolioPage`가 lazy-load). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`(ISA·연금)과 `TaxOptimizationCard`(세금 추정)를 묶는다 — 기존에 두 카드가 각각 접이식으로 나란히 쌓여 3중 중첩이었던 것을 탭 전환 1단계로 단순화(2026-07-25). 탭 상태는 `?taxTab=` 쿼리파라미터로 영속화(`PortfolioPage`의 기존 `portfolioTab` 관리 패턴과 동일한 `useSearchParams` 방식). Home 배너(`TaxLimitsBanner`)의 `?portfolioTab=세금` 딥링크는 `taxTab` 미지정이라 기본값인 "한도 현황" 탭으로 랜딩한다.
-- **`components/portfolio-analysis/TaxLimitsSection.tsx`** — `TaxTabContainer`의 "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`를 감싸는 순수 프레젠테이션 컴포넌트(자체 접기 카드 없음 — 탭이 이미 그 역할을 함). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음).
-- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load). 전체/연령대/기간별 3개 탭이 공유하는 비중 목록·적용 섹션은 `RecommendationWeightList.tsx`/`RecommendationApplySection.tsx`로 추출됨(2026-07-25, 3중 중복 제거) — 탭별 설명 문구·`useMutation`·탭 전환 상태머신은 이 파일에 그대로 유지.
-- **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 4단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안 — `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
+- **`components/portfolio-analysis/TaxLimitsSection.tsx`** — `TaxTabContainer`의 "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 유무 조건부)와 `HealthInsuranceRiskCard`(항상 렌더)를 감싸는 순수 프레젠테이션 컴포넌트(자체 접기 카드 없음 — 탭이 이미 그 역할을 함). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음). `HealthInsuranceRiskCard`가 항상 렌더되므로 이 탭이 완전히 빈 상태(empty-state 문구)는 없음.
+- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load). 전체/연령대/기간별 3개 탭의 결과 렌더(드리프트 배지→비중 목록→안내문구→후보 제안→적용 섹션)는 `RecommendationResultPanel.tsx`로 통합됨(2026-07-26, 그 이전엔 비중 목록·적용 섹션만 `RecommendationWeightList.tsx`/`RecommendationApplySection.tsx`로 부분 추출된 상태였음) — 탭별 설명 문구·`useMutation`·탭 전환 상태머신은 이 파일에 그대로 유지.
+- **`components/rebalancing/RecommendationResultPanel.tsx`** — `RecommendationCard.tsx`의 전체/연령대/기간별 3탭이 공유하는 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·안내문구+`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`)을 props로 데이터만 받아 렌더. `applySection`이 `null`이면 적용 섹션 자체를 생략(기간별 탭에서 현금성 자산을 자동 연결할 계좌가 없어 적용이 불가능한 경우).
+- **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 6단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인 → 투자성향·배당목표 → 추천 포트폴리오). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안. 5단계(출생연도·리스크 성향·배당목표)까지 입력하면 6단계 진입 시 자동 저장 후 `GET /rebalancing/goal-recommendation`(전체 자산 기준 목표 역산 추천)을 조회해 보여주고, "이 추천으로 포트폴리오 만들기"로 그 비중 그대로 신규 `Portfolio`를 생성할 수 있다(계좌 미연결 가상 목표비중). `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음 — 플랫 모달은 5·6단계 UI가 없어 리스크성향 재설정 없이 기존 값을 그대로 유지한다. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
 
@@ -147,7 +150,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `useSettingsToggle.ts` — `["settings"]`의 boolean 필드 하나를 조회 후 PUT으로 토글하는 반복 패턴(조회+뮤테이션+무효화+에러토스트)을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 4개 훅(`useGoalAchievementAlertsToggle`/`useMonthlyReportAlertsToggle`/`useYearEndTaxReminderToggle`/`useRecommendationDriftAlertToggle`)이 필드명만 다르게 얹어 씀 — 전용 상태 조회 엔드포인트가 있는 `useCompositeSignalToggle`/`useMarketSignalDigestToggle`(설정 필드는 후자만 해당)은 구조가 달라 이 팩토리를 쓰지 않음
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
-- `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `useSettingsToggle` 사용, `year_end_tax_reminder_enabled` 필드 · `PUT /settings/year-end-tax-reminder`. 기본값 `false`(옵트인). `SettingsPage`의 "알림 설정" › "정기 리포트·리마인더" 그룹에 배치
+- `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `useSettingsToggle` 사용, `year_end_tax_reminder_enabled` 필드 · `PUT /settings/year-end-tax-reminder`. 기본값 `false`(옵트인). `NotificationSettingsPage`의 "정기 리포트·요약" 그룹에 배치
 - `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `goal_achievement_alerts_enabled` 필드 · `PUT /settings/goal-achievement-alerts`. 기본값 `true` (미설정 시 수신)
 - `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `useSettingsToggle` 사용, `monthly_report_enabled` 필드 · `PUT /settings/monthly-report-alerts`. 기본값 `true` (미설정 시 수신)
 - `useRecommendationDriftAlertToggle.ts` — 매주 월요일 09:15 KST "추천 비중이 달라졌어요" 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `recommendation_drift_alert_enabled` 필드 · `PUT /settings/recommendation-drift-alert`. 기본값 `false`(옵트인)
@@ -336,6 +339,11 @@ cd frontend && npx playwright test
 **진단 인사이트 유틸리티 (`src/utils/diagnosisInsights.ts`)**
 - `buildDiagnosisNotes(ctx)` — `DiagnosisContext`(시장상황/리스크/세금영향)를 화면 표시용 조건부 문구 리스트로 변환.
 - `buildCombinedStatusNote(needsCount, marketLevel)` — "이탈 종목 발견 + 시장상황"을 결합한 한 줄 설명 생성.
+
+**시장 위험 신호 표시 유틸리티 (`src/utils/marketSignalRows.ts`)**
+- `buildSignalRows(signals)` — `MarketSignalResponse.signals`(8개 매크로 지표)를 고정 순서의 `SignalRowDisplay[]`로 변환. 백엔드 `market_signal_service.py`의 Tier A(VIX/하이일드 스프레드/고용)/B+C(미국 금리 커브·인플레이션·달러 인덱스·환율·유가) 분류를 그대로 재사용해 각 행에 `tier`를 부여 — `MarketSignalBanner.tsx`가 Tier A는 항상 노출, 나머지는 "매크로 지표 더보기" 서브 토글로 묶는 데 사용(2026-07-26, 8개 신호를 각각 하드코딩된 JSX+개별 색상/라벨 맵으로 반복하던 것을 데이터 기반으로 통합).
+- `dotColorForSubScore(subScore)` — 모든 신호의 심각도 점 색상을 `sub_score`(0/1/2/3+) 기준 단일 함수로 통일(과거엔 레벨 enum별 개별 맵이 신호마다 따로 있었음).
+- 공용 렌더러는 `components/rebalancing/SignalRow.tsx`(`{label, content}` 프레젠테이션 컴포넌트) — `MarketSignalBanner.tsx`가 `buildSignalRows()` 결과를 매핑해 렌더.
 
 **계좌 유틸리티 (`src/utils/accounts.ts`)**
 - `isPortfolioAccount(account)` / `isStockAccount(account)` / `isBankAccount(account)` — 계좌 유형 판별. 인라인 `asset_type` 비교 금지.

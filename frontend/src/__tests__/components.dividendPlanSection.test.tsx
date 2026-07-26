@@ -106,6 +106,7 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_cagr_lookback_years: 10,
     goal_short_term_equity_floor_pct: 80.0,
     age_group: null,
+    birth_year: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,
     auto_rebalancing_daily_value_cap_krw: null,
     ...overrides,

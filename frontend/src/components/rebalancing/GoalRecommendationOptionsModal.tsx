@@ -9,16 +9,11 @@ import {
 } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
+import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { invalidateGoalRecommendationData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { extractErrorMessage } from "@/utils/error";
 import Modal from "@/components/common/Modal";
-
-const RISK_TOLERANCE_OPTIONS: { value: GoalRiskTolerance; label: string }[] = [
-  { value: "CONSERVATIVE", label: "보수적 (목표치 그대로)" },
-  { value: "BALANCED", label: "중립 (+1.0%p 여유)" },
-  { value: "AGGRESSIVE", label: "공격적 (+2.5%p 여유)" },
-];
 
 const CAGR_LOOKBACK_OPTIONS = [3, 5, 10];
 

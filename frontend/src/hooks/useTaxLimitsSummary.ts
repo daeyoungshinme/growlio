@@ -51,11 +51,13 @@ export function useTaxLimitsSummary(overview: PortfolioOverview | undefined): Ta
     parts.push(`예상세금 ${fmtKrw(taxData.total_estimated_tax_krw)}`);
   }
 
-  const warningText = taxData?.comprehensive_tax_warning
-    ? "금융소득 종합과세 대상 가능"
-    : taxData?.domestic_large_holder_warning
-      ? `국내주식 대주주요건 주의 (${fmtKrw(taxData.domestic_large_holder_excess_krw)} 초과)`
-      : null;
+  const warningText = taxData?.health_insurance_estimate.dependent_risk_warning
+    ? "건강보험 피부양자 자격 상실 위험"
+    : taxData?.comprehensive_tax_warning
+      ? "금융소득 종합과세 대상 가능"
+      : taxData?.domestic_large_holder_warning
+        ? `국내주식 대주주요건 주의 (${fmtKrw(taxData.domestic_large_holder_excess_krw)} 초과)`
+        : null;
 
   return { parts, warningText };
 }

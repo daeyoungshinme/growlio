@@ -263,6 +263,7 @@ import InvestPlanPage from "@/pages/InvestPlanPage";
 import PortfolioPage from "@/pages/PortfolioPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import SettingsPage from "@/pages/SettingsPage";
+import NotificationSettingsPage from "@/pages/NotificationSettingsPage";
 import { useAssetManagementData } from "@/hooks/useAssetManagementData";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -397,6 +398,9 @@ describe("InvestPlanPage", () => {
         goal_initial_amount: "",
         annual_deposit_goal: "",
         retirement_target_year: "",
+        birth_year: "",
+        annual_dividend_goal: "",
+        goal_risk_tolerance: "CONSERVATIVE",
       },
       isDirty: false,
       setForm: vi.fn(),
@@ -457,15 +461,27 @@ describe("SettingsPage", () => {
     expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
   });
 
-  it("알림 발송 이력 섹션이 표시된다", () => {
-    renderPage(<SettingsPage />);
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
-    expect(screen.getByText("알림 발송 이력")).toBeInTheDocument();
-  });
-
   it("DART API Key 입력 필드가 있다", () => {
     renderPage(<SettingsPage />);
     expect(screen.getByText("API Key")).toBeInTheDocument();
+  });
+});
+
+// ── NotificationSettingsPage ─────────────────────────────────────────────────
+
+describe("NotificationSettingsPage", () => {
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const { api } = await import("@/api/client");
+    vi.mocked(api.get).mockResolvedValue({
+      data: { has_dart: false, user_email: "test@example.com" },
+    });
+  });
+
+  it("알림 발송 이력 섹션이 표시된다", () => {
+    renderPage(<NotificationSettingsPage />);
+    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
+    expect(screen.getByText("알림 발송 이력")).toBeInTheDocument();
   });
 });
 

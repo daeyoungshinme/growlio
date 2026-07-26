@@ -16,6 +16,7 @@ from app.limiter import limiter
 from app.models.user import User
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
+from app.services.goal_recommendation_service import age_group_from_birth_year
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
     dashboard_summary_key,
@@ -39,6 +40,7 @@ class GoalUpdate(BaseModel):
     goal_start_date: date | None = None
     goal_initial_amount: float | None = None
     annual_dividend_goal: float | None = None
+    birth_year: int | None = None
 
     @field_validator(
         "goal_amount", "annual_deposit_goal", "goal_initial_amount", "monthly_deposit_amount", "annual_dividend_goal"
@@ -61,6 +63,13 @@ class GoalUpdate(BaseModel):
     def validate_target_year(cls, v: int | None) -> int | None:
         if v is not None and v < date.today().year:
             raise ValueError("목표 연도는 현재 연도 이상이어야 합니다")
+        return v
+
+    @field_validator("birth_year")
+    @classmethod
+    def validate_birth_year(cls, v: int | None) -> int | None:
+        if v is not None and not (1900 <= v <= date.today().year):
+            raise ValueError("출생연도가 올바르지 않습니다")
         return v
 
 
@@ -181,6 +190,7 @@ class SettingsResponse(BaseModel):
     goal_cagr_lookback_years: int = 10
     goal_short_term_equity_floor_pct: float = 80.0
     age_group: AgeGroup | None = None
+    birth_year: int | None = None
     # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
     # 1건당 거래대금 안전장치 상한을 안내하기 위해 노출한다 (app/services/rebalancing/order_builder.py 참고).
     auto_rebalancing_max_order_value_krw: float = 50_000_000.0
@@ -238,6 +248,7 @@ async def get_settings(
             float(row.goal_short_term_equity_floor_pct) if row.goal_short_term_equity_floor_pct else 80.0
         ),
         age_group=AgeGroup(row.age_group) if row.age_group else None,
+        birth_year=row.birth_year,
         auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
         auto_rebalancing_daily_value_cap_krw=(
             float(row.auto_rebalancing_daily_value_cap_krw)
@@ -304,6 +315,9 @@ async def update_goal(
         row.goal_initial_amount = req.goal_initial_amount
     if req.annual_dividend_goal is not None:
         row.annual_dividend_goal = req.annual_dividend_goal
+    if req.birth_year is not None:
+        row.birth_year = req.birth_year
+        row.age_group = age_group_from_birth_year(req.birth_year).value
     await db.commit()
     cache = await get_cache_store()
     await invalidate_user_caches(cache, dashboard_summary_key(current_user.id))

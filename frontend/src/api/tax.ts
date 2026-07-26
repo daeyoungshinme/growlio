@@ -50,6 +50,15 @@ export interface GeumtSimulation {
   };
 }
 
+export interface HealthInsuranceEstimate {
+  financial_income_for_health_insurance_krw: number;
+  threshold_krw: number;
+  dependent_risk_warning: boolean;
+  income_remaining_until_risk_krw: number;
+  estimated_monthly_premium_krw: number | null;
+  note: string;
+}
+
 export interface TaxSummary {
   year: number;
   dividend_income_krw: number;
@@ -67,6 +76,7 @@ export interface TaxSummary {
   total_fees_krw: number;
   harvesting_recommendations: HarvestingRecommendation[];
   financial_investment_tax_simulation: GeumtSimulation;
+  health_insurance_estimate: HealthInsuranceEstimate;
   note: string;
   rates: {
     dividend_tax_rate_pct: number;

@@ -213,7 +213,7 @@ describe("MarketSignalBanner", () => {
   it("shows a labeled link to the settings page to change the alert (read-only here)", async () => {
     renderBanner();
     const link = await screen.findByText("설정에서 켜기/끄기 →");
-    expect(link.getAttribute("href")).toBe("/settings?atab=시장 신호 알림");
+    expect(link.getAttribute("href")).toBe("/settings/notifications?atab=시장 신호 알림");
   });
 
   it("labels the alert status row", async () => {
@@ -221,10 +221,44 @@ describe("MarketSignalBanner", () => {
     expect(await screen.findByText("시장 위험 신호 알림")).toBeDefined();
   });
 
-  it("shows the exchange rate signal row", () => {
+  it("auto-expands the macro tier and shows the exchange rate signal row when a macro signal is elevated", () => {
+    // mockSignal.signals.us_rate_curve.sub_score is 1, so the macro group defaults open
     renderBanner();
     expect(screen.getByText("원/달러 환율")).toBeDefined();
     expect(screen.getByText(/₩1380/)).toBeDefined();
+  });
+
+  it("keeps the core tier (VIX/high-yield/employment) always visible", () => {
+    renderBanner();
+    expect(screen.getByText("VIX")).toBeDefined();
+    expect(screen.getByText("하이일드 스프레드")).toBeDefined();
+    expect(screen.getByText("고용")).toBeDefined();
+  });
+
+  it("collapses the macro tier by default when no macro signal is elevated", () => {
+    const allCalm: MarketSignalResponse = {
+      ...mockSignal,
+      signals: {
+        ...mockSignal.signals,
+        us_rate_curve: { ...mockSignal.signals.us_rate_curve!, sub_score: 0 },
+      },
+    };
+    renderBanner(allCalm);
+    expect(screen.queryByText("원/달러 환율")).toBeNull();
+    expect(screen.getByText(/매크로 지표 5개 더보기/)).toBeDefined();
+  });
+
+  it("expands the macro tier when the 더보기 toggle is clicked", () => {
+    const allCalm: MarketSignalResponse = {
+      ...mockSignal,
+      signals: {
+        ...mockSignal.signals,
+        us_rate_curve: { ...mockSignal.signals.us_rate_curve!, sub_score: 0 },
+      },
+    };
+    renderBanner(allCalm);
+    fireEvent.click(screen.getByText(/매크로 지표 5개 더보기/));
+    expect(screen.getByText("원/달러 환율")).toBeDefined();
   });
 });
 

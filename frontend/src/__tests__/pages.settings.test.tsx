@@ -39,7 +39,6 @@ vi.mock("@/hooks/useLogout", () => ({
 }));
 
 vi.mock("@/api/alerts", () => ({
-  fetchAlertHistory: vi.fn().mockResolvedValue([]),
   fetchRebalancingAlerts: vi.fn().mockResolvedValue([]),
 }));
 
@@ -47,27 +46,6 @@ vi.mock("@/utils/toast", () => ({
   toast: vi.fn(),
 }));
 
-// Heavy sub-sections
-vi.mock("@/components/settings/ExchangeRateAlertSection", () => ({
-  ExchangeRateAlertSection: () => (
-    <div data-testid="exchange-rate-alert-section">ExchangeRateAlertSection</div>
-  ),
-}));
-vi.mock("@/components/settings/StockPriceAlertSection", () => ({
-  StockPriceAlertSection: () => (
-    <div data-testid="stock-price-alert-section">StockPriceAlertSection</div>
-  ),
-}));
-vi.mock("@/components/settings/MarketSignalAlertSection", () => ({
-  MarketSignalAlertSection: () => (
-    <div data-testid="market-signal-alert-section">MarketSignalAlertSection</div>
-  ),
-}));
-vi.mock("@/components/settings/NotificationEmailSection", () => ({
-  NotificationEmailSection: ({ userEmail }: { userEmail?: string }) => (
-    <div data-testid="notification-email-section">{userEmail ?? "no-email"}</div>
-  ),
-}));
 vi.mock("@/components/settings/DeleteAccountModal", () => ({
   default: ({ onClose }: { onClose: () => void }) => (
     <div data-testid="delete-account-modal">
@@ -86,7 +64,6 @@ vi.mock("@/components/settings/ChangePasswordModal", () => ({
 import SettingsPage from "@/pages/SettingsPage";
 import { api } from "@/api/client";
 import { toast } from "@/utils/toast";
-import { fetchAlertHistory } from "@/api/alerts";
 import { useAuthStore } from "@/stores/authStore";
 
 const mockSettings = {
@@ -128,15 +105,12 @@ function renderSettings() {
 describe("SettingsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // useCollapsible이 localStorage로 접힘 상태를 영속화하므로, 알림 그룹 카드를 여닫는 테스트 간
-    // 상태가 새지 않도록 매 테스트 시작 시 초기화한다.
     localStorage.clear();
     vi.mocked(api.get).mockImplementation((url: string) => {
       if (url === "/settings") return Promise.resolve({ data: mockSettings });
       if (url === "/assets") return Promise.resolve({ data: [] });
       return Promise.resolve({ data: {} });
     });
-    vi.mocked(fetchAlertHistory).mockResolvedValue([]);
     useAuthStore.setState({
       isAuthenticated: true,
       userId: "user-1",
@@ -164,11 +138,15 @@ describe("SettingsPage", () => {
     await waitFor(() => {
       expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
     });
-    expect(screen.getByTestId("exchange-rate-alert-section")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "주가 알림" }));
+  });
+
+  it("알림 설정 카드에 요약과 딥링크를 표시한다", async () => {
+    renderSettings();
     await waitFor(() => {
-      expect(screen.getByTestId("stock-price-alert-section")).toBeInTheDocument();
+      expect(screen.getByText(/정기 3개 중 .+개 · 즉시 1개 중 .+개 켜짐/)).toBeInTheDocument();
     });
+    const notificationLink = screen.getByText("알림 설정").closest("a");
+    expect(notificationLink).toHaveAttribute("href", "/settings/notifications");
   });
 
   it("DART 안내 문구에 opendart.fss.or.kr 발급 링크를 표시한다", async () => {
@@ -226,132 +204,6 @@ describe("SettingsPage", () => {
     });
     expect(screen.getByText("목표 2개 설정됨")).toBeInTheDocument();
     expect(screen.getByText("공격적 · 후보 2개")).toBeInTheDocument();
-  });
-
-  it("목표 달성 알림 토글을 클릭하면 설정을 저장한다", async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByText("즉시 알림")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /즉시 알림/ }));
-    await waitFor(() => {
-      expect(screen.getByText("목표 달성 알림")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "목표 달성 알림" }));
-    await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith("/settings/goal-achievement-alerts", { enabled: false });
-    });
-  });
-
-  it("월간 리포트 토글을 클릭하면 설정을 저장한다", async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByText("정기 리포트·요약")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·요약/ }));
-    await waitFor(() => {
-      expect(screen.getByText("월간 리포트")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "월간 리포트" }));
-    await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith("/settings/monthly-report-alerts", { enabled: false });
-    });
-  });
-
-  it("추천 비중 변화 알림 토글을 클릭하면 설정을 저장한다", async () => {
-    vi.mocked(api.put).mockResolvedValue({ data: {} });
-    renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: /정기 리포트·요약/ }));
-    // mockSettings 로드 전 기본값(false)에서 클릭하는 경합을 피하기 위해 로드 완료(checked) 대기
-    await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" })).toBeChecked();
-    });
-    fireEvent.click(screen.getByRole("checkbox", { name: "추천 비중 변화 알림" }));
-    await waitFor(() => {
-      expect(api.put).toHaveBeenCalledWith("/settings/recommendation-drift-alert", {
-        enabled: false,
-      });
-    });
-  });
-
-  it("시장 모니터링 카드를 펼치면 MarketSignalAlertSection을 표시한다", async () => {
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByText("DART OpenAPI (금융감독원)")).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByRole("button", { name: /시장 모니터링/ }));
-    await waitFor(() => {
-      expect(screen.getByTestId("market-signal-alert-section")).toBeInTheDocument();
-    });
-  });
-
-  it("알림 이력이 없을 때 '발송된 알림 이력이 없습니다' 텍스트를 표시한다", async () => {
-    vi.mocked(fetchAlertHistory).mockResolvedValue([]);
-    renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
-    await waitFor(() => {
-      expect(screen.getByText("발송된 알림 이력이 없습니다.")).toBeInTheDocument();
-    });
-  });
-
-  it("알림 이력이 있을 때 목록을 표시한다", async () => {
-    const historyItems = [
-      {
-        id: "h-1",
-        alert_type: "EXCHANGE_RATE",
-        message: "환율이 1300원 이하로 떨어졌습니다",
-        created_at: "2024-06-01T10:00:00Z",
-      },
-      {
-        id: "h-2",
-        alert_type: "REBALANCING",
-        message: "리밸런싱 알림",
-        created_at: "2024-06-02T10:00:00Z",
-      },
-    ];
-    vi.mocked(fetchAlertHistory).mockResolvedValue(historyItems as never);
-    renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
-    await waitFor(() => {
-      expect(screen.getByText("환율이 1300원 이하로 떨어졌습니다")).toBeInTheDocument();
-    });
-    expect(screen.getAllByText("환율 알림").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("리밸런싱 알림").length).toBeGreaterThan(0);
-  });
-
-  it("알림 타입 레이블 매핑에 없는 알림 타입이면 원래 타입을 표시한다", async () => {
-    const historyItems = [
-      {
-        id: "h-1",
-        alert_type: "UNKNOWN_TYPE",
-        message: "알 수 없는 알림",
-        created_at: "2024-06-01T10:00:00Z",
-      },
-    ];
-    vi.mocked(fetchAlertHistory).mockResolvedValue(historyItems as never);
-    renderSettings();
-    fireEvent.click(screen.getByRole("button", { name: "발송 이력" }));
-    await waitFor(() => {
-      expect(screen.getByText("UNKNOWN_TYPE")).toBeInTheDocument();
-    });
-  });
-
-  it("STOCK_PRICE 알림 타입 레이블을 올바르게 표시한다", async () => {
-    const historyItems = [
-      {
-        id: "h-1",
-        alert_type: "STOCK_PRICE",
-        message: "주가 알림 메시지",
-        created_at: "2024-06-01T10:00:00Z",
-      },
-    ];
-    vi.mocked(fetchAlertHistory).mockResolvedValue(historyItems as never);
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByText("주가 알림")).toBeInTheDocument();
-    });
   });
 
   it("has_dart가 true이면 삭제 버튼을 표시한다", async () => {
@@ -434,15 +286,5 @@ describe("SettingsPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "modal-close" }));
     expect(screen.queryByTestId("delete-account-modal")).not.toBeInTheDocument();
-  });
-
-  it("NotificationEmailSection에 user_email을 전달한다", async () => {
-    vi.mocked(api.get).mockResolvedValue({
-      data: { ...mockSettings, user_email: "test@test.com" },
-    });
-    renderSettings();
-    await waitFor(() => {
-      expect(screen.getByTestId("notification-email-section")).toHaveTextContent("test@test.com");
-    });
   });
 });

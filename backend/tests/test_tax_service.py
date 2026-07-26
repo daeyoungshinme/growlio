@@ -10,6 +10,7 @@ import pytest
 from app.services.tax_service import (
     _build_harvesting_recommendations,
     _calc_dividend_income,
+    _calc_health_insurance_estimate,
     _calc_total_fees,
     _get_rates,
     get_tax_summary,
@@ -129,6 +130,7 @@ class TestGetTaxSummary:
             "tax_deferred_value_krw",
             "harvesting_recommendations",
             "financial_investment_tax_simulation",
+            "health_insurance_estimate",
             "note",
             "rates",
         ]
@@ -326,6 +328,45 @@ class TestGetTaxSummary:
             result = await get_tax_summary(user_id, 2024, mock_db)
 
         assert result["year"] == 2024
+
+
+# ── _calc_health_insurance_estimate ──────────────────────────
+
+
+class TestCalcHealthInsuranceEstimate:
+    """건강보험 피부양자 자격상실 위험 추정 순수 로직 검증."""
+
+    def test_under_threshold_no_warning(self, override_settings):
+        """배당소득이 2000만원 미만이면 경고 없고 남은 여유 금액을 반환한다."""
+        result = _calc_health_insurance_estimate(5_000_000.0)
+
+        assert result["dependent_risk_warning"] is False
+        assert result["income_remaining_until_risk_krw"] == 15_000_000.0
+        assert result["estimated_monthly_premium_krw"] is None
+        assert result["threshold_krw"] == 20_000_000.0
+
+    def test_at_threshold_triggers_warning(self, override_settings):
+        """배당소득이 2000만원 이상이면 경고와 예상 월 보험료를 반환한다."""
+        result = _calc_health_insurance_estimate(20_000_000.0)
+
+        assert result["dependent_risk_warning"] is True
+        assert result["income_remaining_until_risk_krw"] == 0.0
+        assert result["estimated_monthly_premium_krw"] is not None
+        assert result["estimated_monthly_premium_krw"] > 0
+
+    def test_estimated_monthly_premium_formula(self, override_settings):
+        """월 보험료 = (배당소득 - 336만원) / 12 × 7.09% × (1 + 12.95%)."""
+        dividend_income = 30_000_000.0
+        result = _calc_health_insurance_estimate(dividend_income)
+
+        taxable = dividend_income - 3_360_000.0
+        expected = round((taxable / 12) * 0.0709 * 1.1295, 0)
+        assert result["estimated_monthly_premium_krw"] == expected
+
+    def test_note_present(self, override_settings):
+        """항상 제약 고지 note를 포함한다."""
+        result = _calc_health_insurance_estimate(0.0)
+        assert "참고" in result["note"]
 
 
 # ── _calc_total_fees / _calc_dividend_income DB 헬퍼 ────────

@@ -111,7 +111,7 @@ cd backend && uv run mypy app/
 - `AssetSnapshot` — 일별 계좌 스냅샷(자산 금액 집계용). `(account_id, snapshot_date)` unique constraint
 - `Position` — 계좌 보유 포지션(릴레이셔널 테이블, 과거 `AssetAccount.manual_positions`/`AssetSnapshot.positions` JSONB 패턴 대체). `snapshot_id IS NULL` → 계좌 현재 포지션, `snapshot_id NOT NULL` → 스냅샷 시점 포지션
 - `Transaction` — 입출금/배당 내역. `transaction_type` = DEPOSIT/WITHDRAWAL/DIVIDEND
-- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS), AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(`auto_rebalancing_daily_value_cap_krw`, nullable — NULL이면 무제한/기본값, `PUT /settings/auto-rebalancing-daily-cap`으로 설정)
+- `UserSettings` — KIS/키움 자격증명(AES-256 암호화 저장), 투자 목표, 연간 입금 목표, 단기 목표 추천 최소 주식비중(`goal_short_term_equity_floor_pct`), 연령대별 추천 전용 연령대(`age_group`, nullable — TWENTIES/THIRTIES/FORTIES/FIFTIES/SIXTIES_PLUS, 온보딩에서 입력한 `birth_year`로 자동 파생 가능 — `goal_recommendation_service.age_group_from_birth_year()`), AUTO 리밸런싱 유저 단위 하루 합산 거래대금 상한(`auto_rebalancing_daily_value_cap_krw`, nullable — NULL이면 무제한/기본값, `PUT /settings/auto-rebalancing-daily-cap`으로 설정)
 
 > 위는 핵심 모델만 표기 — `Portfolio`/`RebalancingExecution`/`RebalancingAlert`/`AlertHistory`/`KisToken`/`KiwoomToken` 등 전체 목록은 `app/models/` 참고.
 
@@ -205,7 +205,7 @@ services/
   ├── portfolio_history_service.py  # 포트폴리오 월별 자산 배분 이력 (portfolio_service.py에서 분리)
   ├── price_service.py        # [현재가 조회 그룹] 현재가 조회 (Yahoo Finance → KIS 우선순위). Yahoo Finance 함수는 yahoo_price.py로 분리됨
   ├── stock_search_service.py # 종목명·티커 검색 — 네이버 금융(한글)/Yahoo Finance(영문·티커) 연동 (stocks.py 라우터에서 분리)
-  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계 (연금 납입 현황은 pension_contribution_service.py로 분리됨)
+  ├── tax_service.py          # 연도별 세금 추정: 배당소득세·해외 양도세·종합과세 경계·건강보험 피부양자 자격상실 위험(배당소득 2000만원 기준, 예상 월 보험료는 이자/근로/사업소득·재산 미반영 참고 추정치) (연금 납입 현황은 pension_contribution_service.py로 분리됨)
   ├── pension_contribution_service.py # 연금저축/IRP 계좌군 세액공제 한도(600만원/900만원) 납입 현황 — tax_service.py에서 분리
   ├── isa_service.py          # ISA 계좌 의무가입 3년 만기 현황 계산 — `isa_open_date` 기준, 수동입력 누적손익(`isa_manual_cumulative_pnl_krw`) 반영
   ├── asset_aggregator.py     # 대시보드 집계 (get_dashboard_summary), XIRR·연환산 수익률·벤치마크 계산

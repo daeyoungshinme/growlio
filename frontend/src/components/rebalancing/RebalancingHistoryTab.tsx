@@ -428,7 +428,7 @@ export default function RebalancingHistoryTab() {
 
   const alertHistoryLink = (
     <Link
-      to="/settings?atab=발송 이력"
+      to="/settings/notifications?atab=발송 이력"
       className="block text-xs text-blue-600 dark:text-blue-400 hover:underline"
     >
       이 화면은 주문 실행 이력이에요 — 알림 발송 이력은 설정에서 확인 →

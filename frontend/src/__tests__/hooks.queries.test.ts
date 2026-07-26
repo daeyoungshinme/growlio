@@ -225,6 +225,9 @@ describe("useGoalSettings", () => {
       goal_initial_amount: "",
       annual_deposit_goal: "",
       retirement_target_year: "",
+      birth_year: "",
+      annual_dividend_goal: "",
+      goal_risk_tolerance: "CONSERVATIVE",
     });
   });
 

@@ -106,6 +106,7 @@ class TestGetSettings:
             goal_cagr_lookback_years=None,
             goal_short_term_equity_floor_pct=None,
             age_group="TWENTIES",
+            birth_year=1995,
             auto_rebalancing_daily_value_cap_krw=None,
         )
         db.scalar = AsyncMock(return_value=settings)
@@ -124,6 +125,7 @@ class TestGetSettings:
             assert data["goal_max_weight_pct"] == 40.0
             assert data["goal_cagr_lookback_years"] == 10
             assert data["age_group"] == "TWENTIES"
+            assert data["birth_year"] == 1995
             assert data["goal_short_term_equity_floor_pct"] == 80.0
             assert data["auto_rebalancing_max_order_value_krw"] == 50_000_000.0
             assert data["auto_rebalancing_daily_value_cap_krw"] is None
@@ -202,6 +204,63 @@ class TestUpdateGoal:
                     headers={"Authorization": "Bearer fake"},
                 )
             assert resp.status_code in (200, 422)
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_with_birth_year_derives_age_group(self, override_settings):
+        """birth_year를 보내면 age_group이 자동 파생되어 함께 저장된다(온보딩 전용)."""
+        user = _make_user()
+        db = _make_mock_db()
+        settings = SimpleNamespace(
+            goal_amount=None,
+            goal_annual_return_pct=None,
+            annual_deposit_goal=None,
+            monthly_deposit_amount=None,
+            retirement_target_year=None,
+            goal_start_date=None,
+            goal_initial_amount=None,
+            annual_dividend_goal=None,
+            birth_year=None,
+            age_group=None,
+        )
+        db.scalar = AsyncMock(return_value=settings)
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal",
+                    json={"goal_amount": 200_000_000, "retirement_target_year": 2045, "birth_year": 1995},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 200
+            assert settings.birth_year == 1995
+            assert settings.age_group == "THIRTIES"
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_rejects_invalid_birth_year(self, override_settings):
+        """미래 출생연도는 422 반환."""
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal",
+                    json={"birth_year": 3000},
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db

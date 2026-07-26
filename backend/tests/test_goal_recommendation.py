@@ -18,6 +18,7 @@ from app.services.goal_recommendation_service import (
     _optimize_goal_portfolio,
     _persist_added_candidates,
     _suggest_for_dividend_goal,
+    age_group_from_birth_year,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,
     existing_items_from_positions,
@@ -3540,6 +3541,47 @@ class TestAgeGroupProfile:
         order = ["TWENTIES", "THIRTIES", "FORTIES", "FIFTIES", "SIXTIES_PLUS"]
         floors = [_AGE_GROUP_PROFILE[key][4] for key in order]
         assert floors == sorted(floors)
+
+
+class TestAgeGroupFromBirthYear:
+    """출생연도 → `_AGE_GROUP_PROFILE` 조회용 연령대 파생(`age_group_from_birth_year`) — 온보딩에서
+    실제 나이를 입력받아 기존 연령대 버킷 로직에 매핑하는 헬퍼."""
+
+    def _current_year(self) -> int:
+        from datetime import UTC, datetime
+
+        return datetime.now(UTC).year
+
+    def test_twenties(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 25).value == "TWENTIES"
+
+    def test_thirties(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 35).value == "THIRTIES"
+
+    def test_forties(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 45).value == "FORTIES"
+
+    def test_fifties(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 55).value == "FIFTIES"
+
+    def test_sixties_plus(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 65).value == "SIXTIES_PLUS"
+
+    def test_boundary_ages_snap_to_next_bucket(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 30).value == "THIRTIES"
+        assert age_group_from_birth_year(year - 40).value == "FORTIES"
+        assert age_group_from_birth_year(year - 50).value == "FIFTIES"
+        assert age_group_from_birth_year(year - 60).value == "SIXTIES_PLUS"
+
+    def test_under_twenty_clamps_to_twenties(self):
+        year = self._current_year()
+        assert age_group_from_birth_year(year - 10).value == "TWENTIES"
 
 
 class TestGetAgeBasedRecommendation:

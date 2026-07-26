@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus, RefreshCw, Settings2, Target } from "lucide-react";
+import { ArrowRight, Plus, Settings2, Target } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   fetchAgeGoalRecommendation,
@@ -31,15 +31,11 @@ import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
-import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBadge";
-import RecommendationApplySection from "@/components/rebalancing/RecommendationApplySection";
-import RecommendationWeightList from "@/components/rebalancing/RecommendationWeightList";
-import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
+import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
 import {
   buildWeightDiffRows,
   computeRecommendationDrift,
   hasSignificantDrift,
-  type RecommendationDrift,
 } from "@/utils/recommendationDrift";
 
 const HORIZON_ORDER: InvestmentHorizon[] = ["SHORT_TERM", "MID_TERM", "LONG_TERM"];
@@ -69,13 +65,6 @@ function normalizeWeights(items: GoalRecommendationItem[]): PortfolioItem[] {
   const diff = Math.round((100 - normalized.reduce((s, i) => s + i.weight, 0)) * 10) / 10;
   if (normalized.length > 0 && diff !== 0) normalized[normalized.length - 1].weight += diff;
   return normalized;
-}
-
-function driftBadgeLabel(drift: RecommendationDrift): string {
-  const parts: string[] = [];
-  if (drift.maxDeltaPct > 0) parts.push(`최대 ${drift.maxDeltaPct}%p 차이`);
-  if (drift.newCandidateCount > 0) parts.push(`신규 후보 ${drift.newCandidateCount}개`);
-  return `시장 상황이 바뀌어 추천 비중이 달라졌어요 · ${parts.join(" · ")}`;
 }
 
 function MetricCompareCell({
@@ -174,17 +163,6 @@ function RecommendationComparisonPreview({
         />
       </div>
     </div>
-  );
-}
-
-/** 마지막으로 적용한 목표 비중과 지금 다시 계산한 추천 비중을 비교해 유의미하게 달라졌을 때만
- * 노출되는 배지 — 사용자가 화면을 열 때마다 직접 비교하지 않아도 되도록 한다. */
-function RecommendationDriftBadge({ drift }: { drift: RecommendationDrift }) {
-  return (
-    <p className="text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1.5">
-      <RefreshCw size={12} className="shrink-0" />
-      {driftBadgeLabel(drift)}
-    </p>
   );
 }
 
@@ -471,48 +449,32 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       ` 예상 변동성은 연 ${overallData.expected_volatility_pct.toFixed(1)}%입니다.`}
                   </p>
 
-                  {overallDrift && hasSignificantDrift(overallDrift) && (
-                    <RecommendationDriftBadge drift={overallDrift} />
-                  )}
-
-                  <RecommendationWeightList items={overallData.recommended_items} />
-
-                  {overallData.note && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 flex items-center gap-1.5 flex-wrap">
-                      {(overallData.market_signal_level === "YELLOW" ||
-                        overallData.market_signal_level === "RED") && (
-                        <MarketSignalLevelBadge level={overallData.market_signal_level} />
-                      )}
-                      {overallData.note}
-                    </p>
-                  )}
-
-                  <SuggestedCandidatesBlock
-                    candidates={overallData.suggested_candidates}
-                    onAdd={() => addSuggestedMutation.mutate(overallData.suggested_candidates)}
-                    isPending={addSuggestedMutation.isPending}
-                  />
-
-                  <p className="text-xs text-teal-500 dark:text-teal-500 pt-1">
-                    등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
-                  </p>
-
-                  <RecommendationApplySection
-                    targetPortfolios={targetPortfolios}
-                    selectedTargetId={selectedOverallTargetId}
-                    onSelectTarget={setSelectedOverallTargetId}
-                    onApplyClick={() => setConfirmOpen(true)}
-                    applyPending={applyOverallMutation.isPending}
-                    noTargetMessage="포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요."
-                    onCreatePortfolio={
-                      onCreatePortfolio
+                  <RecommendationResultPanel
+                    drift={overallDrift && hasSignificantDrift(overallDrift) ? overallDrift : null}
+                    items={overallData.recommended_items}
+                    note={overallData.note}
+                    marketSignalLevel={overallData.market_signal_level}
+                    suggestedCandidates={overallData.suggested_candidates}
+                    onAddSuggested={() =>
+                      addSuggestedMutation.mutate(overallData.suggested_candidates)
+                    }
+                    addPending={addSuggestedMutation.isPending}
+                    applySection={{
+                      targetPortfolios,
+                      selectedTargetId: selectedOverallTargetId,
+                      onSelectTarget: setSelectedOverallTargetId,
+                      onApplyClick: () => setConfirmOpen(true),
+                      applyPending: applyOverallMutation.isPending,
+                      noTargetMessage:
+                        "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                      onCreatePortfolio: onCreatePortfolio
                         ? () =>
                             onCreatePortfolio(
                               normalizeWeights(overallData.recommended_items),
                               "추천 포트폴리오",
                             )
-                        : undefined
-                    }
+                        : undefined,
+                    }}
                   />
                 </>
               ) : (
@@ -551,55 +513,38 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                       ` · 예상 변동성 연 ${ageData.expected_volatility_pct.toFixed(1)}%`}
                   </p>
 
-                  {ageDrift && hasSignificantDrift(ageDrift) && (
-                    <RecommendationDriftBadge drift={ageDrift} />
-                  )}
-
-                  <RecommendationWeightList items={ageData.recommended_items} />
-
-                  {ageData.includes_cash_equivalent && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
-                      현금성 자산(CMA·파킹통장 등) 합성 비중이 포함되어 있어요 — 실제 계좌와 연결해
-                      목표 비중에 반영해주세요.
-                    </p>
-                  )}
-
-                  {ageData.note && (
-                    <p className="text-xs text-amber-600 dark:text-amber-500 pt-1 flex items-center gap-1.5 flex-wrap">
-                      {(ageData.market_signal_level === "YELLOW" ||
-                        ageData.market_signal_level === "RED") && (
-                        <MarketSignalLevelBadge level={ageData.market_signal_level} />
-                      )}
-                      {ageData.note}
-                    </p>
-                  )}
-
-                  <SuggestedCandidatesBlock
-                    candidates={ageData.suggested_candidates}
-                    onAdd={() => addSuggestedMutation.mutate(ageData.suggested_candidates)}
-                    isPending={addSuggestedMutation.isPending}
-                  />
-
-                  <p className="text-xs text-teal-500 dark:text-teal-500 pt-1">
-                    등록한 후보 종목 기준 참고용 제안 — 자동 반영되지 않습니다.
-                  </p>
-
-                  <RecommendationApplySection
-                    targetPortfolios={targetPortfolios}
-                    selectedTargetId={selectedOverallTargetId}
-                    onSelectTarget={setSelectedOverallTargetId}
-                    onApplyClick={() => setConfirmOpen(true)}
-                    applyPending={applyAgeMutation.isPending}
-                    noTargetMessage="포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요."
-                    onCreatePortfolio={
-                      onCreatePortfolio
+                  <RecommendationResultPanel
+                    drift={ageDrift && hasSignificantDrift(ageDrift) ? ageDrift : null}
+                    items={ageData.recommended_items}
+                    note={ageData.note}
+                    marketSignalLevel={ageData.market_signal_level}
+                    extraNoticeAfterWeightList={
+                      ageData.includes_cash_equivalent ? (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          현금성 자산(CMA·파킹통장 등) 합성 비중이 포함되어 있어요 — 실제 계좌와
+                          연결해 목표 비중에 반영해주세요.
+                        </p>
+                      ) : undefined
+                    }
+                    suggestedCandidates={ageData.suggested_candidates}
+                    onAddSuggested={() => addSuggestedMutation.mutate(ageData.suggested_candidates)}
+                    addPending={addSuggestedMutation.isPending}
+                    applySection={{
+                      targetPortfolios,
+                      selectedTargetId: selectedOverallTargetId,
+                      onSelectTarget: setSelectedOverallTargetId,
+                      onApplyClick: () => setConfirmOpen(true),
+                      applyPending: applyAgeMutation.isPending,
+                      noTargetMessage:
+                        "포트폴리오 탭에서 기준 포트폴리오를 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                      onCreatePortfolio: onCreatePortfolio
                         ? () =>
                             onCreatePortfolio(
                               normalizeWeights(ageData.recommended_items),
                               "연령대별 추천 포트폴리오",
                             )
-                        : undefined
-                    }
+                        : undefined,
+                    }}
                   />
                 </>
               ) : (
@@ -628,83 +573,70 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                 ` · 예상 변동성 연 ${activeHorizonRec.expected_volatility_pct.toFixed(1)}%`}
             </p>
 
-            {horizonDrift && hasSignificantDrift(horizonDrift) && (
-              <RecommendationDriftBadge drift={horizonDrift} />
-            )}
-
             {activeHorizonRec.recommended_items.length > 0 ? (
-              <>
-                <RecommendationWeightList items={activeHorizonRec.recommended_items} />
-                {activeHorizonRec.note && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5 flex-wrap">
-                    {(activeHorizonRec.market_signal_level === "YELLOW" ||
-                      activeHorizonRec.market_signal_level === "RED") && (
-                      <MarketSignalLevelBadge level={activeHorizonRec.market_signal_level} />
-                    )}
-                    {activeHorizonRec.note}
-                  </p>
-                )}
-                <SuggestedCandidatesBlock
-                  candidates={activeHorizonRec.suggested_candidates}
-                  onAdd={() => addSuggestedMutation.mutate(activeHorizonRec.suggested_candidates)}
-                  isPending={addSuggestedMutation.isPending}
-                />
-              </>
+              <RecommendationResultPanel
+                drift={horizonDrift && hasSignificantDrift(horizonDrift) ? horizonDrift : null}
+                items={activeHorizonRec.recommended_items}
+                note={activeHorizonRec.note}
+                marketSignalLevel={activeHorizonRec.market_signal_level}
+                suggestedCandidates={activeHorizonRec.suggested_candidates}
+                onAddSuggested={() =>
+                  addSuggestedMutation.mutate(activeHorizonRec.suggested_candidates)
+                }
+                addPending={addSuggestedMutation.isPending}
+                extraNoticeBeforeApply={
+                  activeHorizonRec.includes_cash_equivalent &&
+                  cashEquivalentMatches.length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-teal-200 dark:border-teal-800/50">
+                      현금성 자산(CMA·파킹통장 등)이 포함된 추천이에요 — 계좌 관리에서 CMA/파킹통장
+                      계좌에 "{INVESTMENT_HORIZON_LABELS[effectiveTab]}" 기간 태그를 지정하면 자동
+                      적용할 수 있어요.
+                    </p>
+                  ) : undefined
+                }
+                applySection={
+                  activeHorizonRec.includes_cash_equivalent && cashEquivalentMatches.length === 0
+                    ? null
+                    : {
+                        targetPortfolios: horizonTargetPortfolio ? [horizonTargetPortfolio] : [],
+                        selectedTargetId: horizonTargetPortfolio?.id ?? "",
+                        onSelectTarget: () => {},
+                        onApplyClick: () => setConfirmOpen(true),
+                        applyPending: applyHorizonMutation.isPending,
+                        noTargetMessage:
+                          "포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요.",
+                        extraCopyBeforeButtons: activeHorizonRec.includes_cash_equivalent ? (
+                          <p className="text-xs text-teal-600 dark:text-teal-500">
+                            현금성 자산 반영을 위해{" "}
+                            {cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가
+                            포트폴리오에 자동으로 연결됩니다.
+                          </p>
+                        ) : undefined,
+                        onCreatePortfolio: onCreatePortfolio
+                          ? () =>
+                              onCreatePortfolio(
+                                normalizeWeights(activeHorizonRec.recommended_items),
+                                `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
+                                [
+                                  ...stockAccounts
+                                    .filter(
+                                      (a) =>
+                                        a.investment_horizon === effectiveTab &&
+                                        a.tax_type === activeTaxType,
+                                    )
+                                    .map((a) => a.id),
+                                  ...cashEquivalentMatches.map((a) => a.id),
+                                ],
+                              )
+                          : undefined,
+                      }
+                }
+              />
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {activeHorizonRec.note ?? "추천을 계산할 수 없습니다"}
               </p>
             )}
-
-            {activeHorizonRec.recommended_items.length > 0 &&
-              activeHorizonRec.includes_cash_equivalent &&
-              cashEquivalentMatches.length === 0 && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-teal-200 dark:border-teal-800/50">
-                  현금성 자산(CMA·파킹통장 등)이 포함된 추천이에요 — 계좌 관리에서 CMA/파킹통장
-                  계좌에 "{INVESTMENT_HORIZON_LABELS[effectiveTab]}" 기간 태그를 지정하면 자동
-                  적용할 수 있어요.
-                </p>
-              )}
-
-            {activeHorizonRec.recommended_items.length > 0 &&
-              (!activeHorizonRec.includes_cash_equivalent || cashEquivalentMatches.length > 0) && (
-                <RecommendationApplySection
-                  targetPortfolios={horizonTargetPortfolio ? [horizonTargetPortfolio] : []}
-                  selectedTargetId={horizonTargetPortfolio?.id ?? ""}
-                  onSelectTarget={() => {}}
-                  onApplyClick={() => setConfirmOpen(true)}
-                  applyPending={applyHorizonMutation.isPending}
-                  noTargetMessage="포트폴리오 탭에서 이 기간·계좌유형에 해당하는 계좌를 태그하고 기준 포트폴리오로 지정하면 추천 비중을 바로 적용할 수 있어요."
-                  extraCopyBeforeButtons={
-                    activeHorizonRec.includes_cash_equivalent ? (
-                      <p className="text-xs text-teal-600 dark:text-teal-500">
-                        현금성 자산 반영을 위해{" "}
-                        {cashEquivalentMatches.map((a) => a.name).join(", ")} 계좌가 포트폴리오에
-                        자동으로 연결됩니다.
-                      </p>
-                    ) : undefined
-                  }
-                  onCreatePortfolio={
-                    onCreatePortfolio
-                      ? () =>
-                          onCreatePortfolio(
-                            normalizeWeights(activeHorizonRec.recommended_items),
-                            `${INVESTMENT_HORIZON_LABELS[effectiveTab]} 추천 포트폴리오`,
-                            [
-                              ...stockAccounts
-                                .filter(
-                                  (a) =>
-                                    a.investment_horizon === effectiveTab &&
-                                    a.tax_type === activeTaxType,
-                                )
-                                .map((a) => a.id),
-                              ...cashEquivalentMatches.map((a) => a.id),
-                            ],
-                          )
-                      : undefined
-                  }
-                />
-              )}
           </>
         ) : null}
 

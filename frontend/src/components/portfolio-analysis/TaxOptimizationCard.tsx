@@ -17,6 +17,8 @@ interface TaxOptimizationCardProps {
 
 /** 종합과세 기준까지 이 금액 이하로 남으면 "곧 근접" 경고를 보여준다 */
 const COMPREHENSIVE_TAX_NEAR_THRESHOLD_KRW = 5_000_000;
+/** 건강보험 피부양자 자격상실 기준까지 이 금액 이하로 남으면 "곧 근접" 경고를 보여준다 */
+const HEALTH_INSURANCE_NEAR_THRESHOLD_KRW = 5_000_000;
 
 export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardProps = {}) {
   const currentYear = new Date().getFullYear();
@@ -106,6 +108,36 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                   </div>
                 )
               )}
+            </div>
+          )}
+
+          {(taxData.health_insurance_estimate.dependent_risk_warning ||
+            taxData.health_insurance_estimate.income_remaining_until_risk_krw <=
+              HEALTH_INSURANCE_NEAR_THRESHOLD_KRW) && (
+            <div className="space-y-1">
+              {taxData.health_insurance_estimate.dependent_risk_warning ? (
+                <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                  <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-red-700 dark:text-red-400">
+                    배당소득(2,000만원 기준)이 건강보험 피부양자 자격상실 기준을 초과했습니다.
+                    지역가입자 전환 시 예상 월 보험료는 약{" "}
+                    {fmtKrw(taxData.health_insurance_estimate.estimated_monthly_premium_krw ?? 0)}
+                    입니다.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    배당소득(건강보험 피부양자 기준)이 자격상실 기준(2,000만원)까지{" "}
+                    {fmtKrw(taxData.health_insurance_estimate.income_remaining_until_risk_krw)}{" "}
+                    남았습니다.
+                  </p>
+                </div>
+              )}
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 pl-1">
+                {taxData.health_insurance_estimate.note}
+              </p>
             </div>
           )}
 

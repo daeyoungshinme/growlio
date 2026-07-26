@@ -58,6 +58,14 @@ const emptyTaxSummary: TaxSummary = {
   total_fees_krw: 0,
   harvesting_recommendations: [],
   financial_investment_tax_simulation: {} as TaxSummary["financial_investment_tax_simulation"],
+  health_insurance_estimate: {
+    financial_income_for_health_insurance_krw: 0,
+    threshold_krw: 20_000_000,
+    dependent_risk_warning: false,
+    income_remaining_until_risk_krw: 20_000_000,
+    estimated_monthly_premium_krw: null,
+    note: "",
+  },
   note: "",
   rates: { dividend_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
 };
@@ -168,6 +176,24 @@ describe("TaxLimitsBanner", () => {
       "href",
       "/assets?tab=투자현황&portfolioTab=세금",
     );
+  });
+
+  it("건강보험 피부양자 자격상실 위험이 있으면 종합과세 경고보다 우선 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue({
+      ...emptyTaxSummary,
+      comprehensive_tax_warning: true,
+      health_insurance_estimate: {
+        ...emptyTaxSummary.health_insurance_estimate,
+        dependent_risk_warning: true,
+        income_remaining_until_risk_krw: 0,
+        estimated_monthly_premium_krw: 150_000,
+      },
+    });
+
+    renderBanner(<TaxLimitsBanner overview={makeOverview([])} />);
+    expect(await screen.findByText("건강보험 피부양자 자격 상실 위험")).toBeInTheDocument();
+    expect(screen.queryByText("금융소득 종합과세 대상 가능")).toBeNull();
   });
 
   it("ISA/연금 계좌가 없어도 예상 세금이 있으면 배너를 렌더링한다", async () => {

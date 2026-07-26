@@ -1,20 +1,34 @@
-import { useEffect, type Dispatch, type SetStateAction } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Modal from "@/components/common/Modal";
 import FormInput from "@/components/common/FormInput";
-import { fetchPortfolioOverviewLite } from "@/api/portfolios";
+import { fetchPortfolioOverviewLite, createPortfolio } from "@/api/portfolios";
 import { fetchGoalFeasibility } from "@/api/invest";
+import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
+import type { GoalRiskTolerance } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { RISK_TOLERANCE_OPTIONS } from "@/constants/goalRiskTolerance";
 import { fmtKrw, fmtKrwPreview, fmtPct } from "@/utils/format";
 import { classifyGoalFeasibility } from "@/utils/goalFeasibility";
+import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import { invalidatePortfolioData } from "@/utils/queryInvalidation";
 import type { GoalForm } from "@/hooks/useGoalSettings";
 
-const STEP_TITLES = ["현재 자산 확인", "목표 금액과 시점", "월 적립액", "결과 확인"];
+const STEP_TITLES = [
+  "현재 자산 확인",
+  "목표 금액과 시점",
+  "월 적립액",
+  "결과 확인",
+  "투자성향·배당목표",
+  "추천 포트폴리오",
+];
 const TOTAL_STEPS = STEP_TITLES.length;
+const RECOMMENDATION_STEP = 6;
 
 // 백엔드 DEPOSIT_GUIDE_PRESET_RETURNS_PCT(4/7/10%)와 배열 순서로 매칭되는 표시용 레이블
 const DEPOSIT_GUIDE_PRESET_LABELS = ["보수적", "중립", "공격적"];
@@ -29,10 +43,14 @@ interface Props {
   onClose: () => void;
 }
 
-/** 목표를 처음 설정하는 사용자를 위한 4단계 가이드 — 필요 연수익률과 필요 적립액을 스스로
+/** 목표를 처음 설정하는 사용자를 위한 6단계 가이드 — 필요 연수익률과 필요 적립액을 스스로
  * 지어내지 않도록 `/invest/goal-feasibility`로 역산해 보여준다. 3단계(월 적립액)는 가정
  * 수익률 프리셋별 필요 월/연 적립액을, 4단계(결과 확인)는 입력한 적립액 기준 필요 연수익률을
- * 계산해 각각 기본값으로 제안한다. 기존 플랫 편집 모달(InvestPlanPage.tsx)은 재설정용으로
+ * 계산해 각각 기본값으로 제안한다. 5단계(투자성향·배당목표)는 출생연도·리스크 성향·배당목표를
+ * 추가로 받아 6단계 진입 시 자동 저장(`onSave`)한 뒤 `/rebalancing/goal-recommendation`(전체
+ * 자산 기준 목표 역산 추천)을 조회해 보여주고, "이 추천으로 포트폴리오 만들기"를 누르면 그
+ * 비중 그대로 신규 Portfolio를 생성한다(계좌 연결 없는 가상 목표비중 — `RecommendationCard`의
+ * "새 포트폴리오 만들기"와 동일한 개념). 기존 플랫 편집 모달(InvestPlanPage.tsx)은 재설정용으로
  * 별도 유지되며 이 컴포넌트를 대체하지 않는다. */
 export default function GoalSettingWizard({
   form,
@@ -102,6 +120,61 @@ export default function GoalSettingWizard({
 
   const canProceed = step !== 2 || (goalAmountNum > 0 && targetYearNum > 0);
   const band = feasibility ? classifyGoalFeasibility(feasibility.required_return_pct) : null;
+
+  // 6단계(추천 포트폴리오) 진입 시 1회 자동 저장 — 재진입(이전→다음) 시 값이 바뀌었을 수 있으므로
+  // step이 6에서 벗어났다가 다시 들어올 때마다 다시 트리거한다. onSave(=saveSettings)는
+  // 매 렌더 새 함수 참조라 effect deps에 직접 넣으면 무한 재실행되므로 ref로 최신값만 참조한다.
+  const onSaveRef = useRef(onSave);
+  useEffect(() => {
+    onSaveRef.current = onSave;
+  }, [onSave]);
+  const enteredRecommendationStepRef = useRef(false);
+  const [settingsPersisted, setSettingsPersisted] = useState(false);
+  const prevSavingRef = useRef(saving);
+
+  useEffect(() => {
+    if (step === RECOMMENDATION_STEP && !enteredRecommendationStepRef.current) {
+      enteredRecommendationStepRef.current = true;
+      setSettingsPersisted(false);
+      onSaveRef.current();
+    } else if (step !== RECOMMENDATION_STEP) {
+      enteredRecommendationStepRef.current = false;
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (prevSavingRef.current && !saving && enteredRecommendationStepRef.current) {
+      setSettingsPersisted(true);
+    }
+    prevSavingRef.current = saving;
+  }, [saving]);
+
+  const queryClient = useQueryClient();
+  const { data: recommendation, isLoading: recommendationLoading } = useQuery({
+    queryKey: QUERY_KEYS.goalRecommendationOverall,
+    queryFn: fetchOverallGoalRecommendation,
+    enabled: step === RECOMMENDATION_STEP && settingsPersisted,
+    staleTime: 0,
+  });
+
+  const createPortfolioMutation = useMutation({
+    mutationFn: () =>
+      createPortfolio({
+        name: "추천 포트폴리오",
+        items: (recommendation?.recommended_items ?? []).map((item) => ({
+          ticker: item.ticker,
+          name: item.name,
+          market: item.market,
+          weight: item.weight,
+        })),
+      }),
+    onSuccess: async () => {
+      toast("추천 포트폴리오가 생성되었습니다", "success");
+      await invalidatePortfolioData(queryClient);
+      onClose();
+    },
+    onError: (e) => toast(extractErrorMessage(e), "error"),
+  });
 
   return (
     <Modal title={`목표 설정 가이드 (${step}/${TOTAL_STEPS})`} onClose={onClose} size="md">
@@ -320,6 +393,136 @@ export default function GoalSettingWizard({
           </div>
         )}
 
+        {step === 5 && (
+          <div className="space-y-3">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              이 정보를 바탕으로 다음 단계에서 맞춤 포트폴리오를 추천해드려요. 모두 선택 입력이라
+              건너뛰어도 괜찮아요.
+            </p>
+            <FormInput
+              label="출생연도"
+              type="number"
+              inputMode="numeric"
+              value={form.birth_year}
+              onChange={(e) => setForm((f) => ({ ...f, birth_year: e.target.value }))}
+              placeholder="1990"
+              hint="연령대에 맞는 주식비중 상/하한을 함께 고려합니다"
+            />
+            <div>
+              <label
+                htmlFor="goal-wizard-risk-tolerance"
+                className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1"
+              >
+                투자성향
+              </label>
+              <select
+                id="goal-wizard-risk-tolerance"
+                value={form.goal_risk_tolerance}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    goal_risk_tolerance: e.target.value as GoalRiskTolerance,
+                  }))
+                }
+                className="w-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {RISK_TOLERANCE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">
+                목표 달성에 필요한 최소 수익률보다 더 높은 수익률을 목표로 삼을수록 변동성도
+                커집니다.
+              </p>
+            </div>
+            <FormInput
+              label="연간 배당목표 (원)"
+              type="number"
+              inputMode="numeric"
+              value={form.annual_dividend_goal}
+              onChange={(e) => setForm((f) => ({ ...f, annual_dividend_goal: e.target.value }))}
+              placeholder="3000000"
+              preview={
+                form.annual_dividend_goal
+                  ? fmtKrwPreview(Number(form.annual_dividend_goal))
+                  : undefined
+              }
+              hint="설정하면 추천 포트폴리오가 배당수익률도 함께 고려합니다"
+            />
+          </div>
+        )}
+
+        {step === RECOMMENDATION_STEP && (
+          <div className="space-y-3">
+            {(!settingsPersisted || recommendationLoading) && (
+              <div className="flex items-center gap-2 text-xs text-gray-400 dark:text-gray-500">
+                <Loader2 size={14} className="animate-spin" /> 추천 포트폴리오를 계산하고 있어요...
+              </div>
+            )}
+            {settingsPersisted && recommendation && recommendation.recommended_items.length > 0 && (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">기대수익률</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+                      {recommendation.expected_return_pct != null
+                        ? fmtPct(recommendation.expected_return_pct)
+                        : "—"}
+                    </p>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800">
+                    <p className="text-xs text-gray-500 dark:text-gray-400">예상 변동성</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+                      {recommendation.expected_volatility_pct != null
+                        ? fmtPct(recommendation.expected_volatility_pct)
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {recommendation.recommended_items.map((item) => (
+                    <div
+                      key={`${item.ticker}-${item.market}`}
+                      className="flex items-center justify-between text-xs p-2 rounded-lg bg-gray-50 dark:bg-gray-800"
+                    >
+                      <span className="text-gray-700 dark:text-gray-300">
+                        {item.name || item.ticker}
+                      </span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-50">
+                        {item.weight.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {recommendation.note && (
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{recommendation.note}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => createPortfolioMutation.mutate()}
+                  disabled={createPortfolioMutation.isPending}
+                  className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} w-full flex items-center justify-center gap-1.5 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+                >
+                  {createPortfolioMutation.isPending && (
+                    <Loader2 size={14} className="animate-spin" />
+                  )}
+                  이 추천으로 포트폴리오 만들기
+                </button>
+              </div>
+            )}
+            {settingsPersisted &&
+              recommendation &&
+              recommendation.recommended_items.length === 0 && (
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {recommendation.note ??
+                    "추천을 계산하지 못했습니다 — 나중에 리밸런싱 탭에서 다시 시도해보세요"}
+                </p>
+              )}
+          </div>
+        )}
+
         <div className="flex gap-3 pt-2">
           {step > 1 && (
             <button
@@ -337,16 +540,16 @@ export default function GoalSettingWizard({
               onClick={() => setStep((s) => s + 1)}
               className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
             >
+              {/* 5단계(마지막 입력 단계)의 "다음"이 실제 저장 트리거 — 6단계 진입 시 자동 저장된다 */}
               다음
             </button>
           ) : (
             <button
               type="button"
-              onClick={onSave}
-              disabled={saving}
-              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors`}
+              onClick={onClose}
+              className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} flex-1 px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
             >
-              {saving ? "저장 중..." : "저장하고 시작하기"}
+              완료
             </button>
           )}
         </div>

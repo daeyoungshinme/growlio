@@ -46,6 +46,9 @@ class UserSettings(Base):
     annual_dividend_goal: Mapped[float | None] = mapped_column(Numeric(18, 2), nullable=True)
     # 연령대별 목표 역산 추천 전용 — 사용자가 직접 선택한 연령대(20대/30대/40대/50대/60대 이상)
     age_group: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # 출생연도 — 온보딩에서 실제 나이를 입력받아 age_group을 자동 파생하는 데 사용
+    # (goal_recommendation_service.age_group_from_birth_year)
+    birth_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 목표 역산 추천 엔진에 병합할 사용자 등록 후보 ETF (RECOMMENDATION_UNIVERSE 외 추가분, 최대 10개)
     goal_candidate_tickers: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
     # 목표 역산 추천 엔진 파라미터 (사용자 조정 가능, NULL이면 기존 하드코딩 기본값 사용 — 하위호환)

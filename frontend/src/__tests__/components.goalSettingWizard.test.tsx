@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor, fireEvent } from "@testing-library/react";
+import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
 import { renderWithProviders } from "@/test/renderWithProviders";
@@ -8,13 +8,20 @@ import type { GoalForm } from "@/hooks/useGoalSettings";
 
 const fetchPortfolioOverviewLite = vi.fn();
 const fetchGoalFeasibility = vi.fn();
+const fetchOverallGoalRecommendation = vi.fn();
+const createPortfolio = vi.fn();
 
 vi.mock("@/api/portfolios", () => ({
   fetchPortfolioOverviewLite: (...args: unknown[]) => fetchPortfolioOverviewLite(...args),
+  createPortfolio: (...args: unknown[]) => createPortfolio(...args),
 }));
 
 vi.mock("@/api/invest", () => ({
   fetchGoalFeasibility: (...args: unknown[]) => fetchGoalFeasibility(...args),
+}));
+
+vi.mock("@/api/rebalancing", () => ({
+  fetchOverallGoalRecommendation: (...args: unknown[]) => fetchOverallGoalRecommendation(...args),
 }));
 
 const EMPTY_FORM: GoalForm = {
@@ -25,29 +32,35 @@ const EMPTY_FORM: GoalForm = {
   goal_initial_amount: "",
   annual_deposit_goal: "",
   retirement_target_year: "",
+  birth_year: "",
+  annual_dividend_goal: "",
+  goal_risk_tolerance: "CONSERVATIVE",
 };
 
 function Harness({
   initialStep = 1,
   initialForm = EMPTY_FORM,
-  onSave = vi.fn(),
+  onSaveImpl,
   onClose = vi.fn(),
 }: {
   initialStep?: number;
   initialForm?: GoalForm;
-  onSave?: () => void;
+  /** 저장 트리거 감지 로직(5단계→6단계 진입 시 자동 저장, saving true→false 전환 감지)을
+   * 테스트하려면 실제 saving 상태를 흉내내야 하므로, 호출측이 setSaving을 받아 직접 제어한다. */
+  onSaveImpl?: (setSaving: (v: boolean) => void) => void;
   onClose?: () => void;
 }) {
   const [form, setForm] = useState<GoalForm>(initialForm);
   const [step, setStep] = useState(initialStep);
+  const [saving, setSaving] = useState(false);
   return (
     <GoalSettingWizard
       form={form}
       setForm={setForm}
       step={step}
       setStep={setStep}
-      saving={false}
-      onSave={onSave}
+      saving={saving}
+      onSave={() => onSaveImpl?.(setSaving)}
       onClose={onClose}
     />
   );
@@ -65,10 +78,13 @@ describe("GoalSettingWizard", () => {
   beforeEach(() => {
     fetchPortfolioOverviewLite.mockReset();
     fetchGoalFeasibility.mockReset();
+    fetchOverallGoalRecommendation.mockReset();
+    createPortfolio.mockReset();
     fetchPortfolioOverviewLite.mockResolvedValue({
       total_assets_krw: 100_000_000,
       asset_type_allocation: [],
     });
+    createPortfolio.mockResolvedValue({ id: "new-portfolio" });
   });
 
   it("1단계: 현재 자산 힌트를 표시한다", async () => {
@@ -197,22 +213,84 @@ describe("GoalSettingWizard", () => {
     });
   });
 
-  it("저장 버튼을 누르면 onSave가 호출된다", async () => {
-    const onSave = vi.fn();
-    fetchGoalFeasibility.mockResolvedValue({
+  it("5단계: 출생연도·투자성향·배당목표를 입력할 수 있다", () => {
+    renderWizard({ initialStep: 5 });
+    fireEvent.change(screen.getByLabelText("출생연도"), { target: { value: "1990" } });
+    fireEvent.change(screen.getByLabelText("투자성향"), { target: { value: "AGGRESSIVE" } });
+    fireEvent.change(screen.getByLabelText("연간 배당목표 (원)"), {
+      target: { value: "3000000" },
+    });
+    expect(screen.getByLabelText("출생연도")).toHaveValue(1990);
+    expect(screen.getByLabelText("투자성향")).toHaveValue("AGGRESSIVE");
+    expect(screen.getByLabelText("연간 배당목표 (원)")).toHaveValue(3000000);
+  });
+
+  it("6단계 진입 시 onSave가 자동으로 1회 호출된다", () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(undefined);
+    const onSaveImpl = vi.fn();
+    renderWizard({ initialStep: 6, onSaveImpl });
+    expect(onSaveImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("6단계: 저장이 완료되면 추천 포트폴리오를 조회해 보여주고, 포트폴리오 만들기 버튼으로 생성한다", async () => {
+    fetchOverallGoalRecommendation.mockResolvedValue({
+      generated_at: "2026-07-26T00:00:00Z",
+      is_configured: true,
       required_return_pct: 7,
-      pv: 100_000_000,
-      n_months: 12,
+      required_dividend_yield_pct: null,
+      recommended_items: [
+        {
+          ticker: "069500",
+          name: "KODEX 200",
+          market: "KOSPI",
+          weight: 100,
+          dividend_yield_pct: null,
+        },
+      ],
+      expected_return_pct: 8,
+      expected_dividend_yield_pct: null,
+      expected_volatility_pct: 12,
       note: null,
-      deposit_guide: [],
+      cagr_lookback_years: 10,
+      risk_tolerance: "CONSERVATIVE",
+      max_weight_pct: 40,
+      market_signal_level: null,
+      suggested_candidates: [],
     });
-    renderWizard({
-      initialStep: 4,
-      onSave,
-      initialForm: { ...EMPTY_FORM, goal_amount: "500000000", retirement_target_year: "2045" },
+    let capturedSetSaving: ((v: boolean) => void) | null = null;
+    const onSaveImpl = vi.fn((setSaving: (v: boolean) => void) => {
+      capturedSetSaving = setSaving;
+      setSaving(true);
     });
-    fireEvent.click(screen.getByRole("button", { name: /저장/ }));
-    expect(onSave).toHaveBeenCalled();
+    renderWizard({ initialStep: 6, onSaveImpl });
+    expect(screen.getByText(/추천 포트폴리오를 계산하고 있어요/)).toBeInTheDocument();
+
+    act(() => {
+      capturedSetSaving?.(false);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("KODEX 200")).toBeInTheDocument();
+    });
+    expect(screen.getByText("100.0%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "이 추천으로 포트폴리오 만들기" }));
+    await waitFor(() => {
+      expect(createPortfolio).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "추천 포트폴리오",
+          items: [{ ticker: "069500", name: "KODEX 200", market: "KOSPI", weight: 100 }],
+        }),
+      );
+    });
+  });
+
+  it("6단계: 완료 버튼을 누르면 onClose가 호출된다", () => {
+    fetchOverallGoalRecommendation.mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    renderWizard({ initialStep: 6, onSaveImpl: vi.fn(), onClose });
+    fireEvent.click(screen.getByRole("button", { name: "완료" }));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("이전 버튼으로 단계를 되돌릴 수 있다", () => {

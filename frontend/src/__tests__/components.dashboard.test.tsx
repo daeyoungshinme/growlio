@@ -38,6 +38,14 @@ const emptyTaxSummary: TaxSummary = {
   total_fees_krw: 0,
   harvesting_recommendations: [],
   financial_investment_tax_simulation: {} as TaxSummary["financial_investment_tax_simulation"],
+  health_insurance_estimate: {
+    financial_income_for_health_insurance_krw: 0,
+    threshold_krw: 20_000_000,
+    dependent_risk_warning: false,
+    income_remaining_until_risk_krw: 20_000_000,
+    estimated_monthly_premium_krw: null,
+    note: "",
+  },
   note: "",
   rates: { dividend_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
 };

@@ -30,6 +30,7 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const AssetsPage = lazy(() => import("./pages/AssetsPage"));
 const InvestPlanPage = lazy(() => import("./pages/InvestPlanPage"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
+const NotificationSettingsPage = lazy(() => import("./pages/NotificationSettingsPage"));
 const RebalancingPage = lazy(() => import("./pages/RebalancingPage"));
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -86,6 +87,10 @@ function AppRoutes() {
           <Route path="assets" element={<LazyRoute Component={AssetsPage} />} />
           <Route path="invest-plan" element={<LazyRoute Component={InvestPlanPage} />} />
           <Route path="settings" element={<LazyRoute Component={SettingsPage} />} />
+          <Route
+            path="settings/notifications"
+            element={<LazyRoute Component={NotificationSettingsPage} />}
+          />
           <Route path="rebalancing" element={<LazyRoute Component={RebalancingPage} />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>

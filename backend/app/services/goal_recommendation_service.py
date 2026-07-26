@@ -197,6 +197,25 @@ BALANCED/AGGRESSIVE(20~40대)는 프론티어 보간을 위한 등식 제약(목
 트레이드오프다."""
 
 
+def age_group_from_birth_year(birth_year: int) -> AgeGroup:
+    """출생연도로부터 `_AGE_GROUP_PROFILE` 조회에 쓰이는 10년 단위 연령대를 파생한다.
+
+    온보딩에서 사용자가 실제 나이(출생연도)를 입력하면 이 함수로 기존 `age_group` 버킷에
+    매핑해 저장한다 — `get_age_based_recommendation` 등 기존 연령대 기반 로직을 그대로 재사용하기
+    위함(신규 계산 경로를 만들지 않음). 20세 미만은 TWENTIES로, 60세 이상은 SIXTIES_PLUS로 clamp한다.
+    """
+    age = datetime.now(UTC).year - birth_year
+    if age < 30:
+        return AgeGroup.TWENTIES
+    if age < 40:
+        return AgeGroup.THIRTIES
+    if age < 50:
+        return AgeGroup.FORTIES
+    if age < 60:
+        return AgeGroup.FIFTIES
+    return AgeGroup.SIXTIES_PLUS
+
+
 def _cash_equivalent_daily_returns() -> list[float]:
     """변동성 0으로 가정한 합성 일별수익률 시계열 — MVO 공분산 계산에 참여시키기 위함."""
     return [_CASH_EQUIVALENT_CAGR_PCT / 100 / _CASH_EQUIVALENT_RETURN_DAYS] * _CASH_EQUIVALENT_RETURN_DAYS

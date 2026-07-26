@@ -48,6 +48,7 @@ export interface SettingsData {
   goal_cagr_lookback_years: number;
   goal_short_term_equity_floor_pct: number;
   age_group: AgeGroup | null;
+  birth_year: number | null;
   auto_rebalancing_max_order_value_krw: number;
   auto_rebalancing_daily_value_cap_krw: number | null;
 }

@@ -1,16 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
-import type { IsaStatusSummary } from "@/api/tax";
+import type { IsaStatusSummary, TaxSummary } from "@/api/tax";
 import type { PortfolioOverview } from "@/types";
 
 const fetchIsaStatus = vi.fn();
 const fetchPensionContribution = vi.fn();
 const fetchPortfolioOverviewLite = vi.fn();
+const fetchTaxSummary = vi.fn();
 
 vi.mock("@/api/tax", () => ({
   fetchIsaStatus: (...args: unknown[]) => fetchIsaStatus(...args),
   fetchPensionContribution: (...args: unknown[]) => fetchPensionContribution(...args),
+  fetchTaxSummary: (...args: unknown[]) => fetchTaxSummary(...args),
 }));
 
 vi.mock("@/api/portfolios", () => ({
@@ -35,18 +37,67 @@ function makeOverview(
 
 const emptyIsa: IsaStatusSummary = { accounts: [], note: "" };
 
+const emptyTaxSummary: TaxSummary = {
+  year: 2026,
+  dividend_income_krw: 0,
+  dividend_tax_krw: 0,
+  overseas_unrealized_gain_krw: 0,
+  overseas_gain_deduction_krw: 0,
+  overseas_tax_estimated_krw: 0,
+  domestic_stock_value_krw: 0,
+  domestic_unrealized_gain_krw: 0,
+  domestic_large_holder_warning: false,
+  domestic_large_holder_excess_krw: 0,
+  comprehensive_tax_warning: false,
+  comprehensive_tax_remaining_krw: 20_000_000,
+  total_estimated_tax_krw: 0,
+  total_fees_krw: 0,
+  harvesting_recommendations: [],
+  financial_investment_tax_simulation: {} as TaxSummary["financial_investment_tax_simulation"],
+  health_insurance_estimate: {
+    financial_income_for_health_insurance_krw: 0,
+    threshold_krw: 20_000_000,
+    dependent_risk_warning: false,
+    income_remaining_until_risk_krw: 20_000_000,
+    estimated_monthly_premium_krw: null,
+    note: "참고용 추정치입니다.",
+  },
+  note: "",
+  rates: { dividend_tax_rate_pct: 15.4, overseas_tax_rate_pct: 22 },
+};
+
 describe("TaxLimitsSection", () => {
-  it("ISA/연금 계좌가 하나도 없으면 안내 문구를 표시한다", async () => {
+  it("ISA/연금 계좌가 없어도 건강보험 카드는 항상 표시한다", async () => {
     fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
     fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([{ tax_type: "GENERAL" }]));
     renderWithProviders(<TaxLimitsSection />);
     await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
-    expect(
-      await screen.findByText("ISA·연금저축/IRP 계좌가 없어 한도 현황이 없습니다."),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/건강보험 피부양자 기준/)).toBeInTheDocument();
+    expect(screen.queryByText("ISA 만기·세제 현황")).toBeNull();
+    expect(screen.queryByText(/연금저축·IRP 납입 현황/)).toBeNull();
+  });
+
+  it("배당소득이 자격상실 기준을 넘으면 예상 월 보험료를 표시한다", async () => {
+    fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue({
+      ...emptyTaxSummary,
+      health_insurance_estimate: {
+        ...emptyTaxSummary.health_insurance_estimate,
+        financial_income_for_health_insurance_krw: 25_000_000,
+        dependent_risk_warning: true,
+        income_remaining_until_risk_krw: 0,
+        estimated_monthly_premium_krw: 150_000,
+      },
+    });
+    fetchPortfolioOverviewLite.mockResolvedValue(makeOverview([]));
+
+    renderWithProviders(<TaxLimitsSection />);
+    expect(await screen.findByText(/예상 월 보험료 약/)).toBeInTheDocument();
   });
 
   it("ISA 계좌가 있으면 IsaMaturityCard를 곧바로(접기 없이) 렌더한다", async () => {
+    fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
     fetchIsaStatus.mockResolvedValue({
       accounts: [
         {
@@ -75,6 +126,7 @@ describe("TaxLimitsSection", () => {
 
   it("연금저축 태그 계좌가 있으면 PensionContributionCard를 곧바로 렌더한다", async () => {
     fetchIsaStatus.mockResolvedValue(emptyIsa);
+    fetchTaxSummary.mockResolvedValue(emptyTaxSummary);
     fetchPensionContribution.mockResolvedValue({
       year: 2026,
       pension_savings_deposit_krw: 3_000_000,

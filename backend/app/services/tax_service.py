@@ -22,6 +22,11 @@ _DOMESTIC_LARGE_HOLDER_THRESHOLD = 1_000_000_000
 _COMPREHENSIVE_TAX_THRESHOLD = 20_000_000
 _GEUMT_EXCESS_THRESHOLD = 300_000_000  # 금투세 누진 구간 기준 3억
 
+_HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW = 20_000_000  # 건강보험 피부양자 자격유지 금융소득 기준
+_HEALTH_INSURANCE_REGIONAL_DEDUCTION_KRW = 3_360_000  # 지역가입자 전환 시 소득 기본공제
+_HEALTH_INSURANCE_RATE = 0.0709  # 건강보험료율 (2025년 기준 — 매년 변경되므로 갱신 필요)
+_LONG_TERM_CARE_RATE_OF_PREMIUM = 0.1295  # 장기요양보험료율 (건강보험료 대비 비율)
+
 
 class _GeuMTRates(TypedDict):
     standard_pct: float
@@ -153,6 +158,43 @@ def _simulate_geumt_tax(overseas_gain: float, domestic_gain: float, rates: _TaxR
     }
 
 
+class HealthInsuranceEstimate(TypedDict):
+    financial_income_for_health_insurance_krw: float
+    threshold_krw: float
+    dependent_risk_warning: bool
+    income_remaining_until_risk_krw: float
+    estimated_monthly_premium_krw: float | None
+    note: str
+
+
+def _calc_health_insurance_estimate(dividend_income: float) -> HealthInsuranceEstimate:
+    """건강보험 피부양자 자격상실 위험 추정 (배당소득 기준 근사치).
+
+    이자소득은 추적하지 않아 배당소득만으로 근사하며, 실제 부과액에 필요한
+    근로/사업/기타소득·재산은 반영하지 않는다 — 참고용 추정치.
+    """
+    warning = dividend_income >= _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW
+    remaining = max(0.0, _HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW - dividend_income)
+
+    estimated_monthly_premium: float | None = None
+    if warning:
+        taxable_income = max(0.0, dividend_income - _HEALTH_INSURANCE_REGIONAL_DEDUCTION_KRW)
+        monthly_premium = (taxable_income / 12) * _HEALTH_INSURANCE_RATE * (1 + _LONG_TERM_CARE_RATE_OF_PREMIUM)
+        estimated_monthly_premium = round(monthly_premium, 0)
+
+    return {
+        "financial_income_for_health_insurance_krw": round(dividend_income, 0),
+        "threshold_krw": float(_HEALTH_INSURANCE_DEPENDENT_THRESHOLD_KRW),
+        "dependent_risk_warning": warning,
+        "income_remaining_until_risk_krw": round(remaining, 0),
+        "estimated_monthly_premium_krw": estimated_monthly_premium,
+        "note": (
+            "이자소득·근로/사업소득·재산은 반영되지 않은 배당소득 기준 참고 추정치입니다. "
+            "실제 부과액과 다를 수 있습니다."
+        ),
+    }
+
+
 async def get_tax_summary(
     user_id: uuid.UUID, year: int, db: AsyncSession, account_id: uuid.UUID | None = None
 ) -> dict[str, Any]:
@@ -162,6 +204,7 @@ async def get_tax_summary(
     - 해외 양도세: 미실현 손익 기준 추정치 (250만원 공제 후 22%)
     - 국내 양도세: 대주주 요건(10억) 초과 시 경고
     - 금융소득 종합과세 경계(2000만원) 경고
+    - 건강보험 피부양자 자격상실 위험(배당소득 2000만원 기준) + 예상 월 보험료 참고 추정치
     - 연간 거래 수수료 합계 (fee 컬럼)
     """
     rates = _get_rates(year)
@@ -187,6 +230,7 @@ async def get_tax_summary(
     positions = await get_overseas_positions_detail(user_id, db, account_id)
     harvesting = _build_harvesting_recommendations(positions, overseas_gain_taxable, rates)
     geumt_simulation = _simulate_geumt_tax(overseas_unrealized, domestic_unrealized, rates)
+    health_insurance_estimate = _calc_health_insurance_estimate(dividend_income)
 
     return {
         "year": year,
@@ -206,6 +250,7 @@ async def get_tax_summary(
         "tax_deferred_value_krw": round(tax_deferred_value_krw, 0),
         "harvesting_recommendations": harvesting,
         "financial_investment_tax_simulation": geumt_simulation,
+        "health_insurance_estimate": health_insurance_estimate,
         "note": (
             "해외 주식 양도세는 현재 미실현 손익 기준 추정치입니다. 실제 납부액은 실현 손익 기준으로 계산됩니다. "
             "ISA/연금저축/IRP 계좌 보유분은 과세이연되어 위 추정에서 제외되었습니다."
