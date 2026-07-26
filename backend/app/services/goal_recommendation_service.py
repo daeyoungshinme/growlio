@@ -116,14 +116,17 @@ from app.services.price_service import get_historical_returns
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS, RECOMMENDATION_UNIVERSE
 from app.services.yahoo_price import _yfinance_sem, to_yf_symbol
 from app.utils.cache_keys import (
+    TTL_GOAL_CANDIDATE_DIVIDEND_YIELD,
     TTL_GOAL_RECOMMENDATION,
     CacheStoreType,
     get_cached_json,
+    goal_candidate_dividend_yield_key,
     goal_recommendation_age_key,
     goal_recommendation_horizon_key,
     goal_recommendation_key,
     set_cached_json,
 )
+from app.utils.inproc_lock import single_flight_fetch
 
 logger = structlog.get_logger()
 
@@ -293,17 +296,31 @@ def compute_recommendation_drift(
     return round(max_delta_pct, 1), new_candidate_count
 
 
-async def _fetch_dividend_yields(candidates: list[tuple[str, str]]) -> dict[tuple[str, str], float]:
-    """후보 종목의 배당수익률(%)을 실시간 조회한다.
+async def _fetch_dividend_yields(
+    cache: CacheStoreType, candidates: list[tuple[str, str]]
+) -> dict[tuple[str, str], float]:
+    """후보 종목의 배당수익률(%)을 조회한다.
 
     `api/v1/rebalancing.py`의 `_collect_dividend_map`과 동일한 소스(Naver/Yahoo)를 쓰되,
     임의의 후보 티커 목록(포트폴리오 미보유 큐레이션 ETF 포함)을 대상으로 한다는 점이 다르다.
+
+    ticker+market 단위로 `TTL_GOAL_CANDIDATE_DIVIDEND_YIELD`(1시간) 전역 캐시를 공유한다 —
+    유저별 요청마다 반복 조회할 필요가 없어, 첫 콜드 계산 이후에는 모든 유저·추천 경로
+    (전체/기간별/연령대별)가 캐시를 재사용해 Naver/Yahoo 실시간 스크래핑 호출을 건너뛴다.
+    배당수익률이 0인 종목도 그대로 캐싱한다 — 재조회 자체를 막는 게 목적이라, 매 콜드미스마다
+    무배당 종목을 다시 스크래핑하는 낭비를 없앤다(원본 필터링 동작은 `result` 포함 여부로 유지).
     """
     loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(_DIVIDEND_FETCH_CONCURRENCY)
     result: dict[tuple[str, str], float] = {}
 
     async def _fetch_one(ticker: str, market: str) -> None:
+        cache_key = goal_candidate_dividend_yield_key(ticker, market)
+        cached = await get_cached_json(cache, cache_key)
+        if cached is not None:
+            if cached.get("yield_pct", 0.0) > 0:
+                result[(ticker, market)] = cached["yield_pct"]
+            return
         try:
             async with sem:
                 if market.upper() in DOMESTIC_MARKETS:
@@ -315,8 +332,10 @@ async def _fetch_dividend_yields(candidates: list[tuple[str, str]]) -> dict[tupl
                     info = await loop.run_in_executor(None, fn, ticker)
                 else:
                     info = await loop.run_in_executor(None, sync_yahoo_dividend_info, to_yf_symbol(ticker, market))
-            if info["dividend_yield"] > 0:
-                result[(ticker, market)] = info["dividend_yield"] * 100
+            yield_pct = info["dividend_yield"] * 100
+            await set_cached_json(cache, cache_key, {"yield_pct": yield_pct}, TTL_GOAL_CANDIDATE_DIVIDEND_YIELD)
+            if yield_pct > 0:
+                result[(ticker, market)] = yield_pct
         except Exception as e:
             logger.warning("goal_recommendation_dividend_fetch_failed", ticker=ticker, market=market, error=str(e))
 
@@ -338,6 +357,7 @@ def _attach_dividend_yield(
 
 
 async def _suggest_for_dividend_goal(
+    cache: CacheStoreType,
     candidate_dicts: list[dict[str, str]],
     required_dividend_yield_pct: float | None,
     expected_dividend_yield_pct: float | None,
@@ -403,7 +423,7 @@ async def _suggest_for_dividend_goal(
         return constraint is not None
 
     tickers_only = [(c["ticker"], c["market"]) for c in candidate_dicts]
-    dividend_map = await _fetch_dividend_yields(tickers_only)
+    dividend_map = await _fetch_dividend_yields(cache, tickers_only)
     if not unreachable and _achievable(candidate_dicts, dividend_map):
         # 이미 달성 + 등록 후보만으로 개선 목표(search_target)까지도 달성 가능 — 제안 불필요
         return [], None, status
@@ -417,7 +437,7 @@ async def _suggest_for_dividend_goal(
     if not pool or capacity_remaining <= 0:
         return [], None, status
 
-    pool_dividend_map = await _fetch_dividend_yields([(c["ticker"], c["market"]) for c in pool])
+    pool_dividend_map = await _fetch_dividend_yields(cache, [(c["ticker"], c["market"]) for c in pool])
     pool_sorted = sorted(pool, key=lambda c: pool_dividend_map.get((c["ticker"], c["market"]), 0.0), reverse=True)
     combined_dividend_map = {**dividend_map, **pool_dividend_map}
 
@@ -464,20 +484,38 @@ async def get_goal_recommendation(
     `recommended_items`가 비어 있는 결과(목표 미설정·달성불가·후보부족·Yahoo 서킷브레이커 등으로
     시세 데이터 조회 실패 등)는 캐싱하지 않는다 — 이런 실패는 대부분 일시적 외부 API 장애이며,
     캐싱하면 다음 요청부터 서킷브레이커가 복구된 뒤에도 TTL 동안 계속 같은 실패를 반환하게 된다.
+
+    콜드 캐시(TTL 만료·재배포 직후)에서 동일 유저의 요청이 동시에 여러 건 들어오면(다중 기기/탭,
+    axios 타임아웃 후 재시도 등) `single_flight_fetch`로 한 건만 실제 계산하고 나머지는 그 결과를
+    기다린다 — 안 그러면 무거운 SLSQP+외부API 계산이 동시에 중복 실행되어 서로의 응답을 더 늦춘다.
     """
     user_id = getattr(settings_row, "user_id", None)
-    if user_id is not None:
-        cached = await get_cached_json(cache, goal_recommendation_key(user_id))
-        if cached is not None:
-            return GoalRecommendation(**cached)
 
-    result = await _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
+    async def _fetch_and_cache() -> GoalRecommendation:
+        result = await _compute_goal_recommendation(cache, base_krw, existing_items, settings_row, db)
+        if user_id is not None and result.recommended_items:
+            await set_cached_json(
+                cache, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
+            )
+        return result
 
-    if user_id is not None and result.recommended_items:
-        await set_cached_json(
-            cache, goal_recommendation_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
-        )
-    return result
+    if user_id is None:
+        return await _fetch_and_cache()
+
+    cache_key = goal_recommendation_key(user_id)
+
+    async def _read_cache() -> GoalRecommendation | None:
+        cached = await get_cached_json(cache, cache_key)
+        return GoalRecommendation(**cached) if cached is not None else None
+
+    cached = await _read_cache()
+    if cache is not None and cached is not None:
+        return cached
+
+    if cache is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
 def _resolve_asset_goal_return_pct(
@@ -621,6 +659,7 @@ async def _compute_goal_recommendation(
         if user_id is None:
             return [], None, None
         return await _suggest_for_dividend_goal(
+            cache,
             computed_candidates,
             required_dividend_yield_pct,
             expected_dividend_yield_pct,
@@ -634,7 +673,7 @@ async def _compute_goal_recommendation(
 
     cagr_map, dividend_map, market_signal_level = await asyncio.gather(
         get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-        _fetch_dividend_yields(tickers_only),
+        _fetch_dividend_yields(cache, tickers_only),
         _fetch_market_signal_level(cache),
     )
 
@@ -786,7 +825,7 @@ async def _build_horizon_result(
     cagr_map, dividend_map = (
         await asyncio.gather(
             get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-            _fetch_dividend_yields(tickers_only),
+            _fetch_dividend_yields(cache, tickers_only),
         )
         if tickers_only
         else ({}, {})
@@ -955,18 +994,30 @@ async def get_horizon_recommendations(
     걸려 시세 데이터를 못 가져온 경우) 응답 전체를 캐싱하지 않는다 — 15개 조합이 하나의 캐시
     키로 묶여 있어, 그대로 캐싱하면 일시적으로 실패한 조합 하나 때문에 나머지 정상 조합까지
     TTL 동안 통째로 그 실패 상태를 계속 반환하게 된다.
+
+    콜드 캐시에서 동일 유저의 동시 요청은 `single_flight_fetch`로 한 건만 실제 계산한다 — 이
+    경로는 최대 15콤보를 동시 실행하는 가장 무거운 계산이라 중복 실행을 막는 효과가 특히 크다.
     """
-    cached = await get_cached_json(cache, goal_recommendation_horizon_key(user_id))
-    if cached is not None:
-        return HorizonRecommendationResponse(**cached)
+    cache_key = goal_recommendation_horizon_key(user_id)
 
-    result = await _compute_horizon_recommendations(cache, db, user_id, settings_row)
+    async def _read_cache() -> HorizonRecommendationResponse | None:
+        cached = await get_cached_json(cache, cache_key)
+        return HorizonRecommendationResponse(**cached) if cached is not None else None
 
-    if all(rec.recommended_items for rec in result.recommendations):
-        await set_cached_json(
-            cache, goal_recommendation_horizon_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
-        )
-    return result
+    cached = await _read_cache()
+    if cache is not None and cached is not None:
+        return cached
+
+    async def _fetch_and_cache() -> HorizonRecommendationResponse:
+        result = await _compute_horizon_recommendations(cache, db, user_id, settings_row)
+        if all(rec.recommended_items for rec in result.recommendations):
+            await set_cached_json(cache, cache_key, result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION)
+        return result
+
+    if cache is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
 async def _compute_horizon_recommendations(
@@ -1148,6 +1199,7 @@ async def _compute_horizon_recommendations(
         eligible_candidates = combo[4]
         market_filter = combo[6]
         suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+            cache,
             eligible_candidates,
             required_dividend_yield_pct,
             result.expected_dividend_yield_pct,
@@ -1176,18 +1228,28 @@ async def get_age_based_recommendation(
 
     무효화 조건은 `get_goal_recommendation`/`get_horizon_recommendations`와 동일 —
     `invalidate_goal_recommendation_caches()`가 `age_group` 변경(설정 저장) 시에도 함께 호출된다.
+    콜드 캐시에서 동일 유저의 동시 요청은 `single_flight_fetch`로 한 건만 실제 계산한다.
     """
-    cached = await get_cached_json(cache, goal_recommendation_age_key(user_id))
-    if cached is not None:
-        return GoalRecommendation(**cached)
+    cache_key = goal_recommendation_age_key(user_id)
 
-    result = await _compute_age_based_recommendation(cache, db, user_id, settings_row)
+    async def _read_cache() -> GoalRecommendation | None:
+        cached = await get_cached_json(cache, cache_key)
+        return GoalRecommendation(**cached) if cached is not None else None
 
-    if result.recommended_items:
-        await set_cached_json(
-            cache, goal_recommendation_age_key(user_id), result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION
-        )
-    return result
+    cached = await _read_cache()
+    if cache is not None and cached is not None:
+        return cached
+
+    async def _fetch_and_cache() -> GoalRecommendation:
+        result = await _compute_age_based_recommendation(cache, db, user_id, settings_row)
+        if result.recommended_items:
+            await set_cached_json(cache, cache_key, result.model_dump(mode="json"), TTL_GOAL_RECOMMENDATION)
+        return result
+
+    if cache is None:
+        return await _fetch_and_cache()
+
+    return await single_flight_fetch(cache, cache_key, _read_cache, _fetch_and_cache)
 
 
 async def _compute_age_based_recommendation(
@@ -1252,6 +1314,7 @@ async def _compute_age_based_recommendation(
         호출한다 — 조기 반환 지점은 `None`(미최적화)을 넘긴다."""
         res.age_bracket = age_bracket
         suggested, dividend_note, dividend_goal_status = await _suggest_for_dividend_goal(
+            cache,
             candidate_dicts,
             required_dividend_yield_pct,
             expected_dividend_yield_pct,
@@ -1280,7 +1343,7 @@ async def _compute_age_based_recommendation(
 
     cagr_map, dividend_map = await asyncio.gather(
         get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-        _fetch_dividend_yields(tickers_only),
+        _fetch_dividend_yields(cache, tickers_only),
     )
     filtered = [
         (
@@ -1403,7 +1466,7 @@ async def compute_portfolio_expected_metrics(
     tickers_only = [(ticker, market) for ticker, market, _name, _w in items]
     cagr_map, dividend_map = await asyncio.gather(
         get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-        _fetch_dividend_yields(tickers_only),
+        _fetch_dividend_yields(cache, tickers_only),
     )
 
     symbols = [to_yf_symbol(ticker, market) for ticker, market, _name, _w in items]

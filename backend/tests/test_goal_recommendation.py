@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import random
 import uuid
 from types import SimpleNamespace
@@ -14,6 +15,7 @@ from app.services.goal_portfolio_optimizer import compute_weighted_expected_metr
 from app.services.goal_recommendation_service import (
     _AGE_GROUP_PROFILE,
     _apply_index_region_preference,
+    _fetch_dividend_yields,
     _matches_index_region_preference,
     _optimize_goal_portfolio,
     _persist_added_candidates,
@@ -1005,7 +1007,7 @@ class TestSuggestForDividendGoal:
         ("SPY", "NYSE"): 1.3,
     }
 
-    def _dividend_side_effect(self, tickers):
+    def _dividend_side_effect(self, cache, tickers):
         return {tm: self._DIVIDEND_YIELDS[tm] for tm in tickers if tm in self._DIVIDEND_YIELDS}
 
     def _mock_fetch_dividend_yields(self):
@@ -1014,7 +1016,7 @@ class TestSuggestForDividendGoal:
     async def test_noop_when_no_dividend_goal(self):
         candidates = [{"ticker": "SPY", "name": "SPDR S&P 500 ETF", "market": "NYSE", "asset_class": "EQUITY"}]
 
-        suggested, note, status = await _suggest_for_dividend_goal(candidates, None, None, 0.4, 10)
+        suggested, note, status = await _suggest_for_dividend_goal(None, candidates, None, None, 0.4, 10)
 
         assert suggested == []
         assert note is None
@@ -1032,7 +1034,9 @@ class TestSuggestForDividendGoal:
             "app.services.goal_recommendation_service._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
-            suggested, note, status = await _suggest_for_dividend_goal(candidates, 1.0, 1.2, 0.4, capacity_remaining=10)
+            suggested, note, status = await _suggest_for_dividend_goal(
+                None, candidates, 1.0, 1.2, 0.4, capacity_remaining=10
+            )
 
         assert suggested == []
         assert note is None
@@ -1047,7 +1051,9 @@ class TestSuggestForDividendGoal:
             "app.services.goal_recommendation_service._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
-            suggested, note, status = await _suggest_for_dividend_goal(candidates, 1.0, 1.3, 0.4, capacity_remaining=10)
+            suggested, note, status = await _suggest_for_dividend_goal(
+                None, candidates, 1.0, 1.3, 0.4, capacity_remaining=10
+            )
 
         tickers = [c["ticker"] for c in suggested]
         assert tickers[0] == "JEPQ"
@@ -1065,7 +1071,9 @@ class TestSuggestForDividendGoal:
             "app.services.goal_recommendation_service._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
-            suggested, note, status = await _suggest_for_dividend_goal(candidates, 5.0, 1.3, 0.4, capacity_remaining=10)
+            suggested, note, status = await _suggest_for_dividend_goal(
+                None, candidates, 5.0, 1.3, 0.4, capacity_remaining=10
+            )
 
         tickers = [c["ticker"] for c in suggested]
         assert "SPY" not in tickers  # 이미 등록된 후보는 제안 목록에 포함되지 않음
@@ -1086,7 +1094,7 @@ class TestSuggestForDividendGoal:
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
-                candidates, 5.0, None, 0.4, capacity_remaining=10
+                None, candidates, 5.0, None, 0.4, capacity_remaining=10
             )
 
         assert status == "unreachable"
@@ -1100,7 +1108,9 @@ class TestSuggestForDividendGoal:
             "app.services.goal_recommendation_service._fetch_dividend_yields",
             self._mock_fetch_dividend_yields(),
         ):
-            suggested, note, status = await _suggest_for_dividend_goal(candidates, 5.0, 1.3, 0.4, capacity_remaining=0)
+            suggested, note, status = await _suggest_for_dividend_goal(
+                None, candidates, 5.0, 1.3, 0.4, capacity_remaining=0
+            )
 
         assert suggested == []
         assert note is None
@@ -1119,7 +1129,7 @@ class TestSuggestForDividendGoal:
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
-                candidates, 2.5, 0.0, 0.4, capacity_remaining=10, market_filter=_domestic_only
+                None, candidates, 2.5, 0.0, 0.4, capacity_remaining=10, market_filter=_domestic_only
             )
 
         tickers = {c["ticker"] for c in suggested}
@@ -1139,12 +1149,54 @@ class TestSuggestForDividendGoal:
             self._mock_fetch_dividend_yields(),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
-                candidates, 100.0, 1.3, 0.4, capacity_remaining=10
+                None, candidates, 100.0, 1.3, 0.4, capacity_remaining=10
             )
 
         assert len(suggested) > 0
         assert note is not None
         assert status == "unreachable"
+
+
+class TestFetchDividendYields:
+    """`_fetch_dividend_yields()`의 ticker+market 전역 캐시(TTL_GOAL_CANDIDATE_DIVIDEND_YIELD) —
+    캐시 히트 시 Naver/Yahoo 실시간 스크래핑을 건너뛰고, 배당수익률이 0인 종목도 재조회 방지를
+    위해 그대로 캐싱한다(반환 dict에는 기존과 동일하게 포함하지 않음)."""
+
+    async def test_cache_miss_fetches_and_stores_result(self, mock_cache):
+        with patch(
+            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+            return_value={"dividend_yield": 0.032},
+        ) as mock_yahoo:
+            result = await _fetch_dividend_yields(mock_cache, [("SPY", "NYSE")])
+
+        assert result[("SPY", "NYSE")] == pytest.approx(3.2)
+        mock_yahoo.assert_called_once()
+        mock_cache.setex.assert_awaited_once()
+        cache_key = mock_cache.setex.await_args.args[0]
+        assert "SPY" in cache_key
+        assert "NYSE" in cache_key
+
+    async def test_cache_hit_skips_external_fetch(self, mock_cache):
+        mock_cache.get = AsyncMock(return_value=json.dumps({"yield_pct": 3.2}))
+
+        with patch(
+            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+        ) as mock_yahoo:
+            result = await _fetch_dividend_yields(mock_cache, [("SPY", "NYSE")])
+
+        assert result[("SPY", "NYSE")] == 3.2
+        mock_yahoo.assert_not_called()
+        mock_cache.setex.assert_not_awaited()
+
+    async def test_zero_yield_is_cached_but_excluded_from_result(self, mock_cache):
+        with patch(
+            "app.services.goal_recommendation_service.sync_yahoo_dividend_info",
+            return_value={"dividend_yield": 0.0},
+        ):
+            result = await _fetch_dividend_yields(mock_cache, [("QQQ", "NASDAQ")])
+
+        assert result == {}
+        mock_cache.setex.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -2382,7 +2434,7 @@ class TestGetHorizonRecommendations:
             ("QQQ", "NASDAQ"): 0.6,
         }
 
-        async def _dividend_side_effect(tickers):
+        async def _dividend_side_effect(cache, tickers):
             return {tm: dividend_by_ticker[tm] for tm in tickers if tm in dividend_by_ticker}
 
         random.seed(7)
@@ -2480,7 +2532,7 @@ class TestGetHorizonRecommendations:
             "SCHD": [random.gauss(0.0005, 0.009) for _ in range(252)],
         }
 
-        async def _dividend_side_effect(tickers):
+        async def _dividend_side_effect(cache, tickers):
             return {tm: dividend_map[tm] for tm in tickers if tm in dividend_map}
 
         with (
@@ -3938,7 +3990,7 @@ class TestGetAgeBasedRecommendation:
             ("446720", "KOSPI"): 2.88,
         }
 
-        async def _dividend_side_effect(tickers):
+        async def _dividend_side_effect(cache, tickers):
             return {tm: dividend_by_ticker[tm] for tm in tickers if tm in dividend_by_ticker}
 
         user_id = uuid.uuid4()
@@ -4015,7 +4067,7 @@ class TestGetAgeBasedRecommendation:
             "SCHD": [random.gauss(0.0005, 0.009) for _ in range(252)],
         }
 
-        async def _dividend_side_effect(tickers):
+        async def _dividend_side_effect(cache, tickers):
             return {tm: dividend_map[tm] for tm in tickers if tm in dividend_map}
 
         with (
