@@ -58,7 +58,7 @@ TTL_MARKET_SIGNAL_GATE_ALERT_SENT = 86400  # 시장신호 게이트로 AUTO 계�
 TTL_DAILY_VALUE_CAP_ALERT_SENT = 86400  # 하루 합산 거래한도 게이트로 AUTO 계획 생성 보류 알림, 유저당 1일 1회
 TTL_SYNC_ALL_STATUS = 600  # "전체 갱신" 백그라운드 진행 상태 (폴링 종료 후에도 잠시 조회 가능하도록 여유)
 TTL_ETF_INDEX_REGION = 7 * 24 * 3600  # ETF 추종지수 지역(국내/해외) 7일 — 사실상 불변 데이터
-TTL_GOAL_RECOMMENDATION = 600  # 목표 역산 추천(전체/기간별) 10분 — 설정 변경 시 명시적으로 무효화됨
+TTL_GOAL_RECOMMENDATION = 3600  # 목표 역산 추천(전체/기간별) 1시간 — 프론트 staleTime과 정합, 설정 변경 시 무효화됨
 TTL_REBALANCING_ANALYSIS = 90  # 리밸런싱 진단(analyze) 응답 90초 — 포트폴리오 선택 시 자동 실행되어 재방문마다
 # 전체 파이프라인(배당·수익률·현재가 다중 조회)이 재실행되는 것을 막기 위한 단기 캐시
 TTL_OVERSEAS_STOCK_NAME = 7 * 24 * 3600  # 해외 종목 영문 캐노니컬 이름 7일 — 회사명은 사실상 불변

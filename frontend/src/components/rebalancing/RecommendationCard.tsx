@@ -29,6 +29,7 @@ import { extractErrorMessage } from "@/utils/error";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useAddSuggestedCandidates } from "@/hooks/useAddSuggestedCandidates";
 import ConfirmModal from "@/components/common/ConfirmModal";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
@@ -185,23 +186,34 @@ interface Props {
  * "전체" 탭은 목표 미설정 상태에서도 항상 노출해 설정 유도 문구를 보여준다. */
 export default function RecommendationCard({ onApplied, onCreatePortfolio }: Props) {
   const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
 
-  const { data: overallData } = useQuery({
+  const {
+    data: overallData,
+    isPending: overallPending,
+    isError: overallIsError,
+    refetch: refetchOverall,
+  } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationOverall,
     queryFn: fetchOverallGoalRecommendation,
     staleTime: STALE_TIME.LONG,
   });
 
-  const { data: horizonData } = useQuery({
+  // "기간별"/"연령대" 탭을 실제로 클릭하기 전까지는 지연 로딩 — 둘 다 MVO 최적화 + 외부
+  // 가격/배당 API 호출을 수반하는 무거운 요청이라, 탭 마운트 즉시 3개를 전부 fetch하면
+  // 모바일에서 체감 지연이 크다.
+  const { data: horizonData, isFetching: horizonFetching } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationByHorizon,
     queryFn: fetchHorizonGoalRecommendations,
     staleTime: STALE_TIME.LONG,
+    enabled: activeTab !== "전체" && activeTab !== "연령대",
   });
 
-  const { data: ageData } = useQuery({
+  const { data: ageData, isPending: agePending } = useQuery({
     queryKey: QUERY_KEYS.goalRecommendationByAge,
     queryFn: fetchAgeGoalRecommendation,
     staleTime: STALE_TIME.LONG,
+    enabled: activeTab === "연령대",
   });
 
   const { data: portfoliosRaw } = useQuery({
@@ -229,18 +241,24 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
   const candidateCount = settingsData?.goal_candidate_tickers?.length ?? 0;
 
   const horizonRecommendations = horizonData?.recommendations ?? [];
+
+  // 어떤 (기간, 세제유형) 탭 버튼을 보여줄지는 horizonData(지연 로딩됨) 대신 이미 즉시 fetch되는
+  // accountsRaw에서 파생한다 — 백엔드 goal_recommendation_service.py의 콤보 판별 조건
+  // (is_active == True and investment_horizon is not None)과 반드시 동일하게 유지할 것.
+  const taggedAccounts = (accountsRaw ?? []).filter((a) => a.is_active && a.investment_horizon);
   const availableHorizons = HORIZON_ORDER.filter((h) =>
-    horizonRecommendations.some((r) => r.investment_horizon === h),
+    taggedAccounts.some((a) => a.investment_horizon === h),
   );
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>("전체");
   const effectiveTab: ActiveTab =
     activeTab === "전체" || activeTab === "연령대" || availableHorizons.includes(activeTab)
       ? activeTab
       : "전체";
 
   const taxTypesForHorizon = TAX_TYPE_ORDER.filter((t) =>
-    horizonRecommendations.some((r) => r.investment_horizon === effectiveTab && r.tax_type === t),
+    taggedAccounts.some(
+      (a) => a.investment_horizon === effectiveTab && (a.tax_type ?? "GENERAL") === t,
+    ),
   );
   const [selectedTaxType, setSelectedTaxType] = useState<AccountTaxType | null>(null);
   const activeTaxType =
@@ -357,7 +375,22 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
     }
   }, [overallData, horizonData, ageData, queryClient]);
 
-  if (!overallData) return null;
+  if (overallPending) return <SkeletonCard rows={4} />;
+
+  if (overallIsError || !overallData) {
+    return (
+      <div className="rounded-xl border border-teal-200 dark:border-teal-800/50 bg-teal-50 dark:bg-teal-900/20 p-4 flex items-center justify-between gap-2 text-sm">
+        <span className="text-red-600 dark:text-red-400">추천 비중을 불러오지 못했습니다.</span>
+        <button
+          type="button"
+          onClick={() => refetchOverall()}
+          className="underline font-medium text-teal-700 dark:text-teal-400 shrink-0"
+        >
+          다시 시도
+        </button>
+      </div>
+    );
+  }
 
   const hasOverallRecommendation =
     overallData.is_configured && overallData.recommended_items.length > 0;
@@ -485,7 +518,11 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
             </>
           )
         ) : effectiveTab === "연령대" ? (
-          !ageData ? null : !ageData.is_configured ? (
+          !ageData ? (
+            agePending ? (
+              <SkeletonCard rows={2} />
+            ) : null
+          ) : !ageData.is_configured ? (
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {ageData.note ?? "연령대를 설정하면 연령대별 추천을 받을 수 있습니다"}
@@ -638,6 +675,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               </p>
             )}
           </>
+        ) : horizonFetching ? (
+          <SkeletonCard rows={2} />
         ) : null}
 
         <div className="pt-2 border-t border-teal-200 dark:border-teal-800/50 flex items-center gap-3">

@@ -454,7 +454,7 @@ async def get_goal_recommendation(
     settings_row: UserSettings | None,
     db: AsyncSession,
 ) -> GoalRecommendation:
-    """`_compute_goal_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+    """`_compute_goal_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(1시간) 캐싱한다.
 
     계산 자체가 CAGR/배당수익률 외부 조회 + SLSQP 최적화를 포함해 무겁고, 진단탭 마운트 시
     무조건 호출되므로 짧은 TTL로도 체감 속도 개선 효과가 크다. 목표 설정·후보 ETF 변경,
@@ -944,7 +944,7 @@ async def get_horizon_recommendations(
     user_id: uuid.UUID,
     settings_row: UserSettings,
 ) -> HorizonRecommendationResponse:
-    """`_compute_horizon_recommendations()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+    """`_compute_horizon_recommendations()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(1시간) 캐싱한다.
 
     최대 15개(투자기간×세제유형) 조합에 대해 후보 필터링(순차, 조합 간 상태 의존) 후 조합별
     SLSQP 최적화를 수행하는 무거운 계산이라 캐싱 효과가 크다. 계좌/스냅샷/포지션 DB 조회는
@@ -1172,7 +1172,7 @@ async def get_age_based_recommendation(
     user_id: uuid.UUID,
     settings_row: UserSettings,
 ) -> GoalRecommendation:
-    """`_compute_age_based_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(10분) 캐싱한다.
+    """`_compute_age_based_recommendation()` 결과를 유저당 TTL_GOAL_RECOMMENDATION(1시간) 캐싱한다.
 
     무효화 조건은 `get_goal_recommendation`/`get_horizon_recommendations`와 동일 —
     `invalidate_goal_recommendation_caches()`가 `age_group` 변경(설정 저장) 시에도 함께 호출된다.

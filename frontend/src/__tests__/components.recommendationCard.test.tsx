@@ -843,6 +843,9 @@ describe("RecommendationCard", () => {
       fetchHorizonGoalRecommendations.mockResolvedValue(
         makeHorizonResponse([makeHorizonRec({ investment_horizon: "SHORT_TERM" })]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -869,6 +872,9 @@ describe("RecommendationCard", () => {
       fetchHorizonGoalRecommendations.mockResolvedValue(
         makeHorizonResponse([makeHorizonRec({ investment_horizon: "SHORT_TERM" })]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       expect(await screen.findByText("단기")).toBeDefined();
@@ -879,6 +885,9 @@ describe("RecommendationCard", () => {
     it("renders recommended items for the selected horizon after switching tabs", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -895,6 +904,9 @@ describe("RecommendationCard", () => {
           makeHorizonRec({ expected_dividend_yield_pct: 3.2, expected_volatility_pct: 5.5 }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -923,6 +935,10 @@ describe("RecommendationCard", () => {
           }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ id: "a-short", asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+        makeAccount({ id: "a-long", asset_type: "REAL_ESTATE", investment_horizon: "LONG_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -944,6 +960,9 @@ describe("RecommendationCard", () => {
           }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "MID_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("중기"));
@@ -974,6 +993,9 @@ describe("RecommendationCard", () => {
           }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -989,7 +1011,9 @@ describe("RecommendationCard", () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
       fetchPortfolios.mockResolvedValue([makePortfolio()]);
-      fetchAccounts.mockResolvedValue([makeAccount({ target_portfolio_id: null })]);
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ target_portfolio_id: null, investment_horizon: "SHORT_TERM" }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("단기"));
@@ -1004,6 +1028,9 @@ describe("RecommendationCard", () => {
     it("offers a create-new-portfolio button for the active horizon even without a matching portfolio", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchHorizonGoalRecommendations.mockResolvedValue(makeHorizonResponse([makeHorizonRec()]));
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       const onCreatePortfolio = vi.fn();
       renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
 
@@ -1062,6 +1089,9 @@ describe("RecommendationCard", () => {
           }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
       const onCreatePortfolio = vi.fn();
       renderWithProviders(<RecommendationCard onCreatePortfolio={onCreatePortfolio} />);
 
@@ -1344,6 +1374,20 @@ describe("RecommendationCard", () => {
           }),
         ]),
       );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({
+          id: "a-isa",
+          asset_type: "REAL_ESTATE",
+          investment_horizon: "LONG_TERM",
+          tax_type: "ISA",
+        }),
+        makeAccount({
+          id: "a-overseas",
+          asset_type: "REAL_ESTATE",
+          investment_horizon: "LONG_TERM",
+          tax_type: "OVERSEAS_DEDICATED",
+        }),
+      ]);
       renderWithProviders(<RecommendationCard />);
 
       fireEvent.click(await screen.findByText("장기"));

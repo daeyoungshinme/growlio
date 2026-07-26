@@ -45,7 +45,13 @@ const persister = createSyncStoragePersister({
   retry: removeOldestQuery,
 });
 
-const PERSIST_QUERY_KEYS = new Set(["dashboard", "portfolio-overview", "accounts", "dca-analysis"]);
+const PERSIST_QUERY_KEYS = new Set([
+  "dashboard",
+  "portfolio-overview",
+  "accounts",
+  "dca-analysis",
+  "goal-recommendation",
+]);
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
