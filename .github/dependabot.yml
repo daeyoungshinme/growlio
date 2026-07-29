@@ -17,6 +17,16 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      react-types:
+        patterns:
+          - "@types/react"
+          - "@types/react-dom"
+    ignore:
+      - dependency-name: "@types/react"
+        versions: ["19.x"]
+      - dependency-name: "@types/react-dom"
+        versions: ["19.x"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
