@@ -1,8 +1,9 @@
-import { lazy, Suspense, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrwShort } from "@/utils/format";
 import SkeletonCard from "@/components/common/SkeletonCard";
+import Tabs from "@/components/common/Tabs";
 
 const TreemapChart = lazy(() => import("./TreemapChart"));
 const MonthlyDividendChart = lazy(() => import("./MonthlyDividendChart"));
@@ -43,7 +44,23 @@ export default function DividendTab({
   totalInvestedKrw,
 }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
-  const [divSubTab, setDivSubTab] = useState<DivSubTab>("종목별 배당");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawDivSubTab = searchParams.get("divTab");
+  const divSubTab: DivSubTab = (DIV_SUBTABS as readonly string[]).includes(rawDivSubTab ?? "")
+    ? (rawDivSubTab as DivSubTab)
+    : "종목별 배당";
+  const setDivSubTab = useCallback(
+    (next: DivSubTab) => {
+      setSearchParams(
+        (prev) => {
+          prev.set("divTab", next);
+          return prev;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
 
   const now = new Date();
@@ -155,10 +172,10 @@ export default function DividendTab({
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700">
         <div className="grid grid-cols-3 divide-x divide-gray-100 dark:divide-gray-800">
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap overflow-hidden">
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
               예상 연간 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 whitespace-nowrap overflow-hidden">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-green-600 truncate">
               {totalEstimated > 0 ? `${fmtKrwShort(totalEstimated)}원` : "—"}
             </p>
             {totalEstimated > 0 && overallDividendYield != null ? (
@@ -172,10 +189,10 @@ export default function DividendTab({
             )}
           </div>
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap overflow-hidden">
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
               올해 수령 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 whitespace-nowrap overflow-hidden">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-gray-900 dark:text-gray-50 truncate">
               {received > 0 ? `${fmtKrwShort(received)}원` : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
@@ -183,10 +200,10 @@ export default function DividendTab({
             </p>
           </div>
           <div className="px-2 py-3 sm:px-4 sm:py-4">
-            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 whitespace-nowrap overflow-hidden">
+            <p className="text-xs font-semibold uppercase text-gray-500 dark:text-gray-400 truncate">
               월평균 예상 배당금
             </p>
-            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 whitespace-nowrap overflow-hidden">
+            <p className="text-base sm:text-lg font-bold mt-1 leading-tight text-blue-600 truncate">
               {estimatedMonthly > 0 ? `${fmtKrwShort(estimatedMonthly)}원` : "—"}
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">연간 예상 배당금 ÷ 12</p>
@@ -195,21 +212,7 @@ export default function DividendTab({
       </div>
 
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 w-fit">
-          {DIV_SUBTABS.map((t) => (
-            <button
-              key={t}
-              onClick={() => setDivSubTab(t)}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                divSubTab === t
-                  ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        <Tabs tabs={DIV_SUBTABS} activeTab={divSubTab} onChange={setDivSubTab} variant="pill" />
         <Link
           to="/invest-plan?tab=배당 계획"
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"

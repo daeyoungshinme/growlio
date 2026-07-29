@@ -418,7 +418,7 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
           <span className="text-xs font-semibold text-teal-700 dark:text-teal-400">추천 비중</span>
         </div>
 
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           {(["전체", "연령대", ...availableHorizons] as ActiveTab[]).map((tab) => (
             <button
               key={tab}

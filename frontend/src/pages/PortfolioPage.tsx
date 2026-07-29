@@ -193,6 +193,8 @@ export default function PortfolioPage() {
       </div>
     );
 
+  const hasHorizonTags = data.accounts.some((a) => a.investment_horizon);
+
   return (
     <div className="space-y-6">
       {/* 상단 요약 */}
@@ -244,15 +246,14 @@ export default function PortfolioPage() {
             </span>
           )}
         </div>
+        {/* 특정 계좌 선택 시 overview.accounts가 해당 계좌 1건으로 축소되어
+            상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
+        {!selectedAccountId && hasHorizonTags && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
+            <HorizonSummaryCard overview={data} embedded />
+          </div>
+        )}
       </div>
-
-      {/* 특정 계좌 선택 시 overview.accounts가 해당 계좌 1건으로 축소되어
-          상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
-      {!selectedAccountId && (
-        <ErrorBoundary variant="section">
-          <HorizonSummaryCard overview={data} />
-        </ErrorBoundary>
-      )}
 
       {/* 탭 */}
       <div>

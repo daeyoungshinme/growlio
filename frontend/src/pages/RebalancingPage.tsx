@@ -105,8 +105,11 @@ export default function RebalancingPage() {
   useSwipeTabs(tabContentRef, REBALANCING_PAGE_TABS, localTab, handleTabChange);
 
   const executionRef = useRef<HTMLDivElement>(null);
+  const scrolledForPortfolioIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!portfolioId || localTab !== "포트폴리오") return;
+    if (scrolledForPortfolioIdRef.current === portfolioId) return;
+    scrolledForPortfolioIdRef.current = portfolioId;
     const timer = setTimeout(() => {
       executionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 100);

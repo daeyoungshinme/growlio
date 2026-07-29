@@ -58,8 +58,11 @@ export function AnalysisPanel({
   autoOpenExecution,
 }: Props) {
   const selectedIdStr = Array.from(selectedIds).sort().join(",");
+  const portfolioItemsSignature = autoAnalyzeId
+    ? JSON.stringify(portfolios.find((p) => p.id === autoAnalyzeId)?.items ?? [])
+    : undefined;
   const { mode, analysis, analyzing, error, triggerRebalancingAnalysis, setMode } =
-    useAnalysisState({ autoAnalyzeId, selectedIdStr });
+    useAnalysisState({ autoAnalyzeId, selectedIdStr, portfolioItemsSignature });
 
   const analysisResultRef = useRef<HTMLDivElement>(null);
   const autoScrolledForRef = useRef<string | undefined>(undefined);

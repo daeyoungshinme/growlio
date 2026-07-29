@@ -16,15 +16,24 @@ const INITIAL_STATE: AnalysisState = { mode: null, analysis: null, analyzing: fa
 export function useAnalysisState({
   autoAnalyzeId,
   selectedIdStr,
+  portfolioItemsSignature,
 }: {
   autoAnalyzeId?: string;
   selectedIdStr: string;
+  /** 분석 대상 포트폴리오의 목표 비중(items) 직렬화 값 — 값이 바뀌면(저장으로 비중 변경) 자동 재분석 트리거 */
+  portfolioItemsSignature?: string;
 }) {
   const [state, setState] = useState<AnalysisState>(INITIAL_STATE);
   const autoAnalyzedRef = useRef<string | undefined>(undefined);
 
+  // 마지막으로 분석을 요청한 시점의 비중 시그니처 — 이후 값이 달라지면 재분석이 필요하다는 신호
+  const signatureRef = useRef(portfolioItemsSignature);
+  signatureRef.current = portfolioItemsSignature;
+  const analyzedSignatureRef = useRef<string | undefined>(undefined);
+
   const triggerRebalancingAnalysis = useCallback(
     async (id: string, depositKrwOverride?: number) => {
+      analyzedSignatureRef.current = signatureRef.current;
       // 재분석 시 이전 결과(analysis)를 유지한 채 analyzing만 세워 화면이 비는 깜빡임을 방지
       setState((s) => ({
         mode: "rebalancing",
@@ -77,6 +86,21 @@ export function useAnalysisState({
     // selectedIds(Set)는 참조 비교가 불안정하므로 직렬화된 문자열로 의존성 추적
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoAnalyzeId, selectedIdStr]);
+
+  // 이미 분석 결과를 보여주고 있는 포트폴리오의 목표 비중이 저장으로 바뀌면 자동 재분석
+  useEffect(() => {
+    if (state.mode !== "rebalancing" || !state.analysis) return;
+    if (!autoAnalyzeId || state.analysis.portfolio_id.toString() !== autoAnalyzeId) return;
+    if (portfolioItemsSignature === undefined) return;
+    if (analyzedSignatureRef.current === portfolioItemsSignature) return;
+    void triggerRebalancingAnalysis(autoAnalyzeId);
+  }, [
+    portfolioItemsSignature,
+    autoAnalyzeId,
+    state.mode,
+    state.analysis,
+    triggerRebalancingAnalysis,
+  ]);
 
   return { ...state, triggerRebalancingAnalysis, setMode };
 }

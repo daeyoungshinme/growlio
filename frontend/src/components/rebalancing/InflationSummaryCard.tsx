@@ -15,7 +15,7 @@ function formatReleaseDate(dateStr: string | null): string {
 }
 
 export default function InflationSummaryCard({ data }: Props) {
-  const [isOpen, toggleOpen] = useCollapsible(false);
+  const [isOpen, toggleOpen] = useCollapsible(true);
 
   if (data.length === 0) return null;
 

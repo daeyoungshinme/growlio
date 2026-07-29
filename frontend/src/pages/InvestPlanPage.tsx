@@ -9,11 +9,12 @@ import { api } from "@/api/client";
 import type { SettingsData } from "@/api/settings";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
-import { TOUCH_TARGET_MIN, TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 
 const DCAProjectionChart = lazy(() => import("../components/invest/DCAProjectionChart"));
 const DividendPlanSection = lazy(() => import("../components/invest/DividendPlanSection"));
+const SavingsSimulatorCard = lazy(() => import("../components/invest/SavingsSimulatorCard"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
@@ -25,9 +26,13 @@ import ConfirmModal from "@/components/common/ConfirmModal";
 import Modal from "@/components/common/Modal";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
 import GoalSettingWizard from "@/components/invest/GoalSettingWizard";
+import Tabs from "@/components/common/Tabs";
 
 const TABS = ["적립 계획", "배당 계획"] as const;
 type Tab = (typeof TABS)[number];
+
+const GOAL_TABS = ["목표 현황", "저축 시뮬레이터"] as const;
+type GoalTab = (typeof GOAL_TABS)[number];
 
 export default function InvestPlanPage() {
   const queryClient = useQueryClient();
@@ -42,6 +47,19 @@ export default function InvestPlanPage() {
     setSearchParams(
       (prev) => {
         prev.set("tab", tab);
+        return prev;
+      },
+      { replace: true },
+    );
+
+  const rawGoalTab = searchParams.get("goalTab");
+  const goalTab: GoalTab = (GOAL_TABS as readonly string[]).includes(rawGoalTab ?? "")
+    ? (rawGoalTab as GoalTab)
+    : "목표 현황";
+  const setGoalTab = (tab: GoalTab) =>
+    setSearchParams(
+      (prev) => {
+        prev.set("goalTab", tab);
         return prev;
       },
       { replace: true },
@@ -125,182 +143,191 @@ export default function InvestPlanPage() {
       <h1 className="sr-only">계획</h1>
       {/* 탭 전환 */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl w-full sm:w-fit">
-          {TABS.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 sm:flex-none px-4 py-2.5 text-sm font-medium rounded-lg transition-colors ${TOUCH_TARGET_MIN} ${
-                activeTab === tab
-                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-50 shadow-sm"
-                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+        <Tabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} variant="pill" fullWidth />
       </div>
 
       <div ref={tabContentRef}>
         {/* 적립 계획 탭 */}
         {activeTab === "적립 계획" && (
-          <>
-            {/* 현재 설정 요약 */}
-            <div className="card">
-              <div className="flex flex-wrap items-start justify-between gap-y-2 mb-3">
-                <div className="shrink-0">
-                  <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">
-                    적립 계획 설정
-                  </h2>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    적립식 DCA 복리계산 및 목표 달성 현황
-                  </p>
-                </div>
-                <div className="shrink-0 flex items-center gap-2">
-                  <button
-                    onClick={openWizard}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
-                  >
-                    <Wand2 size={15} />
-                    가이드로 설정
-                  </button>
-                  <button
-                    onClick={openEdit}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  >
-                    <Settings2 size={15} />
-                    설정 편집
-                  </button>
-                </div>
-              </div>
-              <div
-                className={`grid gap-4 ${showAllStats ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}
-              >
-                {(
-                  [
-                    {
-                      label: "월 적립액",
-                      value: s?.monthly_deposit_amount ? fmtKrw(s.monthly_deposit_amount) : null,
-                      priority: true,
-                    },
-                    {
-                      label: "목표 연수익률",
-                      value: s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : null,
-                      priority: true,
-                    },
-                    {
-                      label: "목표 금액",
-                      value: s?.goal_amount ? fmtKrw(s.goal_amount) : null,
-                      priority: true,
-                    },
-                    {
-                      label: "연간 입금 목표 (대시보드 연동)",
-                      value: settingsData?.annual_deposit_goal
-                        ? fmtKrw(settingsData.annual_deposit_goal)
-                        : null,
-                      priority: true,
-                    },
-                    {
-                      label: "투자 시작일",
-                      value: s?.goal_start_date ?? null,
-                      priority: false,
-                    },
-                    {
-                      label: "시작시점 자산",
-                      value: s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : null,
-                      emptyLabel: "스냅샷 자동",
-                      priority: false,
-                    },
-                    {
-                      label: "은퇴 목표시점 (대시보드 연동)",
-                      value: settingsData?.retirement_target_year
-                        ? `${settingsData.retirement_target_year}년`
-                        : null,
-                      priority: false,
-                    },
-                  ] as const
-                ).map((stat) => (
-                  <div
-                    key={stat.label}
-                    className={stat.priority || showAllStats ? "" : "hidden sm:block"}
-                  >
-                    <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
-                    <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
-                      {stat.value ?? (
-                        <span className="text-gray-300 dark:text-gray-600">
-                          {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAllStats((v) => !v)}
-                className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
-              >
-                {showAllStats ? (
-                  <>
-                    접기 <ChevronUp size={13} />
-                  </>
-                ) : (
-                  <>
-                    더보기 <ChevronDown size={13} />
-                  </>
-                )}
-              </button>
-              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수 있습니다.
-              </p>
-              {data && !isConfigured && (
-                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
-                  월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
-                  있습니다.{" "}
-                  <button onClick={openWizard} className="underline font-medium">
-                    지금 설정하기
-                  </button>
-                </div>
-              )}
-            </div>
+          <div className="space-y-6">
+            <Tabs tabs={GOAL_TABS} activeTab={goalTab} onChange={setGoalTab} variant="pill" />
 
-            {isConfigured && data && (
-              <ErrorBoundary variant="section">
-                <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
-                  <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                    <DCAProjectionChart data={data.projection_months} />
-                  </Suspense>
-                  <div className="card divide-y divide-gray-100 dark:divide-gray-700">
-                    <div className="pb-4">
-                      <GoalTimelineCard
-                        flat
-                        timeline={data.goal_timeline}
-                        goalAmount={s?.goal_amount ?? null}
-                      />
+            {goalTab === "목표 현황" && (
+              <div className="space-y-6">
+                {/* 현재 설정 요약 */}
+                <div className="card">
+                  <div className="flex flex-wrap items-start justify-between gap-y-2 mb-3">
+                    <div className="shrink-0">
+                      <h2 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                        적립 계획 설정
+                      </h2>
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+                        적립식 DCA 복리계산 및 목표 달성 현황
+                      </p>
                     </div>
-                    <div className="py-4">
-                      <YearlyAchievementTable flat data={data.yearly_achievements} />
-                    </div>
-                    <div className="pt-4">
-                      <CollapsibleSection
-                        isOpen={monthlyOpen}
-                        onToggle={() => setMonthlyOpen((v) => !v)}
-                        label="월별 상세 보기"
-                        collapsedHint={
-                          latestMonth
-                            ? `최근 달(${latestMonth.month}) 달성율 ${latestMonth.achievement_pct !== null ? `${latestMonth.achievement_pct.toFixed(1)}%` : "—"}`
-                            : undefined
-                        }
+                    <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        onClick={openWizard}
+                        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-2 px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors`}
                       >
-                        <MonthlyAchievementTable flat data={data.projection_months} />
-                      </CollapsibleSection>
+                        <Wand2 size={15} />
+                        가이드로 설정
+                      </button>
+                      <button
+                        onClick={openEdit}
+                        className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors`}
+                      >
+                        <Settings2 size={15} />
+                        설정 편집
+                      </button>
                     </div>
                   </div>
+                  {isConfigured && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1 mb-3">
+                      처음부터 다시 설정하면 투자성향·배당목표까지 다시 입력받습니다. 금액·날짜만
+                      고치려면 값만 빠르게 수정을 사용하세요.
+                    </p>
+                  )}
+                  <div
+                    className={`grid gap-4 ${showAllStats ? "grid-cols-3 sm:grid-cols-4 lg:grid-cols-7" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7"}`}
+                  >
+                    {(
+                      [
+                        {
+                          label: "월 적립액",
+                          value: s?.monthly_deposit_amount
+                            ? fmtKrw(s.monthly_deposit_amount)
+                            : null,
+                          priority: true,
+                        },
+                        {
+                          label: "목표 연수익률",
+                          value: s?.goal_annual_return_pct ? `${s.goal_annual_return_pct}%` : null,
+                          priority: true,
+                        },
+                        {
+                          label: "목표 금액",
+                          value: s?.goal_amount ? fmtKrw(s.goal_amount) : null,
+                          priority: true,
+                        },
+                        {
+                          label: "연간 입금 목표 (대시보드 연동)",
+                          value: settingsData?.annual_deposit_goal
+                            ? fmtKrw(settingsData.annual_deposit_goal)
+                            : null,
+                          priority: true,
+                        },
+                        {
+                          label: "투자 시작일",
+                          value: s?.goal_start_date ?? null,
+                          priority: false,
+                        },
+                        {
+                          label: "시작시점 자산",
+                          value: s?.goal_initial_amount ? fmtKrw(s.goal_initial_amount) : null,
+                          emptyLabel: "스냅샷 자동",
+                          priority: false,
+                        },
+                        {
+                          label: "은퇴 목표시점 (대시보드 연동)",
+                          value: settingsData?.retirement_target_year
+                            ? `${settingsData.retirement_target_year}년`
+                            : null,
+                          priority: false,
+                        },
+                      ] as const
+                    ).map((stat) => (
+                      <div
+                        key={stat.label}
+                        className={stat.priority || showAllStats ? "" : "hidden sm:block"}
+                      >
+                        <p className="text-xs text-gray-400 dark:text-gray-500">{stat.label}</p>
+                        <p className="text-base font-bold text-gray-900 dark:text-gray-50 mt-0.5">
+                          {stat.value ?? (
+                            <span className="text-gray-300 dark:text-gray-600">
+                              {"emptyLabel" in stat ? stat.emptyLabel : "미설정"}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAllStats((v) => !v)}
+                    className="sm:hidden mt-3 flex items-center gap-1 text-xs font-medium text-blue-600 dark:text-blue-400"
+                  >
+                    {showAllStats ? (
+                      <>
+                        접기 <ChevronUp size={13} />
+                      </>
+                    ) : (
+                      <>
+                        더보기 <ChevronDown size={13} />
+                      </>
+                    )}
+                  </button>
+                  <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                    연간 입금 목표·목표 연수익률·은퇴 목표 달성 현황은 대시보드에서 확인할 수
+                    있습니다.
+                  </p>
+                  {data && !isConfigured && (
+                    <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950 rounded-lg text-sm text-yellow-800 dark:text-yellow-400">
+                      월 적립액, 목표 수익률, 목표 금액, 투자 시작일을 모두 설정해야 분석을 볼 수
+                      있습니다.{" "}
+                      <button onClick={openWizard} className="underline font-medium">
+                        지금 설정하기
+                      </button>
+                    </div>
+                  )}
                 </div>
+
+                {isConfigured && data && (
+                  <ErrorBoundary variant="section">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
+                      <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                        <DCAProjectionChart data={data.projection_months} />
+                      </Suspense>
+                      <div className="card divide-y divide-gray-100 dark:divide-gray-700">
+                        <div className="pb-4">
+                          <GoalTimelineCard
+                            flat
+                            timeline={data.goal_timeline}
+                            goalAmount={s?.goal_amount ?? null}
+                          />
+                        </div>
+                        <div className="py-4">
+                          <YearlyAchievementTable flat data={data.yearly_achievements} />
+                        </div>
+                        <div className="pt-4">
+                          <CollapsibleSection
+                            isOpen={monthlyOpen}
+                            onToggle={() => setMonthlyOpen((v) => !v)}
+                            label="월별 상세 보기"
+                            collapsedHint={
+                              latestMonth
+                                ? `최근 달(${latestMonth.month}) 달성율 ${latestMonth.achievement_pct !== null ? `${latestMonth.achievement_pct.toFixed(1)}%` : "—"}`
+                                : undefined
+                            }
+                          >
+                            <MonthlyAchievementTable flat data={data.projection_months} />
+                          </CollapsibleSection>
+                        </div>
+                      </div>
+                    </div>
+                  </ErrorBoundary>
+                )}
+              </div>
+            )}
+
+            {goalTab === "저축 시뮬레이터" && (
+              <ErrorBoundary variant="section">
+                <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
+                  <SavingsSimulatorCard />
+                </Suspense>
               </ErrorBoundary>
             )}
-          </>
+          </div>
         )}
 
         {/* 배당 계획 탭 */}

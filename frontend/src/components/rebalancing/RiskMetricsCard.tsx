@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ShieldAlert } from "lucide-react";
 import type { PortfolioRiskMetrics } from "@/api/risk";
+import { useCollapsible } from "@/hooks/useCollapsible";
 import {
   buildMetrics,
   LEVEL_BADGE,
@@ -55,7 +56,7 @@ function RiskMetricRow({
 }
 
 export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMetrics }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, toggleOpen] = useCollapsible(true);
 
   const metricList = buildMetrics(metrics);
 
@@ -82,11 +83,7 @@ export default function RiskMetricsCard({ metrics }: { metrics: PortfolioRiskMet
   return (
     <div className="card">
       <div className="flex items-center justify-between mb-3">
-        <button
-          onClick={() => setIsOpen((v) => !v)}
-          className="flex items-center gap-2"
-          aria-expanded={isOpen}
-        >
+        <button onClick={toggleOpen} className="flex items-center gap-2" aria-expanded={isOpen}>
           <div className="p-1.5 bg-orange-50 dark:bg-orange-950 rounded-lg">
             <ShieldAlert size={16} className="text-orange-600 dark:text-orange-400" />
           </div>

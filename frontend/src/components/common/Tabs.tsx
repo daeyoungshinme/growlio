@@ -8,6 +8,8 @@ interface Props<T extends string> {
   onChange: (tab: T) => void;
   variant?: Variant;
   className?: string;
+  /** pill 변형 전용 — 버튼을 균등폭(모바일에서 flex-1)으로 채운다. 탭 2~3개짜리 세그먼트 컨트롤에 사용. */
+  fullWidth?: boolean;
 }
 
 export default function Tabs<T extends string>({
@@ -16,12 +18,13 @@ export default function Tabs<T extends string>({
   onChange,
   variant = "underline",
   className,
+  fullWidth,
 }: Props<T>) {
   if (variant === "pill") {
     return (
       <div
         role="tablist"
-        className={`flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none [scroll-snap-type:x_mandatory] ${className ?? ""}`}
+        className={`flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 overflow-x-auto scrollbar-none [scroll-snap-type:x_mandatory] ${fullWidth ? "w-full sm:w-fit" : ""} ${className ?? ""}`}
       >
         {tabs.map((tab) => (
           <button
@@ -31,7 +34,8 @@ export default function Tabs<T extends string>({
             tabIndex={activeTab === tab ? 0 : -1}
             onClick={() => onChange(tab)}
             className={[
-              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 [scroll-snap-align:start]",
+              "px-3 sm:px-5 py-2.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap [scroll-snap-align:start]",
+              fullWidth ? "flex-1 sm:flex-none" : "shrink-0",
               TOUCH_TARGET_MIN,
               activeTab === tab
                 ? "bg-white dark:bg-gray-700 shadow text-gray-900 dark:text-gray-50"

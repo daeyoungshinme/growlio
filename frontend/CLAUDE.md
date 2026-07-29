@@ -260,7 +260,7 @@ cd frontend && npx playwright test
 | 계좌별 개별 알림 | `["rebalancing-alert", portfolioId, "accounts", accountId]` |
 | 리밸런싱 실행 이력 | `["rebalancing-history"]` |
 | 리밸런싱 대기 플랜 목록 | `["rebalancing-plans"]` |
-| 리밸런싱 전략 | `["rebalancing-strategy", portfolioId]` |
+| 리밸런싱 전략 | `["rebalancing-strategy", portfolioId]` — `rebalancingStrategyBase`(`["rebalancing-strategy"]`)는 무효화 프리픽스 전용 |
 | 드리프트 경량 요약 (대시보드) | `["drift-summary"]` |
 | 세금 추정 요약 (accountId 지정 시 계좌별) | `["tax-summary", year, accountId]` — `taxSummaryBase` 무효화 전용 |
 | 해외 포지션 양도세 계획 (accountId 지정 시 계좌별) | `["overseas-positions-tax", accountId]` — `overseasPositionsTaxBase` 무효화 전용 |
@@ -413,7 +413,7 @@ cd frontend && npx playwright test
 - 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 동시 무효화.
 - 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
-- 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios 무효화.
+- 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard 무효화.
 - 환율 알림 CUD 후: `invalidateAlertData(queryClient)` — exchange-rate-alerts 무효화.
 - 리밸런싱 알림 CUD 후: `invalidateRebalancingAlertData(queryClient, portfolioId)` — rebalancing-alerts + rebalancing-alert(portfolioId) 무효화.

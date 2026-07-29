@@ -50,6 +50,7 @@ export function invalidatePortfolioData(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: QUERY_KEYS.portfolios }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.accounts }),
     qc.invalidateQueries({ queryKey: QUERY_KEYS.driftSummary }),
+    qc.invalidateQueries({ queryKey: QUERY_KEYS.rebalancingStrategyBase }),
   ]);
 }
 

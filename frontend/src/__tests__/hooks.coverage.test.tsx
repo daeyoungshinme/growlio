@@ -512,6 +512,28 @@ describe("useAnalysisState — additional coverage", () => {
     expect(result.current.analysis).toBeNull();
     expect(result.current.mode).toBeNull();
   });
+
+  it("portfolioItemsSignature가 바뀌면 같은 포트폴리오를 자동 재분석한다", async () => {
+    const { analyzePortfolio } = await import("@/api/rebalancing");
+    vi.mocked(analyzePortfolio).mockResolvedValue({ portfolio_id: 5 } as never);
+
+    const { result, rerender } = renderHook(
+      ({ portfolioItemsSignature }: { portfolioItemsSignature: string }) =>
+        useAnalysisState({ autoAnalyzeId: "5", selectedIdStr: "5", portfolioItemsSignature }),
+      { initialProps: { portfolioItemsSignature: "sig-1" } },
+    );
+
+    await waitFor(() => expect(result.current.analyzing).toBe(false));
+    expect(analyzePortfolio).toHaveBeenCalledTimes(1);
+
+    // 시그니처가 바뀌지 않으면 재분석하지 않는다
+    rerender({ portfolioItemsSignature: "sig-1" });
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledTimes(1));
+
+    // 비중이 저장되어 시그니처가 바뀌면 자동으로 재분석한다
+    rerender({ portfolioItemsSignature: "sig-2" });
+    await waitFor(() => expect(analyzePortfolio).toHaveBeenCalledTimes(2));
+  });
 });
 
 // ─── useAssetManagementData ───────────────────────────────────────────────────

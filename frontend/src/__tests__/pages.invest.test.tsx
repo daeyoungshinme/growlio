@@ -58,6 +58,9 @@ vi.mock("@/components/invest/MonthlyAchievementTable", () => ({
 vi.mock("@/components/invest/YearlyAchievementTable", () => ({
   default: () => <div data-testid="yearly-table">YearlyAchievementTable</div>,
 }));
+vi.mock("../components/invest/SavingsSimulatorCard", () => ({
+  default: () => <div data-testid="savings-simulator">SavingsSimulatorCard</div>,
+}));
 vi.mock("@/components/ErrorBoundary", () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -187,6 +190,28 @@ describe("InvestPlanPage", () => {
     });
     expect(screen.getByTestId("dca-chart")).toBeInTheDocument();
     expect(screen.getByTestId("goal-timeline")).toBeInTheDocument();
+  });
+
+  it("목표 현황 서브탭이 기본으로 렌더링되고 저축 시뮬레이터는 숨겨진다", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("적립 계획 설정")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("savings-simulator")).not.toBeInTheDocument();
+  });
+
+  it("'저축 시뮬레이터' 서브탭 클릭 시 SavingsSimulatorCard가 렌더링되고 설정 요약은 숨겨진다", async () => {
+    vi.mocked(fetchDCAAnalysis).mockResolvedValue(mockConfiguredData as never);
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText("적립 계획 설정")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "저축 시뮬레이터" }));
+    await waitFor(() => {
+      expect(screen.getByTestId("savings-simulator")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("적립 계획 설정")).not.toBeInTheDocument();
   });
 
   it("shows 미설정 for unconfigured fields", async () => {

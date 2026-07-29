@@ -40,6 +40,7 @@ vi.mock("@/api/rebalancing", () => ({
 
 import DCAProjectionChart from "@/components/invest/DCAProjectionChart";
 import GoalTimelineCard from "@/components/invest/GoalTimelineCard";
+import SavingsSimulatorCard from "@/components/invest/SavingsSimulatorCard";
 import { fetchOverallGoalRecommendation } from "@/api/rebalancing";
 import type { GoalRecommendation } from "@/api/rebalancing";
 import MonthlyAchievementTable from "@/components/invest/MonthlyAchievementTable";
@@ -289,6 +290,81 @@ describe("GoalTimelineCard", () => {
     };
     renderCard(withScenarios, 100000000);
     expect(await screen.findByText("추천 포트폴리오로는 1.5%p 부족")).toBeDefined();
+  });
+});
+
+// ------- SavingsSimulatorCard -------
+describe("SavingsSimulatorCard", () => {
+  it("renders default 10/20/30년 stat tiles with default amount", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    expect(screen.getByText("절약 복리 시뮬레이터")).toBeDefined();
+    expect(screen.getByText("10년 후")).toBeDefined();
+    expect(screen.getByText("20년 후")).toBeDefined();
+    expect(screen.getByText("30년 후")).toBeDefined();
+  });
+
+  it("updates the amount input and preview when an amount preset is clicked", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    const presetButton = screen.getByText(/커피값 아끼기/);
+    fireEvent.click(presetButton);
+    const input = screen.getByLabelText("매달 절약할 금액") as HTMLInputElement;
+    expect(input.value).toBe("90000");
+  });
+
+  it("switches assumed return rate when a return preset is clicked", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    const conservativeButton = screen.getByText(/보수적 연4%/);
+    fireEvent.click(conservativeButton);
+    expect(conservativeButton.className).toContain("bg-blue-600");
+  });
+
+  it("recalculates stat tiles when the amount input changes", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    const input = screen.getByLabelText("매달 절약할 금액") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "0" } });
+    expect(screen.getAllByText("0원").length).toBeGreaterThan(0);
+  });
+
+  it("switches to 거치식 mode and shows the lump-sum amount input", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    fireEvent.click(screen.getByRole("tab", { name: "거치식" }));
+    expect(screen.getByLabelText("한 번에 투자할 목돈")).toBeDefined();
+    expect(screen.queryByLabelText("매달 절약할 금액")).toBeNull();
+  });
+
+  it("updates the lump-sum amount input and preview when a preset is clicked", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    fireEvent.click(screen.getByRole("tab", { name: "거치식" }));
+    const presetButton = screen.getByText(/적금 만기금/);
+    fireEvent.click(presetButton);
+    const input = screen.getByLabelText("한 번에 투자할 목돈") as HTMLInputElement;
+    expect(input.value).toBe("3000000");
+  });
+
+  it("recalculates stat tiles in 거치식 mode when the amount input changes", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    fireEvent.click(screen.getByRole("tab", { name: "거치식" }));
+    const input = screen.getByLabelText("한 번에 투자할 목돈") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "0" } });
+    expect(screen.getAllByText("0원").length).toBeGreaterThan(0);
+  });
+
+  it("keeps each mode's input value independent when switching between tabs", () => {
+    renderWithProviders(<SavingsSimulatorCard />);
+    const monthlyInput = screen.getByLabelText("매달 절약할 금액") as HTMLInputElement;
+    fireEvent.change(monthlyInput, { target: { value: "250000" } });
+
+    fireEvent.click(screen.getByRole("tab", { name: "거치식" }));
+    const lumpInput = screen.getByLabelText("한 번에 투자할 목돈") as HTMLInputElement;
+    fireEvent.change(lumpInput, { target: { value: "5000000" } });
+
+    fireEvent.click(screen.getByRole("tab", { name: "적립식" }));
+    expect((screen.getByLabelText("매달 절약할 금액") as HTMLInputElement).value).toBe("250000");
+
+    fireEvent.click(screen.getByRole("tab", { name: "거치식" }));
+    expect((screen.getByLabelText("한 번에 투자할 목돈") as HTMLInputElement).value).toBe(
+      "5000000",
+    );
   });
 });
 
