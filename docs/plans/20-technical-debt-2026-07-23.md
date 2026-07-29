@@ -12,19 +12,20 @@
 - **근거**: 오픈소스 .NET 클라이언트 `dongbin300/KiwoomRestApi.Net`의 `Clients/UsStocks/KiwoomRestApiClientUsStockOrder.cs`/`Objects/ApiEndpoint.cs`/`Enums/UsStock/Order/*.cs`를 GitHub REST API로 직접 조회해 확인. 거래소 코드(`ND`/`NY`/`NA`)는 이 프로젝트의 `balance.py`가 별도로 실측 확정해둔 값과 정확히 일치해 교차검증됨.
 - **주의**: 공식 문서 원문으로 재확인한 것은 아니므로(3rd-party 라이브러리 소스 기반), 실계좌 첫 해외 매수/매도 주문 시 응답 필드(`ord_no` 등 파싱 부분)는 실측으로 한 번 검증 권장.
 
-### 2. `goal_recommendation_service.py` 대형 함수 분해
-- `_build_horizon_result`(약 217줄, 425행 부근)와 `_compute_goal_recommendation`(약 141줄, 281행 부근)이 여전히 큼. `goal_portfolio_optimizer.py`/`goal_candidate_service.py` 분리(계획 11) 이후에도 API 진입점 자체의 개별 함수가 비대함.
-- 목표금액/월적립액/배당목표 제약이 얽힌 금융 계산 로직이라, 리팩터링 시 케이스별(배당목표 있음/없음, 후보 부족 fail-soft 등) 회귀 테스트를 촘촘히 갖추고 진행해야 함 — 별도 세션에서 테스트 보강과 병행 권장.
+### 2. `goal_recommendation_service.py` 대형 함수 분해 — ✅ 완료 (2026-07-29)
+- `_compute_goal_recommendation`에서 `_fetch_overall_candidate_data`/`_filter_candidates_with_cagr`를, `_build_horizon_result`에서 `_build_horizon_candidate_universe`/`_single_candidate_horizon_result`를 순수 extract-method로 분리(로직/분기/상수 변경 없음). 공개 진입점(`get_goal_recommendation`/`get_horizon_recommendations`/`get_age_based_recommendation`) 시그니처는 그대로 유지.
+- 검증: `pytest -k goal_recommendation`(167개) + 백엔드 전체 스위트(1974 passed, 87.78% coverage), ruff/mypy 클린.
 
 ### 3. Join/집계/컬럼-select 쿼리용 "활성 계좌 조건" 헬퍼 확장
 - 이번 세션에 `_account_queries.active_accounts_stmt()`를 적용한 6개 파일은 전부 `select(AssetAccount).where(user_id==, is_active==True, ...)` 형태였음.
 - 반면 `dca_service.py`, `tax_service.py`, `backtest_service.py`, `pension_contribution_service.py`, `position_aggregator.py`, `dividend/orchestrator.py`, `returns_calculator.py`, `goal_candidate_service.py`, `goal_recommendation_service.py:716` 등은 `AssetSnapshot`과의 join 또는 컬럼-select(`select(AssetAccount.tax_type, ...)`) 형태라 `Select[tuple[AssetAccount]]`를 반환하는 현재 헬퍼가 맞지 않음. **필터 자체는 이미 정확히 존재하므로 버그는 아님** — 다만 조건이 각 파일에 반복 작성되어 있음.
 - 검토 필요: 재사용 가능한 WHERE절 fragment(`ACTIVE_ACCOUNT_CONDITION = AssetAccount.is_active == True` 같은 단순 상수)를 만들지, 아니면 현재처럼 파일별로 명시하는 게 오히려 가독성이 나은지 — 후자라면 이 항목은 "조사 완료, 조치 불필요"로 종결해도 됨. 다음 세션에서 실제 가치가 있는지부터 재확인.
 
-### 4. 프론트엔드 대형 컴포넌트 재분해
-- `src/components/rebalancing/RecommendationCard.tsx`(741줄) — 비교 프리뷰/적용 모달/포트폴리오 생성 분기가 한 파일에 응집.
-- `src/components/assets/RealEstateSection.tsx`(611줄), `src/pages/SettingsPage.tsx`(593줄), `src/hooks/rebalancingExecution/index.ts`(528줄).
-- 여러 차례 컴포넌트 분해가 있었음에도 rebalancing/assets 도메인은 기능 추가 때마다 재비대화되는 패턴 — 이번엔 설계 단위 분해(하위 컴포넌트/훅 추출 경계를 어디로 그을지)부터 논의 필요해 별도 세션으로 이관.
+### 4. 프론트엔드 대형 컴포넌트 재분해 — 재검증 결과 부분 종결 (2026-07-29)
+- `src/pages/SettingsPage.tsx`(593줄) — ✅ 이미 해결됨. 2026-07-26 세션에서 `/settings/notifications`(`NotificationSettingsPage`)로 알림 설정 상세가 분리되며 339줄로 축소(`frontend/CLAUDE.md` 참고).
+- `src/components/rebalancing/RecommendationCard.tsx`(741줄, 재검증 시점 778줄) — ✅ 의도적 설계로 종결. 2026-07-26 세션에서 3탭 공통 렌더(드리프트 배지·비중 목록·안내문구·적용 섹션)가 `RecommendationResultPanel.tsx`로 이미 분리됨. 남은 부분(탭별 `useMutation`·탭 전환 상태머신)은 3탭이 공유하는 파생 상태(activeTab/selectedTaxType/taggedAccounts/cashEquivalentMatches/horizonTargetPortfolio 등)가 강하게 얽혀 있어 `frontend/CLAUDE.md`에 "이 파일에 그대로 유지"라고 명시된 의도적 설계 — 추가 분해 대상 아님.
+- `src/components/assets/RealEstateSection.tsx`(611줄) — ✅ 완료 (2026-07-29). 이미 독립적이던 4개 named export(`RealEstateAccountModal`/`RealEstateEditModal`/`RealEstateSummaryCard`/`RealEstateAccountCard`)를 `components/assets/realEstate/` 하위 개별 파일로 분리, 원 경로는 barrel re-export로 유지(기존 import 불변). 로직 변경 없음 — typecheck/lint/test(20개) 통과.
+- `src/hooks/rebalancingExecution/index.ts`(528줄) — 미착수, `docs/plans/24-technical-debt-2026-07-29.md`로 이관. effect 간 상태 공유가 강하고 실거래 실행 경로라 신중한 별도 세션 필요.
 
 ### 5. 프론트엔드 메이저 버전 업그레이드 로드맵
 `npm outdated` 기준 뒤처진 메이저 버전:

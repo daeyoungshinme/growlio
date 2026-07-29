@@ -580,6 +580,32 @@ async def _apply_tax_type_preference_for_overall(
     return computed_candidates, preference_fallback_note, single_tax_type
 
 
+async def _fetch_overall_candidate_data(
+    cache: CacheStoreType,
+    tickers_only: list[tuple[str, str]],
+    cagr_lookback_years: int,
+) -> tuple[dict[tuple[str, str], dict], dict[tuple[str, str], float], str | None]:
+    """전체 자산 기준 추천용 CAGR·배당수익률·시장신호를 병렬 조회한다."""
+    return await asyncio.gather(
+        get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
+        _fetch_dividend_yields(cache, tickers_only),
+        _fetch_market_signal_level(cache),
+    )
+
+
+def _filter_candidates_with_cagr(
+    candidates: list[tuple[str, str, str]],
+    cagr_map: dict[tuple[str, str], dict],
+    dividend_map: dict[tuple[str, str], float],
+) -> list[tuple[str, tuple[str, str, str], float, float]]:
+    """CAGR 데이터가 확보된 후보만 남기고, yfinance 심볼·배당수익률을 함께 묶는다."""
+    return [
+        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], dividend_map.get((t, m), 0.0))
+        for t, name, m in candidates
+        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
+    ]
+
+
 async def _compute_goal_recommendation(
     cache: CacheStoreType,
     base_krw: float,
@@ -671,17 +697,10 @@ async def _compute_goal_recommendation(
     candidates = [(c["ticker"], c["name"], c["market"]) for c in computed_candidates]
     tickers_only = [(t, m) for t, _, m in candidates]
 
-    cagr_map, dividend_map, market_signal_level = await asyncio.gather(
-        get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-        _fetch_dividend_yields(cache, tickers_only),
-        _fetch_market_signal_level(cache),
+    cagr_map, dividend_map, market_signal_level = await _fetch_overall_candidate_data(
+        cache, tickers_only, cagr_lookback_years
     )
-
-    filtered = [
-        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], dividend_map.get((t, m), 0.0))
-        for t, name, m in candidates
-        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
-    ]
+    filtered = _filter_candidates_with_cagr(candidates, cagr_map, dividend_map)
     if len(filtered) < _MIN_CANDIDATES:
         suggested_candidates, dividend_note, dividend_goal_status = await _suggest_dividend_candidates(None)
         result = _no_recommendation(
@@ -753,6 +772,100 @@ async def _compute_goal_recommendation(
     )
 
 
+async def _build_horizon_candidate_universe(
+    cache: CacheStoreType,
+    eligible_candidates: list[dict[str, str]],
+    cagr_lookback_years: int,
+    is_irp: bool,
+    horizon: str,
+) -> tuple[list[tuple[str, tuple[str, str, str], float, bool, float]], dict[tuple[str, str], float], bool]:
+    """(기간, 세제유형) 조합의 후보 유니버스를 구성한다.
+
+    CAGR 데이터가 확보된 후보만 남기고, IRP는 실보유 안전자산 후보가 하나도 없을 때만,
+    SHORT_TERM은 항상 현금성 자산 합성 후보를 포함시킨다(`_build_horizon_result` 독스트링 참고).
+    """
+    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in eligible_candidates]
+    tickers_only = [(t, m) for t, _, m, _ in candidates]
+
+    cagr_map, dividend_map = (
+        await asyncio.gather(
+            get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
+            _fetch_dividend_yields(cache, tickers_only),
+        )
+        if tickers_only
+        else ({}, {})
+    )
+    filtered = [
+        (
+            to_yf_symbol(t, m),
+            (t, name, m),
+            cagr_map[(t, m)]["cagr_pct"],
+            asset_class == "EQUITY",
+            dividend_map.get((t, m), 0.0),
+        )
+        for t, name, m, asset_class in candidates
+        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
+    ]
+    has_real_safe_asset = any(not is_eq for _, _, _, is_eq, _ in filtered)
+    include_cash_equivalent = (not has_real_safe_asset) if is_irp else (horizon == "SHORT_TERM")
+    if include_cash_equivalent:
+        filtered.append(
+            (
+                _CASH_EQUIVALENT_TICKER,
+                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
+                _CASH_EQUIVALENT_CAGR_PCT,
+                False,
+                0.0,
+            )
+        )
+    return filtered, dividend_map, include_cash_equivalent
+
+
+def _single_candidate_horizon_result(
+    single: tuple[str, tuple[str, str, str], float, bool, float],
+    horizon: str,
+    tax_type: str,
+    base_krw: float,
+    account_count: int,
+    risk_tolerance: str,
+    max_weight: float,
+    market_signal_level: str | None,
+    combine_note: Callable[[str | None], str | None],
+) -> HorizonGoalRecommendation:
+    """유효 후보가 1개뿐일 때 옵티마이저 없이 전액 배분하는 조기 반환 결과를 만든다.
+
+    현금성 자산 합성 후보만 남았을 수도(등록 후보 없음/시세 미확보) 있고, 실보유 안전자산 후보
+    하나만 유효했을 수도 있다 — `is_synthetic`으로 구분해 안내 문구를 다르게 붙인다.
+    """
+    _, (tk, name, mk), cagr, _, dividend = single
+    is_synthetic = tk == _CASH_EQUIVALENT_TICKER
+    return HorizonGoalRecommendation(
+        investment_horizon=horizon,
+        tax_type=tax_type,
+        base_krw=base_krw,
+        account_count=account_count,
+        recommended_items=[
+            GoalRecommendationItem(
+                ticker=tk, name=name, market=mk, weight=100.0, dividend_yield_pct=dividend if dividend > 0 else None
+            )
+        ],
+        expected_return_pct=cagr,
+        expected_dividend_yield_pct=dividend if dividend > 0 else None,
+        risk_tolerance=risk_tolerance,
+        max_weight_pct=round(max_weight * 100, 2),
+        market_signal_level=market_signal_level,
+        includes_cash_equivalent=is_synthetic,
+        note=combine_note(
+            (
+                "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 "
+                "배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다."
+            )
+            if is_synthetic
+            else None
+        ),
+    )
+
+
 async def _build_horizon_result(
     cache: CacheStoreType,
     horizon: str,
@@ -819,40 +932,9 @@ async def _build_horizon_result(
             note=_combine_note(note),
         )
 
-    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in eligible_candidates]
-    tickers_only = [(t, m) for t, _, m, _ in candidates]
-
-    cagr_map, dividend_map = (
-        await asyncio.gather(
-            get_historical_returns(tickers_only, cache=cache, years=cagr_lookback_years),
-            _fetch_dividend_yields(cache, tickers_only),
-        )
-        if tickers_only
-        else ({}, {})
+    filtered, dividend_map, include_cash_equivalent = await _build_horizon_candidate_universe(
+        cache, eligible_candidates, cagr_lookback_years, is_irp, horizon
     )
-    filtered = [
-        (
-            to_yf_symbol(t, m),
-            (t, name, m),
-            cagr_map[(t, m)]["cagr_pct"],
-            asset_class == "EQUITY",
-            dividend_map.get((t, m), 0.0),
-        )
-        for t, name, m, asset_class in candidates
-        if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
-    ]
-    has_real_safe_asset = any(not is_eq for _, _, _, is_eq, _ in filtered)
-    include_cash_equivalent = (not has_real_safe_asset) if is_irp else (horizon == "SHORT_TERM")
-    if include_cash_equivalent:
-        filtered.append(
-            (
-                _CASH_EQUIVALENT_TICKER,
-                (_CASH_EQUIVALENT_TICKER, _CASH_EQUIVALENT_NAME, _CASH_EQUIVALENT_MARKET),
-                _CASH_EQUIVALENT_CAGR_PCT,
-                False,
-                0.0,
-            )
-        )
 
     if not filtered:
         return HorizonGoalRecommendation(
@@ -867,35 +949,16 @@ async def _build_horizon_result(
         )
 
     if len(filtered) == 1:
-        # 유효 후보가 하나뿐인 경우 — 옵티마이저 없이 전액 배분. 현금성 자산 합성 후보만 남았을 수도
-        # 있고(등록된 실 후보가 없거나 전부 시세 데이터 미확보), 실보유 안전자산 후보 하나만 유효했을
-        # 수도 있다(예: 매칭되는 EQUITY 후보가 없어 BOND 후보 1개만 남음) — 둘을 구분해 안내한다.
-        _, (tk, name, mk), cagr, _, dividend = filtered[0]
-        is_synthetic = tk == _CASH_EQUIVALENT_TICKER
-        return HorizonGoalRecommendation(
-            investment_horizon=horizon,
-            tax_type=tax_type,
-            base_krw=base_krw,
-            account_count=len(account_ids),
-            recommended_items=[
-                GoalRecommendationItem(
-                    ticker=tk, name=name, market=mk, weight=100.0, dividend_yield_pct=dividend if dividend > 0 else None
-                )
-            ],
-            expected_return_pct=cagr,
-            expected_dividend_yield_pct=dividend if dividend > 0 else None,
-            risk_tolerance=risk_tolerance,
-            max_weight_pct=round(max_weight * 100, 2),
-            market_signal_level=market_signal_level,
-            includes_cash_equivalent=is_synthetic,
-            note=_combine_note(
-                (
-                    "채권/현금성 ETF 후보가 등록되어 있지 않아 현금성 자산(CMA·파킹통장 등)으로 전액 "
-                    "배분을 권장합니다. 후보 ETF 관리에서 채권/현금성 ETF를 등록하면 함께 분석해 비중을 조정합니다."
-                )
-                if is_synthetic
-                else None
-            ),
+        return _single_candidate_horizon_result(
+            filtered[0],
+            horizon,
+            tax_type,
+            base_krw,
+            len(account_ids),
+            risk_tolerance,
+            max_weight,
+            market_signal_level,
+            _combine_note,
         )
 
     f_symbols = [f[0] for f in filtered]
