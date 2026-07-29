@@ -279,7 +279,7 @@ async def fetch_us_rate_curve_signal() -> dict[str, Any] | None:
     yc_sub = yc["sub_score"] if yc else 0
     rate_sub = rate["sub_score"] if rate else 0
     reference = yc or rate
-    assert reference is not None  # 위에서 둘 다 None인 경우는 이미 반환됨
+    assert reference is not None  # nosec B101 - 위에서 둘 다 None인 경우는 이미 반환됨
 
     return {
         "yield_curve_value": yc["value"] if yc else None,
@@ -481,7 +481,7 @@ async def fetch_inflation_signal() -> dict[str, Any] | None:
     cpi_sub = cpi["sub_score"] if cpi else 0
     pce_sub = pce["sub_score"] if pce else 0
     reference = cpi or pce
-    assert reference is not None  # 위에서 둘 다 None인 경우는 이미 반환됨
+    assert reference is not None  # nosec B101 - 위에서 둘 다 None인 경우는 이미 반환됨
 
     return {
         "cpi_yoy_pct": cpi["yoy_change_pct"] if cpi else None,

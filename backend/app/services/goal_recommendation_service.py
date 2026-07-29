@@ -529,8 +529,8 @@ def _resolve_asset_goal_return_pct(
     `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다. 호출측이 `has_asset_goal`
     (goal_amount·retirement_target_year 둘 다 설정됨)을 이미 확인했다고 전제한다.
     """
-    assert settings_row.goal_amount is not None
-    assert settings_row.retirement_target_year is not None
+    assert settings_row.goal_amount is not None  # nosec B101 - has_asset_goal 체크로 호출측이 이미 보장함
+    assert settings_row.retirement_target_year is not None  # nosec B101 - has_asset_goal 체크로 호출측이 이미 보장함
     pmt = float(settings_row.monthly_deposit_amount or 0)
     if not pmt and settings_row.annual_deposit_goal:
         pmt = float(settings_row.annual_deposit_goal) / 12
@@ -639,7 +639,7 @@ async def _compute_goal_recommendation(
         )
         if early_result is not None:
             return early_result
-        assert required_return_pct is not None
+        assert required_return_pct is not None  # nosec B101 - early_result is None이면 항상 값이 있음
         required_return_pct_for_optimizer = required_return_pct
 
     candidate_dicts = await _get_or_seed_candidates(db, settings_row, existing_items)
