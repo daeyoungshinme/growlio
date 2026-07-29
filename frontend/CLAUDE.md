@@ -202,14 +202,6 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 > 순수 유틸뿐 아니라 컴포넌트·훅·페이지·API 레이어 모두 테스트 대상. 새 유틸은 동일 디렉토리에 `*.test.ts`, 새 컴포넌트/훅/페이지는 `src/__tests__/`에 대응 파일 작성. `vite.config.ts`에 커버리지 임계값(lines/functions/branches/statements) 설정됨.
 
-**E2E 테스트 (Playwright):**
-```bash
-# dev 서버(localhost:5173)가 실행 중이어야 함 — package.json에 전용 npm 스크립트 없음
-cd frontend && npx playwright test
-```
-- 설정: `playwright.config.ts`
-- 위치: `e2e/` — `auth.setup.ts`(로그인 상태 저장), `auth.spec.ts`, `dashboard.spec.ts`, `asset-management.spec.ts`, `portfolio.spec.ts`, `transactions.spec.ts`
-
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
 **`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.

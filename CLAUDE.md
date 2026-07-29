@@ -56,7 +56,6 @@ make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && pytest
 make test-frontend    # cd frontend && npm run test
-# E2E (Makefile 없음): cd frontend && npx playwright test   # dev 서버(5173) 실행 중 필요
 make lint             # ruff (backend) + eslint (frontend)
 make typecheck        # mypy (backend) + tsc --noEmit (frontend)
 make clean            # frontend/dist, pytest_cache, ruff_cache 삭제
@@ -99,7 +98,7 @@ growlio/
 - `render.yaml` — 백엔드 Render 배포 설정. 프론트엔드는 별도 호스팅.
 - `nginx/` — 포트 80 리버스 프록시. `/api/*` → backend:8000, 그 외 → frontend 정적파일. 새 API prefix 추가 시 `nginx/nginx.conf`의 `location` 블록 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
-- `.github/` — 3개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행), `e2e.yml` (Playwright E2E, PR 전용).
+- `.github/` — 2개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행).
 
 ---
 

@@ -118,7 +118,7 @@ export default defineConfig({
       VITE_SUPABASE_URL: "https://placeholder.supabase.co",
       VITE_SUPABASE_ANON_KEY: "placeholder-anon-key-for-tests",
     },
-    exclude: ["**/node_modules/**", "**/e2e/**"],
+    exclude: ["**/node_modules/**"],
     coverage: {
       provider: "v8",
       reporter: ["text", "lcov"],
