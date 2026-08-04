@@ -7,6 +7,8 @@ interface Props {
   children: React.ReactNode;
 }
 
+// 이 컴포넌트는 UI 레벨 게이트일 뿐이다 — 통과 못 해도 API 호출은 그대로 나간다(캐시된 JWT로 인증).
+// 실제 데이터 접근 통제는 백엔드 JWT 인증이 담당하며, 생체 인증은 화면 진입을 지연시키는 편의 기능이다.
 export default function BiometricGuard({ children }: Props) {
   const { isVerified, isAvailable, isEnabled, isLoading, error, verify } = useBiometric();
 

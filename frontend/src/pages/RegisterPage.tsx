@@ -64,7 +64,7 @@ export default function RegisterPage() {
         );
       } else {
         console.error("[Register] Unhandled Supabase signUp error:", msg);
-        Sentry.captureException(err, { extra: { context: "register", email } });
+        Sentry.captureException(err, { extra: { context: "register" } });
         setError("회원가입 중 오류가 발생했습니다");
       }
     } finally {

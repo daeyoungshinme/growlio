@@ -1,5 +1,4 @@
 import hmac
-import re
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -12,6 +11,7 @@ from fastapi.responses import JSONResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.gzip import GZipMiddleware
@@ -21,6 +21,7 @@ from app.api.v1.router import router
 from app.core.cache_store import close_cache_store
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import configure_logging, redact_secrets
 from app.exceptions import (
     AppError,
     ProviderApiError,
@@ -35,6 +36,7 @@ from app.scheduler import init_scheduler, scheduler
 from app.utils.circuit_breaker import CircuitOpenError
 from app.utils.metrics import http_request_duration
 
+configure_logging()
 logger = structlog.get_logger()
 
 if settings.sentry_dsn:
@@ -50,17 +52,6 @@ if settings.sentry_dsn:
         env=settings.app_env,
         release=settings.sentry_release or "unset",
     )
-
-_SECRET_PATTERN = re.compile(
-    r"(appkey|appsecret|secretkey|access_token|refresh_token|Bearer|password|Authorization"
-    r"|api_key|apikey|dart_api_key|encryption_key|jwt_secret|supabase_key|database_url)"
-    r"[=:\s\"']+[A-Za-z0-9+/=_\-\.]{4,}",
-    re.IGNORECASE,
-)
-
-
-def _sanitize(text: str) -> str:
-    return _SECRET_PATTERN.sub(r"\1=[REDACTED]", text)
 
 
 @asynccontextmanager
@@ -86,6 +77,7 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]  # slowapi handler signature
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -209,7 +201,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     logger.error(
         "unhandled_exception",
         path=str(request.url.path),
-        error=_sanitize(str(exc)),
+        error=redact_secrets(str(exc)),
         exc_info=True,
     )
     return JSONResponse(status_code=500, content={"detail": "서버 오류가 발생했습니다."})

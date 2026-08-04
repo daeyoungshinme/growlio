@@ -65,7 +65,8 @@ export const updateTickerDividendMonths = (
   ticker: string,
   market: string,
   dividend_months: number[],
-) => apiPut(`/dividends/ticker-settings/${ticker}`, { market, dividend_months });
+) =>
+  apiPut(`/dividends/ticker-settings/${encodeURIComponent(ticker)}`, { market, dividend_months });
 
 export const deleteTickerDividendMonths = (ticker: string, market: string) =>
-  apiDelete(`/dividends/ticker-settings/${ticker}`, { params: { market } });
+  apiDelete(`/dividends/ticker-settings/${encodeURIComponent(ticker)}`, { params: { market } });

@@ -14,6 +14,7 @@ from app.kiwoom.constants import (
 )
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
+from app.services.credential_service import encrypt
 
 logger = structlog.get_logger()
 
@@ -116,21 +117,23 @@ async def _fetch_and_store_token(
     ttl = remaining - TOKEN_CACHE_TTL_BUFFER
     await cache.setex(cache_key, max(ttl, 60), access_token)
 
-    # DB upsert (account_id unique 제약 기반)
+    # DB upsert (account_id unique 제약 기반, DB에는 암호화된 값만 저장 — 캐시/반환값은 평문 유지)
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     from app.models.token import KiwoomToken
 
+    encrypted_token = encrypt(access_token)
+
     stmt = pg_insert(KiwoomToken).values(
         user_id=user_id,
         account_id=account_id,
-        access_token=access_token,
+        access_token=encrypted_token,
         expires_at=expires_at,
         is_mock_mode=is_mock,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["account_id"],
-        set_={"access_token": access_token, "expires_at": expires_at},
+        set_={"access_token": encrypted_token, "expires_at": expires_at},
     )
     await db.execute(stmt)
     await db.commit()

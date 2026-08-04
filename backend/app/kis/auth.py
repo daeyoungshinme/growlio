@@ -11,6 +11,7 @@ from app.kis.constants import (
 )
 from app.providers._token_cache import get_or_fetch_token
 from app.providers.http_client import _get_client
+from app.services.credential_service import decrypt, encrypt
 
 logger = structlog.get_logger()
 
@@ -111,36 +112,38 @@ async def _fetch_and_store_token(
     ttl = expires_in - TOKEN_CACHE_TTL_BUFFER
     await cache.setex(cache_key, max(ttl, 60), access_token)
 
-    # DB upsert
+    # DB upsert (DB에는 암호화된 값만 저장 — 캐시/반환값은 평문 유지)
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
     from app.models.token import KisToken
+
+    encrypted_token = encrypt(access_token)
 
     if account_id:
         stmt = pg_insert(KisToken).values(
             user_id=user_id,
             account_id=account_id,
-            access_token=access_token,
+            access_token=encrypted_token,
             expires_at=expires_at,
             is_mock_mode=is_mock,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["account_id"],
             index_where=KisToken.account_id != None,  # noqa: E711
-            set_={"access_token": access_token, "expires_at": expires_at},
+            set_={"access_token": encrypted_token, "expires_at": expires_at},
         )
     else:
         stmt = pg_insert(KisToken).values(
             user_id=user_id,
             account_id=None,
-            access_token=access_token,
+            access_token=encrypted_token,
             expires_at=expires_at,
             is_mock_mode=is_mock,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["user_id", "is_mock_mode"],
             index_where=KisToken.account_id == None,  # noqa: E711
-            set_={"access_token": access_token, "expires_at": expires_at},
+            set_={"access_token": encrypted_token, "expires_at": expires_at},
         )
     await db.execute(stmt)
     await db.commit()
@@ -181,24 +184,32 @@ async def promote_user_token_to_account(
     if row is None:
         return False
 
+    try:
+        plaintext_token = decrypt(row.access_token)
+        encrypted_token = row.access_token  # 이미 암호문 — 그대로 복사
+    except ValueError:
+        # 암호화 적용 이전에 저장된 레거시 평문 row — 복사 시점에 암호화해 새 row는 안전하게 저장
+        plaintext_token = row.access_token
+        encrypted_token = encrypt(row.access_token)
+
     stmt = pg_insert(KisToken).values(
         user_id=user_id,
         account_id=account_id,
-        access_token=row.access_token,
+        access_token=encrypted_token,
         expires_at=row.expires_at,
         is_mock_mode=is_mock,
     )
     stmt = stmt.on_conflict_do_update(
         index_elements=["account_id"],
         index_where=KisToken.account_id != None,  # noqa: E711
-        set_={"access_token": row.access_token, "expires_at": row.expires_at},
+        set_={"access_token": encrypted_token, "expires_at": row.expires_at},
     )
     await db.execute(stmt)
     await db.commit()
 
     ttl = int((row.expires_at - datetime.now(UTC)).total_seconds() - TOKEN_CACHE_TTL_BUFFER)
     if ttl > 0:
-        await cache.setex(ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id), ttl, row.access_token)
+        await cache.setex(ACCOUNT_TOKEN_CACHE_KEY.format(account_id=account_id), ttl, plaintext_token)
 
     logger.info("kis_token_promoted_to_account", user_id=user_id, account_id=account_id, is_mock=is_mock)
     return True

@@ -100,7 +100,7 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 
 > 새 공통 컴포넌트 추가/삭제 시 이 목록도 함께 갱신.
 
-- **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동).
+- **`BiometricGuard.tsx`** — `App.tsx`에서 `AppLayout` 전체를 감싸는 게이트 컴포넌트. Android 네이티브 빌드에서 생체 인증 미통과 시 하위 라우트 렌더링 차단 (`useBiometric.ts`와 연동). **UI 레벨 게이트일 뿐** — 통과 못 해도 캐시된 JWT로 API 호출 자체는 막히지 않는다. 실제 접근 통제는 백엔드 JWT 인증이 담당하며, 이 컴포넌트를 보안 경계로 의존하는 설계는 하지 말 것.
 - **`OfflineBanner.tsx`** — `useOnlineStatus.ts`로 네트워크 상태 감지 + PWA 오프라인 캐싱(`vite.config.ts`의 VitePWA/Workbox `StaleWhileRevalidate`, 대상: dashboard/portfolio-overview/accounts 엔드포인트)과 함께 오프라인 상태를 안내.
 - **`components/dashboard/IsaMaturityCard.tsx`** — ISA 계좌 의무가입 3년 만기 현황 카드. `PortfolioPage`(자산탭 투자현황 › 세금 서브탭)의 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.

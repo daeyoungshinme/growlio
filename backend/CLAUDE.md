@@ -73,7 +73,7 @@ cd backend && uv run mypy app/
 `backend/.env` (`.env.example` 참고):
 - `APP_ENV=development` — `/docs` Swagger UI 활성화 여부 제어
 - `APP_SECRET_KEY` — JWT 서명 키
-- `DATABASE_URL` — PostgreSQL asyncpg URL
+- `DATABASE_URL` — PostgreSQL asyncpg URL. Supabase 사용 시 **Transaction Pooler(6543) 권장** — Session Pooler(5432)는 프로젝트 전체에 걸쳐 동시 연결 15개 상한을 공유해 orphan 프로세스(비정상 종료된 `uvicorn --reload` 등) 하나만 남아도 쉽게 소진되어 `EMAXCONNSESSION` 오류가 발생함
 - `MIGRATION_DATABASE_URL` — Supabase 전용 마이그레이션 DB URL (로컬 Docker는 `DATABASE_URL`과 동일)
 - `KIS_CRED_ENCRYPTION_KEY` — 32-byte hex (64자). KIS/키움 자격증명 AES-256 암호화 키
 - `ALLOWED_ORIGINS` — CORS 허용 출처 (쉼표 구분, 예: `http://localhost:5173`)

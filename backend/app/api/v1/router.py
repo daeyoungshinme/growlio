@@ -8,6 +8,7 @@ from app.api.v1 import (
     dashboard,
     dividends,
     economic_indicators,
+    external,
     insights,
     invest,
     market_signals,
@@ -45,3 +46,4 @@ router.include_router(alerts.router)
 router.include_router(tax.router)
 router.include_router(economic_indicators.router)
 router.include_router(market_signals.router)
+router.include_router(external.router)

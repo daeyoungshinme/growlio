@@ -11,6 +11,8 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Protocol
 
+from app.services.credential_service import decrypt
+
 if TYPE_CHECKING:
     from app.core.cache_store import CacheStore
 
@@ -42,7 +44,13 @@ async def get_or_fetch_token(
         elapsed = (token_row.expires_at - datetime.now(UTC)).total_seconds()
         ttl = int(elapsed - ttl_buffer)
         if ttl > 0:
-            await cache.setex(cache_key, ttl, token_row.access_token)
-            return token_row.access_token
+            try:
+                plaintext_token = decrypt(token_row.access_token)
+            except ValueError:
+                # 암호화 적용 이전에 평문으로 저장된 레거시 row — 캐시 미스로 간주하고 새로 발급
+                plaintext_token = None
+            if plaintext_token is not None:
+                await cache.setex(cache_key, ttl, plaintext_token)
+                return plaintext_token
 
     return await fetch()
