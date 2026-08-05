@@ -415,6 +415,67 @@ class TestBuildPortfolioOverviewWithAccounts:
         assert by_type["CASH_STOCK"] == pytest.approx(10_000_000 - 800_000)
 
     @pytest.mark.asyncio
+    async def test_total_deposit_krw_derived_from_snapshot_not_deposit_krw_column(self, override_settings):
+        """total_deposit_krw는 acc.deposit_krw 컬럼이 아니라 스냅샷 amount_krw 기반 CASH_STOCK 버킷에서
+        유도되어야 한다 — deposit_krw가 None(해외주식 계좌의 USD예수금이거나 컬럼이 스냅샷과 어긋난 경우)이어도
+        실제 계좌 현금(예수금)이 리밸런싱 분석의 available_cash_krw 계산에서 누락되면 안 된다."""
+        db = AsyncMock()
+        acc_id = uuid.uuid4()
+        snap_id = uuid.uuid4()
+
+        account = _make_account(acc_id=acc_id, asset_type="STOCK_KIS")  # deposit_krw=None (fixture 기본값)
+        snapshot = _make_snapshot(snap_id, acc_id)  # amount_krw=10,000,000
+        position = _make_position(snap_id, acc_id)  # 평가금 800,000
+
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account]),
+                _exec_result([snapshot]),
+                _exec_result([position]),
+                _exec_result([]),
+            ]
+        )
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        assert result["total_deposit_krw"] == pytest.approx(10_000_000 - 800_000)
+
+    @pytest.mark.asyncio
+    async def test_total_deposit_krw_sums_across_multiple_broker_accounts(self, override_settings):
+        """'전체 계좌' 포트폴리오처럼 KIS + 키움 등 여러 증권 계좌가 있을 때 total_deposit_krw는
+        각 계좌 예수금(amount_krw - 포지션 평가금)의 합이어야 한다."""
+        db = AsyncMock()
+        acc_id1, acc_id2 = uuid.uuid4(), uuid.uuid4()
+        snap_id1, snap_id2 = uuid.uuid4(), uuid.uuid4()
+
+        account1 = _make_account(acc_id=acc_id1, asset_type="STOCK_KIS")
+        account2 = _make_account(acc_id=acc_id2, asset_type="STOCK_KIWOOM")
+        snapshot1 = _make_snapshot(snap_id1, acc_id1)  # amount_krw=10,000,000
+        snapshot2 = SimpleNamespace(
+            id=snap_id2,
+            account_id=acc_id2,
+            snapshot_date=date.today(),
+            amount_krw=5_000_000,
+            invested_amount=4_000_000,
+            unrealized_pnl=500_000,
+        )
+        position1 = _make_position(snap_id1, acc_id1)  # 평가금 800,000
+
+        db.execute = AsyncMock(
+            side_effect=[
+                _exec_result([account1, account2]),
+                _exec_result([snapshot1, snapshot2]),
+                _exec_result([position1]),  # account2는 보유 종목 없음(예수금만)
+                _exec_result([]),
+            ]
+        )
+
+        result = await build_portfolio_overview(uuid.uuid4(), db)
+
+        # account1 예수금: 10,000,000 - 800,000 = 9,200,000 / account2 예수금: 5,000,000 - 0 = 5,000,000
+        assert result["total_deposit_krw"] == pytest.approx(9_200_000 + 5_000_000)
+
+    @pytest.mark.asyncio
     async def test_kiwoom_stock_account_positions_included_in_all_positions(self, override_settings):
         """STOCK_KIWOOM 계좌 보유종목도 all_positions에 포함되어야 한다 — 과거 STOCK_TYPES
         frozenset에서 STOCK_KIWOOM이 누락되어 종목 상세가 통째로 빠지던 회귀 방지."""

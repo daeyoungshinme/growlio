@@ -11,7 +11,7 @@ import RebalancingSummaryCards from "./RebalancingSummaryCards";
 import RebalancingTradePlanPanel from "./RebalancingTradePlanPanel";
 import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
-import { calcTradeKrw } from "./rebalancingTradeMath";
+import { calcTradeSummary } from "./rebalancingTradeMath";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -52,13 +52,8 @@ export default function RebalancingTable({
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
     (analysis.total_current_annual_dividend ?? analysis.current_portfolio_annual_dividend ?? 0) > 0;
 
-  // 요약·거래계획·거래비용 모두 calcTradeKrw 기준으로 통일
-  const totalBuySummary = analysis.items
-    .filter((i) => i.diff_krw > 0)
-    .reduce((s, i) => s + calcTradeKrw(i), 0);
-  const totalSellSummary = analysis.items
-    .filter((i) => i.diff_krw < 0)
-    .reduce((s, i) => s + calcTradeKrw(i), 0);
+  // 요약·거래계획·거래비용 모두 calcTradeKrw 기준으로 통일 (거래 불가 항목은 calcTradeSummary가 제외)
+  const { totalBuySummary, totalSellSummary } = calcTradeSummary(analysis.items);
   const cashAvailable = analysis.available_cash_krw ?? 0;
   const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
 

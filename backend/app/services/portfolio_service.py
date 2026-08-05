@@ -40,11 +40,6 @@ STOCK_TYPES: frozenset[str] = frozenset(
     {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER, AssetType.CASH_OTHER}
 )
 
-# 브로커 계좌: deposit_krw를 보유하는 유형 (예수금 합산 대상)
-_BROKER_TYPES: frozenset[str] = frozenset(
-    {AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER, AssetType.CASH_OTHER}
-)
-
 # 전체 자산 구성 집계 시 포지션 평가금/예수금을 분리하는 대상 (composition_calculator._STOCK_TYPES와 동일)
 _EQUITY_TYPES: frozenset[str] = frozenset({AssetType.STOCK_KIS, AssetType.STOCK_KIWOOM, AssetType.STOCK_OTHER})
 
@@ -267,7 +262,6 @@ async def build_portfolio_overview(
     total_assets_krw = 0.0
     total_invested_krw = 0.0
     unrealized_pnl_krw = 0.0
-    total_deposit_krw = 0.0
     asset_type_totals: dict[str, float] = {}
     all_positions: list[dict] = []
     # lite 모드에서 stock_allocation 계산용 최소 필드만 수집
@@ -304,8 +298,12 @@ async def build_portfolio_overview(
         )
         account_rows.append(account_row)
 
-        if acc.asset_type in _BROKER_TYPES and acc.include_in_total:
-            total_deposit_krw += float(acc.deposit_krw or 0)
+    # 증권계좌 예수금 = CASH_STOCK(증권계좌 현금 + 수동 등록 예수금) + CASH_OTHER(현금 전용 브로커 계좌) 버킷 합.
+    # acc.deposit_krw만 합산하면 해외주식 계좌의 deposit_usd(달러 예수금)가 누락되고, deposit_krw가
+    # 스냅샷과 어긋난 계좌에서도 과소 계산되므로, 스냅샷 amount_krw 기반의 정확한 버킷을 재사용한다.
+    total_deposit_krw = asset_type_totals.get(AssetType.CASH_STOCK, 0.0) + asset_type_totals.get(
+        AssetType.CASH_OTHER, 0.0
+    )
 
     stock_total_krw = total_invested_krw + unrealized_pnl_krw
     stock_return_pct = (unrealized_pnl_krw / total_invested_krw * 100) if total_invested_krw else 0.0

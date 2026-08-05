@@ -3,7 +3,7 @@ import { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { PROFIT_COLOR, LOSS_COLOR } from "@/utils/colors";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
-import { TRADING_FEE_RATE, calcTradeKrw } from "./rebalancingTradeMath";
+import { TRADING_FEE_RATE, calcTradeKrw, isTradableItem } from "./rebalancingTradeMath";
 
 interface Props {
   items: RebalancingItem[];
@@ -20,12 +20,8 @@ export default function RebalancingTradePlanPanel({
 }: Props) {
   const [showTradePlan, setShowTradePlan] = useState(false);
 
-  const buyItems = items.filter(
-    (i) => i.shares_to_trade !== null && i.shares_to_trade > 0 && i.current_price_krw,
-  );
-  const sellItems = items.filter(
-    (i) => i.shares_to_trade !== null && i.shares_to_trade < 0 && i.current_price_krw,
-  );
+  const buyItems = items.filter((i) => isTradableItem(i) && i.shares_to_trade! > 0);
+  const sellItems = items.filter((i) => isTradableItem(i) && i.shares_to_trade! < 0);
   const unpricedItems = items.filter(
     (i) =>
       i.diff_krw !== 0 &&
