@@ -170,6 +170,8 @@ export function useGoalSettings() {
           cagr_lookback_years: current.goal_cagr_lookback_years,
           short_term_equity_floor_pct: current.goal_short_term_equity_floor_pct,
           age_group: current.age_group,
+          bond_ceiling_pct: current.goal_bond_ceiling_pct,
+          cash_ceiling_pct: current.goal_cash_ceiling_pct,
         });
         await invalidateGoalRecommendationData(queryClient);
       }

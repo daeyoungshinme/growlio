@@ -9,8 +9,10 @@ import pytest
 from app.services.rebalancing.strategy_service import (
     _build_summary,
     _build_trade_recommendations,
+    _drift_threshold,
     _factor_reason,
     _overall_direction,
+    _per_ticker_factor_reason,
     _sharpe,
 )
 
@@ -73,7 +75,7 @@ class TestBuildTradeRecommendations:
 
     def test_new_ticker_gets_new_action(self):
         items = [self._make_item("035420", "KOSPI", "NAVER", 30.0)]
-        recs = _build_trade_recommendations({}, items, {})
+        recs = _build_trade_recommendations({}, items, {}, [], [])
         assert len(recs) == 1
         assert recs[0]["action"] == "신규 편입"
         assert recs[0]["ticker"] == "035420"
@@ -81,7 +83,7 @@ class TestBuildTradeRecommendations:
     def test_below_threshold_skipped(self):
         current = {"005930-KOSPI": {"ticker": "005930", "market": "KOSPI", "name": "삼성전자", "value_krw": 1000000.0}}
         items = [self._make_item("005930", "KOSPI", "삼성전자", 11.5)]  # 10% current, 11.5% target → delta 1.5 < 2
-        recs = _build_trade_recommendations(current, items, {})
+        recs = _build_trade_recommendations(current, items, {}, [], [])
         assert all(r["ticker"] != "005930" or r["action"] != "비중 확대" for r in recs)
 
     def test_increase_weight(self):
@@ -94,7 +96,7 @@ class TestBuildTradeRecommendations:
             self._make_item("005930", "KOSPI", "삼성전자", 70.0),
             self._make_item("035420", "KOSPI", "NAVER", 30.0),
         ]
-        recs = _build_trade_recommendations(current, items, {})
+        recs = _build_trade_recommendations(current, items, {}, [], [])
         assert any(r["action"] == "비중 확대" for r in recs)
 
     def test_decrease_weight(self):
@@ -106,22 +108,159 @@ class TestBuildTradeRecommendations:
             self._make_item("005930", "KOSPI", "삼성전자", 40.0),
             self._make_item("035420", "KOSPI", "NAVER", 30.0),
         ]
-        recs = _build_trade_recommendations(current, items, {})
+        recs = _build_trade_recommendations(current, items, {}, [], [])
         assert any(r["action"] == "비중 축소" for r in recs)
 
     def test_sell_action_for_missing_from_target(self):
         current = {"999999-KOSPI": {"ticker": "999999", "market": "KOSPI", "name": "구종목", "value_krw": 5000000.0}}
         items = []
-        recs = _build_trade_recommendations(current, items, {})
+        recs = _build_trade_recommendations(current, items, {}, [], [])
         assert any(r["action"] == "전량 매도" and r["ticker"] == "999999" for r in recs)
 
     def test_empty_inputs(self):
-        assert _build_trade_recommendations({}, [], {}) == []
+        assert _build_trade_recommendations({}, [], {}, [], []) == []
 
     def test_results_limited_to_10(self):
         items = [self._make_item(f"00{i:04d}", "KOSPI", f"종목{i}", 5.0) for i in range(15)]
-        recs = _build_trade_recommendations({}, items, {})
+        recs = _build_trade_recommendations({}, items, {}, [], [])
         assert len(recs) <= 10
+
+
+class TestDriftThreshold:
+    def test_small_target_weight_uses_floor(self):
+        assert _drift_threshold(5.0) == 2.0  # max(2.0, 5.0*0.1=0.5) → 바닥값(2.0)
+
+    def test_large_target_weight_uses_ratio(self):
+        assert _drift_threshold(30.0) == 3.0  # max(2.0, 30.0*0.1=3.0) → 비율값(3.0)
+
+    def test_zero_target_weight_uses_floor(self):
+        assert _drift_threshold(0.0) == 2.0
+
+
+class TestPerTickerFactorReason:
+    def _holding(self, ticker: str, **scores) -> dict:
+        base = {"value_score": 50.0, "growth_score": 50.0, "size_score": 50.0, "momentum_score": 50.0}
+        base.update(scores)
+        return {"ticker": ticker, **base}
+
+    def test_missing_current_holding_uses_fallback(self):
+        target = {"005930": self._holding("005930")}
+        result = _per_ticker_factor_reason("005930", {}, target, "폴백")
+        assert result == "폴백"
+
+    def test_missing_target_holding_uses_fallback(self):
+        current = {"005930": self._holding("005930")}
+        result = _per_ticker_factor_reason("005930", current, {}, "폴백")
+        assert result == "폴백"
+
+    def test_no_significant_delta_uses_fallback(self):
+        current = {"005930": self._holding("005930", value_score=50.0)}
+        target = {"005930": self._holding("005930", value_score=52.0)}  # delta=2 <= 5, 무의미
+        result = _per_ticker_factor_reason("005930", current, target, "폴백")
+        assert result == "폴백"
+
+    def test_largest_delta_used_over_smaller_one(self):
+        current = {"005930": self._holding("005930", value_score=50.0, momentum_score=50.0)}
+        target = {"005930": self._holding("005930", value_score=60.0, momentum_score=90.0)}
+        result = _per_ticker_factor_reason("005930", current, target, "폴백")
+        assert "모멘텀 팩터 강화" in result
+        assert "가치 팩터 강화" in result
+        # 모멘텀(delta=40)이 가치(delta=10)보다 먼저 나와야 한다(내림차순 정렬)
+        assert result.index("모멘텀") < result.index("가치")
+
+    def test_negative_delta_is_weakening(self):
+        current = {"005930": self._holding("005930", growth_score=70.0)}
+        target = {"005930": self._holding("005930", growth_score=40.0)}
+        result = _per_ticker_factor_reason("005930", current, target, "폴백")
+        assert "성장 팩터 완화" in result
+
+    def test_at_most_two_factors_shown(self):
+        current = {"005930": self._holding("005930")}
+        target = {
+            "005930": {
+                "ticker": "005930",
+                "value_score": 90.0,
+                "growth_score": 90.0,
+                "size_score": 90.0,
+                "momentum_score": 90.0,
+            }
+        }
+        result = _per_ticker_factor_reason("005930", current, target, "폴백")
+        assert result.count("팩터") == 2
+
+
+class TestBuildTradeRecommendationsPerTickerReason:
+    def _make_item(self, ticker: str, market: str, name: str, weight: float):
+        return SimpleNamespace(ticker=ticker, market=market, name=name, weight=weight)
+
+    def _holding(self, ticker: str, **scores) -> dict:
+        base = {"value_score": 50.0, "growth_score": 50.0, "size_score": 50.0, "momentum_score": 50.0}
+        base.update(scores)
+        return {"ticker": ticker, **base}
+
+    def test_increase_uses_per_ticker_reason_when_holdings_available(self):
+        current_pos = {
+            "005930-KOSPI": {"ticker": "005930", "market": "KOSPI", "name": "삼성전자", "value_krw": 3000000.0},
+            "035420-KOSPI": {"ticker": "035420", "market": "KOSPI", "name": "NAVER", "value_krw": 7000000.0},
+        }
+        items = [
+            self._make_item("005930", "KOSPI", "삼성전자", 70.0),
+            self._make_item("035420", "KOSPI", "NAVER", 30.0),
+        ]
+        current_holdings = [self._holding("005930", momentum_score=30.0)]
+        target_holdings = [self._holding("005930", momentum_score=80.0)]
+
+        recs = _build_trade_recommendations(current_pos, items, {}, current_holdings, target_holdings)
+
+        increase_rec = next(r for r in recs if r["action"] == "비중 확대")
+        assert "모멘텀 팩터 강화" in increase_rec["reason"]
+
+    def test_increase_falls_back_to_portfolio_summary_without_holdings(self):
+        current_pos = {
+            "005930-KOSPI": {"ticker": "005930", "market": "KOSPI", "name": "삼성전자", "value_krw": 3000000.0},
+            "035420-KOSPI": {"ticker": "035420", "market": "KOSPI", "name": "NAVER", "value_krw": 7000000.0},
+        }
+        items = [
+            self._make_item("005930", "KOSPI", "삼성전자", 70.0),
+            self._make_item("035420", "KOSPI", "NAVER", 30.0),
+        ]
+        factor_changes = {"value": {"delta": 10}}
+
+        recs = _build_trade_recommendations(current_pos, items, factor_changes, [], [])
+
+        increase_rec = next(r for r in recs if r["action"] == "비중 확대")
+        assert "가치 팩터 강화" in increase_rec["reason"]
+
+    def test_decrease_falls_back_to_fixed_text_without_holdings(self):
+        current_pos = {
+            "005930-KOSPI": {"ticker": "005930", "market": "KOSPI", "name": "삼성전자", "value_krw": 7000000.0},
+            "035420-KOSPI": {"ticker": "035420", "market": "KOSPI", "name": "NAVER", "value_krw": 3000000.0},
+        }
+        items = [
+            self._make_item("005930", "KOSPI", "삼성전자", 40.0),
+            self._make_item("035420", "KOSPI", "NAVER", 30.0),
+        ]
+
+        recs = _build_trade_recommendations(current_pos, items, {}, [], [])
+
+        decrease_rec = next(r for r in recs if r["action"] == "비중 축소")
+        assert decrease_rec["reason"] == "리스크 감소 또는 비중 조정"
+
+    def test_relative_threshold_skips_small_delta_on_large_target_weight(self):
+        """목표비중 30%에 델타 2.5%p는 기존 고정 임계값(2.0)으로는 포함됐겠지만, 상대 임계값
+        max(2.0, 30*0.1=3.0)=3.0보다 작아 이제는 스킵돼야 한다."""
+        current_pos = {
+            "005930-KOSPI": {"ticker": "005930", "market": "KOSPI", "name": "삼성전자", "value_krw": 2750000.0},
+            "035420-KOSPI": {"ticker": "035420", "market": "KOSPI", "name": "NAVER", "value_krw": 7250000.0},
+        }
+        items = [
+            self._make_item("005930", "KOSPI", "삼성전자", 30.0),  # 27.5% → 30.0%, delta=2.5
+            self._make_item("035420", "KOSPI", "NAVER", 70.0),
+        ]
+
+        recs = _build_trade_recommendations(current_pos, items, {}, [], [])
+
+        assert all(r["ticker"] != "005930" for r in recs)
 
 
 class TestOverallDirection:

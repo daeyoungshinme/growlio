@@ -33,6 +33,7 @@ import SkeletonCard from "@/components/common/SkeletonCard";
 import GoalCandidateManagerModal from "@/components/rebalancing/GoalCandidateManagerModal";
 import GoalRecommendationOptionsModal from "@/components/rebalancing/GoalRecommendationOptionsModal";
 import RecommendationResultPanel from "@/components/rebalancing/RecommendationResultPanel";
+import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 import {
   buildWeightDiffRows,
   computeRecommendationDrift,
@@ -119,6 +120,16 @@ function RecommendationComparisonPreview({
 
   return (
     <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <p className="text-center text-xs text-gray-400 dark:text-gray-500">현재</p>
+          <PortfolioWeightChart items={currentItems} />
+        </div>
+        <div>
+          <p className="text-center text-xs text-teal-600 dark:text-teal-400 font-medium">추천</p>
+          <PortfolioWeightChart items={recommendedItems} />
+        </div>
+      </div>
       <div className="max-h-40 overflow-y-auto">
         <table className="w-full text-xs">
           <thead>
@@ -472,9 +483,12 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               {hasOverallRecommendation ? (
                 <>
                   <p className="text-xs text-gray-600 dark:text-gray-300">
-                    목표 달성에 필요한 연 수익률 {overallData.required_return_pct?.toFixed(1)}% —
-                    아래 비중으로 조정하면 기대수익률 {overallData.expected_return_pct?.toFixed(1)}%
-                    (최근 {overallData.cagr_lookback_years}년 CAGR 기준)
+                    목표 달성에 필요한 연 수익률 {overallData.required_return_pct?.toFixed(1)}%
+                    {overallData.required_dividend_yield_pct != null &&
+                      ` · 목표 배당수익률 연 ${overallData.required_dividend_yield_pct.toFixed(1)}%`}{" "}
+                    — 아래 비중으로 조정하면 기대수익률{" "}
+                    {overallData.expected_return_pct?.toFixed(1)}% (최근{" "}
+                    {overallData.cagr_lookback_years}년 CAGR 기준)
                     {overallData.expected_dividend_yield_pct != null &&
                       ` (배당수익률 약 ${overallData.expected_dividend_yield_pct.toFixed(1)}%)`}
                     를 기대할 수 있습니다.
@@ -542,6 +556,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
                   <p className="text-xs text-gray-600 dark:text-gray-300">
                     {ageData.age_bracket} 기준 리스크 성향{" "}
                     {RISK_TOLERANCE_LABELS[ageData.risk_tolerance] ?? ageData.risk_tolerance}
+                    {ageData.required_dividend_yield_pct != null &&
+                      ` · 목표 배당수익률 연 ${ageData.required_dividend_yield_pct.toFixed(1)}%`}
                     {ageData.expected_return_pct != null &&
                       ` · 기대수익률 ${ageData.expected_return_pct.toFixed(1)}%`}
                     {ageData.expected_dividend_yield_pct != null &&
@@ -599,6 +615,8 @@ export default function RecommendationCard({ onApplied, onCreatePortfolio }: Pro
               {fmtKrw(activeHorizonRec.base_krw)} · 리스크 성향{" "}
               {RISK_TOLERANCE_LABELS[activeHorizonRec.risk_tolerance] ??
                 activeHorizonRec.risk_tolerance}
+              {activeHorizonRec.required_dividend_yield_pct != null &&
+                ` · 목표 배당수익률 연 ${activeHorizonRec.required_dividend_yield_pct.toFixed(1)}%`}
               {activeHorizonRec.recommended_items.length > 0 &&
                 activeHorizonRec.expected_return_pct != null &&
                 ` · 기대수익률 ${activeHorizonRec.expected_return_pct.toFixed(1)}%`}

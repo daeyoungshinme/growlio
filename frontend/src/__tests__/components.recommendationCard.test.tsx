@@ -133,6 +133,8 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_max_weight_pct: 40.0,
     goal_cagr_lookback_years: 10,
     goal_short_term_equity_floor_pct: 80.0,
+    goal_bond_ceiling_pct: null,
+    goal_cash_ceiling_pct: null,
     age_group: null,
     birth_year: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,
@@ -239,6 +241,7 @@ function makeHorizonRec(
         dividend_yield_pct: null,
       },
     ],
+    required_dividend_yield_pct: null,
     expected_return_pct: 2.5,
     expected_dividend_yield_pct: null,
     expected_volatility_pct: null,
@@ -329,6 +332,15 @@ describe("RecommendationCard", () => {
       expect(screen.getByText("40.0%")).toBeDefined();
       expect(screen.getByText(/최근 10년 CAGR 기준/)).toBeDefined();
       expect(screen.getByText(/예상 변동성은 연 12\.3%입니다/)).toBeDefined();
+    });
+
+    it("shows the target (required) dividend yield when a dividend goal is set", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(
+        makeOverallRecommendation({ required_dividend_yield_pct: 5.0 }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      expect(await screen.findByText(/목표 배당수익률 연 5\.0%/)).toBeDefined();
     });
 
     it("shows a hint instead of an apply control when no portfolio is set as a goal target", async () => {
@@ -639,6 +651,22 @@ describe("RecommendationCard", () => {
       expect(screen.getByText(/예상 변동성 연 16\.0%/)).toBeDefined();
     });
 
+    it("shows the target (required) dividend yield distinct from expected", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchAgeGoalRecommendation.mockResolvedValue(
+        makeAgeRecommendation({
+          required_dividend_yield_pct: 4.0,
+          expected_dividend_yield_pct: 1.5,
+        }),
+      );
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("연령대"));
+
+      expect(await screen.findByText(/목표 배당수익률 연 4\.0%/)).toBeDefined();
+      expect(screen.getByText(/배당수익률 약 1\.5%/)).toBeDefined();
+    });
+
     it("applies the age-based recommendation to the tagged target portfolio", async () => {
       fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
       fetchAgeGoalRecommendation.mockResolvedValue(makeAgeRecommendation());
@@ -835,6 +863,8 @@ describe("RecommendationCard", () => {
         cagr_lookback_years: 10,
         short_term_equity_floor_pct: 80,
         age_group: null,
+        bond_ceiling_pct: null,
+        cash_ceiling_pct: null,
       });
     });
 
@@ -913,6 +943,24 @@ describe("RecommendationCard", () => {
 
       expect(await screen.findByText(/배당수익률 약 3\.2%/)).toBeDefined();
       expect(screen.getByText(/예상 변동성 연 5\.5%/)).toBeDefined();
+    });
+
+    it("shows the target (required) dividend yield for the selected horizon, distinct from expected", async () => {
+      fetchOverallGoalRecommendation.mockResolvedValue(makeOverallRecommendation());
+      fetchHorizonGoalRecommendations.mockResolvedValue(
+        makeHorizonResponse([
+          makeHorizonRec({ required_dividend_yield_pct: 4.5, expected_dividend_yield_pct: 3.2 }),
+        ]),
+      );
+      fetchAccounts.mockResolvedValue([
+        makeAccount({ asset_type: "REAL_ESTATE", investment_horizon: "SHORT_TERM" }),
+      ]);
+      renderWithProviders(<RecommendationCard />);
+
+      fireEvent.click(await screen.findByText("단기"));
+
+      expect(await screen.findByText(/목표 배당수익률 연 4\.5%/)).toBeDefined();
+      expect(screen.getByText(/배당수익률 약 3\.2%/)).toBeDefined();
     });
 
     it("switches displayed recommendation when another horizon pill is clicked", async () => {

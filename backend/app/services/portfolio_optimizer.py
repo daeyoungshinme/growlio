@@ -46,6 +46,8 @@ def _compute_frontier(
         logger.error("scipy_not_installed")
         return {"frontier": [], "current": None, "assets": [], "note": "scipy 미설치"}
 
+    from app.services.estimation import shrink_covariance, shrink_expected_returns
+
     # 충분한 데이터가 있는 종목만 사용
     valid_pairs = [
         (s, w)
@@ -68,11 +70,13 @@ def _compute_frontier(
     min_len = min(len(returns_map[s]) for s in valid_syms)
     rets = np.array([returns_map[s][:min_len] for s in valid_syms])  # (n, T)
 
-    # 연율화 기대수익률 및 공분산 행렬
-    mean_annual = rets.mean(axis=1) * 252
-    cov_annual = np.cov(rets) * 252
-
+    # 연율화 기대수익률 및 공분산 행렬 — 표본 추정치를 축소추정(shrinkage)으로 보정해 추정오차로
+    # 인한 과최적화(극단적 프론티어/비중)를 완화한다. 종목이 3개 미만이면 James-Stein 축소는
+    # no-op(estimation.py 참고).
     n = len(valid_syms)
+    mean_annual = shrink_expected_returns(rets.mean(axis=1) * 252)
+    cov_annual = shrink_covariance(rets, np.cov(rets) * 252)
+
     bounds = [(0.0, 1.0)] * n
     base_constraints = [{"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0}]
 
@@ -137,6 +141,8 @@ def _compute_portfolio_position(
     """주어진 tickers·weights로 포트폴리오의 (risk, return) 위치를 계산한다."""
     import numpy as np
 
+    from app.services.estimation import shrink_covariance, shrink_expected_returns
+
     valid_pairs = [
         (s, w)
         for s, w in zip(symbols, weights, strict=False)
@@ -154,9 +160,11 @@ def _compute_portfolio_position(
 
     min_len = min(len(returns_map[s]) for s in valid_syms)
     rets = np.array([returns_map[s][:min_len] for s in valid_syms])
-    mean_annual = rets.mean(axis=1) * 252
+    # `_compute_frontier`가 그리는 프론티어 곡선과 같은 척도로 비교되도록 동일하게 축소추정 적용
+    # — 그렇지 않으면 비교 포트폴리오 점이 축소추정으로 이동한 프론티어 곡선 기준에서 어긋난다.
+    mean_annual = shrink_expected_returns(rets.mean(axis=1) * 252)
     if len(valid_syms) > 1:
-        cov_annual = np.cov(rets) * 252
+        cov_annual = shrink_covariance(rets, np.cov(rets) * 252)
     else:
         cov_annual = np.array([[float(np.var(rets[0])) * 252]])
 

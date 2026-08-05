@@ -35,7 +35,15 @@ _ACTION_NEW = "신규 편입"
 _ACTION_SELL = "전량 매도"
 _ACTION_INCREASE = "비중 확대"
 _ACTION_DECREASE = "비중 축소"
-_WEIGHT_THRESHOLD = 2.0  # 비중 차이가 이 값 이상일 때만 추천
+_WEIGHT_THRESHOLD_FLOOR = 2.0  # 비중 차이 임계값의 최솟값(%p) — 목표비중이 작은 종목도 이 이하 변화는 노이즈로 간주
+_WEIGHT_THRESHOLD_RATIO = 0.1  # 목표비중 대비 임계값 비율 — 목표비중이 큰 종목은 작은 %p 변화도 유의미하므로 비례 상향
+
+_FACTOR_SCORE_LABELS: dict[str, str] = {
+    "value_score": "가치",
+    "growth_score": "성장",
+    "size_score": "소형주",
+    "momentum_score": "모멘텀",
+}
 
 
 def _sharpe(ret: float, risk: float) -> float | None:
@@ -45,20 +53,58 @@ def _sharpe(ret: float, risk: float) -> float | None:
 
 
 def _factor_reason(factor_changes: dict) -> str:
-    """팩터 변화에서 핵심 변화 요약 문장 생성."""
+    """팩터 변화에서 핵심 변화 요약 문장 생성(포트폴리오 전체 집계 기준)."""
     positives = [f"{_FACTOR_LABELS.get(k, k)} 팩터 강화" for k, v in factor_changes.items() if v["delta"] > 5]
     negatives = [f"{_FACTOR_LABELS.get(k, k)} 팩터 완화" for k, v in factor_changes.items() if v["delta"] < -5]
     parts = positives + negatives
     return "、".join(parts) if parts else "팩터 구성 변화"
 
 
+def _drift_threshold(target_weight: float) -> float:
+    """목표비중에 비례하는 상대 임계값 — 목표비중이 큰 종목(예: 30%)은 2%p 변화도 포트폴리오
+    전체에 미치는 영향이 크므로 절대 임계값(2.0)보다 낮게 반응해야 하지만, 반대로 목표비중이
+    아주 작은 종목은 절대 임계값 밑으로는 노이즈로 무시한다 — 그래서 `max(바닥값, 비율)`로 둘 다
+    보장한다."""
+    return max(_WEIGHT_THRESHOLD_FLOOR, target_weight * _WEIGHT_THRESHOLD_RATIO)
+
+
+def _per_ticker_factor_reason(
+    ticker: str,
+    current_holdings_by_ticker: dict[str, dict],
+    target_holdings_by_ticker: dict[str, dict],
+    fallback: str,
+) -> str:
+    """종목별 팩터 점수(`factor_service.get_factor_analysis*`의 holdings) 변화에서 가장 크게
+    바뀐 1~2개 팩터를 근거 문장으로 만든다 — 포트폴리오 전체 집계(`_factor_reason`)를 모든
+    종목에 동일하게 재사용하던 것을 종목 단위로 세분화한다. 종목별 데이터가 없으면(신규 편입
+    등 현재/목표 어느 한쪽에 보유가 없는 경우) `fallback`(포트폴리오 전체 요약 또는 고정 문구)을
+    그대로 쓴다."""
+    cur = current_holdings_by_ticker.get(ticker)
+    tgt = target_holdings_by_ticker.get(ticker)
+    if cur is None or tgt is None:
+        return fallback
+
+    deltas = [(key, tgt[key] - cur[key]) for key in _FACTOR_SCORE_LABELS if abs(tgt[key] - cur[key]) > 5]
+    if not deltas:
+        return fallback
+
+    deltas.sort(key=lambda kv: abs(kv[1]), reverse=True)
+    parts = [f"{_FACTOR_SCORE_LABELS[key]} 팩터 {'강화' if delta > 0 else '완화'}" for key, delta in deltas[:2]]
+    return "、".join(parts)
+
+
 def _build_trade_recommendations(
     current_pos_map: dict[str, dict],
     target_items: list,
     factor_changes: dict,
+    current_holdings: list[dict],
+    target_holdings: list[dict],
 ) -> list[dict]:
     """현재 포지션과 목표 포트폴리오 비중 차이에서 거래 추천 생성."""
     factor_summary = _factor_reason(factor_changes)
+    # holdings는 ticker 단위로 인덱싱된다(factor_service._build_holdings — market 구분 없음).
+    current_holdings_by_ticker = {h["ticker"]: h for h in current_holdings}
+    target_holdings_by_ticker = {h["ticker"]: h for h in target_holdings}
 
     # 목표 포트폴리오를 ticker-market 키로 인덱싱
     target_map: dict[str, dict] = {}
@@ -89,14 +135,18 @@ def _build_trade_recommendations(
         if cur_w == 0.0:
             action = _ACTION_NEW
             reason = f"목표 포트폴리오 신규 구성 · {factor_summary}"
-        elif abs(delta) < _WEIGHT_THRESHOLD:
+        elif abs(delta) < _drift_threshold(tgt_w):
             continue
         elif delta > 0:
             action = _ACTION_INCREASE
-            reason = factor_summary
+            reason = _per_ticker_factor_reason(
+                target["ticker"], current_holdings_by_ticker, target_holdings_by_ticker, factor_summary
+            )
         else:
             action = _ACTION_DECREASE
-            reason = "리스크 감소 또는 비중 조정"
+            reason = _per_ticker_factor_reason(
+                target["ticker"], current_holdings_by_ticker, target_holdings_by_ticker, "리스크 감소 또는 비중 조정"
+            )
 
         recommendations.append(
             {
@@ -112,7 +162,7 @@ def _build_trade_recommendations(
 
     # 현재 보유하지만 목표 포트폴리오에 없는 종목
     for key, cur_w_val in current_weights.items():
-        if key not in target_map and cur_w_val >= _WEIGHT_THRESHOLD:
+        if key not in target_map and cur_w_val >= _drift_threshold(0.0):
             pos = current_pos_map[key]
             recommendations.append(
                 {
@@ -251,8 +301,14 @@ async def get_rebalancing_strategy(
     # 3. 현재 포지션 map 조회 (거래 추천용) — 포트폴리오 연결 계좌만 포함
     current_pos_map = await query_latest_position_map(user_id, db, include_name=True, account_ids=portfolio_acct_ids)
 
-    # 4. 거래 추천
-    trade_recommendations = _build_trade_recommendations(current_pos_map, portfolio.items, factor_changes)
+    # 4. 거래 추천 — 종목별 근거는 두 호출이 이미 반환한 holdings(종목별 팩터 점수)를 재사용한다.
+    trade_recommendations = _build_trade_recommendations(
+        current_pos_map,
+        portfolio.items,
+        factor_changes,
+        current_factors_data.get("holdings", []),
+        target_factors_data.get("holdings", []),
+    )
 
     # 5. 종합 방향 및 요약
     direction = _overall_direction(risk_change, return_change, sharpe_improvement)

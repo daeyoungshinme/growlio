@@ -91,6 +91,11 @@ def _div_info(
     return None, 0.0
 
 
+def _has_real_estate_item(portfolio: Portfolio) -> bool:
+    """포트폴리오 목표 항목 중 KR_PROPERTY(부동산)가 명시적으로 있는지 여부."""
+    return any(str(_item_attr(i, "market")) == "KR_PROPERTY" for i in portfolio.items)
+
+
 def _real_estate_value_krw(overview: dict) -> float:
     """overview.accounts 중 REAL_ESTATE 계좌 잔액 합산 (부동산 항목 현재가치)."""
     return sum(
@@ -122,11 +127,11 @@ def _build_target_items(
     target_keys: set[tuple[str, str]] = set()
 
     # CASH(브로커 예수금) 항목의 "total_assets - total_stock" 잔여값에는 REAL_ESTATE·
-    # CASH_EQUIVALENT 계좌 잔액도 섞여 있다. 두 항목이 포트폴리오에 별도로 존재하면 그만큼
-    # 미리 차감해 CASH 값과 이중 계산되지 않도록 한다.
-    has_real_estate_item = any(str(_item_attr(i, "market")) == "KR_PROPERTY" for i in portfolio.items)
+    # CASH_EQUIVALENT 계좌 잔액도 섞여 있다. 부동산은 포트폴리오에 KR_PROPERTY 항목 유무와
+    # 무관하게 "현금"이 아니므로 항상 차감한다. CASH_EQUIVALENT는 별도 항목으로 존재할 때만
+    # 그만큼 미리 차감해 CASH 값과 이중 계산되지 않도록 한다.
     has_cash_equivalent_item = any(str(_item_attr(i, "ticker")) == CASH_EQUIVALENT_TICKER for i in portfolio.items)
-    real_estate_claimed_krw = _real_estate_value_krw(overview) if has_real_estate_item else 0.0
+    real_estate_claimed_krw = _real_estate_value_krw(overview)
     cash_equivalent_claimed_krw = _cash_equivalent_value_krw(overview) if has_cash_equivalent_item else 0.0
 
     for item in portfolio.items:
@@ -403,12 +408,19 @@ def _build_implicit_cash_item(
 
 
 def compute_base_value_krw(portfolio: Portfolio, overview: dict) -> float:
-    """포트폴리오 base_type에 따른 기준 자산총액(KRW) — 목표역산 추천 등 base_krw가 필요한 곳에서 공용으로 사용."""
+    """포트폴리오 base_type에 따른 기준 자산총액(KRW) — 목표역산 추천 등 base_krw가 필요한 곳에서 공용으로 사용.
+
+    portfolio가 KR_PROPERTY 항목을 명시적으로 갖고 있지 않은 한, REAL_ESTATE 계좌 잔액은
+    기준 자산에서 제외한다 — 그렇지 않으면 부동산이 목표 비중과 무관하게 base_krw에 섞여
+    모든 종목의 target_value_krw가 부동산 가치만큼 부풀려진다.
+    """
+    total_assets = float(overview.get("total_assets_krw", 0))
+    real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
     if portfolio.base_type == "TOTAL_ASSETS":
-        return float(overview.get("total_assets_krw", 0))
+        return total_assets - real_estate_krw
     # STOCK_ONLY: 예수금을 항상 기준 자산에 포함
     total_stock = float(overview.get("total_stock_krw", 0))
-    available_cash = max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+    available_cash = max(0.0, total_assets - total_stock - real_estate_krw)
     return total_stock + available_cash
 
 
@@ -437,12 +449,13 @@ def analyze_rebalancing(
     target_weighted_cagr, current_weighted_cagr = _calc_portfolio_cagrs(result_items, current_map, returns_map)
     ticker_account_map = _build_ticker_account_map(overview)
     _total_deposit = float(overview.get("total_deposit_krw") or 0)
+    _real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
     available_cash_krw = (
         _total_deposit
         if _total_deposit > 0
         else max(
             0.0,
-            float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)),
+            float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)) - _real_estate_krw,
         )
     )
 
@@ -478,12 +491,15 @@ def compute_portfolio_drift_summary(
     배당·수익률 외부 API를 호출하지 않으므로 빠르게 실행된다.
     대시보드 RebalancingStatusCard 용도로 설계됨.
     """
+    _real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
     if portfolio.base_type == "TOTAL_ASSETS":
-        base_krw = float(overview.get("total_assets_krw", 0))
+        base_krw = float(overview.get("total_assets_krw", 0)) - _real_estate_krw
     else:
         total_stock = float(overview.get("total_stock_krw", 0))
         _dep = float(overview.get("total_deposit_krw") or 0)
-        available_cash = _dep if _dep > 0 else max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock)
+        available_cash = (
+            _dep if _dep > 0 else max(0.0, float(overview.get("total_assets_krw", 0)) - total_stock - _real_estate_krw)
+        )
         base_krw = total_stock + available_cash
 
     if base_krw <= 0:

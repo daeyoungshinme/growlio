@@ -8,10 +8,9 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import RebalancingDividendSection from "./RebalancingDividendSection";
 import RebalancingDiagnosisCard from "./RebalancingDiagnosisCard";
 import RebalancingSummaryCards from "./RebalancingSummaryCards";
-import RebalancingTradePlanPanel from "./RebalancingTradePlanPanel";
 import RebalancingWeightTable from "./RebalancingWeightTable";
 import RebalancingDetailMetrics from "./RebalancingDetailMetrics";
-import { calcTradeSummary } from "./rebalancingTradeMath";
+import { calcTradeSummary, TRADING_FEE_RATE } from "./rebalancingTradeMath";
 
 interface Props {
   analysis: RebalancingAnalysis;
@@ -52,10 +51,11 @@ export default function RebalancingTable({
     (analysis.target_portfolio_annual_dividend ?? 0) > 0 ||
     (analysis.total_current_annual_dividend ?? analysis.current_portfolio_annual_dividend ?? 0) > 0;
 
-  // 요약·거래계획·거래비용 모두 calcTradeKrw 기준으로 통일 (거래 불가 항목은 calcTradeSummary가 제외)
+  // 요약·비중테이블·거래비용 모두 calcTradeKrw 기준으로 통일 (거래 불가 항목은 calcTradeSummary가 제외)
   const { totalBuySummary, totalSellSummary } = calcTradeSummary(analysis.items);
   const cashAvailable = analysis.available_cash_krw ?? 0;
   const cashAfter = cashAvailable + totalSellSummary - totalBuySummary;
+  const estFee = (totalBuySummary + totalSellSummary) * TRADING_FEE_RATE;
 
   return (
     <div className="space-y-4">
@@ -94,20 +94,14 @@ export default function RebalancingTable({
       </div>
 
       {/* 요약 카드 */}
-      <div className="space-y-2">
-        <RebalancingSummaryCards
-          analysis={analysis}
-          cashAvailable={cashAvailable}
-          totalBuySummary={totalBuySummary}
-          totalSellSummary={totalSellSummary}
-          cashAfter={cashAfter}
-        />
-        <RebalancingTradePlanPanel
-          items={analysis.items}
-          totalBuySummary={totalBuySummary}
-          totalSellSummary={totalSellSummary}
-        />
-      </div>
+      <RebalancingSummaryCards
+        analysis={analysis}
+        cashAvailable={cashAvailable}
+        totalBuySummary={totalBuySummary}
+        totalSellSummary={totalSellSummary}
+        cashAfter={cashAfter}
+        estFee={estFee}
+      />
 
       {/* 리밸런싱 비중 테이블 */}
       <RebalancingWeightTable items={analysis.items} />

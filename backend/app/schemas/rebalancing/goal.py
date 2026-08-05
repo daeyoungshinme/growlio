@@ -68,6 +68,8 @@ class HorizonGoalRecommendation(BaseModel):
     base_krw: float  # 해당 (기간, 세제유형) 조합에 태그된 계좌들의 자산총액
     account_count: int
     recommended_items: list[GoalRecommendationItem] = []
+    # 배당 목표 달성에 필요한 배당수익률(%) — 전체 자산 기준과 동일한 %를 모든 조합에 적용
+    required_dividend_yield_pct: float | None = None
     expected_return_pct: float | None = None
     expected_dividend_yield_pct: float | None = None  # 추천 비중의 가중평균 배당수익률(%)
     expected_volatility_pct: float | None = None  # 추천 비중의 연율화 변동성(%, 공분산 기반)

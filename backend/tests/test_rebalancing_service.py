@@ -515,6 +515,104 @@ class TestKrPropertyItem:
         assert item.current_value_krw == 0
 
 
+# ── KR_PROPERTY 항목 없이 REAL_ESTATE 계좌만 있는 경우 ──────
+# (포트폴리오 목표 항목에 부동산을 명시적으로 넣지 않은 흔한 케이스에서
+#  부동산 계좌 잔액이 기준자산(base_krw)/CASH 버킷에 섞여 매수·매도 금액이
+#  부풀려지던 버그의 회귀 테스트)
+
+
+class TestRealEstateExcludedWithoutPropertyItem:
+    def test_stock_only_base_excludes_real_estate(self):
+        """STOCK_ONLY: 부동산 항목이 없으면 base_krw·주식 목표금액·CASH 현재값 모두 부동산 제외."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 80},
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 20},
+            ]
+        )
+        overview = {
+            # 총자산 10M = 주식 6M + 부동산 2M + 순수 현금 2M
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 6_000_000,
+            "all_positions": [
+                {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 6_000_000, "current_price": 100_000, "qty": 60},
+            ],
+            "accounts": [
+                {"asset_type": "REAL_ESTATE", "amount_krw": 2_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        # base_krw = total_stock(6M) + max(0, total_assets(10M) - total_stock(6M) - real_estate(2M)) = 8M
+        assert result.base_value_krw == pytest.approx(8_000_000)
+
+        by_ticker = {i.ticker: i for i in result.items}
+        assert by_ticker["AAPL"].target_value_krw == pytest.approx(6_400_000)  # 8M * 80%
+        assert by_ticker["CASH"].current_value_krw == pytest.approx(2_000_000)  # 10M - 6M - 2M(부동산)
+        assert by_ticker["CASH"].target_value_krw == pytest.approx(1_600_000)  # 8M * 20%
+
+    def test_total_assets_base_excludes_real_estate(self):
+        """TOTAL_ASSETS: 부동산 항목이 없으면 base_krw에서 부동산 값을 제외한다."""
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100},
+            ],
+            base_type="TOTAL_ASSETS",
+        )
+        overview = {
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 6_000_000,
+            "all_positions": [
+                {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 6_000_000, "current_price": 100_000, "qty": 60},
+            ],
+            "accounts": [
+                {"asset_type": "REAL_ESTATE", "amount_krw": 2_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.base_value_krw == pytest.approx(8_000_000)
+        assert result.items[0].target_value_krw == pytest.approx(8_000_000)
+
+    def test_available_cash_krw_excludes_real_estate_fallback(self):
+        """total_deposit_krw가 없을 때 쓰이는 available_cash_krw 폴백도 부동산을 제외한다."""
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
+        overview = {
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 6_000_000,
+            "all_positions": [],
+            "accounts": [
+                {"asset_type": "REAL_ESTATE", "amount_krw": 2_000_000, "include_in_total": True},
+            ],
+        }
+        result = analyze_rebalancing(portfolio, overview)
+        # 10M - 6M(주식) - 2M(부동산) = 2M (부동산 미차감 시 4M로 잘못 계산됨)
+        assert result.available_cash_krw == pytest.approx(2_000_000)
+
+    def test_drift_summary_excludes_real_estate(self):
+        """compute_portfolio_drift_summary()도 base_krw에서 부동산을 제외해야 드리프트가 정확하다."""
+        from app.services.rebalancing.service import compute_portfolio_drift_summary
+
+        portfolio = _make_portfolio(
+            [
+                {"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 80},
+                {"ticker": "CASH", "name": "현금", "market": "KRW", "weight": 20},
+            ]
+        )
+        overview = {
+            "total_assets_krw": 10_000_000,
+            "total_stock_krw": 6_000_000,
+            "all_positions": [
+                {"ticker": "AAPL", "market": "NASDAQ", "value_krw": 6_000_000, "current_price": 100_000, "qty": 60},
+            ],
+            "accounts": [
+                {"asset_type": "REAL_ESTATE", "amount_krw": 2_000_000, "include_in_total": True},
+            ],
+        }
+        summary = compute_portfolio_drift_summary(portfolio, overview)
+        # base_krw = 8M → AAPL current_weight = 6M/8M = 75%, target 80% → drift 5%p
+        # (부동산 미차감 시 base_krw=10M → current_weight 60%, drift 20%p로 과대평가됨)
+        assert summary.max_drift_pct == pytest.approx(5.0)
+
+
 # ── CASH_EQUIVALENT(현금성 자산) 항목 ───────────────────────
 
 

@@ -7,6 +7,7 @@ import MarketSignalLevelBadge from "@/components/rebalancing/MarketSignalLevelBa
 import RecommendationApplySection from "@/components/rebalancing/RecommendationApplySection";
 import RecommendationWeightList from "@/components/rebalancing/RecommendationWeightList";
 import SuggestedCandidatesBlock from "@/components/rebalancing/SuggestedCandidatesBlock";
+import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 
 function driftBadgeLabel(drift: RecommendationDrift): string {
   const parts: string[] = [];
@@ -56,6 +57,8 @@ export default function RecommendationResultPanel({
       )}
 
       <RecommendationWeightList items={items} />
+
+      <PortfolioWeightChart items={items} />
 
       {extraNoticeAfterWeightList}
 

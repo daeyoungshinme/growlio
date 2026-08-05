@@ -83,11 +83,6 @@ export default function RebalancingDiagnosisCard({
   const status = getDriftStatus(maxDrift, threshold);
   const cfg = STATUS_CONFIG[status];
 
-  // 이탈 크기 상위 3개 종목 (CASH·KR_PROPERTY·CASH_EQUIVALENT 제외)
-  const topDrifted = [...tradeable]
-    .sort((a, b) => Math.abs(b.weight_diff_pct) - Math.abs(a.weight_diff_pct))
-    .slice(0, 3);
-
   const subText =
     status === "stable"
       ? `모든 종목이 ±${threshold}% 이내 비중을 유지하고 있습니다`
@@ -118,31 +113,6 @@ export default function RebalancingDiagnosisCard({
       cardClassName={`card ${cfg.cardAccent}`.trim()}
     >
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{subText}</p>
-      {/* 상위 이탈 종목 */}
-      {status !== "stable" && topDrifted.length > 0 && (
-        <div className="flex flex-wrap gap-2 mt-3">
-          {topDrifted.map((item) => {
-            const diff = item.weight_diff_pct;
-            const isOver = diff > 0;
-            return (
-              <div
-                key={item.ticker}
-                className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/60 rounded-lg px-2.5 py-1"
-              >
-                <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                  {item.name}
-                </span>
-                <span
-                  className={`text-xs font-bold ${isOver ? "text-red-600 dark:text-red-400" : "text-blue-600 dark:text-blue-400"}`}
-                >
-                  {isOver ? "▲" : "▼"}
-                  {Math.abs(diff).toFixed(1)}%
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
       {/* 안정 상태 - 이탈 없음 메시지 */}
       {status === "stable" && tradeable.length > 0 && (

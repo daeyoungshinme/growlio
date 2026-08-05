@@ -40,6 +40,9 @@ function makeDividendPlan(overrides: Partial<DividendPlanData> = {}): DividendPl
     estimated_monthly_krw: 166_667,
     actual_annual_received_krw: 1_500_000,
     goal_achievement_pct: 66.7,
+    required_dividend_yield_pct: 4.0,
+    current_dividend_yield_pct: 2.67,
+    total_assets_krw: 75_000_000,
     monthly_projected: Array.from({ length: 12 }, (_, i) => ({
       month: i + 1,
       amount_krw: 166_667,
@@ -105,6 +108,8 @@ function makeSettingsData(overrides: Partial<SettingsData> = {}): SettingsData {
     goal_max_weight_pct: 40.0,
     goal_cagr_lookback_years: 10,
     goal_short_term_equity_floor_pct: 80.0,
+    goal_bond_ceiling_pct: null,
+    goal_cash_ceiling_pct: null,
     age_group: null,
     birth_year: null,
     auto_rebalancing_max_order_value_krw: 50_000_000.0,

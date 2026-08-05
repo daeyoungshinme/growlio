@@ -1,5 +1,6 @@
 import { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
+import { CASH_EQUIVALENT_TICKER, CASH_TICKER } from "@/constants/assets";
 import {
   DiffCell,
   QuantityCell,
@@ -7,7 +8,24 @@ import {
   WeightBar,
   WeightDiffBadge,
 } from "./RebalancingCells";
-import { calcSignedTradeKrw } from "./rebalancingTradeMath";
+import {
+  calcSignedTradeKrw,
+  calcTradeKrw,
+  isTradableItem,
+  TRADING_FEE_RATE,
+} from "./rebalancingTradeMath";
+
+// 매매 가능 종목의 실제 거래 내역(가격×수량 + 수수료) — 모바일/데스크탑 공용
+function TradeExecutionDetail({ item }: { item: RebalancingItem }) {
+  if (!isTradableItem(item) || item.shares_to_trade === 0) return null;
+  const tradeKrw = calcTradeKrw(item);
+  return (
+    <div className="text-xs text-gray-500 dark:text-gray-500 mt-0.5">
+      {Math.abs(Math.round(item.shares_to_trade!))}주 × {fmtKrw(item.current_price_krw!)} · 수수료{" "}
+      {fmtKrw(tradeKrw * TRADING_FEE_RATE)}
+    </div>
+  );
+}
 
 function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
   const isUntracked = item.target_weight_pct === 0 && item.diff_krw < 0;
@@ -44,6 +62,7 @@ function RebalancingItemMobileCard({ item }: { item: RebalancingItem }) {
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
             <QuantityCell item={item} />
           </p>
+          <TradeExecutionDetail item={item} />
         </div>
       </div>
       <div className="mt-2">
@@ -88,6 +107,7 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
       </td>
       <td className="py-3.5 px-3 text-right">
         <DiffCell diff={calcSignedTradeKrw(item)} />
+        <TradeExecutionDetail item={item} />
       </td>
       <td className="py-3.5 px-3 text-right">
         <QuantityCell item={item} />
@@ -99,8 +119,16 @@ function RebalancingItemRow({ item }: { item: RebalancingItem }) {
   );
 }
 
-// 리밸런싱 비중 테이블 — 모바일 카드 뷰 + 데스크탑 테이블 뷰
+// 리밸런싱 비중 테이블 — 모바일 카드 뷰 + 데스크탑 테이블 뷰 (종목별 거래 실행 정보 포함)
 export default function RebalancingWeightTable({ items }: { items: RebalancingItem[] }) {
+  const unpricedItems = items.filter(
+    (i) =>
+      i.diff_krw !== 0 &&
+      (i.shares_to_trade === null || !i.current_price_krw) &&
+      i.ticker !== CASH_TICKER &&
+      i.ticker !== CASH_EQUIVALENT_TICKER,
+  );
+
   return (
     <>
       <div className="sm:hidden divide-y divide-gray-200 dark:divide-gray-700">
@@ -132,6 +160,13 @@ export default function RebalancingWeightTable({ items }: { items: RebalancingIt
           </tbody>
         </table>
       </div>
+
+      {unpricedItems.length > 0 && (
+        <div className="text-xs text-amber-600 dark:text-amber-500/80 px-1 pt-2">
+          {unpricedItems.map((i) => i.name).join(", ")} 등 {unpricedItems.length}개 종목은 현재가
+          미조회로 거래 계획에서 제외됨
+        </div>
+      )}
     </>
   );
 }

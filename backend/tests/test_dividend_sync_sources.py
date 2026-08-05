@@ -472,3 +472,26 @@ class TestSyncFetchDividendMonths:
             result = sync_fetch_dividend_months("AAPL")
 
         assert isinstance(result, list)
+
+
+# ── is_korean_etf ──────────────────────────────────────────────
+
+
+class TestIsKoreanEtf:
+    """`is_korean_etf()`의 `_ETF_CODE_PREFIXES` 화이트리스트가 큐레이션 유니버스
+    (`recommendation_universe.RECOMMENDATION_UNIVERSE`)의 국내상장 ETF를 전부 커버하는지
+    검증한다 — 프리픽스 누락 시 ETF 전용 Naver 엔드포인트 대신 개별주식 엔드포인트로 잘못
+    라우팅되어 배당수익률이 조용히 0%로 처리되는 회귀가 있었다(133690/153130/357870/446720/
+    458730 5종목이 이 문제로 배당 목표 추천의 "고배당 후보" 제안에서 실제 배당수익률과
+    무관하게 전부 제외됐다)."""
+
+    def test_all_curated_domestic_etfs_are_recognized(self):
+        from app.services.dividend.constants import is_korean_etf
+        from app.services.recommendation_universe import RECOMMENDATION_UNIVERSE
+
+        domestic_etf_tickers = {
+            c["ticker"] for c in RECOMMENDATION_UNIVERSE if c["market"].upper() in ("KOSPI", "KOSDAQ")
+        }
+        assert domestic_etf_tickers  # 유니버스 구성이 바뀌어 이 집합이 비면 이 테스트 자체가 무의미해짐
+        for ticker in domestic_etf_tickers:
+            assert is_korean_etf(ticker, "KOSPI") is True, f"{ticker} should be recognized as a Korean ETF"

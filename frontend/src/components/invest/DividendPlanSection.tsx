@@ -74,6 +74,8 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
     estimated_monthly_krw,
     actual_annual_received_krw,
     goal_achievement_pct,
+    required_dividend_yield_pct,
+    current_dividend_yield_pct,
     monthly_projected,
     monthly_received,
     yearly_received,
@@ -215,6 +217,25 @@ export default function DividendPlanSection({ onOpenSettings }: Props) {
                 )}
               </div>
             </div>
+
+            {required_dividend_yield_pct !== null && (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-4 p-2.5 rounded-lg bg-indigo-50 dark:bg-indigo-950">
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
+                    목표 달성에 필요한 배당수익률
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+                    {fmtPct(required_dividend_yield_pct)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">현재 예상 배당수익률</p>
+                  <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">
+                    {fmtPct(current_dividend_yield_pct)}
+                  </p>
+                </div>
+              </div>
+            )}
 
             {progressPct !== null && (
               <div>

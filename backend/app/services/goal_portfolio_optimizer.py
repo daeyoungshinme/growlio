@@ -23,17 +23,17 @@ def _dividend_floor_constraint(
     bounds: list[tuple[float, float]],
     dividend_list: tuple[float, ...],
     required_dividend_yield_pct: float,
-    equity_flags: tuple[bool, ...] | None = None,
-    group_budget: dict[bool, float] | None = None,
+    asset_classes: tuple[str, ...] | None = None,
+    group_budget: dict[str, float] | None = None,
 ) -> tuple[dict | None, str | None]:
     """종목당 비중 상한(bounds) 하에서 목표 배당수익률 달성 가능 여부를 그리디하게 판정한다.
 
-    `equity_flags`+`group_budget`이 함께 주어지면(`equity_floor`/`equity_ceiling`이 적용된
-    호출) 종목당 상한뿐 아니라 주식/비주식 그룹 예산도 함께 반영한다 —
-    `_optimize_goal_portfolio`의 `max_achievable_return` 계산과 동일한 방식. 이걸 빠뜨리면
-    실제로는 `equity_floor`가 저배당 주식 종목에 비중을 강제로 배분시켜 달성 불가능한데도
-    "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패하는 버그가 생긴다
-    (단기 추천의 `equity_floor=0.8`처럼 그룹 제약이 걸린 조합에서 실제로 재현됨).
+    `asset_classes`+`group_budget`이 함께 주어지면(`class_bounds`가 적용된 호출) 종목당
+    상한뿐 아니라 자산군별 그룹 예산도 함께 반영한다 — `_optimize_goal_portfolio`의
+    `max_achievable_return` 계산과 동일한 방식. 이걸 빠뜨리면 실제로는 자산군 하한 제약이
+    저배당 종목에 비중을 강제로 배분시켜 달성 불가능한데도 "달성 가능"으로 오판해 SLSQP에
+    불충족 제약을 넘기고 최적화 전체가 실패하는 버그가 생긴다(단기 추천의 주식비중 하한
+    80%처럼 그룹 제약이 걸린 조합에서 실제로 재현됨).
 
     달성 가능하면 (SLSQP 부등식 제약 dict, None)을, 불가능하면 (None, 안내 note)를 반환한다
     — `_optimize_goal_portfolio`의 순환 복잡도를 낮추기 위해 분리한 헬퍼(로직 자체는 동일).
@@ -41,20 +41,21 @@ def _dividend_floor_constraint(
     import numpy as np
 
     divs = np.array(dividend_list, dtype=float)
-    use_group_budget = equity_flags is not None and group_budget is not None
-    group_used = {True: 0.0, False: 0.0}
+    use_group_budget = asset_classes is not None and group_budget is not None
+    group_used: dict[str, float] = {}
     achievable = 0.0
     remaining = 1.0
     for idx in np.argsort(-divs):
         cap = bounds[idx][1]
         if use_group_budget:
-            is_eq = bool(equity_flags[idx])  # type: ignore[index]
-            cap = min(cap, group_budget[is_eq] - group_used[is_eq])  # type: ignore[index]
+            cls = asset_classes[idx]  # type: ignore[index]
+            cap = min(cap, group_budget[cls] - group_used.get(cls, 0.0))  # type: ignore[index]
         take = max(min(cap, remaining), 0.0)
         achievable += take * float(divs[idx])
         remaining -= take
         if use_group_budget:
-            group_used[bool(equity_flags[idx])] += take  # type: ignore[index]
+            cls = asset_classes[idx]  # type: ignore[index]
+            group_used[cls] = group_used.get(cls, 0.0) + take
         if remaining <= 1e-9:
             break
 
@@ -75,8 +76,8 @@ def _apply_dividend_floor(
     bounds: list[tuple[float, float]],
     dividend_list: tuple[float, ...],
     required_dividend_yield_pct: float | None,
-    equity_flags: tuple[bool, ...] | None = None,
-    group_budget: dict[bool, float] | None = None,
+    asset_classes: tuple[str, ...] | None = None,
+    group_budget: dict[str, float] | None = None,
 ) -> tuple[list[dict], str | None]:
     """`_dividend_floor_constraint()` 결과를 constraints/note에 병합한다 — 호출부(`_optimize_goal_portfolio`)의
     순환 복잡도를 낮추기 위해 분기 처리를 이 헬퍼로 옮겼다. required_dividend_yield_pct가 없거나
@@ -85,7 +86,7 @@ def _apply_dividend_floor(
         return constraints, note
 
     constraint, dividend_note = _dividend_floor_constraint(
-        bounds, dividend_list, required_dividend_yield_pct, equity_flags=equity_flags, group_budget=group_budget
+        bounds, dividend_list, required_dividend_yield_pct, asset_classes=asset_classes, group_budget=group_budget
     )
     if constraint is not None:
         constraints = [*constraints, constraint]
@@ -134,6 +135,87 @@ def _solve_with_dividend_fallback(
     return retry_res, (f"{note} {dividend_note}" if note else dividend_note)
 
 
+def _resolve_class_bounds(
+    classes: tuple[str, ...],
+    class_bounds: dict[str, tuple[float, float]] | None,
+    n: int,
+    max_weight_used: float,
+) -> tuple[list[tuple[float, float]], dict[str, float], list[str]]:
+    """자산군별 종목당 상한(bounds)·그룹 예산(group_budget)·활성 자산군 목록을 계산한다 —
+    `_optimize_goal_portfolio`의 순환 복잡도를 낮추기 위해 분리한 헬퍼.
+
+    자산군이 후보 전부이거나 전무하면 비교 대상이 없어 제약이 무의미하므로 무시한다
+    (equity_floor/ceiling의 "0 < n_equity < n" 가드를 N개 자산군으로 일반화).
+
+    각 자산군의 "유효 하한"·"유효 상한"은 자기 자신의 명시적 범위와, 다른 모든 자산군의 명시적
+    범위로부터 총합=1 제약을 통해 유도되는 묵시적 범위(다른 자산군 상한 합이 작을수록 이
+    자산군의 하한이 올라가고, 다른 자산군 하한 합이 클수록 이 자산군의 상한이 내려간다) 중
+    더 타이트한 쪽이다 — equity_ceiling이 "안전자산 하한"을, equity_floor가 "안전자산 상한"을
+    자동 함의하던 기존 대칭 로직을 N개 자산군으로 일반화한 것. 다른 자산군 중 범위가 지정되지
+    않은 것이 있으면(기본값 (0,1)) 묵시적 범위는 자연스럽게 무력화된다(기존과 동일하게 안전).
+    유효 하한은 종목당 상한(bounds) 완화에, 유효 상한은 `group_budget`(그리디 max_achievable_return·
+    배당 달성가능성 검증 공용)에 쓰인다 — 둘 다 실제 SLSQP 부등식 제약으로는 추가하지 않고
+    (명시적으로 지정된 자산군에 대해서만 호출부에서 별도로 추가한다) box 제약·예산 계산에만
+    반영한다. 묵시적 범위를 SLSQP 제약으로 다시 추가하면 총합=1 제약과 선형종속돼 야코비안이
+    특이해질 위험이 있다.
+    """
+    bounds_in = class_bounds or {}
+
+    def _class_bound(cls: str) -> tuple[float, float]:
+        return bounds_in.get(cls, (0.0, 1.0))
+
+    class_counts: dict[str, int] = {}
+    for cls in classes:
+        class_counts[cls] = class_counts.get(cls, 0) + 1
+    present_classes = list(class_counts.keys())
+    active_classes = [c for c in present_classes if 0 < class_counts[c] < n]
+
+    effective_lower: dict[str, float] = {}
+    effective_upper: dict[str, float] = {}
+    for c in active_classes:
+        explicit_lower, explicit_upper = _class_bound(c)
+        other_upper_sum = sum(_class_bound(c2)[1] for c2 in present_classes if c2 != c)
+        other_lower_sum = sum(_class_bound(c2)[0] for c2 in present_classes if c2 != c)
+        effective_lower[c] = max(explicit_lower, 1.0 - other_upper_sum, 0.0)
+        effective_upper[c] = min(explicit_upper, 1.0 - other_lower_sum, 1.0)
+
+    bounds = [
+        (
+            0.0,
+            max(max_weight_used, effective_lower[cls] / class_counts[cls])
+            if effective_lower.get(cls, 0.0) > 0
+            else max_weight_used,
+        )
+        for cls in classes
+    ]
+    group_budget = {c: (effective_upper[c] if c in active_classes else _class_bound(c)[1]) for c in present_classes}
+    return bounds, group_budget, active_classes
+
+
+def _class_range_constraints(
+    classes: tuple[str, ...],
+    class_bounds: dict[str, tuple[float, float]] | None,
+    active_classes: list[str],
+) -> list[dict]:
+    """명시적으로 범위가 지정된 자산군에 대해서만 SLSQP 부등식 제약을 만든다 —
+    `_optimize_goal_portfolio`의 순환 복잡도를 낮추기 위해 분리한 헬퍼(로직은 `_resolve_class_bounds`의
+    독스트링 참고)."""
+    import numpy as np
+
+    bounds_in = class_bounds or {}
+    constraints: list[dict] = []
+    for c in active_classes:
+        lower_c, upper_c = bounds_in.get(c, (0.0, 1.0))
+        if lower_c <= 0 and upper_c >= 1.0:
+            continue
+        mask = np.array([cls == c for cls in classes], dtype=bool)
+        if lower_c > 0:
+            constraints.append({"type": "ineq", "fun": lambda w, m=mask, lo=lower_c: float(w[m].sum()) - lo})
+        if upper_c < 1.0:
+            constraints.append({"type": "ineq", "fun": lambda w, m=mask, up=upper_c: up - float(w[m].sum())})
+    return constraints
+
+
 def _optimize_goal_portfolio(
     symbols: list[str],
     tickers: list[tuple[str, str, str]],  # (ticker, name, market)
@@ -142,9 +224,8 @@ def _optimize_goal_portfolio(
     required_return_pct: float,
     max_weight: float = _MAX_WEIGHT,
     risk_tolerance: str = "CONSERVATIVE",
-    is_equity: list[bool] | None = None,
-    equity_floor: float | None = None,
-    equity_ceiling: float | None = None,
+    asset_classes: list[str] | None = None,
+    class_bounds: dict[str, tuple[float, float]] | None = None,
     market_signal_level: str | None = None,
     dividend_yields: list[float] | None = None,
     required_dividend_yield_pct: float | None = None,
@@ -162,92 +243,90 @@ def _optimize_goal_portfolio(
     고정한다 — 부등식과 달리 이미 자연 수익률이 목표를 넘는 경우에도 항상 실제로 비중이
     달라짐을 보장한다.
 
-    `is_equity`+`equity_floor`가 함께 주어지면(단기 추천 전용) "주식 비중 합 ≥ equity_floor"
-    부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산 비중 ≤ 1-equity_floor"도 자동
-    성립한다. 후보가 전부 주식이거나 전부 비주식이면(비교 대상이 없어 제약이 무의미) 무시한다.
+    `asset_classes`(종목별 EQUITY/BOND/CASH 등 자산군 태그)+`class_bounds`(자산군별
+    `(하한, 상한)` 비율, 0~1)가 함께 주어지면 각 자산군의 비중 합이 그 범위 안에 들도록 부등식
+    제약을 추가한다. 자산군이 후보 전부이거나 전무하면(비교 대상이 없어 제약이 무의미) 그
+    자산군은 무시한다. 과거의 이분법(`is_equity`+`equity_floor`/`equity_ceiling`)은 이 함수의
+    N개 자산군 일반화 버전이다 — 호출측은 `class_bounds={"EQUITY": (equity_floor, 1.0)}`
+    (단기 추천, 주식 하한) 또는 `class_bounds={"EQUITY": (0.0, equity_ceiling)}`(IRP, 주식
+    상한)로 그대로 대응시키면 이전과 동일하게 동작한다.
 
-    `is_equity`+`equity_ceiling`이 함께 주어지면(IRP 추천 전용) `equity_floor`와 대칭으로
-    "주식 비중 합 ≤ equity_ceiling" 부등식 제약을 추가한다 — 총합=1 제약과 결합되면 "안전자산
-    비중 ≥ 1-equity_ceiling"도 자동 성립한다. 호출측은 `equity_floor`와 `equity_ceiling`을
-    동시에 넘기지 않는다(IRP는 단기 주식 하한 규칙보다 우선하므로 상호 배타적으로 세팅됨).
+    한 자산군에만 명시적 범위를 지정해도(예: EQUITY 하한만) 총합=1 제약으로부터 나머지
+    자산군들의 묵시적 범위가 자동으로 유도된다 — 예를 들어 EQUITY 하한이 있으면 "나머지
+    자산군 합 ≤ 1-EQUITY하한"이 자동 성립한다(반대로 EQUITY 상한이 있으면 "나머지 합 ≥
+    1-EQUITY상한"). 이런 묵시적 범위는 별도 SLSQP 제약으로 추가하지 않고(총합=1 제약과
+    선형종속이 되어 SLSQP 야코비안이 특이(singular)해질 위험이 있다) 종목당 비중 상한(bounds)만
+    넉넉히 완화해 옵티마이저가 실제로 그 지점에 도달할 수 있게 한다 — 명시적으로 지정된
+    자산군의 범위만 실제 SLSQP 부등식 제약으로 추가된다.
 
     `market_signal_level`(GREEN/YELLOW/RED)이 주어지면 `_SIGNAL_FRONTIER_DAMPENING`에 따라
-    `frontier_frac`을 감쇠시켜 최소분산 쪽으로 결과를 당긴다 — `equity_floor`/`equity_ceiling`
-    같은 규제·정책성 하드 제약과는 별개 축이라 함께 조정하지 않는다.
+    `frontier_frac`을 감쇠시켜 최소분산 쪽으로 결과를 당긴다 — `class_bounds` 같은 규제·정책성
+    하드 제약과는 별개 축이라 함께 조정하지 않는다.
 
     `dividend_yields`+`required_dividend_yield_pct`가 함께 주어지면 "가중평균 배당수익률 ≥
     required_dividend_yield_pct" 부등식 제약을 추가한다 — 배당 목표(`UserSettings.annual_dividend_goal`)를
     실제 비중 계산에 반영하기 위함(과거에는 표시용으로만 사후 계산되고 최적화 입력으로 쓰이지
-    않았음). 종목당 비중 상한(bounds) 하에서, `equity_floor`/`equity_ceiling`이 걸려 있으면
-    그 그룹 예산까지 함께 반영해 그리디하게 계산한 달성 가능 최대 배당수익률이 목표에 못
-    미치면 제약을 적용하지 않고(자산 목표 기준으로만 계산) note에 안내를 남긴다 — 배당 목표를
-    못 채운다고 전체 추천 자체를 실패시키지 않는다(fail-soft). 그룹 예산을 무시하고 종목당
-    상한만으로 판정하면, `equity_floor`가 저배당 주식 종목에 비중을 강제로 배분시켜 실제로는
-    불가능한데도 "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가
-    실패(빈 추천)하는 버그가 생긴다(단기/IRP 추천에서 실제 재현됨).
+    않았음). 종목당 비중 상한(bounds) 하에서, `class_bounds`가 걸려 있으면 그 그룹 예산까지
+    함께 반영해 그리디하게 계산한 달성 가능 최대 배당수익률이 목표에 못 미치면 제약을
+    적용하지 않고(자산 목표 기준으로만 계산) note에 안내를 남긴다 — 배당 목표를 못 채운다고
+    전체 추천 자체를 실패시키지 않는다(fail-soft). 그룹 예산을 무시하고 종목당 상한만으로
+    판정하면, 자산군 하한 제약이 저배당 종목에 비중을 강제로 배분시켜 실제로는 불가능한데도
+    "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패(빈 추천)하는 버그가
+    생긴다(단기/IRP 추천에서 실제 재현됨).
     """
     import numpy as np
     from scipy.optimize import minimize
 
-    equity_flags_in = is_equity or [False] * len(symbols)
+    from app.services.estimation import shrink_covariance, shrink_expected_returns
+
+    asset_classes_in = asset_classes or ["EQUITY"] * len(symbols)
     dividend_yields_in = dividend_yields or [0.0] * len(symbols)
     valid = [
-        (s, tk, c, eq, dy)
-        for s, tk, c, eq, dy in zip(symbols, tickers, cagr_pct, equity_flags_in, dividend_yields_in, strict=False)
+        (s, tk, c, ac, dy)
+        for s, tk, c, ac, dy in zip(symbols, tickers, cagr_pct, asset_classes_in, dividend_yields_in, strict=False)
         if s in returns_map and len(returns_map[s]) >= _MIN_RETURN_DAYS
     ]
     if len(valid) < _MIN_CANDIDATES:
         return [], None, None, f"추천에 충분한 시세 데이터가 있는 종목이 {_MIN_CANDIDATES}개 미만입니다"
 
-    syms, tks, cagrs_list, equity_flags, dividend_list = zip(*valid, strict=False)
-    cagrs = np.array(cagrs_list, dtype=float)
+    syms, tks, cagrs_list, classes, dividend_list = zip(*valid, strict=False)
+    cagrs_raw = np.array(cagrs_list, dtype=float)
     n = len(syms)
 
-    if float(cagrs.max()) < required_return_pct:
+    if float(cagrs_raw.max()) < required_return_pct:
         return [], None, None, f"큐레이션 종목만으로는 목표 수익률(연 {required_return_pct:.1f}%)을 달성하기 어렵습니다"
+
+    # 축소추정(shrinkage estimation) — 표본 평균·표본 공분산을 그대로 쓰면 추정오차가 최적화
+    # 결과에 그대로 반영돼 과최적화된 극단적 비중을 만들기 쉽다. 실행가능성 판정(위 max() 비교)은
+    # "이론상 최선의 경우"를 봐야 하므로 축소 전 원본값을 쓰고, 이후 실제 최적화 입력으로는
+    # 축소추정치를 쓴다.
+    cagrs = shrink_expected_returns(cagrs_raw)
 
     min_len = min(len(returns_map[s]) for s in syms)
     rets = np.array([returns_map[s][:min_len] for s in syms])
     cov_annual = np.cov(rets) * 252 if n > 1 else np.array([[float(np.var(rets[0])) * 252]])
+    cov_annual = shrink_covariance(rets, cov_annual)
 
     max_weight_used = max(max_weight, 1.0 / n)  # n이 작아 상한 합이 100%를 못 채우면 완화
 
-    n_equity = sum(equity_flags)
-    apply_equity_floor = equity_floor is not None and equity_floor > 0 and 0 < n_equity < n
-    apply_equity_ceiling = equity_ceiling is not None and equity_ceiling < 1.0 and 0 < n_equity < n
-    if apply_equity_floor:
-        assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
-        # 주식 후보가 적어도(예: 1개) 하한을 채울 수 있도록 주식 종목당 상한을 별도로 완화
-        equity_cap = max(max_weight_used, equity_floor / n_equity)
-        bounds = [(0.0, equity_cap if eq else max_weight_used) for eq in equity_flags]
-    elif apply_equity_ceiling:
-        assert equity_ceiling is not None  # nosec B101 — apply_equity_ceiling 가드로 이미 None 아님 보장, mypy 타입 내로잉용
-        # 비주식(안전자산) 후보가 적어도(예: 1개) 하한(1-equity_ceiling)을 채울 수 있도록 비주식
-        # 종목당 상한을 별도로 완화 — apply_equity_floor의 equity_cap과 대칭.
-        n_non_equity = n - n_equity
-        non_equity_cap = max(max_weight_used, (1.0 - equity_ceiling) / n_non_equity)
-        bounds = [(0.0, max_weight_used if eq else non_equity_cap) for eq in equity_flags]
-    else:
-        bounds = [(0.0, max_weight_used)] * n
+    bounds, group_budget, active_classes = _resolve_class_bounds(classes, class_bounds, n, max_weight_used)
     x0 = np.full(n, 1.0 / n)
 
-    # 종목당 비중 상한(bounds) 하에서 달성 가능한 최대 가중평균 CAGR — equity_floor/equity_ceiling이
-    # 걸려 있으면 해당 그룹(주식/비주식)의 합산 상한도 함께 지켜야 한다. 그렇지 않으면 BALANCED/
-    # AGGRESSIVE 성향의 프론티어 목표(target)가 그 그룹 제약과 동시에 만족 불가능한 지점으로
-    # 계산돼 옵티마이저가 실패할 수 있다(예: IRP 안전자산 30% 하한 + LONG_TERM AGGRESSIVE 조합).
-    # 상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR 종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음.
-    equity_budget: float = equity_ceiling if apply_equity_ceiling and equity_ceiling is not None else 1.0
-    non_equity_budget: float = 1.0 - equity_floor if apply_equity_floor and equity_floor is not None else 1.0
-    group_budget = {True: equity_budget, False: non_equity_budget}
-    group_used = {True: 0.0, False: 0.0}
+    # 자산군별 예산(그리디 max_achievable_return·배당 달성가능성 검증 공용) — 명시적 상한이
+    # 없으면(기본 1.0) 무제한. 자산군 범위가 걸려 있으면 해당 그룹의 합산 상한도 함께 지켜야
+    # 한다. 그렇지 않으면 BALANCED/AGGRESSIVE 성향의 프론티어 목표(target)가 그 그룹 제약과
+    # 동시에 만족 불가능한 지점으로 계산돼 옵티마이저가 실패할 수 있다(예: IRP 안전자산 30%
+    # 하한 + LONG_TERM AGGRESSIVE 조합). 상한이 없다면 cagrs.max()겠지만, 캡이 있으면 고CAGR
+    # 종목에만 몰아줄 수 없으므로 그보다 낮을 수 있음.
+    group_used: dict[str, float] = dict.fromkeys(group_budget, 0.0)
     max_achievable_return = 0.0
     remaining = 1.0
     for idx in np.argsort(-cagrs):
-        is_eq = bool(equity_flags[idx])
-        take = max(min(bounds[idx][1], remaining, group_budget[is_eq] - group_used[is_eq]), 0.0)
+        cls = classes[idx]
+        take = max(min(bounds[idx][1], remaining, group_budget[cls] - group_used[cls]), 0.0)
         max_achievable_return += take * float(cagrs[idx])
         remaining -= take
-        group_used[is_eq] += take
+        group_used[cls] += take
         if remaining <= 1e-9:
             break
 
@@ -280,35 +359,36 @@ def _optimize_goal_portfolio(
         target = frontier_low + effective_frontier_frac * max(frontier_high - frontier_low, 0.0)
         target = min(max(target, required_return_pct), frontier_high)
 
-        if frontier_high - frontier_low < 1e-6:
-            note = "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
+        no_spread = frontier_high - frontier_low < 1e-6
+        if no_spread:
+            spread_note = "선택한 리스크 성향을 반영하기에는 후보 종목 간 기대수익률 차이가 크지 않습니다"
+            note = f"{note} {spread_note}" if note else spread_note
 
+        # 후보 간 기대수익률 차이가 거의 없으면(no_spread) "가중평균 CAGR = target" 등식 제약의
+        # 그래디언트(cagrs 벡터)가 총합=1 제약의 그래디언트(전부 1인 벡터)와 사실상 평행해져
+        # SLSQP의 QP 서브문제 야코비안이 특이(singular)해져 최적화 전체가 실패한다 — 실제로
+        # 축소추정(James-Stein) 도입 후 유사한 CAGR을 가진 후보가 많은 경우(예: 10종목 큐레이션
+        # 유니버스) 흔하게 재현된다. 이 경우 부등식 제약(CONSERVATIVE와 동일)으로 대체해 등식
+        # 제약의 중복을 피한다 — 어차피 목표 지점 간 차이가 없어 등식으로 고정할 실익도 없다.
         constraints = [
             {"type": "eq", "fun": lambda w: float(np.sum(w)) - 1.0},
-            {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
+            {"type": "ineq", "fun": lambda w: float(w @ cagrs) - required_return_pct}
+            if no_spread
+            else {"type": "eq", "fun": lambda w: float(w @ cagrs) - target},
         ]
-    if apply_equity_floor or apply_equity_ceiling:
-        equity_mask = np.array(equity_flags, dtype=bool)
-        if apply_equity_floor:
-            assert equity_floor is not None  # nosec B101 — apply_equity_floor 가드로 이미 None 아님 보장, mypy 타입 내로잉용
-            constraints = [
-                *constraints,
-                {"type": "ineq", "fun": lambda w: float(w[equity_mask].sum()) - equity_floor},
-            ]
-        if apply_equity_ceiling:
-            assert equity_ceiling is not None  # nosec B101 — apply_equity_ceiling 가드로 이미 None 아님 보장, mypy 타입 내로잉용
-            constraints = [
-                *constraints,
-                {"type": "ineq", "fun": lambda w: equity_ceiling - float(w[equity_mask].sum())},
-            ]
+    # 명시적으로 범위가 지정된 자산군만 실제 SLSQP 부등식 제약으로 추가한다 — 묵시적으로
+    # 유도되는 범위는 `_resolve_class_bounds`가 이미 bounds(종목당 상한) 완화에 반영했으므로
+    # 여기서 별도 제약으로 다시 추가하면 총합=1 제약과 선형종속돼 야코비안이 특이해질 위험이
+    # 있다(no_spread 케이스와 동일한 이유).
+    constraints = [*constraints, *_class_range_constraints(classes, class_bounds, active_classes)]
 
-    # equity_floor/ceiling이 걸려 있으면 배당 달성가능성 검증도 동일한 group_budget으로 제한한다
-    # (위 max_achievable_return 계산과 동일한 이유) — 그렇지 않으면 실제로는 equity_floor가
-    # 저배당 주식 종목에 비중을 강제로 배분시켜 달성 불가능한데도 종목당 상한만 보고
-    # "달성 가능"으로 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패한다(단기/IRP 추천에서
-    # 실제 재현됨). required_dividend_yield_pct가 없으면(배당 목표 미설정) 헬퍼 내부에서 즉시 no-op.
-    dividend_group_budget = group_budget if (apply_equity_floor or apply_equity_ceiling) else None
-    dividend_equity_flags = equity_flags if (apply_equity_floor or apply_equity_ceiling) else None
+    # 자산군 범위가 걸려 있으면 배당 달성가능성 검증도 동일한 group_budget으로 제한한다(위
+    # max_achievable_return 계산과 동일한 이유) — 그렇지 않으면 실제로는 자산군 하한 제약이
+    # 저배당 종목에 비중을 강제로 배분시켜 달성 불가능한데도 종목당 상한만 보고 "달성 가능"으로
+    # 오판해 SLSQP에 불충족 제약을 넘기고 최적화 전체가 실패한다(단기/IRP 추천에서 실제 재현됨).
+    # required_dividend_yield_pct가 없으면(배당 목표 미설정) 헬퍼 내부에서 즉시 no-op.
+    dividend_group_budget = group_budget if active_classes else None
+    dividend_classes = classes if active_classes else None
     constraints_without_dividend = constraints
     constraints, note = _apply_dividend_floor(
         constraints,
@@ -316,7 +396,7 @@ def _optimize_goal_portfolio(
         bounds,
         dividend_list,
         required_dividend_yield_pct,
-        equity_flags=dividend_equity_flags,
+        asset_classes=dividend_classes,
         group_budget=dividend_group_budget,
     )
 
@@ -365,6 +445,8 @@ def compute_weighted_expected_metrics(
     """
     import numpy as np
 
+    from app.services.estimation import shrink_covariance
+
     valid = [
         (sym, w)
         for sym, w in zip(symbols, weights_pct, strict=False)
@@ -380,6 +462,9 @@ def compute_weighted_expected_metrics(
         return None, None, None
     weights = raw_weights / weight_sum
 
+    # 기대수익률은 "이미 정해진" 비중에 대한 실제 가중평균이므로(최적화 대상이 아님) 축소추정을
+    # 적용하지 않는다 — 축소추정(CAGR)은 `_optimize_goal_portfolio`가 최적화 입력을 만들 때만
+    # 쓰인다. 변동성(공분산)은 최적화 쪽 결과와 같은 척도로 비교되도록 동일하게 축소추정을 적용.
     cagrs = np.array([cagr_by_symbol.get(s, 0.0) for s in syms], dtype=float)
     dividends = np.array([dividend_by_symbol.get(s, 0.0) for s in syms], dtype=float)
 
@@ -389,6 +474,7 @@ def compute_weighted_expected_metrics(
     min_len = min(len(returns_map[s]) for s in syms)
     rets = np.array([returns_map[s][:min_len] for s in syms])
     cov_annual = np.cov(rets) * 252 if len(syms) > 1 else np.array([[float(np.var(rets[0])) * 252]])
+    cov_annual = shrink_covariance(rets, cov_annual)
     expected_volatility = round(float(np.sqrt(weights @ cov_annual @ weights)) * 100, 2)
 
     return expected_return, expected_dividend, expected_volatility

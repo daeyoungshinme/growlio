@@ -105,6 +105,8 @@ class TestGetSettings:
             goal_max_weight_pct=None,
             goal_cagr_lookback_years=None,
             goal_short_term_equity_floor_pct=None,
+            goal_bond_ceiling_pct=None,
+            goal_cash_ceiling_pct=None,
             age_group="TWENTIES",
             birth_year=1995,
             auto_rebalancing_daily_value_cap_krw=None,
@@ -127,6 +129,8 @@ class TestGetSettings:
             assert data["age_group"] == "TWENTIES"
             assert data["birth_year"] == 1995
             assert data["goal_short_term_equity_floor_pct"] == 80.0
+            assert data["goal_bond_ceiling_pct"] is None
+            assert data["goal_cash_ceiling_pct"] is None
             assert data["auto_rebalancing_max_order_value_krw"] == 50_000_000.0
             assert data["auto_rebalancing_daily_value_cap_krw"] is None
         finally:
@@ -584,6 +588,8 @@ class TestUpdateGoalRecommendationOptions:
             goal_max_weight_pct=None,
             goal_cagr_lookback_years=None,
             goal_short_term_equity_floor_pct=None,
+            goal_bond_ceiling_pct=None,
+            goal_cash_ceiling_pct=None,
             age_group=None,
         )
         db.scalar = AsyncMock(return_value=settings)
@@ -599,6 +605,8 @@ class TestUpdateGoalRecommendationOptions:
                         "cagr_lookback_years": 5,
                         "short_term_equity_floor_pct": 60.0,
                         "age_group": "THIRTIES",
+                        "bond_ceiling_pct": 30.0,
+                        "cash_ceiling_pct": 20.0,
                     },
                     headers={"Authorization": "Bearer fake"},
                 )
@@ -608,6 +616,33 @@ class TestUpdateGoalRecommendationOptions:
             assert settings.goal_cagr_lookback_years == 5
             assert settings.goal_short_term_equity_floor_pct == 60.0
             assert settings.age_group == "THIRTIES"
+            assert settings.goal_bond_ceiling_pct == 30.0
+            assert settings.goal_cash_ceiling_pct == 20.0
+        finally:
+            from app.api.deps import get_current_user
+            from app.core.database import get_db
+
+            app.dependency_overrides.pop(get_current_user, None)
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_put_goal_recommendation_options_rejects_bond_ceiling_out_of_range(self, override_settings):
+        user = _make_user()
+        db = _make_mock_db()
+
+        app = _setup_app(user, db)
+        try:
+            with TestClient(app, raise_server_exceptions=False) as client:
+                resp = client.put(
+                    "/api/v1/settings/goal-recommendation-options",
+                    json={
+                        "risk_tolerance": "BALANCED",
+                        "max_weight_pct": 40.0,
+                        "cagr_lookback_years": 10,
+                        "bond_ceiling_pct": 150.0,
+                    },
+                    headers={"Authorization": "Bearer fake"},
+                )
+            assert resp.status_code == 422
         finally:
             from app.api.deps import get_current_user
             from app.core.database import get_db

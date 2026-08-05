@@ -40,6 +40,8 @@ _ETF_CODE_PREFIXES: frozenset[str] = frozenset(
         "102",
         "114",
         "122",
+        "133",
+        "153",
         "229",
         "233",
         "251",
@@ -48,6 +50,7 @@ _ETF_CODE_PREFIXES: frozenset[str] = frozenset(
         "278",
         "305",
         "329",
+        "357",
         "360",
         "367",
         "379",
@@ -55,6 +58,8 @@ _ETF_CODE_PREFIXES: frozenset[str] = frozenset(
         "411",
         "414",
         "438",
+        "446",
+        "458",
     ]
 )
 

@@ -70,6 +70,9 @@ export interface DividendPlanData {
   estimated_monthly_krw: number;
   actual_annual_received_krw: number;
   goal_achievement_pct: number | null;
+  required_dividend_yield_pct: number | null;
+  current_dividend_yield_pct: number | null;
+  total_assets_krw: number;
   monthly_projected: MonthlyProjected[];
   monthly_received: { month: string; amount: number }[];
   yearly_received: YearlyReceived[];

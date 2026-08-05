@@ -47,12 +47,16 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
     null,
   );
   const [ageGroupInput, setAgeGroupInput] = useState<AgeGroup | "" | null>(null);
+  const [bondCeilingPctInput, setBondCeilingPctInput] = useState<string | null>(null);
+  const [cashCeilingPctInput, setCashCeilingPctInput] = useState<string | null>(null);
 
   const savedRiskTolerance = settingsData?.goal_risk_tolerance ?? "CONSERVATIVE";
   const savedMaxWeightPct = settingsData?.goal_max_weight_pct ?? 40.0;
   const savedCagrLookbackYears = settingsData?.goal_cagr_lookback_years ?? 10;
   const savedShortTermEquityFloorPct = settingsData?.goal_short_term_equity_floor_pct ?? 80.0;
   const savedAgeGroup = settingsData?.age_group ?? null;
+  const savedBondCeilingPct = settingsData?.goal_bond_ceiling_pct ?? null;
+  const savedCashCeilingPct = settingsData?.goal_cash_ceiling_pct ?? null;
 
   const currentRiskTolerance = riskTolerance ?? savedRiskTolerance;
   const currentCagrLookbackYears = cagrLookbackYears ?? savedCagrLookbackYears;
@@ -69,19 +73,48 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
   const currentAgeGroup: AgeGroup | null =
     ageGroupInput === null ? savedAgeGroup : ageGroupInput === "" ? null : ageGroupInput;
 
+  const currentBondCeilingPctStr =
+    bondCeilingPctInput ?? (savedBondCeilingPct === null ? "" : String(savedBondCeilingPct));
+  const currentBondCeilingPct: number | null =
+    bondCeilingPctInput === null
+      ? savedBondCeilingPct
+      : bondCeilingPctInput === ""
+        ? null
+        : Number(bondCeilingPctInput);
+  const currentCashCeilingPctStr =
+    cashCeilingPctInput ?? (savedCashCeilingPct === null ? "" : String(savedCashCeilingPct));
+  const currentCashCeilingPct: number | null =
+    cashCeilingPctInput === null
+      ? savedCashCeilingPct
+      : cashCeilingPctInput === ""
+        ? null
+        : Number(cashCeilingPctInput);
+
   const maxWeightValid =
     Number.isFinite(currentMaxWeightPct) && currentMaxWeightPct >= 10 && currentMaxWeightPct <= 100;
   const shortTermFloorValid =
     Number.isFinite(currentShortTermEquityFloorPct) &&
     currentShortTermEquityFloorPct >= 0 &&
     currentShortTermEquityFloorPct <= 100;
+  const bondCeilingValid =
+    currentBondCeilingPct === null ||
+    (Number.isFinite(currentBondCeilingPct) &&
+      currentBondCeilingPct >= 0 &&
+      currentBondCeilingPct <= 100);
+  const cashCeilingValid =
+    currentCashCeilingPct === null ||
+    (Number.isFinite(currentCashCeilingPct) &&
+      currentCashCeilingPct >= 0 &&
+      currentCashCeilingPct <= 100);
 
   const isDirty =
     currentRiskTolerance !== savedRiskTolerance ||
     currentMaxWeightPct !== savedMaxWeightPct ||
     currentCagrLookbackYears !== savedCagrLookbackYears ||
     currentShortTermEquityFloorPct !== savedShortTermEquityFloorPct ||
-    currentAgeGroup !== savedAgeGroup;
+    currentAgeGroup !== savedAgeGroup ||
+    currentBondCeilingPct !== savedBondCeilingPct ||
+    currentCashCeilingPct !== savedCashCeilingPct;
 
   const saveMutation = useMutation({
     mutationFn: updateGoalRecommendationOptions,
@@ -188,6 +221,54 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
 
         <div>
           <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            채권 비중 상한 (전체 자산 기준 추천)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100}
+              step={5}
+              placeholder="상한 없음"
+              value={currentBondCeilingPctStr}
+              onChange={(e) => setBondCeilingPctInput(e.target.value)}
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              % (0~100, 비워두면 상한 없음)
+            </span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+            현금성 비중 상한 (전체 자산 기준 추천)
+          </label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={100}
+              step={5}
+              placeholder="상한 없음"
+              value={currentCashCeilingPctStr}
+              onChange={(e) => setCashCeilingPctInput(e.target.value)}
+              className="w-24 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              % (0~100, 비워두면 상한 없음)
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            "전체" 탭 추천에만 적용됩니다. 두 상한을 함께 설정하면 나머지(주식) 비중 하한이 자동으로
+            계산됩니다 — 예: 채권 30% + 현금성 20%면 주식은 최소 50%.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
             연령대 (연령대별 추천)
           </label>
           <select
@@ -219,7 +300,13 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
           {isDirty && (
             <button
               type="button"
-              disabled={saveMutation.isPending || !maxWeightValid || !shortTermFloorValid}
+              disabled={
+                saveMutation.isPending ||
+                !maxWeightValid ||
+                !shortTermFloorValid ||
+                !bondCeilingValid ||
+                !cashCeilingValid
+              }
               onClick={() =>
                 saveMutation.mutate({
                   risk_tolerance: currentRiskTolerance,
@@ -227,6 +314,8 @@ export default function GoalRecommendationOptionsModal({ onClose }: Props) {
                   cagr_lookback_years: currentCagrLookbackYears,
                   short_term_equity_floor_pct: currentShortTermEquityFloorPct,
                   age_group: currentAgeGroup,
+                  bond_ceiling_pct: currentBondCeilingPct,
+                  cash_ceiling_pct: currentCashCeilingPct,
                 })
               }
               className="flex items-center gap-1 text-xs font-medium text-white bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"

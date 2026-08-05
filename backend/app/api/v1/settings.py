@@ -98,6 +98,9 @@ class GoalRecommendationOptionsUpdate(BaseModel):
     cagr_lookback_years: int = 10
     short_term_equity_floor_pct: float = 80.0
     age_group: AgeGroup | None = None  # 연령대별 추천(goal-recommendation/by-age) 전용 — 미입력 시 None
+    # 전체 자산 기준 추천(get_goal_recommendation) 전용 자산군 상한(%) — None이면 상한 없음(기본값).
+    bond_ceiling_pct: float | None = None
+    cash_ceiling_pct: float | None = None
 
     @field_validator("max_weight_pct")
     @classmethod
@@ -118,6 +121,13 @@ class GoalRecommendationOptionsUpdate(BaseModel):
     def validate_short_term_equity_floor(cls, v: float) -> float:
         if not (0 <= v <= 100):
             raise ValueError("단기 목표 최소 주식 비중은 0~100% 범위여야 합니다")
+        return v
+
+    @field_validator("bond_ceiling_pct", "cash_ceiling_pct")
+    @classmethod
+    def validate_class_ceiling(cls, v: float | None) -> float | None:
+        if v is not None and not (0 <= v <= 100):
+            raise ValueError("자산군 비중 상한은 0~100% 범위여야 합니다")
         return v
 
 
@@ -189,6 +199,8 @@ class SettingsResponse(BaseModel):
     goal_max_weight_pct: float = 40.0
     goal_cagr_lookback_years: int = 10
     goal_short_term_equity_floor_pct: float = 80.0
+    goal_bond_ceiling_pct: float | None = None
+    goal_cash_ceiling_pct: float | None = None
     age_group: AgeGroup | None = None
     birth_year: int | None = None
     # 서버 전역 설정(env) — 유저별 조정 불가. 리밸런싱 알림 설정 화면에서 AUTO 모드의
@@ -247,6 +259,8 @@ async def get_settings(
         goal_short_term_equity_floor_pct=(
             float(row.goal_short_term_equity_floor_pct) if row.goal_short_term_equity_floor_pct else 80.0
         ),
+        goal_bond_ceiling_pct=(float(row.goal_bond_ceiling_pct) if row.goal_bond_ceiling_pct is not None else None),
+        goal_cash_ceiling_pct=(float(row.goal_cash_ceiling_pct) if row.goal_cash_ceiling_pct is not None else None),
         age_group=AgeGroup(row.age_group) if row.age_group else None,
         birth_year=row.birth_year,
         auto_rebalancing_max_order_value_krw=settings.auto_rebalancing_max_order_value_krw,
@@ -356,6 +370,8 @@ async def update_goal_recommendation_options(
     row.goal_max_weight_pct = req.max_weight_pct
     row.goal_cagr_lookback_years = req.cagr_lookback_years
     row.goal_short_term_equity_floor_pct = req.short_term_equity_floor_pct
+    row.goal_bond_ceiling_pct = req.bond_ceiling_pct
+    row.goal_cash_ceiling_pct = req.cash_ceiling_pct
     row.age_group = req.age_group.value if req.age_group else None
     await db.commit()
     cache = await get_cache_store()

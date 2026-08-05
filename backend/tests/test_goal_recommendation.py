@@ -15,6 +15,7 @@ from app.services.goal_portfolio_optimizer import compute_weighted_expected_metr
 from app.services.goal_recommendation_service import (
     _AGE_GROUP_PROFILE,
     _apply_index_region_preference,
+    _compute_overall_class_bounds,
     _fetch_dividend_yields,
     _matches_index_region_preference,
     _optimize_goal_portfolio,
@@ -132,6 +133,26 @@ class TestMonthsUntilYearEnd:
         from datetime import date
 
         assert months_until_year_end(date.today().year - 5) <= 0
+
+
+class TestComputeOverallClassBounds:
+    """`_compute_overall_class_bounds()` — 전체 자산 기준 추천 전용 채권/현금성 비중 상한
+    (`UserSettings.goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`) → `class_bounds` 변환."""
+
+    def test_no_ceilings_set_returns_none(self):
+        settings_row = SimpleNamespace(goal_bond_ceiling_pct=None, goal_cash_ceiling_pct=None)
+        assert _compute_overall_class_bounds(settings_row) is None
+
+    def test_bond_ceiling_only(self):
+        settings_row = SimpleNamespace(goal_bond_ceiling_pct=30.0, goal_cash_ceiling_pct=None)
+        assert _compute_overall_class_bounds(settings_row) == {"BOND": (0.0, 0.3)}
+
+    def test_both_ceilings_set(self):
+        settings_row = SimpleNamespace(goal_bond_ceiling_pct=30.0, goal_cash_ceiling_pct=20.0)
+        assert _compute_overall_class_bounds(settings_row) == {"BOND": (0.0, 0.3), "CASH": (0.0, 0.2)}
+
+    def test_none_settings_row_returns_none(self):
+        assert _compute_overall_class_bounds(None) is None
 
 
 class TestOptimizeGoalPortfolio:
@@ -429,8 +450,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[3.0, 8.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[False, True],
-            equity_floor=0.8,
+            asset_classes=["OTHER", "EQUITY"],
+            class_bounds={"EQUITY": (0.8, 1.0)},
         )
 
         assert note is None
@@ -452,8 +473,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[3.0, 8.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[True, True],
-            equity_floor=0.8,
+            asset_classes=["EQUITY", "EQUITY"],
+            class_bounds={"EQUITY": (0.8, 1.0)},
         )
 
         assert note is None
@@ -481,8 +502,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[8.0, 8.0, 3.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[True, True, False],
-            equity_ceiling=0.7,
+            asset_classes=["EQUITY", "EQUITY", "OTHER"],
+            class_bounds={"EQUITY": (0.0, 0.7)},
         )
 
         assert note is None
@@ -504,8 +525,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[3.0, 8.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[True, True],
-            equity_ceiling=0.7,
+            asset_classes=["EQUITY", "EQUITY"],
+            class_bounds={"EQUITY": (0.0, 0.7)},
         )
 
         assert note is None
@@ -528,8 +549,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[3.0, 3.0, 8.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[False, False, True],
-            equity_ceiling=1.0,
+            asset_classes=["OTHER", "OTHER", "EQUITY"],
+            class_bounds={"EQUITY": (0.0, 1.0)},
         )
 
         assert note is None
@@ -554,8 +575,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[8.0, 8.0, 3.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[True, True, False],
-            equity_ceiling=0.5,  # 안전자산 하한 50% > 기본 종목당 상한 40%
+            asset_classes=["EQUITY", "EQUITY", "OTHER"],
+            class_bounds={"EQUITY": (0.0, 0.5)},  # 안전자산 하한 50% > 기본 종목당 상한 40%
         )
 
         assert note is None
@@ -583,8 +604,8 @@ class TestOptimizeGoalPortfolio:
             cagr_pct=[3.0, 3.0, 8.0],
             returns_map=returns_map,
             required_return_pct=-50.0,
-            is_equity=[False, False, True],
-            equity_floor=0.0,
+            asset_classes=["OTHER", "OTHER", "EQUITY"],
+            class_bounds={"EQUITY": (0.0, 1.0)},
         )
 
         assert note is None
@@ -1084,6 +1105,41 @@ class TestSuggestForDividendGoal:
         assert "아래 고배당 후보를 추가하면 도움이 됩니다" in note
         assert "자동 등록" not in note
 
+    async def test_excludes_candidates_below_minimum_suggestable_yield(self):
+        """등록된 후보(SCHD/JEPI/JEPQ/VYM/446720)가 fixture상 2.5% 이상인 종목을 전부 차지해
+        남은 큐레이션 풀에는 2.5% 미만 종목(SPY 1.3%, 나머지는 fixture에 값이 없어 0%로 취급)만
+        남으면, 목표를 채우기에 부족해도 저배당 종목을 "고배당 후보"로 제안하지 않는다
+        (unreachable 유지, 빈 제안)."""
+        candidates = [
+            {"ticker": "SCHD", "name": "Schwab US Dividend Equity ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            {"ticker": "JEPI", "name": "JPMorgan Equity Premium Income ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            {
+                "ticker": "JEPQ",
+                "name": "JPMorgan Nasdaq Equity Premium Income ETF",
+                "market": "NASDAQ",
+                "asset_class": "EQUITY",
+            },
+            {"ticker": "VYM", "name": "Vanguard High Dividend Yield ETF", "market": "NYSE", "asset_class": "EQUITY"},
+            {
+                "ticker": "446720",
+                "name": "SOL 미국배당다우존스",
+                "market": "KOSPI",
+                "asset_class": "EQUITY",
+            },
+        ]
+
+        with patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            self._mock_fetch_dividend_yields(),
+        ):
+            suggested, note, status = await _suggest_for_dividend_goal(
+                None, candidates, 20.0, 5.0, 0.4, capacity_remaining=10
+            )
+
+        assert suggested == []
+        assert note is None
+        assert status == "unreachable"
+
     async def test_status_unreachable_when_expected_is_none(self):
         """옵티마이저가 아직 실행되지 않았거나 실패해 `expected_dividend_yield_pct=None`이면
         무조건 미달성(unreachable)으로 취급한다(조기 반환 지점에서 호출되는 경우)."""
@@ -1124,9 +1180,17 @@ class TestSuggestForDividendGoal:
         def _domestic_only(c: dict[str, str]) -> bool:
             return c["market"].upper() in {"KOSPI", "KOSDAQ"}
 
+        # 446720의 배당수익률을 3.5%로 오버라이드 — 시장 필터 동작 자체를 검증하는 테스트라,
+        # 클래스 공용 fixture의 2.88%(최소 제안 하한 3.0% 미만)를 그대로 쓰면 제안 자체가
+        # 걸러져 이 테스트의 의도(시장 필터 검증)와 무관하게 실패한다.
+        yields = {**self._DIVIDEND_YIELDS, ("446720", "KOSPI"): 3.5}
+
+        async def _dividend_side_effect(cache, tickers):
+            return {tm: yields[tm] for tm in tickers if tm in yields}
+
         with patch(
             "app.services.goal_recommendation_service._fetch_dividend_yields",
-            self._mock_fetch_dividend_yields(),
+            AsyncMock(side_effect=_dividend_side_effect),
         ):
             suggested, note, status = await _suggest_for_dividend_goal(
                 None, candidates, 2.5, 0.0, 0.4, capacity_remaining=10, market_filter=_domestic_only
@@ -2286,6 +2350,7 @@ class TestGetHorizonRecommendations:
         assert rec.recommended_items
         equity_weight = sum(i.weight for i in rec.recommended_items if i.ticker == "069500")
         assert equity_weight >= 79.5  # equity_floor(80%)는 여전히 만족
+        assert rec.required_dividend_yield_pct == pytest.approx(2.4)
 
     async def test_long_term_overseas_dedicated_with_dividend_goal_does_not_crash(self):
         """실제 계정에서 재현된 회귀 시나리오: 장기(LONG_TERM, risk_tolerance=AGGRESSIVE 고정) +
@@ -2420,11 +2485,12 @@ class TestGetHorizonRecommendations:
             ("000660", "KOSPI"): 0.6,
             ("SPY", "NYSE"): 1.3,
             ("VOO", "NYSE"): 1.2,
-            # 국내(GENERAL) 큐레이션 풀 — 진짜 국내지수 추종 EQUITY는 069500 하나뿐이고, 그것을
-            # 더해도 최대 1.52%뿐이라 3.0%에 못 미쳐 풀 전체(069500 하나)가 그대로 제안됨.
+            # 국내(GENERAL) 큐레이션 풀 — 진짜 국내지수 추종 EQUITY는 069500 하나뿐이다. 최소
+            # 제안 하한(3.0%)을 넘기도록 3.5%로 설정해(그것만 더해도 3.0% 목표에는 못 미치지만
+            # 여전히 제안은 되어야 함) 제안 자체는 그대로 나오는지 검증한다.
             # 360750/133690/458730/446720(해외지수 추종·KRX 상장)은 GENERAL 지역 선호에 안 맞아
             # 제안 풀에서 제외돼야 한다 — 이게 이 테스트가 검증하는 회귀 방지 포인트.
-            ("069500", "KOSPI"): 2.5,
+            ("069500", "KOSPI"): 3.5,
             # 해외(OVERSEAS_DEDICATED) 큐레이션 풀 — JEPQ 하나만 추가해도 목표 달성 가능
             ("JEPQ", "NASDAQ"): 9.95,
             ("JEPI", "NYSE"): 8.1,
@@ -2568,6 +2634,7 @@ class TestGetHorizonRecommendations:
             result = await get_horizon_recommendations(None, mock_db, uuid.uuid4(), settings_row)
 
         rec = result.recommendations[0]
+        assert rec.required_dividend_yield_pct == pytest.approx(1.74)
         assert rec.expected_dividend_yield_pct >= 1.74  # 등록 후보만으로 이미 목표 달성
         assert rec.dividend_goal_status == "improvable"
         suggested_tickers = {c.ticker for c in rec.suggested_candidates}

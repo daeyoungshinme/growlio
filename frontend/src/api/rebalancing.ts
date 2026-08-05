@@ -337,6 +337,7 @@ export interface HorizonGoalRecommendation {
   base_krw: number;
   account_count: number;
   recommended_items: GoalRecommendationItem[];
+  required_dividend_yield_pct: number | null;
   expected_return_pct: number | null;
   expected_dividend_yield_pct: number | null;
   expected_volatility_pct: number | null;

@@ -7,6 +7,8 @@
 
 import random
 
+import pytest
+
 from app.services.goal_portfolio_optimizer import (
     _dividend_floor_constraint,
     _optimize_goal_portfolio,
@@ -39,8 +41,8 @@ class TestDividendFloorConstraintGroupBudget:
         """
         bounds = [(0.0, 0.8), (0.0, 0.6)]  # equity_floor로 인해 확장된 주식 종목 상한(0.8)
         dividends = (2.0, 3.0)
-        equity_flags = (True, False)
-        group_budget = {True: 1.0, False: 0.2}  # 비주식 예산 = 1 - equity_floor(0.8)
+        asset_classes = ("EQUITY", "OTHER")
+        group_budget = {"EQUITY": 1.0, "OTHER": 0.2}  # 비주식 예산 = 1 - equity_floor(0.8)
 
         # group_budget 없이는 achievable = 0.8*2.0 + 0.2*3.0 = 2.2%로 동일하게 계산되지만
         # (bounds 자체가 이미 equity_cap=0.8로 좁혀져 있으므로), 아래처럼 종목당 상한이 더
@@ -51,14 +53,14 @@ class TestDividendFloorConstraintGroupBudget:
         assert note_no_budget is None
 
         constraint_with_budget, note_with_budget = _dividend_floor_constraint(
-            wide_bounds, dividends, 2.6, equity_flags=equity_flags, group_budget=group_budget
+            wide_bounds, dividends, 2.6, asset_classes=asset_classes, group_budget=group_budget
         )
         assert constraint_with_budget is None  # 그룹 예산 반영 시 실제로는 2.2%가 한계라 불가능
         assert "충족하는 조합을 찾지 못해" in note_with_budget
 
         # 실제 한계치(2.2%) 이하는 그룹 예산을 반영해도 여전히 달성 가능
         constraint_ok, note_ok = _dividend_floor_constraint(
-            bounds, dividends, 2.2, equity_flags=equity_flags, group_budget=group_budget
+            bounds, dividends, 2.2, asset_classes=asset_classes, group_budget=group_budget
         )
         assert constraint_ok is not None
         assert note_ok is None
@@ -97,9 +99,8 @@ class TestOptimizeGoalPortfolioDividendEquityFloorInteraction:
             -50.0,
             max_weight=0.6,
             risk_tolerance="CONSERVATIVE",
-            is_equity=is_equity,
-            equity_floor=0.8,
-            equity_ceiling=None,
+            asset_classes=["EQUITY" if b else "OTHER" for b in is_equity],
+            class_bounds={"EQUITY": (0.8, 1.0)},
             market_signal_level=None,
             dividend_yields=dividend_yields,
             required_dividend_yield_pct=2.6,
@@ -125,9 +126,8 @@ class TestOptimizeGoalPortfolioDividendEquityFloorInteraction:
             -50.0,
             max_weight=0.6,
             risk_tolerance="CONSERVATIVE",
-            is_equity=is_equity,
-            equity_floor=0.8,
-            equity_ceiling=None,
+            asset_classes=["EQUITY" if b else "OTHER" for b in is_equity],
+            class_bounds={"EQUITY": (0.8, 1.0)},
             market_signal_level=None,
             dividend_yields=dividend_yields,
             required_dividend_yield_pct=1.5,
@@ -153,9 +153,8 @@ class TestOptimizeGoalPortfolioDividendEquityFloorInteraction:
             -50.0,
             max_weight=0.6,
             risk_tolerance="CONSERVATIVE",
-            is_equity=is_equity,
-            equity_floor=None,
-            equity_ceiling=None,
+            asset_classes=["EQUITY" if b else "OTHER" for b in is_equity],
+            class_bounds=None,
             market_signal_level=None,
             dividend_yields=dividend_yields,
             required_dividend_yield_pct=2.6,
@@ -208,9 +207,8 @@ class TestDividendFallbackRetryOnTargetReturnConflict:
             -50.0,
             max_weight=0.4,
             risk_tolerance="AGGRESSIVE",
-            is_equity=[True] * 5,
-            equity_floor=None,
-            equity_ceiling=None,
+            asset_classes=["EQUITY"] * 5,
+            class_bounds=None,
             market_signal_level=None,
             dividend_yields=dividend_yields,
             required_dividend_yield_pct=1.8,
@@ -236,9 +234,8 @@ class TestDividendFallbackRetryOnTargetReturnConflict:
             -50.0,
             max_weight=0.4,
             risk_tolerance="CONSERVATIVE",
-            is_equity=[True] * 5,
-            equity_floor=None,
-            equity_ceiling=None,
+            asset_classes=["EQUITY"] * 5,
+            class_bounds=None,
             market_signal_level=None,
             dividend_yields=dividend_yields,
             required_dividend_yield_pct=1.8,
@@ -249,3 +246,99 @@ class TestDividendFallbackRetryOnTargetReturnConflict:
         dividend_by_ticker = dict(zip((t[0] for t in tickers), dividend_yields, strict=False))
         weighted_dividend = sum(i["weight"] / 100 * dividend_by_ticker[i["ticker"]] for i in items)
         assert weighted_dividend >= 1.8 - 0.05
+
+
+class TestOptimizeGoalPortfolioMultiClassBounds:
+    """3개 자산군(EQUITY/BOND/CASH)에 동시에 상한을 거는 신규 시나리오 — 전체 자산 기준 추천의
+    채권/현금성 비중 상한 설정(`_compute_overall_class_bounds`)이 실제로 넘기는 형태."""
+
+    def _candidates(self):
+        symbols = ["EQ1", "EQ2", "BOND1", "CASH1"]
+        tickers = [
+            ("EQ1", "주식1", "NASDAQ"),
+            ("EQ2", "주식2", "NASDAQ"),
+            ("BOND1", "채권1", "NASDAQ"),
+            ("CASH1", "현금성1", "NASDAQ"),
+        ]
+        cagrs = [10.0, 9.0, 4.0, 2.0]
+        asset_classes = ["EQUITY", "EQUITY", "BOND", "CASH"]
+        return symbols, tickers, cagrs, asset_classes
+
+    def _returns_map(self, symbols):
+        random.seed(11)
+        return {s: [random.gauss(0.0004, 0.01) for _ in range(252)] for s in symbols}
+
+    def test_bond_and_cash_ceilings_together_cap_each_class(self):
+        """BOND<=30%, CASH<=20% 동시 설정 시 각 자산군이 자기 상한을 넘지 않아야 한다."""
+        symbols, tickers, cagrs, asset_classes = self._candidates()
+        returns_map = self._returns_map(symbols)
+
+        items, expected_return, expected_vol, note = _optimize_goal_portfolio(
+            symbols,
+            tickers,
+            cagrs,
+            returns_map,
+            required_return_pct=-50.0,
+            asset_classes=asset_classes,
+            class_bounds={"BOND": (0.0, 0.3), "CASH": (0.0, 0.2)},
+        )
+
+        assert items
+        assert note is None
+        bond_weight = sum(i["weight"] for i in items if i["ticker"] == "BOND1")
+        cash_weight = sum(i["weight"] for i in items if i["ticker"] == "CASH1")
+        assert bond_weight <= 30.0 + 0.5
+        assert cash_weight <= 20.0 + 0.5
+
+    def test_bond_and_cash_ceilings_imply_equity_floor(self):
+        """BOND<=30%+CASH<=20% 동시 설정은 EQUITY 하한을 명시하지 않아도 총합=1 제약으로부터
+        EQUITY>=50%가 묵시적으로 유도돼야 한다(각 자산군이 매우 저변동이라 무제한이면 그쪽으로
+        쏠리는 후보 구성)."""
+        symbols = ["EQ1", "BOND1", "CASH1"]
+        tickers = [("EQ1", "주식1", "NASDAQ"), ("BOND1", "채권1", "NASDAQ"), ("CASH1", "현금성1", "NASDAQ")]
+        cagrs = [10.0, 4.0, 2.0]
+        asset_classes = ["EQUITY", "BOND", "CASH"]
+        random.seed(13)
+        returns_map = {
+            "EQ1": [random.gauss(0.0004, 0.01) for _ in range(252)],
+            "BOND1": [random.gauss(0.0001, 0.0005) for _ in range(252)],  # 매우 저변동 — 무제한이면 쏠림
+            "CASH1": [random.gauss(0.00005, 0.0002) for _ in range(252)],  # 매우 저변동 — 무제한이면 쏠림
+        }
+
+        items, expected_return, expected_vol, note = _optimize_goal_portfolio(
+            symbols,
+            tickers,
+            cagrs,
+            returns_map,
+            required_return_pct=-50.0,
+            max_weight=1.0,
+            asset_classes=asset_classes,
+            class_bounds={"BOND": (0.0, 0.3), "CASH": (0.0, 0.2)},
+        )
+
+        assert items
+        assert note is None
+        equity_weight = sum(i["weight"] for i in items if i["ticker"] == "EQ1")
+        assert equity_weight == pytest.approx(50.0, abs=1.0)
+
+    def test_ceiling_only_on_absent_class_is_noop(self):
+        """후보에 아예 존재하지 않는 자산군에 상한을 걸어도(BOND 후보 없음) 크래시 없이 무시된다."""
+        symbols = ["EQ1", "EQ2"]
+        tickers = [("EQ1", "주식1", "NASDAQ"), ("EQ2", "주식2", "NASDAQ")]
+        cagrs = [10.0, 9.0]
+        asset_classes = ["EQUITY", "EQUITY"]
+        returns_map = self._returns_map(symbols)
+
+        items, expected_return, expected_vol, note = _optimize_goal_portfolio(
+            symbols,
+            tickers,
+            cagrs,
+            returns_map,
+            required_return_pct=-50.0,
+            asset_classes=asset_classes,
+            class_bounds={"BOND": (0.0, 0.3)},
+        )
+
+        assert items
+        assert note is None
+        assert sum(i["weight"] for i in items) == pytest.approx(100.0, abs=0.5)

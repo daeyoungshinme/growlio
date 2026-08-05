@@ -22,6 +22,8 @@ export interface GoalRecommendationOptions {
   cagr_lookback_years: number;
   short_term_equity_floor_pct: number;
   age_group: AgeGroup | null;
+  bond_ceiling_pct: number | null;
+  cash_ceiling_pct: number | null;
 }
 
 export interface SettingsData {
@@ -47,6 +49,8 @@ export interface SettingsData {
   goal_max_weight_pct: number;
   goal_cagr_lookback_years: number;
   goal_short_term_equity_floor_pct: number;
+  goal_bond_ceiling_pct: number | null;
+  goal_cash_ceiling_pct: number | null;
   age_group: AgeGroup | null;
   birth_year: number | null;
   auto_rebalancing_max_order_value_krw: number;

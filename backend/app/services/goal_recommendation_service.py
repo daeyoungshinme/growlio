@@ -274,6 +274,19 @@ _DIVIDEND_IMPROVEMENT_THRESHOLD_PCT = 0.5
 노이즈성 제안(0.1%p 차이로 계속 새 종목을 권유)을 막기 위한 최소 유의미 기준 —
 `_RECOMMENDATION_DRIFT_THRESHOLD_PCT`(3.0%p, 비중 변화 감지용)와는 판단 축이 달라 값도 다르게 잡는다."""
 
+_MIN_SUGGESTABLE_DIVIDEND_YIELD_PCT = 2.5
+"""`_suggest_for_dividend_goal()`이 "고배당 후보"로 제안할 수 있는 최소 배당수익률(%) 하한.
+큐레이션 유니버스(`RECOMMENDATION_UNIVERSE`)에는 SPY/QQQ/KODEX200 같은 저배당 브로드마켓 ETF와
+채권/현금성 ETF도 섞여 있는데, 하한 없이 "목표 달성에 필요한 만큼만" 그리디하게 채우다 보면
+사용자가 이미 진짜 고배당 ETF(JEPI/JEPQ/SCHD 등)를 후보로 등록해둔 상태에서 남은 풀 중 "가장
+나은" 선택지가 저배당 종목이 되어도 그대로 "고배당 후보"로 제안되는 문제가 있었다 — 이 하한
+미만인 후보는 목표 달성에 부족하더라도(상태는 unreachable로 유지) 아예 제안하지 않는다.
+
+3.0%로 처음 도입했다가 실측 데이터로 2.5%로 낮췄다 — 국내계좌(GENERAL/ISA/PENSION_SAVINGS/IRP)는
+지역 선호 필터로 해외상장 고배당 ETF(JEPI/JEPQ/SCHD)가 애초에 제안 풀에서 제외되는데, 유일하게
+남는 국내상장 배당형 ETF(458730/446720, Dow Jones US Dividend 100 추종)의 실제 수익률이 ~2.9%로
+3.0%를 근소하게 밑돌아 이 계좌군에서 고배당 후보가 사실상 영구히 제안되지 않는 문제가 있었다."""
+
 
 def compute_recommendation_drift(
     recommended: list[tuple[str, str, float]],  # (ticker, market, weight 0~100)
@@ -438,7 +451,14 @@ async def _suggest_for_dividend_goal(
         return [], None, status
 
     pool_dividend_map = await _fetch_dividend_yields(cache, [(c["ticker"], c["market"]) for c in pool])
-    pool_sorted = sorted(pool, key=lambda c: pool_dividend_map.get((c["ticker"], c["market"]), 0.0), reverse=True)
+    # 절대 수익률 하한 미만인 후보는 "고배당"이라 부를 수 없으므로 애초에 정렬 대상에서 제외한다
+    # (`_MIN_SUGGESTABLE_DIVIDEND_YIELD_PCT` 참고) — 목표 달성에 부족해도 저배당 종목으로 채우지 않는다.
+    pool_above_floor = [
+        c for c in pool if pool_dividend_map.get((c["ticker"], c["market"]), 0.0) >= _MIN_SUGGESTABLE_DIVIDEND_YIELD_PCT
+    ]
+    pool_sorted = sorted(
+        pool_above_floor, key=lambda c: pool_dividend_map.get((c["ticker"], c["market"]), 0.0), reverse=True
+    )
     combined_dividend_map = {**dividend_map, **pool_dividend_map}
 
     trial = list(candidate_dicts)
@@ -447,8 +467,6 @@ async def _suggest_for_dividend_goal(
         if len(suggested) >= capacity_remaining:
             break
         yield_pct = pool_dividend_map.get((c["ticker"], c["market"]), 0.0)
-        if yield_pct <= 0:
-            break  # 남은 후보는 배당수익률 데이터가 없거나 0 — 더 제안해도 목표 달성에 도움 안 됨
         trial.append(c)
         suggested.append({**c, "dividend_yield_pct": round(yield_pct, 2)})
         if _achievable(trial, combined_dividend_map):
@@ -594,16 +612,49 @@ async def _fetch_overall_candidate_data(
 
 
 def _filter_candidates_with_cagr(
-    candidates: list[tuple[str, str, str]],
+    candidates: list[tuple[str, str, str, str]],
     cagr_map: dict[tuple[str, str], dict],
     dividend_map: dict[tuple[str, str], float],
-) -> list[tuple[str, tuple[str, str, str], float, float]]:
-    """CAGR 데이터가 확보된 후보만 남기고, yfinance 심볼·배당수익률을 함께 묶는다."""
+) -> list[tuple[str, tuple[str, str, str], float, float, str]]:
+    """CAGR 데이터가 확보된 후보만 남기고, yfinance 심볼·배당수익률·자산군을 함께 묶는다."""
     return [
-        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], dividend_map.get((t, m), 0.0))
-        for t, name, m in candidates
+        (to_yf_symbol(t, m), (t, name, m), cagr_map[(t, m)]["cagr_pct"], dividend_map.get((t, m), 0.0), asset_class)
+        for t, name, m, asset_class in candidates
         if (t, m) in cagr_map and cagr_map[(t, m)].get("cagr_pct") is not None
     ]
+
+
+def _equity_class_bounds(
+    equity_floor: float | None, equity_ceiling: float | None
+) -> dict[str, tuple[float, float]] | None:
+    """단기/IRP/연령대별 추천의 EQUITY vs OTHER 이분법 하한·상한을 `class_bounds`로 변환한다 —
+    호출측은 항상 둘 중 하나만 넘긴다(`_AGE_GROUP_PROFILE` 독스트링 참고)."""
+    if equity_floor is not None:
+        return {"EQUITY": (equity_floor, 1.0)}
+    if equity_ceiling is not None:
+        return {"EQUITY": (0.0, equity_ceiling)}
+    return None
+
+
+def _compute_overall_class_bounds(settings_row: UserSettings | None) -> dict[str, tuple[float, float]] | None:
+    """전체 자산 기준 추천(`get_goal_recommendation`) 전용 — 사용자가 설정한 채권/현금성 비중
+    상한(`goal_bond_ceiling_pct`/`goal_cash_ceiling_pct`, %)을 `_optimize_goal_portfolio`의
+    `class_bounds`(자산군별 (하한, 상한) 비율, 0~1)로 변환한다. 상한이 없으면(None) 해당
+    자산군은 제약에서 제외 — 상한을 하나도 설정하지 않았으면 전체가 None(기존 동작과 동일하게
+    자산군 제약 없이 계산).
+
+    두 상한을 동시에 설정하면(예: 채권 30%↓ + 현금성 20%↓) `_optimize_goal_portfolio`가
+    총합=1 제약으로부터 "주식 비중 ≥ 1-채권상한-현금성상한"(여기서는 50%)이라는 묵시적
+    하한을 자동으로 유도한다 — EQUITY에 대해 별도 하한을 명시할 필요가 없다.
+    """
+    bond_ceiling_pct = getattr(settings_row, "goal_bond_ceiling_pct", None)
+    cash_ceiling_pct = getattr(settings_row, "goal_cash_ceiling_pct", None)
+    class_bounds: dict[str, tuple[float, float]] = {}
+    if bond_ceiling_pct is not None:
+        class_bounds["BOND"] = (0.0, float(bond_ceiling_pct) / 100)
+    if cash_ceiling_pct is not None:
+        class_bounds["CASH"] = (0.0, float(cash_ceiling_pct) / 100)
+    return class_bounds or None
 
 
 async def _compute_goal_recommendation(
@@ -694,8 +745,8 @@ async def _compute_goal_recommendation(
             market_filter=overall_market_filter,
         )
 
-    candidates = [(c["ticker"], c["name"], c["market"]) for c in computed_candidates]
-    tickers_only = [(t, m) for t, _, m in candidates]
+    candidates = [(c["ticker"], c["name"], c["market"], c.get("asset_class", "EQUITY")) for c in computed_candidates]
+    tickers_only = [(t, m) for t, _, m, _ in candidates]
 
     cagr_map, dividend_map, market_signal_level = await _fetch_overall_candidate_data(
         cache, tickers_only, cagr_lookback_years
@@ -719,6 +770,7 @@ async def _compute_goal_recommendation(
     f_tickers = [f[1] for f in filtered]
     f_cagrs = [f[2] for f in filtered]
     f_dividends = [f[3] for f in filtered]
+    f_asset_classes = [f[4] for f in filtered]
 
     loop = asyncio.get_running_loop()
     async with _yfinance_sem:
@@ -734,6 +786,8 @@ async def _compute_goal_recommendation(
             required_return_pct_for_optimizer,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
+            asset_classes=f_asset_classes,
+            class_bounds=_compute_overall_class_bounds(settings_row),
             market_signal_level=market_signal_level,
             dividend_yields=f_dividends,
             required_dividend_yield_pct=required_dividend_yield_pct,
@@ -831,6 +885,7 @@ def _single_candidate_horizon_result(
     max_weight: float,
     market_signal_level: str | None,
     combine_note: Callable[[str | None], str | None],
+    required_dividend_yield_pct: float | None = None,
 ) -> HorizonGoalRecommendation:
     """유효 후보가 1개뿐일 때 옵티마이저 없이 전액 배분하는 조기 반환 결과를 만든다.
 
@@ -849,6 +904,7 @@ def _single_candidate_horizon_result(
                 ticker=tk, name=name, market=mk, weight=100.0, dividend_yield_pct=dividend if dividend > 0 else None
             )
         ],
+        required_dividend_yield_pct=required_dividend_yield_pct,
         expected_return_pct=cagr,
         expected_dividend_yield_pct=dividend if dividend > 0 else None,
         risk_tolerance=risk_tolerance,
@@ -926,6 +982,7 @@ async def _build_horizon_result(
             tax_type=tax_type,
             base_krw=base_krw,
             account_count=len(account_ids),
+            required_dividend_yield_pct=required_dividend_yield_pct,
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
             market_signal_level=market_signal_level,
@@ -942,6 +999,7 @@ async def _build_horizon_result(
             tax_type=tax_type,
             base_krw=base_krw,
             account_count=len(account_ids),
+            required_dividend_yield_pct=required_dividend_yield_pct,
             risk_tolerance=risk_tolerance,
             max_weight_pct=round(max_weight * 100, 2),
             market_signal_level=market_signal_level,
@@ -959,12 +1017,14 @@ async def _build_horizon_result(
             max_weight,
             market_signal_level,
             _combine_note,
+            required_dividend_yield_pct=required_dividend_yield_pct,
         )
 
     f_symbols = [f[0] for f in filtered]
     f_tickers = [f[1] for f in filtered]
     f_cagrs = [f[2] for f in filtered]
     f_is_equity = [f[3] for f in filtered]
+    f_asset_classes = ["EQUITY" if is_eq else "OTHER" for is_eq in f_is_equity]
     f_dividends = [f[4] for f in filtered]
 
     loop = asyncio.get_running_loop()
@@ -984,6 +1044,10 @@ async def _build_horizon_result(
     elif include_cash_equivalent and any(f_is_equity):
         equity_floor = short_term_equity_floor
 
+    # 자산군 단위 비중 제약 일반화(`_optimize_goal_portfolio`의 `class_bounds`) — 이 경로는
+    # EQUITY vs 그 외(OTHER)의 기존 이분법 그대로 매핑한다(단기 주식 하한 / IRP 주식 상한).
+    class_bounds = _equity_class_bounds(equity_floor, equity_ceiling)
+
     items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
         None,
         functools.partial(
@@ -995,9 +1059,8 @@ async def _build_horizon_result(
             _NON_BINDING_RETURN_FLOOR,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
-            is_equity=f_is_equity,
-            equity_floor=equity_floor,
-            equity_ceiling=equity_ceiling,
+            asset_classes=f_asset_classes,
+            class_bounds=class_bounds,
             market_signal_level=market_signal_level,
             dividend_yields=f_dividends,
             required_dividend_yield_pct=required_dividend_yield_pct,
@@ -1029,6 +1092,7 @@ async def _build_horizon_result(
         base_krw=base_krw,
         account_count=len(account_ids),
         recommended_items=_attach_dividend_yield(items, dividend_map),
+        required_dividend_yield_pct=required_dividend_yield_pct,
         expected_return_pct=expected_return_pct,
         expected_dividend_yield_pct=expected_dividend_yield_pct,
         expected_volatility_pct=expected_volatility_pct,
@@ -1445,6 +1509,7 @@ async def _compute_age_based_recommendation(
     f_tickers = [f[1] for f in filtered]
     f_cagrs = [f[2] for f in filtered]
     f_is_equity = [f[3] for f in filtered]
+    f_asset_classes = ["EQUITY" if is_eq else "OTHER" for is_eq in f_is_equity]
     f_dividends = [f[4] for f in filtered]
 
     loop = asyncio.get_running_loop()
@@ -1457,6 +1522,9 @@ async def _compute_age_based_recommendation(
     if include_cash_equivalent:
         returns_map[_CASH_EQUIVALENT_TICKER] = _cash_equivalent_daily_returns()
 
+    # `_AGE_GROUP_PROFILE`은 구간마다 equity_floor/equity_ceiling 중 하나만 설정한다(docstring 참고).
+    class_bounds = _equity_class_bounds(equity_floor, equity_ceiling)
+
     items, expected_return_pct, expected_volatility_pct, opt_note = await loop.run_in_executor(
         None,
         functools.partial(
@@ -1468,9 +1536,8 @@ async def _compute_age_based_recommendation(
             _NON_BINDING_RETURN_FLOOR,
             max_weight=max_weight,
             risk_tolerance=risk_tolerance,
-            is_equity=f_is_equity,
-            equity_floor=equity_floor,
-            equity_ceiling=equity_ceiling,
+            asset_classes=f_asset_classes,
+            class_bounds=class_bounds,
             market_signal_level=market_signal_level,
             dividend_yields=f_dividends,
             required_dividend_yield_pct=required_dividend_yield_pct,

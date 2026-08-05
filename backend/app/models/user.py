@@ -57,6 +57,11 @@ class UserSettings(Base):
     goal_cagr_lookback_years: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 단기(SHORT_TERM) 추천의 주식 최소 비중(%) — NULL이면 기본값 80% 사용
     goal_short_term_equity_floor_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    # 전체 자산 기준 목표 역산 추천(get_goal_recommendation) 전용 자산군 상한(%) — NULL이면 상한
+    # 없음(기존 동작과 동일). goal_portfolio_optimizer.py의 class_bounds={"BOND": (0, .../100)}
+    # 형태로 변환되어 전달된다(goal_recommendation_service._compute_overall_class_bounds).
+    goal_bond_ceiling_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
+    goal_cash_ceiling_pct: Mapped[float | None] = mapped_column(Numeric(5, 2), nullable=True)
     # DART OpenAPI 자격증명 (AES-256 암호화)
     dart_api_key: Mapped[str | None] = mapped_column(String(512))
     # 알림 설정

@@ -8,6 +8,7 @@ interface Props {
   totalBuySummary: number;
   totalSellSummary: number;
   cashAfter: number;
+  estFee: number;
 }
 
 // 핵심 요약 — 예수금 / 매도 예상 / 매수 필요 / 리밸런싱 후 예수금 2×2 그리드
@@ -17,6 +18,7 @@ export default function RebalancingSummaryCards({
   totalBuySummary,
   totalSellSummary,
   cashAfter,
+  estFee,
 }: Props) {
   const cashAfterCls =
     cashAfter >= 0
@@ -70,6 +72,14 @@ export default function RebalancingSummaryCards({
       {cashAfter < 0 && (
         <div className="text-xs text-red-600 dark:text-red-400 mt-2">
           예수금 부족 — 매도 후 매수하거나 수량을 조정하세요
+        </div>
+      )}
+      {estFee > 0 && (
+        <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mt-2 pt-2 border-t border-gray-200 dark:border-gray-700/40">
+          <span>
+            예상 거래 비용 <span className="text-gray-500 dark:text-gray-500">(수수료 0.014%)</span>
+          </span>
+          <span className="text-gray-700 dark:text-gray-300 font-medium">{fmtKrw(estFee)}</span>
         </div>
       )}
     </div>

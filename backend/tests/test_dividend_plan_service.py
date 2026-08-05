@@ -169,11 +169,71 @@ class TestGetDividendPlan:
                 "app.services.dividend.plan_service.get_dividend_summary",
                 AsyncMock(return_value=DIVIDEND_SUMMARY),
             ),
+            patch(
+                "app.services.dividend.plan_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 90_000_000}),
+            ),
         ):
             result = await get_dividend_plan(user_id, mock_db, mock_cache)
 
         assert result["annual_dividend_goal"] == 3_600_000
         assert result["goal_achievement_pct"] == 50.0  # 1_800_000 / 3_600_000 * 100
+        assert result["required_dividend_yield_pct"] == 4.0  # 3_600_000 / 90_000_000 * 100
+        assert result["current_dividend_yield_pct"] == 2.0  # 1_800_000 / 90_000_000 * 100
+        assert result["total_assets_krw"] == 90_000_000
+
+    @pytest.mark.asyncio
+    async def test_no_goal_yields_none_required_yield(self, user_id, mock_db, mock_cache):
+        mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=None)
+        execute_result = MagicMock()
+        execute_result.fetchall.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            patch(
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
+                AsyncMock(return_value=TICKER_SUMMARIES),
+            ),
+            patch(
+                "app.services.dividend.plan_service.get_dividend_summary",
+                AsyncMock(return_value=DIVIDEND_SUMMARY),
+            ),
+            patch(
+                "app.services.dividend.plan_service.build_portfolio_overview",
+            ) as mock_overview,
+        ):
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
+
+        assert result["required_dividend_yield_pct"] is None
+        assert result["current_dividend_yield_pct"] is None
+        assert result["total_assets_krw"] == 0
+        mock_overview.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_zero_total_assets_yields_none_required_yield(self, user_id, mock_db, mock_cache):
+        mock_db.scalar.return_value = SimpleNamespace(annual_dividend_goal=3_600_000)
+        execute_result = MagicMock()
+        execute_result.fetchall.return_value = []
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            patch(
+                "app.services.dividend.plan_service.get_ticker_dividend_summary",
+                AsyncMock(return_value=TICKER_SUMMARIES),
+            ),
+            patch(
+                "app.services.dividend.plan_service.get_dividend_summary",
+                AsyncMock(return_value=DIVIDEND_SUMMARY),
+            ),
+            patch(
+                "app.services.dividend.plan_service.build_portfolio_overview",
+                AsyncMock(return_value={"total_assets_krw": 0}),
+            ),
+        ):
+            result = await get_dividend_plan(user_id, mock_db, mock_cache)
+
+        assert result["required_dividend_yield_pct"] is None
+        assert result["current_dividend_yield_pct"] is None
 
     @pytest.mark.asyncio
     async def test_no_settings_row_returns_none_goal(self, user_id, mock_db, mock_cache):
