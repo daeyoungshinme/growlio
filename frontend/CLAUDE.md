@@ -106,11 +106,11 @@ assets, backtest, common, dashboard, invest, layout, portfolio, portfolio-analys
 - **`components/dashboard/PensionContributionCard.tsx`** — 연금저축/IRP 연간 납입 현황 카드. 마찬가지로 `TaxLimitsSection`이 `embedded` 모드로 렌더.
 - **`components/dashboard/HealthInsuranceRiskCard.tsx`** — 배당소득 기준 건강보험 피부양자 자격상실 위험 상시 노출 카드(진행률 바 + 기준 초과 시 예상 월 보험료). `TaxLimitsSection`이 ISA/연금 계좌 유무와 무관하게 항상 렌더 — 배당소득은 계좌 태그가 아닌 전체 배당 수령액 기준이라 두 카드와 게이트 조건이 다름. `TaxOptimizationCard`("세금 추정" 탭)의 조건부 경고 배너와는 별개(상호 보완 — 이 카드가 상시 노출, 배너는 임계값 근접/초과 시 강조).
 - **`components/dashboard/TaxLimitsBanner.tsx`** — `InvestmentSnapshotCard`("주식 투자 현황") 안에 4번째 하위 섹션으로 임베드되는 세금 한도 요약 행. ISA 임박 만기/한도초과·연금공제 달성률을 한 줄로 보여주고 `/assets?tab=투자현황&portfolioTab=세금`으로 딥링크(상세 카드 자체는 여전히 홈에 렌더하지 않음). 계산 로직은 `useTaxLimitsSummary` 훅(`hooks/useTaxLimitsSummary.ts`)에 있으며, 같은 훅을 `InvestmentSnapshotCard`가 헤더 경고 배지·collapsedHint 계산에도 재사용한다(React Query 캐시 공유로 요청 중복 없음).
-- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭의 진입점(`PortfolioPage`가 lazy-load). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`(ISA·연금)과 `TaxOptimizationCard`(세금 추정)를 묶는다 — 기존에 두 카드가 각각 접이식으로 나란히 쌓여 3중 중첩이었던 것을 탭 전환 1단계로 단순화(2026-07-25). 탭 상태는 `?taxTab=` 쿼리파라미터로 영속화(`PortfolioPage`의 기존 `portfolioTab` 관리 패턴과 동일한 `useSearchParams` 방식). Home 배너(`TaxLimitsBanner`)의 `?portfolioTab=세금` 딥링크는 `taxTab` 미지정이라 기본값인 "한도 현황" 탭으로 랜딩한다.
+- **`components/portfolio-analysis/TaxTabContainer.tsx`** — 자산탭 세금 서브탭의 진입점(`PortfolioPage`가 lazy-load). "한도 현황"/"세금 추정" 2탭으로 `TaxLimitsSection`(ISA·연금)과 `TaxOptimizationCard`(세금 추정)를 묶는다. 탭 상태는 `?taxTab=` 쿼리파라미터로 영속화(`useSearchParams`). Home 배너(`TaxLimitsBanner`)의 `?portfolioTab=세금` 딥링크는 `taxTab` 미지정이라 기본값인 "한도 현황" 탭으로 랜딩한다.
 - **`components/portfolio-analysis/TaxLimitsSection.tsx`** — `TaxTabContainer`의 "한도 현황" 탭 콘텐츠. `IsaMaturityCard`/`PensionContributionCard`(계좌 유무 조건부)와 `HealthInsuranceRiskCard`(항상 렌더)를 감싸는 순수 프레젠테이션 컴포넌트(자체 접기 카드 없음 — 탭이 이미 그 역할을 함). 계좌 필터와 무관하게 항상 전체 계좌 기준(`TaxOptimizationCard`의 세금 추정과 달리 `accountId` prop 없음). `HealthInsuranceRiskCard`가 항상 렌더되므로 이 탭이 완전히 빈 상태(empty-state 문구)는 없음.
-- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드 (구 `GoalRecommendationCard.tsx` 대체, `RebalancingPage`에서 lazy-load). 전체/연령대/기간별 3개 탭의 결과 렌더(드리프트 배지→비중 목록→안내문구→후보 제안→적용 섹션)는 `RecommendationResultPanel.tsx`로 통합됨(2026-07-26, 그 이전엔 비중 목록·적용 섹션만 `RecommendationWeightList.tsx`/`RecommendationApplySection.tsx`로 부분 추출된 상태였음) — 탭별 설명 문구·`useMutation`·탭 전환 상태머신은 이 파일에 그대로 유지.
+- **`components/rebalancing/RecommendationCard.tsx`** — 목표 역산 추천 카드(`RebalancingPage`에서 lazy-load). 전체/연령대/기간별 3개 탭의 결과 렌더는 `RecommendationResultPanel.tsx`로 통합됨 — 탭별 설명 문구·`useMutation`·탭 전환 상태머신은 이 파일에 그대로 유지.
 - **`components/rebalancing/RecommendationResultPanel.tsx`** — `RecommendationCard.tsx`의 전체/연령대/기간별 3탭이 공유하는 추천 결과 프레젠테이션(드리프트 배지·`RecommendationWeightList`·안내문구+`MarketSignalLevelBadge`·`SuggestedCandidatesBlock`·`RecommendationApplySection`)을 props로 데이터만 받아 렌더. `applySection`이 `null`이면 적용 섹션 자체를 생략(기간별 탭에서 현금성 자산을 자동 연결할 계좌가 없어 적용이 불가능한 경우).
-- **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 6단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인 → 투자성향·배당목표 → 추천 포트폴리오). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안. 5단계(출생연도·리스크 성향·배당목표)까지 입력하면 6단계 진입 시 자동 저장 후 `GET /rebalancing/goal-recommendation`(전체 자산 기준 목표 역산 추천)을 조회해 보여주고, "이 추천으로 포트폴리오 만들기"로 그 비중 그대로 신규 `Portfolio`를 생성할 수 있다(계좌 미연결 가상 목표비중). `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용)과 별개로 유지되며 대체하지 않음 — 플랫 모달은 5·6단계 UI가 없어 리스크성향 재설정 없이 기존 값을 그대로 유지한다. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
+- **`components/invest/GoalSettingWizard.tsx`** — 투자 목표 최초 설정용 6단계 마법사(현재 자산 확인 → 목표 금액/시점 → 월 적립액 → 결과 확인 → 투자성향·배당목표 → 추천 포트폴리오). `GET /invest/goal-feasibility`로 필요 연수익률·가정 수익률 프리셋별 필요 적립액을 역산해 제안, 6단계에서 `GET /rebalancing/goal-recommendation` 조회 후 "이 추천으로 포트폴리오 만들기"로 신규 `Portfolio` 생성 가능(계좌 미연결 가상 목표비중). `InvestPlanPage.tsx`의 기존 플랫 편집 모달(재설정 전용, 5·6단계 UI 없음)과 별개로 유지. `useGoalSettings.ts`의 `openWizard()`/`wizardMode`/`wizardStep`이 상태 관리.
 
 **Android 홈 위젯:** `useWidget.ts`(React 훅) ↔ `src/plugins/WidgetPlugin.ts`(Capacitor 플러그인 브리지) ↔ 네이티브 `android/app/src/main/java/com/growlio/app/{GrowlioWidget,WidgetPlugin}.java`. 위젯 UI 변경 시 네이티브 Java 코드도 함께 수정 필요.
 
@@ -125,51 +125,66 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 > `api/economicIndicators.ts`는 백엔드 `/economic-indicators/inflation-summary`(CPI·Core CPI 요약)만 호출 — `RebalancingPage`의 `InflationSummaryCard`가 소비. 백엔드에는 이 엔드포인트만 존재함(과거 프론트 미연동이던 지표 목록·구독·캘린더 엔드포인트는 제거됨).
 
-**hooks/**
+**hooks/** (도메인별로 그룹핑 — 새 훅 추가/삭제 시 해당 그룹에 함께 갱신)
+
+*공통/입력*
 - `useExchangeRate.ts` — 환율 조회
 - `useForm.ts` — 폼 상태 관리
 - `useStockSearch.ts` — 종목 검색
 - `useCurrencyInput.ts` — 통화 입력 처리 (KRW/USD 포맷팅)
+- `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
+- `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
+- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
+
+*세금*
 - `useTaxSimulation.ts` — 세금 시뮬레이션 로직 (해외 양도세 계획)
 - `useTaxLimitsSummary.ts` — ISA 만기·연금 공제한도·세금 추정 현황을 한 줄 요약(`parts`/`warningText`)으로 계산. `TaxLimitsBanner.tsx`(본문)와 `InvestmentSnapshotCard.tsx`(헤더 경고 배지·collapsedHint) 양쪽에서 호출
+
+*자산관리/대시보드*
 - `useAssetManagementData.ts` — 자산관리 페이지 전용 데이터 훅 (accounts + portfolio overview + transactions 통합)
 - `useAssetModals.ts` — 자산관리 페이지 모달 열기/닫기 상태 통합 관리
 - `useDashboardData.ts` — 대시보드 페이지 전용 데이터 훅 (dashboard + overview + dca + exchange-rate 통합)
-- `useDividendData.ts` — 배당 요약 데이터 조회
-- `useDividendPlanSettings.ts` — 배당 계획(연/월배당) 설정 폼 상태 관리
-- `useEditableSettingsForm.ts` — 설정 편집 모달 공용 상태 머신(editing/saving/dirty-check/close-confirm). `useGoalSettings`/`useDividendPlanSettings`가 내부적으로 사용
+- `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
+- `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `usePositionsEditor.ts` — 포지션(종목) 편집 폼 상태 관리
 - `usePortfolioItemsEditor.ts` — 포트폴리오 종목 편집 폼 상태 (종목 검색 연동)
 - `useKisCredentialVerify.ts` — KIS 자격증명 검증 상태 머신 (`verifyKisCredentials` 래핑)
+
+*배당*
+- `useDividendData.ts` — 배당 요약 데이터 조회
+- `useDividendPlanSettings.ts` — 배당 계획(연/월배당) 설정 폼 상태 관리
+
+*리밸런싱/추천*
 - `useRebalancingBalances.ts` — 리밸런싱 잔고 조회
 - `useRebalancingExecution.ts` — 리밸런싱 주문 실행 훅의 공개 진입점(barrel re-export). 실제 구현은 `rebalancingExecution/`(`index.ts`/`reducer.ts`/`types.ts`) 패키지에 있지만, 모든 소비 코드는 이 파일을 통해서만 import — 패키지를 직접 import 금지
 - `useRebalancingPrices.ts` — 리밸런싱 종목 현재가 조회
-- `useAccountMutations.ts` / `useAccountPositions.ts` — 계좌 뮤테이션·포지션 조회
-- `useStockAccountStats.ts` — 증권 계좌별 평가금액·투자원금·손익·입금액·배당액 통계 집계 (portfolio overview + 거래내역 조인)
 - `useAlertCrud.ts` / `useRebalancingAlertForm.ts` — 알림 CRUD
-- `useSettingsToggle.ts` — `["settings"]`의 boolean 필드 하나를 조회 후 PUT으로 토글하는 반복 패턴(조회+뮤테이션+무효화+에러토스트)을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 4개 훅(`useGoalAchievementAlertsToggle`/`useMonthlyReportAlertsToggle`/`useYearEndTaxReminderToggle`/`useRecommendationDriftAlertToggle`)이 필드명만 다르게 얹어 씀 — 전용 상태 조회 엔드포인트가 있는 `useCompositeSignalToggle`/`useMarketSignalDigestToggle`(설정 필드는 후자만 해당)은 구조가 달라 이 팩토리를 쓰지 않음
+- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
+- `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
+- `useGoalSettings.ts` — 투자 목표 설정 폼 상태
+- `useAddSuggestedCandidates.ts` — 목표 역산 추천의 `suggested_candidates`(고배당 미등록 후보 제안)를 "후보에 추가" 클릭으로 승인하는 뮤테이션. `RecommendationCard.tsx`/`DividendPlanSection.tsx` 공용
+- `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
+
+*알림 토글* (설정 페이지, `["settings"]` boolean 필드 조회/PUT 패턴)
+- `useSettingsToggle.ts` — 조회+뮤테이션+무효화+에러토스트 반복 패턴을 통합한 제네릭 팩토리(`{ field, defaultValue, mutationFn, invalidate }`). 아래 4개 훅(`useGoalAchievementAlertsToggle`/`useMonthlyReportAlertsToggle`/`useYearEndTaxReminderToggle`/`useRecommendationDriftAlertToggle`)이 필드명만 다르게 얹어 씀 — 전용 상태 조회 엔드포인트가 있는 `useCompositeSignalToggle`/`useMarketSignalDigestToggle`(설정 필드는 후자만 해당)은 구조가 달라 이 팩토리를 쓰지 않음
 - `useCompositeSignalToggle.ts` — 시장/리스크 복합신호 알림(등급 전환 시 즉시) on/off 조회·토글. `MarketSignalAlertSection`(설정 페이지, 토글 가능한 단일 소스)과 `MarketSignalBanner`(진단 탭, 상태만 읽기 전용 표시 + 설정 페이지 링크)가 공용
 - `useMarketSignalDigestToggle.ts` — 시장신호 매일 요약(08:30 KST, 등급 전환 여부 무관) 알림 on/off. `useCompositeSignalToggle`과 별개 설정 — `["settings"]` 쿼리의 `market_signal_daily_digest_enabled` 필드를 직접 읽음 (전용 상태 조회 엔드포인트 없음). `MarketSignalAlertSection`이 두 번째 토글로 사용
 - `useYearEndTaxReminderToggle.ts` — 11~12월 매주 월요일 09:00 KST 연말 절세 리마인더(손실수확·공제한도 요약) on/off. `useSettingsToggle` 사용, `year_end_tax_reminder_enabled` 필드 · `PUT /settings/year-end-tax-reminder`. 기본값 `false`(옵트인). `NotificationSettingsPage`의 "정기 리포트·요약" 그룹에 배치
 - `useGoalAchievementAlertsToggle.ts` — 자산/입금/배당 목표 달성 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `goal_achievement_alerts_enabled` 필드 · `PUT /settings/goal-achievement-alerts`. 기본값 `true` (미설정 시 수신)
 - `useMonthlyReportAlertsToggle.ts` — 매월 1일 발송 월간 포트폴리오 리포트 이메일 on/off. `useSettingsToggle` 사용, `monthly_report_enabled` 필드 · `PUT /settings/monthly-report-alerts`. 기본값 `true` (미설정 시 수신)
 - `useRecommendationDriftAlertToggle.ts` — 매주 월요일 09:15 KST "추천 비중이 달라졌어요" 알림(이메일·푸시) on/off. `useSettingsToggle` 사용, `recommendation_drift_alert_enabled` 필드 · `PUT /settings/recommendation-drift-alert`. 기본값 `false`(옵트인)
-- `useCollapsible.ts` — `[isOpen, toggle, setIsOpen]` 반환하는 접기/펼치기 상태 헬퍼. `CollapsibleCard`/`CollapsibleSection`과 함께 사용
-- `useModalBehavior.ts` — 모달 공통 동작(body 스크롤 잠금 참조카운트, 포커스 트랩, Escape 닫기, pull-to-refresh 터치 전파 차단) 훅. `common/Modal.tsx`와 독자 레이아웃이 필요한 모달(`RebalancingExecutionModal.tsx` 등)이 공용
-- `useAllocationHistory.ts` / `useAnalysisState.ts` / `useOptimizationSuggestions.ts` — 포트폴리오 분석
-- `useBacktestDateRange.ts` — 백테스트 날짜 범위 관리
+
+*모바일/네이티브 (Capacitor)*
 - `useBiometric.ts` — 생체 인증 (Capacitor Android)
-- `useInsights.ts` — 인사이트 조회
-- `useGoalSettings.ts` — 투자 목표 설정 폼 상태
 - `useHaptic.ts` / `usePullToRefresh.ts` / `useSwipeNavigation.ts` — 모바일 UX
-- `useLogout.ts` — 로그아웃 로직, `useOnlineStatus.ts` — 온라인/오프라인 감지
-- `usePortfolioTabFetching.ts` — 포트폴리오 탭 데이터 프리패치
 - `usePushNotifications.ts` / `useRegisterRefresh.ts` / `useWidget.ts` — FCM 푸시·홈 위젯 (Android)
 - `useSyncAllWatcher.ts` — "전체 갱신"(계좌 전체 동기화) 백그라운드 진행 상태 폴링. `App.tsx`의 `AppRoutes()` 최상단에서 한 번만 마운트되어 탭 이동과 무관하게 계속 폴링 — 진행 상태는 `stores/syncStore.ts`(Zustand)로 관리
+
+*기타*
+- `useInsights.ts` — 인사이트 조회
+- `useLogout.ts` — 로그아웃 로직, `useOnlineStatus.ts` — 온라인/오프라인 감지
 - `useTransactionFormState.ts` — 거래내역 입력 폼 상태
 - `useCapsLockWarning.ts` — 비밀번호 입력 시 Caps Lock 켜짐 여부 감지 (로그인/회원가입 폼)
-
-새 커스텀 훅은 이 디렉토리에 추가/삭제 시 위 목록도 갱신.
 
 **기타 상수 (`src/constants/`):**
 - `queryKeys.ts` — React Query queryKey 상수 (`QUERY_KEYS` 객체). 모든 queryKey는 여기서 import
@@ -181,7 +196,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - `rebalancingConfig.ts` — 리밸런싱 알림 폼용 상수 (`SCHEDULE_OPTIONS`, `TRIGGER_CONDITION_OPTIONS`, `MODE_OPTIONS`, `STRATEGY_OPTIONS`, `MARKET_CONDITION_OPTIONS`, `TAX_IMPACT_GATE_OPTIONS` — AUTO 모드 세금영향 게이트 on/off, `AlertAutoModeSection.tsx`가 소비)
 - `uiSizes.ts` — 모바일 터치 타겟 상수 (`TOUCH_TARGET_MIN`: `min-h-[44px] min-w-[44px]` + 가운데 정렬, `TOUCH_TARGET_MIN_MOBILE_ONLY`: 모바일에서만 44px 적용하고 `sm:` 이상에서 축소하는 변형, `TOUCH_TARGET_ROW`: 아이콘+레이블이 좌측 정렬인 메뉴 로우/링크용 변형(`justify-start`), `TOUCH_TARGET_COMPACT_MOBILE_ONLY`: 배지/탭/필터 칩처럼 조밀하게 나열되는 보조 요소용 절충 터치 타겟(36px, 모바일 전용). 인터랙티브 요소(버튼/입력 등)에 인라인 `min-h-[44px] min-w-[44px]` 재정의 금지, 이 상수들 사용
 - `timers.ts` — UI 타이밍 상수 (`SEARCH_DROPDOWN_HIDE_DELAY`: 150ms blur 후 드롭다운 지연, `REDIRECT_DELAY_MS`: 3000ms, `FOCUS_SETTLE_DELAY`: 0ms)
-- `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`)
+- `assets.ts` — 자산 유형 관련 상수 (`CASH_TICKER`, `REAL_ESTATE_ASSET_TYPE`, `KR_PROPERTY_MARKET`, `BASE_TYPE_STOCK_ONLY`, `BASE_TYPE_TOTAL_ASSETS`, `CASH_EQUIVALENT_TICKER`/`CASH_EQUIVALENT_MARKET`/`CASH_EQUIVALENT_NAME`)
+- `goalRiskTolerance.ts` — 목표 설정 마법사/옵션 모달 공용 리스크 성향 옵션 레이블 (`GoalSettingWizard`, `GoalRecommendationOptionsModal`)
+- `savingsPresets.ts` — 계획탭 저축 시뮬레이터 가정 수익률 프리셋
 - `nav.ts` — `BottomNav` 탭 정의 (홈/자산/리밸런싱/계획/설정 5탭)
 - `markets.ts` — 해외거래소 판별 상수 (상세는 하단 "마켓 유틸리티" 참고)
 - `inputStyles.ts` — 공통 입력 필드 Tailwind 스타일 상수 (상세는 하단 "입력 스타일 상수" 참고)
@@ -194,10 +211,11 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **테스트 위치 (Vitest):**
 - `src/utils/__tests__/*.test.ts` — 순수 유틸 함수 단위 테스트 (`format.test.ts`, `error.test.ts`, `colors.test.ts`, `chart.test.ts`, `dividendUtils.test.ts`, `portfolio.test.ts`, `queryInvalidation.test.ts`, `accounts.test.ts`, `diagnosisInsights.test.ts`, `platform.test.ts`, `toast.test.ts` 등)
-- `src/__tests__/components.*.test.tsx` — 컴포넌트 테스트 (10개)
-- `src/__tests__/pages.*.test.tsx` — 페이지 테스트 (9개)
-- `src/__tests__/hooks.*.test.ts(x)` — 커스텀 훅 테스트 (7개)
-- `src/__tests__/api.*.test.ts` — API 레이어 테스트 (7개)
+- `src/__tests__/components.*.test.tsx` — 컴포넌트 테스트
+- `src/__tests__/pages.*.test.tsx` — 페이지 테스트
+- `src/__tests__/hooks.*.test.ts(x)` — 커스텀 훅 테스트
+- `src/__tests__/api.*.test.ts` — API 레이어 테스트
+> 각 카테고리 파일 개수는 계속 늘어남 — 현재 목록은 `ls src/__tests__/` 확인.
 - 도메인별 개별 위치: 예) `src/components/rebalancing/__tests__/rebalancingTradeMath.test.ts`
 
 > 순수 유틸뿐 아니라 컴포넌트·훅·페이지·API 레이어 모두 테스트 대상. 새 유틸은 동일 디렉토리에 `*.test.ts`, 새 컴포넌트/훅/페이지는 `src/__tests__/`에 대응 파일 작성. `vite.config.ts`에 커버리지 임계값(lines/functions/branches/statements) 설정됨.
@@ -211,7 +229,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 > 타입 체크는 `npm run build` 또는 위 tsc 명령으로 대체.
 
 **상태 관리 원칙:** 서버에서 오는 데이터 → React Query. 순수 클라이언트 전역 상태 → Zustand.
-- Zustand (`src/stores/`): `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글), `syncStore.ts`("전체 갱신" 백그라운드 진행 상태 — `useSyncAllWatcher.ts`가 갱신)
+- Zustand (`src/stores/`): `authStore.ts`(인증 토큰·유저 정보), `themeStore.ts`(다크모드 토글), `syncStore.ts`("전체 갱신" 백그라운드 진행 상태 — `useSyncAllWatcher.ts`가 갱신), `pushNotificationStore.ts`(FCM 푸시 등록 상태 — `SettingsPage`가 읽음)
 - 새 전역 상태 추가 시: 서버 fetch가 필요하면 React Query 훅, 그렇지 않으면 Zustand store.
 
 **포트폴리오와 대시보드의 관계:** `DashboardPage`가 `/portfolio/overview`를 추가 조회해 `PortfolioSummaryCard`에 전달. 양쪽이 같은 queryKey(`"portfolio-overview"`)를 공유하므로 포트폴리오 sync 후 대시보드도 자동 갱신됨.
@@ -338,7 +356,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 공용 렌더러는 `components/rebalancing/SignalRow.tsx`(`{label, content}` 프레젠테이션 컴포넌트) — `MarketSignalBanner.tsx`가 `buildSignalRows()` 결과를 매핑해 렌더.
 
 **계좌 유틸리티 (`src/utils/accounts.ts`)**
-- `isPortfolioAccount(account)` / `isStockAccount(account)` / `isBankAccount(account)` — 계좌 유형 판별. 인라인 `asset_type` 비교 금지.
+- `isPortfolioAccount(assetType)` / `isStockAccount(assetType)` / `isBankAccount(assetType)` — `asset_type` 문자열을 받아 계좌 유형 판별(계좌 객체가 아닌 `account.asset_type` 전달). 인라인 `asset_type` 비교 금지.
 
 **색상 유틸리티 (`src/utils/colors.ts`)**
 - P&L 색상은 `pnlColor(value)` 함수 사용 — `PROFIT_COLOR`(`text-red-500`) / `LOSS_COLOR`(`text-blue-500`) 상수도 export됨.
@@ -372,6 +390,10 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 단, 배지/탭/필터 칩/보조 링크/카드 내부 아이콘 버튼처럼 여러 개가 조밀하게 나열되는 요소는 44px 강제 시 시각적으로 뭉툭해져 오히려 가독성이 떨어질 수 있다 — 이 경우 `TOUCH_TARGET_COMPACT_MOBILE_ONLY`(36px, WCAG AA 24px 이상 충족)를 사용해도 된다.
 - 단, `StockAccountCard.tsx`/`BankAccountCard.tsx`/`PortfolioItemRow.tsx`의 삭제 버튼처럼 이미 앱 전역에 44px로 정착된 아이콘 버튼 패턴은 개별 화면에서 임의로 축소하지 말 것 — 화면 간 일관성이 깨짐.
 
+**탭/서브패널 지연 로딩 규칙**
+- 페이지 내부 무거운 탭·서브패널 콘텐츠는 `React.lazy()`로 분리 — 최상위 라우트뿐 아니라 페이지 안에서 탭 전환으로 진입하는 콘텐츠도 대상(예: `AssetsPage`가 `AssetManagementPage`/`PortfolioPage`를, `PortfolioPage`/`InvestPlanPage`/`RebalancingPage`/`DashboardPage`가 각각 하위 탭 컴포넌트를 lazy-load). 새 탭 콘텐츠 추가 시 이 패턴을 따를 것.
+- 로딩 중 표시는 `common/SkeletonCard.tsx`/`SkeletonStatBox.tsx`를 사용 — 카드/통계 박스 형태의 로딩 플레이스홀더를 인라인으로 새로 작성하지 말 것.
+
 **헤딩 구조 규칙 (접근성)**
 - 각 페이지(`src/pages/*.tsx`)의 최상위 return에는 `<h1 className="sr-only">{페이지명}</h1>`을 두어 스크린리더 사용자가 진입 시 현재 위치를 알 수 있게 한다(시각적으로는 숨김 — `BottomNav`/탭 UI가 이미 시각적 내비게이션을 담당).
 - 카드/섹션 제목은 `<span>`/`<p>` 대신 `<h2>`/`<h3>`을 사용 — 스크린리더의 헤딩 내비게이션(다음 섹션으로 건너뛰기)이 동작하려면 실제 헤딩 태그가 필요하다. `CollapsibleCard.tsx`/`settings/shared.tsx`(`SectionCard`)/`Modal.tsx` 등 공용 컴포넌트를 거치는 카드 제목은 이미 전부 `h2`이고, 직접 마크업을 그리던 나머지 straggler(`StockAccountSummaryCard`/`RealEstateSection`/`EditableNameField`/`HeroSummaryCard`)도 정리 완료. 단, `RebalancingMobileCard.tsx` 같은 반복되는 리스트 행 아이템은 헤딩으로 승격하지 않음(그리드/리스트에 다수 반복 렌더돼 헤딩 목록이 라벨로 도배되면 오히려 스크린리더 내비게이션을 해침) — 의도된 제외이니 새 컴포넌트를 만들 때도 이 기준을 따를 것.
@@ -401,9 +423,9 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
   const { contentStyle, labelStyle, itemStyle } = chartTooltipStyle(isDark);
   ```
 
-**캐시 무효화 유틸리티 (`src/utils/queryInvalidation.ts`)**
-- 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 동시 무효화.
-- 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 무효화.
+**캐시 무효화 유틸리티 (`src/utils/queryInvalidation.ts`)** — 아래 괄호 설명은 대표 항목만 나열(각 함수는 세금/자산배분이력 등 파생 Base 키도 함께 무효화하는 경우가 많음) — 정확한 전체 목록은 소스 확인.
+- 계좌 sync 후: `invalidateSyncData(queryClient)` — portfolio-overview + dashboard + dividend 등 무효화.
+- 계좌 CUD 후: `invalidateAccountData(queryClient)` — accounts + portfolio-overview + dashboard 등 무효화.
 - 거래내역 CUD 후: `invalidateTransactionData(queryClient)` — transactions-all + dashboard 무효화.
 - 포트폴리오/백테스트/리밸런싱 CUD 후: `invalidatePortfolioData(queryClient)` — portfolios + accounts + drift-summary + rebalancing-strategy(전체 포트폴리오, 프리픽스) 무효화. 목표 비중 저장 직후 이미 열려있는 리밸런싱 분석 화면(`useAnalysisState`)은 이 무효화가 아니라 `AnalysisPanel`이 계산하는 `portfolioItemsSignature`(분석 중인 포트폴리오의 `items` 직렬화 값) 변경 감지로 자동 재분석됨 — `Portfolio.updated_at`은 비중만 바뀐 저장에서는 갱신되지 않으므로 신선도 판단에 쓰지 말 것.
 - DCA 목표 변경 후: `invalidateDcaData(queryClient)` — dca-analysis + settings + dashboard 무효화.
@@ -419,14 +441,14 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 - 목표 달성 알림 설정 변경 후: `invalidateGoalAchievementAlertsData(queryClient)`.
 - 월간 리포트 설정 변경 후: `invalidateMonthlyReportAlertsData(queryClient)`.
 - 추천 비중 변화 알림 설정 변경 후: `invalidateRecommendationDriftAlertData(queryClient)`.
-- 목표 역산 추천 후보 변경 후: `invalidateGoalCandidateData(queryClient)`.
+- 목표 역산 추천 후보 변경 후: `invalidateGoalRecommendationData(queryClient)`.
 - 수동으로 `invalidateQueries` 여러 번 호출하지 말고 이 함수 사용.
 
 > **새 invalidation 함수 추가 시:** 이 파일에 `invalidate<Domain>Data(queryClient)` 형태로 추가하고, 관련 mutation의 `onSuccess`에서 호출. 컴포넌트·훅 내부에서 직접 `queryClient.invalidateQueries()` 호출 금지.
 
 **쿼리 설정 상수 (`src/constants/queryConfig.ts`)**
 - `STALE_TIME.SHORT` (30s, 기본값), `STALE_TIME.MEDIUM` (60s), `STALE_TIME.LONG` (1h), `STALE_TIME.EXCHANGE_RATE` (5m)
-- `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (1분)
+- `REFETCH_INTERVAL.DASHBOARD` (5분), `REFETCH_INTERVAL.PORTFOLIO` (5분)
 - staleTime/refetchInterval 매직 넘버 직접 작성 금지. 상수 import해 사용.
 
 ---
