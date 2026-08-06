@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown, ChevronRight, Search, X } from "lucide-react";
 import { fmtKrwShort } from "@/utils/format";
@@ -310,9 +310,8 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                       const hasMultiple = agg.sub_positions.length > 1;
                       const divData = dividendMap[key];
                       return (
-                        <>
+                        <Fragment key={key}>
                           <tr
-                            key={key}
                             className={`border-t border-gray-100 dark:border-gray-700 cursor-pointer ${
                               isExpanded
                                 ? "bg-blue-50/30 dark:bg-blue-950/20"
@@ -492,7 +491,7 @@ function StockHoldingsTable({ positions, totalStock, dividendMap, divLoading, di
                                 <td className="py-2 px-4" />
                               </tr>
                             ))}
-                        </>
+                        </Fragment>
                       );
                     })}
                   </tbody>

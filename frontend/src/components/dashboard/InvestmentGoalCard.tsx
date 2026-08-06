@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Target, TrendingDown, TrendingUp } from "lucide-react";
 import { fmtKrw, fmtKrwShort, fmtMonth } from "@/utils/format";
 import CollapsibleSection from "@/components/common/CollapsibleSection";
+import SkeletonCard from "@/components/common/SkeletonCard";
 import { useCollapsible } from "@/hooks/useCollapsible";
 import type { DashboardData } from "@/api/dashboard";
 import type { DCAAnalysisData } from "@/api/invest";
@@ -90,6 +91,11 @@ function gapBadge(gap: number, { unit, decimals = 1, aheadLabel, behindLabel }: 
 
 export default function InvestmentGoalCard({ data, dcaData, isLoading }: Props) {
   const [dcaDetailOpen, toggleDcaDetail] = useCollapsible(false, "growlio:goalCard:dcaDetailOpen");
+
+  if (isLoading) {
+    return <SkeletonCard rows={4} />;
+  }
+
   const timeline = dcaData?.goal_timeline;
   const currentProgressPct = timeline?.current_progress_pct ?? data?.goal_achievement_pct;
   const goalAmountDisplay = dcaData?.settings.goal_amount ?? data?.goal_amount;

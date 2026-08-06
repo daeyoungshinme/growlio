@@ -150,8 +150,11 @@ export function useGoalSettings() {
           ? Number(form.goal_annual_return_pct)
           : null,
         goal_amount: form.goal_amount ? Number(form.goal_amount) : null,
-        goal_start_date:
-          form.goal_start_date || (wizardMode ? new Date().toISOString().slice(0, 10) : null),
+        // 플랫 편집 모달에서도 비워두면 오늘 날짜로 기본값 처리 — wizardMode에서만 기본값을
+        // 적용하면 마법사를 거치지 않고 플랫 모달로만 목표를 편집한 사용자는 goal_start_date가
+        // null로 저장되어 dca_service의 is_configured가 계속 false로 남고(목표 진행률 카드가
+        // "미설정"으로 보임), 목표 설정 가이드 모달이 브라우저를 바꿀 때마다 다시 뜬다.
+        goal_start_date: form.goal_start_date || new Date().toISOString().slice(0, 10),
         goal_initial_amount: form.goal_initial_amount ? Number(form.goal_initial_amount) : null,
         annual_deposit_goal: form.annual_deposit_goal ? Number(form.annual_deposit_goal) : null,
         retirement_target_year: form.retirement_target_year

@@ -43,12 +43,12 @@ export default function MarketSignalBanner({ signal }: Props) {
   return (
     <div className={`rounded-xl border ${BANNER_BG[composite_level]}`}>
       {/* 헤더 */}
-      <div className="px-4 py-3 flex items-center gap-2">
+      <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
         <span className="text-xs font-medium text-gray-600 dark:text-gray-300 shrink-0">
           시장 위험 신호
         </span>
         <MarketSignalLevelBadge level={composite_level} />
-        <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 truncate">
+        <span className="text-xs text-gray-500 dark:text-gray-400 order-last basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate">
           {SHORT_IMPLICATION[composite_level]}
           {data_freshness === "STALE" && " · 데이터 조회 불가"}
           {data_freshness === "PARTIAL" && " · 일부 데이터 없음"}

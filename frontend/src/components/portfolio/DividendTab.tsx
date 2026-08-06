@@ -38,7 +38,7 @@ type DivSubTab = (typeof DIV_SUBTABS)[number];
 
 export default function DividendTab({
   dividendData,
-  divLoading: _divLoading,
+  divLoading,
   divSummary,
   dividendByTicker,
   totalInvestedKrw,
@@ -165,6 +165,10 @@ export default function DividendTab({
   for (const entry of divSummary?.monthly_ticker_breakdown ?? []) {
     const key = `${entry.month}-${entry.ticker ?? ""}`;
     monthTickerActualMap[key] = (monthTickerActualMap[key] ?? 0) + entry.amount;
+  }
+
+  if (divLoading) {
+    return <SkeletonCard rows={4} />;
   }
 
   return (
