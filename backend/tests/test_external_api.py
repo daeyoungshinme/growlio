@@ -106,6 +106,94 @@ class TestListAccountBalances:
         assert body[0]["as_of"] is None
 
 
+class TestListRealEstateItems:
+    """부동산 시세/담보대출 분리 조회 (GET /api/v1/external/real-estate)."""
+
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.get("/api/v1/external/real-estate")
+        assert resp.status_code == 401
+
+    def test_filters_to_real_estate_accounts_only(self, override_settings):
+        user = _make_user()
+        bank = _make_account(user.id, asset_type="BANK_ACCOUNT", manual_amount=1_000_000.0)
+        real_estate = _make_account(
+            user.id,
+            asset_type="REAL_ESTATE",
+            manual_amount=500_000_000.0,
+            real_estate_details={
+                "address": "서울시 강남구",
+                "property_type": "아파트",
+                "purchase_price_krw": 400_000_000.0,
+                "purchase_date": "2020-01-01",
+                "mortgage_balance_krw": 150_000_000.0,
+            },
+        )
+        db = AsyncMock()
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[bank, real_estate])),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/external/real-estate")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert len(body) == 1
+        item = body[0]
+        assert item["id"] == str(real_estate.id)
+        assert item["address"] == "서울시 강남구"
+        assert item["property_type"] == "아파트"
+        assert item["market_value_krw"] == 500_000_000.0
+        assert item["mortgage_balance_krw"] == 150_000_000.0
+        assert item["net_equity_krw"] == 350_000_000.0
+        assert item["purchase_price_krw"] == 400_000_000.0
+        assert item["purchase_date"] == "2020-01-01"
+
+    def test_defaults_mortgage_to_zero_when_details_missing(self, override_settings):
+        user = _make_user()
+        real_estate = _make_account(
+            user.id,
+            asset_type="REAL_ESTATE",
+            manual_amount=300_000_000.0,
+            real_estate_details=None,
+        )
+        db = AsyncMock()
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[real_estate])),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/external/real-estate")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body[0]["mortgage_balance_krw"] == 0
+        assert body[0]["net_equity_krw"] == 300_000_000.0
+        assert body[0]["address"] is None
+
+    def test_returns_empty_list_when_no_real_estate_accounts(self, override_settings):
+        user = _make_user()
+        bank = _make_account(user.id, asset_type="BANK_ACCOUNT")
+        db = AsyncMock()
+        app = _setup_app(user, db)
+
+        with (
+            patch("app.api.v1.external._list_accounts", AsyncMock(return_value=[bank])),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.get("/api/v1/external/real-estate")
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+
 class TestCreateExternalTransaction:
     """nestlio 저축/투자 내역 반영 (POST /api/v1/external/transactions)."""
 

@@ -142,7 +142,7 @@ API Request
         ├── exchange_rate_alerts.py # 환율 알림 CRUD (alerts.py 하위, /alerts/exchange-rate)
         ├── rebalancing_alerts.py   # 리밸런싱 드리프트 알림 (alerts.py 하위, /alerts/rebalancing)
         ├── stock_price_alerts.py   # 주가 알림 CRUD (alerts.py 하위, /alerts/stock-price)
-        ├── external.py              # 자매 앱(nestlio) 등 외부 서비스가 같은 Supabase JWT로 호출하는 읽기 전용 엔드포인트(GET /external/accounts — 계좌별 최신 스냅샷 평가액). growlio 자체 프론트엔드는 미사용
+        ├── external.py              # 자매 앱(nestlio) 등 외부 서비스가 같은 Supabase JWT로 호출하는 엔드포인트. growlio 자체 프론트엔드는 미사용. GET /external/accounts(계좌별 최신 스냅샷 평가액, 부동산은 담보대출 뺀 순액) + POST /external/transactions(nestlio 저축/투자 내역을 growlio Transaction에 반영, MANUAL 계좌는 deposit_krw도 갱신) + GET /external/real-estate(부동산 시세·담보대출 잔액을 분리 반환 — nestlio가 자산/대출 항목을 각각 등록할 수 있도록)
         ├── _account_deps.py        # 계좌 소유권 검증 헬퍼(get_owned_account) + api/deps.py의 get_owned_or_404 재노출
         └── _alert_crud.py          # 환율/주가 알림 라우터 공용 reactivate·delete 엔드포인트 팩토리(register_alert_reactivate_delete)
 

@@ -5,6 +5,10 @@
 가계부 내역을 growlio 입출금 내역(Transaction)에 그대로 반영하고, 수동(MANUAL) 계좌라면
 예수금(deposit_krw)까지 합산하는 쓰기 엔드포인트다 — KIS/키움처럼 자동 연동된 계좌는 다음
 브로커 동기화가 deposit_krw를 실제 값으로 덮어쓰므로 여기서는 건드리지 않는다(이중 반영 방지).
+
+GET /real-estate는 부동산 계좌의 시세(market_value_krw)와 담보대출 잔액(mortgage_balance_krw)을
+분리해서 반환한다 — GET /accounts는 부동산도 담보대출을 뺀 순액 하나만 주므로, nestlio가
+"자산 항목"과 "대출 항목"을 각각 등록하려면 이 엔드포인트가 필요하다.
 """
 
 from datetime import UTC, date, datetime
@@ -67,6 +71,56 @@ async def list_account_balances(
                 asset_type=account.asset_type,
                 current_value_krw=value,
                 as_of=as_of,
+            )
+        )
+    return result
+
+
+class ExternalRealEstateItem(BaseModel):
+    id: str
+    name: str
+    address: str | None = None
+    property_type: str | None = None
+    market_value_krw: float
+    mortgage_balance_krw: float
+    net_equity_krw: float
+    purchase_price_krw: float | None = None
+    purchase_date: str | None = None
+    as_of: date | None = None
+
+
+@router.get("/real-estate", response_model=list[ExternalRealEstateItem])
+@limiter.limit("20/minute")
+async def list_real_estate_items(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """현재 사용자의 활성 부동산 계좌를 시세/담보대출 분리 형태로 반환한다.
+
+    GET /accounts는 부동산도 담보대출을 뺀 순액(net) 하나만 주지만, nestlio가 "자산 항목"과
+    "대출 항목"을 각각 등록하려면 원본 시세와 대출잔액이 따로 필요하다.
+    """
+    accounts = await _list_accounts(current_user.id, db, skip=0, limit=200)
+    result: list[ExternalRealEstateItem] = []
+    for account in accounts:
+        if account.asset_type != AssetType.REAL_ESTATE:
+            continue
+        details = account.real_estate_details or {}
+        market_value = float(account.manual_amount or 0)
+        mortgage = float(details.get("mortgage_balance_krw", 0) or 0)
+        result.append(
+            ExternalRealEstateItem(
+                id=str(account.id),
+                name=account.name,
+                address=details.get("address"),
+                property_type=details.get("property_type"),
+                market_value_krw=market_value,
+                mortgage_balance_krw=mortgage,
+                net_equity_krw=market_value - mortgage,
+                purchase_price_krw=details.get("purchase_price_krw"),
+                purchase_date=details.get("purchase_date"),
+                as_of=account.manual_updated_at.date() if account.manual_updated_at else None,
             )
         )
     return result
