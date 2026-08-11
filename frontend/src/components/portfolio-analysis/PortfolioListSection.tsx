@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -26,9 +26,9 @@ import { Portfolio } from "@/api/portfolios";
 import { RebalancingAlert } from "@/api/alerts";
 import { AssetAccount } from "@/api/assets";
 import type { PortfolioDriftSummary } from "@/api/rebalancing";
-import { toast } from "@/utils/toast";
 import { getPortfolioTargetState } from "@/utils/portfolio";
 import AutomationStatusBar from "@/components/rebalancing/AutomationStatusBar";
+import ConfirmModal from "@/components/common/ConfirmModal";
 import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
 
 function SortablePortfolioItem({
@@ -271,6 +271,12 @@ export default function PortfolioListSection({
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
   );
 
+  const [pendingReassign, setPendingReassign] = useState<{
+    portfolio: Portfolio;
+    accountIds: string[];
+    conflicts: { accountName: string; fromPortfolioName: string }[];
+  } | null>(null);
+
   const unassignedAccounts = stockAccounts.filter((a) => !a.target_portfolio_id);
 
   function getAccountLabel(p: Portfolio): string {
@@ -301,17 +307,15 @@ export default function PortfolioListSection({
       (a) => a.target_portfolio_id !== null && a.target_portfolio_id !== p.id,
     );
     if (conflicting.length > 0) {
-      const conflictNames = conflicting
-        .map((a) => {
-          const targetPName =
-            portfolios.find((po) => po.id === a.target_portfolio_id)?.name ?? "다른 포트폴리오";
-          return `${a.name}(→${targetPName})`;
-        })
-        .join(", ");
-      toast(
-        `다음 계좌가 이미 다른 포트폴리오를 기준으로 지정하고 있습니다: ${conflictNames}`,
-        "error",
-      );
+      setPendingReassign({
+        portfolio: p,
+        accountIds: relevant.map((a) => a.id),
+        conflicts: conflicting.map((a) => ({
+          accountName: a.name,
+          fromPortfolioName:
+            portfolios.find((po) => po.id === a.target_portfolio_id)?.name ?? "다른 포트폴리오",
+        })),
+      });
       return;
     }
     onBatchSetTarget(
@@ -448,6 +452,36 @@ export default function PortfolioListSection({
             ))}
           </SortableContext>
         </DndContext>
+      )}
+      {pendingReassign && (
+        <ConfirmModal
+          message={`'${pendingReassign.portfolio.name}'을(를) 기준 포트폴리오로 다시 지정할까요?`}
+          confirmLabel="변경"
+          danger={false}
+          onConfirm={() => {
+            onBatchSetTarget(pendingReassign.portfolio.id, pendingReassign.accountIds);
+            setPendingReassign(null);
+          }}
+          onCancel={() => setPendingReassign(null)}
+        >
+          <ul className="mt-2 space-y-1 text-xs text-gray-500 dark:text-gray-400">
+            {pendingReassign.conflicts.map((c) => (
+              <li key={c.accountName} className="flex flex-wrap items-center gap-1">
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {c.accountName}
+                </span>
+                <span>{c.fromPortfolioName}</span>
+                <span aria-hidden="true">→</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {pendingReassign.portfolio.name}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            기존 지정은 자동으로 해제돼요.
+          </p>
+        </ConfirmModal>
       )}
     </div>
   );

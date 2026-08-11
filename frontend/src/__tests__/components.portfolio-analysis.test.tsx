@@ -1,10 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent } from "@testing-library/react";
+import { screen, fireEvent, within } from "@testing-library/react";
 import { renderWithProviders } from "@/test/renderWithProviders";
 import type { AssetAccount } from "@/api/assets";
+import type { Portfolio } from "@/api/portfolios";
 
 import PortfolioWeightChart from "@/components/portfolio-analysis/PortfolioWeightChart";
 import PortfolioAccountSelector from "@/components/portfolio-analysis/PortfolioAccountSelector";
+import PortfolioListSection from "@/components/portfolio-analysis/PortfolioListSection";
 
 // ------- PortfolioWeightChart -------
 describe("PortfolioWeightChart", () => {
@@ -147,5 +149,90 @@ describe("PortfolioAccountSelector", () => {
       />,
     );
     expect(screen.getByText(/1개 계좌만 분석에 포함됩니다/)).toBeDefined();
+  });
+});
+
+// ------- PortfolioListSection: 기준 포트폴리오 재지정 -------
+describe("PortfolioListSection - 기준 지정 재지정", () => {
+  const portfolioA: Portfolio = {
+    id: "pA",
+    name: "포트폴리오 A",
+    items: [],
+    base_type: "STOCK_ONLY",
+    account_ids: null,
+    sort_order: 0,
+    created_at: "2024-01-01",
+    updated_at: "2024-01-01",
+  };
+  const portfolioB: Portfolio = {
+    id: "pB",
+    name: "포트폴리오 B",
+    items: [],
+    base_type: "STOCK_ONLY",
+    account_ids: null,
+    sort_order: 1,
+    created_at: "2024-01-01",
+    updated_at: "2024-01-01",
+  };
+  const targetedAccount: AssetAccount = {
+    ...mockAccounts[0],
+    id: "acc1",
+    name: "한국투자 주식계좌",
+    target_portfolio_id: "pA",
+  };
+
+  function renderSection(onBatchSetTarget = vi.fn()) {
+    renderWithProviders(
+      <PortfolioListSection
+        portfolios={[portfolioA, portfolioB]}
+        isLoading={false}
+        selectedIds={new Set()}
+        stockAccounts={[targetedAccount]}
+        alertPortfolioIds={new Set()}
+        autoAlertCount={0}
+        alertByPortfolioId={{}}
+        isTargetPending={false}
+        onDragEnd={vi.fn()}
+        onToggleSelect={vi.fn()}
+        onOpenEditor={vi.fn()}
+        onOpenAlertModal={vi.fn()}
+        onConfirmDelete={vi.fn()}
+        onBatchSetTarget={onBatchSetTarget}
+      />,
+    );
+    return onBatchSetTarget;
+  }
+
+  function clickAssignButton(index: number) {
+    const buttons = screen.getAllByRole("button", { name: "기준 포트폴리오 지정" });
+    fireEvent.click(buttons[index]);
+  }
+
+  it("이미 다른 포트폴리오에 지정된 계좌를 선택하면 확인 모달을 띄우고 즉시 재지정하지 않는다", () => {
+    const onBatchSetTarget = renderSection();
+    clickAssignButton(1); // 포트폴리오 B 카드
+    const dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText(/포트폴리오 B.*기준 포트폴리오로 다시 지정할까요/),
+    ).toBeDefined();
+    expect(within(dialog).getByText("한국투자 주식계좌")).toBeDefined();
+    expect(within(dialog).getByText("포트폴리오 A")).toBeDefined();
+    expect(onBatchSetTarget).not.toHaveBeenCalled();
+  });
+
+  it("확인 모달에서 변경을 누르면 새 포트폴리오로 재지정된다", () => {
+    const onBatchSetTarget = renderSection();
+    clickAssignButton(1);
+    fireEvent.click(screen.getByRole("button", { name: "변경" }));
+    expect(onBatchSetTarget).toHaveBeenCalledWith("pB", ["acc1"]);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("확인 모달에서 취소를 누르면 재지정하지 않는다", () => {
+    const onBatchSetTarget = renderSection();
+    clickAssignButton(1);
+    fireEvent.click(screen.getByRole("button", { name: "취소" }));
+    expect(onBatchSetTarget).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
