@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 
@@ -16,10 +16,28 @@ def _make_user():
 
 def _make_account(user_id, **overrides):
     defaults = dict(
-        id=uuid.uuid4(), user_id=user_id, name="테스트 계좌", asset_type="BANK_ACCOUNT", manual_amount=1000.0
+        id=uuid.uuid4(),
+        user_id=user_id,
+        name="테스트 계좌",
+        asset_type="BANK_ACCOUNT",
+        manual_amount=1000.0,
+        data_source="MANUAL",
+        deposit_krw=None,
+        deposit_usd=None,
+        manual_updated_at=None,
     )
     defaults.update(overrides)
     return SimpleNamespace(**defaults)
+
+
+def _make_mock_db():
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    db = AsyncMock(spec=AsyncSession)
+    db.add = MagicMock()
+    db.commit = AsyncMock()
+    db.refresh = AsyncMock()
+    return db
 
 
 def _setup_app(user, db):
@@ -86,3 +104,195 @@ class TestListAccountBalances:
         body = resp.json()
         assert body[0]["current_value_krw"] == 500_000.0
         assert body[0]["as_of"] is None
+
+
+class TestCreateExternalTransaction:
+    """nestlio 저축/투자 내역 반영 (POST /api/v1/external/transactions)."""
+
+    def _patches(self, account, snapshot=None, positions=None):
+        return (
+            patch("app.api.v1.external._get_owned_account", AsyncMock(return_value=account)),
+            patch("app.api.v1.external.get_cache_store", AsyncMock(return_value=None)),
+            patch("app.api.v1.external.fetch_usd_krw", AsyncMock(return_value=1300.0)),
+            patch(
+                "app.api.v1.external.get_latest_snapshot_with_positions",
+                AsyncMock(return_value=(snapshot, positions or [])),
+            ),
+            patch("app.api.v1.external._upsert_snapshot", AsyncMock()),
+            patch("app.api.v1.external.invalidate_asset_account_caches", AsyncMock()),
+            patch("app.api.v1.external.invalidate_user_caches", AsyncMock()),
+        )
+
+    def test_returns_401_without_auth(self, override_settings):
+        from app.api.deps import get_current_user
+        from app.main import app
+
+        app.dependency_overrides.pop(get_current_user, None)
+        with TestClient(app, raise_server_exceptions=False) as client:
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(uuid.uuid4()),
+                    "transaction_type": "DEPOSIT",
+                    "amount": 100000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+        assert resp.status_code == 401
+
+    def test_manual_account_deposit_adjusts_deposit_krw_and_snapshots(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patches[4] as upsert_mock,
+            patches[5],
+            patches[6],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": "DEPOSIT",
+                    "amount": 50_000,
+                    "transaction_date": "2026-08-01",
+                    "notes": "적금 이체",
+                },
+            )
+
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["deposit_krw_adjusted"] is True
+        assert body["deposit_krw"] == 150_000.0
+        assert account.deposit_krw == 150_000.0
+        upsert_mock.assert_awaited_once()
+        assert db.add.call_count == 1  # Transaction row만 add (계좌는 기존 ORM 객체 수정)
+
+    def test_manual_account_withdrawal_subtracts_deposit_krw(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id, data_source="MANUAL", deposit_krw=100_000.0, deposit_usd=None)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patches[4],
+            patches[5],
+            patches[6],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": "WITHDRAWAL",
+                    "amount": 30_000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+        assert resp.status_code == 201
+        assert resp.json()["deposit_krw"] == 70_000.0
+
+    def test_auto_synced_account_records_history_without_touching_deposit_krw(self, override_settings):
+        user = _make_user()
+        account = _make_account(
+            user.id, data_source="KIS_API", asset_type="STOCK_KIS", deposit_krw=500_000.0, deposit_usd=None
+        )
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patches[4] as upsert_mock,
+            patches[5],
+            patches[6],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": "DEPOSIT",
+                    "amount": 50_000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["deposit_krw_adjusted"] is False
+        assert body["deposit_krw"] is None
+        assert account.deposit_krw == 500_000.0  # 자동연동 계좌는 손대지 않음
+        upsert_mock.assert_not_awaited()
+
+    def test_rejects_dividend_transaction_type(self, override_settings):
+        user = _make_user()
+        account = _make_account(user.id, data_source="MANUAL", deposit_krw=0.0)
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        patches = self._patches(account)
+        with (
+            patches[0],
+            patches[1],
+            patches[2],
+            patches[3],
+            patches[4],
+            patches[5],
+            patches[6],
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(account.id),
+                    "transaction_type": "DIVIDEND",
+                    "amount": 1_000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+        assert resp.status_code == 400
+
+    def test_returns_404_for_account_not_owned(self, override_settings):
+        from fastapi import HTTPException, status
+
+        user = _make_user()
+        db = _make_mock_db()
+        app = _setup_app(user, db)
+
+        with (
+            patch(
+                "app.api.v1.external._get_owned_account",
+                AsyncMock(side_effect=HTTPException(status.HTTP_404_NOT_FOUND, "계좌를 찾을 수 없습니다")),
+            ),
+            TestClient(app, raise_server_exceptions=False) as client,
+        ):
+            resp = client.post(
+                "/api/v1/external/transactions",
+                json={
+                    "account_id": str(uuid.uuid4()),
+                    "transaction_type": "DEPOSIT",
+                    "amount": 10_000,
+                    "transaction_date": "2026-08-01",
+                },
+            )
+
+        assert resp.status_code == 404
