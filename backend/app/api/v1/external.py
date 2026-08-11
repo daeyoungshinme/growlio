@@ -9,6 +9,11 @@
 GET /real-estate는 부동산 계좌의 시세(market_value_krw)와 담보대출 잔액(mortgage_balance_krw)을
 분리해서 반환한다 — GET /accounts는 부동산도 담보대출을 뺀 순액 하나만 주므로, nestlio가
 "자산 항목"과 "대출 항목"을 각각 등록하려면 이 엔드포인트가 필요하다.
+
+GET /goal은 사용자가 growlio 설정에서 입력한 투자목표(목표금액/목표수익률/연 납입목표 등)를
+읽기전용으로 노출한다 — nestlio가 재무목표를 새로 만들 때 이 값으로 폼을 미리 채워준다.
+진행률 자체는 nestlio가 이미 가져온 growlio 연동 자산 잔액으로 스스로 계산하므로, 이
+엔드포인트는 목표 "설정값"만 내려주고 진행률/달성 시점 같은 계산값은 포함하지 않는다.
 """
 
 from datetime import UTC, date, datetime
@@ -25,6 +30,7 @@ from app.enums import AssetType, DataSource, TransactionType
 from app.limiter import limiter
 from app.models.asset import Transaction
 from app.models.user import User
+from app.services._settings_queries import get_settings_row
 from app.services.asset_service import list_accounts as _list_accounts
 from app.services.snapshot_service import _upsert_snapshot, get_latest_snapshot_with_positions
 from app.utils.cache_keys import invalidate_asset_account_caches, invalidate_user_caches, monthly_trend_key
@@ -124,6 +130,42 @@ async def list_real_estate_items(
             )
         )
     return result
+
+
+class ExternalGoalSettings(BaseModel):
+    is_configured: bool
+    goal_amount: float | None = None
+    goal_annual_return_pct: float | None = None
+    goal_start_date: datetime | None = None
+    goal_initial_amount: float | None = None
+    annual_deposit_goal: float | None = None
+    annual_dividend_goal: float | None = None
+
+
+@router.get("/goal", response_model=ExternalGoalSettings)
+@limiter.limit("20/minute")
+async def get_investment_goal(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """nestlio가 재무목표를 미리 채우기 위해 조회하는, 사용자가 growlio에 설정한 투자목표.
+
+    포트폴리오 구성용 필드(candidate_tickers, risk_tolerance 등)는 목표 진행상황
+    모니터링과 무관해 내려주지 않는다.
+    """
+    row = await get_settings_row(db, current_user.id)
+    if row is None or row.goal_amount is None:
+        return ExternalGoalSettings(is_configured=False)
+    return ExternalGoalSettings(
+        is_configured=True,
+        goal_amount=float(row.goal_amount),
+        goal_annual_return_pct=float(row.goal_annual_return_pct) if row.goal_annual_return_pct is not None else None,
+        goal_start_date=row.goal_start_date,
+        goal_initial_amount=float(row.goal_initial_amount) if row.goal_initial_amount is not None else None,
+        annual_deposit_goal=float(row.annual_deposit_goal) if row.annual_deposit_goal is not None else None,
+        annual_dividend_goal=float(row.annual_dividend_goal) if row.annual_dividend_goal is not None else None,
+    )
 
 
 class ExternalTransactionCreate(BaseModel):
