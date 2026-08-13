@@ -21,22 +21,25 @@ if [ ! -f "backend/.venv/Scripts/uvicorn" ]; then
   exit 1
 fi
 
-# 이전 세션이 비정상 종료(터미널 강제 종료 등)되면 uvicorn --reload 프로세스가 orphan으로
-# 남아 DB 커넥션(Supabase pooler)을 계속 점유할 수 있음 — 재기동 전 8000 포트 선점 프로세스 정리
-kill_stale_backend() {
+# 이전 세션이 비정상 종료(터미널 강제 종료 등)되면 uvicorn --reload / vite 프로세스가 orphan으로
+# 남아 포트(및 DB 커넥션)를 계속 점유할 수 있음 — 재기동 전 포트 선점 프로세스 정리
+kill_port() {
+  local port="$1"
+  local label="$2"
   local pids
   pids=$(powershell.exe -NoProfile -Command \
-    "(Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue).OwningProcess" \
+    "(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue).OwningProcess" \
     2>/dev/null | tr -d '\r')
   if [ -n "$pids" ]; then
-    echo "8000 포트를 점유 중인 이전 프로세스 발견, 종료합니다: $pids"
+    echo "${port} 포트(${label})를 점유 중인 이전 프로세스 발견, 종료합니다: $pids"
     for pid in $pids; do
       powershell.exe -NoProfile -Command "Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue" 2>/dev/null
     done
     sleep 1
   fi
 }
-kill_stale_backend
+kill_port 8000 "백엔드"
+kill_port 5173 "프론트엔드"
 
 (cd backend && .venv/Scripts/uvicorn app.main:app --reload) &
 BACKEND_PID=$!

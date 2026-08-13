@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="28%" cy="22%" r="65%">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#60A5FA"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <filter id="softBlur" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="114" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="114" fill="url(#glow)"/>
+
+  <circle cx="256" cy="256" r="172" fill="none" stroke="#FFFFFF" stroke-opacity="0.10" stroke-width="9"/>
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#FFFFFF" stroke-opacity="0.06" stroke-width="4" stroke-dasharray="1 16" stroke-linecap="round"/>
+
+  <ellipse cx="256" cy="340" rx="140" ry="16" fill="#020617" opacity="0.35" filter="url(#softBlur)"/>
+
+  <rect x="141" y="270" width="44" height="60" rx="11" fill="url(#barGrad)"/>
+  <rect x="203" y="230" width="44" height="100" rx="11" fill="url(#barGrad)"/>
+  <rect x="265" y="182" width="44" height="148" rx="11" fill="url(#barGrad)"/>
+  <rect x="327" y="126" width="44" height="204" rx="11" fill="url(#barGrad)"/>
+
+  <path d="M163 270 L225 230 L287 182 L349 126" stroke="#DBEAFE" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <path d="M380 98 L370 125 L352 105 Z" fill="#DBEAFE"/>
+</svg>
