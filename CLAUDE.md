@@ -52,6 +52,7 @@ make migrate-down     # cd backend && alembic downgrade -1 (1단계 롤백)
 make install-backend  # cd backend && uv venv && uv pip install -e ".[dev]"
 make install-frontend # cd frontend && npm install
 make dev              # 백엔드 + 프론트엔드 동시 실행 (bash dev.sh) — Windows Git Bash 전용
+make dev-keep-port    # 위와 동일하되, 8000 포트가 이미 사용 중이면 강제 종료 대신 다음 빈 포트로 백엔드 구동
 make dev-backend      # 백엔드만 (localhost:8000)
 make dev-frontend     # 프론트엔드만 (localhost:5173)
 make test-backend     # cd backend && pytest
@@ -119,6 +120,7 @@ growlio/
 ## 자주 막히는 문제
 
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
+- `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
 - **동시 세션 작업**: 이 저장소는 여러 창/세션에서 병행 작업되는 경우가 잦음 — 계획 수립·구현 도중 `git status`가 대화 시작 시점과 달라져 있다면 다른 세션의 진행 중 작업일 가능성이 높음. 무시하거나 되돌리지 말고 먼저 `git diff`로 변경 내용을 확인할 것

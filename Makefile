@@ -1,4 +1,4 @@
-.PHONY: up down migrate migrate-down install-backend install-frontend dev dev-backend dev-frontend \
+.PHONY: up down migrate migrate-down install-backend install-frontend dev dev-keep-port dev-backend dev-frontend \
         test-backend test-frontend lint typecheck \
         clean format db-reset \
         build-android-debug build-android-release
@@ -27,6 +27,9 @@ install-frontend:
 
 dev:
 	bash dev.sh
+
+dev-keep-port:
+	bash dev.sh --keep-port
 
 dev-backend:
 	cd backend && uv run uvicorn app.main:app --reload

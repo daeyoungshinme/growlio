@@ -5,6 +5,8 @@ import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 const apiDomain = process.env.VITE_API_DOMAIN ?? "localhost:8000";
+// dev.sh --keep-port가 8000 사용 중일 때 백엔드를 다른 포트로 띄우면 이 값으로 프록시 타겟을 넘겨줌
+const devBackendPort = process.env.VITE_DEV_BACKEND_PORT ?? "8000";
 const apiBase = `^https://${apiDomain.replace(/\./g, "\\.")}`;
 const apiPattern = new RegExp(`${apiBase}/.*`);
 const dashboardPattern = new RegExp(`${apiBase}/api/v1/dashboard(\\?.*)?$`);
@@ -105,7 +107,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: `http://127.0.0.1:${devBackendPort}`,
         changeOrigin: true,
       },
     },

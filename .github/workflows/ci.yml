@@ -14,6 +14,9 @@ jobs:
     name: Backend — lint, typecheck, test
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: write
 
     services:
       postgres:
@@ -90,6 +93,7 @@ jobs:
           hide-comment: false
           create-new-comment: false
           default-branch: main
+          report-only-changed-files: true
 
       - name: Security scan (bandit)
         run: .venv/bin/bandit -r app/ -l -q
