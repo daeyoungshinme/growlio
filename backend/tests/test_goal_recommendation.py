@@ -10,10 +10,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.goal_age_recommendation_service import (
+    _AGE_GROUP_PROFILE,
+    age_group_from_birth_year,
+    get_age_based_recommendation,
+)
 from app.services.goal_candidate_service import _seed_candidate_tickers, detect_duplicate_tracking_index_note
 from app.services.goal_portfolio_optimizer import compute_weighted_expected_metrics
 from app.services.goal_recommendation_service import (
-    _AGE_GROUP_PROFILE,
     _apply_index_region_preference,
     _compute_overall_class_bounds,
     _fetch_dividend_yields,
@@ -21,11 +25,9 @@ from app.services.goal_recommendation_service import (
     _optimize_goal_portfolio,
     _persist_added_candidates,
     _suggest_for_dividend_goal,
-    age_group_from_birth_year,
     compute_portfolio_expected_metrics,
     compute_recommendation_drift,
     existing_items_from_positions,
-    get_age_based_recommendation,
     get_goal_recommendation,
     get_horizon_recommendations,
 )
@@ -65,10 +67,21 @@ def _mock_dividend_yields():
 
     배당 목표(A1)를 검증하는 `TestGetGoalRecommendation`의 일부 테스트와 기간별 배당 반영(Part 3)을
     검증하는 테스트는 이 fixture 범위 안에서 `patch(...)`로 개별 재정의한다.
+
+    `goal_age_recommendation_service.py`(연령대별 추천, 2026-08-13 분리)가 이 심볼을
+    `goal_recommendation_service`에서 import해 자기 모듈 네임스페이스에 별도로 바인딩하므로,
+    호출 시점 룩업 대상인 두 경로 모두 patch해야 한다 — 하나만 patch하면 나머지 경로가 실제
+    Naver/Yahoo API를 호출한다.
     """
-    with patch(
-        "app.services.goal_recommendation_service._fetch_dividend_yields",
-        AsyncMock(return_value={}),
+    with (
+        patch(
+            "app.services.goal_recommendation_service._fetch_dividend_yields",
+            AsyncMock(return_value={}),
+        ),
+        patch(
+            "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+            AsyncMock(return_value={}),
+        ),
     ):
         yield
 
@@ -3725,7 +3738,7 @@ class TestGetAgeBasedRecommendation:
         )
 
         with patch(
-            "app.services.goal_recommendation_service.query_latest_position_map",
+            "app.services.goal_age_recommendation_service.query_latest_position_map",
             AsyncMock(return_value={}),
         ):
             result = await get_age_based_recommendation(None, AsyncMock(), uuid.uuid4(), settings_row)
@@ -3756,11 +3769,11 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(
                     return_value={
                         ("SPY", "NYSE"): {"cagr_pct": 10.0},
@@ -3770,7 +3783,7 @@ class TestGetAgeBasedRecommendation:
                 ),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3805,15 +3818,15 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("114260", "KOSPI"): {"cagr_pct": 3.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3847,11 +3860,11 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(
                     return_value={
                         ("SPY", "NYSE"): {"cagr_pct": 10.0},
@@ -3861,7 +3874,7 @@ class TestGetAgeBasedRecommendation:
                 ),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3893,19 +3906,19 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3944,23 +3957,23 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_age_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("SCHD", "NYSE"): {"cagr_pct": 8.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -3997,19 +4010,19 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value={("SPY", "NYSE"): {"cagr_pct": 10.0}, ("114260", "KOSPI"): {"cagr_pct": 3.0}}),
             ),
             patch(
-                "app.services.goal_recommendation_service._fetch_dividend_yields",
+                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
                 AsyncMock(return_value=dividend_map),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -4065,19 +4078,23 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):
@@ -4139,23 +4156,27 @@ class TestGetAgeBasedRecommendation:
 
         with (
             patch(
-                "app.services.goal_recommendation_service.query_latest_position_map",
+                "app.services.goal_age_recommendation_service.query_latest_position_map",
                 AsyncMock(return_value={}),
             ),
             patch(
-                "app.services.goal_recommendation_service.build_portfolio_overview",
+                "app.services.goal_age_recommendation_service.build_portfolio_overview",
                 AsyncMock(return_value={"total_assets_krw": 10_000_000.0}),
             ),
             patch(
-                "app.services.goal_recommendation_service.get_historical_returns",
+                "app.services.goal_age_recommendation_service.get_historical_returns",
                 AsyncMock(return_value=cagr_map),
+            ),
+            patch(
+                "app.services.goal_age_recommendation_service._fetch_dividend_yields",
+                AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
                 "app.services.goal_recommendation_service._fetch_dividend_yields",
                 AsyncMock(side_effect=_dividend_side_effect),
             ),
             patch(
-                "app.services.goal_recommendation_service.fetch_yf_daily_returns",
+                "app.services.goal_age_recommendation_service.fetch_yf_daily_returns",
                 return_value=returns_map,
             ),
         ):

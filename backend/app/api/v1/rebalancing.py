@@ -29,10 +29,10 @@ from app.services._account_queries import active_broker_accounts_stmt, get_accou
 from app.services._portfolio_queries import get_active_alert_thresholds, get_linked_portfolios
 from app.services._settings_queries import get_or_create_settings, get_settings_row
 from app.services.dividend.orchestrator import get_ticker_dividend_summary
+from app.services.goal_age_recommendation_service import get_age_based_recommendation
 from app.services.goal_recommendation_service import (
     compute_portfolio_expected_metrics,
     existing_items_from_positions,
-    get_age_based_recommendation,
     get_goal_recommendation,
     get_horizon_recommendations,
 )

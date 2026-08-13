@@ -16,7 +16,7 @@ from app.limiter import limiter
 from app.models.user import User
 from app.services._settings_queries import get_or_create_settings, get_settings_row, has_active_kis_credentials
 from app.services.credential_service import encrypt
-from app.services.goal_recommendation_service import age_group_from_birth_year
+from app.services.goal_age_recommendation_service import age_group_from_birth_year
 from app.services.recommendation_universe import MAX_GOAL_CANDIDATE_TICKERS
 from app.utils.cache_keys import (
     dashboard_summary_key,

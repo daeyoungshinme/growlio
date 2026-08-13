@@ -23,8 +23,8 @@ backend/.pytest_cache/
 backend/.ruff_cache/
 backend/.mypy_cache/
 *.egg-info/
-backend/.coverage
-backend/.coverage.*
+.coverage
+.coverage.*
 backend/htmlcov/
 backend/coverage.xml
 
