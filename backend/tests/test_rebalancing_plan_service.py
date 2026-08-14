@@ -795,6 +795,7 @@ class TestExecuteDueBuyLegs:
             decided_at=None,
             decided_by=None,
             error_message=None,
+            token_consumed_at=None,
         )
 
         mock_db.execute = AsyncMock(return_value=due_result)
@@ -920,6 +921,37 @@ class TestExecuteDueBuyLegs:
         assert locked_leg.token_consumed_at is None
 
     @pytest.mark.asyncio
+    async def test_skips_leg_already_claimed_by_stalled_previous_run(self, mock_db):
+        """status가 아직 PENDING이어도 token_consumed_at이 이미 세팅돼 있으면(직전 tick이 브로커
+        호출 도중 죽거나 지연된 경우) 재클레임하지 않는다 — 안 그러면 동일 leg가 브로커에 중복
+        주문될 수 있다(`_lock_and_claim`의 수동 승인 경로와 동일한 가드로 통일)."""
+        leg_id = uuid.uuid4()
+        due_result = MagicMock()
+        due_result.all.return_value = [(leg_id,)]
+        locked_leg = SimpleNamespace(
+            id=leg_id,
+            side="BUY",
+            market="KR",
+            status="PENDING",
+            deadline_at=datetime.now(tz=UTC) - timedelta(minutes=5),
+            decided_at=None,
+            decided_by=None,
+            error_message=None,
+            token_consumed_at=datetime.now(tz=UTC) - timedelta(seconds=30),
+        )
+
+        mock_db.execute = AsyncMock(return_value=due_result)
+        mock_db.scalar = AsyncMock(return_value=locked_leg)
+        mock_db.commit = AsyncMock()
+
+        with patch("app.utils.market_hours.is_korean_market_open", return_value=True):
+            count = await svc.execute_due_buy_legs(mock_db, MagicMock())
+
+        assert count == 0
+        assert locked_leg.status == "PENDING"  # 재클레임되지 않았으니 상태 변경도 없어야 함
+        mock_db.commit.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_no_due_legs_returns_zero(self, mock_db):
         due_result = MagicMock()
         due_result.all.return_value = []
@@ -1000,6 +1032,7 @@ class TestExecuteDueBuyLegs:
             decided_at=None,
             decided_by=None,
             error_message=None,
+            token_consumed_at=None,
         )
 
         mock_db.execute = AsyncMock(return_value=due_result)

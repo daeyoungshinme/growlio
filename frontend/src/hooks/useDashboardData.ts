@@ -25,7 +25,7 @@ export function useDashboardData() {
     refetchOnWindowFocus: false,
   });
 
-  const { data: dcaData } = useQuery({
+  const { data: dcaData, isLoading: dcaLoading } = useQuery({
     queryKey: QUERY_KEYS.dcaAnalysis,
     queryFn: fetchDCAAnalysis,
     staleTime: STALE_TIME.EXCHANGE_RATE,
@@ -61,6 +61,7 @@ export function useDashboardData() {
     dataUpdatedAt,
     overview,
     dcaData,
+    dcaLoading,
     accounts,
     accountsLoading,
     exchangeRate,

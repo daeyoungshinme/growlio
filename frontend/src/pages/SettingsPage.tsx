@@ -17,8 +17,14 @@ import { Link } from "react-router-dom";
 import { isNativePlatform } from "@/utils/platform";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/api/client";
-import { type SettingsData } from "@/api/settings";
+import { fetchSettings } from "@/api/settings";
 import { toast } from "@/utils/toast";
+import { extractErrorMessage } from "@/utils/error";
+import {
+  REPORT_ALERT_FIELDS,
+  INSTANT_ALERT_FIELDS,
+  countEnabled,
+} from "@/utils/notificationAlertGroups";
 import { useThemeStore } from "@/stores/themeStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useLogout } from "@/hooks/useLogout";
@@ -84,7 +90,7 @@ export default function SettingsPage() {
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
-    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
+    queryFn: fetchSettings,
     staleTime: STALE_TIME.LONG,
   });
 
@@ -96,17 +102,24 @@ export default function SettingsPage() {
       await api.put("/settings/dart", { api_key: dart.api_key });
       toast("DART API 키가 저장되었습니다", "success");
       void invalidateSettings();
-    } catch {
-      toast("저장에 실패했습니다", "error");
+    } catch (e) {
+      toast(extractErrorMessage(e, "저장에 실패했습니다"), "error");
     } finally {
       setSaving(null);
     }
   };
 
   const deleteDart = async () => {
-    await api.delete("/settings/dart");
-    toast("DART API 키가 삭제되었습니다", "success");
-    void invalidateSettings();
+    setSaving("dart-delete");
+    try {
+      await api.delete("/settings/dart");
+      toast("DART API 키가 삭제되었습니다", "success");
+      void invalidateSettings();
+    } catch (e) {
+      toast(extractErrorMessage(e, "삭제에 실패했습니다"), "error");
+    } finally {
+      setSaving(null);
+    }
   };
 
   const goalFieldsSetCount = current
@@ -129,18 +142,14 @@ export default function SettingsPage() {
     : "불러오는 중...";
 
   const reportAlertsEnabledCount = current
-    ? [
-        current.monthly_report_enabled,
-        current.year_end_tax_reminder_enabled,
-        current.recommendation_drift_alert_enabled,
-      ].filter(Boolean).length
+    ? countEnabled(REPORT_ALERT_FIELDS.map((field) => Boolean(current[field])))
     : 0;
   const instantAlertsEnabledCount = current
-    ? [current.goal_achievement_alerts_enabled].filter(Boolean).length
+    ? countEnabled(INSTANT_ALERT_FIELDS.map((field) => Boolean(current[field])))
     : 0;
   const notificationSummary = !current
     ? "불러오는 중..."
-    : `정기 3개 중 ${reportAlertsEnabledCount}개 · 즉시 1개 중 ${instantAlertsEnabledCount}개 켜짐`;
+    : `정기 ${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 · 즉시 ${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`;
 
   return (
     <div className="space-y-6 max-w-xl">
@@ -182,9 +191,10 @@ export default function SettingsPage() {
           {current?.has_dart && (
             <button
               onClick={deleteDart}
-              className="px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
+              disabled={saving === "dart-delete"}
+              className="px-5 py-2 text-sm border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 disabled:opacity-50 transition-colors"
             >
-              삭제
+              {saving === "dart-delete" ? "삭제 중..." : "삭제"}
             </button>
           )}
         </div>

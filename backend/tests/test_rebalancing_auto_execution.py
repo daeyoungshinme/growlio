@@ -403,6 +403,42 @@ class TestRunAutoExecution:
         assert mock_notify.call_args.args[2] is blocked
 
     @pytest.mark.asyncio
+    async def test_plan_generation_in_progress_skips_silently_and_continues(self):
+        """build_pending_plan_for_alert()가 PlanGenerationInProgress를 반환하면(수동 "지금 실행"과
+        거의 동시에 겹친 락 경합) 알림 없이 조용히 다음 alert로 넘어가야 한다 — 다음 5분 tick에
+        자연히 재시도되므로 사용자에게 알릴 내용이 없다."""
+        from app.services.rebalancing.plan_service import PlanGenerationInProgress
+
+        mock_db = _make_mock_db()
+        alert = _make_alert()
+        portfolio = _make_portfolio()
+
+        execute_result = MagicMock()
+        execute_result.all.return_value = [(alert, portfolio, "u@test.com", None, None)]
+        mock_db.execute = AsyncMock(return_value=execute_result)
+
+        with (
+            _patch_common(mock_db),
+            patch("app.jobs.rebalancing_auto_execution.is_alert_execution_time", return_value=True),
+            patch("app.jobs.rebalancing_auto_execution.already_fired_today", return_value=False),
+            patch(
+                "app.jobs.rebalancing_auto_execution.get_alert_ids_with_pending_plan",
+                new=AsyncMock(return_value=set()),
+            ),
+            patch(
+                "app.jobs.rebalancing_auto_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=PlanGenerationInProgress()),
+            ) as mock_gen,
+            patch("app.jobs.rebalancing_auto_execution.notify_plan_generated", new=AsyncMock()) as mock_notify,
+        ):
+            from app.jobs.rebalancing_auto_execution import _run_auto_execution
+
+            await _run_auto_execution()
+
+        mock_gen.assert_called_once()
+        mock_notify.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_market_signal_blocked_notifies_with_gate_context(self):
         """시장신호 게이트로 차단되면 build_pending_plan_for_alert()를 아예 호출하지 않고
         notify_market_signal_gate_blocked()에 등급·게이트 모드·데이터 신선도를 실어 전달해야 한다."""
@@ -678,6 +714,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch(
                 "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", None)),
@@ -734,6 +771,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch(
                 "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, None, "sell-token")),
@@ -758,6 +796,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch(
                 "app.services.rebalancing.diagnosis_service._build_tax_preview",
                 return_value=(500_000.0, 200_000.0, 0.0, [], []),
@@ -782,6 +821,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch(
                 "app.services.rebalancing.diagnosis_service._build_tax_preview",
                 return_value=(500_000.0, 200_000.0, 0.0, [], []),
@@ -810,6 +850,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch("app.services.rebalancing.diagnosis_service._build_tax_preview") as mock_tax_preview,
             patch(
                 "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
@@ -839,6 +880,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch("app.services.rebalancing.plan_service.generate_pending_plan_for_alert", new=AsyncMock()) as mock_gen,
         ):
             result = await build_pending_plan_for_alert(alert, portfolio, mock_db, "GREEN")
@@ -863,6 +905,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch(
                 "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",
                 new=AsyncMock(return_value=(plan, "buy-token", None)),
@@ -889,6 +932,7 @@ class TestBuildPendingPlanForAlert:
         with (
             patch("app.services.portfolio_service.build_portfolio_overview", new=AsyncMock(return_value=MagicMock())),
             patch("app.services.rebalancing.service.analyze_rebalancing", return_value=analysis),
+            patch("app.services.rebalancing.plan_service.refresh_live_prices", new=AsyncMock()),
             patch("app.services.rebalancing.plan_service.sum_today_auto_plan_value_krw", new=AsyncMock()) as mock_sum,
             patch(
                 "app.services.rebalancing.plan_service.generate_pending_plan_for_alert",

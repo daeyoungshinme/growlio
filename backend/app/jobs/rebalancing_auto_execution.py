@@ -20,6 +20,7 @@ from app.services.rebalancing.order_builder import is_market_signal_blocking_aut
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
     MarketSignalGateBlocked,
+    PlanGenerationInProgress,
     TaxGateBlocked,
     build_pending_plan_for_alert,
     get_alert_ids_with_pending_plan,
@@ -120,6 +121,10 @@ async def _run_auto_execution() -> None:
                 continue
             if isinstance(generated, DailyValueCapBlocked):
                 await notify_daily_value_cap_blocked(alert, portfolio, generated, email, fcm_token, db)
+                continue
+            if isinstance(generated, PlanGenerationInProgress):
+                # 수동 "지금 실행"과 거의 동시에 겹친 드문 경합 — 다음 5분 tick에 재시도되므로
+                # 별도 알림 없이 조용히 스킵한다.
                 continue
             if generated is None:
                 continue

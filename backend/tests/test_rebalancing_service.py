@@ -1047,12 +1047,14 @@ class TestAvailableCashKrw:
         result = analyze_rebalancing(portfolio, overview)
         assert result.available_cash_krw == pytest.approx(0)
 
-    def test_available_cash_clamped_to_zero(self):
-        """total_stock이 total_assets를 초과할 경우 0 이하로 내려가지 않는다."""
+    def test_available_cash_shows_true_negative_when_stock_exceeds_assets(self):
+        """total_stock이 total_assets를 초과하면(미수/미결제 등 실제 마이너스 예수금) 0으로
+        숨기지 않고 실제 마이너스 값을 그대로 노출한다 — 표시용 필드라 부족분을 사용자가
+        인지할 수 있어야 한다(목표비중 계산용 base_krw의 0 하한과는 별개, compute_base_value_krw 참고)."""
         portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
         overview = _make_overview(total_assets_krw=900_000, total_stock_krw=1_000_000)
         result = analyze_rebalancing(portfolio, overview)
-        assert result.available_cash_krw == pytest.approx(0)
+        assert result.available_cash_krw == pytest.approx(-100_000)
 
     def test_available_cash_present_in_total_assets_base_type(self):
         """TOTAL_ASSETS base_type에서도 예수금이 올바르게 반환된다."""
@@ -1063,3 +1065,23 @@ class TestAvailableCashKrw:
         overview = _make_overview(total_assets_krw=2_000_000, total_stock_krw=1_500_000)
         result = analyze_rebalancing(portfolio, overview)
         assert result.available_cash_krw == pytest.approx(500_000)
+
+
+class TestBaseValueKrwNegativeCash:
+    """STOCK_ONLY base_krw가 마이너스 예수금(미수/미결제 등)을 부풀리지 않고 실제로 차감하는지 검증."""
+
+    def test_negative_cash_reduces_base_krw_instead_of_being_dropped(self):
+        """total_stock=1,000,000·total_assets=900,000(예수금 -100,000)이면 base_krw는 total_stock
+        그대로(1,000,000)가 아니라 실제 구매력인 900,000이어야 한다 — 컴포넌트 단위로 미리 0
+        클램프하면 부족분이 사라져 모든 종목의 target_value_krw가 부풀려진다."""
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
+        overview = _make_overview(total_assets_krw=900_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.base_value_krw == pytest.approx(900_000)
+
+    def test_extreme_negative_cash_still_floors_base_krw_at_zero(self):
+        """예수금 부족분이 total_stock보다 커도 base_krw 전체가 마이너스로 내려가지는 않는다."""
+        portfolio = _make_portfolio([{"ticker": "AAPL", "name": "Apple", "market": "NASDAQ", "weight": 100}])
+        overview = _make_overview(total_assets_krw=-500_000, total_stock_krw=1_000_000)
+        result = analyze_rebalancing(portfolio, overview)
+        assert result.base_value_krw == pytest.approx(0)

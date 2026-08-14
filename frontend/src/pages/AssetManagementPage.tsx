@@ -29,6 +29,8 @@ import { useAccountMutations } from "@/hooks/useAccountMutations";
 import { useStockAccountStats } from "@/hooks/useStockAccountStats";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { ASSET_MANAGEMENT_TABS } from "@/constants/tabs";
+import { QUERY_KEYS } from "@/constants/queryKeys";
+import { TOUCH_TARGET_MIN_MOBILE_ONLY } from "@/constants/uiSizes";
 import Tabs from "@/components/common/Tabs";
 import { fmtKrw, fmtPct } from "@/utils/format";
 
@@ -83,7 +85,7 @@ export default function AssetManagementPage() {
     await invalidateAccountData(queryClient);
   }, [queryClient]);
   useRegisterRefresh(handleRefresh);
-  const { accounts, isLoading, overview, allTx, usdRate } = useAssetManagementData(tab);
+  const { accounts, isLoading, error, overview, allTx, usdRate } = useAssetManagementData(tab);
 
   const {
     createMutation,
@@ -144,6 +146,19 @@ export default function AssetManagementPage() {
       realEstate: { amount: realEstateKrw, pct: pct(realEstateKrw) },
     };
   }, [overview]);
+
+  if (error)
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <p className="text-sm text-red-500">계좌 정보를 불러오지 못했습니다</p>
+        <button
+          onClick={() => queryClient.invalidateQueries({ queryKey: QUERY_KEYS.accounts })}
+          className={`${TOUCH_TARGET_MIN_MOBILE_ONLY} px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors`}
+        >
+          다시 시도
+        </button>
+      </div>
+    );
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -213,9 +228,9 @@ export default function AssetManagementPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 <Home size={18} />
-                <span className="text-sm font-medium">
+                <h2 className="text-sm font-medium">
                   부동산 {isLoading ? "" : `(${realEstateAccounts.length}개)`}
-                </span>
+                </h2>
               </div>
               <button
                 onClick={() => setShowRealEstateModal(true)}
@@ -259,9 +274,9 @@ export default function AssetManagementPage() {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
                 {tab === "은행계좌" ? <Building2 size={18} /> : <TrendingUp size={18} />}
-                <span className="text-sm font-medium">
+                <h2 className="text-sm font-medium">
                   {tab} {isLoading ? "" : `(${currentBankOrStock.length}개)`}
-                </span>
+                </h2>
               </div>
               <button
                 onClick={() =>

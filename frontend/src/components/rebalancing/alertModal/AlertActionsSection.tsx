@@ -50,7 +50,8 @@ export function AlertActionsSection({ form, hasAlert, portfolioId, targetAccount
       const isBlocked =
         result.status === "MARKET_BLOCKED" ||
         result.status === "TAX_BLOCKED" ||
-        result.status === "DAILY_CAP_BLOCKED";
+        result.status === "DAILY_CAP_BLOCKED" ||
+        result.status === "GENERATION_IN_PROGRESS";
       toast(result.message, isBlocked ? "error" : "success");
       if (result.status === "PLAN_GENERATED") {
         void invalidateRebalancingPlanData(queryClient);

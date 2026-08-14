@@ -36,16 +36,18 @@ type SavingsMode = (typeof SAVINGS_MODES)[number];
 
 interface Props {
   flat?: boolean;
+  /** 사용자가 설정한 실제 목표 연수익률(UserSettings.goal_annual_return_pct) — 있으면 초기 가정 수익률로 사용 */
+  goalReturnPct?: number | null;
 }
 
-export default function SavingsSimulatorCard({ flat }: Props) {
+export default function SavingsSimulatorCard({ flat, goalReturnPct }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
   const [mode, setMode] = useState<SavingsMode>("적립식");
   const [monthlyAmountInput, setMonthlyAmountInput] = useState(
     String(DEFAULT_SAVINGS_MONTHLY_AMOUNT),
   );
   const [lumpAmountInput, setLumpAmountInput] = useState(String(DEFAULT_SAVINGS_LUMP_SUM_AMOUNT));
-  const [returnPct, setReturnPct] = useState(DEFAULT_SAVINGS_RETURN_PCT);
+  const [returnPct, setReturnPct] = useState(goalReturnPct ?? DEFAULT_SAVINGS_RETURN_PCT);
 
   const isLumpSum = mode === "거치식";
   const monthlyAmount = Math.max(0, Number(monthlyAmountInput) || 0);
@@ -180,6 +182,20 @@ export default function SavingsSimulatorCard({ flat }: Props) {
               {preset.label} 연{preset.pct}%
             </button>
           ))}
+          {goalReturnPct != null &&
+            !SAVINGS_RETURN_PRESETS.some((p) => p.pct === goalReturnPct) && (
+              <button
+                type="button"
+                onClick={() => setReturnPct(goalReturnPct)}
+                className={`flex-1 text-xs py-1.5 px-2 rounded-lg transition-colors ${TOUCH_TARGET_COMPACT_MOBILE_ONLY} ${
+                  returnPct === goalReturnPct
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950"
+                }`}
+              >
+                내 목표 연{goalReturnPct}%
+              </button>
+            )}
         </div>
       </div>
 

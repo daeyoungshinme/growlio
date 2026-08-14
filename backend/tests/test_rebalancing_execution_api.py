@@ -252,6 +252,46 @@ class TestExecutionPlanGates:
         assert "6,000,000" in result.message
         assert "10,000,000" in result.message
 
+    @pytest.mark.asyncio
+    async def test_generation_in_progress_when_build_pending_plan_returns_lock_busy(self, mock_db, mock_request):
+        """AUTO 잡과 거의 동시에 겹쳐 유저 단위 락을 획득하지 못한 경우 — 균형 상태(NO_DRIFT)로
+        오인되지 않고 재시도 안내 상태를 별도로 반환해야 한다."""
+        from app.api.v1.rebalancing_execution import create_rebalancing_execution_plan
+        from app.services.rebalancing.plan_service import PlanGenerationInProgress
+
+        portfolio_id = uuid.uuid4()
+        user = SimpleNamespace(id=uuid.uuid4())
+        portfolio = SimpleNamespace(id=portfolio_id, account_ids=None)
+        alert_row = SimpleNamespace(
+            id=uuid.uuid4(),
+            account_id=uuid.uuid4(),
+            strategy="FULL",
+            order_type="MARKET",
+            market_condition_mode="DISABLED",
+        )
+        mock_db.scalar = AsyncMock(side_effect=[portfolio, alert_row])
+
+        with (
+            patch("app.api.v1.rebalancing_execution.has_pending_plan_for_alert", new=AsyncMock(return_value=False)),
+            patch(
+                "app.services.market_signal_service.get_market_signal",
+                new=AsyncMock(return_value={"composite_level": "GREEN"}),
+            ),
+            patch(
+                "app.api.v1.rebalancing_execution.build_pending_plan_for_alert",
+                new=AsyncMock(return_value=PlanGenerationInProgress()),
+            ),
+        ):
+            result = await create_rebalancing_execution_plan(
+                request=mock_request,
+                portfolio_id=portfolio_id,
+                current_user=user,
+                db=mock_db,
+                cache=None,
+            )
+
+        assert result.status == "GENERATION_IN_PROGRESS"
+
 
 class TestExecutionPlanGenerated:
     @pytest.mark.asyncio

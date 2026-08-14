@@ -311,6 +311,7 @@ describe("AssetManagementPage", () => {
     vi.mocked(useAssetManagementData).mockReturnValue({
       accounts: [],
       isLoading: false,
+      error: null,
       overview: {
         total_assets_krw: 10_000_000,
         total_stock_krw: 6_000_000,

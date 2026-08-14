@@ -286,7 +286,10 @@ export default function InvestPlanPage() {
                   <ErrorBoundary variant="section">
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-[3fr_2fr] sm:items-start">
                       <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                        <DCAProjectionChart data={data.projection_months} />
+                        <DCAProjectionChart
+                          data={data.projection_months}
+                          monthlyDepositAmount={s?.monthly_deposit_amount}
+                        />
                       </Suspense>
                       <div className="card divide-y divide-gray-100 dark:divide-gray-700">
                         <div className="pb-4">
@@ -323,7 +326,7 @@ export default function InvestPlanPage() {
             {goalTab === "저축 시뮬레이터" && (
               <ErrorBoundary variant="section">
                 <Suspense fallback={<SkeletonCard rows={4} height="h-5" />}>
-                  <SavingsSimulatorCard />
+                  <SavingsSimulatorCard goalReturnPct={s?.goal_annual_return_pct ?? null} />
                 </Suspense>
               </ErrorBoundary>
             )}

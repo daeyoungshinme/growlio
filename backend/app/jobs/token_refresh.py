@@ -5,7 +5,7 @@ from sqlalchemy import select
 
 from app.core.cache_store import get_cache_store
 from app.core.database import AsyncSessionLocal
-from app.kis.auth import _fetch_and_store_token
+from app.kis.auth import get_access_token
 from app.models.asset import AssetAccount
 from app.services.credential_service import decrypt_kis_credentials
 
@@ -43,7 +43,7 @@ async def refresh_all_user_tokens() -> None:
                     return
                 app_key, app_secret = creds
                 async with AsyncSessionLocal() as db:
-                    await _fetch_and_store_token(
+                    await get_access_token(
                         app_key,
                         app_secret,
                         is_mock=account.is_mock_mode,

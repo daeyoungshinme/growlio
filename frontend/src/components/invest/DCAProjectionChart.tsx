@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import {
   CartesianGrid,
   Line,
@@ -12,13 +12,22 @@ import type { DCAProjectionPoint } from "@/api/invest";
 import { useThemeStore } from "@/stores/themeStore";
 import { fmtKrw, fmtKrwShort } from "@/utils/format";
 import { chartTooltipStyle } from "@/utils/chart";
+import { buildScenarioCurve } from "@/utils/dcaScenarioProjection";
+import { SAVINGS_RETURN_PRESETS } from "@/constants/savingsPresets";
+import { TOUCH_TARGET_COMPACT_MOBILE_ONLY } from "@/constants/uiSizes";
+
+const CONSERVATIVE_RETURN_PCT = SAVINGS_RETURN_PRESETS[0].pct;
+const AGGRESSIVE_RETURN_PCT = SAVINGS_RETURN_PRESETS[SAVINGS_RETURN_PRESETS.length - 1].pct;
 
 interface Props {
   data: DCAProjectionPoint[];
+  monthlyDepositAmount?: number | null;
 }
 
-function DCAProjectionChart({ data }: Props) {
+function DCAProjectionChart({ data, monthlyDepositAmount }: Props) {
   const isDark = useThemeStore((s) => s.isDark);
+  const [showScenarios, setShowScenarios] = useState(false);
+  const canShowScenarios = !!monthlyDepositAmount && monthlyDepositAmount > 0;
   const today = new Date().toISOString().slice(0, 7);
   const pastPoints = data.filter((d) => d.month <= today);
   const futurePoints = data.filter((d) => d.month > today);
@@ -28,6 +37,15 @@ function DCAProjectionChart({ data }: Props) {
   const hasActualData = data.some((d) => d.actual_krw !== null);
   // 경계점: 마지막 과거 달을 미래 시작점으로도 포함해 실선↔점선이 끊기지 않게
   const boundaryPoint = recentPast.length > 0 ? recentPast[recentPast.length - 1] : null;
+  const conservativeCurve =
+    showScenarios && canShowScenarios
+      ? buildScenarioCurve(data, monthlyDepositAmount!, CONSERVATIVE_RETURN_PCT)
+      : {};
+  const aggressiveCurve =
+    showScenarios && canShowScenarios
+      ? buildScenarioCurve(data, monthlyDepositAmount!, AGGRESSIVE_RETURN_PCT)
+      : {};
+
   const chartData = [
     ...recentPast.map((d) => ({ ...d, projected_future_krw: undefined })),
     ...(boundaryPoint
@@ -48,12 +66,22 @@ function DCAProjectionChart({ data }: Props) {
           projected_krw: undefined,
         }))
       : visibleFuture.map((d) => ({ ...d, projected_future_krw: d.projected_krw }))),
-  ];
+  ].map((d) => ({
+    ...d,
+    conservative_krw: conservativeCurve[d.month],
+    aggressive_krw: aggressiveCurve[d.month],
+  }));
 
   const allChartNums = chartData
     .flatMap((d) => {
       const row = d as Record<string, unknown>;
-      return [row.projected_krw, row.projected_future_krw, row.actual_krw];
+      return [
+        row.projected_krw,
+        row.projected_future_krw,
+        row.actual_krw,
+        row.conservative_krw,
+        row.aggressive_krw,
+      ];
     })
     .filter((v): v is number => typeof v === "number" && isFinite(v));
   const actualNums = chartData
@@ -67,9 +95,24 @@ function DCAProjectionChart({ data }: Props) {
 
   return (
     <div className="card pl-2 sm:pl-5">
-      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">
-        이론 복리 곡선 vs 실제 자산
-      </h3>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+          이론 복리 곡선 vs 실제 자산
+        </h3>
+        {canShowScenarios && (
+          <button
+            type="button"
+            onClick={() => setShowScenarios((v) => !v)}
+            className={`shrink-0 text-xs py-1 px-2.5 rounded-full transition-colors ${TOUCH_TARGET_COMPACT_MOBILE_ONLY} ${
+              showScenarios
+                ? "bg-blue-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-blue-50 dark:hover:bg-blue-950"
+            }`}
+          >
+            보수·공격 시나리오 비교
+          </button>
+        )}
+      </div>
       <div className="flex items-center gap-4 flex-wrap mb-3 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-5 border-t-2 border-blue-500" />
@@ -86,6 +129,18 @@ function DCAProjectionChart({ data }: Props) {
           </span>
           실제 자산
         </span>
+        {showScenarios && canShowScenarios && (
+          <>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-5 border-t-2 border-gray-400 border-dashed" />
+              보수적 가정 (연 {CONSERVATIVE_RETURN_PCT}%)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="inline-block w-5 border-t-2 border-violet-500 border-dashed" />
+              공격적 가정 (연 {AGGRESSIVE_RETURN_PCT}%)
+            </span>
+          </>
+        )}
       </div>
       <ResponsiveContainer width="100%" height={320}>
         <LineChart data={chartData} margin={{ top: 4, right: 12, left: 0, bottom: 4 }}>
@@ -105,7 +160,13 @@ function DCAProjectionChart({ data }: Props) {
           <Tooltip
             formatter={(value: number, name: string) => {
               const label =
-                name === "projected_krw" || name === "projected_future_krw" ? "이론값" : "실제값";
+                name === "conservative_krw"
+                  ? `보수적 가정(연 ${CONSERVATIVE_RETURN_PCT}%)`
+                  : name === "aggressive_krw"
+                    ? `공격적 가정(연 ${AGGRESSIVE_RETURN_PCT}%)`
+                    : name === "projected_krw" || name === "projected_future_krw"
+                      ? "이론값"
+                      : "실제값";
               return [fmtKrw(value), label];
             }}
             labelFormatter={(label: string) => `${label}`}
@@ -134,6 +195,26 @@ function DCAProjectionChart({ data }: Props) {
             dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }}
             connectNulls={true}
           />
+          {showScenarios && canShowScenarios && (
+            <>
+              <Line
+                type="monotone"
+                dataKey="conservative_krw"
+                stroke="#9ca3af"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 3"
+              />
+              <Line
+                type="monotone"
+                dataKey="aggressive_krw"
+                stroke="#8b5cf6"
+                strokeWidth={1.5}
+                dot={false}
+                strokeDasharray="4 3"
+              />
+            </>
+          )}
         </LineChart>
       </ResponsiveContainer>
       {!hasActualData && (

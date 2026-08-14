@@ -85,7 +85,7 @@ export default memo(function HeroSummaryCard({
 
   return (
     <div className="card !pt-0 !pr-2 !pb-3 !pl-3 sm:!pt-0 sm:!pr-3 sm:!pb-5 sm:!pl-5 flex flex-col gap-3 lg:gap-4">
-      <div className="flex flex-row items-center sm:gap-4">
+      <div className="flex flex-row items-center gap-2 sm:gap-4">
         {/* 좌: 제목/금액 + 지표 */}
         <div className="flex-1 min-w-0 flex flex-col gap-1 sm:gap-2">
           <div className="flex items-center justify-between gap-2">
@@ -135,7 +135,7 @@ export default memo(function HeroSummaryCard({
         </div>
 
         {/* 우: 도넛 + 범례 */}
-        <div className="shrink-0 self-start w-[164px] sm:w-[180px] lg:w-[196px] xl:w-[208px] flex flex-col items-center gap-0 -mr-2 sm:mr-0">
+        <div className="shrink-0 self-start w-[136px] sm:w-[180px] lg:w-[196px] xl:w-[208px] flex flex-col items-center gap-0 -mr-2 sm:mr-0">
           {allocationChartData.length > 0 ? (
             <Suspense fallback={<div className="w-full h-40 sm:h-44 lg:h-48" />}>
               <>

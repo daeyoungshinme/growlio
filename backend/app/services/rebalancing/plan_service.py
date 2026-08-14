@@ -71,6 +71,16 @@ class DailyValueCapBlocked:
     cap_krw: float
 
 
+@dataclass(frozen=True)
+class PlanGenerationInProgress:
+    """동시에 들어온 다른 계획 생성 요청이 이미 처리 중이라 유저 단위 락을 획득하지 못했을 때 반환하는 sentinel.
+
+    AUTO 스케줄러 job과 수동 "지금 실행"이 같은 유저에 대해 거의 동시에 호출되는 경우에만 발생한다
+    (하루 합산 거래한도의 check-then-act 레이스를 막기 위한 `inproc_lock` 직렬화, `build_pending_plan_for_alert`
+    참고). 흔치 않은 경합이므로 재시도 안내만 하면 충분 — 별도 알림 발송은 하지 않는다.
+    """
+
+
 def _generate_token() -> tuple[str, str]:
     """(원문 토큰, SHA-256 해시) 반환 — DB에는 해시만 저장한다."""
     raw = secrets.token_urlsafe(32)
@@ -212,15 +222,11 @@ async def generate_pending_plan_for_alert(
     반환: (plan, buy_tokens, sell_tokens). 각 tokens는 [(market, raw_token), ...] 형태로
     비어있는 side는 빈 리스트. 실행할 주문이 전혀 없으면 (None, [], []).
     """
-    from app.core.cache_store import get_cache_store
     from app.utils.market_hours import korean_market_close_datetime, us_market_close_datetime
 
     strategy = cast(str, strategy_override or getattr(alert, "strategy", "BUY_ONLY"))
     order_type = order_type_override or cast(Literal["MARKET", "LIMIT"], getattr(alert, "order_type", "MARKET"))
     account_id = account_id_override or alert.account_id
-
-    cache = await get_cache_store()
-    await refresh_live_prices(drifting, alert.user_id, db, cache)
 
     orders = build_rebalancing_orders(
         drifting, ticker_account_map or {}, strategy, order_type, str(account_id), alert_id=str(alert.id)
@@ -300,14 +306,18 @@ async def build_pending_plan_for_alert(
     account_id_override: uuid.UUID | None = None,
     cache: Any = None,
 ) -> (
-    tuple[RebalancingPlan, list[tuple[str, str]], list[tuple[str, str]]] | None | TaxGateBlocked | DailyValueCapBlocked
+    tuple[RebalancingPlan, list[tuple[str, str]], list[tuple[str, str]]]
+    | None
+    | TaxGateBlocked
+    | DailyValueCapBlocked
+    | PlanGenerationInProgress
 ):
     """알림 설정 기준으로 드리프트 분석 후 대기 플랜을 생성한다.
 
     AUTO 스케줄러 job과 수동 "지금 테스트 실행" 모두 이 함수로 플랜을 생성해 두 경로가
     동일한 계획 생성 로직(및 이메일 발송 파이프라인)을 공유하도록 한다.
     반환: (plan, buy_tokens, sell_tokens) | None(드리프트 없음) | TaxGateBlocked(세금영향 게이트 차단)
-    | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단).
+    | DailyValueCapBlocked(하루 합산 거래한도 게이트 차단) | PlanGenerationInProgress(동시 요청 락 획득 실패).
     buy_tokens/sell_tokens는 [(market, raw_token), ...] — KR/US leg가 각각 있으면 최대 2개.
     """
     from app.services.portfolio_service import build_portfolio_overview
@@ -326,6 +336,10 @@ async def build_pending_plan_for_alert(
         logger.info("rebalancing_plan_no_drift", alert_id=str(alert.id))
         return None
 
+    # 게이트 판정(세금영향·하루합산한도) 이전에 라이브 시세로 갱신 — analysis.items와 drifting은
+    # 같은 객체를 참조하므로 여기서 갱신하면 아래 _build_tax_preview(analysis, ...)에도 반영된다.
+    await refresh_live_prices(drifting, alert.user_id, db, cache)
+
     tax_gate_mode = getattr(alert, "tax_impact_gate_mode", "DISABLED")
     max_tax_impact_krw = getattr(alert, "max_tax_impact_krw", None)
     if tax_gate_mode == "ENABLED" and max_tax_impact_krw is not None:
@@ -341,39 +355,51 @@ async def build_pending_plan_for_alert(
             )
             return TaxGateBlocked(estimated_tax_krw=estimated_tax_krw, max_tax_impact_krw=float(max_tax_impact_krw))
 
+    from app.core.cache_store import get_cache_store
     from app.models.user import UserSettings
+    from app.utils.inproc_lock import inproc_lock
 
-    daily_cap_krw = await db.scalar(
-        select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
-    )
-    if daily_cap_krw is not None:
-        attempted_value_krw = sum(abs(item.diff_krw) for item in drifting)
-        today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
-        if is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
-            logger.info(
-                "rebalancing_plan_blocked_daily_value_cap",
-                alert_id=str(alert.id),
-                today_total_krw=today_total_krw,
-                attempted_value_krw=attempted_value_krw,
-                cap_krw=float(daily_cap_krw),
-            )
-            return DailyValueCapBlocked(
-                today_total_krw=today_total_krw,
-                attempted_value_krw=attempted_value_krw,
-                cap_krw=float(daily_cap_krw),
-            )
+    # 하루 합산 거래한도 체크(조회→비교→플랜생성)는 AUTO 잡과 수동 "지금 실행"이 거의 동시에
+    # 호출될 수 있어 유저 단위 락으로 직렬화한다 — 락 없이는 두 호출이 같은 "오늘 누적액"을
+    # 읽고 둘 다 통과해 한도를 최대 2배 초과할 수 있다.
+    lock_cache = cache or await get_cache_store()
+    async with inproc_lock(lock_cache, f"rebalancing_plan_gen:{alert.user_id}", ttl=60) as acquired:
+        if not acquired:
+            logger.info("rebalancing_plan_generation_lock_busy", alert_id=str(alert.id))
+            return PlanGenerationInProgress()
 
-    plan, buy_tokens, sell_tokens = await generate_pending_plan_for_alert(
-        alert,
-        portfolio,
-        drifting,
-        db,
-        analysis.ticker_account_map,
-        composite_level,
-        strategy_override=strategy_override,
-        order_type_override=order_type_override,
-        account_id_override=account_id_override,
-    )
+        daily_cap_krw = await db.scalar(
+            select(UserSettings.auto_rebalancing_daily_value_cap_krw).where(UserSettings.user_id == alert.user_id)
+        )
+        if daily_cap_krw is not None:
+            attempted_value_krw = sum(abs(item.diff_krw) for item in drifting)
+            today_total_krw = await sum_today_auto_plan_value_krw(alert.user_id, db)
+            if is_daily_value_cap_blocking_auto_mode(today_total_krw, attempted_value_krw, float(daily_cap_krw)):
+                logger.info(
+                    "rebalancing_plan_blocked_daily_value_cap",
+                    alert_id=str(alert.id),
+                    today_total_krw=today_total_krw,
+                    attempted_value_krw=attempted_value_krw,
+                    cap_krw=float(daily_cap_krw),
+                )
+                return DailyValueCapBlocked(
+                    today_total_krw=today_total_krw,
+                    attempted_value_krw=attempted_value_krw,
+                    cap_krw=float(daily_cap_krw),
+                )
+
+        plan, buy_tokens, sell_tokens = await generate_pending_plan_for_alert(
+            alert,
+            portfolio,
+            drifting,
+            db,
+            analysis.ticker_account_map,
+            composite_level,
+            strategy_override=strategy_override,
+            order_type_override=order_type_override,
+            account_id_override=account_id_override,
+        )
+
     if plan is None:
         return None
 
@@ -915,7 +941,7 @@ async def execute_due_buy_legs(db: AsyncSession, cache) -> int:
     processed = 0
     for leg_id in due_leg_ids:
         locked = await db.scalar(select(RebalancingPlanLeg).where(RebalancingPlanLeg.id == leg_id).with_for_update())
-        if locked is None or locked.status != "PENDING":
+        if locked is None or locked.status != "PENDING" or locked.token_consumed_at is not None:
             continue
 
         market_open = is_korean_market_open() if locked.market == "KR" else is_us_market_open()

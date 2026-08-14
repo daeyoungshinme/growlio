@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Bell, Mail, TrendingUp, Activity } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "@/api/client";
-import { type SettingsData } from "@/api/settings";
+import { fetchSettings } from "@/api/settings";
 import { fetchAlertHistory, type AlertHistoryItem } from "@/api/alerts";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useCollapsible } from "@/hooks/useCollapsible";
@@ -19,6 +18,11 @@ import { StockPriceAlertSection } from "@/components/settings/StockPriceAlertSec
 import { MarketSignalAlertSection } from "@/components/settings/MarketSignalAlertSection";
 import { NotificationEmailSection } from "@/components/settings/NotificationEmailSection";
 import { SectionCard } from "@/components/settings/shared";
+import {
+  REPORT_ALERT_FIELDS,
+  INSTANT_ALERT_FIELDS,
+  countEnabled,
+} from "@/utils/notificationAlertGroups";
 import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { TOUCH_TARGET_MIN, TOUCH_TARGET_ROW } from "@/constants/uiSizes";
@@ -160,16 +164,16 @@ export default function NotificationSettingsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAlertTab]);
 
-  const reportAlertsEnabledCount = [
+  const reportAlertsEnabledCount = countEnabled([
     monthlyReportEnabled,
     yearEndTaxReminderEnabled,
     recommendationDriftAlertEnabled,
-  ].filter(Boolean).length;
-  const instantAlertsEnabledCount = [goalAlertsEnabled].filter(Boolean).length;
+  ]);
+  const instantAlertsEnabledCount = countEnabled([goalAlertsEnabled]);
 
   const { data: current } = useQuery({
     queryKey: QUERY_KEYS.settings,
-    queryFn: () => api.get<SettingsData>("/settings").then((r) => r.data),
+    queryFn: fetchSettings,
     staleTime: STALE_TIME.LONG,
   });
 
@@ -200,7 +204,7 @@ export default function NotificationSettingsPage() {
           title="정기 리포트·요약"
           isOpen={isReportAlertsOpen}
           onToggle={toggleReportAlertsOpen}
-          collapsedHint={`3개 중 ${reportAlertsEnabledCount}개 켜짐`}
+          collapsedHint={`${REPORT_ALERT_FIELDS.length}개 중 ${reportAlertsEnabledCount}개 켜짐`}
         >
           <div>
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">월간 리포트</p>
@@ -248,7 +252,7 @@ export default function NotificationSettingsPage() {
           title="즉시 알림"
           isOpen={isGoalAlertsOpen}
           onToggle={toggleGoalAlertsOpen}
-          collapsedHint={`1개 중 ${instantAlertsEnabledCount}개 켜짐`}
+          collapsedHint={`${INSTANT_ALERT_FIELDS.length}개 중 ${instantAlertsEnabledCount}개 켜짐`}
         >
           <div>
             <p className="text-sm text-gray-700 dark:text-gray-300 mb-1">목표 달성 알림</p>

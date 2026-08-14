@@ -50,7 +50,13 @@ class ExecutionPlanResult(BaseModel):
     """ "지금 테스트 실행" 결과 — AUTO와 동일하게 대기 플랜을 생성하고 이메일로 안내한다 (즉시 체결 아님)."""
 
     status: Literal[
-        "PLAN_GENERATED", "NO_DRIFT", "ALREADY_PENDING", "MARKET_BLOCKED", "TAX_BLOCKED", "DAILY_CAP_BLOCKED"
+        "PLAN_GENERATED",
+        "NO_DRIFT",
+        "ALREADY_PENDING",
+        "MARKET_BLOCKED",
+        "TAX_BLOCKED",
+        "DAILY_CAP_BLOCKED",
+        "GENERATION_IN_PROGRESS",
     ]
     message: str
     email_sent: bool = False

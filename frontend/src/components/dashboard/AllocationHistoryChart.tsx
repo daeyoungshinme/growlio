@@ -157,7 +157,7 @@ function AllocationHistoryChart({
         </button>
 
         {showDetail && (
-          <div className="mt-2 max-h-96 overflow-y-auto">
+          <div className="mt-2 max-h-96 overflow-y-auto overflow-x-auto">
             <table className="w-full">
               <thead className="sticky top-0 bg-white dark:bg-gray-900">
                 <tr className="border-b border-gray-100 dark:border-gray-700">

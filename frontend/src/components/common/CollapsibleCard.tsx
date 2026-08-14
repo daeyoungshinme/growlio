@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { ChevronDown } from "lucide-react";
+import { TOUCH_TARGET_ROW } from "@/constants/uiSizes";
 
 interface Props {
   icon: LucideIcon;
@@ -35,7 +36,7 @@ export default function CollapsibleCard({
       <div className="flex items-center justify-between">
         <button
           onClick={onToggle}
-          className="flex items-center gap-2 min-w-0"
+          className={`gap-2 min-w-0 ${TOUCH_TARGET_ROW}`}
           aria-expanded={isOpen}
         >
           <div className={`p-1.5 rounded-lg shrink-0 ${iconWrapClassName}`}>

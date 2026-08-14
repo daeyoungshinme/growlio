@@ -200,7 +200,8 @@ export interface ExecutionPlanResult {
     | "ALREADY_PENDING"
     | "MARKET_BLOCKED"
     | "TAX_BLOCKED"
-    | "DAILY_CAP_BLOCKED";
+    | "DAILY_CAP_BLOCKED"
+    | "GENERATION_IN_PROGRESS";
   message: string;
   email_sent: boolean;
   plan_id: string | null;

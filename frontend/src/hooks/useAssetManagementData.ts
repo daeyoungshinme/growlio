@@ -11,7 +11,11 @@ type Tab = (typeof ASSET_MANAGEMENT_TABS)[number];
 export function useAssetManagementData(tab: Tab) {
   const isStockTab = tab === "증권계좌";
 
-  const { data: accounts = [], isLoading } = useQuery({
+  const {
+    data: accounts = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: QUERY_KEYS.accounts,
     queryFn: fetchAccounts,
   });
@@ -29,5 +33,5 @@ export function useAssetManagementData(tab: Tab) {
 
   const usdRate = useExchangeRate();
 
-  return { accounts: accounts as AssetAccount[], isLoading, overview, allTx, usdRate };
+  return { accounts: accounts as AssetAccount[], isLoading, error, overview, allTx, usdRate };
 }

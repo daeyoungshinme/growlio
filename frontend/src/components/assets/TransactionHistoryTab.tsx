@@ -8,6 +8,7 @@ import { fetchTransactions, deleteTransaction, type Transaction } from "@/api/tr
 import { TransactionForm } from "./TransactionForm";
 import DepositReflectPrompt from "./DepositReflectPrompt";
 import { fmtKrw } from "@/utils/format";
+import { QUERY_KEYS } from "@/constants/queryKeys";
 import { invalidateAccountData, invalidateTransactionData } from "@/utils/queryInvalidation";
 import { toast } from "@/utils/toast";
 import { STOCK_TYPES } from "@/constants";
@@ -38,7 +39,7 @@ export default function TransactionHistoryTab({ accounts }: Props) {
   } | null>(null);
 
   const { data: txList = [], isLoading } = useQuery<Transaction[]>({
-    queryKey: ["transactions", "all", selectedYear],
+    queryKey: QUERY_KEYS.allTransactions(selectedYear),
     queryFn: () => fetchTransactions({ year: selectedYear }),
   });
 

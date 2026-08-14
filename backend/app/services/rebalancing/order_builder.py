@@ -91,17 +91,20 @@ async def refresh_live_prices(
     db: AsyncSession,
     cache: Any = None,
 ) -> None:
-    """드리프트 항목의 `current_price_krw`를 실시간 시세로 갱신한다 (in-place).
+    """드리프트 항목의 `current_price_krw`/`shares_to_trade`/`diff_krw`를 실시간 시세 기준으로 갱신한다 (in-place).
 
-    `analyze_rebalancing()`이 채운 `current_price_krw`는 계좌 동기화 시점의 DB 스냅샷 값이라
-    자동실행·원클릭실행 시점에는 이미 낡았을 수 있다. 수동 실행 모달(`/stocks/prices-batch`)과
-    동일하게 `price_service.fetch_prices_batch()`로 실시간 시세를 조회해 지정가 산정에 반영한다.
+    `analyze_rebalancing()`이 채운 값은 계좌 동기화 시점의 DB 스냅샷 기준이라 자동실행·원클릭실행
+    시점에는 이미 낡았을 수 있다. 수동 실행 모달(`/stocks/prices-batch`)과 동일하게
+    `price_service.fetch_prices_batch_krw()`로 실시간 시세를 조회해 지정가뿐 아니라 거래수량·거래금액도
+    항상 같은 공식(`floor(target_value / price) - current_qty`, `target_value - current_qty * price`)으로
+    다시 계산한다.
+
+    `plan_service.build_pending_plan_for_alert()`가 세금영향/하루합산한도 게이트 판정 **이전에**
+    이 함수를 호출하도록 순서가 잡혀 있다 — 게이트(하루합산한도는 `diff_krw` 합산, 세금영향은
+    `shares_to_trade` 기반)가 스냅샷 시점 금액으로 판정하고 실제 체결은 라이브 가격/수량으로
+    나가는 불일치를 막기 위함(과거엔 가격만 갱신하고 이미 계산된 `shares_to_trade`/`diff_krw`는
+    건드리지 않아, 지정가는 라이브인데 수량·게이트 판정금액은 스냅샷 시점 그대로인 문제가 있었다).
     조회 실패 종목은 기존 값을 그대로 둔다(폴백).
-
-    `analyze_rebalancing()`은 분석 시점에 유효 가격을 못 구하면(보유수량 0 + 캐시된 가격도 없음)
-    `shares_to_trade`를 None으로 남긴다 — 이 경우 여기서 실시간 가격을 새로 확보하면 동일한 공식으로
-    `shares_to_trade`도 함께 재계산한다. 그러지 않으면 `build_rebalancing_orders()`가 이 항목을
-    "거래수량 없음"으로 영구히 스킵해 실제로는 존재하는 드리프트가 조용히 누락된다.
     """
     from app.services.price_service import fetch_prices_batch_krw
 
@@ -119,9 +122,11 @@ async def refresh_live_prices(
         price = price_map.get(item.ticker)
         if price and price > 0:
             item.current_price_krw = float(price)
-            if item.shares_to_trade is None and item.ticker not in _NON_TRADABLE_TICKERS:
+            if item.ticker not in _NON_TRADABLE_TICKERS:
+                current_qty = item.current_qty or 0
                 target_qty = math.floor(item.target_value_krw / price)
-                item.shares_to_trade = target_qty - (item.current_qty or 0)
+                item.shares_to_trade = target_qty - current_qty
+                item.diff_krw = item.target_value_krw - current_qty * price
 
 
 def clamp_orders_to_max_value(orders: list[Any], max_order_value_krw: float) -> list[Any]:

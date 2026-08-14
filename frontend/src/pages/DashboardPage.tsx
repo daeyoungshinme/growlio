@@ -118,6 +118,7 @@ export default function DashboardPage() {
     dataUpdatedAt,
     overview,
     dcaData,
+    dcaLoading,
     accounts,
     accountsLoading,
     exchangeRate,
@@ -199,7 +200,7 @@ export default function DashboardPage() {
 
         {/* 투자 목표 달성 현황 */}
         <ErrorBoundary variant="section">
-          <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading} />
+          <InvestmentGoalCard data={data} dcaData={dcaData} isLoading={isLoading || dcaLoading} />
         </ErrorBoundary>
 
         {/* 주식 투자 현황 (투자기간별 자산현황·배당·세금 한도 요약 포함) */}

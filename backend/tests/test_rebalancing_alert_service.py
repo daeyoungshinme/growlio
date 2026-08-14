@@ -1074,6 +1074,10 @@ def _make_drift_item(ticker="005930", diff_krw=-100000.0, shares_to_trade=-5.0, 
         "diff_krw": diff_krw,
         "shares_to_trade": shares_to_trade,
         "current_price_krw": 70000.0,
+        # refresh_live_prices()가 라이브 가격 확보 시 항상 shares_to_trade를 재계산하므로,
+        # 이 필드들을 참조하는 테스트가 아니어도 AttributeError 없이 돌아가도록 기본값을 둔다.
+        "target_value_krw": 1_000_000.0,
+        "current_qty": 0.0,
     }
     defaults.update(kwargs)
     return SimpleNamespace(**defaults)
@@ -1548,9 +1552,11 @@ class TestRefreshLivePrices:
         assert item.shares_to_trade is None
 
     @pytest.mark.asyncio
-    async def test_does_not_touch_already_computed_shares_to_trade(self, mock_db):
-        """이미 shares_to_trade가 계산돼 있던 항목은 실시간 가격 갱신 후에도 재계산하지 않는다
-        (기존 동작 회귀 방지 — 재계산 범위는 '분석 시점에 None이었던 경우'로 한정)."""
+    async def test_recomputes_already_computed_shares_to_trade_from_live_price(self, mock_db):
+        """이미 shares_to_trade가 계산돼 있던 항목도 실시간 가격 갱신 시 항상 재계산한다.
+
+        게이트 판정(세금영향·하루합산한도)이 이 함수 호출 직후 값을 그대로 쓰므로, 스냅샷 시점
+        가격으로 계산된 수량을 남겨두면 지정가(라이브)와 체결수량(스냅샷)의 기준이 어긋난다."""
         from app.services.rebalancing.order_builder import refresh_live_prices
 
         item = _make_drift_item(
@@ -1567,7 +1573,8 @@ class TestRefreshLivePrices:
         ):
             await refresh_live_prices([item], uuid.uuid4(), mock_db, MagicMock())
 
-        assert item.shares_to_trade == -5.0
+        assert item.shares_to_trade == 3  # floor(1,000,000 / 71,500) - 10
+        assert item.diff_krw == pytest.approx(285_000.0)  # 1,000,000 - 10 * 71,500 — 하루한도 게이트가 참조
 
     @pytest.mark.asyncio
     async def test_overseas_ticker_price_converted_to_krw(self, mock_db):

@@ -418,10 +418,12 @@ def compute_base_value_krw(portfolio: Portfolio, overview: dict) -> float:
     real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
     if portfolio.base_type == "TOTAL_ASSETS":
         return total_assets - real_estate_krw
-    # STOCK_ONLY: 예수금을 항상 기준 자산에 포함
+    # STOCK_ONLY: 예수금을 항상 기준 자산에 포함. 예수금이 마이너스(미수/미결제 등)일 때 이 컴포넌트만
+    # 미리 0으로 클램프하면 실제 부족분이 사라져 base_krw(→ target_value_krw)가 부풀려진다 —
+    # 합계를 낸 뒤 전체 결과에만 0 하한을 적용한다.
     total_stock = float(overview.get("total_stock_krw", 0))
-    available_cash = max(0.0, total_assets - total_stock - real_estate_krw)
-    return total_stock + available_cash
+    available_cash = total_assets - total_stock - real_estate_krw
+    return max(0.0, total_stock + available_cash)
 
 
 def analyze_rebalancing(
@@ -450,13 +452,12 @@ def analyze_rebalancing(
     ticker_account_map = _build_ticker_account_map(overview)
     _total_deposit = float(overview.get("total_deposit_krw") or 0)
     _real_estate_krw = 0.0 if _has_real_estate_item(portfolio) else _real_estate_value_krw(overview)
+    # 표시용 필드라 0으로 클램프하지 않는다 — 미수/미결제 등으로 실제 마이너스 예수금이면 그대로
+    # 노출해야 사용자가 부족분을 인지할 수 있다(목표비중 계산용 base_krw의 0 하한과는 별개).
     available_cash_krw = (
         _total_deposit
         if _total_deposit > 0
-        else max(
-            0.0,
-            float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)) - _real_estate_krw,
-        )
+        else float(overview.get("total_assets_krw", 0)) - float(overview.get("total_stock_krw", 0)) - _real_estate_krw
     )
 
     return RebalancingAnalysis(

@@ -30,6 +30,7 @@ from app.services.rebalancing.execution_service import execute_rebalancing
 from app.services.rebalancing.order_builder import is_market_signal_blocking_auto_mode
 from app.services.rebalancing.plan_service import (
     DailyValueCapBlocked,
+    PlanGenerationInProgress,
     TaxGateBlocked,
     build_pending_plan_for_alert,
     has_pending_plan_for_alert,
@@ -181,6 +182,11 @@ async def create_rebalancing_execution_plan(
             message=f"오늘 자동 실행된 금액(약 {generated.today_total_krw:,.0f}원)에 이번 계획 예상 금액"
             f"(약 {generated.attempted_value_krw:,.0f}원)을 더하면 설정하신 하루 합산 상한"
             f"({generated.cap_krw:,.0f}원)을 초과해 실행이 보류됩니다.",
+        )
+    if isinstance(generated, PlanGenerationInProgress):
+        return ExecutionPlanResult(
+            status="GENERATION_IN_PROGRESS",
+            message="다른 요청이 이미 처리 중입니다. 잠시 후 다시 시도해주세요.",
         )
     if generated is None:
         return ExecutionPlanResult(

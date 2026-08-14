@@ -248,7 +248,7 @@ describe("SettingsPage", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "저장" }));
     await waitFor(() => {
-      expect(toast).toHaveBeenCalledWith("저장에 실패했습니다", "error");
+      expect(toast).toHaveBeenCalledWith("server error", "error");
     });
   });
 
@@ -272,6 +272,20 @@ describe("SettingsPage", () => {
       expect(api.delete).toHaveBeenCalledWith("/settings/dart");
     });
     expect(toast).toHaveBeenCalledWith("DART API 키가 삭제되었습니다", "success");
+  });
+
+  it("DART 삭제 실패 시 에러 토스트를 표시하고 버튼이 다시 활성화된다", async () => {
+    vi.mocked(api.get).mockResolvedValue({ data: { ...mockSettings, has_dart: true } });
+    vi.mocked(api.delete).mockRejectedValue(new Error("server error"));
+    renderSettings();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "삭제" })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "삭제" }));
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith("server error", "error");
+    });
+    expect(screen.getByRole("button", { name: "삭제" })).not.toBeDisabled();
   });
 
   it("회원 탈퇴 버튼을 클릭하면 모달이 열리고 닫기 버튼으로 닫힌다", async () => {

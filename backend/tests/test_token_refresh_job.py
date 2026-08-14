@@ -54,7 +54,7 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.token_refresh.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.token_refresh.decrypt_kis_credentials", return_value=("decrypted", "decrypted")),
-            patch("app.jobs.token_refresh._fetch_and_store_token", new_callable=AsyncMock) as mock_token,
+            patch("app.jobs.token_refresh.get_access_token", new_callable=AsyncMock) as mock_token,
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
 
@@ -81,7 +81,7 @@ class TestRefreshAllUserTokens:
             patch("app.jobs.token_refresh.AsyncSessionLocal", return_value=mock_session),
             patch("app.jobs.token_refresh.get_cache_store", new_callable=AsyncMock, return_value=AsyncMock()),
             patch("app.jobs.token_refresh.decrypt_kis_credentials", return_value=("decrypted", "decrypted")),
-            patch("app.jobs.token_refresh._fetch_and_store_token", side_effect=fail_token),
+            patch("app.jobs.token_refresh.get_access_token", side_effect=fail_token),
         ):
             from app.jobs.token_refresh import refresh_all_user_tokens
 
