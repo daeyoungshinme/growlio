@@ -115,7 +115,7 @@ class TestExecuteKiwoomSingleOrder:
     @pytest.mark.asyncio
     async def test_skips_zero_quantity(self, override_settings):
         from app.services.rebalancing import _kiwoom_order_executor
-        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_single_order
 
         order = _make_order(quantity=0)
         with patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock()):
@@ -126,7 +126,7 @@ class TestExecuteKiwoomSingleOrder:
     @pytest.mark.asyncio
     async def test_overseas_market_executes_via_place_overseas_order(self, override_settings):
         from app.services.rebalancing import _kiwoom_order_executor
-        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_single_order
 
         order = _make_order(ticker="AAPL", market="NASDAQ", quantity=5)
         with patch.object(
@@ -141,7 +141,7 @@ class TestExecuteKiwoomSingleOrder:
     @pytest.mark.asyncio
     async def test_returns_success_on_successful_order(self, override_settings):
         from app.services.rebalancing import _kiwoom_order_executor
-        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
         with patch.object(
@@ -155,7 +155,7 @@ class TestExecuteKiwoomSingleOrder:
     @pytest.mark.asyncio
     async def test_returns_failed_on_exception(self, override_settings):
         from app.services.rebalancing import _kiwoom_order_executor
-        from app.services.rebalancing.execution_service import _execute_kiwoom_single_order
+        from app.services.rebalancing._kiwoom_order_executor import _execute_kiwoom_single_order
 
         order = _make_order(quantity=10)
         with patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(side_effect=Exception("API 오류"))):
@@ -378,6 +378,12 @@ class TestExecuteRebalancing:
                 for order in sells
             ]
 
+        async def mock_execute_buys_with_cash_check(buys, app_key, app_secret, access_token, account_no, is_mock):
+            return [
+                await mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock)
+                for order in buys
+            ]
+
         mock_db.scalar = AsyncMock(return_value=account)
         mock_db.flush = AsyncMock()
         mock_db.commit = AsyncMock()
@@ -393,10 +399,13 @@ class TestExecuteRebalancing:
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
             patch(
                 "app.services.rebalancing.execution_service._execute_sells_with_clamp",
                 side_effect=mock_execute_sells_with_clamp,
+            ),
+            patch(
+                "app.services.rebalancing.execution_service._execute_buys_with_cash_check",
+                side_effect=mock_execute_buys_with_cash_check,
             ),
         ):
             await execute_rebalancing(user_id, account.id, [buy_order, sell_order], mock_db, mock_cache)
@@ -420,20 +429,25 @@ class TestExecuteRebalancing:
 
         call_count = 0
 
-        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+        async def mock_execute_buys_with_cash_check(buys, app_key, app_secret, access_token, account_no, is_mock):
             nonlocal call_count
-            call_count += 1
-            # _execute_single_order는 내부에서 예외를 잡아 FAILED를 반환함
-            status = "FAILED" if order.ticker == "A" else "SUCCESS"
-            return OrderResult(
-                ticker=order.ticker,
-                name=order.name,
-                market=order.market,
-                side=order.side,
-                quantity=order.quantity,
-                status=status,
-                error_msg="API 오류" if status == "FAILED" else None,
-            )
+            results = []
+            for order in buys:
+                call_count += 1
+                # _execute_single_order는 내부에서 예외를 잡아 FAILED를 반환함
+                status = "FAILED" if order.ticker == "A" else "SUCCESS"
+                results.append(
+                    OrderResult(
+                        ticker=order.ticker,
+                        name=order.name,
+                        market=order.market,
+                        side=order.side,
+                        quantity=order.quantity,
+                        status=status,
+                        error_msg="API 오류" if status == "FAILED" else None,
+                    )
+                )
+            return results
 
         mock_db.scalar = AsyncMock(return_value=account)
         mock_db.flush = AsyncMock()
@@ -450,7 +464,10 @@ class TestExecuteRebalancing:
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch(
+                "app.services.rebalancing.execution_service._execute_buys_with_cash_check",
+                side_effect=mock_execute_buys_with_cash_check,
+            ),
         ):
             results, _execution_id = await execute_rebalancing(user_id, account.id, orders, mock_db, mock_cache)
 
@@ -473,15 +490,18 @@ class TestExecuteRebalancing:
         valid_order = _make_order(ticker="A", side="BUY", account_id=str(valid_account.id))
         broken_order = _make_order(ticker="B", side="BUY", account_id=str(missing_account_id))
 
-        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
-            return OrderResult(
-                ticker=order.ticker,
-                name=order.name,
-                market=order.market,
-                side=order.side,
-                quantity=order.quantity,
-                status="SUCCESS",
-            )
+        async def mock_execute_buys_with_cash_check(buys, app_key, app_secret, access_token, account_no, is_mock):
+            return [
+                OrderResult(
+                    ticker=order.ticker,
+                    name=order.name,
+                    market=order.market,
+                    side=order.side,
+                    quantity=order.quantity,
+                    status="SUCCESS",
+                )
+                for order in buys
+            ]
 
         mock_db.scalar = AsyncMock(side_effect=[valid_account, None])
         mock_db.flush = AsyncMock()
@@ -498,7 +518,10 @@ class TestExecuteRebalancing:
                 new_callable=AsyncMock,
                 return_value="token",
             ),
-            patch("app.services.rebalancing.execution_service._execute_single_order", side_effect=mock_execute_single),
+            patch(
+                "app.services.rebalancing.execution_service._execute_buys_with_cash_check",
+                side_effect=mock_execute_buys_with_cash_check,
+            ),
         ):
             results, _execution_id = await execute_rebalancing(
                 user_id, None, [valid_order, broken_order], mock_db, mock_cache

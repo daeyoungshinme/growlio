@@ -58,6 +58,7 @@ async def kiwoom_request(
     json: dict[str, Any] | None = None,
     retries: int | None = None,
     quiet: bool = False,
+    retry_on_request_error: bool = True,
 ) -> dict[str, Any]:
     """키움 OpenAPI+ 기본 HTTP 클라이언트.
 
@@ -79,4 +80,5 @@ async def kiwoom_request(
         check_token_expired=_check_kiwoom_token_expired,
         check_api_error=lambda data, path: _check_kiwoom_api_error(data, path, quiet=quiet),
         token_expired_exc=KiwoomTokenExpiredError,
+        retry_on_request_error=retry_on_request_error,
     )

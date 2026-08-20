@@ -150,6 +150,60 @@ class TestBrokerRequest:
             )
 
     @pytest.mark.asyncio
+    async def test_request_error_retries_by_default(self, override_settings):
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(side_effect=httpx.ConnectTimeout("timed out"))
+
+        with (
+            patch("app.providers.http_client._get_client", return_value=mock_client),
+            patch("asyncio.sleep", AsyncMock()) as mock_sleep,
+            pytest.raises(RuntimeError),
+        ):
+            await broker_request(
+                "POST",
+                "/test",
+                base_url="https://api.example.com",
+                headers={},
+                retries=3,
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: False,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=RuntimeError,
+            )
+        # retries=3 → 마지막 시도 전 2번 sleep(1) 호출
+        assert mock_client.request.call_count == 3
+        assert mock_sleep.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_request_error_no_retry_when_disabled(self, override_settings):
+        """주문 접수처럼 뮤테이션 호출은 응답 유실 시 즉시 실패해야 중복 주문을 막는다."""
+        mock_client = AsyncMock()
+        mock_client.request = AsyncMock(side_effect=httpx.ConnectTimeout("timed out"))
+
+        with (
+            patch("app.providers.http_client._get_client", return_value=mock_client),
+            patch("asyncio.sleep", AsyncMock()) as mock_sleep,
+            pytest.raises(RuntimeError),
+        ):
+            await broker_request(
+                "POST",
+                "/test",
+                base_url="https://api.example.com",
+                headers={},
+                retries=3,
+                semaphore=self._make_semaphore(),
+                log_prefix="test",
+                check_token_expired=lambda data, status: False,
+                check_api_error=lambda data, path: None,
+                token_expired_exc=RuntimeError,
+                retry_on_request_error=False,
+            )
+        # 재시도 없이 첫 시도 실패 즉시 예외 전파
+        assert mock_client.request.call_count == 1
+        mock_sleep.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_raises_token_expired(self, override_settings):
         class MyTokenExpiredError(Exception):
             pass

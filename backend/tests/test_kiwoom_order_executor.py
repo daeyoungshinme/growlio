@@ -219,3 +219,85 @@ class TestExecuteKiwoomSellsWithClamp:
         assert len(results) == 1
         assert results[0].quantity == 10
         assert results[0].status == "SUCCESS"
+
+
+class TestExecuteKiwoomBuysWithCashCheck:
+    """FULL 전략 매수 실행 — 실행 직전 국내 예수금으로 clamp(_execute_kiwoom_buys_with_cash_check)."""
+
+    @pytest.mark.asyncio
+    async def test_clamps_buy_quantity_to_deposit(self, override_settings):
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
+
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_domestic_balance",
+                AsyncMock(return_value={"positions": [], "deposit_krw": 4500.0}),
+            ),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [buy_order], "token", "1234567890", True
+            )
+
+        assert len(results) == 1
+        assert results[0].quantity == 4  # 4500 // 1000
+        assert results[0].status == "SUCCESS"
+
+    @pytest.mark.asyncio
+    async def test_zero_deposit_skips_buy_without_calling_broker(self, override_settings):
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
+
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_domestic_balance",
+                AsyncMock(return_value={"positions": [], "deposit_krw": 0.0}),
+            ),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock()) as place_fn,
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [buy_order], "token", "1234567890", True
+            )
+
+        place_fn.assert_not_called()
+        assert results[0].status == "SKIPPED"
+
+    @pytest.mark.asyncio
+    async def test_overseas_buy_skips_clamp_entirely(self, override_settings):
+        buy_order = _make_order(ticker="AAPL", market="NASDAQ", side="BUY", quantity=5)
+
+        with (
+            patch.object(_kiwoom_order_executor, "kiwoom_get_domestic_balance", AsyncMock()) as balance_fn,
+            patch.object(_kiwoom_order_executor, "place_overseas_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [buy_order], "token", "1234567890", True
+            )
+
+        balance_fn.assert_not_called()
+        assert results[0].quantity == 5
+
+    @pytest.mark.asyncio
+    async def test_deposit_lookup_failure_falls_back_to_unclamped_execution(self, override_settings):
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, order_type="LIMIT", limit_price=1000.0)
+
+        with (
+            patch.object(
+                _kiwoom_order_executor,
+                "kiwoom_get_domestic_balance",
+                AsyncMock(side_effect=RuntimeError("network")),
+            ),
+            patch.object(_kiwoom_order_executor, "place_domestic_order", AsyncMock(return_value={"order_no": "1"})),
+        ):
+            results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check(
+                [buy_order], "token", "1234567890", True
+            )
+
+        assert results[0].quantity == 10
+        assert results[0].status == "SUCCESS"
+
+    @pytest.mark.asyncio
+    async def test_empty_buys_returns_empty(self):
+        results = await _kiwoom_order_executor._execute_kiwoom_buys_with_cash_check([], "token", "1234567890", True)
+        assert results == []

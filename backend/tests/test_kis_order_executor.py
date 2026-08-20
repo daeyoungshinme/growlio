@@ -13,8 +13,17 @@ def _make_order(
     market: str = "KOSPI",
     side: str = "SELL",
     quantity: int = 10,
+    limit_price: float | None = None,
 ) -> ExecutionOrderItem:
-    return ExecutionOrderItem(ticker=ticker, name="삼성전자", market=market, side=side, quantity=quantity)
+    return ExecutionOrderItem(
+        ticker=ticker,
+        name="삼성전자",
+        market=market,
+        side=side,
+        quantity=quantity,
+        order_type="LIMIT" if limit_price else "MARKET",
+        limit_price=limit_price,
+    )
 
 
 class TestExecuteSingleOrderPrice:
@@ -131,3 +140,111 @@ class TestExecuteTwoPhaseOrdersSellClamp:
 
         assert captured_quantity == 2
         assert len(results) == 2
+
+
+class TestExecuteBuysWithCashCheck:
+    """FULL 전략 매수 실행 — 실행 직전 주문가능금액으로 clamp(_execute_buys_with_cash_check)."""
+
+    @pytest.mark.asyncio
+    async def test_clamps_buy_quantity_to_orderable_cash(self, override_settings):
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, limit_price=1000.0)
+
+        captured_quantity: int | None = None
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            nonlocal captured_quantity
+            captured_quantity = order.quantity
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock(return_value=4500.0)),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_buys_with_cash_check(
+                [buy_order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert captured_quantity == 4  # 4500 // 1000
+        assert len(results) == 1
+
+    @pytest.mark.asyncio
+    async def test_zero_cash_skips_buy_without_calling_broker(self, override_settings):
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, limit_price=1000.0)
+
+        with (
+            patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock(return_value=0.0)),
+            patch.object(_kis_order_executor, "_execute_single_order", AsyncMock()) as mock_execute,
+        ):
+            results = await _kis_order_executor._execute_buys_with_cash_check(
+                [buy_order], "key", "secret", "token", "12345678-01", True
+            )
+
+        mock_execute.assert_not_called()
+        assert len(results) == 1
+        assert results[0].status == "SKIPPED"
+
+    @pytest.mark.asyncio
+    async def test_overseas_buy_skips_clamp_entirely(self, override_settings):
+        """해외 종목이 섞이면 get_orderable_cash()가 국내 전용이라 clamp 없이 원래 수량으로 실행한다."""
+        buy_order = _make_order(ticker="AAPL", market="NASDAQ", side="BUY", quantity=5)
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock()) as mock_cash,
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_buys_with_cash_check(
+                [buy_order], "key", "secret", "token", "12345678-01", True
+            )
+
+        mock_cash.assert_not_called()
+        assert results[0].quantity == 5
+
+    @pytest.mark.asyncio
+    async def test_cash_lookup_failure_falls_back_to_unclamped_execution(self, override_settings):
+        """기존 매도 clamp 폴백 정책과 동일 — 조회 실패 시 clamp 없이 원래 수량으로 시도."""
+        buy_order = _make_order(ticker="005930", side="BUY", quantity=10, limit_price=1000.0)
+
+        async def mock_execute_single(order, app_key, app_secret, access_token, account_no, is_mock):
+            return OrderResult(
+                ticker=order.ticker,
+                name=order.name,
+                market=order.market,
+                side=order.side,
+                quantity=order.quantity,
+                status="SUCCESS",
+            )
+
+        with (
+            patch.object(_kis_order_executor, "get_orderable_cash", AsyncMock(side_effect=Exception("timeout"))),
+            patch.object(_kis_order_executor, "_execute_single_order", side_effect=mock_execute_single),
+        ):
+            results = await _kis_order_executor._execute_buys_with_cash_check(
+                [buy_order], "key", "secret", "token", "12345678-01", True
+            )
+
+        assert results[0].quantity == 10
+        assert results[0].status == "SUCCESS"
+
+    @pytest.mark.asyncio
+    async def test_empty_buys_returns_empty(self, override_settings):
+        results = await _kis_order_executor._execute_buys_with_cash_check(
+            [], "key", "secret", "token", "12345678-01", True
+        )
+        assert results == []

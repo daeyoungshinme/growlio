@@ -78,10 +78,10 @@ export function useSwipeNavigation(containerRef: React.RefObject<HTMLElement | n
 
       if (deltaX < 0 && currentIndex < NAV_ORDER.length - 1) {
         void triggerHaptic("light");
-        navigate(NAV_ORDER[currentIndex + 1]);
+        void navigate(NAV_ORDER[currentIndex + 1]);
       } else if (deltaX > 0 && currentIndex > 0) {
         void triggerHaptic("light");
-        navigate(NAV_ORDER[currentIndex - 1]);
+        void navigate(NAV_ORDER[currentIndex - 1]);
       }
     },
     [pathname, navigate],

@@ -51,6 +51,7 @@ async def kis_request(
     params: dict[str, str] | None = None,
     json: dict[str, Any] | None = None,
     retries: int = 5,
+    retry_on_request_error: bool = True,
 ) -> dict[str, Any]:
     """KIS OpenAPI 기본 HTTP 클라이언트 — 속도제한 + 재시도 포함."""
     await _rate_limiter.acquire()  # broker_request 밖에서 호출 — 세마포어 취득 전 간격 보장
@@ -71,6 +72,7 @@ async def kis_request(
                 check_token_expired=_check_kis_token_expired,
                 check_api_error=_check_kis_api_error,
                 token_expired_exc=KisTokenExpiredError,
+                retry_on_request_error=retry_on_request_error,
             )
         except KisApiError as e:
             if e.rt_cd not in _TRANSIENT_RT_CD or attempt >= 1:

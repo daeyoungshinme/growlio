@@ -124,7 +124,7 @@ export function usePushNotifications() {
         (action) => {
           if (cancelled) return;
           const path = resolvePushDeepLink(action.notification.data);
-          if (path) navigate(path);
+          if (path) void navigate(path);
         },
       );
 

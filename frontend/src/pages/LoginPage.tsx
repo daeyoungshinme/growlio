@@ -43,7 +43,7 @@ export default function LoginPage() {
         queryKey: QUERY_KEYS.exchangeRate,
         queryFn: fetchExchangeRate,
       });
-      navigate("/dashboard");
+      void navigate("/dashboard");
     } catch {
       setError("이메일 또는 비밀번호가 올바르지 않습니다");
     } finally {

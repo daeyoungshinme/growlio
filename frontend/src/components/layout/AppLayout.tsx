@@ -59,7 +59,7 @@ export default function AppLayout() {
         return;
       }
       if (canGoBack) {
-        navigate(-1);
+        void navigate(-1);
       } else {
         void App.exitApp();
       }

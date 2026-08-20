@@ -169,12 +169,15 @@ services/
   │   ├── alert_check.py      # 리밸런싱 드리프트 알림 체크(SCHEDULE/DRIFT/BOTH, 10분 간격 job의 메인 루프) — 구 rebalancing_alert_service.py에서 책임별로 3분할된 것 중 하나. 시장신호 게이팅은 alerts/market_signal_alert_service.py의 `check_composite_signal`을 재사용. 복합신호 알림 on/off는 포트폴리오 단위가 아닌 **유저 단위** 설정(마이그레이션 `cs2_composite_signal_user_level`). AUTO 모드 알림이 시장신호 게이트로 이번만 NOTIFY로 강등되면 그 사유를 `automation_note`로 이메일 본문·발송 이력에 노출
   │   ├── alert_scope.py      # 리밸런싱 알림 alert_scope(AGGREGATE↔PER_ACCOUNT) 전환 (구 rebalancing_alert_service.py에서 분리)
   │   ├── alert_test.py       # 리밸런싱 알림 즉시 테스트 발송 (구 rebalancing_alert_service.py에서 분리)
-  │   ├── plan_service.py     # AUTO 리밸런싱 2단계 플랜(계획 생성 → 매수 대기/매도 승인 → 실행) 생명주기 관리 — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지 (구 rebalancing_plan_service.py). `build_pending_plan_for_alert()`가 세금영향·시장신호·하루 합산 거래한도(`UserSettings.auto_rebalancing_daily_value_cap_krw`, nullable=무제한, `sum_today_auto_plan_value_krw()`로 오늘 PENDING/EXECUTED leg 합산 판정) 게이트에 걸리면 각각 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel 반환(플랜 미생성) — 대응 `notify_*_blocked()`가 하루 1회(durable_state dedup, 재시작에도 유지) 이메일/푸시/이력으로 보류 사유 안내. `execute_due_buy_legs()`는 매수 leg 실행 직전 시장신호 게이트 재확인(차단 시 조용히 다음 1분 tick 재시도), leg 실행 자체가 예외 실패하면 `_notify_leg_execution_failed()`가 안내
+  │   ├── plan_service.py     # AUTO 리밸런싱 2단계 플랜 API 진입점 — `list_recent_plan_legs()` 1종만 남고 나머지는 아래 3개 서브모듈로 분리됨(2026-08-20, 1025줄). 하위호환을 위해 3개 서브모듈의 전체 심볼을 이름으로 재노출하므로 `from ...plan_service import X` 호출부는 무변경 — 단, 서브모듈 간 내부 호출(예: `plan_execution._execute_leg`→`plan_notifications._notify_leg_execution_failed`)을 가로채는 테스트 patch는 `plan_service.X`가 아닌 실제 호출부 서브모듈 경로를 써야 함(구 rebalancing_plan_service.py)
+  │   ├── plan_generation.py  # AUTO 대기 플랜 생성 — 드리프트 분석→게이트 판정→BUY/SELL leg 생성(plan_service.py에서 분리). `build_pending_plan_for_alert()`가 세금영향·시장신호·하루 합산 거래한도(`UserSettings.auto_rebalancing_daily_value_cap_krw`, nullable=무제한, `sum_today_auto_plan_value_krw()`로 오늘 PENDING/EXECUTED leg 합산 판정) 게이트에 걸리면 각각 `TaxGateBlocked`/`MarketSignalGateBlocked`/`DailyValueCapBlocked` sentinel 반환(플랜 미생성)
+  │   ├── plan_execution.py   # AUTO 플랜 leg 잠금/실행/취소/만료(plan_service.py에서 분리) — 매수는 대기시간 경과 후 자동 실행(취소 가능), 매도는 이메일 승인 필요(당일 장마감 미응답 시 자동 만료). 토큰은 SHA-256 해시만 저장, `FOR UPDATE`로 중복 실행 방지. `execute_due_buy_legs()`는 매수 leg 실행 직전 시장신호 게이트 재확인(차단 시 조용히 다음 1분 tick 재시도), leg 실행 자체가 예외 실패하면 `plan_notifications._notify_leg_execution_failed()`가 안내
+  │   ├── plan_notifications.py # AUTO 플랜 관련 이메일/푸시/이력 알림(plan_service.py에서 분리) — 플랜 생성 안내(`notify_plan_generated`), 게이트 차단 보류 안내(`notify_*_blocked()`가 하루 1회 durable_state dedup, 재시작에도 유지), leg 실행 완료/실패 결과 안내
   │   ├── execution_service.py # 리밸런싱 주문 실행 조율 — 실제 주문은 _kis_order_executor.py/_kiwoom_order_executor.py로 분리 (구 rebalancing_execution_service.py)
-  │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE 리밸런싱 주문 실행 (execution_service.py에서 분리)
-  │   ├── _kiwoom_order_executor.py # Kiwoom 국내 단일 주문 실행 (execution_service.py에서 분리)
+  │   ├── _kis_order_executor.py  # KIS 단일/TWO_PHASE/FULL 리밸런싱 주문 실행 (execution_service.py에서 분리). FULL 전략 매수(`_execute_buys_with_cash_check`)도 TWO_PHASE와 동일하게 실행 직전 `get_orderable_cash()`로 예산 clamp — 같은 실행 묶음의 매도가 예상보다 적게 체결되거나 실패해도 매수가 실제 가용 현금을 초과하지 않도록 함(AUTO leg 실행도 이 경로 공유)
+  │   ├── _kiwoom_order_executor.py # Kiwoom 국내/해외 단일 주문 실행 + FULL 전략 매수 예산 clamp(`_execute_kiwoom_buys_with_cash_check`, KIS의 `get_orderable_cash()` 대응 API가 없어 `get_domestic_balance()`의 `deposit_krw`를 예산으로 사용) (execution_service.py에서 분리)
   │   ├── _order_executor_common.py # KIS/Kiwoom 주문 실행 결과 처리 공용 헬퍼 (양쪽 executor 공용)
-  │   ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp (양쪽 executor 공용)
+  │   ├── _order_quantity_guard.py # clamp_sell_orders() — 매도 수량을 실제 보유 수량으로 clamp / clamp_buy_orders_to_budget() — 매수 수량을 실행 직전 조회한 예산으로 clamp (양쪽 executor·FULL 전략 공용)
   │   ├── diagnosis_service.py # 진단 화면 표시용 시장상황/리스크/세금영향 코멘트 생성 — needs_rebalancing 알림 판정과는 완전히 분리된 설명 전용 로직, alert 아님 (구 rebalancing_diagnosis_service.py)
   │   ├── overview_enrichment.py # 목표 포트폴리오 중 미보유 종목의 배당수익률·현재가 보완(collect_dividend_map/enrich_overview_with_prices) — rebalancing.py analyze_portfolio 엔드포인트 전용, 헬퍼를 라우터에서 분리
   │   ├── broker_balance_service.py # KIS/키움 계좌 실시간 잔고 조회(fetch_broker_balance) — rebalancing.py broker-balance 엔드포인트 전용, 헬퍼를 라우터에서 분리
@@ -258,7 +261,7 @@ kis/                          # KIS OpenAPI 클라이언트 (auth, balance, clie
 kiwoom/                       # 키움증권 API 클라이언트 (auth, balance, client, order, constants). `client.py`는 KIS와 동일한 `AsyncRateLimiter`로 초당 `kiwoom_rate_per_second`(기본 4.0, 관측 유량 5/s 대비 20% 버퍼) 건 제한 — `providers/http_client.py`의 rate-limit 응답 감지도 키움 `return_code=5`(EGW00201과 동일 의미)에 대응
 providers/                    # 금융 데이터 provider
   ├── base.py                 # Provider 추상 베이스
-  ├── http_client.py          # 공통 HTTP 클라이언트
+  ├── http_client.py          # 공통 HTTP 클라이언트. `broker_request()`의 `retry_on_request_error`(기본 True)를 False로 넘기면 `httpx.RequestError`(타임아웃/커넥션 오류) 시 재시도 없이 즉시 실패 — KIS/키움 주문 접수(`kis/order.py`·`kiwoom/order.py`의 4개 `place_*_order`)만 False로 호출해, 응답 유실 시 이미 접수됐을 수 있는 주문을 맹목적으로 재시도해 중복 주문이 나가는 것을 막는다(KIS/키움 API는 클라이언트 지정 idempotency key 미지원). 조회성 호출(잔고·시세 등)은 기본값 유지
   ├── kis_provider.py         # KIS API provider
   ├── kiwoom_provider.py      # 키움증권 API provider
   ├── manual_provider.py      # 수동 입력 provider

@@ -95,6 +95,7 @@ async def broker_request(
     check_api_error: Callable[[dict[str, Any], str], None],
     token_expired_exc: type[Exception],
     post_request_delay: float = 0.05,
+    retry_on_request_error: bool = True,
 ) -> dict[str, Any]:
     """KIS/Kiwoom 공통 HTTP 요청 함수 — 속도제한(429) 지수 백오프 + 재시도 포함.
 
@@ -102,6 +103,11 @@ async def broker_request(
         check_token_expired: (data, status_code) → bool. 토큰 만료 여부 반환.
         check_api_error: (data, path) → None. API 오류 시 예외 발생.
         token_expired_exc: 토큰 만료 시 발생할 예외 클래스.
+        retry_on_request_error: httpx.RequestError(타임아웃/커넥션 오류) 발생 시 재시도 여부.
+            주문 접수처럼 서버가 요청을 실제로 처리했을 수 있는 뮤테이션 호출은 False로 넘겨
+            응답 유실 시 동일 payload를 맹목적으로 재시도해 중복 주문이 나가는 것을 막는다
+            (KIS/키움 API는 클라이언트 지정 idempotency key를 지원하지 않음). 조회성 호출은
+            재시도해도 안전하므로 기본값 True를 유지한다.
     """
     client = _get_client(ssl_verify)
     async with semaphore:
@@ -165,6 +171,10 @@ async def broker_request(
                 else:
                     raise
             except httpx.RequestError as e:
+                if not retry_on_request_error:
+                    raise RuntimeError(
+                        f"{log_prefix} API 요청 실패(재시도 비활성화 — 응답 유실 시 실제 처리 여부 불명): {e}"
+                    ) from e
                 if attempt < retries - 1:
                     await asyncio.sleep(1)
                 else:

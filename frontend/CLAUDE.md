@@ -222,7 +222,7 @@ api/client.ts (axios + JWT interceptor + 401 자동 refresh)
 
 **asset_type_allocation:** 백엔드는 모든 자산 유형을 반환. PortfolioPage에서 STOCK 타입만 프론트엔드 필터링으로 표시 — 포트폴리오 페이지는 주식 계좌 전용 뷰이므로 의도된 동작.
 
-**`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재.
+**`src/lib/supabase.ts`** — Supabase 클라이언트 초기화 (env vars 필요). 직접 확장 금지 — 인증 흐름은 백엔드 JWT가 담당하며 이 파일은 초기화 목적으로만 존재. `persistSession: true`로 세션 JWT가 localStorage(`sb-*-auth-token`)에 평문 저장되는 것은 알려진 사실 — httpOnly 쿠키 완전 전환은 Capacitor Android WebView의 크로스오리진 SameSite 제약으로 웹/모바일 이중 인증 아키텍처가 필요해 보류, 대신 CSP(`script-src 'self'`)와 로그아웃 시 `queryClient.clear()`+`PERSIST_CACHE_KEY` 삭제로 경계강화만 적용된 상태(결정기록: `docs/plans/28-localstorage-token-decision.md`).
 
 > **인증 구조:** Supabase는 이메일 인증·OAuth 콜백(리다이렉트 URL) 처리에만 사용됨. 실제 API 인증은 백엔드(`auth.py`)가 발급한 JWT Bearer 토큰 사용. `api/client.ts`의 Axios 인터셉터가 토큰 관리. Supabase Session과 백엔드 JWT는 별개이므로 혼용 금지.
 

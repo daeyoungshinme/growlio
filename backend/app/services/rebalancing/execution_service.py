@@ -15,13 +15,13 @@ from app.schemas.rebalancing import ExecutionOrderItem, ExecutionResult, OrderRe
 from app.services._account_queries import active_accounts_stmt
 from app.services.credential_service import decrypt_kis_credentials, decrypt_kiwoom_credentials
 from app.services.rebalancing._kis_order_executor import (
+    _execute_buys_with_cash_check,
     _execute_sells_with_clamp,
-    _execute_single_order,
     _execute_two_phase_orders,
 )
 from app.services.rebalancing._kiwoom_order_executor import (
+    _execute_kiwoom_buys_with_cash_check,
     _execute_kiwoom_sells_with_clamp,
-    _execute_kiwoom_single_order,
 )
 from app.utils.cache_keys import invalidate_rebalancing_analysis_cache, invalidate_rebalancing_strategy_cache
 from app.utils.metrics import rebalancing_execution_count
@@ -260,15 +260,14 @@ async def _execute_kiwoom_account_orders(
         account_no,
         is_mock,
     )
-    for order in buys:
-        account_results.append(
-            await _execute_kiwoom_single_order(
-                order,
-                access_token,
-                account_no,
-                is_mock,
-            )
+    account_results.extend(
+        await _execute_kiwoom_buys_with_cash_check(
+            buys,
+            access_token,
+            account_no,
+            is_mock,
         )
+    )
     return account_results
 
 
@@ -320,17 +319,16 @@ async def _execute_kis_account_orders(
         account_no,
         is_mock,
     )
-    for order in buys:
-        account_results.append(
-            await _execute_single_order(
-                order,
-                app_key,
-                app_secret,
-                access_token,
-                account_no,
-                is_mock,
-            )
+    account_results.extend(
+        await _execute_buys_with_cash_check(
+            buys,
+            app_key,
+            app_secret,
+            access_token,
+            account_no,
+            is_mock,
         )
+    )
     return account_results
 
 

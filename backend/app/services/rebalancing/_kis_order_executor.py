@@ -8,7 +8,7 @@ from app.kis.balance import get_domestic_balance, get_orderable_cash, get_overse
 from app.kis.order import is_overseas_market, place_domestic_order, place_overseas_order
 from app.schemas.rebalancing import ExecutionOrderItem, OrderResult
 from app.services.rebalancing._order_executor_common import execute_single_order
-from app.services.rebalancing._order_quantity_guard import clamp_sell_orders
+from app.services.rebalancing._order_quantity_guard import clamp_buy_orders_to_budget, clamp_sell_orders
 
 logger = structlog.get_logger()
 
@@ -107,6 +107,48 @@ async def _execute_sells_with_clamp(
         for order in adjusted_o:
             results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
 
+    return results
+
+
+async def _execute_buys_with_cash_check(
+    buys: list[ExecutionOrderItem],
+    app_key: str,
+    app_secret: str,
+    access_token: str,
+    account_no: str,
+    is_mock: bool,
+) -> list[OrderResult]:
+    """FULL 전략 매수 실행 — 매도 완료 후 실제 주문가능금액을 재조회해 예산 내로 clamp한다.
+
+    포트폴리오 합산 계획 수량을 그대로 밀어붙이면, 이번 리밸런싱의 매도 leg가 실패·부분체결·
+    (AUTO 2단계 플랜의 경우) 만료됐을 때 매수가 실제 가용 현금을 초과해 브로커에 거부당하거나
+    남은 주문이 줄줄이 실패로 떨어질 수 있다. TWO_PHASE 전략(Phase1/3)과 동일한 개념의 clamp를
+    여기서도 1회 적용한다(공용 헬퍼는 `clamp_buy_orders_to_budget`).
+
+    해외 주식 포함 시 `get_orderable_cash()`가 국내 전용이므로 clamp를 건너뛰고 원래 수량
+    그대로 실행한다(TWO_PHASE의 `has_overseas` 폴백과 동일 정책). 주문가능금액 조회 자체가
+    실패해도 마찬가지로 clamp 없이 원래 수량으로 시도한다(기존 동작 유지).
+    """
+    if not buys:
+        return []
+
+    if any(is_overseas_market(o.market) for o in buys):
+        return [
+            await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock) for order in buys
+        ]
+
+    try:
+        orderable_cash = await get_orderable_cash(app_key, app_secret, access_token, account_no, is_mock=is_mock)
+    except Exception as exc:
+        logger.warning("full_strategy_orderable_cash_failed", error=str(exc))
+        return [
+            await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock) for order in buys
+        ]
+
+    adjusted, skipped = clamp_buy_orders_to_budget(buys, orderable_cash)
+    results: list[OrderResult] = list(skipped)
+    for order in adjusted:
+        results.append(await _execute_single_order(order, app_key, app_secret, access_token, account_no, is_mock))
     return results
 
 

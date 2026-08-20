@@ -64,6 +64,7 @@ async def place_domestic_order(
         is_mock=is_mock,
         headers=headers,
         json=body,
+        retry_on_request_error=False,
     )
 
     if str(data.get("return_code", "0")) != "0":
@@ -118,6 +119,7 @@ async def place_overseas_order(
         is_mock=is_mock,
         headers=headers,
         json=body,
+        retry_on_request_error=False,
     )
 
     if str(data.get("return_code", "0")) != "0":

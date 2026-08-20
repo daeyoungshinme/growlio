@@ -41,7 +41,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password, displayName || undefined);
-      navigate("/dashboard");
+      void navigate("/dashboard");
     } catch (err: unknown) {
       const msg = (err as Error)?.message ?? "";
       if (
