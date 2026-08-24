@@ -78,7 +78,7 @@ growlio/
 ├── backend/          # FastAPI (Python 3.11+)
 ├── frontend/         # React 18 + Vite (TypeScript)
 │   └── android/      # Capacitor Android 프로젝트
-├── nginx/            # nginx 리버스 프록시 (프로덕션/Docker 전용 — 로컬 개발에서는 미사용; Vite dev server가 /api/* 프록시 처리)
+├── nginx/            # nginx 리버스 프록시 (자체 호스팅용 Docker Compose 배포 대안 경로 — 실제 운영은 Render+Vercel 사용, 로컬 개발에서도 미사용; Vite dev server가 /api/* 프록시 처리)
 ├── monitoring/       # Prometheus 설정(prometheus.yml) + Grafana 대시보드
 ├── .github/          # GitHub Actions (CI: lint/test/build, Android APK)
 ├── render.yaml       # Render 백엔드 배포 설정
@@ -96,8 +96,8 @@ growlio/
 
 ## 배포 & CI
 
-- `render.yaml` — 백엔드 Render 배포 설정. 프론트엔드는 별도 호스팅.
-- `nginx/` — 포트 80 리버스 프록시. `/api/*` → backend:8000, 그 외 → frontend 정적파일. 새 API prefix 추가 시 `nginx/nginx.conf`의 `location` 블록 수정 필요.
+- **실제 운영 배포**: 백엔드는 `render.yaml`(Render, Docker runtime) — 프론트엔드는 `frontend/vercel.json`(Vercel)이 실제 배포 경로. `vercel.json`이 `/api/*` → Render 백엔드로 rewrite하고, CSP를 포함한 보안 헤더도 여기서 설정됨(`nginx.conf`가 아님 — 과거 이 구분이 문서화돼 있지 않아 "nginx가 CSP를 처리한다"고 오인해 실제 배포에는 CSP가 미적용이던 사고가 있었음). 새 API prefix 추가 시 `frontend/vercel.json`의 `rewrites`도 함께 확인.
+- `nginx/` + `docker-compose.yml` — 위 Render/Vercel 조합을 쓰지 않고 자체 서버에 통째로 호스팅할 때를 위한 대안 구성(포트 80 리버스 프록시, `/api/*` → backend:8000, 그 외 → frontend 정적파일). 현재 운영에서는 사용하지 않음. 이 경로를 실제로 쓰게 되면 `nginx/nginx.conf`의 `location` 블록도 새 API prefix에 맞춰 수정 필요.
 - `monitoring/` — Prometheus 설정(`prometheus.yml`) + Grafana 대시보드. `docker compose --profile monitoring up -d` 로 실행 (Prometheus `:9090`, Grafana `:3000`).
 - `.github/` — 2개 워크플로우: `ci.yml` (lint/test/build, push·PR마다), `build-android.yml` (APK 빌드, tag push 또는 workflow_dispatch 수동 실행).
 
@@ -120,6 +120,7 @@ growlio/
 ## 자주 막히는 문제
 
 - `make up` 후 DB 연결 실패: PostgreSQL 준비 대기 필요 — `docker compose logs db` 로 상태 확인 후 재시도
+- `EMAXCONNSESSION`/`max clients reached` 오류: `backend/.env`의 `DATABASE_URL`이 로컬 Docker Postgres가 아니라 Supabase 풀러를 직접 가리키는 구성일 수 있음(개발자별로 다를 수 있으니 먼저 `.env` 확인) — 이 경우 Session Pooler(5432) 대신 Transaction Pooler(6543) 사용 권장, 상세는 `backend/CLAUDE.md` Environment 섹션 참고
 - `dev.sh`는 기본적으로 8000/5173 포트를 점유한 이전(좀비) 프로세스를 강제 종료 후 재기동함. 다른 세션에서 의도적으로 띄워둔 백엔드까지 종료되는 게 문제라면 `bash dev.sh --keep-port`(또는 `make dev-keep-port`) 사용 — 8000이 사용 중이면 종료하지 않고 다음 빈 포트로 대신 구동, 프론트엔드 Vite 프록시도 자동으로 그 포트를 따라감
 - alembic revision 생성 후 반드시 `alembic/env.py`에 새 모델 import 추가 (누락 시 autogenerate에서 모델 인식 못함)
 - pre-commit hook 실패: `make lint` 로 로컬 점검 후 커밋 — mypy 타입 오류가 가장 흔한 원인
