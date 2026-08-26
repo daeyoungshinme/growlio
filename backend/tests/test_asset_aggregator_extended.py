@@ -930,6 +930,54 @@ class TestBuildAssetTotals:
         assert result["cumulative_return_pct"] < result["stock_return_pct"]
 
     @pytest.mark.asyncio
+    async def test_dashboard_uninvested_stock_cash_does_not_inflate_return(self, mock_db, override_settings):
+        """주식 계좌에 매수하지 않은 예수금(CASH_STOCK)이 크게 쌓여 있어도 대응 원금 없는
+        가짜 이익으로 잡히면 안 된다 — 실사용자 버그(연환산 수익률이 1000%대로 폭주) 재현.
+
+        주식: 매입원가 1,000만원 → 평가액 1,200만원 (실제 이익 200만원)
+        예수금: 최근 입금해 아직 매수하지 않은 2,000만원 (by_type["CASH_STOCK"])
+        total_assets_krw = 1,200만(평가액) + 2,000만(예수금) = 3,200만원
+        base = total_invested(1,000만) — 예수금 미반영이므로 current 쪽에서도 예수금을 빼야
+        기준이 맞음: (3,200만 - 2,000만 예수금) - 1,000만 = 200만 → cumulative = 200/1000×100 = 20%
+        수정 전에는 예수금 2,000만원이 그대로 이익으로 잡혀 cumulative ≈ 220%까지 부풀려졌었다.
+        """
+        from datetime import date as _date
+
+        from app.services.asset_aggregator import get_dashboard_summary
+
+        first_snap = _date(2023, 6, 1)
+        mock_db.scalar = AsyncMock(return_value=None)
+
+        with (
+            patch(
+                "app.services.asset_aggregator._get_scalar_init_data",
+                new=AsyncMock(return_value=(first_snap, 0.0, 0.0, 0.0)),
+            ),
+            patch(
+                "app.services.asset_aggregator._build_asset_totals",
+                new=AsyncMock(
+                    return_value=(
+                        32_000_000.0,
+                        10_000_000.0,
+                        12_000_000.0,
+                        {"CASH_STOCK": 20_000_000.0},
+                    )
+                ),
+            ),
+            patch("app.services.asset_aggregator._get_monthly_trend", new=AsyncMock(return_value=[])),
+            patch(
+                "app.services.asset_aggregator.get_dividend_summary",
+                new=AsyncMock(return_value={"annual_received": 0.0, "estimated_annual": 0.0, "monthly_breakdown": []}),
+            ),
+            patch("app.services.asset_aggregator._calc_xirr", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = await get_dashboard_summary(uuid.uuid4(), mock_db)
+
+        assert result["cumulative_return_pct"] == pytest.approx(20.0, abs=0.1)
+        # total_assets_krw 필드 자체(대시보드 총자산 표시)는 예수금을 그대로 포함해야 함
+        assert result["total_assets_krw"] == pytest.approx(32_000_000.0)
+
+    @pytest.mark.asyncio
     async def test_dashboard_modified_dietz_excludes_deposits(self, mock_db, override_settings):
         """최초 스냅샷 이후 입금분은 수익률에서 제외됨 (Modified Dietz).
 

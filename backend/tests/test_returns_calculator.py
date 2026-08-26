@@ -102,6 +102,16 @@ class TestCalcReturns:
         assert annualized is None
         assert cumulative is None
 
+    def test_extreme_annualized_near_90_day_floor_clamped_to_none(self):
+        from datetime import timedelta
+
+        # 90일 남짓한 기간에 누적 100% 수익률만으로도 (365/91≈4 지수) 연환산이
+        # 1000%를 훌쩍 넘김 — xirr()과 동일한 -99~1000 클램프로 None 반환해야 함.
+        first_date = date.today() - timedelta(days=91)
+        annualized, cumulative = calc_returns(20000.0, 10000.0, first_date)
+        assert annualized is None
+        assert cumulative == pytest.approx(100.0, abs=0.1)
+
 
 class TestCalcXirr:
     @pytest.mark.asyncio

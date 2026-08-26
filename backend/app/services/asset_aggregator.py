@@ -157,8 +157,13 @@ async def get_dashboard_summary(user_id: uuid.UUID, db: AsyncSession, cache: Cac
         # 현금성/부동산 등 나머지는 Growlio 추적 시작 시점 기준 Modified Dietz를 각각 계산해 합산.
         # base = total_invested + non_stock_first_total, net_flows는 비-주식 계좌 거래만 반영
         # (주식 계좌는 거래 기록이 거의 없어 total_invested와 겹치지 않음 — 이중계산 없음).
+        # 주식 계좌 예수금(CASH_STOCK)은 total_assets_krw에는 포함되지만 total_invested에는
+        # 매입원가만 반영돼 빠져 있으므로, base와 기준을 맞추기 위해 current 쪽에서도 제외한다
+        # — 그렇지 않으면 미투자 예수금만큼 대응 원금 없는 가짜 이익이 발생해 누적/연환산
+        # 수익률이 폭주한다(현금이 많을수록, 추적 기간이 90일에 가까울수록 심함).
+        cash_in_stock_accounts = by_type.get("CASH_STOCK", 0.0)
         annualized_return, cumulative_return = calc_returns(
-            total_assets_krw,
+            total_assets_krw - cash_in_stock_accounts,
             total_invested + non_stock_first_total,
             first_snap_date,
             non_stock_net_flows_after,

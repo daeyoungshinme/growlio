@@ -80,6 +80,8 @@ def calc_returns(
     if ratio <= 0:
         return None, cumulative
     annualized = (ratio ** (365.0 / days) - 1) * 100
+    if not (-99 < annualized < 1000):
+        return None, cumulative
     return annualized, cumulative
 
 
