@@ -613,7 +613,19 @@ describe("RebalancingStatusCard", () => {
     });
   });
 
-  it("showCombinedNote=false이면 결합 안내 문구를 숨긴다 (진단 탭에서 DiagnosisSummaryHeader와 중복 방지)", async () => {
+  it("emptyStateCta 지정 시 포트폴리오가 없으면 '포트폴리오 만들기' CTA를 렌더한다 (진단 탭)", async () => {
+    const onCreate = vi.fn();
+    renderWithProviders(
+      <MemoryRouter>
+        <RebalancingStatusCard emptyStateCta={onCreate} />
+      </MemoryRouter>,
+    );
+    const btn = await screen.findByRole("button", { name: /포트폴리오 만들기/ });
+    btn.click();
+    expect(onCreate).toHaveBeenCalled();
+  });
+
+  it("showCombinedNote=false이면 결합 안내 문구를 숨긴다", async () => {
     vi.mocked(fetchPortfolios).mockResolvedValueOnce([{ id: "p1", name: "테스트" }] as never);
     vi.mocked(fetchDriftSummary).mockResolvedValueOnce([
       { portfolio_id: "p1", portfolio_name: "테스트", max_drift_pct: 10, needs_rebalancing: true },

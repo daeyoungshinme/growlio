@@ -155,16 +155,17 @@ interface Props {
   signalDisplay?: "none" | "badge" | "banner";
   showDriftRows?: boolean;
   maxDriftRows?: number;
-  /** false면 헤더의 "N개 필요" 배지를 숨긴다 — 상위에 DiagnosisSummaryHeader 등 동일 정보를
-   * 이미 보여주는 통합 헤더가 있을 때 중복 표시를 피하기 위함 (기본값 true, 대시보드 카드는 유지). */
+  /** false면 헤더의 "N개 필요" 배지를 숨긴다 — 상위에 동일 정보를 보여주는 통합 헤더가 있을 때
+   * 중복 표시를 피하기 위함 (기본값 true — 홈·진단 탭 모두 이 카드가 드리프트 개수의 권위 표면). */
   showHeaderBadge?: boolean;
-  /** false면 "이탈 종목 + 시장상황" 결합 안내 문구를 숨긴다 — DiagnosisSummaryHeader가 동일
-   * buildCombinedStatusNote() 결과를 이미 상단에 표시하는 진단 탭에서 중복을 피하기 위함
-   * (기본값 true, 대시보드 카드는 유지). */
+  /** false면 "이탈 종목 + 시장상황" 결합 안내 문구를 숨긴다 (기본값 true). */
   showCombinedNote?: boolean;
   /** 접기/펼치기 상태 localStorage 키 — 미지정 시 저장하지 않음(RebalancingPage 진단탭처럼
    * 같은 컴포넌트를 다른 맥락으로 재사용할 때 대시보드와 상태가 뒤섞이지 않도록 기본값 없음). */
   storageKey?: string;
+  /** 지정 시, 포트폴리오가 하나도 없을 때 `null` 대신 "포트폴리오 만들기" CTA 카드를 렌더한다.
+   * 리밸런싱 진단 탭 전용(대시보드 인스턴스는 미지정 → 종전대로 아무것도 렌더하지 않음). */
+  emptyStateCta?: () => void;
 }
 
 const DASHBOARD_TYPES: InsightType[] = ["CONCENTRATION", "TAX_LOSS_HARVEST"];
@@ -187,6 +188,7 @@ export default function RebalancingStatusCard({
   showHeaderBadge = true,
   showCombinedNote = true,
   storageKey,
+  emptyStateCta,
 }: Props) {
   const [isOpen, toggleOpen] = useCollapsible(true, storageKey);
   const [showAllOtherInsights, toggleShowAllOtherInsights] = useCollapsible(false);
@@ -231,7 +233,29 @@ export default function RebalancingStatusCard({
     [needsCount, marketSignal?.composite_level],
   );
 
-  if (portfolioCount === 0) return null;
+  if (portfolioCount === 0) {
+    if (!emptyStateCta) return null;
+    return (
+      <div className="card">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="p-1.5 bg-blue-50 dark:bg-blue-950 rounded-lg shrink-0">
+            <Shuffle size={16} className="text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-gray-200">투자 현황 진단</h2>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          아직 등록된 포트폴리오가 없어 진단할 수 없습니다. 포트폴리오를 만들면 목표 비중 대비 이탈
+          현황과 시장 상황을 여기서 확인할 수 있습니다.
+        </p>
+        <button
+          onClick={emptyStateCta}
+          className="flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+        >
+          포트폴리오 만들기 <ArrowRight size={12} />
+        </button>
+      </div>
+    );
+  }
 
   const cardClass =
     needsCount > 0

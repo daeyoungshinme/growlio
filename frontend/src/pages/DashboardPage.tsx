@@ -206,7 +206,7 @@ export default function DashboardPage() {
         {/* 주식 투자 현황 (투자기간별 자산현황·배당·세금 한도 요약 포함) */}
         <ErrorBoundary variant="section">
           <Suspense fallback={<SkeletonCard />}>
-            <InvestmentSnapshotCard overview={overview} data={data} />
+            <InvestmentSnapshotCard overview={overview} />
           </Suspense>
         </ErrorBoundary>
 

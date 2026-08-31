@@ -278,31 +278,26 @@ describe("InvestmentSnapshotCard", () => {
 
   it("보유 주식 자산이 없으면 아무것도 렌더링하지 않는다", () => {
     const { container } = renderGoalCard(
-      <InvestmentSnapshotCard overview={{ ...overview, total_stock_krw: 0 }} data={undefined} />,
+      <InvestmentSnapshotCard overview={{ ...overview, total_stock_krw: 0 }} />,
     );
     expect(container.firstChild).toBeNull();
   });
 
   it("기본적으로 펼쳐진 상태로 평가액/투자원금/평가손익을 표시한다", () => {
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     expect(screen.getByText("주식 투자 현황")).toBeInTheDocument();
     expect(screen.getByText("평가액")).toBeInTheDocument();
     expect(screen.getByText("투자원금")).toBeInTheDocument();
   });
 
   it("헤더를 클릭하면 접히고, 접힌 상태는 localStorage에 영속화된다", () => {
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));
     expect(screen.queryByText("평가액")).not.toBeInTheDocument();
     expect(localStorage.getItem("growlio:dashboard:investmentSnapshotOpen")).toBe("false");
   });
 
-  it("투자기간 태그가 없으면 투자기간별 자산현황 섹션을 표시하지 않는다", () => {
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
-    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
-  });
-
-  it("투자기간 태그가 있는 계좌가 있으면 투자기간별 자산현황이 카드 안에 임베드된다", () => {
+  it("투자기간별 자산현황·배당 현황은 홈에서 표시하지 않는다 (자산 탭이 권위 표면)", () => {
     const overviewWithHorizon: PortfolioOverview = {
       ...overview,
       accounts: [
@@ -322,12 +317,14 @@ describe("InvestmentSnapshotCard", () => {
         },
       ],
     };
-    renderGoalCard(<InvestmentSnapshotCard overview={overviewWithHorizon} data={undefined} />);
-    expect(screen.getByText("투자기간별 자산현황")).toBeInTheDocument();
+    renderGoalCard(<InvestmentSnapshotCard overview={overviewWithHorizon} />);
+    expect(screen.queryByText("투자기간별 자산현황")).not.toBeInTheDocument();
+    expect(screen.queryByText("배당 상세")).not.toBeInTheDocument();
+    expect(screen.queryByText("예상 연간")).not.toBeInTheDocument();
   });
 
   it("ISA/연금/세금 추정 정보가 전혀 없으면 세금 한도 요약 섹션을 표시하지 않는다", async () => {
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     await waitFor(() => expect(fetchIsaStatus).toHaveBeenCalled());
     expect(screen.queryByText(/ISA|연금공제|예상세금/)).not.toBeInTheDocument();
   });
@@ -354,7 +351,7 @@ describe("InvestmentSnapshotCard", () => {
       note: "",
     } as IsaStatusSummary);
 
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     expect(await screen.findByText("ISA D-45")).toBeInTheDocument();
   });
 
@@ -365,7 +362,7 @@ describe("InvestmentSnapshotCard", () => {
       total_estimated_tax_krw: 1_320_000,
     });
 
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     expect(await screen.findByLabelText("금융소득 종합과세 대상 가능")).toBeInTheDocument();
     expect(screen.getByText("주의")).toBeInTheDocument();
 
@@ -381,7 +378,7 @@ describe("InvestmentSnapshotCard", () => {
       total_estimated_tax_krw: 500_000,
     });
 
-    renderGoalCard(<InvestmentSnapshotCard overview={overview} data={undefined} />);
+    renderGoalCard(<InvestmentSnapshotCard overview={overview} />);
     await screen.findByText(/예상세금/);
 
     fireEvent.click(screen.getByRole("button", { name: /주식 투자 현황/ }));

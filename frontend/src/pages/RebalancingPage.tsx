@@ -16,7 +16,6 @@ import { QUERY_KEYS } from "@/constants/queryKeys";
 import { STALE_TIME } from "@/constants/queryConfig";
 import { useSwipeTabs } from "@/hooks/useSwipeNavigation";
 import { useCollapsible } from "@/hooks/useCollapsible";
-import DiagnosisSummaryHeader from "@/components/rebalancing/DiagnosisSummaryHeader";
 
 const RebalancingStatusCard = lazy(() => import("../components/dashboard/RebalancingStatusCard"));
 const RiskMetricsCard = lazy(() => import("../components/rebalancing/RiskMetricsCard"));
@@ -129,15 +128,15 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
-  // RebalancingStatusCard/PortfolioManageTab도 동일 queryKey로 조회하므로(캐시 dedup),
-  // 여기서 미리 발화해 진단탭 첫 방문 시 "포트폴리오 0개" CTA 판별에 사용한다.
-  const { data: portfoliosRaw } = useQuery({
+  // RebalancingStatusCard/PortfolioManageTab이 동일 queryKey(portfolios)로 조회한다 — 여기서 같은
+  // 렌더 틱에 미리 발화해두면(캐시 dedup) 진단탭 첫 방문 시 카드가 즉시 "포트폴리오 0개" 여부를
+  // 판별해 CTA/카드를 스태거링 없이 렌더한다.
+  useQuery({
     queryKey: QUERY_KEYS.portfolios,
     queryFn: fetchPortfolios,
     staleTime: STALE_TIME.MEDIUM,
     enabled: localTab === "진단",
   });
-  const portfolioCount = portfoliosRaw ? portfoliosRaw.length : undefined;
 
   const { data: inflationSummary } = useQuery({
     queryKey: QUERY_KEYS.inflationSummary,
@@ -155,11 +154,10 @@ export default function RebalancingPage() {
     enabled: localTab === "진단",
   });
 
-  // RebalancingStatusCard도 동일 queryKey로 driftSummary를 조회한다 — 여기서 다른 3개 쿼리와
-  // 같은 렌더 틱에 미리 발화해두면(React Query 캐시 dedup) 콜드 캐시에서도 스태거링 없이
-  // 동시에 조회되어 콜드 캐시 경쟁 창을 줄인다. 또한 이 헤더(DiagnosisSummaryHeader)의
-  // 드리프트 개수 계산에도 재사용한다.
-  const { data: driftSummaries } = useQuery({
+  // RebalancingStatusCard도 동일 queryKey로 driftSummary를 조회한다 — 여기서 다른 쿼리들과 같은
+  // 렌더 틱에 미리 발화해두면(React Query 캐시 dedup) 콜드 캐시에서도 스태거링 없이 동시에 조회되어
+  // 콜드 캐시 경쟁 창을 줄인다.
+  useQuery({
     queryKey: QUERY_KEYS.driftSummary,
     queryFn: fetchDriftSummary,
     staleTime: STALE_TIME.MEDIUM,
@@ -183,23 +181,13 @@ export default function RebalancingPage() {
         {localTab === "진단" && (
           <>
             <ErrorBoundary variant="section">
-              <DiagnosisSummaryHeader
-                driftSummaries={driftSummaries}
-                marketSignal={signal}
-                riskMetrics={riskMetrics}
-                portfolioCount={portfolioCount}
-                onCreatePortfolio={() => handleTabChange("포트폴리오")}
-              />
-            </ErrorBoundary>
-            <ErrorBoundary variant="section">
               <Suspense fallback={<SkeletonCard />}>
                 <RebalancingStatusCard
                   marketSignal={signal ?? undefined}
                   onPortfolioSelect={handlePortfolioSelectFromDiagnosis}
                   signalDisplay="none"
                   showAllInsights={true}
-                  showHeaderBadge={false}
-                  showCombinedNote={false}
+                  emptyStateCta={() => handleTabChange("포트폴리오")}
                 />
               </Suspense>
             </ErrorBoundary>

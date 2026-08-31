@@ -10,6 +10,7 @@ import {
 import { BACKTEST_DEFAULT_END_DATE, BACKTEST_DEFAULT_START_DATE } from "@/constants/defaults";
 import { STALE_TIME, REFETCH_INTERVAL, PERSIST_CACHE_KEY } from "@/constants/queryConfig";
 import { ASSET_MANAGEMENT_TABS, PORTFOLIO_TABS } from "@/constants/tabs";
+import { NAV_ITEMS, NAV_ORDER } from "@/constants/nav";
 
 // ────────────────────────────────────────────
 // queryKeys
@@ -162,5 +163,25 @@ describe("tabs constants", () => {
     expect(PORTFOLIO_TABS).toContain("종목 현황");
     expect(PORTFOLIO_TABS).toContain("배당");
     expect(PORTFOLIO_TABS).toContain("세금");
+  });
+});
+
+// ────────────────────────────────────────────
+// nav
+// ────────────────────────────────────────────
+describe("nav constants", () => {
+  it("NAV_ITEMS는 5개 탭(홈/자산/리밸런싱/계획/설정)이다", () => {
+    expect(NAV_ITEMS.map((i) => i.label)).toEqual(["홈", "자산", "리밸런싱", "계획", "설정"]);
+  });
+
+  it("NAV_ORDER는 NAV_ITEMS의 경로 순서에서 파생된다", () => {
+    expect(NAV_ORDER).toEqual(NAV_ITEMS.map((i) => i.to));
+    expect(NAV_ORDER).toEqual([
+      "/dashboard",
+      "/assets",
+      "/rebalancing",
+      "/invest-plan",
+      "/settings",
+    ]);
   });
 });

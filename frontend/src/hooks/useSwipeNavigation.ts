@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { NAV_ORDER } from "@/constants/nav";
 import { triggerHaptic } from "./useHaptic";
-
-const NAV_ORDER = ["/dashboard", "/assets", "/rebalancing", "/invest-plan", "/settings"];
 
 const SWIPE_THRESHOLD = 50; // px
 const VELOCITY_THRESHOLD = 0.3; // px/ms

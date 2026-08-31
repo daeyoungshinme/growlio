@@ -250,7 +250,7 @@ export default function PortfolioPage() {
             상단 "주식 총평가액"과 동일한 값만 나오므로 전체 계좌 뷰에서만 표시 */}
         {!selectedAccountId && hasHorizonTags && (
           <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
-            <HorizonSummaryCard overview={data} embedded />
+            <HorizonSummaryCard overview={data} />
           </div>
         )}
       </div>

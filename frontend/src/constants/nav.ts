@@ -14,3 +14,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/invest-plan", icon: TrendingUp, label: "계획" },
   { to: "/settings", icon: Settings, label: "설정" },
 ];
+
+/** 하단 네비 경로 순서 — `NAV_ITEMS`에서 파생. 페이지 간 스와이프 전환(`useSwipeNavigation`)에서 사용 */
+export const NAV_ORDER: string[] = NAV_ITEMS.map((item) => item.to);
