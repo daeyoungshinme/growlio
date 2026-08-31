@@ -271,7 +271,7 @@ async def get_overseas_positions_detail(
     """
     subq = latest_snapshot_subquery(user_id=user_id)
     conditions = [
-        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.is_active == True,
         AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
     ]
     if account_id is not None:
@@ -400,7 +400,7 @@ async def _calc_stock_unrealized(
     """
     subq = latest_snapshot_subquery(user_id=user_id)
     conditions = [
-        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.is_active == True,
         AssetAccount.asset_type.in_(_DOMESTIC_STOCK_TYPES),
     ]
     if account_id is not None:

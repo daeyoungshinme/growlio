@@ -56,8 +56,8 @@ async def _get_subscribers(db: AsyncSession) -> list[tuple[User, UserSettings]]:
         select(User, UserSettings)
         .join(UserSettings, UserSettings.user_id == User.id)
         .where(
-            User.is_active == True,  # noqa: E712
-            UserSettings.recommendation_drift_alert_enabled == True,  # noqa: E712
+            User.is_active == True,
+            UserSettings.recommendation_drift_alert_enabled == True,
         )
     )
     return [(user, user_settings) for user, user_settings in result.all()]

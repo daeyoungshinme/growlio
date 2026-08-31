@@ -6,7 +6,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import uuid
 from datetime import UTC, datetime, timedelta, timezone
 
@@ -139,7 +138,7 @@ async def notify_tax_gate_blocked(
             logger.error("tax_impact_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
 
     push_body = f"세금영향 상한 초과로 이번 계획을 만들지 않았습니다 (추정 양도세 {blocked.estimated_tax_krw:,.0f}원)."
-    with contextlib.suppress(Exception):
+    try:
         await send_push_to_user(
             user_id=alert.user_id,
             title=f"리밸런싱 자동화 보류 — {portfolio.name}",
@@ -147,6 +146,8 @@ async def notify_tax_gate_blocked(
             fcm_token=fcm_token,
             data={"type": "REBALANCING_TAX_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
         )
+    except Exception as exc:
+        logger.warning("tax_impact_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
 
     history_message = (
         f"리밸런싱 자동화 보류(세금영향 상한 초과): {portfolio.name} — 추정 양도세 {blocked.estimated_tax_krw:,.0f}원"
@@ -189,7 +190,7 @@ async def notify_market_signal_gate_blocked(
             logger.error("market_signal_gate_blocked_email_error", alert_id=str(alert.id), error=str(exc))
 
     push_body = f"시장신호 게이트({blocked.composite_level})로 이번 계획을 만들지 않았습니다."
-    with contextlib.suppress(Exception):
+    try:
         await send_push_to_user(
             user_id=alert.user_id,
             title=f"리밸런싱 자동화 보류 — {portfolio.name}",
@@ -197,6 +198,8 @@ async def notify_market_signal_gate_blocked(
             fcm_token=fcm_token,
             data={"type": "REBALANCING_MARKET_GATE_BLOCKED", "portfolio_id": str(portfolio.id)},
         )
+    except Exception as exc:
+        logger.warning("market_signal_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
 
     history_message = f"리밸런싱 자동화 보류(시장신호 게이트): {portfolio.name} — 현재 신호 {blocked.composite_level}"
     await save_alert_history(db, alert.user_id, "REBALANCING", history_message)
@@ -241,7 +244,7 @@ async def notify_daily_value_cap_blocked(
         f"하루 합산 거래한도({blocked.cap_krw:,.0f}원) 초과로 이번 계획을 만들지 않았습니다 "
         f"(오늘 누적 약 {blocked.today_total_krw:,.0f}원)."
     )
-    with contextlib.suppress(Exception):
+    try:
         await send_push_to_user(
             user_id=alert.user_id,
             title=f"리밸런싱 자동화 보류 — {portfolio.name}",
@@ -249,6 +252,8 @@ async def notify_daily_value_cap_blocked(
             fcm_token=fcm_token,
             data={"type": "REBALANCING_DAILY_CAP_BLOCKED", "portfolio_id": str(portfolio.id)},
         )
+    except Exception as exc:
+        logger.warning("daily_value_cap_gate_blocked_push_failed", alert_id=str(alert.id), error=str(exc))
 
     history_message = (
         f"리밸런싱 자동화 보류(하루 합산 거래한도 초과): {portfolio.name} — "
@@ -304,7 +309,7 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
         except Exception as exc:
             logger.error("rebalancing_plan_execution_email_failed", execution_id=str(execution_id), error=str(exc))
 
-    with contextlib.suppress(Exception):
+    try:
         await send_push_to_user(
             user_id=plan.user_id,
             title=f"리밸런싱 자동 실행 완료 — {portfolio_name}",
@@ -315,6 +320,8 @@ async def _send_leg_execution_email(plan: RebalancingPlan, execution_id: uuid.UU
             fcm_token=fcm_token,
             data={"type": "REBALANCING_EXECUTED", "portfolio_id": str(plan.portfolio_id or "")},
         )
+    except Exception as exc:
+        logger.warning("rebalancing_plan_execution_push_failed", execution_id=str(execution_id), error=str(exc))
 
 
 async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_message: str, db: AsyncSession) -> None:
@@ -348,8 +355,8 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
         except Exception as exc:
             logger.error("rebalancing_plan_execution_failed_email_error", plan_id=str(plan.id), error=str(exc))
 
-    with contextlib.suppress(Exception):
-        side_label = "매수" if side == "BUY" else "매도"
+    side_label = "매수" if side == "BUY" else "매도"
+    try:
         await send_push_to_user(
             user_id=plan.user_id,
             title=f"리밸런싱 자동화 {side_label} 실행 실패 — {portfolio_name}",
@@ -357,3 +364,5 @@ async def _notify_leg_execution_failed(plan: RebalancingPlan, side: str, error_m
             fcm_token=fcm_token,
             data={"type": "REBALANCING_PLAN_EXECUTION_FAILED", "portfolio_id": str(plan.portfolio_id or "")},
         )
+    except Exception as exc:
+        logger.warning("rebalancing_plan_execution_failed_push_failed", plan_id=str(plan.id), error=str(exc))

@@ -46,7 +46,7 @@ async def calc_pension_contribution_status(user_id: uuid.UUID, year: int, db: As
         .where(
             AssetAccount.user_id == user_id,
             AssetAccount.tax_type.in_(_PENSION_TAX_TYPES),
-            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.is_active == True,
             Transaction.transaction_type == "DEPOSIT",
             func.extract("year", Transaction.transaction_date) == year,
         )

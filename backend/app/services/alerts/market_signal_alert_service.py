@@ -42,8 +42,8 @@ async def _get_composite_subscribers(db: AsyncSession) -> list[tuple[User, UserS
         select(User, UserSettings)
         .outerjoin(UserSettings, UserSettings.user_id == User.id)
         .where(
-            User.is_active == True,  # noqa: E712
-            or_(UserSettings.user_id.is_(None), UserSettings.composite_signal_alerts_enabled == True),  # noqa: E712
+            User.is_active == True,
+            or_(UserSettings.user_id.is_(None), UserSettings.composite_signal_alerts_enabled == True),
         )
         .distinct()
     )
@@ -123,14 +123,14 @@ async def _get_daily_digest_subscribers(db: AsyncSession) -> list[tuple[User, Us
         select(User, UserSettings)
         .join(UserSettings, UserSettings.user_id == User.id)
         .where(
-            User.is_active == True,  # noqa: E712
-            UserSettings.market_signal_daily_digest_enabled == True,  # noqa: E712
+            User.is_active == True,
+            UserSettings.market_signal_daily_digest_enabled == True,
         )
     )
     return [(user, user_settings) for user, user_settings in result.all()]
 
 
-async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:  # noqa: ANN001
+async def _already_sent_digest_today(db: AsyncSession, user_id) -> bool:
     """오늘 이미 다이제스트를 발송했으면 True — 스케줄러 재시작/misfire로 인한 중복 발송 방지."""
     today = date.today()
     day_start = datetime(today.year, today.month, today.day, tzinfo=UTC)

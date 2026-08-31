@@ -32,7 +32,7 @@ async def query_latest_position_map(
             (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date),
         )
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
+        .where(AssetAccount.is_active == True)
     )
     if account_ids:
         q = q.where(AssetAccount.id.in_(account_ids))

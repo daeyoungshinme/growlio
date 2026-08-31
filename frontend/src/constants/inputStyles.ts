@@ -11,4 +11,3 @@ export const SELECT_SM = INPUT_SM;
 export const TEXTAREA_SM = INPUT_SM + " resize-none";
 
 export const FORM_LABEL = `block ${LABEL_MD} mb-1`;
-export const HINT_TEXT = "text-xs text-gray-400 dark:text-gray-500";

@@ -97,7 +97,7 @@ async def sync_account(account: AssetAccount, db: AsyncSession, cache: CacheStor
 
     if balance.positions:
         await db.execute(
-            sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711, E501
+            sql_delete(Position).where(Position.account_id == account.id, Position.snapshot_id == None)  # noqa: E711
         )
         for p in balance.positions:
             db.add(

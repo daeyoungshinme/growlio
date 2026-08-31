@@ -17,18 +17,6 @@ export const STOCK_TYPE_LABELS: Record<string, string> = {
   CASH_OTHER: "예수금",
 };
 
-export const DATA_SOURCE_LABELS: Record<string, string> = {
-  MANUAL: "수동",
-  KIS_API: "KIS 자동",
-  KIWOOM_API: "키움 자동",
-};
-
-export const DATA_SOURCE_BADGE: Record<string, string> = {
-  KIS_API: "bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-400",
-  KIWOOM_API: "bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400",
-  MANUAL: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
-};
-
 export const BANK_TYPE_LABELS: Record<string, string> = {
   BANK_ACCOUNT: "입출금",
   DEPOSIT: "예·적금",
@@ -40,4 +28,3 @@ export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "C
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];
 
 export { DOMESTIC_MARKETS } from "./markets";
-export { SEARCH_DROPDOWN_HIDE_DELAY, REDIRECT_DELAY_MS, FOCUS_SETTLE_DELAY } from "./timers";

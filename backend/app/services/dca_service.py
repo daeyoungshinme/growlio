@@ -118,8 +118,8 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
         .where(
             AssetSnapshot.user_id == user_id,
             AssetSnapshot.snapshot_date >= start_date,
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.include_in_total == True,  # noqa: E712
+            AssetAccount.is_active == True,
+            AssetAccount.include_in_total == True,
             AssetAccount.asset_type != AssetType.REAL_ESTATE,
         )
         .group_by(AssetSnapshot.snapshot_date)
@@ -136,8 +136,8 @@ async def _get_initial_value(user_id: uuid.UUID, start_date: date, db: AsyncSess
         .where(
             AssetSnapshot.user_id == user_id,
             AssetSnapshot.snapshot_date < start_date,
-            AssetAccount.is_active == True,  # noqa: E712
-            AssetAccount.include_in_total == True,  # noqa: E712
+            AssetAccount.is_active == True,
+            AssetAccount.include_in_total == True,
             AssetAccount.asset_type != AssetType.REAL_ESTATE,
         )
         .group_by(AssetSnapshot.snapshot_date)

@@ -27,12 +27,6 @@ export const SCHEDULE_LABEL: Record<ScheduleType, string> = {
 
 export const NEEDS_DAY_OF_MONTH: ScheduleType[] = ["MONTHLY", "QUARTERLY", "SEMIANNUAL", "ANNUAL"];
 
-export const TRIGGER_CONDITION_SHORT_LABEL: Record<TriggerCondition, string> = {
-  DRIFT_ONLY: "이탈 감지",
-  SCHEDULE_ONLY: "정기 리포트",
-  BOTH: "이탈+정기",
-};
-
 export const TRIGGER_CONDITION_OPTIONS: { value: TriggerCondition; label: string; desc: string }[] =
   [
     { value: "DRIFT_ONLY", label: "비중 이탈 시에만", desc: "이탈 종목이 있을 때만 동작합니다" },

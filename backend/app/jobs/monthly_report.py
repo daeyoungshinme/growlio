@@ -32,7 +32,7 @@ async def _run_monthly_report(db: AsyncSession, cache: CacheStoreType) -> None:
     report_month = _prev_month_label(date.today())
 
     result = await db.execute(
-        select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)  # noqa: E712
+        select(User, UserSettings).join(UserSettings, User.id == UserSettings.user_id).where(User.is_active == True)
     )
     users = result.all()
 

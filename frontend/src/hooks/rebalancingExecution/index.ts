@@ -4,7 +4,7 @@ import type { AssetAccount } from "@/api/assets";
 import { extractErrorMessage } from "@/utils/error";
 import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { triggerHaptic } from "../useHaptic";
-import { OVERSEAS_MARKET_SET, isOverseasMarket } from "@/constants/markets";
+import { isOverseasMarket } from "@/constants/markets";
 import { CASH_EQUIVALENT_TICKER, CASH_TICKER, KR_PROPERTY_MARKET } from "@/constants/assets";
 import {
   type ExecutionOrderItem,
@@ -36,8 +36,6 @@ export type {
   ExecutionState,
   ExecutionAction,
 } from "./types";
-export { executionReducer } from "./reducer";
-export { isOverseasMarket, OVERSEAS_MARKET_SET };
 
 export function getActionableItems(analysis: RebalancingAnalysis): RebalancingItem[] {
   return analysis.items.filter(

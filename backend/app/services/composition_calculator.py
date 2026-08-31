@@ -28,7 +28,7 @@ async def get_latest_snapshot_rows(user_id: uuid.UUID, db: AsyncSession) -> tupl
         select(AssetSnapshot, AssetAccount)
         .join(subq, (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date))
         .join(AssetAccount, AssetAccount.id == AssetSnapshot.account_id)
-        .where(AssetAccount.is_active == True)  # noqa: E712
+        .where(AssetAccount.is_active == True)
     )
     rows = result.all()
     snapped_ids = {acc.id for _, acc in rows}

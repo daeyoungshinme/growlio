@@ -124,7 +124,7 @@ async def create_rebalancing_execution_plan(
         select(RebalancingAlert).where(
             RebalancingAlert.portfolio_id == portfolio_id,
             RebalancingAlert.user_id == current_user.id,
-            RebalancingAlert.is_active == True,  # noqa: E712
+            RebalancingAlert.is_active == True,
             account_filter,
         )
     )

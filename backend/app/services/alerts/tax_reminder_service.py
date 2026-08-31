@@ -50,7 +50,7 @@ async def _has_pension_accounts(user_id: uuid.UUID, db: AsyncSession) -> bool:
         .where(
             AssetAccount.user_id == user_id,
             AssetAccount.tax_type.in_(_PENSION_TAX_TYPES),
-            AssetAccount.is_active == True,  # noqa: E712
+            AssetAccount.is_active == True,
         )
         .limit(1)
     )
@@ -102,8 +102,8 @@ async def _get_reminder_subscribers(db: AsyncSession) -> list[tuple[User, UserSe
         select(User, UserSettings)
         .join(UserSettings, UserSettings.user_id == User.id)
         .where(
-            User.is_active == True,  # noqa: E712
-            UserSettings.year_end_tax_reminder_enabled == True,  # noqa: E712
+            User.is_active == True,
+            UserSettings.year_end_tax_reminder_enabled == True,
         )
     )
     return [(user, user_settings) for user, user_settings in result.all()]

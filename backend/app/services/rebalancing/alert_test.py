@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import uuid
 from typing import Any, Literal, cast
 
@@ -108,7 +107,7 @@ async def send_test_rebalancing_alert(
 
     push_sent = False
     drift_info = f"{len(drifting)}개 종목이 ±{threshold:.1f}% 이상 이탈" if drifting else "현재 이탈 없음"
-    with contextlib.suppress(Exception):
+    try:
         push_sent = await send_push_to_user(
             user_id=user_id,
             title=f"[테스트] 리밸런싱 알림 — {portfolio.name}",
@@ -116,6 +115,8 @@ async def send_test_rebalancing_alert(
             fcm_token=fcm_token,
             data={"type": "REBALANCING", "portfolio_id": str(portfolio.id)},
         )
+    except Exception as exc:
+        logger.warning("test_rebalancing_alert_push_failed", portfolio_id=str(portfolio_id), error=str(exc))
 
     await save_alert_history(db, user_id, "REBALANCING", f"[테스트] 리밸런싱 알림: {portfolio.name}")
     await db.commit()

@@ -2,7 +2,6 @@ import { memo } from "react";
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { chartTooltipStyle } from "@/utils/chart";
 import { fmtKrwShort } from "@/utils/format";
-import { MONTH_LABELS } from "@/utils/dividendUtils";
 
 interface BarEntry {
   name: string;
@@ -107,6 +106,3 @@ function MonthlyDividendChart({
 }
 
 export default memo(MonthlyDividendChart);
-
-// Re-export for convenience
-export { MONTH_LABELS };

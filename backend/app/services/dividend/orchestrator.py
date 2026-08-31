@@ -48,7 +48,7 @@ async def _collect_positions(
     subq = latest_snapshot_subquery(user_id=user_id)
     snap_date_match = (AssetSnapshot.account_id == subq.c.account_id) & (AssetSnapshot.snapshot_date == subq.c.max_date)
     conditions = [
-        AssetAccount.is_active == True,  # noqa: E712
+        AssetAccount.is_active == True,
         AssetAccount.asset_type.like("STOCK%"),
     ]
     if account_ids:

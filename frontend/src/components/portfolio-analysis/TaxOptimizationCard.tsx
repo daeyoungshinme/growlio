@@ -135,7 +135,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
                   </p>
                 </div>
               )}
-              <p className="text-[11px] text-gray-400 dark:text-gray-500 pl-1">
+              <p className="text-xs text-gray-400 dark:text-gray-500 pl-1">
                 {taxData.health_insurance_estimate.note}
               </p>
             </div>
@@ -186,7 +186,7 @@ export default function TaxOptimizationCard({ accountId }: TaxOptimizationCardPr
             <span className="flex items-center gap-1.5">
               절세 플래너 — 해외 종목 매도 시뮬레이션
               {hasLossHarvestCandidates && (
-                <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
+                <span className="px-1.5 py-0.5 text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full">
                   손실수확 가능
                 </span>
               )}

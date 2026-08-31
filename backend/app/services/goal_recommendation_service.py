@@ -493,8 +493,8 @@ def _resolve_asset_goal_return_pct(
     `_compute_goal_recommendation()`의 분기 복잡도를 낮추기 위해 분리했다. 호출측이 `has_asset_goal`
     (goal_amount·retirement_target_year 둘 다 설정됨)을 이미 확인했다고 전제한다.
     """
-    assert settings_row.goal_amount is not None  # nosec B101 - has_asset_goal 체크로 호출측이 이미 보장함
-    assert settings_row.retirement_target_year is not None  # nosec B101 - has_asset_goal 체크로 호출측이 이미 보장함
+    if settings_row.goal_amount is None or settings_row.retirement_target_year is None:
+        raise ValueError("_resolve_asset_goal_return_pct는 has_asset_goal 확인 후에만 호출해야 합니다")
     pmt = float(settings_row.monthly_deposit_amount or 0)
     if not pmt and settings_row.annual_deposit_goal:
         pmt = float(settings_row.annual_deposit_goal) / 12
@@ -1136,7 +1136,7 @@ async def _compute_horizon_recommendations(
         await db.execute(
             select(AssetAccount.investment_horizon, AssetAccount.tax_type, AssetAccount.id).where(
                 AssetAccount.user_id == user_id,
-                AssetAccount.is_active == True,  # noqa: E712
+                AssetAccount.is_active == True,
                 AssetAccount.investment_horizon.isnot(None),
             )
         )

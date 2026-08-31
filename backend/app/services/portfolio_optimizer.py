@@ -7,7 +7,6 @@ scipy.optimize.minimize(SLSQP)를 사용하며, 1년 일별 수익률 데이터�
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import math
 import uuid
@@ -175,7 +174,7 @@ def _compute_portfolio_position(
     return {"risk": round(cur_vol, 2), "return": round(cur_ret, 2)}
 
 
-async def get_efficient_frontier(  # noqa: C901
+async def get_efficient_frontier(
     user_id: uuid.UUID,
     db: AsyncSession,
     cache: CacheStoreType = None,
@@ -254,7 +253,9 @@ async def get_efficient_frontier(  # noqa: C901
     result_data["target"] = target_pos
 
     if cache:
-        with contextlib.suppress(Exception):
+        try:
             await cache.setex(cache_key, TTL_PORTFOLIO_OPTIMIZER, json.dumps(result_data))
+        except Exception as exc:
+            logger.debug("efficient_frontier_cache_write_failed", error=str(exc))
 
     return result_data

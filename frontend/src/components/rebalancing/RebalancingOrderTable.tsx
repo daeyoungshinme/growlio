@@ -5,14 +5,10 @@ import type { RebalancingItem } from "@/api/rebalancing";
 import { fmtKrw } from "@/utils/format";
 import { SideBadge } from "./RebalancingBadges";
 import type { ExecutionAction, OrderType, PriceLoadState } from "@/hooks/useRebalancingExecution";
-import { isOverseasMarket } from "@/hooks/useRebalancingExecution";
+import { isOverseasMarket } from "@/constants/markets";
 import { PriceCell } from "./RebalancingPriceCell";
 import { RebalancingPriceInput } from "./RebalancingPriceInput";
 import { RebalancingMobileCard } from "./RebalancingMobileCard";
-
-export type { PriceCellProps } from "./RebalancingPriceCell";
-export { PriceCell } from "./RebalancingPriceCell";
-export { RebalancingPriceInput } from "./RebalancingPriceInput";
 
 function getNativePrice(
   ticker: string,
