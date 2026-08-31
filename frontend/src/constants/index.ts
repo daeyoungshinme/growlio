@@ -25,6 +25,8 @@ export const BANK_TYPE_LABELS: Record<string, string> = {
 
 export const STOCK_TYPES: string[] = ["STOCK_KIS", "STOCK_KIWOOM", "STOCK_OTHER"];
 export const BANK_TYPES: string[] = ["BANK_ACCOUNT", "DEPOSIT", "CASH_OTHER", "CASH_STOCK"];
+/** 브로커 API 연동으로 데이터 동기화가 가능한 data_source 값 */
+export const SYNCABLE_DATA_SOURCES: string[] = ["KIS_API", "KIWOOM_API"];
 export const REAL_ESTATE_TYPES: string[] = ["REAL_ESTATE"];
 
 export { DOMESTIC_MARKETS } from "./markets";

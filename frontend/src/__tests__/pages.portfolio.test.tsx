@@ -30,6 +30,7 @@ vi.mock("@/api/client", () => {
 
 vi.mock("@/api/assets", () => ({
   syncAllAccounts: vi.fn().mockResolvedValue({ total: 2, status: "started" }),
+  syncAccount: vi.fn().mockResolvedValue({ detail: "동기화 완료" }),
   fetchAccounts: vi.fn().mockResolvedValue([]),
   INVESTMENT_HORIZON_LABELS: { SHORT_TERM: "단기", MID_TERM: "중기", LONG_TERM: "장기" },
 }));
@@ -79,7 +80,8 @@ vi.mock("@/components/common/SkeletonStatBox", () => ({
 import PortfolioPage from "@/pages/PortfolioPage";
 import { api } from "@/api/client";
 import { toast } from "@/utils/toast";
-import { fetchAccounts, syncAllAccounts } from "@/api/assets";
+import { fetchAccounts, syncAccount, syncAllAccounts } from "@/api/assets";
+import { invalidateSyncData } from "@/utils/queryInvalidation";
 import { useSyncStore } from "@/stores/syncStore";
 
 const mockPortfolioData = {
@@ -386,6 +388,44 @@ describe("PortfolioPage", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /0\/2 갱신 중/ })).toBeInTheDocument();
     });
+  });
+
+  it("계좌를 선택하고 갱신하면 해당 계좌만 동기화한다", async () => {
+    vi.mocked(fetchAccounts).mockResolvedValueOnce([
+      { id: "acc-1", asset_type: "STOCK_KIS", name: "KIS 계좌", data_source: "KIS_API" },
+      { id: "acc-2", asset_type: "STOCK_KIWOOM", name: "키움 계좌", data_source: "KIWOOM_API" },
+    ] as never);
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio("?account=acc-1");
+    const syncBtn = await screen.findByRole("button", { name: /선택 계좌 갱신/ });
+    fireEvent.click(syncBtn);
+    await waitFor(() => {
+      expect(syncAccount).toHaveBeenCalledWith("acc-1");
+    });
+    expect(syncAccount).toHaveBeenCalledTimes(1);
+    expect(syncAllAccounts).not.toHaveBeenCalled();
+    expect(invalidateSyncData).toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith("동기화 완료", "success");
+  });
+
+  it("수동(비연동) 계좌를 선택하면 갱신 버튼이 비활성화된다", async () => {
+    vi.mocked(fetchAccounts).mockResolvedValueOnce([
+      { id: "acc-3", asset_type: "STOCK_OTHER", name: "타증권사 계좌", data_source: "MANUAL" },
+    ] as never);
+    vi.mocked(api.get).mockImplementation((url: string) => {
+      if (url === "/portfolio/overview") return Promise.resolve({ data: mockPortfolioData });
+      if (url === "/dividends/positions") return Promise.resolve({ data: [] });
+      return Promise.resolve({ data: {} });
+    });
+    renderPortfolio("?account=acc-3");
+    const syncBtn = await screen.findByRole("button", { name: /선택 계좌 갱신/ });
+    expect(syncBtn).toBeDisabled();
+    fireEvent.click(syncBtn);
+    expect(syncAccount).not.toHaveBeenCalled();
   });
 
   it("동기화 시작 요청이 실패하면 에러 토스트를 표시한다", async () => {
